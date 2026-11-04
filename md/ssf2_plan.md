@@ -2,7 +2,7 @@
 
 Plan for the second small-scale fading series: from the clusters of `ssf_clusters` to propagation paths that feed `get_channels_planar`, `get_channels_spherical` and the QRT writer, for TR 38.901 v19.5.0 clause 7.5 steps 7 (ray offsets) to 11 (antenna-free part) and the QuaDRiGa method. Working document; deleted before the merge, its outcome goes to `md/ssf_notes.md`. Builds on series 1 (`md/ssf_notes.md`: decisions D1–D8, W1–W22).
 
-Status: plan v1 (step 1 of 7), decisions taken; open items for the plan review in section 9.
+Status: plan v2 (step 1 of 7), decisions taken; v2 adds the single-link channel function and the antenna-free power correction (P9, P10, P17, P18); open items for the plan review in section 9.
 
 ## 1. Goal and requirements
 
@@ -21,7 +21,7 @@ Side quests (no implementation, the design must not block them): multi-frequency
 2. **QRT stores interaction coordinates and one Jones matrix per frequency** (≤ 127 frequencies, shared coordinates, float32). Path length and gain are recomputed on read (gain = FSPL(length, f) · |M|²), so GBSM path power must be folded into M. Origin = static Tx; CIR = Rx snapshot; destination = group of CIRs. Dual mobility cannot be stored. float32 gives about 1 mm resolution 10 km from the origin; local coordinates are recommended.
 3. **NG drifting lives inside `get_channels_spherical`** (`update_drifting.m` has no caller). NG keeps FBS/LBS from the drop, moves Tx/Rx, recomputes LOS and the GR point (ground z = 0, GR polarisation R(t)/R0) and passes `path_length = d(t) + τ·c`; the library uses max(path_length, polyline), so a path cannot become shorter than its drop excess delay. To be measured in R0.
 4. **NG's TR baseline mobility** is one `get_channels_planar` call at the drop and a phase rotation per sub-path afterwards (straight track along the Rx heading). Its sub-cluster offsets are rescaled tables, not the TR ray mapping of Table 7.5-5.
-5. **NG sums sub-paths per cluster and normalises each cluster's segment-average power with the antennas** (`p_correct`). Not portable to an antenna-free model; stays in NG.
+5. **NG sums sub-paths per cluster and normalises each cluster's segment-average power with the antennas** (`p_correct`, per antenna pair, in all methods including the TR baseline). It depends on the array, flattens power differences between elements within a segment, and cannot be stored in QRT. The library replaces it by an antenna-free correction with an ideal dual-polarised reference (P18).
 6. **NG multi-frequency QuaDRiGa geometry is per frequency** (coupling and sub-cluster delays per frequency); a multi-frequency QRT file and `get_channels_multifreq` need one geometry.
 7. **Sub-path methods in use:** `legacy` in all library conf files and 85 of 91 NG files; `mmMAGIC` in 6 deprecated NG files; `Laplacian` in none. `NumSubPaths` = 20 except one NG file with 10 and one with 26.
 8. **Ray-level random fields are large** (TR: about 1900 SOS generators per frequency for N = 19, M = 20); cost to be measured in R0. Coupling is kept per drop (TR 7.6.3.1) and needs a seeded stream, not an SOS field.
@@ -38,8 +38,10 @@ Side quests (no implementation, the design must not block them): multi-frequency
 | P6 | Ray XPR, phases and η come from spatially consistent SOS fields in all methods (TR 7.6.3.1), in new append-only generator sets; coupling per drop from a seeded stream (SplitMix64 of the LSF seed and a tag, as W8). Run time measured in R0; fallback: seeded stream when `SC_lambda = 0`, same layout. |
 | P7 | `phase` mobility: TR-literal phase exp(j·2π·(r̂_rx·Δr_rx + r̂_tx·Δr_tx)/λ) per ray folded into M per frequency; delays and angles fixed; `get_channels_planar` called with the arrays at the drop position (orientations may change per offset, TR 7.6.7). Valid for short moves (documented). Procedure A later (7.2). |
 | P8 | Large-scale changes along a track (PL + SF per frequency, K) are optional per-offset inputs of the offset assembly; the caller evaluates them with the existing LSF functions at the offset positions; omitted = drop values. The assembly applies the gain to all paths and rescales LOS/GR against NLOS to follow K, as NG does. |
-| P9 | API: building blocks only (random sets, rays, scatterers, offset assembly, QRT conversion); the caller runs `get_channels_*`. A one-call coefficient function can wrap the blocks later. |
-| P10 | Rays are separate paths; every ray carries its slot (cluster) index so that a caller can sum rays per cluster. NG's antenna-dependent `p_correct` is not ported; it stays in NG until the track logic is ported. Channels read from a QRT file do not contain it unless the caller applies it after reading. |
+| P9 | API: building blocks (random sets, rays, scatterers, offset assembly, QRT conversion) plus one function on top, `gbsm_single_link_channel` (P17), that runs `get_channels_*` for one link, one frequency and one segment. Tracks, segment boundaries, merging and multi-frequency loops stay with the caller (NG now, a library layout class later). |
+| P10 | The blocks keep rays as separate paths; every ray carries its sub-cluster index (slot and sub-cluster; TR sub-clusters have different delays and are separate taps). NG's antenna-dependent `p_correct` is not ported; P18 replaces it. |
+| P17 | `gbsm_single_link_channel`: one link, one frequency, one segment (the list of Tx/Rx positions and orientations of one drop); inputs: the ray data of the link, both arrays, positions and orientations per snapshot, optional per-snapshot link gain and K (P8); output: a `channel` object. Output switch: `taps` (default; rays summed per sub-cluster, mean delay per element pair; tap 0 = LOS, then GR, then sub-clusters) or `rays`. "phase" mobility with constant orientations computes the planar coefficients once and rotates them per snapshot. The function contains no power correction of its own. MEX and Python wrappers. A later layout class (tracks, segments, multi-frequency, scenario assignment, antennas) calls it per segment. |
+| P18 | Power correction (replaces NG's `p_correct`): antenna-free, in `ssf_paths`, over the given list of offsets (one segment): per sub-cluster, the coherent sum of its rays' Jones matrices at the Tx/Rx phase centres (ideal dual-polarised isotropic reference, the reference of QRT files) is compared with the incoherent ray power, averaged over the offsets, and one real factor per sub-cluster scales all its rays. Switch: off for TR methods, on for `quadriga`; when on it always applies, also to a single offset (system-level drops then reproduce the cluster powers exactly). Factors returned as diagnostics. The array structure is left untouched, so a QRT file written from `ssf_paths` and read back gives the same channel as the direct route (within float32 precision). R0 measures the impact in link-level (phase rotation, drift) and system-level (many single-snapshot drops) settings, with NG's per-antenna version as reference. |
 | P11 | `SubpathMethod`: `legacy` only; any `NumSubPaths` via the rescale rule of NG (TR Table 7.5-3 at 20); `Laplacian` and `mmMAGIC` raise an error. |
 | P12 | QRT: generic C++ conversion of spherical path data (FBS, LBS, gain and M per frequency) into `quadriga_lib::path` objects for `qrt_file_append`. No MEX/Python QRT wrappers in this series. Segment overlaps are out of scope (a path-level merge is the bridge for the track project). |
 | P13 | Scatterer solver: redesign with the intent of NG's `gen_fbs_lbs` (exact angles at both ends where a two-bounce solution exists), with a documented rule for the free distance, a minimum distance to both arrays (open item of series 1), a defined fallback and a direct solve; compared with NG in R0. No faithful port, no NG parity test. |
@@ -83,7 +85,15 @@ Legend: **new** = new code, **ext** = extension of an existing function, **NG** 
 | C1 | `phase`: per-ray phase rotation for Rx and Tx offsets, per frequency (7.5-22, 7.6-6, 7.6-45) | new |
 | C2 | `drift`: fixed FBS/LBS, moved ends, polyline length (P15), LOS and GR recomputed, GR Jones R(t)/R0 | new, NG |
 | C3 | Optional per-offset link gain and K (P8) | new, NG |
-| C4 | Inactive rays dropped; slot index per output path (P10) | new |
+| C4 | Inactive rays dropped; sub-cluster index per output path (P10) | new |
+| C5 | Antenna-free power correction over the offsets of a segment, with diagnostics (P18) | new, NG |
+
+### 4.3a Channels of one link
+
+| # | Feature | Kind |
+|---|---|---|
+| H1 | `gbsm_single_link_channel`: per snapshot `get_channels_planar` or `get_channels_spherical` with the link's arrays, positions and orientations; `taps` / `rays` output; `channel` object (P17) | new, NG |
+| H2 | Planar speed-up: one planar call per distinct orientation, phase rotation per snapshot | new |
 
 ### 4.4 Random fields
 
@@ -98,11 +108,11 @@ Legend: **new** = new code, **ext** = extension of an existing function, **NG** 
 | # | Feature | Kind |
 |---|---|---|
 | E1 | Spherical path data → `quadriga_lib::path` (0/1/2 interactions, gain folded into M per frequency, interaction type code for scattering) | new |
-| E2 | MEX and Python wrappers for the new GBSM functions (not for QRT, P12) | new |
+| E2 | MEX and Python wrappers for the new GBSM functions and `gbsm_single_link_channel` (not for QRT, P12) | new |
 
 ### 4.6 NG code that the library replaces (retired in the NG integration project)
 
-`gen_fbs_lbs`, `private/solve_multi_bounce_opti`, `private/solve_cos_theorem`, `private/rotate_sphere`, `private/get_subpath_angles`, `private/update_drifting` (already unused), the sub-cluster split, XPR and phase parts of `gen_ssf_parameters`, `xpr_sos` / `pin_sos` / `clst_dl_sos` / `subpath_coupling` in `init_sos`, the path assembly and GR update inside `qd_builder.get_channels`. NG keeps tracks, segments, merge, layout, builder bookkeeping, sub-path summation and `p_correct`.
+`gen_fbs_lbs`, `private/solve_multi_bounce_opti`, `private/solve_cos_theorem`, `private/rotate_sphere`, `private/get_subpath_angles`, `private/update_drifting` (already unused), the sub-cluster split, XPR and phase parts of `gen_ssf_parameters`, `xpr_sos` / `pin_sos` / `clst_dl_sos` / `subpath_coupling` in `init_sos`, the interior of `qd_builder.get_channels` (path assembly, GR update, Doppler rotation, sub-path summation, `p_correct`), which becomes one `gbsm_single_link_channel` call per mobile. NG keeps tracks, segments, merge, layout, builder bookkeeping and the LSF evaluation along the track.
 
 ## 5. Draft contracts
 
@@ -135,7 +145,7 @@ void ssf_rays(const std::unordered_map<std::string, double> &scenpar,
               arma::cube &aod, arma::cube &eod,   // Output: ray angles in [rad], [n_ray, n_link, n_fd]
               arma::cube &aoa, arma::cube &eoa,
               std::vector<arma::cube> &jones,     // Output: M per frequency, n_freq × [8, n_ray, n_link]
-              arma::uvec &slot,                   // Output: slot index per ray, [n_ray]
+              arma::ucube &group,                 // Output: sub-cluster index per ray (TR: depends on the link) (slot and sub-cluster), [n_ray, n_link, n_fd]
               const std::string &method = "38.901",          // cluster method that produced the clusters
               const std::string &angle_model = "",           // "additive", "rotation"; "" = default of the method
               const std::string &pol_model = "",             // "38.901", "quadriga"; "" = default of the method
@@ -172,10 +182,12 @@ void ssf_paths(const arma::vec &tx_pos0, const arma::vec &rx_pos0,      // drop 
                                  path_gain [n_path, n_freq], M [8, n_path, n_freq], slot [n_path],
                const arma::mat *gain_dB = nullptr,                      // optional PL+SF per offset, [n_off, n_freq]
                const arma::mat *kf = nullptr,                           // optional K (linear) per offset, [n_off, n_freq]
-               const arma::mat *gr_eps_re = nullptr, const arma::mat *gr_eps_im = nullptr);
+               const arma::mat *gr_eps_re = nullptr, const arma::mat *gr_eps_im = nullptr,
+               bool power_correction = false,                           // P18; default by method in the spec
+               arma::mat *correction = nullptr);                        // Optional output: factor per sub-cluster, [n_group, n_freq]
 ```
 
-The output per offset is exactly the argument set of one `get_channels_*` call (one frequency: column `f` of gain, slice `f` of M).
+The output per offset is exactly the argument set of one `get_channels_*` call (one frequency: column `f` of gain, slice `f` of M). With `power_correction` the list of offsets is one segment; the factors are computed over all of them (P18).
 
 ### 5.5 `qrt_paths_from_scatterers` (new, generic, `src/qd_channel_qrt.cpp`)
 
@@ -189,13 +201,32 @@ std::vector<quadriga_lib::path> qrt_paths_from_scatterers(
 
 Folds the gain into M with FSPL of the polyline length; LOS → 0, FBS = LBS → 1, else 2 interactions. Round trip with `qrt_file_read` is the main test.
 
-### 5.6 Wrappers
+### 5.6 `gbsm_single_link_channel` (new, `src/gbsm_single_link_channel.cpp`)
 
-MEX and Python for 5.1 (extension), 5.2, 5.3, 5.4. Not for 5.5 (P12).
+Channel coefficients of one link at one frequency over one segment (P17). Header open (section 9).
+
+```
+quadriga_lib::channel<double> gbsm_single_link_channel(
+    const arrayant<double> &tx_array, const arrayant<double> &rx_array,
+    const arma::mat &tx_pos, const arma::mat &tx_orientation,   // [n_snap, 3] or [1, 3]
+    const arma::mat &rx_pos, const arma::mat &rx_orientation,   // [n_snap, 3] or [1, 3]
+    ray data of one link at one frequency (as for ssf_paths, incl. drop positions and sub-cluster index),
+    double fc,
+    const std::string &mobility,                                 // "phase" or "drift"
+    const std::string &output = "taps",                          // "taps" or "rays"
+    bool power_correction = ..., const arma::vec *gain_dB = nullptr, const arma::vec *kf = nullptr,
+    bool use_absolute_delays = false);
+```
+
+Internally: `ssf_paths` at the offsets (positions minus drop positions), then `get_channels_*` per snapshot (or once per orientation for planar), summation per sub-cluster in `taps` mode. Correction factors and cluster powers go into the channel's `par` data. Multi-frequency: one call per frequency with the same ray data.
+
+### 5.7 Wrappers
+
+MEX and Python for 5.1 (extension), 5.2, 5.3, 5.4, 5.6. Not for 5.5 (P12).
 
 ## 6. Data flow
 
-Drop: `lsf_*` / `lsp_generate` / `path_loss` → `ssf_init_phases` + `ssf_draw` (cluster and ray sets) → `ssf_clusters` → `ssf_rays` → (`drift`:) `ssf_scatterers`. Per link and offset: `ssf_paths` → `get_channels_planar` (`phase`) or `get_channels_spherical` (`drift`) with the antennas. QRT: `ssf_paths` (`drift`) at the CIR positions → `qrt_paths_from_scatterers` → `qrt_file_append`.
+Drop: `lsf_*` / `lsp_generate` / `path_loss` → `ssf_init_phases` + `ssf_draw` (cluster and ray sets) → `ssf_clusters` → `ssf_rays` → (`drift`:) `ssf_scatterers`. Per link and segment: `gbsm_single_link_channel` (= `ssf_paths` with the power correction, then `get_channels_planar` for `phase` or `get_channels_spherical` for `drift` with the antennas). Optional QRT route: `ssf_paths` (`drift`) at the CIR positions of a segment → `qrt_paths_from_scatterers` → `qrt_file_append`; later `qrt_file_read` → `get_channels_*` with any antennas gives the same channel within float32 precision.
 
 ## 7. Readiness checks (side quests)
 
@@ -215,16 +246,16 @@ Needs: absolute cluster delays and angles at the segment start (available: `ssf_
 
 ### 7.4 Library-only TR 7.8.2 calibration
 
-Needs: many sites and sectors in one batch (per-link `tx_pos` is supported), rays shared by co-sited sectors (TR: steps 1–9 identical; the rays are antenna-free, sectors differ only in the `get_channels_*` call), per-site seeds (series 1), LOS and NLOS links of a layout handled by separate calls per scenario (W1: LOS is a scenario property) and joined by the caller, TR antenna models (`arrayant_generate`). Nothing in this series may require QuaDRiGa-NG; the R0 notes for P3 and P16 go to the calibration session.
+Needs: many sites and sectors in one batch (per-link `tx_pos` is supported), rays shared by co-sited sectors (TR: steps 1–9 identical; the rays are antenna-free, sectors differ only in the `get_channels_*` call), per-site seeds (series 1), LOS and NLOS links of a layout handled by separate calls per scenario (W1: LOS is a scenario property) and joined by the caller, TR antenna models (`arrayant_generate`), and `gbsm_single_link_channel` as the per-link channel generator (one snapshot per drop, power correction off for TR methods). Nothing in this series may require QuaDRiGa-NG; the R0 notes for P3 and P16 go to the calibration session.
 
 ## 8. Process (steps 2–7)
 
 A manager session tracks plan, spec and code and starts agents; Stephan talks only to the manager. Working folders: repository `/home/stephan/quadriga-lib-ssf` (branch `ssf`), internals (briefs, reports, R0 data, review reports) in `/home/stephan/quadriga-lib-agents/ssf2/`. Coding rules: `md/SPEC_CPP_API.md`, `md/SPEC_MATLAB_API.md`, `md/SPEC_PYTHON_API.md`; produced code cites only published material and the SPEC files.
 
 1. **Plan review (step 2):** Stephan + independent reviewers. Lesson of series 1: prototype runs belong in the first plan review. Reviewers check the TR transcription numerically and test the contracts against NG's use.
-2. **R0 study (between plan review and spec):** prototype (NumPy or C++ scratch, not kept). Measures: P3 and P16 impact (spreads, XPR, rank with simple antennas); P5 frequency correlation of the coefficients vs. frequency spacing; P6 run time of the ray fields vs. the cluster step; P10 spread of per-segment cluster powers without `p_correct`; P13 solver vs. NG (exact-solution fraction, scatterer distance distribution, drift rates in °/m, Doppler spread, run time); P15 NG's length rule (Doppler asymmetry); drift continuity; TR oracle for steps 8–11. Results go into the plan before the spec.
+2. **R0 study (between plan review and spec):** prototype (NumPy or C++ scratch, not kept). Measures: P3 and P16 impact (spreads, XPR, rank with simple antennas); P5 frequency correlation of the coefficients vs. frequency spacing; P6 run time of the ray fields vs. the cluster step; P18 power correction on/off and against NG's per-antenna `p_correct`, in a link-level setting (time evolution by phase rotation and by drift: fading statistics, per-segment cluster powers) and a system-level setting (hundreds of single-snapshot drops: per-drop spread distributions vs. the input LSPs, coupling loss, singular values of a small array), plus the distribution of the correction factors; P17 run time of `gbsm_single_link_channel` vs. NG's builder loop; P13 solver vs. NG (exact-solution fraction, scatterer distance distribution, drift rates in °/m, Doppler spread, run time); P15 NG's length rule (Doppler asymmetry); drift continuity; TR oracle for steps 8–11. Results go into the plan before the spec.
 3. **Spec (step 3), spec review (step 4):** one mandatory round, up to three if major issues are found; each reviewer checks the TR transcription numerically. Doc rules in the spec: API only, each fact once, no formulas, size targets set against `ssf_clusters`; doc blocks follow the block grammar and writing pitfalls of `docs_builder/README.md`, and each run regenerates `docs/` with `make docs` and commits the changed files with the function (`md/SPEC_*.md`).
-4. **Implementation (step 5)**, test-first, in runs: R1 random sets (5.1); R2 `ssf_rays` TR methods; R3 `ssf_rays` QuaDRiGa models, 7.6.1, 7.6.16; R4 `ssf_scatterers`; R5 `ssf_paths`; R6 `qrt_paths_from_scatterers`; R7 wrappers and documentation. R4 and R6 touch separate files and may run in parallel with R2/R3. Shared test headers and method-generic test cases are specified up front (lesson: test sizes exceeded 1.5–2×).
+4. **Implementation (step 5)**, test-first, in runs: R1 random sets (5.1); R2 `ssf_rays` TR methods; R3 `ssf_rays` QuaDRiGa models, 7.6.1, 7.6.16; R4 `ssf_scatterers`; R5 `ssf_paths`; R6 `qrt_paths_from_scatterers`; R7 `gbsm_single_link_channel` (QRT round-trip test against the direct route); R8 wrappers and documentation. R4 and R6 touch separate files and may run in parallel with R2/R3. Shared test headers and method-generic test cases are specified up front (lesson: test sizes exceeded 1.5–2×).
 5. **Code review (step 6):** up to three rounds, one mandatory, plus a security review (inputs, sizes, file output of 5.5).
 6. **Cleanup and merge (step 7):** working documents deleted, `md/ssf_notes.md` updated, Stephan commits.
 7. **NG integration (step 8):** separate project; retires the code of 4.6.
@@ -237,4 +268,8 @@ A manager session tracks plan, spec and code and starts agents; Stephan talks on
 - 7.6.16 with the QuaDRiGa polarisation model: apply η to the rotation matrix with the 7.6-62 normalisation, or TR model only.
 - 7.6.1 τ_Δ with W13 (Δτ already in the NLOS delays).
 - Free-distance rule of the solver (R0 sub-study).
-- Function names (`ssf_rays`, `ssf_scatterers`, `ssf_paths`, `qrt_paths_from_scatterers`).
+- Function names (`ssf_rays`, `ssf_scatterers`, `ssf_paths`, `qrt_paths_from_scatterers`); `gbsm_single_link_channel` is fixed.
+- Header of `gbsm_single_link_channel`: `quadriga_gbsm.hpp` (next to the blocks; the header then needs the arrayant and channel types) or `quadriga_lib.hpp` (next to `get_channels_ieee_indoor`).
+- How the ray data of one link is passed to `ssf_paths` and `gbsm_single_link_channel` (many arguments vs. a small struct of the library).
+- Power-correction reference: total power of the four Jones entries vs. the maximum column power used by `qrt_file_read`.
+- Ray mode and 7.6.2.2: rays of a TR sub-cluster share their delay at the phase centres, so `rays` output adds detail mainly for large arrays and with 7.6.2.2 later.
