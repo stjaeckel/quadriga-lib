@@ -90,7 +90,11 @@ def build_docs(root, diag):
     root: repository root (Path). diag: a Diagnostics. Returns (model, mapping):
     model is a dict with
       "api":          {lang: docblocks.ApiPage}, intro included (lang in config.LANGS),
-      "pages":        {page_id: prose.Page} for config.TEXT_PAGES,
+      "pages":        {page_id: prose.Page} for config.TEXT_PAGES ("formats": the formats page's
+                      front matter and intro),
+      "formats":      [prose.Page] of docs_builder/content/formats/*.md in page order (order, then
+                      file name); page_id is the section id, title, summary, body and headings
+                      are set; ids are unique across the formats page,
       "publications": prose.Publications or None,
     and mapping is {path relative to docs/: bytes}. The mapping is empty if a structural
     error stopped the build before rendering; the caller checks diag.errors.
@@ -105,7 +109,7 @@ def build_docs(root, diag):
     for name in needed:
         if not (content / name).is_file():
             diag.error("%s/%s" % (config.DOCS_CONTENT, name), None, "content file missing")
-    model = {"api": {}, "pages": {}, "publications": None}
+    model = {"api": {}, "pages": {}, "formats": [], "publications": None}
     if diag.errors:
         return model, {}
 
@@ -114,9 +118,11 @@ def build_docs(root, diag):
         model["api"][lang] = docblocks.read_api(root, lang, intro, diag)
     for pid in config.TEXT_PAGES:
         model["pages"][pid] = prose.read_page(content / (pid + ".md"), diag, root)
+    model["formats"] = read_formats(root, model["pages"]["formats"], diag)
     model["publications"] = prose.read_publications(content / "publications.toml", diag, root)
     links.match_families(model["api"], content / "api_matching.toml", diag, root)
     links.set_index(model["api"], diag)
+    links.set_formats(model["formats"])
     render_md.check_parts(model, diag)
     diag.gaps.extend(prose.gap_scan(root, [config.DOCS_CONTENT], diag))
     if diag.errors:
@@ -125,6 +131,22 @@ def build_docs(root, diag):
     mapping = render_md.render_docs(model, diag)
     checks.check_markdown(mapping, "docs", diag)
     return model, mapping
+
+
+def read_formats(root, intro, diag):
+    """The format files in page order; their ids share one set with the intro's headings, since all
+    of them are on formats.html."""
+    folder = root / config.FORMATS_DIR
+    files = sorted(folder.glob("*.md"), key=lambda p: p.name) if folder.is_dir() else []
+    if not files:
+        diag.error(config.FORMATS_DIR, None, "no format files (*.md) found")
+        return []
+    formats = sorted((prose.read_page(p, diag, root, prose.FORMAT_KEYS, ids=False) for p in files),
+                     key=lambda f: (f.order, f.page_id))
+    used = set(config.RESERVED_IDS) | {h.id for h in intro.headings if h.id} | {f.page_id for f in formats}
+    for f in formats:  # in page order, so that a repeated heading gets -2 in the later section
+        f.headings = prose.heading_ids(f.body, diag, f.path, f.body_line, used)
+    return formats
 
 
 def main(argv=None):

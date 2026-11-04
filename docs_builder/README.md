@@ -34,7 +34,7 @@ python3 docs_builder/build.py docs --root /path/to/repository
 | `docs_builder/qdocs/config.py` | Site URLs, the page list `PAGES`, the content pages `TEXT_PAGES`, source folders, build variables, the version reader, the TOML import. |
 | `docs_builder/qdocs/docblocks.py` | Doc-block parser: block grammar, sub-blocks, parameter lists, the table and wrap checks. |
 | `docs_builder/qdocs/prose.py` | Content pages: front matter, heading ids, build variables, `publications.toml`, the gap scan. |
-| `docs_builder/qdocs/links.py` | Slugs, old hash ids, cross-language matching, `[[name]]` resolution, the URL of every link for each output file. |
+| `docs_builder/qdocs/links.py` | Slugs, cross-language matching, `[[name]]` resolution, the URL of every link for each output file. |
 | `docs_builder/qdocs/render_md.py` | Markdown output: the twin writer, the full and per-section API files, `publications.md`, `llms.txt`, `docs/README.md`. |
 | `docs_builder/qdocs/checks.py` | Link and anchor check of the generated Markdown. |
 | `docs_builder/content/` | Every source of `docs/` besides the doc blocks (see [Content pages](#content-pages)). |
@@ -50,7 +50,9 @@ How the sources land in `docs/` (`<lang>` is `cpp`, `mex` or `python`; `<slug>` 
 | `quadriga_lib_api_<lang>.md` | All doc blocks of the language (`src/`, `api_mex/`, `api_python/`) and `content/api_intro_<lang>.md` |
 | `api/<lang>/general-usage-notes.md` | `content/api_intro_<lang>.md` |
 | `api/<lang>/<slug>.md` | The doc blocks of one section |
-| `download.md`, `formats.md`, `faq.md`, `ai_agents.md` | `content/<same name>.md` |
+| `download.md`, `faq.md`, `ai_agents.md` | `content/<same name>.md` |
+| `formats.md` | The index of the data formats: title, lead and intro of `content/formats.md`, a table of the format files |
+| `formats/<name>.md` | `content/formats/<name>.md`, one file per data format |
 | `publications.md` | `content/publications.toml` |
 | `llms.txt` | The page list, the API sections and `llms_summary` of `content/ai_agents.md`; absolute links |
 | `README.md` | The same list with relative links, for GitHub; not copied to the website |
@@ -96,7 +98,7 @@ docs: <N> errors, <M> warnings, <K> gaps
 python3 docs_builder/extract_matlab_comments.py api_mex/<name>.cpp <build folder>/+quadriga_lib/<name>.m
 ```
 
-CMake calls it once per MEX source in the target `mex_documentation` (`CMakeLists.txt`, section "MEX Documentation", with `ENABLE_MEX_DOC=ON`). It takes the first `/*!MD` block of the file, removes backticks, asterisks, `<br>` and raw links, prefixes each line with `%` and appends the licence text. The result is the MATLAB / Octave `help` text, which is why MATLAB doc-block lines stay within 100 characters. The script uses only the standard library, runs on Python 3.10 (the Ubuntu 22.04 Debian build) and on Windows, and does not import `qdocs`. Keep it that way.
+CMake calls it once per MEX source in the target `mex_documentation` (`CMakeLists.txt`, section "MEX Documentation", with `ENABLE_MEX_DOC=ON`). It takes the first `/*!MD` block of the file, removes backticks, asterisks, `<br>` and raw links, prefixes each line with `%` and appends the licence text. The result is the MATLAB / Octave `help` text. The script uses only the standard library, runs on Python 3.10 (the Ubuntu 22.04 Debian build) and on Windows, and does not import `qdocs`. Keep it that way.
 
 ## Content pages
 
@@ -105,7 +107,8 @@ The prose sources of `docs/` live in `docs_builder/content/`:
 | File | Page | Twin in `docs/` |
 |------|------|-----------------|
 | `download.md` | Get started (`download.html`) | `download.md` |
-| `formats.md` | Data formats (`formats.html`) | `formats.md` |
+| `formats.md` | Title, description, lead and intro of the Data formats page (`formats.html`) | `formats.md` (with the table of formats) |
+| `formats/<name>.md` | One data format: one section of `formats.html` (see [Data formats](#data-formats)) | `formats/<name>.md` |
 | `faq.md` | Questions (`faq.html`) | `faq.md` |
 | `ai_agents.md` | AI agents (`ai_agents.html`) | `ai_agents.md` |
 | `api_intro_cpp.md`, `api_intro_mex.md`, `api_intro_python.md` | Title, lead and "General usage notes" of each API page | in the full API file and `api/<lang>/general-usage-notes.md` |
@@ -120,12 +123,14 @@ A content page starts with TOML front matter between two lines that are exactly 
 
 ```
 +++
-title = "Data formats"
-description = "File formats that Quadriga-Lib reads and writes."
-lead = "The QDANT antenna format and the material table."
+title = "Questions"
+description = "Answers to frequent questions about Quadriga-Lib."
+lead = "Citing, licence, bug reports."
 +++
 
-## QuaDRiGa Array Antenna Exchange Format (QDANT) {#qdant legacy="6cab4884"}
+## About the Library
+
+### How do I cite Quadriga-Lib? {#cite}
 
 Text ...
 ```
@@ -142,7 +147,7 @@ A missing required key, an unknown key or a value that is not a string stops the
 
 The body is CommonMark with tables, formulas, note boxes, heading ids, build variables and gap markers. Headings run from `##` to `####`; the `h1` comes from `title`. Write each paragraph and each list item on one line; do not wrap prose. Raw HTML is not interpreted on content pages and shows as text: write links and formatting in Markdown.
 
-**Heading ids.** Every `##` and `###` heading gets an id: the slug of its text (lower case, every run of other characters than `a-z` and `0-9` becomes `-`), made unique on the page with `-2`, `-3`. Links and `[[x]]` count with their text only; `*` and backticks are dropped; escapes and entities are resolved. A heading must start in column 0 with `## `; a text line underlined with `=` or `-` (a setext heading) and an indented heading would get no id, so they stop the build (`E-heading`), and so does a `#` heading in the body of a content page, whose title comes from the front matter. Leave a blank line before a `---` rule. To fix an id, add it at the end of the heading: `### How do I cite Quadriga-Lib? {#cite}`. Old anchors are kept with `legacy="..."`, which may repeat: `## Material Properties {#material-properties legacy="9f6922f9"}`; a heading may have legacy ids without an explicit id (`### \<layout> {legacy="<layout>"}`). On the website the legacy ids become empty `<span id>` elements in the heading, in the twins extra `<a id>` anchors; the braces never show. The legacy ids of the converted pages (the eight-character hashes and `<layout>`, `<arrayant>`) are what old links to quadriga-lib.org point to: do not remove them. A text page shows an index of its `##` headings (with the `###` headings below) when it has at least two.
+**Heading ids.** Every `##` and `###` heading gets an id: the slug of its text (lower case, every run of other characters than `a-z` and `0-9` becomes `-`), made unique on the page with `-2`, `-3`. Links and `[[x]]` count with their text only; `*` and backticks are dropped; escapes and entities are resolved. A heading must start in column 0 with `## `; a text line underlined with `=` or `-` (a setext heading) and an indented heading would get no id, so they stop the build (`E-heading`), and so does a `#` heading in the body of a content page, whose title comes from the front matter. Leave a blank line before a `---` rule. To give a heading another id, add it at the end of the heading: `### How do I cite Quadriga-Lib? {#cite}`; the braces never show. Links point to these ids (the footer of every page links `faq.html#cite`), so changing a heading's text changes its id and can break a link; the link check reports it. A text page shows an index of its `##` headings (with the `###` headings below) when it has at least two.
 
 **Build variables.** `{{ name }}` is replaced in the source text before anything else, also inside code, in the body, the front matter and the strings of `publications.toml` (not in doc blocks or notebooks):
 
@@ -168,6 +173,17 @@ The URL values are constants in `docs_builder/qdocs/config.py`. An unknown name 
 The first line is exactly `[!NOTE]` or `[!WARNING]`. If the next line is entirely bold, it is the title; otherwise the title is "Note" or "Warning". The twins keep the block quote as written.
 
 **Formulas and gap markers** follow the same rules as in doc blocks: see [Formulas](#formulas) and [Gap markers and going live](#gap-markers-and-going-live).
+
+### Data formats
+
+The Data formats page has one section per file format, so the formats are not one long file:
+
+- `docs_builder/content/formats.md` holds the page's front matter (`title`, `description`, `lead`) and an optional intro text.
+- `docs_builder/content/formats/<name>.md` holds one format. Its front matter has three keys, all required: `title` (the section heading and the title of its Markdown file), `summary` (one line for the table of formats in `docs/formats.md`, `llms.txt` and `docs/README.md`) and `order` (an integer; the sections appear in this order, then by file name). The body starts with `##` headings, which sit one level below the format's title.
+- The section id of a format on `formats.html` is its file name without `.md`: `formats.html#qdant` for `formats/qdant.md`. Heading ids are unique across the whole page: a heading that repeats one of an earlier section gets `-2`.
+- `make docs` writes `docs/formats/<name>.md` per format and `docs/formats.md` with the table of formats. A link to `formats.html#<name>` becomes a link to `formats/<name>.md` in the Markdown files, a link to a heading in a format to `formats/<name>.md#<id>`.
+
+To add a format: write `docs_builder/content/formats/<name>.md` with the three keys, choose `order`, run `make docs` and commit the new files of `docs/`.
 
 ### Edit a page
 
@@ -277,13 +293,13 @@ The Markdown files keep every item as written; only the website splits it into n
 ### Links
 
 - `[[name]]` links to the function `name` on the same API page, by the name exactly as in its name line (`[[arrayant_generate]]`, `[[sos.val]]`), without a `quadriga_lib.` prefix; `.[[name]]` links to the member function `.name` (C++). MATLAB names are compared in lower case. Nothing else is tried: a name that matches no function on that page stops the build (`E-link`). Links go only to functions of the same language; a function that exists only in another API cannot be linked from a doc block.
-- Links to other pages and files are written relative to the site root, as on the website: `formats.html#6cab4884`, `faq.html#cite`, `publications/x.pdf`. Absolute links to `http://quadriga-lib.org/...` (with or without `www.`, http or https) are treated the same; links below `download/` and `releases/` stay absolute. Every such link and its anchor is checked: a wrong anchor stops the build.
+- Links to other pages and files are written relative to the site root, as on the website: `formats.html#qdant`, `faq.html#cite`, `publications/x.pdf`. Absolute links to `http://quadriga-lib.org/...` (with or without `www.`, http or https) are treated the same; links below `download/` and `releases/` stay absolute. Every such link and its anchor is checked: a wrong anchor stops the build.
 - A raw `<a href="U">text</a>` in a doc block works like `[text](U)`; `target` and `rel` are dropped. A `<br>` at the end of a line becomes a line break when the next line continues the paragraph, and is dropped at the end of a paragraph.
 - Inside code spans and fences nothing is rewritten.
 
 ### Anchors
 
-The id of a function is its name on the page, exactly: `arrayant_interpolate_multi`, `.calc_directivity_dBi`, `arrayant_generate` (MATLAB, lower case), `sos.acf_2d`. A section has two ids: `sec-<slug>` (the slug of its title; "Miscellaneous / Tools" gives `sec-miscellaneous-tools` and the file `api/<lang>/miscellaneous-tools.md`) and the old eight-character hash id of the previous website, `hashlib.shake_256(title.encode("utf-8")).hexdigest(4)`, kept so that old links work. Renaming a section or a function changes its ids and breaks links to it from outside. Two equal ids on one page stop the build (`E-anchor`).
+The id of a function is its name on the page, exactly: `arrayant_interpolate_multi`, `.calc_directivity_dBi`, `arrayant_generate` (MATLAB, lower case), `sos.acf_2d`. A section's id is `sec-<slug>`, the slug of its title: "Miscellaneous / Tools" gives `sec-miscellaneous-tools` and the file `api/<lang>/miscellaneous-tools.md`. Headings on content pages get the slug of their text unless `{#id}` sets another one (see [File format](#file-format)); there are no other ids. Renaming a section or a function changes its ids and breaks links to it from outside. Two equal ids on one page stop the build (`E-anchor`).
 
 ### Cross-language buttons
 
@@ -314,7 +330,7 @@ These follow from how Markdown reads the text, and the builder checks the first 
 - **Code fences close on a backtick run at least as long as the opener** and only on a line that holds nothing but backticks (`E-fence`). To show a fence inside a fence, open the outer one with four backticks.
 - **No `*` or `|` in running text**: they are emphasis and table syntax. Write `·` for multiplication and `abs()` for absolute values; inside a formula use `\cdot` and `\lvert x \rvert`.
 - **A backtick run needs its closing run in the same paragraph** (warning `code-span`); otherwise the rest of the paragraph is not rewritten in the Markdown files. Escape a literal backtick as `` \` ``.
-- **Line length in doc blocks**: C++ and Python blocks up to 120 characters, MATLAB blocks up to 100 characters because the block also becomes the `help` text (soft limits; tables and usage lines may be longer). Continuation lines of a list item are indented by 2 spaces. Content pages are not wrapped: one line per paragraph and per list item.
+- **Line length in doc blocks**: up to 120 characters in all three languages (a soft limit; tables and usage lines may be longer). Continuation lines of a list item are indented by 2 spaces. Content pages are not wrapped: one line per paragraph and per list item.
 - Fence info strings that colour code: `cpp`, `c++`, `matlab`, `octave`, `python`, `py`, `bash`, `sh`, `shell`, `console`; `text` and `none` give plain text. Another info string gives the warning `fence-language` in the website build.
 
 ## Errors and warnings
@@ -329,7 +345,7 @@ Errors stop the build; nothing is written. Warnings are printed and do not stop 
 | `E-fence` | error | docs | A code fence is not closed within its part (the summary line, the body of an `/*!MD` block, an `/*!SECTION_DESC` block). | Close it with a line of at least as many backticks as the opener. |
 | `E-required` | error | docs | A required sub-block is missing. | Add `## Declaration:` (C++) or `## Usage:` (MATLAB, Python). |
 | `E-link` | error | docs | `[[name]]` matches no function on the API page of the same language. | Correct the name, use `.[[name]]` for a member function, or remove the link. |
-| `E-anchor` | error | docs | Two equal ids on one page: function names, section ids, heading ids, legacy ids or publication group ids. | Rename one, or give a heading an explicit `{#id}`. |
+| `E-anchor` | error | docs | Two equal ids on one page: function names, section ids, heading ids or publication group ids (on the formats page across all format files). | Rename one, or give a heading an explicit `{#id}`. |
 | `E-gap` | error | docs | A gap marker `%%GAP:` is not closed with `%%` on the same line. | Close it on the same line. |
 | `E-table` | error | docs | A table and the text next to it have no blank line between them. | Add the blank line. |
 | `E-wrap` | error | docs | A wrapped line starts with `>` or `+ `. | Move the line break. |
@@ -397,11 +413,11 @@ Every page of the website that has a Markdown version (a twin) links to it in th
 
 - Each twin starts with `# title`, then `Quadriga-Lib <version> · Web page: <URL>`, then an index table of its `##` headings when it has at least two (with a column of `###` links on content pages), then the lead and the body.
 - The text is copied line by line. Only these change: sub-block headings move one level down; `{...}` after headings is removed; fences without info string get the page language; `[[name]]`, raw `<a href>` links and trailing `<br>` become Markdown; link URLs are rewritten for the twin's location; gap markers are removed. Formulas, tables, note boxes and parameter items stay as written.
-- Anchors: every function, section and heading gets an explicit `<a id="..."></a>` line before it, with the same ids as the HTML page (for a section `<a id="sec-<slug>"></a><a id="<hash>"></a>`). So `#arrayant_generate`, `#sec-channel-functions` and `faq.md#cite` work in both formats, and links between twins use these ids. When you change how anchors are written, check on GitHub that a function link with a `.` (such as `#.calc_directivity_dBi`) still resolves.
+- Anchors: every function, section and heading gets an explicit `<a id="..."></a>` line before it, with the same ids as the HTML page (for a section `<a id="sec-<slug>"></a>`). So `#arrayant_generate`, `#sec-channel-functions` and `faq.md#cite` work in both formats, and links between twins use these ids. When you change how anchors are written, check on GitHub that a function link with a `.` (such as `#.calc_directivity_dBi`) still resolves.
 - Every function has the line "Also in: [C++](...) · [Python](...)" or "Not in: C++, Python" with the same information as the buttons on the website. "Not in" names a language without a counterpart; the line is never left out.
 - `quadriga_lib_api_<lang>.md` has YAML front matter (title with the version, author, language), the general usage notes, a "Function Index" table (Function, Section, Summary) and then every section and function. Agents should read the index and then fetch only the section file `api/<lang>/<slug>.md`.
 - Links to website pages without a twin (the landing page, the Impressum) and to site files outside `docs/` (publications, the skill, the material model, the tutorials) are absolute `http://quadriga-lib.org/...` links in `docs/`.
-- `llms.txt` (format of llmstxt.org) lists the content pages, the three full API files and every API section with its number of functions, with absolute links; it is served at `http://quadriga-lib.org/llms.txt`. `docs/README.md` is the same list with relative links and a note that the files are generated.
+- `llms.txt` (format of llmstxt.org) lists the content pages, every data format, the three full API files and every API section with its number of functions, with absolute links; it is served at `http://quadriga-lib.org/llms.txt`. `docs/README.md` is the same list with relative links and a note that the files are generated.
 
 ## License
 

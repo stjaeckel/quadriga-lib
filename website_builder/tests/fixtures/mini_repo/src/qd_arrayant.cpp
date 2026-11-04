@@ -21,7 +21,7 @@ MD!*/
 # .interpolate
 Interpolate the field patterns
 
-- Uses [[arrayant_interpolate_multi]]; file format: <a target="_blank" rel="noopener noreferrer" href="formats.html#6cab4884">QDANT</a>
+- Uses [[arrayant_interpolate_multi]]; file format: <a target="_blank" rel="noopener noreferrer" href="formats.html#qdant">QDANT</a>
 - Material data: <a href="http://quadriga-lib.org/quadriga_lib_material_model.md">material model</a>
 
 ## Declaration:

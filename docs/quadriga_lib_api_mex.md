@@ -116,7 +116,7 @@ lang: en-US
 
 ---
 
-<a id="sec-array-antenna-functions"></a><a id="e091e809"></a>
+<a id="sec-array-antenna-functions"></a>
 # Array antenna functions
 
 ---
@@ -625,7 +625,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_read) · [Python](quadriga_lib_api_
 ### See also:
 - [arrayant_qdant_write](#arrayant_qdant_write) (for writing QDANT data)
 - [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats/qdant.md))
 
 ---
 <a id="arrayant_qdant_write"></a>
@@ -689,7 +689,7 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 ### See also:
 - [arrayant_qdant_read](#arrayant_qdant_read) (for reading QDANT data)
 - [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats/qdant.md))
 
 ---
 <a id="arrayant_rotate_pattern"></a>
@@ -810,7 +810,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 
 ---
 
-<a id="sec-channel-functions"></a><a id="eab50272"></a>
+<a id="sec-channel-functions"></a>
 # Channel functions
 
 ---
@@ -1398,7 +1398,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [Python](quadriga_lib
 
 ---
 
-<a id="sec-channel-generation-functions"></a><a id="6f9553d7"></a>
+<a id="sec-channel-generation-functions"></a>
 # Channel generation functions
 
 ---
@@ -1778,7 +1778,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 
 ---
 
-<a id="sec-channel-statistics"></a><a id="c2d4d113"></a>
+<a id="sec-channel-statistics"></a>
 # Channel statistics
 
 ---
@@ -1985,7 +1985,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_rician_k_factor) · [Python](quadrig
 
 ---
 
-<a id="sec-geometry-based-stochastic-model"></a><a id="85ec7f8f"></a>
+<a id="sec-geometry-based-stochastic-model"></a>
 # Geometry-based stochastic model
 
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of
@@ -2809,7 +2809,7 @@ phase = quadriga_lib.ssf_init_phases( scenpar, seed, set_id, preset );
 
 ---
 
-<a id="sec-math-functions"></a><a id="40522dfe"></a>
+<a id="sec-math-functions"></a>
 # Math functions
 
 ---
@@ -2982,7 +2982,7 @@ dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
 
 ---
 
-<a id="sec-miscellaneous-tools"></a><a id="b11e2d16"></a>
+<a id="sec-miscellaneous-tools"></a>
 # Miscellaneous / Tools
 
 ---
@@ -3035,7 +3035,7 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform );
 
 ---
 
-<a id="sec-site-specific-simulation-tools"></a><a id="386370db"></a>
+<a id="sec-site-specific-simulation-tools"></a>
 # Site-specific simulation tools
 
 ---
@@ -3757,7 +3757,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_segmentation) · [Python](q
 
 ---
 
-<a id="sec-sum-of-sinusoids-random-number-generator"></a><a id="2d15ed9b"></a>
+<a id="sec-sum-of-sinusoids-random-number-generator"></a>
 # Sum-of-sinusoids random number generator
 
 These functions generate **spatially correlated random numbers**: values that are random, but similar at

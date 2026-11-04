@@ -76,7 +76,6 @@ class Section:
     lang: str
     title: str
     slug: str
-    legacy: str
     descs: list         # Parts of the SECTION_DESC blocks, in file-name order
     functions: list
     path: str           # where the section first appears
@@ -381,7 +380,7 @@ def read_api(root, lang, intro, diag):
         title = sec_lines[0].strip()
         sec = sections.get(title)
         if sec is None:
-            sec = sections[title] = Section(lang, title, links.slug(title), links.legacy_hash(title), [], [],
+            sec = sections[title] = Section(lang, title, links.slug(title), [], [],
                                              path, secs[0][1] - 1)
         stem = p.stem
         if lang == "python" and stem.startswith("qpy_"):

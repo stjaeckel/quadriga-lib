@@ -53,7 +53,7 @@ def test_section_and_function_order(tmp_path):
     page, diag = parse(tmp_path, "cpp", text)
     assert [f.name for f in page.sections[0].functions] == ["a", "z", ".b"]
     sec = page.sections[0]
-    assert (sec.title, sec.slug, sec.legacy) == ("Tools", "tools", docblocks.links.legacy_hash("Tools"))
+    assert (sec.title, sec.slug) == ("Tools", "tools")
 
 
 def test_display_names(tmp_path):

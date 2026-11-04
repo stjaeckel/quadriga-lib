@@ -168,7 +168,7 @@ lang: en-US
 
 ---
 
-<a id="sec-array-antenna-class"></a><a id="3a0c780f"></a>
+<a id="sec-array-antenna-class"></a>
 # Array antenna class
 
 ---
@@ -615,7 +615,7 @@ void quadriga_lib::arrayant<dtype>::set_size(
 
 ---
 
-<a id="sec-array-antenna-functions"></a><a id="e091e809"></a>
+<a id="sec-array-antenna-functions"></a>
 # Array antenna functions
 
 ---
@@ -1318,7 +1318,7 @@ void quadriga_lib::qdant_write_multi(
 
 ---
 
-<a id="sec-channel-class"></a><a id="4f5f509b"></a>
+<a id="sec-channel-class"></a>
 # Channel class
 
 ---
@@ -1477,7 +1477,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 
 ---
 
-<a id="sec-channel-functions"></a><a id="eab50272"></a>
+<a id="sec-channel-functions"></a>
 # Channel functions
 
 ---
@@ -2525,7 +2525,7 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 
 ---
 
-<a id="sec-channel-generation-functions"></a><a id="6f9553d7"></a>
+<a id="sec-channel-generation-functions"></a>
 # Channel generation functions
 
 ---
@@ -3000,7 +3000,7 @@ void quadriga_lib::get_channels_spherical(
 
 ---
 
-<a id="sec-channel-statistics"></a><a id="c2d4d113"></a>
+<a id="sec-channel-statistics"></a>
 # Channel statistics
 
 ---
@@ -3237,7 +3237,7 @@ void quadriga_lib::calc_rician_k_factor(
 
 ---
 
-<a id="sec-geometry-based-stochastic-model"></a><a id="85ec7f8f"></a>
+<a id="sec-geometry-based-stochastic-model"></a>
 # Geometry-based stochastic model
 
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
@@ -4126,7 +4126,7 @@ void quadriga_lib::ssf_init_phases(
 
 ---
 
-<a id="sec-math-functions"></a><a id="40522dfe"></a>
+<a id="sec-math-functions"></a>
 # Math functions
 
 ---
@@ -4458,7 +4458,7 @@ auto output = quadriga_lib::interp_1D(input, xi, xo);
 
 ---
 
-<a id="sec-site-specific-simulation-tools"></a><a id="386370db"></a>
+<a id="sec-site-specific-simulation-tools"></a>
 # Site-specific simulation tools
 
 ---
@@ -6603,7 +6603,7 @@ xpr_update(M, &U, &g, false, true, true, &idx);     // full chain step: scatter+
 
 ---
 
-<a id="sec-sum-of-sinusoids-random-number-generator"></a><a id="2d15ed9b"></a>
+<a id="sec-sum-of-sinusoids-random-number-generator"></a>
 # Sum-of-sinusoids random number generator
 
 These functions generate **spatially correlated random numbers**: values that are random, but similar at

@@ -94,7 +94,7 @@ lang: en-US
 
 ---
 
-<a id="sec-array-antenna-functions"></a><a id="e091e809"></a>
+<a id="sec-array-antenna-functions"></a>
 # Array antenna functions
 
 ---
@@ -647,7 +647,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id=0 )
 ### See also:
 - [qdant_write](#qdant_write) (for writing QDANT data)
 - [generate](#generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats/qdant.md))
 
 ---
 <a id="qdant_write"></a>
@@ -698,7 +698,7 @@ arrayant.quadriga_lib.qdant_write( fn, arrayant )
 ### See also:
 - [qdant_read](#qdant_read) (for reading QDANT data)
 - [generate](#generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats.md#6cab4884))
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](formats/qdant.md))
 
 ---
 <a id="rotate_pattern"></a>
@@ -752,7 +752,7 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, y_deg=10.0 )
 
 ---
 
-<a id="sec-channel-functions"></a><a id="eab50272"></a>
+<a id="sec-channel-functions"></a>
 # Channel functions
 
 ---
@@ -1377,7 +1377,7 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=dela
 
 ---
 
-<a id="sec-channel-generation-functions"></a><a id="6f9553d7"></a>
+<a id="sec-channel-generation-functions"></a>
 # Channel generation functions
 
 ---
@@ -1737,7 +1737,7 @@ See also:
 
 ---
 
-<a id="sec-channel-statistics"></a><a id="c2d4d113"></a>
+<a id="sec-channel-statistics"></a>
 # Channel statistics
 
 ---
@@ -1953,7 +1953,7 @@ kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, r
 
 ---
 
-<a id="sec-geometry-based-stochastic-model"></a><a id="85ec7f8f"></a>
+<a id="sec-geometry-based-stochastic-model"></a>
 # Geometry-based stochastic model
 
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the *scenario*
@@ -2717,7 +2717,7 @@ phase = quadriga_lib.gbsm.ssf_init_phases( scenpar, seed, set_id, preset )
 
 ---
 
-<a id="sec-math-functions"></a><a id="40522dfe"></a>
+<a id="sec-math-functions"></a>
 # Math functions
 
 ---
@@ -2794,7 +2794,7 @@ x, y, z = quadriga_lib.tools.geo2cart( az, el, len, combine=False )
 
 ---
 
-<a id="sec-miscellaneous-tools"></a><a id="b11e2d16"></a>
+<a id="sec-miscellaneous-tools"></a>
 # Miscellaneous / Tools
 
 ---
@@ -2871,7 +2871,7 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 
 ---
 
-<a id="sec-site-specific-simulation-tools"></a><a id="386370db"></a>
+<a id="sec-site-specific-simulation-tools"></a>
 # Site-specific simulation tools
 
 ---
@@ -3477,7 +3477,7 @@ triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
 
 ---
 
-<a id="sec-sum-of-sinusoids-random-number-generator"></a><a id="2d15ed9b"></a>
+<a id="sec-sum-of-sinusoids-random-number-generator"></a>
 # Sum-of-sinusoids random number generator
 
 These functions generate **spatially correlated random numbers**: values that are random, but similar at

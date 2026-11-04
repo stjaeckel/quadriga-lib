@@ -62,10 +62,10 @@ def test_twin_lines_code_span_across_lines_and_warning():
 
 
 def test_twin_lines_prose_headings():
-    lines = ["## Material Properties {#material-properties legacy=\"9f6922f9\"}", "", "### Cite {#cite}", "",
+    lines = ["## Material Properties {#material-properties}", "", "### Cite {#cite}", "",
              "#### Detail {#ignored}"]
     out = render_md.twin_lines(lines, "formats.md", headings=prose.heading_ids(lines))
-    assert out == ['<a id="material-properties"></a><a id="9f6922f9"></a>', "## Material Properties", "",
+    assert out == ['<a id="material-properties"></a>', "## Material Properties", "",
                    '<a id="cite"></a>', "### Cite", "", "#### Detail"]
     cell = ["## Step", "### Deeper", "#### Deepest"]
     out = render_md.twin_lines(cell, "tutorials/x.md", headings=prose.heading_ids(cell))
@@ -86,7 +86,7 @@ def test_full_api_file(docs):
                            'lang: en-US\n---\n\n<a id="sec-general-usage-notes"></a>\n# General usage notes\n')
     assert "date:" not in text and "Line" not in text
     assert "| Function | Section | Summary |\n| --- | --- | --- |\n| [arrayant](#arrayant) | Array antenna class |" in text
-    assert '---\n\n<a id="sec-miscellaneous-tools"></a><a id="b11e2d16"></a>\n# Miscellaneous / Tools\n' in text
+    assert '---\n\n<a id="sec-miscellaneous-tools"></a>\n# Miscellaneous / Tools\n' in text
     assert ('---\n<a id=".interpolate"></a>\n## .interpolate\nInterpolate the field patterns\n\n'
             "Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_interpolate) · "
             "[Python](quadriga_lib_api_python.md#interpolate)\n") in text
@@ -106,7 +106,7 @@ def test_section_file(docs):
                            "| [arrayant](#arrayant) | Class for storing array antenna models |\n")
     assert ("Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_interpolate) · "
             "[Python](../python/array-antenna-functions.md#interpolate)") in text
-    assert "[QDANT](../../formats.md#6cab4884)" in text
+    assert "[QDANT](../../formats/qdant.md)" in text
     assert "[material model](%s/quadriga_lib_material_model.md)" % BASE in text
     notes = docs["api/python/general-usage-notes.md"]
     assert notes == "# General usage notes\n\nQuadriga-Lib 9.9.9 · Web page: %s/python_api.html#sec-general-usage-notes\n" % BASE
@@ -119,9 +119,17 @@ def test_prose_twin(docs):
                            "| [About the Library](#about-the-library) | [How do I cite Quadriga-Lib?](#cite) · " % BASE)
     assert '<a id="cite"></a>\n### How do I cite Quadriga-Lib?\n' in text
     assert "{#" not in text
-    formats = docs["formats.md"]
-    assert "> [!NOTE]\n> **Units**\n> Angles are in degrees.\n" in formats
-    assert "| [Entry `<arrayant>`](#entry-arrayant) |" in formats
+    qdant = docs["formats/qdant.md"]
+    assert qdant.startswith("# QuaDRiGa Array Antenna Exchange Format (QDANT)\n\nQuadriga-Lib 9.9.9 · Web page: "
+                            "%s/formats.html#qdant\n\n| Section |\n| --- |\n| [Entry `<arrayant>`](#entry-arrayant) |" % BASE)
+    assert "> [!NOTE]\n> **Units**\n> Angles are in degrees.\n" in qdant
+    assert "[material table](materials.md) and its [notes](#notes)" in qdant
+    assert '<a id="notes-2"></a>\n## Notes\n\nMaterial notes; the [QDANT format](qdant.md).' in docs["formats/materials.md"]
+    assert docs["formats.md"] == ("# Data formats\n\nQuadriga-Lib 9.9.9 · Web page: %s/formats.html\n\n"
+                                  "| Format | Summary |\n| --- | --- |\n"
+                                  "| [QuaDRiGa Array Antenna Exchange Format (QDANT)](formats/qdant.md) | XML file format "
+                                  "for array antennas |\n| [Material Properties](formats/materials.md) | CSV table of "
+                                  "material properties |\n" % BASE)
     download = docs["download.md"]
     assert "\n\nQuadriga-Lib 9.9.9 for C++, MATLAB / Octave and Python.\n\n" in download  # lead, gap removed
     assert "g++ -I armadillo-1.0.0/include main.cpp" in download

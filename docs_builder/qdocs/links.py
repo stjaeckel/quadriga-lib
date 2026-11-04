@@ -3,7 +3,6 @@
 # Part of quadriga-lib — see LICENSE for terms.
 """Ids, slugs, old hash ids, cross-language matching, [[name]] resolution and URLs per output location."""
 
-import hashlib
 import posixpath
 import re
 
@@ -18,16 +17,13 @@ FULL_FILES = {config.TWINS["%s_api" % lang] for lang in config.LANGS}
 
 # lang -> {anchor: (section slug, True for a section id)}; filled by set_index()
 _API = {lang: {} for lang in config.LANGS}
+# anchor on formats.html -> (format file stem, True for the section id of the format); filled by set_formats()
+_FORMATS = {}
 
 
 def slug(text):
     """Lower case; every run of characters outside [a-z0-9] becomes one '-'; no '-' at the ends."""
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-
-
-def legacy_hash(title):
-    """The section id of the old pages: 8 hex characters."""
-    return hashlib.shake_256(title.encode("utf-8")).hexdigest(4)
 
 
 def _norm(name):
@@ -109,13 +105,22 @@ def set_index(api, diag):
         intro = page.intro
         add("sec-general-usage-notes", ("general-usage-notes", True), intro.path, None)
         for h in intro.headings:
-            for a in [h.id] + h.legacy:
-                add(a, ("general-usage-notes", False), intro.path, intro.body_line + h.index)
+            if h.id:
+                add(h.id, ("general-usage-notes", False), intro.path, intro.body_line + h.index)
         for sec in page.sections:
             add("sec-" + sec.slug, (sec.slug, True), sec.path, sec.line)
-            add(sec.legacy, (sec.slug, True), sec.path, sec.line)
             for f in sec.functions:
                 add(f.name, (sec.slug, False), f.path, f.line)
+
+
+def set_formats(formats):
+    """Index the anchors of formats.html for url(): each format's section id and its heading ids."""
+    _FORMATS.clear()
+    for f in formats:
+        _FORMATS[f.page_id] = (f.page_id, True)
+        for h in f.headings:
+            if h.id:
+                _FORMATS[h.id] = (f.page_id, False)
 
 
 def resolve(lang, name, member):
@@ -149,7 +154,7 @@ def website_only(path):
 
 def in_docs(path):
     """True for a file that docs/ holds (and the website copies at the same path)."""
-    return path.startswith("api/") or path == "llms.txt" or (
+    return path.startswith(("api/", "formats/")) or path == "llms.txt" or (
         path in config.TWINS.values() and not website_only(path))
 
 
@@ -190,6 +195,9 @@ def url(target, location):
             else:
                 path = "api/%s/%s.md" % (lang, entry[0])
                 frag = "" if entry[1] else frag
+        elif pid == "formats" and frag[1:] in _FORMATS:
+            stem, section = _FORMATS[frag[1:]]
+            path, frag = "formats/%s.md" % stem, "" if section else frag
         elif pid in config.TWINS:
             path = config.TWINS[pid]
         elif website_only(path):

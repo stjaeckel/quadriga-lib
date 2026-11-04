@@ -4,11 +4,15 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 
 ## Documentation
 - [Get started](http://quadriga-lib.org/download.md): installation and quick start
-- [Data formats](http://quadriga-lib.org/formats.md): QDANT antenna files and the material table
+- [Data formats](http://quadriga-lib.org/formats.md): index of the file formats, one Markdown file per format
 - [Questions](http://quadriga-lib.org/faq.md): FAQ, how to cite
 - [Publications](http://quadriga-lib.org/publications.md): papers and IEEE 802.11 contributions
 - [AI agents](http://quadriga-lib.org/ai_agents.md): how to use these files and the agent skill
 - [Tutorials](http://quadriga-lib.org/tutorials.md): worked examples as Jupyter notebooks
+
+## Data formats
+- [QuaDRiGa Array Antenna Exchange Format (QDANT)](http://quadriga-lib.org/formats/qdant.md): XML file format for array antenna patterns: elements, positions, coupling and the layout of several antennas
+- [Material Properties](http://quadriga-lib.org/formats/materials.md): The material table of the ray functions: CSV columns, built-in EM materials and the .mtl mapping
 
 ## API reference
 - [C++ API, complete](http://quadriga-lib.org/quadriga_lib_api_cpp.md)
