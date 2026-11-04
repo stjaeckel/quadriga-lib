@@ -71,7 +71,7 @@ class Context:
         if key not in self._parsers:
             md = mdparse.make_parser(kind, lang)
             for name, rule in (("fence", _fence), ("table_open", _table_open), ("table_close", _table_close),
-                               ("heading_open", _heading_open), ("blockquote_open", _quote_open),
+                               ("blockquote_open", _quote_open),
                                ("blockquote_close", _quote_close), ("math_inline", _math),
                                ("math_inline_double", _math), ("math_block", _math),
                                ("math_block_label", _math_label)):
@@ -79,13 +79,13 @@ class Context:
             self._parsers[key] = md
         return self._parsers[key]
 
-    def fragment(self, lines, kind, path, line, lang=None, headings=None, tight=False, note=""):
+    def fragment(self, lines, kind, path, line, lang=None, headings=None, tight=False, note="", shift=0):
         """Render source lines to HTML (Markup).
 
         kind: docblock, prose or notebook. path, line: source file and 1-based line of lines[0]
         (line None for notebook cells, with note naming the cell). lang: the API page language (wikilinks,
         fence default in doc blocks). headings: qdocs Headings of these lines. tight: a single paragraph
-        is rendered without its <p>.
+        is rendered without its <p>. shift: headings move down by this many levels.
         """
         def where(i):
             return (path, line + i) if line else (path, None)
@@ -97,7 +97,7 @@ class Context:
             self.diag.warning(*where(i), note + msg, k)
 
         md = self.parser(kind, lang)
-        env = {"location": self.location, "headings": {h.index: h for h in headings or []},
+        env = {"location": self.location, "headings": {h.index: h for h in headings or []}, "shift": shift,
                "error": error, "warn": warn, "ctx": self, "kind": kind, "lang": lang, "where": where, "note": note}
         tokens = md.parse("\n".join(lines), env)
         if tight and [t.type for t in tokens] == ["paragraph_open", "inline", "paragraph_close"]:
@@ -126,12 +126,6 @@ def _table_open(self, tokens, idx, options, env):
 
 def _table_close(self, tokens, idx, options, env):
     return "</table></div>\n"
-
-
-def _heading_open(self, tokens, idx, options, env):
-    tok = tokens[idx]
-    spans = "".join('<span id="%s"></span>' % html.escape(a) for a in tok.meta.get("legacy", []))
-    return self.renderToken(tokens, idx, options, env) + spans
 
 
 def _quote_open(self, tokens, idx, options, env):
@@ -219,11 +213,20 @@ def environment():
     return env
 
 
-def _index(ctx, page):
-    """Text-page index (two or more h2 headings): [(text, id, [(text, id)])], texts as inline HTML."""
+def _index(ctx, page, least=2):
+    """Text-page index (at least `least` h2 headings): [(text, id, [(text, id)])], texts as inline HTML."""
     rows = render_md.index_rows(page.headings)
     return [(ctx.inline(t, page.path), i, [(ctx.inline(st, page.path), si) for st, si in sub])
-            for t, i, sub in rows] if len(rows) >= 2 else []
+            for t, i, sub in rows] if len(rows) >= least else []
+
+
+def formats_page(ctx, formats):
+    """One section per format file: its title, id, Markdown twin, body (headings one level down) and
+    the index entries of its ## headings."""
+    return [{"id": f.page_id, "title": ctx.inline(f.title, f.path), "twin": "formats/%s.md" % f.page_id,
+             "body": ctx.fragment(f.body, "prose", f.path, f.body_line, headings=f.headings, shift=1),
+             "index": [(ctx.inline(t, f.path), i) for t, i, _ in render_md.index_rows(f.headings)]}
+            for f in formats]
 
 
 def _pills(f, page_lang, location):
@@ -272,7 +275,7 @@ def api_page(ctx, page):
     sections = []
     for sec in page.sections:
         desc = Markup("").join(ctx.fragment(d.lines, "docblock", d.path, d.line, lang) for d in sec.descs)
-        sections.append({"title": sec.title, "slug": sec.slug, "legacy": sec.legacy, "desc": desc,
+        sections.append({"title": sec.title, "slug": sec.slug, "desc": desc,
                          "functions": [_function(ctx, f, sec) for f in sec.functions]})
     return {"lang": lang, "display": LANG_DISPLAY[lang], "title": intro.title, "description": intro.description,
             "lead": ctx.inline(intro.lead, intro.path, lang), "others": [x for x in config.LANGS if x != lang],
@@ -349,6 +352,11 @@ def render_site(model, diag):
              description=api["description"])
     for pid, p in sorted(model["pages"].items()):
         ctx.location = pid + ".html"
+        if pid == "formats":
+            page("formats.html", "formats.html", current=pid, twin=config.TWINS[pid], page=p,
+                 lead=ctx.inline(p.lead, p.path), body=_prose(ctx, p), formats=formats_page(ctx, model["formats"]),
+                 intro_index=_index(ctx, p, 1), title=p.title, description=p.description)
+            continue
         page(pid + ".html", "text.html", current=pid, twin=config.TWINS[pid], page=p, lead=ctx.inline(p.lead, p.path),
              body=_prose(ctx, p), index=_index(ctx, p), title=p.title, description=p.description)
     ctx.location = "publications.html"

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="wrap doc">
+<nav class="doc-side idx" aria-label="Page sections">{% include "_formats_index.html" %}</nav>
+<div class="doc-main prose">
+  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › {{ page.title }}</p>
+  <h1>{{ page.title }}</h1>
+{% if lead %}
+  <p class="lead">{{ lead }}</p>
+{% endif %}
+  <div class="page-tools"><a href="{{ root }}{{ twin }}">Markdown version</a></div>
+  <details class="doc-index"><summary>On this page</summary><nav class="idx" aria-label="Page sections (collapsible)">{% include "_formats_index.html" %}</nav></details>
+{{ body }}
+{% for f in formats %}
+<section class="api-section format" id="{{ f.id }}"><h2>{{ f.title }}</h2>
+<div class="page-tools"><a href="{{ root }}{{ f.twin }}">Markdown</a></div>
+{{ f.body }}
+</section>
+{% endfor %}
+</div>
+</div>
+{% endblock %}

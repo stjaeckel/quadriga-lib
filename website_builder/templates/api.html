@@ -14,7 +14,7 @@
 {{ api.notes }}
 </section>
 {% for s in api.sections %}
-<section class="api-section" id="sec-{{ s.slug }}"><h2 id="{{ s.legacy }}">{{ s.title }}</h2>
+<section class="api-section" id="sec-{{ s.slug }}"><h2>{{ s.title }}</h2>
 {% if s.desc %}
 <div class="section-desc">{{ s.desc }}</div>
 {% endif %}

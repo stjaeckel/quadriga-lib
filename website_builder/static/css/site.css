@@ -279,6 +279,7 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .idx a:hover { background: var(--surface); }
 .idx .fn a { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted); padding-left: 20px; overflow-wrap: anywhere; }
 .idx .fn a:hover { color: var(--fg); }
+.idx .sub a { padding-left: 20px; }  /* sub-headings of text pages: text font, indented */
 .idx a.current, .idx .fn a.current { color: var(--link); background: var(--pitch); font-weight: 600; }
 .idx details > summary { list-style: none; cursor: pointer; padding: 6px 8px; font-weight: 600; border-radius: 4px; display: flex; justify-content: space-between; gap: 8px; }
 .idx details > summary::-webkit-details-marker { display: none; }
@@ -299,6 +300,8 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .api-section { border-top: 2px solid var(--line); padding-top: var(--s6); margin-top: var(--s7) !important; }
 .api-section > h2 { font-size: 1.75rem; }
 .api-section > .section-desc { color: var(--muted); }
+/* several paragraphs in running text: descriptions, list items and parameter descriptions */
+.section-desc > * + *, .doc-main li > p + p, .doc-main dd > p + p { margin-top: var(--s3); }
 .fn-entry { border-top: 1px solid var(--line); padding-top: var(--s6); margin-top: var(--s6) !important; }
 .fn-entry > * + * { margin-top: var(--s3); }
 .fn-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2) var(--s3); }
@@ -317,6 +320,8 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .fn-entry h4 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: var(--s5); font-weight: 600; }
 .fn-entry ul { padding-left: 1.25em; margin: 0; }
 .fn-entry ul li + li { margin-top: 4px; }
+.fn-entry > .fn-brief + ul, .fn-entry > .fn-brief + ol { margin-top: var(--s2); }
+.fn-entry > ul, .fn-entry > ol { color: var(--muted); }  /* detail bullets in the grey of the section overview */
 
 /* parameter list: name column + description, stacks on phones */
 .params { margin: 0; border-top: 1px solid var(--line); }
@@ -329,13 +334,16 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .params dd > * + * { margin-top: var(--s2); }
 .params > .pnote > dt { display: none; }
 .params > .pnote > dd { grid-column: 1 / -1; }
-@media (min-width: 600px) { .params > div { grid-template-columns: 190px minmax(0, 1fr); } }
+@media (min-width: 600px) { .params > div { grid-template-columns: 150px minmax(0, 1fr); } }
 
 /* ---------- Text pages ---------- */
 .prose > * + * { margin-top: var(--s4); }
 .prose h2 { margin-top: var(--s7); padding-top: var(--s2); border-top: 1px solid var(--line); }
 .prose h3 { margin-top: var(--s5); }
 .prose h4 { margin-top: var(--s4); }
+/* formats page: one section per format, framed like an API section */
+.prose .format > h2 { margin-top: 0; padding-top: 0; border-top: 0; }
+.format > * + * { margin-top: var(--s4); }
 .prose ul, .prose ol { padding-left: 1.4em; }
 .prose li + li { margin-top: 4px; }
 .lead { font-size: var(--fs-lg); color: var(--muted); }

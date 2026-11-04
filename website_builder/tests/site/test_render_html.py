@@ -58,7 +58,7 @@ def test_tabs_and_menu(site):
 
 def test_api_page(site):
     cpp = site("cpp_api.html")
-    assert '<section class="api-section" id="sec-array-antenna-class"><h2 id="3a0c780f">Array antenna class</h2>' in cpp
+    assert '<section class="api-section" id="sec-array-antenna-class"><h2>Array antenna class</h2>' in cpp
     assert '<section class="api-section" id="sec-general-usage-notes"><h2>General usage notes</h2>' in cpp
     assert '<article class="fn-entry" id=".interpolate">' in cpp
     assert ('<a class="pill" aria-current="page" href="#.interpolate">C++</a><a class="pill" '
@@ -87,16 +87,27 @@ def test_sub_block_label_as_inline_markdown(mini_repo, run_site):
 
 
 def test_text_page_index_and_note_boxes(site):
-    formats = site("formats.html")
-    side = ('<ul><li><details open><summary><span>QuaDRiGa Array Antenna Exchange Format (QDANT)</span></summary><ul>'
-            '<li><a href="#qdant">Overview</a></li><li class="fn"><a href="#entry-arrayant">Entry <code>&lt;arrayant&gt;</code></a>'
-            '</li></ul></details></li><li><a href="#material-properties">Material Properties</a></li></ul>')
-    assert '<nav class="doc-side idx" aria-label="Page sections">' + side in formats
-    assert '<details class="doc-index"><summary>On this page</summary>' in formats
-    assert '<div class="note-box"><b>Units</b>' in formats
+    faq = site("faq.html")
+    assert '<nav class="doc-side idx" aria-label="Page sections"><ul><li><details open><summary><span>About the Library' in faq
+    assert '<details class="doc-index"><summary>On this page</summary>' in faq
     assert '<div class="note-box"><b>Note</b>' in site("privacy.html")
     assert '<div class="note-box warn"><b>Placeholder</b>' in site("impressum.html")
     assert "doc-side" not in site("impressum.html")
+
+
+def test_formats_page(site):
+    formats = site("formats.html")
+    side = ('<ul><li><details open><summary><span>QuaDRiGa Array Antenna Exchange Format (QDANT)</span></summary><ul>'
+            '<li><a href="#qdant">Overview</a></li><li class="sub"><a href="#entry-arrayant">Entry <code>&lt;arrayant&gt;'
+            '</code></a></li><li class="sub"><a href="#notes">Notes</a></li></ul></details></li><li><details open><summary>'
+            '<span>Material Properties</span></summary><ul><li><a href="#materials">Overview</a></li>')
+    assert '<nav class="doc-side idx" aria-label="Page sections">' + side in formats
+    assert ('<section class="api-section format" id="qdant"><h2>QuaDRiGa Array Antenna Exchange Format (QDANT)</h2>\n'
+            '<div class="page-tools"><a href="formats/qdant.md">Markdown</a></div>') in formats
+    assert '<h3 id="entry-arrayant">Entry <code>&lt;arrayant&gt;</code></h3>' in formats  # ## moves down to h3
+    assert '<h3 id="notes-2">Notes</h3>' in formats and '<div class="note-box"><b>Units</b>' in formats
+    assert '<a href="formats.md">Markdown version</a>' in formats
+    assert site("formats/qdant.md") and site("formats/materials.md")
 
 
 def test_code_colouring(site):
