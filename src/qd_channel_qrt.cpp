@@ -1922,3 +1922,59 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
 
     return out;
 }
+
+/*!MD
+# qrt_paths_from_scatterers
+Path objects of one CIR from spherical path data, for qrt_file_append
+
+- The path gain and the inverse free-space loss of the polyline length are folded into the stored Jones matrices
+- LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
+- Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
+
+## Declaration:
+```
+std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
+    const arma::vec &center_frequency,
+    const arma::vec &tx_pos,
+    const arma::vec &rx_pos,
+    const arma::mat &fbs_pos,
+    const arma::mat &lbs_pos,
+    const arma::mat &path_gain,
+    const arma::cube &M,
+    const arma::uvec &path_type,
+    arma::uword i_cir = 0);
+```
+
+## Inputs:
+- **`center_frequency`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
+- **`tx_pos`** — Tx (origin) position in [m]; `[3]`
+- **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
+- **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
+- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
+- **`i_cir`** *(optional)* — CIR index, stored in `path::iC`, < 2^32
+
+## Returns:
+- Path objects in input order; `[n_path]`
+
+## See also:
+- [[qrt_file_append]] (writes the paths)
+- [[ssf_paths]] (path data of the geometry-based stochastic model)
+MD!*/
+
+std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const arma::vec &center_frequency,
+                                                                        const arma::vec &tx_pos,
+                                                                        const arma::vec &rx_pos,
+                                                                        const arma::mat &fbs_pos,
+                                                                        const arma::mat &lbs_pos,
+                                                                        const arma::mat &path_gain,
+                                                                        const arma::cube &M,
+                                                                        const arma::uvec &path_type,
+                                                                        arma::uword i_cir)
+{
+    // STUB: no computation yet; returns n_path empty path objects
+    (void)center_frequency, (void)tx_pos, (void)rx_pos, (void)lbs_pos, (void)path_gain, (void)M, (void)path_type;
+    (void)i_cir;
+    return std::vector<quadriga_lib::path>(fbs_pos.n_cols);
+}

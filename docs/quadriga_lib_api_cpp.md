@@ -82,6 +82,7 @@ lang: en-US
 | [qrt_file_parse](#qrt_file_parse) | Channel functions | Read metadata from a QRT file |
 | [qrt_file_read](#qrt_file_read) | Channel functions | Read ray-tracing CIR data from a QRT file |
 | [qrt_file_read_raw](#qrt_file_read_raw) | Channel functions | Read raw ray-tracing path data from a QRT file into path objects |
+| [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) | Channel functions | Path objects of one CIR from spherical path data, for qrt_file_append |
 | [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | Initialize a QRT read cache for fast repeated access |
 | [quantize_delays](#quantize_delays) | Channel functions | Map path delays to a fixed tap grid using two-tap power-weighted interpolation |
 | [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models |
@@ -99,12 +100,18 @@ lang: en-US
 | [conf_file_write](#conf_file_write) | Geometry-based stochastic model | Write a QuaDRiGa scenario configuration file |
 | [gbsm_draw](#gbsm_draw) | Geometry-based stochastic model | Spatially correlated normalized random values of one generator set at a set of links |
 | [gbsm_init_phases](#gbsm_init_phases) | Geometry-based stochastic model | Draw the random phases of one generator set of a BS site and scenario |
+| [gbsm_rays](#gbsm_rays) | Geometry-based stochastic model | Ray data of one link (geometry-based stochastic model) |
+| [gbsm_rays_from_paths](#gbsm_rays_from_paths) | Geometry-based stochastic model | Ray data of one link from spherical path data (e.g. read with qrt_file_read) |
+| [gbsm_single_link_channel](#gbsm_single_link_channel) | Geometry-based stochastic model | Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model) |
 | [los_probability](#los_probability) | Geometry-based stochastic model | LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models |
 | [lsp_generate](#lsp_generate) | Geometry-based stochastic model | Large-scale parameters of a set of links from normalized random values |
 | [o2i_loss](#o2i_loss) | Geometry-based stochastic model | O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3 |
 | [path_loss](#path_loss) | Geometry-based stochastic model | Path loss and shadow-fading standard deviation of a set of links |
 | [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | Validate scenario parameters and complete them with default values |
 | [ssf_clusters](#ssf_clusters) | Geometry-based stochastic model | Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7) |
+| [ssf_paths](#ssf_paths) | Geometry-based stochastic model | Antenna-free paths of one link at one position |
+| [ssf_rays](#ssf_rays) | Geometry-based stochastic model | Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16) |
+| [.solve_scatterers](#.solve_scatterers) | Geometry-based stochastic model | First- and last-bounce scatterers of the rays of one link (two-bounce solver) |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | Calculate rotation matrices from Euler angles |
 | [fast_acos](#fast_acos) | Math functions | Compute elementwise approximate arc-cosine of a vector |
 | [fast_asin](#fast_asin) | Math functions | Compute elementwise approximate arc-sine of a vector |
@@ -2401,6 +2408,48 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 - [qrt_file_read](#qrt_file_read) (read processed CIR data instead of raw paths)
 
 ---
+<a id="qrt_paths_from_scatterers"></a>
+## qrt_paths_from_scatterers
+Path objects of one CIR from spherical path data, for qrt_file_append
+
+Not in: MATLAB, Python
+
+- The path gain and the inverse free-space loss of the polyline length are folded into the stored Jones matrices
+- LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
+- Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
+
+### Declaration:
+```cpp
+std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
+    const arma::vec &center_frequency,
+    const arma::vec &tx_pos,
+    const arma::vec &rx_pos,
+    const arma::mat &fbs_pos,
+    const arma::mat &lbs_pos,
+    const arma::mat &path_gain,
+    const arma::cube &M,
+    const arma::uvec &path_type,
+    arma::uword i_cir = 0);
+```
+
+### Inputs:
+- **`center_frequency`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
+- **`tx_pos`** — Tx (origin) position in [m]; `[3]`
+- **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
+- **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
+- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
+- **`i_cir`** *(optional)* — CIR index, stored in `path::iC`, < 2^32
+
+### Returns:
+- Path objects in input order; `[n_path]`
+
+### See also:
+- [qrt_file_append](#qrt_file_append) (writes the paths)
+- [ssf_paths](#ssf_paths) (path data of the geometry-based stochastic model)
+
+---
 <a id="qrt_read_cache_init"></a>
 ## qrt_read_cache_init
 Initialize a QRT read cache for fast repeated access
@@ -3572,6 +3621,157 @@ void quadriga_lib::gbsm_init_phases(
 - [sos_remove_bias](#sos_remove_bias) (the bias removal of one generator)
 
 ---
+<a id="gbsm_rays"></a>
+## gbsm_rays
+Ray data of one link (geometry-based stochastic model)
+
+Not in: MATLAB, Python
+
+- Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
+  positions the data refer to; written by [ssf_rays](#ssf_rays) and [gbsm_rays_from_paths](#gbsm_rays_from_paths), completed by
+  [.solve_scatterers](#.solve_scatterers), read by [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel), which call `is_valid()` first
+- Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
+- An object has scatterers when `fbs_pos` has `n_ray` columns; every object with `n_ray = 0` has them
+- Rays from several sources in one object: at most one LOS and one GR ray, with tap index 0 and 3; the other rays
+  take any other tap indices; one `method` for all rays; `.solve_scatterers` overwrites given scatterers, so solve
+  rays without scatterers in a separate object and concatenate the attributes
+
+### Attributes:
+| Attribute | Size | Meaning | Set by |
+| --- | --- | --- | --- |
+| `method` | string | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
+| `tx_pos`, `rx_pos` | `[3]` | Tx and Rx position the ray data refer to in [m] | all |
+| `center_frequency` | `[n_freq]` | Carrier frequencies in [Hz] | all |
+| `delay` | `[n_ray]` | Delays in [s] relative to the LOS delay `abs(rx_pos - tx_pos) / c` | all |
+| `power` | `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
+| `aod`, `eod`, `aoa`, `eoa` | `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
+| `M` | `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | all |
+| `path_type` | `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
+| `tap` | `[n_ray]` | Tap index; rays with equal index form one tap | all |
+| `gr_eps_re`, `gr_eps_im` | `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fbs_pos`, `lbs_pos` | `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [.solve_scatterers](#.solve_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
+| `fallback` | `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [.solve_scatterers](#.solve_scatterers) |
+
+### Member functions:
+| Member | Returns |
+| --- | --- |
+| `n_ray()` | Number of rays, length of `delay` |
+| `n_freq()` | Number of frequencies, length of `center_frequency` |
+| `empty()` | `true` if `n_ray() == 0` |
+| `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
+| `b_med(i_freq)` | `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based); NaN without scatterers or without NLOS power |
+| `b_eff(i_freq)` | `[2]`, Tx and Rx in [m]: $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$, with $b$ the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); NaN without scatterers or power |
+
+### See also:
+- [ssf_rays](#ssf_rays) (ray data of a set of links)
+- [ssf_paths](#ssf_paths) (paths of one link at one position)
+
+---
+<a id="gbsm_rays_from_paths"></a>
+## gbsm_rays_from_paths
+Ray data of one link from spherical path data (e.g. read with qrt_file_read)
+
+Not in: MATLAB, Python
+
+- Delays from the path lengths, angles from the scatterer positions, power = path gain
+- Fills a pre-initialised object in place; use the result with `link_gain_dB = 0` in [ssf_paths](#ssf_paths) and
+  [gbsm_single_link_channel](#gbsm_single_link_channel)
+
+### Declaration:
+```cpp
+void quadriga_lib::gbsm_rays_from_paths(
+    const arma::vec &center_frequency,
+    const arma::vec &tx_pos,
+    const arma::vec &rx_pos,
+    const arma::mat &fbs_pos,
+    const arma::mat &lbs_pos,
+    const arma::mat &path_gain,
+    const arma::vec &path_length,
+    const arma::cube &M,
+    gbsm_rays &rays,
+    const std::string &method = "quadriga",
+    const arma::uvec *path_type = nullptr,
+    const arma::uvec *tap = nullptr,
+    const arma::vec *gr_eps_re = nullptr,
+    const arma::vec *gr_eps_im = nullptr);
+```
+
+### Inputs:
+- **`center_frequency`** — Frequencies in [Hz]; `[n_freq]`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
+- **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
+- **`path_length`** — Path lengths in [m]; `[n_path]`
+- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`method`** *(optional)* — Value of `rays.method`: GR power law and default mobility
+- **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS; omitted: LOS where FBS = LBS on the direct
+  line, else NLOS; `[n_path]`
+- **`tap`** *(optional)* — Tap index; omitted: one tap per path; `[n_path]`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity; needed where a GR path is recomputed;
+  `[n_freq]`
+
+### Output:
+- **`rays`** — Ray data with `n_ray = n_path`, see [gbsm_rays](#gbsm_rays)
+
+### See also:
+- [qrt_file_read](#qrt_file_read) (reads path data from QRT files)
+- [ssf_paths](#ssf_paths) (paths of one link at one position)
+
+---
+<a id="gbsm_single_link_channel"></a>
+## gbsm_single_link_channel
+Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
+
+Not in: MATLAB, Python
+
+- Per snapshot [get_channels_planar](#get_channels_planar) (`"phase"`, arrays at the positions of `rays`) or
+  [get_channels_spherical](#get_channels_spherical) (`"drift"`) with the paths of [ssf_paths](#ssf_paths)
+- `"taps"`: rays summed per tap, LOS and GR taps always present, tap count fixed per call; `"rays"`: one path per
+  ray
+- Validity: see [ssf_paths](#ssf_paths); the channel's `par` reports the largest displacement relative to the limit
+
+### Declaration:
+```cpp
+channel<double> quadriga_lib::gbsm_single_link_channel(
+    const arrayant<double> &tx_array,
+    const arrayant<double> &rx_array,
+    const gbsm_rays &rays,
+    const arma::vec &link_gain_dB,
+    const std::string &mobility = "auto",
+    const std::string &output = "taps",
+    arma::uword i_freq = 0,
+    const arma::mat *tx_pos = nullptr,
+    const arma::mat *rx_pos = nullptr,
+    const arma::mat *tx_orientation = nullptr,
+    const arma::mat *rx_orientation = nullptr,
+    const arma::vec *kf_ratio = nullptr,
+    bool oxygen = false,
+    bool use_absolute_delays = false);
+```
+
+### Inputs:
+- **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
+- **`rays`** — Ray data of the link, see [gbsm_rays](#gbsm_rays)
+- **`link_gain_dB`** — Link gain `-PL - O2I + SF` at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
+- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (phase for the TR methods, drift for quadriga)
+- **`output`** *(optional)* — `"taps"` or `"rays"`
+- **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 0-based
+- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in [m]; omitted: the positions of `rays`;
+  `[n_snap, 3]` or `[1, 3]`
+- **`tx_orientation`**, **`rx_orientation`** *(optional)* — Euler angles (bank, tilt, heading) in [rad]; omitted: 0;
+  `[n_snap, 3]` or `[1, 3]`
+- **`kf_ratio`** *(optional)* — K(snapshot) / K(drop); omitted: 1; `[n_snap]` or `[1]`
+- **`oxygen`** *(optional)* — TR 7.6.1 oxygen absorption from each path's own length
+- **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
+
+### Returns:
+- Channel object with `n_snap` snapshots
+
+### See also:
+- [ssf_paths](#ssf_paths) (paths of one link at one position)
+- [gbsm_rays](#gbsm_rays) (input data)
+
+---
 <a id="los_probability"></a>
 ## los_probability
 LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models
@@ -4026,6 +4226,158 @@ void quadriga_lib::ssf_clusters(
 - [gbsm_draw](#gbsm_draw) (the random values `rnd` and `rnd_freq`)
 - [lsp_generate](#lsp_generate) (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [calc_delay_spread](#calc_delay_spread), [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) (spreads of the output)
+
+---
+<a id="ssf_paths"></a>
+## ssf_paths
+Antenna-free paths of one link at one position
+
+Not in: MATLAB, Python
+
+- `"phase"`: use the outputs with [get_channels_planar](#get_channels_planar) and the arrays at the positions of `rays` (the
+  displacement phase is in `M`); `"drift"`: inputs of [get_channels_spherical](#get_channels_spherical), [get_channels_multifreq](#get_channels_multifreq) and
+  [qrt_paths_from_scatterers](#qrt_paths_from_scatterers)
+- Rays with zero power at all frequencies are dropped, LOS and GR rays are kept
+- Validity: `"phase"` up to about `sqrt(lambda · b_eff / 8)` per moving end, `"drift"` up to about `0.2 · b_med`
+  per moving end (see [gbsm_rays](#gbsm_rays))
+
+### Declaration:
+```cpp
+void quadriga_lib::ssf_paths(
+    const gbsm_rays &rays,
+    const arma::vec &link_gain_dB,
+    arma::mat &path_gain,
+    arma::vec &path_length,
+    arma::cube &M,
+    const std::string &mobility = "auto",
+    const arma::vec *tx_pos = nullptr,
+    const arma::vec *rx_pos = nullptr,
+    const arma::vec *kf_ratio = nullptr,
+    arma::vec *aod = nullptr,
+    arma::vec *eod = nullptr,
+    arma::vec *aoa = nullptr,
+    arma::vec *eoa = nullptr,
+    arma::mat *fbs_pos = nullptr,
+    arma::mat *lbs_pos = nullptr,
+    arma::uvec *path_type = nullptr,
+    arma::uvec *ray_ind = nullptr,
+    bool oxygen = false);
+```
+
+### Inputs:
+- **`rays`** — Ray data of the link, see [gbsm_rays](#gbsm_rays)
+- **`link_gain_dB`** — Link gain `-PL - O2I + SF` at the position in [dB]; 0 for data from paths; `[n_freq]`
+- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (phase for the TR methods, drift for quadriga)
+- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
+- **`kf_ratio`** *(optional)* — K(position) / K(drop); omitted: 1; `[n_freq]`
+- **`oxygen`** *(optional)* — TR 7.6.1 oxygen absorption from each path's own length
+
+### Outputs:
+- **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
+- **`path_length`** — Path lengths in [m]; `[n_path]`
+- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Departure and arrival angles in [rad]; `[n_path]`
+- **`fbs_pos`**, **`lbs_pos`** *(optional)* — Scatterer positions in [m]; `[3, n_path]`, `"phase"`: `[3, 0]`
+- **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
+- **`ray_ind`** *(optional)* — Index of the ray in `rays`, 0-based; `[n_path]`
+
+### See also:
+- [gbsm_rays](#gbsm_rays) (input data, validity scales)
+- [gbsm_single_link_channel](#gbsm_single_link_channel) (channel coefficients of one link)
+
+---
+<a id="ssf_rays"></a>
+## ssf_rays
+Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16)
+
+Not in: MATLAB, Python
+
+- Splits the clusters of [ssf_clusters](#ssf_clusters) into rays and writes one [gbsm_rays](#gbsm_rays) object per link: ray delays,
+  powers, angles, polarization transfer matrices with initial phases, path types and tap indices
+- One geometry per call: the TR methods compute frequency `i_freq`, `"quadriga"` all frequencies
+- Ray layout per link: index 0 LOS, 1 GR (if `GR_enabled`), then ray m of NLOS cluster n at `1 + G + n·M + m`
+
+### Declaration:
+```cpp
+void quadriga_lib::ssf_rays(
+    const std::unordered_map<std::string, double> &scenpar,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
+    const arma::vec &center_frequency,
+    const arma::cube &lsp,
+    const arma::cube &lsp_mu,
+    const arma::cube &lsp_sigma,
+    const arma::cube &delay,
+    const arma::cube &power,
+    const arma::cube &aod,
+    const arma::cube &eod,
+    const arma::cube &aoa,
+    const arma::cube &eoa,
+    const arma::cube &rnd_ray,
+    std::vector<gbsm_rays> &rays,
+    const std::string &method = "38.901",
+    arma::uword i_freq = 0,
+    const std::string &angle_model = "additive",
+    const std::string &pol_model = "38.901",
+    const arma::mat *gr_eps_re = nullptr,
+    const arma::mat *gr_eps_im = nullptr,
+    bool pol_variability = false,
+    bool random_phase = true);
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters
+- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
+- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`center_frequency`** — Carrier frequencies in [Hz]; `[n_freq]`
+- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [lsp_generate](#lsp_generate);
+  `[n_link, n_freq, 8]`
+- **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [ssf_clusters](#ssf_clusters);
+  `[n_link, n_slot, n_freq]` for `"38.901_MF"`, else `[n_link, n_slot, 1]`
+- **`power`** — Cluster powers from [ssf_clusters](#ssf_clusters); `[n_link, n_slot, n_freq]`
+- **`rnd_ray`** — "ray" sets from [gbsm_draw](#gbsm_draw); `[n_link, n_gen, n_freq]` (TR methods) or `[n_link, n_gen, 1]`
+- **`method`** *(optional)* — Method of [ssf_clusters](#ssf_clusters): `"38.901"`, `"38.901_MF"` or `"quadriga"`
+- **`i_freq`** *(optional)* — TR methods: index into `center_frequency`, 0-based; `"quadriga"`: 0
+- **`angle_model`** *(optional)* — `"additive"` or `"rotation"`
+- **`pol_model`** *(optional)* — `"38.901"` or `"quadriga"`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [lsp_generate](#lsp_generate); required if
+  `GR_enabled`; `[n_link, n_freq]`
+- **`pol_variability`** *(optional)* — TR 7.6.16 polarisation power variability
+- **`random_phase`** *(optional)* — `false`: all initial phases 0
+
+### Output:
+- **`rays`** — Ray data, one entry per link; `fbs_pos`, `lbs_pos`, `fallback` empty; `[n_link]`
+
+### See also:
+- [gbsm_rays](#gbsm_rays) (attributes of the output)
+- [ssf_paths](#ssf_paths) (paths of one link)
+
+---
+<a id=".solve_scatterers"></a>
+## .solve_scatterers
+First- and last-bounce scatterers of the rays of one link (two-bounce solver)
+
+Not in: MATLAB, Python
+
+- NLOS rays: exact departure and arrival angles where a solution exists, equal distances from both ends;
+  otherwise the shortest polyline along the ray's own directions with both scatterers at least `d_min` away
+  (`fallback` = 1; the ray is lengthened, `delay` keeps its value)
+- LOS ray on the direct line, GR ray at the specular point on z = 0, rays with zero power at all frequencies at
+  the midpoint of the direct line
+- Writes `fbs_pos`, `lbs_pos` and `fallback` of all rays and overwrites given scatterers; nothing else changes;
+  afterwards `b_med()` and `b_eff()` give the validity scales of [ssf_paths](#ssf_paths)
+
+### Declaration:
+```cpp
+void quadriga_lib::gbsm_rays::solve_scatterers(double d_min = 2.0);
+```
+
+### Input:
+- **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0
+
+### See also:
+- [gbsm_rays](#gbsm_rays) (attributes and members)
+- [ssf_paths](#ssf_paths) (mobility `drift` needs the scatterers)
 
 ---
 

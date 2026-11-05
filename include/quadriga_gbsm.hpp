@@ -174,8 +174,9 @@ namespace quadriga_lib
                   arma::uvec *model_index = nullptr);        // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]
 
     // ---- Small-scale fading ----
-    // Cluster level of TR 38.901 clause 7.5 steps 5 to 7; N = NumClusters - 1 NLOS clusters. The column layout of
-    // the random values: see the documentation of gbsm_draw
+    // Cluster level (ssf_clusters) and ray level (gbsm_rays, ssf_rays, ssf_paths) of TR 38.901 clause 7.5;
+    // N = NumClusters - 1 NLOS clusters, M = NumSubPaths rays per cluster. The column layout of the random values:
+    // see the set table in the documentation
 
     // Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
     // - Methods "38.901", "38.901_MF" (clause 7.6.5.1), "quadriga"
@@ -201,6 +202,113 @@ namespace quadriga_lib
                       const std::vector<bool> *o2i = nullptr,                 // Optional: O2I flag per link (mean ZOA 90 deg in 38.901), [n_link]; nullptr = none
                       const arma::uvec *n_cluster = nullptr,                  // Optional: Number of NLOS clusters per link (TR clause 7.6.15), [n_link]; nullptr = N
                       arma::uvec *n_active = nullptr);                        // Optional output: Number of NLOS clusters with power > 0, [n_link]
+
+    // Ray data of one link (geometry-based stochastic model)
+    // - Output of ssf_rays and gbsm_rays_from_paths; solve_scatterers adds the scatterer positions
+    // - Input of ssf_paths and gbsm_single_link_channel, which call is_valid() first
+    // - Set the attributes by name: later versions append attributes
+    class gbsm_rays
+    {
+    public:
+        std::string method = "38.901"; // Method of the ray data: "38.901", "38.901_MF" or "quadriga"; sets the GR power law and the default mobility
+        arma::vec tx_pos;               // Tx position the ray data refer to in [m], [3]
+        arma::vec rx_pos;               // Rx position the ray data refer to in [m], [3]
+        arma::vec center_frequency;     // Carrier frequencies in [Hz], [n_freq]
+        arma::vec delay;                // Delays in [s] relative to the LOS delay |rx_pos - tx_pos| / c, [n_ray]
+        arma::mat power;                // Coefficient powers (linear), without link gain; data from paths: path gain, [n_ray, n_freq]
+        arma::vec aod;                  // Azimuth of departure in [rad], GCS, [n_ray]
+        arma::vec eod;                  // Elevation of departure in [rad], GCS, [n_ray]
+        arma::vec aoa;                  // Azimuth of arrival in [rad], GCS, [n_ray]
+        arma::vec eoa;                  // Elevation of arrival in [rad], GCS, [n_ray]
+        arma::cube M;                   // Polarization transfer matrices incl. initial phases, row order of get_channels_*, [8, n_ray, n_freq]
+        arma::uvec path_type;           // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_ray]
+        arma::uvec tap;                 // Tap index, rays with equal index form one tap, [n_ray]
+        arma::vec gr_eps_re;            // Ground permittivity, real part, [n_freq] or empty; needed where a GR ray is recomputed
+        arma::vec gr_eps_im;            // Ground permittivity, imaginary part, [n_freq] or empty; needed where a GR ray is recomputed
+        arma::mat fbs_pos;              // First-bounce scatterer positions in [m], [3, n_ray]; empty until solve_scatterers
+        arma::mat lbs_pos;              // Last-bounce scatterer positions in [m], [3, n_ray]; empty until solve_scatterers
+        arma::uvec fallback;            // 1 = lengthened by the solver fallback, [n_ray]; empty until solve_scatterers
+        gbsm_rays() {};                 // Default constructor
+
+        arma::uword n_ray() const;                     // Number of rays, length of 'delay'
+        arma::uword n_freq() const;                    // Number of frequencies, length of 'center_frequency'
+        bool empty() const;                            // true if the object holds no rays
+        std::string is_valid() const;                  // Empty string if the object is valid, else an error message
+        arma::vec b_med(arma::uword i_freq = 0) const; // b_med of the Tx (to FBS) and the Rx (to LBS) in [m], [2]; NaN without scatterers or NLOS power
+        arma::vec b_eff(arma::uword i_freq = 0) const; // b_eff of the Tx and the Rx in [m], [2]; NaN without scatterers or power
+        void solve_scatterers(double d_min = 2.0);     // Two-bounce solver: writes fbs_pos, lbs_pos and fallback; d_min in [m], > 0
+    };
+
+    // Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16)
+    // - One geometry per call: "38.901" and "38.901_MF" compute frequency 'i_freq' (with slice i_freq of 'rnd_ray');
+    //   "quadriga" all frequencies; all other inputs as ssf_clusters and lsp_generate return them
+    // - A pure function of the clusters, the LSPs and the random values: no seed, batch-independent
+    void ssf_rays(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters, NumSubPaths, PerCluster*, GR_enabled, PolVar_sigma)
+                  const arma::mat &tx_pos,                                // Tx positions in [m], [1, 3] or [n_link, 3]
+                  const arma::mat &rx_pos,                                // Rx positions in [m], [n_link, 3]
+                  const arma::vec &center_frequency,                      // Carrier frequencies in [Hz], [n_freq]
+                  const arma::cube &lsp,                                  // LSPs from lsp_generate, [n_link, n_freq, 8]
+                  const arma::cube &lsp_mu,                               // Log-domain means from lsp_generate, [n_link, n_freq, 8]
+                  const arma::cube &lsp_sigma,                            // Log-domain std from lsp_generate, [n_link, n_freq, 8]
+                  const arma::cube &delay,                                // Cluster delays from ssf_clusters, [n_link, n_slot, n_freq] ("38.901_MF") or [n_link, n_slot, 1]
+                  const arma::cube &power,                                // Cluster powers from ssf_clusters, [n_link, n_slot, n_freq]
+                  const arma::cube &aod,                                  // Cluster AOD from ssf_clusters, size as 'delay'
+                  const arma::cube &eod,                                  // Cluster EOD from ssf_clusters, size as 'delay'
+                  const arma::cube &aoa,                                  // Cluster AOA from ssf_clusters, size as 'delay'
+                  const arma::cube &eoa,                                  // Cluster EOA from ssf_clusters, size as 'delay'
+                  const arma::cube &rnd_ray,                              // "ray" sets from gbsm_draw, [n_link, n_gen, n_freq] (TR methods: slice k = set k) or [n_link, n_gen, 1] (quadriga: set -1)
+                  std::vector<gbsm_rays> &rays,                           // Output: Ray data, n_link entries; fbs_pos, lbs_pos, fallback empty
+                  const std::string &method = "38.901",                   // Method of ssf_clusters: "38.901", "38.901_MF" or "quadriga"
+                  arma::uword i_freq = 0,                                 // TR methods: index into center_frequency and slice of rnd_ray, 0-based; quadriga: must be 0
+                  const std::string &angle_model = "additive",            // "additive" (TR, zenith fold) or "rotation" (3-D rotation of the offsets)
+                  const std::string &pol_model = "38.901",                // "38.901" (kappa, four phases) or "quadriga" (rotation model)
+                  const arma::mat *gr_eps_re = nullptr,                   // Optional: Ground permittivity, real part, from lsp_generate, [n_link, n_freq]; required if GR_enabled
+                  const arma::mat *gr_eps_im = nullptr,                   // Optional: Ground permittivity, imaginary part, from lsp_generate, [n_link, n_freq]; required if GR_enabled
+                  bool pol_variability = false,                           // TR 7.6.16 polarisation power variability; pol_model "38.901" only
+                  bool random_phase = true);                              // false: all initial phases 0
+
+    // Antenna-free paths of one link at one position
+    // - "phase": use the outputs with get_channels_planar and the arrays at the positions of 'rays' (the displacement
+    //   phase is in M); "drift": inputs of get_channels_spherical / get_channels_multifreq and qrt_paths_from_scatterers
+    // - Rays with zero power at all frequencies are dropped, LOS and GR rays are kept
+    // - Validity: "phase" up to about sqrt(lambda * b_eff / 8) per moving end (see gbsm_rays::b_eff),
+    //   "drift" up to about 0.2 * b_med per moving end
+    void ssf_paths(const gbsm_rays &rays,                // Ray data of the link
+                   const arma::vec &link_gain_dB,        // Link gain -PL - O2I + SF at the position in [dB], [n_freq]; 0 for data from paths
+                   arma::mat &path_gain,                 // Output: Path gains (linear), [n_path, n_freq]
+                   arma::vec &path_length,               // Output: Path lengths in [m], [n_path]
+                   arma::cube &M,                        // Output: Polarization transfer matrices, [8, n_path, n_freq]
+                   const std::string &mobility = "auto", // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
+                   const arma::vec *tx_pos = nullptr,    // Optional: Tx position in [m], [3]; nullptr = rays.tx_pos
+                   const arma::vec *rx_pos = nullptr,    // Optional: Rx position in [m], [3]; nullptr = rays.rx_pos
+                   const arma::vec *kf_ratio = nullptr,  // Optional: K(position) / K(drop), [n_freq]; nullptr = 1
+                   arma::vec *aod = nullptr,             // Optional output: Azimuth of departure in [rad], [n_path]
+                   arma::vec *eod = nullptr,             // Optional output: Elevation of departure in [rad], [n_path]
+                   arma::vec *aoa = nullptr,             // Optional output: Azimuth of arrival in [rad], [n_path]
+                   arma::vec *eoa = nullptr,             // Optional output: Elevation of arrival in [rad], [n_path]
+                   arma::mat *fbs_pos = nullptr,         // Optional output: First-bounce scatterer positions in [m], [3, n_path]; "phase": [3, 0]
+                   arma::mat *lbs_pos = nullptr,         // Optional output: Last-bounce scatterer positions in [m], [3, n_path]; "phase": [3, 0]
+                   arma::uvec *path_type = nullptr,      // Optional output: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
+                   arma::uvec *ray_ind = nullptr,        // Optional output: Index of the ray in 'rays', 0-based, [n_path]
+                   bool oxygen = false);                 // TR 7.6.1 oxygen absorption from each path's own length
+
+    // Ray data of one link from spherical path data (e.g. read with qrt_file_read)
+    // - Delays from the path lengths, angles from the scatterer positions, power = path gain
+    // - Fills a pre-initialised object in place
+    void gbsm_rays_from_paths(const arma::vec &center_frequency,      // Frequencies in [Hz], [n_freq]
+                              const arma::vec &tx_pos,                // Tx position in [m], [3]
+                              const arma::vec &rx_pos,                // Rx position in [m], [3]
+                              const arma::mat &fbs_pos,               // First-bounce scatterer positions in [m], [3, n_path]
+                              const arma::mat &lbs_pos,               // Last-bounce scatterer positions in [m], [3, n_path]
+                              const arma::mat &path_gain,             // Path gains (linear), [n_path, n_freq]
+                              const arma::vec &path_length,           // Path lengths in [m], [n_path]
+                              const arma::cube &M,                    // Polarization transfer matrices, [8, n_path, n_freq]
+                              gbsm_rays &rays,                        // Output: Ray data, n_ray = n_path
+                              const std::string &method = "quadriga", // Value of rays.method: GR power law and default mobility
+                              const arma::uvec *path_type = nullptr,  // Optional: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]; nullptr = LOS where FBS = LBS on the direct line, else NLOS
+                              const arma::uvec *tap = nullptr,        // Optional: Tap index, [n_path]; nullptr = one tap per path
+                              const arma::vec *gr_eps_re = nullptr,   // Optional: Ground permittivity, real part, [n_freq]; needed where a GR path is recomputed
+                              const arma::vec *gr_eps_im = nullptr);  // Optional: Ground permittivity, imaginary part, [n_freq]; needed where a GR path is recomputed
 }
 
 #endif

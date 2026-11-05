@@ -22,6 +22,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [qrt_file_parse](#qrt_file_parse) | Read metadata from a QRT file |
 | [qrt_file_read](#qrt_file_read) | Read ray-tracing CIR data from a QRT file |
 | [qrt_file_read_raw](#qrt_file_read_raw) | Read raw ray-tracing path data from a QRT file into path objects |
+| [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) | Path objects of one CIR from spherical path data, for qrt_file_append |
 | [qrt_read_cache_init](#qrt_read_cache_init) | Initialize a QRT read cache for fast repeated access |
 | [quantize_delays](#quantize_delays) | Map path delays to a fixed tap grid using two-tap power-weighted interpolation |
 
@@ -946,6 +947,48 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 - [qrt_file_append](#qrt_file_append) (write path data — the inverse operation)
 - [qrt_read_cache_init](#qrt_read_cache_init) (populate cache for fast repeated reads)
 - [qrt_file_read](#qrt_file_read) (read processed CIR data instead of raw paths)
+
+---
+<a id="qrt_paths_from_scatterers"></a>
+## qrt_paths_from_scatterers
+Path objects of one CIR from spherical path data, for qrt_file_append
+
+Not in: MATLAB, Python
+
+- The path gain and the inverse free-space loss of the polyline length are folded into the stored Jones matrices
+- LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
+- Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
+
+### Declaration:
+```cpp
+std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
+    const arma::vec &center_frequency,
+    const arma::vec &tx_pos,
+    const arma::vec &rx_pos,
+    const arma::mat &fbs_pos,
+    const arma::mat &lbs_pos,
+    const arma::mat &path_gain,
+    const arma::cube &M,
+    const arma::uvec &path_type,
+    arma::uword i_cir = 0);
+```
+
+### Inputs:
+- **`center_frequency`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
+- **`tx_pos`** — Tx (origin) position in [m]; `[3]`
+- **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
+- **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
+- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
+- **`i_cir`** *(optional)* — CIR index, stored in `path::iC`, < 2^32
+
+### Returns:
+- Path objects in input order; `[n_path]`
+
+### See also:
+- [qrt_file_append](#qrt_file_append) (writes the paths)
+- [ssf_paths](geometry-based-stochastic-model.md#ssf_paths) (path data of the geometry-based stochastic model)
 
 ---
 <a id="qrt_read_cache_init"></a>

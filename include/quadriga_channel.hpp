@@ -484,6 +484,20 @@ namespace quadriga_lib
                                                       std::ifstream *file = nullptr,          // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
                                                       const qrt_read_cache *cache = nullptr); // Optional pre-parsed metadata cache for maximum performance in tight loops
 
+    // Path objects of one CIR from spherical path data, for qrt_file_append
+    // - The path gain and the inverse free-space loss of the polyline length are folded into the stored Jones matrices
+    // - LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
+    // - Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
+    std::vector<path> qrt_paths_from_scatterers(const arma::vec &center_frequency, // Frequencies in [Hz], [n_freq], 1 to 127 entries
+                                                const arma::vec &tx_pos,           // Tx (origin) position in [m], [3]
+                                                const arma::vec &rx_pos,           // Rx position of the CIR in [m], [3]
+                                                const arma::mat &fbs_pos,          // First-bounce scatterer positions in [m], [3, n_path]
+                                                const arma::mat &lbs_pos,          // Last-bounce scatterer positions in [m], [3, n_path]
+                                                const arma::mat &path_gain,        // Path gains (linear), [n_path, n_freq]
+                                                const arma::cube &M,               // Polarization transfer matrices, [8, n_path, n_freq]
+                                                const arma::uvec &path_type,       // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
+                                                arma::uword i_cir = 0);            // CIR index, stored in path::iC, < 2^32
+
 }
 
 #endif
