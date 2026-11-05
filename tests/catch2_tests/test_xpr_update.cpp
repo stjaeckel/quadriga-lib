@@ -7,8 +7,14 @@
 #include "quadriga_tools.hpp"
 
 #include <cmath>
-#include <omp.h>
 #include <random>
+
+#ifdef _OPENMP
+#include <omp.h>
+#else // Without OpenMP the thread-count loops repeat the single-thread call
+inline int omp_get_max_threads() { return 1; }
+inline void omp_set_num_threads(int) {}
+#endif
 
 // Reference: the same updates applied in chunks of 1000 (below the OpenMP threshold of xpr_update, so each chunk runs
 // serially), i.e. one after the other in update-index order

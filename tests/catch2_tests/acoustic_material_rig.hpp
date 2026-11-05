@@ -644,7 +644,8 @@ namespace mt
             for (int i = -nx; i < nx; ++i)
                 for (int j = -nx; j < nx; ++j)
                 {
-                    const arma::vec3 o = ((i + U(rng)) * dx) * u + ((j + U(rng)) * dx) * v - D * d, t0 = (-hi - o) / d, t1 = (hi - o) / d; // slab test
+                    const double rj = U(rng), ri = U(rng); // fixed order: the reference values of the tests depend on it
+                    const arma::vec3 o = ((i + ri) * dx) * u + ((j + rj) * dx) * v - D * d, t0 = (-hi - o) / d, t1 = (hi - o) / d; // slab test
                     const double a = arma::max(arma::min(t0, t1)), b = arma::min(arma::max(t0, t1));
                     if (b > a)
                         O.push_back(o), R.chord += dx * dx * (1.0 - std::exp(-m * (b - a))) * 2.0 / n_dir;

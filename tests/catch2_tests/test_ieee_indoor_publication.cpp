@@ -470,7 +470,10 @@ TEST_CASE("IEEE indoor publication - Sec. 4.2, Table 4-2: 4x4 MIMO NLOS capacity
                 std::mt19937_64 g(n);
                 std::normal_distribution<double> N01;
                 for (auto &h : H)
-                    h = cx(N01(g), N01(g)) / std::sqrt(2.0);
+                {
+                    const double re = N01(g), im = N01(g);
+                    h = cx(re, im) / std::sqrt(2.0);
+                }
             }
             double P = 0.0;
             for (auto &h : H)
