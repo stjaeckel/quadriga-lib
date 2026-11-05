@@ -24,3 +24,4 @@ test*.txt
 .claude/worktrees/
 /website/
 .ipynb_checkpoints/
+view_website.py
