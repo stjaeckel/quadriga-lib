@@ -27,8 +27,8 @@ Write a QuaDRiGa scenario configuration file
   passed unchanged
 - Numbers have up to 15 significant digits, or 16 or 17 where 15 do not read back to the same
   double, independent of the locale; `Inf`, `-Inf` and `-0` are kept
-- `write_defaults = false`: only fields whose value differs from the default (bit for bit) and
-  `SubpathMethod` if it is not `legacy`; a section without a written field is left out
+- `write_defaults = false`: only fields whose value differs from the default (bit for bit); a
+  section without a written field is left out
 - All inputs are validated before the file is opened: the checks of [[scenpar_validate]]; `model`,
   the other fields of `plpar` and the short names are names, the short names distinct; every `plpar`
   field has at least one value and no `NaN`; `fn`, `ref` and `ref_sec` have no line break
@@ -44,10 +44,9 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 
 ## Inputs:
 - **`fn`** — Path of the conf file to write; string
-- **`scenpar`** — Scenario parameters; struct with any subset of the 172 fields returned by
-  [[conf_file_read]]; numeric fields are real scalars of class double, single, int32, uint32,
-  int64, uint64 or logical; `SubpathMethod` is a string; missing fields have their default; `[]`
-  writes the default set
+- **`scenpar`** — Scenario parameters; struct with any subset of the 171 fields returned by
+  [[conf_file_read]]; real scalars of class double, single, int32, uint32, int64, uint64 or logical;
+  missing fields have their default; `[]` writes the default set
 - **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one
   real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further
   field, named without the prefix `PL_`, as returned by [[conf_file_read]]; a matrix is an error;
@@ -82,8 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
 
-    std::string subpath_method = "legacy";
-    const auto scenpar = qd_mex_struct2scenpar(prhs[1], subpath_method, "scenpar");
+    const auto scenpar = qd_mex_struct2scenpar(prhs[1], "scenpar");
 
     std::string pl_model;
     std::vector<std::string> pl_order;
@@ -112,6 +110,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool write_defaults = (nrhs < 8) ? false : qd_mex_get_scalar<bool>(prhs[7], "write_defaults", false);
 
     // Call library function
-    CALL_QD(quadriga_lib::conf_file_write(fn, scenpar, subpath_method, pl_model, &plpar, &pl_order, &short_names,
+    CALL_QD(quadriga_lib::conf_file_write(fn, scenpar, pl_model, &plpar, &pl_order, &short_names,
                                           ref, &ref_sec, &valid_range, write_defaults));
 }

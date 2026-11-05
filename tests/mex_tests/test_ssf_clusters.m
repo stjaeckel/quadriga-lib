@@ -59,7 +59,7 @@ assertTrue( max(abs(dq(:) - delay(:))) > 1e-9 );
 
 % '38.901_MF' with two frequencies and anchor LSPs: delays and angles per frequency
 [ lsp2, ~, rnd_f1 ] = draw( sp, [ 6e9, 30e9 ], tx_pos, rx_pos, 11 );
-rnd_f2 = quadriga_lib.ssf_draw( sp, quadriga_lib.ssf_init_phases( sp, 11, 2 ), tx_pos, rx_pos, 2 );
+rnd_f2 = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 11, 2 ), tx_pos, rx_pos, 2 );
 lsp_a = draw( sp, 2e9, tx_pos, rx_pos, 11 );
 [ dm, pm, am ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp2, rnd, '38.901_MF', cat( 3, rnd_f1, rnd_f2 ), lsp_a );
 assertEqual( size(dm), [4, N + 1, 2] );
@@ -174,11 +174,11 @@ end
 
 % LSPs and the random values of one scenario at the links
 function [ lsp, rnd, rnd_f, abs_toa, eod_offset_deg ] = draw( sp, fc, tx_pos, rx_pos, seed )
-phase = quadriga_lib.lsf_init_phases( sp, seed, [], [], [], false );
+phase = quadriga_lib.gbsm_init_phases( sp, 'lsf', seed, [], [], [], [], [], false );
 [ lsp, abs_toa, ~, ~, eod_offset_deg ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
-    quadriga_lib.lsf_draw( sp, phase, tx_pos, rx_pos ) );
-rnd = quadriga_lib.ssf_draw( sp, quadriga_lib.ssf_init_phases( sp, seed ), tx_pos, rx_pos );
-rnd_f = quadriga_lib.ssf_draw( sp, quadriga_lib.ssf_init_phases( sp, seed, 1 ), tx_pos, rx_pos, 1 );
+    quadriga_lib.gbsm_draw( sp, 'lsf', phase, tx_pos, rx_pos ) );
+rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', seed ), tx_pos, rx_pos );
+rnd_f = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', seed, 1 ), tx_pos, rx_pos, 1 );
 end
 
 % EoA of the '38.901' method with an O2I flag

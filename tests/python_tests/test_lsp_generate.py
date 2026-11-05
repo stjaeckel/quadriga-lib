@@ -77,7 +77,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(toa, 10.0 ** (-7.4 + self.sp_nlos["absTOA_sigma"] * rnd_t[:, 8]), rtol=1e-12, atol=0)
 
     def test_keyword_arguments(self):
-        ok = self.call(scenpar=self.sp, fc=self.fc, tx_pos=self.tx_pos, rx_pos=self.rx_pos, rnd=self.rnd,
+        ok = self.call(scenpar=self.sp, center_freq=self.fc, tx_pos=self.tx_pos, rx_pos=self.rx_pos, rnd=self.rnd,
                        sf_sigma=None, cholesky=True, clip_spreads=True, complex=True)
         op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True, True)
         for a, b, c in zip(ok, op, self.out):
@@ -209,7 +209,7 @@ class test_case(unittest.TestCase):
         self.assertIn("LSP cross-correlation matrix in 'scenpar' is not positive definite.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             self.call(self.sp, np.zeros(0), self.tx_pos, self.rx_pos, self.rnd)
-        self.assertIn("Input 'fc' cannot be empty.", str(ctx.exception))
+        self.assertIn("Input 'center_frequency' cannot be empty.", str(ctx.exception))
         with self.assertRaises(TypeError):
             self.call(self.sp, self.fc, self.tx_pos, self.rx_pos)
         with self.assertRaises(TypeError):

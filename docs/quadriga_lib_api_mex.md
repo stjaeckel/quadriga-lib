@@ -66,16 +66,14 @@ lang: en-US
 | [conf_file_list](#conf_file_list) | Geometry-based stochastic model | List the scenarios defined by the conf files in a set of directories |
 | [conf_file_read](#conf_file_read) | Geometry-based stochastic model | Read and validate a QuaDRiGa scenario configuration file |
 | [conf_file_write](#conf_file_write) | Geometry-based stochastic model | Write a QuaDRiGa scenario configuration file |
+| [gbsm_draw](#gbsm_draw) | Geometry-based stochastic model | Spatially correlated normalized random values of one generator set at a set of links |
+| [gbsm_init_phases](#gbsm_init_phases) | Geometry-based stochastic model | Draw the random phases of one generator set of a BS site and scenario |
 | [los_probability](#los_probability) | Geometry-based stochastic model | LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models |
-| [lsf_draw](#lsf_draw) | Geometry-based stochastic model | Spatially correlated normalized random values of the large-scale generators at a set of links |
-| [lsf_init_phases](#lsf_init_phases) | Geometry-based stochastic model | Draw the random phases of the large-scale generators of one BS site and scenario |
 | [lsp_generate](#lsp_generate) | Geometry-based stochastic model | Large-scale parameters of a set of links from normalized random values |
 | [o2i_loss](#o2i_loss) | Geometry-based stochastic model | O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3 |
 | [path_loss](#path_loss) | Geometry-based stochastic model | Path loss and shadow-fading standard deviation of a set of links |
 | [scenpar_validate](#scenpar_validate) | Geometry-based stochastic model | Validate scenario parameters and complete them with default values |
 | [ssf_clusters](#ssf_clusters) | Geometry-based stochastic model | Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7) |
-| [ssf_draw](#ssf_draw) | Geometry-based stochastic model | Spatially correlated normalized random values of one small-scale fading generator set at a set of links |
-| [ssf_init_phases](#ssf_init_phases) | Geometry-based stochastic model | Draw the random phases of one small-scale fading generator set of a BS site and scenario |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | Calculate rotation matrices from Euler angles |
 | [cart2geo](#cart2geo) | Math functions | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
 | [fast_sincos](#fast_sincos) | Math functions | Compute elementwise approximate sine and/or cosine of a vector |
@@ -2000,36 +1998,38 @@ path-loss parameters (`plpar`) and optional short names, read from a conf file b
 [conf_file_read](#conf_file_read). 23 files for TR 38.901 v19.5.0 come with the library, in `data/config` of the
 source tree and in `share/quadriga-lib/config` of an installed package; [conf_file_list](#conf_file_list) finds
 them and [conf_file_write](#conf_file_write) writes them. Every function that takes `scenpar` accepts the struct of
-[conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate) or any subset of its fields (`SubpathMethod` is ignored,
-`[]` = all defaults), completes it with the defaults of missing fields and validates it with
-[scenpar_validate](#scenpar_validate); an invalid value of a field that the function does not use is an error as
-well.
+[conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate) or any subset of its fields (`[]` = all defaults; a field
+`SubpathMethod` of QuaDRiGa's structs must be `'legacy'`), completes it with the defaults of missing
+fields and validates it with [scenpar_validate](#scenpar_validate); an invalid value of a field that the function
+does not use is an error as well.
 
 **Workflow.** Per drop: [o2i_loss](#o2i_loss) gives the penetration loss and the indoor distance of each
 indoor UT, then [los_probability](#los_probability) the LOS probability at the outdoor distance `d2D - d2D-in`. The
 caller draws the LOS, indoor and O2I states with [sos_rand](#sos_rand) / [sos_randn](#sos_randn) at the correlation
 distances of TR 38.901 clause 7.6.3.3; the fields `LOS_state_lambda` and `IO_state_lambda` apply to
 all links of a scenario and are stated in the NLOS and in the O2I files (0 in the other files means
-"not stated here"). Per BS site and scenario: [lsf_init_phases](#lsf_init_phases) draws the phases of the
-large-scale generators once, [lsf_draw](#lsf_draw) evaluates them at the links, [path_loss](#path_loss) gives the path
-loss and the shadow-fading (SF) standard deviation, and [lsp_generate](#lsp_generate) the LSPs of each link and
-frequency. Small scale: [ssf_init_phases](#ssf_init_phases) and [ssf_draw](#ssf_draw) do the same for the cluster random
-values, and [ssf_clusters](#ssf_clusters) turns the LSPs and random values into cluster delays, powers and
+"not stated here"). Per BS site and scenario: [gbsm_init_phases](#gbsm_init_phases) draws the phases of each random
+set once (`'lsf'`; `'cluster'` with `set_id = 0` and one set per carrier frequency), and
+[gbsm_draw](#gbsm_draw) evaluates them at the links. Then [path_loss](#path_loss) gives the path loss and the
+shadow-fading (SF) standard deviation, [lsp_generate](#lsp_generate) the LSPs of each link and frequency, and
+[ssf_clusters](#ssf_clusters) turns the LSPs and the cluster random values into cluster delays, powers and
 angles.
 
-**Large-scale generators.** Columns of the phase array of [lsf_init_phases](#lsf_init_phases) and of the random
-values of [lsf_draw](#lsf_draw); a decorrelation distance of 0 is used as 0.1 m:
+**Random sets.** The spatially correlated random values come in sets of generators, one column of
+`rnd` each; `N = NumClusters - 1`, columns `b·N + 1` to `(b + 1)·N` of a `'cluster'` set form block
+`b`, one column per NLOS cluster:
 
-| Column | Generator | Distribution | Decorrelation distance |
-| --- | --- | --- | --- |
-| 1 to 8 | DS, KF, SF, ASD, ASA, ESD, ESA, XPR | Normal(0,1) | `DS_lambda`, `KF_lambda`, `SF_lambda`, `AS_D_lambda`, `AS_A_lambda`, `ES_D_lambda`, `ES_A_lambda`, `XPR_lambda` |
-| 9 | absolute TOA | Normal(0,1) | `absTOA_lambda` |
-| 10 | ground permittivity | Uniform(0,1) | `SC_lambda` |
-| 11 | UMa environment height hE | Uniform(0,1) | `SF_lambda` |
+| `set_type`, `set_id` | `n_gen` | Columns and distributions | Decorrelation distance | Mirror pairs | Used by |
+| --- | --- | --- | --- | --- | --- |
+| `'lsf'` | 11 | 1 to 8 DS, KF, SF, ASD, ASA, ESD, ESA, XPR, Normal(0,1); 9 absolute TOA, Normal(0,1); 10 ground permittivity, 11 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (1 to 8), `absTOA_lambda` (9), `SC_lambda` (10), `SF_lambda` (11) | 4 and 5, 6 and 7 | [lsp_generate](#lsp_generate) `rnd`, [path_loss](#path_loss) `rnd_he` (column 11) |
+| `'cluster'`, 0 | `9·N` | block 0 cluster delay, Uniform(0,1); 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 offset of AOD, AOA; 7, 8 offset of ZOD, ZOA, Normal(0,1) | `SC_lambda` | blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 | [ssf_clusters](#ssf_clusters) `rnd` |
+| `'cluster'`, `k` | `N` | cluster shadowing of frequency `k`, Normal(0,1) | `SC_lambda` | none | [ssf_clusters](#ssf_clusters) `rnd_freq`, slice `k` |
 
-The Tx side of a phase array (slice 2) exchanges ASD and ASA, ESD and ESA, so that in dual mobility
-(Tx and Rx both move) the departure spreads at the Tx are the arrival spreads of the Tx as a second
-device.
+The Tx side of a phase array (slice 2) exchanges the columns of each mirror pair, so that in dual
+mobility (Tx and Rx both move) the departure quantities at the Tx are the arrival quantities of the
+Tx as a second device. A decorrelation distance of 0 is used as 0.1 m. Only the `'lsf'` columns 1 to
+9 take part in the bias removal. A set never changes size: new random quantities come in new sets
+(a new `set_type` or `set_id`).
 
 **Conventions.** Positions are in m with the columns x, y, z: `rx_pos` is `[n_link, 3]`, `tx_pos` is
 `[1, 3]` (one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. In 2D mode
@@ -2092,15 +2092,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_read) · [Python](quadriga_lib_
 - A conf file has one `Key = value` assignment per line; `%` starts a comment; blank lines, LF or
   CRLF line ends and a UTF-8 byte order mark at the start are accepted; keys are case-sensitive
   names of `A-Z`, `a-z`, `0-9` and `_`
-- Four kinds of keys:
+- Three kinds of keys:
   - 171 numeric scenario parameters (see [scenpar_validate](#scenpar_validate)), one number each; keys that are not
     in the file have their default value
-  - `SubpathMethod`: one word, default `legacy`
   - `PL_` keys: `PL_model` has one name, the others one or more numbers separated by white space
   - `ShortName`: an alias of the scenario, one name; can occur several times with different values
 - Any other key is reported in `ignored_keys` and its value is not examined; this includes the
   QuaDRiGa key `GR_epsilon` (the complex ground permittivity comes from [lsp_generate](#lsp_generate)). A key
   stated more than once has its last value
+- The line `SubpathMethod = legacy` of QuaDRiGa's files is accepted and ignored; another value of
+  `SubpathMethod` is an error, also with `validate = false`
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`),
   read independent of the locale; `Inf`, `+Inf` and `-Inf` in any case; a number below the smallest
   subnormal reads as 0
@@ -2124,9 +2125,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_read) · [Python](quadriga_lib_
   grammar is checked; default: true
 
 ### Outputs:
-- **`scenpar`** — Scenario parameters; struct with 172 fields in the QuaDRiGa field order: the 138
-  numeric keys of QuaDRiGa with `SubpathMethod` (string) as field 107, then the 33 new keys; all
-  numeric fields are scalars
+- **`scenpar`** — Scenario parameters; struct with 171 scalar fields in the canonical order: the 138
+  numeric keys of QuaDRiGa, then the 33 new keys
 - **`plpar`** — Path-loss parameters; struct with the field `model` (string, only if the file states
   `PL_model`) followed by one field per `PL_` key in file order, named without the prefix `PL_`;
   each is a row vector with one or more values; `[]` if the file has no `PL_` key
@@ -2164,8 +2164,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_write) · [Python](quadriga_lib
   passed unchanged
 - Numbers have up to 15 significant digits, or 16 or 17 where 15 do not read back to the same
   double, independent of the locale; `Inf`, `-Inf` and `-0` are kept
-- `write_defaults = false`: only fields whose value differs from the default (bit for bit) and
-  `SubpathMethod` if it is not `legacy`; a section without a written field is left out
+- `write_defaults = false`: only fields whose value differs from the default (bit for bit); a
+  section without a written field is left out
 - All inputs are validated before the file is opened: the checks of [scenpar_validate](#scenpar_validate); `model`,
   the other fields of `plpar` and the short names are names, the short names distinct; every `plpar`
   field has at least one value and no `NaN`; `fn`, `ref` and `ref_sec` have no line break
@@ -2181,10 +2181,9 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 
 ### Inputs:
 - **`fn`** — Path of the conf file to write; string
-- **`scenpar`** — Scenario parameters; struct with any subset of the 172 fields returned by
-  [conf_file_read](#conf_file_read); numeric fields are real scalars of class double, single, int32, uint32,
-  int64, uint64 or logical; `SubpathMethod` is a string; missing fields have their default; `[]`
-  writes the default set
+- **`scenpar`** — Scenario parameters; struct with any subset of the 171 fields returned by
+  [conf_file_read](#conf_file_read); real scalars of class double, single, int32, uint32, int64, uint64 or logical;
+  missing fields have their default; `[]` writes the default set
 - **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one
   real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further
   field, named without the prefix `PL_`, as returned by [conf_file_read](#conf_file_read); a matrix is an error;
@@ -2206,6 +2205,108 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 - [scenpar_validate](#scenpar_validate) (value checks and defaults)
 
 ---
+<a id="gbsm_draw"></a>
+## gbsm_draw
+Spatially correlated normalized random values of one generator set at a set of links
+
+Also in: [C++](quadriga_lib_api_cpp.md#gbsm_draw) · [Python](quadriga_lib_api_python.md#gbsm.draw)
+
+- Evaluates the phases of [gbsm_init_phases](#gbsm_init_phases) at the links, one column per generator; columns,
+  distributions and decorrelation distances: see the set table in the section description. The value
+  of a link does not depend on the other links of the call; in single mobility it does not depend on
+  `tx_pos`
+- Dual mobility: the Tx is a second device on the same maps, its side of each generator uses the
+  mirror generator. Every column keeps its distribution; swapping `tx_pos` and `rx_pos` exchanges the
+  columns of each mirror pair and keeps the self-mirrored columns, exactly
+- Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are
+  uncorrelated at equal horizontal positions, exactly within a block of `n_coeff` consecutive IDs,
+  otherwise up to a random residual of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both
+  devices of a link are on the link's floor
+- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
+- A set never changes size: new random quantities come in new sets (a new `set_type` or `set_id`). A
+  column depends neither on the other columns nor on the other links
+- An empty set (`NumClusters = 1`) gives `[n_link, 0]` and accepts any empty `phase`
+
+### Usage:
+```matlab
+rnd = quadriga_lib.gbsm_draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, ...
+    center_freq, dual_mobility, horizontal );
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
+- **`set_type`** — Set type of [gbsm_init_phases](#gbsm_init_phases); string
+- **`phase`** — Phases from [gbsm_init_phases](#gbsm_init_phases), finite; `[n_coeff, n_gen, 2]`
+- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or
+  `[n_link, 3]`
+- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
+- **`set_id`** — Set of [gbsm_init_phases](#gbsm_init_phases): `0` = shared set, `k >= 1` = set of frequency `k`;
+  ignored for `'lsf'`; default: 0
+- **`preset`** — Preset of [gbsm_init_phases](#gbsm_init_phases); another preset with the same `n_coeff` is not
+  detected; default: `'Comb256'`
+- **`floor_id`** *(optional)* — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT
+  heights of TR 38.901 Table 7.2-1, 0 for outdoor UTs); omitted or empty = floor 0; 2D mode only;
+  `[n_link]`
+- **`center_freq`** *(optional)* — Carrier frequencies in [Hz] (messages name it
+  `center_frequency`); ignored and not checked for the `'lsf'` and `'cluster'` sets; `[n_freq]`
+- **`dual_mobility`** — `true`: Tx and Rx both move; default: false
+- **`horizontal`** — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa); default: true
+
+### Output:
+- **`rnd`** — Random values; `[n_link, n_gen]`
+
+### See also:
+- [lsp_generate](#lsp_generate) (the large-scale parameters from the `'lsf'` set)
+- [path_loss](#path_loss) (column 11 of the `'lsf'` set as `rnd_he`)
+- [ssf_clusters](#ssf_clusters) (the clusters from the `'cluster'` sets)
+
+---
+<a id="gbsm_init_phases"></a>
+## gbsm_init_phases
+Draw the random phases of one generator set of a BS site and scenario
+
+Also in: [C++](quadriga_lib_api_cpp.md#gbsm_init_phases) · [Python](quadriga_lib_api_python.md#gbsm.init_phases)
+
+- Draws the phases of one random set (set table in the section description) for [gbsm_draw](#gbsm_draw);
+  store `phase` or the seed to evaluate the same fields again along tracks or on maps
+- The phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms
+  (bias-removed `'lsf'` phases within about 2e-14 rad); the sets are independent; each scenario of a
+  site needs its own seed
+- `'lsf'` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [sos_remove_bias](#sos_remove_bias) sets the
+  sample mean of columns 1 to 9 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode:
+  one floor), removing variance
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: empty
+  `'cluster'` sets
+
+### Usage:
+```matlab
+phase = quadriga_lib.gbsm_init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, ...
+    dual_mobility, remove_bias, horizontal );
+```
+
+### Inputs:
+- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
+- **`set_type`** — `'lsf'` or `'cluster'`; `'ray'` is not available yet; string
+- **`seed`** — Seed of the site and scenario; integer from -1 to 2^63-1; -1 = system random device,
+  new phases on each call; default: -1
+- **`set_id`** — `'cluster'`: `0` = shared set, `k >= 1` = set of frequency `k`; ignored for
+  `'lsf'`; default: 0
+- **`preset`** — Sum-of-sinusoids preset, see [sos_preset](#sos_preset); sets `n_coeff`; default: `'Comb256'`
+- **`tx_pos`**, **`rx_pos`** *(optional)* — `'lsf'` only: positions in [m] for the bias removal, as
+  in [gbsm_draw](#gbsm_draw)
+- **`dual_mobility`**, **`remove_bias`**, **`horizontal`** — `'lsf'`: Tx and Rx both move; remove
+  the sample mean; 2D bias removal (TR 38.901), `false`: 3D (legacy QuaDRiGa); default: false, true,
+  true
+
+### Output:
+- **`phase`** — Phases in [rad], in [-pi, pi); slice 1 = Rx side, slice 2 = Tx side;
+  `[n_coeff, n_gen, 2]`
+
+### See also:
+- [gbsm_draw](#gbsm_draw) (evaluates the phases at the links)
+- [sos_remove_bias](#sos_remove_bias) (the bias removal of one generator)
+
+---
 <a id="los_probability"></a>
 ## los_probability
 LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models
@@ -2213,7 +2314,7 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 Also in: [C++](quadriga_lib_api_cpp.md#los_probability) · [Python](quadriga_lib_api_python.md#los_probability)
 
 - Evaluates the probability that a link is in line-of-sight (LOS) from its 2D distance and the BS
-  and UT heights, and, when `rnd_g` and `fc` are given, the soft LOS state of TR 38.901 eq.
+  and UT heights, and, when `rnd_g` and `center_freq` are given, the soft LOS state of TR 38.901 eq.
   (7.6-18); the LOS state itself (a draw against `p_los`) and its spatial correlation are the
   caller's
 - `38.901_*`: TR 38.901 v19.5.0 Table 7.4.2-1 (`InH_Mixed`, `InH_Open`: mixed and open office).
@@ -2231,7 +2332,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#los_probability) · [Python](quadriga_lib
 ### Usage:
 ```matlab
 [ p_los, los_soft ] = quadriga_lib.los_probability( model, d2d_out, h_bs, h_ut, ...
-    d_clutter, r_clutter, h_clutter, rnd_g, fc );
+    d_clutter, r_clutter, h_clutter, rnd_g, center_freq );
 ```
 
 ### Inputs:
@@ -2252,117 +2353,18 @@ Also in: [C++](quadriga_lib_api_cpp.md#los_probability) · [Python](quadriga_lib
   empty = default. The other models ignore the clutter arguments, which are validated for every
   model; default: NaN
 - **`rnd_g`** *(optional)* — Normal(0,1) value per link, G of eq. (7.6-18); `[n_link]`
-- **`fc`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0 (messages name it
+  `center_frequency`); `[n_freq]`
 
 ### Outputs:
 - **`p_los`** — LOS probability in [0, 1]; `[n_link, 1]`
 - **`los_soft`** — Soft LOS state in [0, 1]; `> 0.5` exactly when `rnd_g > -F(p_los)` of eq.
-  (7.6-18), which has the probability `p_los`; `[n_link, n_freq]`; `[]` if `rnd_g` or `fc` is
-  omitted or empty
+  (7.6-18), which has the probability `p_los`; `[n_link, n_freq]`; `[]` if `rnd_g` or `center_freq`
+  is omitted or empty
 
 ### See also:
 - [o2i_loss](#o2i_loss) (indoor distance for `d2d_out`)
 - [sos_rand](#sos_rand), [sos_randn](#sos_randn) (spatially consistent LOS-state draw and `rnd_g`)
-
----
-<a id="lsf_draw"></a>
-## lsf_draw
-Spatially correlated normalized random values of the large-scale generators at a set of links
-
-Also in: [C++](quadriga_lib_api_cpp.md#lsf_draw) · [Python](quadriga_lib_api_python.md#lsf_draw)
-
-- Evaluates the phases of [lsf_init_phases](#lsf_init_phases) at the links, one column per generator (see the
-  section description). The value of a link does not depend on the other links of the call; in
-  single mobility it does not depend on `tx_pos`
-- Dual mobility: the Tx is a second device on the same maps. Every column keeps its distribution;
-  ASD and ASA, ESD and ESA of a link are correlated by the ACF at the Tx-Rx distance (equal at
-  distance 0). Swapping `tx_pos` and `rx_pos` swaps the columns 4 and 5, 6 and 7 and leaves the
-  others unchanged, exactly
-- Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are
-  uncorrelated at equal horizontal positions, exactly within a block of `n_coeff` consecutive IDs,
-  otherwise up to a random residual of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both
-  devices of a link are on the link's floor
-- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation (AVX2 kernel of
-  [sos_val](#sos_val))
-
-### Usage:
-```matlab
-rnd = quadriga_lib.lsf_draw( scenpar, phase, tx_pos, rx_pos, floor_id, dual_mobility, ...
-    preset, horizontal );
-```
-
-### Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances are used
-- **`phase`** — Phases from [lsf_init_phases](#lsf_init_phases), finite; `[n_coeff, 11, 2]`
-- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link,
-  3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`floor_id`** *(optional)* — Floor index of the UT per link, a label starting at 0 (no index
-  shift), non-negative integers below 2^53 (`n_fl - 1` for the UT heights of TR 38.901 Table 7.2-1,
-  0 for outdoor UTs); omitted or empty = floor 0; 2D mode only; `[n_link]`
-- **`dual_mobility`** — `true`: Tx and Rx both move; default: false
-- **`preset`** — Sum-of-sinusoids preset of [lsf_init_phases](#lsf_init_phases), see [sos_preset](#sos_preset); a different
-  preset with the same number of sinusoids is not detected; default: `'Comb256'`
-- **`horizontal`** — Mode of [lsf_init_phases](#lsf_init_phases); default: true
-
-### Output:
-- **`rnd`** — Random values, columns as in the section description; `[n_link, 11]`
-
-### See also:
-- [lsf_init_phases](#lsf_init_phases) (draws the phases)
-- [path_loss](#path_loss) (column 11 as `rnd_he`)
-- [lsp_generate](#lsp_generate) (the large-scale parameters from `rnd`)
-
----
-<a id="lsf_init_phases"></a>
-## lsf_init_phases
-Draw the random phases of the large-scale generators of one BS site and scenario
-
-Also in: [C++](quadriga_lib_api_cpp.md#lsf_init_phases) · [Python](quadriga_lib_api_python.md#lsf_init_phases)
-
-- Draws the phases of the 11 large-scale generators (see the section description); [lsf_draw](#lsf_draw)
-  evaluates them at the links. The caller stores `phase` to evaluate the same fields again along
-  tracks or on maps
-- Without bias removal, slice 1 (Rx side) equals [sos_init_phases](#sos_init_phases) with 11 generators and the
-  `n_coeff` of `preset`; slice 2 (Tx side) is its mirror, with and without bias removal
-- Bias removal (`remove_bias = true` and at least 3 rows in `rx_pos`): [sos_remove_bias](#sos_remove_bias) sets the
-  sample mean of each Normal field (columns 1 to 9) over the positions to 0; in dual mobility over
-  `rx_pos` and `tx_pos` together. It removes variance unless the positions spread over many
-  decorrelation distances
-- In 2D mode the bias removal treats all positions as one floor: for a drop with UTs on several
-  floors pass the positions of one floor or set `remove_bias = false`
-- TR 38.901 clause 7.4.4 literally (exponential ACF, no bias removal): `preset = 'Exp256'`,
-  `remove_bias = false`. The default `'Comb256'` has the same decorrelation distance without the
-  kink of the exponential ACF at zero distance, so the values evolve smoothly along a track
-
-### Usage:
-```matlab
-phase = quadriga_lib.lsf_init_phases( scenpar, seed, tx_pos, rx_pos, dual_mobility, ...
-    remove_bias, preset, horizontal );
-```
-
-### Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances are used
-- **`seed`** — Seed of the phases; integer from -1 to 2^63-1; -1 = system random device, new phases
-  on each call; default: -1
-- **`tx_pos`** *(optional)* — Tx positions in [m]; required for the bias removal in dual mobility,
-  otherwise not used; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** *(optional)* — Rx positions of the drop in [m] for the bias removal; omitted or empty
-  or fewer than 3 rows: no bias removal; `[n_link, 3]`
-- **`dual_mobility`** — `true`: Tx and Rx both move; default: false
-- **`remove_bias`** — `true`: remove the sample mean of the Normal fields over the positions;
-  default: true
-- **`preset`** — Sum-of-sinusoids preset, see [sos_preset](#sos_preset); sets `n_coeff`; default: `'Comb256'`
-- **`horizontal`** — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa); default: true
-
-### Output:
-- **`phase`** — Phases in [rad], in [-pi, pi); slice 1 = Rx side, slice 2 = Tx side; `[n_coeff, 11,
-  2]`
-
-### See also:
-- [lsf_draw](#lsf_draw) (evaluates the phases at the links)
-- [ssf_init_phases](#ssf_init_phases) (the small-scale sets, seeds derived from this seed)
-- [sos_remove_bias](#sos_remove_bias) (the bias removal of one generator)
 
 ---
 <a id="lsp_generate"></a>
@@ -2372,10 +2374,10 @@ Large-scale parameters of a set of links from normalized random values
 Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_api_python.md#lsp_generate)
 
 - Generates the 8 LSPs of TR 38.901 clause 7.5 step 4 per link and frequency from the random values
-  of [lsf_draw](#lsf_draw), and the absolute TOA offset, the ground permittivity and the EoD offset
+  of [gbsm_draw](#gbsm_draw) (`'lsf'`), and the absolute TOA offset, the ground permittivity and the EoD offset
 - Mean `mu` and standard deviation `sigma` in the log domain (lg for DS and the angular spreads, dB
   for KF, SF and XPR), with the field prefix `P` (`DS`, `KF`, `SF`, `AS_D`, `AS_A`, `ES_D`, `ES_A`,
-  `XPR`), `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(fc/1e9,
+  `XPR`), `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(center_freq/1e9,
   LSP_fc_min)` in GHz:
   - `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`
   - `sigma = max(0, max(0, P_sigma + P_delta·lg(P_omega + f')) + P_kappa·lg(d) + P_tau·lg(h) +
@@ -2395,9 +2397,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_ap
 - The InF and InH NLOS files set `absTOA_Lmax`, and the InF files `DS_VS`, for the hall or office of
   their calibration scenario; for another hall set these fields in `scenpar`
 - Ground permittivity: QuaDRiGa's fits for dry, medium and wet ground, interpolated linearly over
-  column 10 of `rnd` (0 dry, 0.5 medium, 1 wet) with `fc` not limited by `LSP_fc_min`; they are not
-  the materials of TR 38.901 Table 7.6.8-1. The imaginary part is >= 0: the complex value of TR
-  38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`
+  column 10 of `rnd` (0 dry, 0.5 medium, 1 wet) with `center_freq` not limited by `LSP_fc_min`; they
+  are not the materials of TR 38.901 Table 7.6.8-1. The imaginary part is >= 0: the complex value of
+  TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`
 - EoD offset, the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12: `EoD_offset_e +
   EoD_offset_e_gamma·lg f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg
   f')·lg(max(EoD_offset_b, d)) + EoD_offset_c + EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if
@@ -2408,16 +2410,18 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_ap
 ### Usage:
 ```matlab
 [ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ...
-    quadriga_lib.lsp_generate( scenpar, fc, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads );
+    quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads );
 ```
 
 ### Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0 (messages name it
+  `center_frequency`); `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`rnd`** — Random values from [lsf_draw](#lsf_draw), finite; column 10 in [0, 1] when 3 or more outputs
-  are requested (the error message counts the columns from 0); column 11 is not used; `[n_link, 11]`
+- **`rnd`** — Random values from [gbsm_draw](#gbsm_draw) (`'lsf'`), finite; column 10 in [0, 1] when 3 or more
+  outputs are requested (the error message counts the columns from 0); column 11 is not used;
+  `[n_link, 11]`
 - **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite
   and >= 0; replaces the value from `scenpar`, also in `lsp_sigma`; omitted or empty = the scenario
   value; `[n_link, n_freq]`
@@ -2437,7 +2441,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_ap
 - **`lsp_sigma`** — Standard deviation `sigma` in the log domain, >= 0; `[n_link, n_freq, 8]`
 
 ### See also:
-- [lsf_draw](#lsf_draw) (the random values `rnd`)
+- [gbsm_draw](#gbsm_draw) (the random values `rnd`)
 - [path_loss](#path_loss) (the SF standard deviation `sf_sigma`)
 - [ssf_clusters](#ssf_clusters) (the clusters from the LSPs)
 
@@ -2466,11 +2470,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#o2i_loss) · [Python](quadriga_lib_api_py
 
 ### Usage:
 ```matlab
-[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( fc, rnd, models, weights, d2d_in_max );
+[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
 ```
 
 ### Inputs:
-- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0 (messages name it
+  `center_frequency`); `[n_freq]`
 - **`rnd`** — Random values per UT: columns 1 to 3 Uniform in [0, 1] (model choice, two indoor
   distances), column 4 Normal(0,1), finite (deviation `sigma_P`, car loss); `[n_ut, 4]`, `n_ut = 0`
   allowed
@@ -2501,10 +2506,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#path_loss) · [Python](quadriga_lib_api_p
   carrier frequency; the TR 38.901 v19.5.0 conf files of the library reproduce Table 7.4.1-1 with
   them. The O2I penetration loss is not included (see [o2i_loss](#o2i_loss)). The models are evaluated as
   written for any positive frequency, also outside their validity range
-- Notation: `f = fc/1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance, at
-  least 0.1 m; `hBS`, `hUT` the z coordinates of Tx and Rx; `lg = log10`; `PL1(x) = A1·lg(x) + B +
-  C·lg(f) + D·x`; `sf` the shadow-fading std. Fields of `plpar` in parentheses: the required ones,
-  after the semicolon the optional ones (`X = v`: default)
+- Notation: `f = center_freq/1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D
+  distance, at least 0.1 m; `hBS`, `hUT` the z coordinates of Tx and Rx; `lg = log10`; `PL1(x) =
+  A1·lg(x) + B + C·lg(f) + D·x`; `sf` the shadow-fading std. Fields of `plpar` in parentheses: the
+  required ones, after the semicolon the optional ones (`X = v`: default)
 - Models (the field `model` of `plpar`):
   - `constant` (A): `A`
   - `logdist` (A, B, C; SF): `A·lg d3 + B + C·lg f`; `sf = SF`
@@ -2550,21 +2555,22 @@ Also in: [C++](quadriga_lib_api_cpp.md#path_loss) · [Python](quadriga_lib_api_p
 
 ### Usage:
 ```matlab
-[ pl, sf_sigma ] = quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos, d2d_in, rnd_he );
+[ pl, sf_sigma ] = quadriga_lib.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he );
 ```
 
 ### Inputs:
 - **`plpar`** — Path-loss parameters; struct as returned by [conf_file_read](#conf_file_read): the field `model`
   (string) and one numeric field per parameter, named without "PL_"; fields not read are ignored
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
-- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0 (messages name it
+  `center_frequency`); `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from
   [o2i_loss](#o2i_loss)), finite and >= 0; given = legacy outdoor distance; 0 = outdoor link; omitted or
   empty = geometric distance; `[n_link]`
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column
-  11 of [lsf_draw](#lsf_draw); omitted or empty = fixed `hE`; `[n_link]`
+  11 of [gbsm_draw](#gbsm_draw) (`'lsf'`); omitted or empty = fixed `hE`; `[n_link]`
 
 ### Outputs:
 - **`pl`** — Path loss in [dB]; `[n_link, n_freq]`
@@ -2582,8 +2588,8 @@ Validate scenario parameters and complete them with default values
 Also in: [C++](quadriga_lib_api_cpp.md#scenpar_validate) · [Python](quadriga_lib_api_python.md#scenpar_validate)
 
 - Checks scenario parameters that did not come from a conf file and adds every missing field with
-  its default value, so that `scenpar_out` has all 172 fields: the 138 numeric fields of QuaDRiGa,
-  `SubpathMethod` and 33 fields for TR 38.901 v19.5.0, which have no effect at their default of 0.
+  its default value, so that `scenpar_out` has all 171 fields: the 138 numeric fields of QuaDRiGa
+  and 33 fields for TR 38.901 v19.5.0, which have no effect at their default of 0.
   An empty input (`[]` or a struct without fields) gives the complete default set
 - A name that is not one of the fields is an error, also with `validate = false`; this includes the
   QuaDRiGa field `GR_epsilon`, which is not supported
@@ -2603,8 +2609,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#scenpar_validate) · [Python](quadriga_li
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
-  - `SubpathMethod` must be `legacy`, `Laplacian` or `mmMAGIC`
-- With `validate = false` no value is checked: `NaN` and any `SubpathMethod` are accepted
+- With `validate = false` no value is checked: `NaN` is accepted
 
 ### Usage:
 ```matlab
@@ -2612,15 +2617,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#scenpar_validate) · [Python](quadriga_li
 ```
 
 ### Inputs:
-- **`scenpar_in`** *(optional)* — Scenario parameters; struct with any subset of the 172 fields;
+- **`scenpar_in`** *(optional)* — Scenario parameters; struct with any subset of the 171 fields;
   numeric fields are real scalars of class double, single, int32, uint32, int64, uint64 or
   logical; if omitted or empty, the default set is returned
 - **`validate`** — `false`: only complete with defaults, no value checks; default: true
 
 ### Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing fields have their
-  default; struct with 172 fields in the QuaDRiGa field order: the 138 numeric keys of QuaDRiGa with
-  `SubpathMethod` (string) as field 107, then the 33 new keys; all numeric fields are double scalars
+  default; struct with 171 double scalar fields in the canonical order: the 138 numeric keys of
+  QuaDRiGa, then the 33 new keys
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
 - **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains
@@ -2637,9 +2642,9 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 
 Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_api_python.md#ssf_clusters)
 
-- Turns the LSPs of [lsp_generate](#lsp_generate) and the random values of [ssf_draw](#ssf_draw) into the clusters of each
-  link, by one of three methods (a method and property table is in the C++ documentation of
-  `ssf_clusters`):
+- Turns the LSPs of [lsp_generate](#lsp_generate) and the cluster random values of [gbsm_draw](#gbsm_draw) into the
+  clusters of each link, by one of three methods (a method and property table is in the C++
+  documentation of `ssf_clusters`):
   - `'38.901'` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based
     calibration. Clusters 25 dB below the strongest get power 0 (no renormalisation); the K-factor
     in the scaling factors is limited to >= -5 dB. Under spatial consistency (clause 7.6.3.1)
@@ -2670,7 +2675,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
   `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation `sqrt(power)·exp(j·arg(R_par))`
 - `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if
   enabled; `rnd` must be empty, `rnd_freq` and `lsp_anchor` are not used
-- Swap reciprocity: with mirrored random values (dual mobility in [ssf_draw](#ssf_draw)) and mirrored LSPs,
+- Swap reciprocity: with mirrored random values (dual mobility in [gbsm_draw](#gbsm_draw)) and mirrored LSPs,
   swapping `tx_pos` and `rx_pos` exchanges the departure and arrival angles (`'38.901'`:
   `eod_offset_deg` = 0 and no O2I link; `'quadriga'`: `eod_offset_deg` = 0)
 - `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are
@@ -2689,11 +2694,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
 - **`lsp`** — LSPs from [lsp_generate](#lsp_generate); DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0, KF (slice
   2) >= 0; `'38.901'`: one frequency; `[n_link, n_freq, 8]`
-- **`rnd`** — Shared cluster set of [ssf_draw](#ssf_draw) (`set_id = 0`), columns 1 to N in [0, 1]; `[n_link,
-  9·N]`
+- **`rnd`** — Shared cluster set of [gbsm_draw](#gbsm_draw) (`'cluster'`, `set_id = 0`), columns 1 to N in [0,
+  1]; `[n_link, 9·N]`
 - **`method`** *(optional)* — `'38.901'` (default), `'38.901_MF'` or `'quadriga'`
-- **`rnd_freq`** *(optional)* — Per-frequency sets of [ssf_draw](#ssf_draw), slice `k` from `set_id = k`;
-  required by `'38.901'` and `'38.901_MF'`; `[n_link, N, n_freq]`
+- **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [gbsm_draw](#gbsm_draw), slice `k` from `set_id
+  = k`; required by `'38.901'` and `'38.901_MF'`; `[n_link, N, n_freq]`
 - **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz); required by
   `'38.901_MF'`; `[n_link, 1, 8]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [lsp_generate](#lsp_generate); used by `'38.901'`
@@ -2708,104 +2713,18 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
   NumClusters_min - 1), N), N]`; omitted or empty = N; `[n_link]`
 
 ### Outputs:
-- **`delay`** — Delays in [s]; `[n_link, n_slot, n_fd]`, `n_fd = n_freq` for `'38.901_MF'`, else 1
+- **`delay`** — Delays in [s]; `[n_link, n_slot, n_freq]` for `'38.901_MF'`, else `[n_link, n_slot,
+  1]`
 - **`power`** — Coefficient powers (linear); `[n_link, n_slot, n_freq]`
-- **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); `[n_link, n_slot,
-  n_fd]`
-- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; `[n_link,
-  n_slot, n_fd]`
+- **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); sizes as `delay`
+- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as
+  `delay`
 - **`n_active`** — Number of NLOS clusters with power > 0; uint64; `[n_link, 1]`
 
 ### See also:
-- [ssf_draw](#ssf_draw) (the random values `rnd` and `rnd_freq`)
+- [gbsm_draw](#gbsm_draw) (the random values `rnd` and `rnd_freq`)
 - [lsp_generate](#lsp_generate) (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [calc_delay_spread](#calc_delay_spread), [calc_angular_spread](#calc_angular_spread) (spreads of the output)
-
----
-<a id="ssf_draw"></a>
-## ssf_draw
-Spatially correlated normalized random values of one small-scale fading generator set at a set of links
-
-Also in: [C++](quadriga_lib_api_cpp.md#ssf_draw) · [Python](quadriga_lib_api_python.md#ssf_draw)
-
-- Evaluates a set of [ssf_init_phases](#ssf_init_phases) at the links with the rules of [lsf_draw](#lsf_draw) (dual mobility,
-  floors, accuracy); every generator uses the decorrelation distance `SC_lambda` (TR 38.901 Table
-  7.6.3.1-2; 0 = spatial consistency off)
-- Columns, `N = NumClusters - 1`; block `b = 0 ... 8` holds the columns `b·N + 1` to `(b + 1)·N`,
-  one per NLOS cluster:
-  - shared set (`9·N` columns): block 0 cluster delay, Uniform(0,1); blocks 1, 2 sign of AOD, AOA;
-    3, 4 sign of ZOD, ZOA; 5, 6 angle offset of AOD, AOA; 7, 8 angle offset of ZOD, ZOA; Normal(0,1)
-  - per-frequency set (`N` columns): cluster shadowing, Normal(0,1)
-- Dual mobility: swapping `tx_pos` and `rx_pos` exchanges the blocks 1 and 2, 3 and 4, 5 and 6, 7
-  and 8 and keeps the delay and shadowing blocks, exactly
-- A column depends neither on the other columns nor on the other links; later versions append blocks
-  and keep the values of the existing columns
-- `NumClusters = 1` gives an empty result with `n_link` rows; at least one link is required
-
-### Usage:
-```matlab
-rnd = quadriga_lib.ssf_draw( scenpar, phase, tx_pos, rx_pos, set_id, floor_id, dual_mobility, ...
-    preset, horizontal );
-```
-
-### Inputs:
-- **`scenpar`** — Scenario parameters; `NumClusters` and `SC_lambda` are used
-- **`phase`** — Phases from [ssf_init_phases](#ssf_init_phases), finite; `[n_coeff, n_gen, 2]`
-- **`tx_pos`** — Tx positions in [m]; used in dual mobility; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`set_id`** — Set of [ssf_init_phases](#ssf_init_phases): `0` = shared cluster set; `k >= 1` = per-frequency set;
-  default: 0
-- **`floor_id`** *(optional)* — Floor index per link as in [lsf_draw](#lsf_draw); omitted or empty = floor 0;
-  2D mode only; `[n_link]`
-- **`dual_mobility`** — `true`: Tx and Rx both move; default: false
-- **`preset`** — Sum-of-sinusoids preset of [ssf_init_phases](#ssf_init_phases), see [sos_preset](#sos_preset); default:
-  `'Comb256'`
-- **`horizontal`** — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa); default: true
-
-### Output:
-- **`rnd`** — Random values; `[n_link, n_gen]`
-
-### See also:
-- [ssf_init_phases](#ssf_init_phases) (draws the phases)
-- [ssf_clusters](#ssf_clusters) (the clusters from the random values)
-
----
-<a id="ssf_init_phases"></a>
-## ssf_init_phases
-Draw the random phases of one small-scale fading generator set of a BS site and scenario
-
-Also in: [C++](quadriga_lib_api_cpp.md#ssf_init_phases) · [Python](quadriga_lib_api_python.md#ssf_init_phases)
-
-- The cluster random values (TR 38.901 clause 7.6.3.1) come in one shared cluster set (`set_id = 0`,
-  `9·N` generators, `N = NumClusters - 1` NLOS clusters) and one set per carrier frequency (`set_id
-  = k`, `N` generators, `k` the position in the caller's frequency list, 1-based); [ssf_draw](#ssf_draw)
-  evaluates them and lists the columns
-- The phases are a fixed function of `seed` and `set_id`, equal on all platforms; the sets are
-  independent of each other and of the large-scale phases. Keep an explicit seed (or the phase
-  arrays) to reproduce the clusters
-- Each scenario of a site (LOS, NLOS, O2I) needs its own large-scale seed: TR 38.901 clause 7.6.3.4
-  makes the link types uncorrelated
-- `NumClusters = 1`: both sets are empty
-
-### Usage:
-```matlab
-phase = quadriga_lib.ssf_init_phases( scenpar, seed, set_id, preset );
-```
-
-### Inputs:
-- **`scenpar`** — Scenario parameters; `NumClusters` sets `N`
-- **`seed`** — Seed of the large-scale set of the same site and scenario ([lsf_init_phases](#lsf_init_phases));
-  integer from -1 to 2^63-1; -1 = system random device, new phases on each call; default: -1
-- **`set_id`** — `0` = shared cluster set; `k >= 1` = set of frequency `k`; default: 0
-- **`preset`** — Sum-of-sinusoids preset, see [sos_preset](#sos_preset); sets `n_coeff`; default: `'Comb256'`
-
-### Output:
-- **`phase`** — Phases in [rad], in [-pi, pi); slice 1 = Rx side, slice 2 = Tx side; `[n_coeff,
-  n_gen, 2]`, `n_gen = 9·N` (shared set) or `N`
-
-### See also:
-- [ssf_draw](#ssf_draw) (evaluates the phases at the links)
-- [lsf_init_phases](#lsf_init_phases) (the large-scale set and its seed)
 
 ---
 

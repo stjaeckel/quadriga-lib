@@ -33,10 +33,11 @@ def read(name):
 
 def draw(sp, fc, seed):
     # LSPs, ground permittivity, EoD offset, absolute TOA and the random values of one scenario at the links
-    phase = gbsm.lsf_init_phases(sp, seed, remove_bias=False)
-    lsp, abs_toa, gr_eps, eod, _, _ = gbsm.lsp_generate(sp, np.array(fc), TX, RX, gbsm.lsf_draw(sp, phase, TX, RX))
-    rnd = gbsm.ssf_draw(sp, gbsm.ssf_init_phases(sp, seed), TX, RX)
-    rnd_f = np.stack([gbsm.ssf_draw(sp, gbsm.ssf_init_phases(sp, seed, k), TX, RX, k) for k in range(len(fc))], 2)
+    phase = gbsm.init_phases(sp, "lsf", seed, remove_bias=False)
+    lsp, abs_toa, gr_eps, eod, _, _ = gbsm.lsp_generate(sp, np.array(fc), TX, RX, gbsm.draw(sp, "lsf", phase, TX, RX))
+    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed), TX, RX)
+    rnd_f = np.stack([gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed, k), TX, RX, k)
+                      for k in range(len(fc))], 2)
     return lsp, rnd, rnd_f, abs_toa, gr_eps, eod
 
 

@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
+#include "mex.h"
+#include "quadriga_lib.hpp"
+#include "mex_quadriga_lib_functions.hpp"
+#include "quadriga_gbsm_helpers.hpp"
+
+/*!SECTION
+Geometry-based stochastic model
+SECTION!*/
+
+/*!MD
+# GBSM_INIT_PHASES
+Draw the random phases of one generator set of a BS site and scenario
+
+- Draws the phases of one random set (set table in the section description) for [[gbsm_draw]];
+  store `phase` or the seed to evaluate the same fields again along tracks or on maps
+- The phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms
+  (bias-removed `'lsf'` phases within about 2e-14 rad); the sets are independent; each scenario of a
+  site needs its own seed
+- `'lsf'` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos_remove_bias]] sets the
+  sample mean of columns 1 to 9 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode:
+  one floor), removing variance
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: empty
+  `'cluster'` sets
+
+## Usage:
+```
+phase = quadriga_lib.gbsm_init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, ...
+    dual_mobility, remove_bias, horizontal );
+```
+
+## Inputs:
+- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
+- **`set_type`** — `'lsf'` or `'cluster'`; `'ray'` is not available yet; string
+- **`seed`** — Seed of the site and scenario; integer from -1 to 2^63-1; -1 = system random device,
+  new phases on each call; default: -1
+- **`set_id`** — `'cluster'`: `0` = shared set, `k >= 1` = set of frequency `k`; ignored for
+  `'lsf'`; default: 0
+- **`preset`** — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`; default: `'Comb256'`
+- **`tx_pos`**, **`rx_pos`** *(optional)* — `'lsf'` only: positions in [m] for the bias removal, as
+  in [[gbsm_draw]]
+- **`dual_mobility`**, **`remove_bias`**, **`horizontal`** — `'lsf'`: Tx and Rx both move; remove
+  the sample mean; 2D bias removal (TR 38.901), `false`: 3D (legacy QuaDRiGa); default: false, true,
+  true
+
+## Output:
+- **`phase`** — Phases in [rad], in [-pi, pi); slice 1 = Rx side, slice 2 = Tx side;
+  `[n_coeff, n_gen, 2]`
+
+## See also:
+- [[gbsm_draw]] (evaluates the phases at the links)
+- [[sos_remove_bias]] (the bias removal of one generator)
+MD!*/
+
+void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+{
+    // Validate argument counts
+    if (nrhs < 2 || nrhs > 10)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+    if (nlhs > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
+
+    // Read inputs
+    const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
+    const std::string set_type = qd_mex_get_string(prhs[1]);
+    const arma::sword seed = (nrhs < 3) ? -1 : qd_mex_get_seed(prhs[2]);
+    const double set_id_in = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "set_id", 0.0);
+    const std::string preset = (nrhs < 5) ? std::string("Comb256") : qd_mex_get_string(prhs[4], "Comb256");
+    const arma::mat tx_pos = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5]);
+    const arma::mat rx_pos = (nrhs < 7) ? arma::mat() : qd_mex_get_Mat<double>(prhs[6]);
+    const bool dual_mobility = (nrhs < 8) ? false : qd_mex_get_scalar<bool>(prhs[7], "dual_mobility", false);
+    const bool remove_bias = (nrhs < 9) ? true : qd_mex_get_scalar<bool>(prhs[8], "remove_bias", true);
+    const bool horizontal = (nrhs < 10) ? true : qd_mex_get_scalar<bool>(prhs[9], "horizontal", true);
+
+    // Set index: MATLAB 0 = shared set, k >= 1 = frequency k (1-based); C++ -1 and k - 1; ignored for "lsf"
+    const bool lsf = set_type == "lsf";
+    if (!lsf && !(set_id_in >= 0.0 && set_id_in < 9007199254740992.0 && set_id_in == std::floor(set_id_in)))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'set_id' must be 0 (shared set) or a frequency index >= 1.");
+    const arma::sword set_id = lsf ? -1 : (arma::sword)set_id_in - 1;
+
+    // Wrap optional pointers
+    const arma::mat *p_tx_pos = tx_pos.empty() ? nullptr : &tx_pos;
+    const arma::mat *p_rx_pos = rx_pos.empty() ? nullptr : &rx_pos;
+
+    // Output allocation in MATLAB memory: n_coeff of the preset, n_gen of the set from a completed copy of
+    // 'scenpar'; with an unknown preset or set type or an invalid 'scenpar' the call throws before any output
+    arma::cube phase;
+    const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
+    bool known = nlhs > 0 && n_coeff > 0 && (lsf || set_type == "cluster");
+    auto sp = scenpar;
+    try
+    {
+        if (known)
+            quadriga_lib::scenpar_validate(sp);
+    }
+    catch (const std::exception &)
+    {
+        known = false;
+    }
+    if (known)
+    {
+        const arma::uword N = (arma::uword)sp.at("NumClusters") - 1;
+        plhs[0] = qd_mex_init_output(&phase, n_coeff, lsf ? 11 : (set_id < 0 ? 9 * N : N), 2);
+    }
+
+    // Call library function
+    CALL_QD(quadriga_lib::gbsm_init_phases(scenpar, set_type, phase, seed, set_id, preset, p_tx_pos, p_rx_pos,
+                                           dual_mobility, remove_bias, horizontal));
+
+}

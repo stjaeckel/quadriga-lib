@@ -51,7 +51,7 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         pk, sk = quadriga_lib.gbsm.los_probability(model="38.901_UMi", d2d_out=self.d, h_bs=10.0, h_ut=1.5,
                                                    d_clutter=math.nan, r_clutter=math.nan, h_clutter=math.nan,
-                                                   rnd_g=self.rnd_g, fc=self.fc)
+                                                   rnd_g=self.rnd_g, center_freq=self.fc)
         pp, sp = quadriga_lib.gbsm.los_probability("38.901_UMi", self.d, 10.0, 1.5, math.nan, math.nan, math.nan,
                                                    self.rnd_g, self.fc)
         npt.assert_array_equal(pk, self.p)
@@ -95,9 +95,9 @@ class test_case(unittest.TestCase):
     def test_soft_los(self):
         f = quadriga_lib.gbsm.los_probability
         self.assertIsNone(f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g)[1])  # no fc
-        self.assertIsNone(f("38.901_UMi", self.d, 10.0, 1.5, fc=self.fc)[1])  # no rnd_g
-        self.assertIsNone(f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=None, fc=None)[1])
-        p4, s4 = f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, fc=self.fc)
+        self.assertIsNone(f("38.901_UMi", self.d, 10.0, 1.5, center_freq=self.fc)[1])  # no rnd_g
+        self.assertIsNone(f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=None, center_freq=None)[1])
+        p4, s4 = f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, center_freq=self.fc)
         npt.assert_array_equal(p4, self.p)
         self.assertEqual(s4.shape, (4, 2))
         self.assertEqual(s4.dtype, np.float64)
@@ -117,7 +117,7 @@ class test_case(unittest.TestCase):
         F = np.array(F)[:, None]
         ref = 0.5 + np.arctan(np.sqrt(20 / lam) * (self.rnd_g[2:, None] + F)) / np.pi
         npt.assert_allclose(s4[2:], ref, atol=1e-8, rtol=0)
-        s5 = f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g.tolist(), fc=1e9)[1]  # list and scalar
+        s5 = f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g.tolist(), center_freq=1e9)[1]  # list and scalar
         npt.assert_array_equal(s5, s4[:, :1])
 
     def test_array_layout_and_dtype(self):
@@ -134,12 +134,12 @@ class test_case(unittest.TestCase):
         p, s = quadriga_lib.gbsm.los_probability("38.901_UMi", np.zeros(0), 10.0, 1.5)
         self.assertEqual(p.shape, (0,))
         self.assertIsNone(s)
-        p, s = quadriga_lib.gbsm.los_probability("38.901_UMi", np.zeros(0), 10.0, 1.5, rnd_g=np.zeros(0), fc=self.fc)
+        p, s = quadriga_lib.gbsm.los_probability("38.901_UMi", np.zeros(0), 10.0, 1.5, rnd_g=np.zeros(0), center_freq=self.fc)
         self.assertEqual(s.shape, (0, 2))
 
     def test_inputs_not_modified(self):
         d, g = self.d.copy(), self.rnd_g.copy()
-        quadriga_lib.gbsm.los_probability("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, fc=self.fc)
+        quadriga_lib.gbsm.los_probability("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, center_freq=self.fc)
         npt.assert_array_equal(self.d, d)
         npt.assert_array_equal(self.rnd_g, g)
 
@@ -155,12 +155,12 @@ class test_case(unittest.TestCase):
             f("38.901_UMi", self.d, 10.0, 1.5, r_clutter=1.0)
         self.assertIn("Input 'r_clutter' must be NaN or in the range from 0 to 1, 1 excluded.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=[0.0, 1.0], fc=self.fc)
+            f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=[0.0, 1.0], center_freq=self.fc)
         self.assertIn("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'.",
                       str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, fc=np.zeros(0))
-        self.assertIn("Input 'fc' cannot be empty.", str(ctx.exception))
+            f("38.901_UMi", self.d, 10.0, 1.5, rnd_g=self.rnd_g, center_freq=np.zeros(0))
+        self.assertIn("Input 'center_frequency' cannot be empty.", str(ctx.exception))
         with self.assertRaises(TypeError):
             f("38.901_UMi", self.d, 10.0)
         with self.assertRaises(TypeError):

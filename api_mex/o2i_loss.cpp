@@ -32,11 +32,12 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 ## Usage:
 ```
-[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( fc, rnd, models, weights, d2d_in_max );
+[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
 ```
 
 ## Inputs:
-- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0 (messages name it
+  `center_frequency`); `[n_freq]`
 - **`rnd`** — Random values per UT: columns 1 to 3 Uniform in [0, 1] (model choice, two indoor
   distances), column 4 Normal(0,1), finite (deviation `sigma_P`, car loss); `[n_ut, 4]`, `n_ut = 0`
   allowed
@@ -66,7 +67,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::vec fc = qd_mex_get_Col<double>(prhs[0]);
+    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[0]);
     const arma::mat rnd = qd_mex_get_Mat<double>(prhs[1]);
     const std::vector<std::string> models = qd_mex_get_strings(prhs[2], "models");
     const arma::vec weights = qd_mex_get_Col<double>(prhs[3]);
@@ -77,7 +78,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec d2d_in;
     arma::uvec model_index;
     if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&loss, rnd.n_rows, fc.n_elem);
+        plhs[0] = qd_mex_init_output(&loss, rnd.n_rows, center_freq.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&d2d_in, rnd.n_rows);
     if (nlhs > 2)
@@ -88,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uvec *p_model_index = (nlhs > 2) ? &model_index : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::o2i_loss(fc, rnd, models, weights, loss, d2d_in_max, p_d2d_in, p_model_index));
+    CALL_QD(quadriga_lib::o2i_loss(center_freq, rnd, models, weights, loss, d2d_in_max, p_d2d_in, p_model_index));
 
     // Model index: 0-based (C++) -> 1-based (MATLAB)
     if (nlhs > 2)

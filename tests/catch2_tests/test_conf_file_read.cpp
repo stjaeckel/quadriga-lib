@@ -48,7 +48,7 @@ namespace
     const double QNAN = std::numeric_limits<double>::quiet_NaN();
 
     // Oracle: canonical key order. The 138 numeric legacy keys are typed from the struct(...) call in
-    // QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and 'GR_epsilon'), then the 33 keys for TR 38.901 v19.5.0
+    // QuaDRiGa's set_scenario_table.m (without its string key and 'GR_epsilon'), then the 33 keys for TR 38.901 v19.5.0
     // in the order in which they were added to the library.
     const std::vector<std::string> &ref_key_order()
     {
@@ -149,7 +149,7 @@ namespace
     {
         bool ok = false;
         std::unordered_map<std::string, double> scenpar;
-        std::string subpath_method, pl_model;
+        std::string pl_model;
         std::unordered_map<std::string, std::vector<double>> plpar;
         arma::mat lsp_xcorr;
         std::vector<std::string> key_order, pl_order, short_names, ignored_keys;
@@ -170,7 +170,7 @@ namespace
     conf_out read_all(const std::string &fn, bool validate = true)
     {
         conf_out r;
-        r.ok = quadriga_lib::conf_file_read(fn, r.scenpar, &r.subpath_method, &r.pl_model, &r.plpar, &r.lsp_xcorr,
+        r.ok = quadriga_lib::conf_file_read(fn, r.scenpar, &r.pl_model, &r.plpar, &r.lsp_xcorr,
                                             &r.key_order, &r.pl_order, &r.short_names, &r.ignored_keys, validate);
         return r;
     }
@@ -253,7 +253,6 @@ TEST_CASE("conf_file_read - an empty file gives the 171 default values")
     CHECK(r.scenpar.size() == 171);
     CHECK(n_not_default(r.scenpar) == 0);
     CHECK(same(val(r, "ES_D_mu_min"), -INF));
-    CHECK(r.subpath_method == "legacy");
     CHECK(r.pl_model.empty());
     CHECK(r.plpar.empty());
     CHECK(r.pl_order.empty());
@@ -262,7 +261,7 @@ TEST_CASE("conf_file_read - an empty file gives the 171 default values")
 
     REQUIRE(r.key_order.size() == 171);
     CHECK(r.key_order == ref_key_order());
-    CHECK(r.key_order[105] == "absTOA_lambda"); // 'SubpathMethod' is legacy field 107, between these two
+    CHECK(r.key_order[105] == "absTOA_lambda");
     CHECK(r.key_order[106] == "LOS_scatter_radius");
 
     REQUIRE((r.lsp_xcorr.n_rows == 8 && r.lsp_xcorr.n_cols == 8));
@@ -306,7 +305,7 @@ TEST_CASE("conf_file_read - line grammar: comments, white space, line ends and n
         "SC_lambda = 50\n"
         "SC_lambda = 60\n"
         "XPR_mu = 9 % non-ASCII bytes: caf\xc3\xa9 \xe9\xff\n"
-        "SubpathMethod = mmMAGIC   % string value\n"
+        "SubpathMethod = legacy   % accepted and ignored\n"
         "MIMOSA_like = 6.2e-07\n"
         "PerClusterAS_D = 6.2e-07\n"
         "NumClusters = 12"; // no line end at the end of the file
@@ -339,7 +338,6 @@ TEST_CASE("conf_file_read - line grammar: comments, white space, line ends and n
     CHECK(n_not_default(r.scenpar) == n_expect);
     CHECK(same(val(r, "KF_mu"), 0.0));
     CHECK(same(val(r, "KF_sigma"), 0.0));
-    CHECK(r.subpath_method == "mmMAGIC");
     CHECK(r.ignored_keys == std::vector<std::string>{"MIMOSA_like"});
     CHECK(r.ok);
 }
@@ -686,16 +684,16 @@ TEST_CASE("conf_file_read - value checks per validation class")
         CHECK(m.find("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.") != std::string::npos);
     }
 
-    SECTION("SubpathMethod is one of three names")
+    SECTION("SubpathMethod = legacy is accepted, another value throws also without validation")
     {
         accepts("SubpathMethod = legacy");
-        accepts("SubpathMethod = Laplacian");
-        accepts("SubpathMethod = mmMAGIC");
-        rejects_value("SubpathMethod = Legacy");
-        rejects_value("SubpathMethod = mmmagic");
-        rejects_value("SubpathMethod = other");
-        conf_out r = read_text("SubpathMethod = other\n", false);
-        CHECK(r.subpath_method == "other");
+        rejects_grammar("SubpathMethod = Laplacian");
+        rejects_grammar("SubpathMethod = mmMAGIC");
+        rejects_grammar("SubpathMethod = Legacy");
+        const std::string m = read_error("DS_mu = -7\nSubpathMethod = Laplacian\n", false);
+        QD_DIAG("\n# diag: conf_file_read SubpathMethod: %s\n", m.c_str());
+        CHECK(m == case_file() + ", line 2: Value 'Laplacian' of 'SubpathMethod' is not supported; only 'legacy' is "
+                                 "accepted.");
     }
 }
 
@@ -835,7 +833,6 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
 {
     conf_out r;
     r.scenpar["marker"] = 42.0;
-    r.subpath_method = "marker";
     r.pl_model = "marker";
     r.plpar["marker"] = {1.0, 2.0};
     r.lsp_xcorr.set_size(2, 3);
@@ -848,7 +845,7 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
     auto call = [&r](const std::string &content)
     {
         tmp_file f("test_conf_file_read_untouched.conf", content);
-        quadriga_lib::conf_file_read(f.fn, r.scenpar, &r.subpath_method, &r.pl_model, &r.plpar, &r.lsp_xcorr,
+        quadriga_lib::conf_file_read(f.fn, r.scenpar, &r.pl_model, &r.plpar, &r.lsp_xcorr,
                                      &r.key_order, &r.pl_order, &r.short_names, &r.ignored_keys);
     };
 
@@ -864,7 +861,7 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
     }
     SECTION("missing file")
     {
-        CHECK_THROWS_AS(quadriga_lib::conf_file_read("test_conf_file_read_missing.conf", r.scenpar, &r.subpath_method,
+        CHECK_THROWS_AS(quadriga_lib::conf_file_read("test_conf_file_read_missing.conf", r.scenpar,
                                                      &r.pl_model, &r.plpar, &r.lsp_xcorr, &r.key_order, &r.pl_order,
                                                      &r.short_names, &r.ignored_keys),
                         std::runtime_error);
@@ -872,7 +869,6 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
 
     CHECK(r.scenpar.size() == 1);
     CHECK(r.scenpar.count("marker") == 1);
-    CHECK(r.subpath_method == "marker");
     CHECK(r.pl_model == "marker");
     CHECK(r.plpar.size() == 1);
     CHECK((r.lsp_xcorr.n_rows == 2 && r.lsp_xcorr.n_cols == 3 && r.lsp_xcorr(1, 2) == 7.0));
@@ -884,14 +880,13 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
 
 TEST_CASE("conf_file_read - optional outputs alone and together, stale content is replaced")
 {
-    const std::string content = std::string("DS_mu = -7.1\nSubpathMethod = Laplacian\nPL_model = nlos\nPL_A = 3 4\n"
+    const std::string content = std::string("DS_mu = -7.1\nSubpathMethod = legacy\nPL_model = nlos\nPL_A = 3 4\n"
                                             "PL_B = 5\nShortName = Ab\nFoo = 1\n") + UMA_LOS_XCORR;
     tmp_file f("test_conf_file_read_optional.conf", content);
 
     conf_out all = read_all(f.fn);
     CHECK(all.ok);
     CHECK(same(val(all, "DS_mu"), -7.1));
-    CHECK(all.subpath_method == "Laplacian");
     CHECK(all.pl_model == "nlos");
     CHECK(all.pl_order == std::vector<std::string>{"A", "B"});
     CHECK(all.short_names == std::vector<std::string>{"Ab"});
@@ -911,44 +906,40 @@ TEST_CASE("conf_file_read - optional outputs alone and together, stale content i
     // Each optional output alone, starting from stale content
     std::string s = "stale";
     quadriga_lib::conf_file_read(f.fn, sp, &s);
-    CHECK(s == all.subpath_method);
-
-    s = "stale";
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, &s);
     CHECK(s == all.pl_model);
 
     std::unordered_map<std::string, std::vector<double>> pl;
     pl["stale"] = {1.0};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, &pl);
+    quadriga_lib::conf_file_read(f.fn, sp, nullptr, &pl);
     CHECK(pl == all.plpar);
 
     std::vector<std::string> v = {"stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, &v);
+    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.key_order);
 
     v = {"stale", "stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
+    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.pl_order);
 
     v = {"stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
+    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.short_names);
 
     v = {"stale", "stale"};
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
+    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &v);
     CHECK(v == all.ignored_keys);
 
     // lsp_xcorr: a correctly sized output is written in place, a wrong size is resized
     arma::mat X(8, 8);
     X.fill(7.0);
     const double *mem = X.memptr();
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, &X);
+    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, &X);
     CHECK(X.memptr() == mem);
     CHECK(arma::approx_equal(X, all.lsp_xcorr, "absdiff", 0.0));
 
     arma::mat Y(3, 5);
     Y.fill(7.0);
-    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, nullptr, &Y);
+    quadriga_lib::conf_file_read(f.fn, sp, nullptr, nullptr, &Y);
     REQUIRE((Y.n_rows == 8 && Y.n_cols == 8));
     CHECK(arma::approx_equal(Y, all.lsp_xcorr, "absdiff", 0.0));
 

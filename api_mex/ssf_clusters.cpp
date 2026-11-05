@@ -14,9 +14,9 @@ SECTION!*/
 # SSF_CLUSTERS
 Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
 
-- Turns the LSPs of [[lsp_generate]] and the random values of [[ssf_draw]] into the clusters of each
-  link, by one of three methods (a method and property table is in the C++ documentation of
-  `ssf_clusters`):
+- Turns the LSPs of [[lsp_generate]] and the cluster random values of [[gbsm_draw]] into the
+  clusters of each link, by one of three methods (a method and property table is in the C++
+  documentation of `ssf_clusters`):
   - `'38.901'` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based
     calibration. Clusters 25 dB below the strongest get power 0 (no renormalisation); the K-factor
     in the scaling factors is limited to >= -5 dB. Under spatial consistency (clause 7.6.3.1)
@@ -47,7 +47,7 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation `sqrt(power)·exp(j·arg(R_par))`
 - `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if
   enabled; `rnd` must be empty, `rnd_freq` and `lsp_anchor` are not used
-- Swap reciprocity: with mirrored random values (dual mobility in [[ssf_draw]]) and mirrored LSPs,
+- Swap reciprocity: with mirrored random values (dual mobility in [[gbsm_draw]]) and mirrored LSPs,
   swapping `tx_pos` and `rx_pos` exchanges the departure and arrival angles (`'38.901'`:
   `eod_offset_deg` = 0 and no O2I link; `'quadriga'`: `eod_offset_deg` = 0)
 - `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are
@@ -66,11 +66,11 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
 - **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0, KF (slice
   2) >= 0; `'38.901'`: one frequency; `[n_link, n_freq, 8]`
-- **`rnd`** — Shared cluster set of [[ssf_draw]] (`set_id = 0`), columns 1 to N in [0, 1]; `[n_link,
-  9·N]`
+- **`rnd`** — Shared cluster set of [[gbsm_draw]] (`'cluster'`, `set_id = 0`), columns 1 to N in [0,
+  1]; `[n_link, 9·N]`
 - **`method`** *(optional)* — `'38.901'` (default), `'38.901_MF'` or `'quadriga'`
-- **`rnd_freq`** *(optional)* — Per-frequency sets of [[ssf_draw]], slice `k` from `set_id = k`;
-  required by `'38.901'` and `'38.901_MF'`; `[n_link, N, n_freq]`
+- **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [[gbsm_draw]], slice `k` from `set_id
+  = k`; required by `'38.901'` and `'38.901_MF'`; `[n_link, N, n_freq]`
 - **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz); required by
   `'38.901_MF'`; `[n_link, 1, 8]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]]; used by `'38.901'`
@@ -85,16 +85,16 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   NumClusters_min - 1), N), N]`; omitted or empty = N; `[n_link]`
 
 ## Outputs:
-- **`delay`** — Delays in [s]; `[n_link, n_slot, n_fd]`, `n_fd = n_freq` for `'38.901_MF'`, else 1
+- **`delay`** — Delays in [s]; `[n_link, n_slot, n_freq]` for `'38.901_MF'`, else `[n_link, n_slot,
+  1]`
 - **`power`** — Coefficient powers (linear); `[n_link, n_slot, n_freq]`
-- **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); `[n_link, n_slot,
-  n_fd]`
-- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; `[n_link,
-  n_slot, n_fd]`
+- **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); sizes as `delay`
+- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as
+  `delay`
 - **`n_active`** — Number of NLOS clusters with power > 0; uint64; `[n_link, 1]`
 
 ## See also:
-- [[ssf_draw]] (the random values `rnd` and `rnd_freq`)
+- [[gbsm_draw]] (the random values `rnd` and `rnd_freq`)
 - [[lsp_generate]] (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [[calc_delay_spread]], [[calc_angular_spread]] (spreads of the output)
 MD!*/
@@ -107,9 +107,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs; the field 'SubpathMethod' of the scenario struct is not used
-    std::string subpath_method;
-    const auto scenpar = qd_mex_struct2scenpar(prhs[0], subpath_method, "scenpar");
+    // Read inputs
+    const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[1]);
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[2]);
     const arma::cube lsp = qd_mex_get_Cube<double>(prhs[3]);
@@ -137,26 +136,35 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::vector<bool> *p_o2i = o2i.empty() ? nullptr : &o2i;
     const arma::uvec *p_n_cluster = n_cluster.empty() ? nullptr : &n_cluster;
 
-    // Call library function; the output sizes depend on 'scenpar' and 'method', so the outputs are copied afterwards
+    // Output allocation in MATLAB memory, sizes from a completed copy of 'scenpar'; an invalid 'scenpar' allocates
+    // nothing, the library call then throws its message
     arma::cube delay, power, aod, eod, aoa, eoa;
     arma::uvec n_active;
+    auto sp = scenpar;
+    bool known = true;
+    try
+    {
+        quadriga_lib::scenpar_validate(sp);
+    }
+    catch (const std::exception &)
+    {
+        known = false;
+    }
+    if (known)
+    {
+        const arma::uword n_link = rx_pos.n_rows, n_freq = lsp.n_cols;
+        const arma::uword n_slot = (arma::uword)sp.at("NumClusters") + (sp.at("GR_enabled") > 0.0 ? 1 : 0);
+        const arma::uword n_fd = (method == "38.901_MF") ? n_freq : 1;
+        arma::cube *out[6] = {&delay, &power, &aod, &eod, &aoa, &eoa};
+        for (int k = 0; k < 6 && k < nlhs; ++k)
+            plhs[k] = qd_mex_init_output(out[k], n_link, n_slot, k == 1 ? n_freq : n_fd);
+        if (nlhs > 6)
+            plhs[6] = qd_mex_init_output(&n_active, n_link);
+    }
+
+    // Call library function
     arma::uvec *p_n_active = (nlhs > 6) ? &n_active : nullptr;
     CALL_QD(quadriga_lib::ssf_clusters(scenpar, tx_pos, rx_pos, lsp, rnd, delay, power, aod, eod, aoa, eoa, method,
                                        p_rnd_freq, p_lsp_anchor, p_eod_offset_deg, p_abs_toa, p_gr_eps_re,
                                        p_gr_eps_im, p_o2i, p_n_cluster, p_n_active));
-
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&delay);
-    if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&power);
-    if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&aod);
-    if (nlhs > 3)
-        plhs[3] = qd_mex_copy2matlab(&eod);
-    if (nlhs > 4)
-        plhs[4] = qd_mex_copy2matlab(&aoa);
-    if (nlhs > 5)
-        plhs[5] = qd_mex_copy2matlab(&eoa);
-    if (nlhs > 6)
-        plhs[6] = qd_mex_copy2matlab(&n_active);
 }

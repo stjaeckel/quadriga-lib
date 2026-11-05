@@ -12,6 +12,8 @@
 //                                                                  ssf_clusters.cpp
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
 //                                                                  o2i_loss.cpp
+//   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
+//                                                                  gbsm_init_phases
 //   qd_gbsm_lsp_stats     LSP mean and std per link and frequency  lsp_generate.cpp, path_loss.cpp
 //   qd_gbsm_chol8         Cholesky factorization of an 8x8 matrix  lsp_generate.cpp, qd_scenpar.cpp
 //
@@ -22,6 +24,8 @@
 
 #ifndef quadriga_gbsm_helpers_H
 #define quadriga_gbsm_helpers_H
+
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <armadillo>
 #include <algorithm>
@@ -49,18 +53,27 @@ static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat 
 }
 
 // Validation of the carrier frequencies in [Hz]: not empty, finite and > 0; throws std::invalid_argument
-static inline void qd_gbsm_check_fc(const arma::vec &fc)
+static inline void qd_gbsm_check_fc(const arma::vec &center_frequency)
 {
-    if (fc.n_elem == 0)
-        throw std::invalid_argument("Input 'fc' cannot be empty.");
-    for (arma::uword k = 0; k < fc.n_elem; ++k)
-        if (!(std::isfinite(fc[k]) && fc[k] > 0.0))
-            throw std::invalid_argument("Input 'fc' must be finite and > 0.");
+    if (center_frequency.n_elem == 0)
+        throw std::invalid_argument("Input 'center_frequency' cannot be empty.");
+    for (arma::uword k = 0; k < center_frequency.n_elem; ++k)
+        if (!(std::isfinite(center_frequency[k]) && center_frequency[k] > 0.0))
+            throw std::invalid_argument("Input 'center_frequency' must be finite and > 0.");
+}
+
+// Number of sinusoids of a preset of sos_preset; 0 for a name that is not a preset, so that the caller throws its
+// own message in its order of checks
+static inline arma::uword qd_gbsm_n_coeff(const std::string &preset)
+{
+    int type = 0;
+    arma::uword n_coeff = 0;
+    return qd_sos_preset_lookup(preset, type, n_coeff) ? n_coeff : 0;
 }
 
 // LSP mean and std per link and frequency of a completed scenpar
 // - Per link and frequency, with P the key prefix of the LSP (DS, KF, SF, AS_D, AS_A, ES_D, ES_A, XPR):
-//     d = max(d2D, 1e-4), h = max(hBS, 1e-4), a = atan(h / d), f' = max(fc / 1e9, LSP_fc_min)
+//     d = max(d2D, 1e-4), h = max(hBS, 1e-4), a = atan(h / d), f' = max(center_frequency / 1e9, LSP_fc_min)
 //     mu    = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)
 //     s     = max(0, P_sigma + P_delta·lg(P_omega + f'))
 //     sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))
@@ -73,21 +86,22 @@ static inline void qd_gbsm_check_fc(const arma::vec &fc)
 //   acts for them; the default sf_sigma of path_loss is always >= 0, as lsp_generate requires
 // - The keys that do not exist for SF (SF_mu, SF_gamma, SF_epsilon, SF_zeta, SF_alpha) count as 0, so the SF mean
 //   is 0. A frequency term with P_gamma = 0 (P_delta = 0) contributes 0 to mu (s)
-// - The constructor reads the coefficients and evaluates the frequency terms at 'fc' for the LSPs in 'lsps'
-//   (bit i = LSP i; the others are not evaluated and must not be queried). It throws std::invalid_argument for
+// - The constructor reads the coefficients and evaluates the frequency terms at 'center_frequency' for the LSPs in
+//   'lsps' (bit i = LSP i; the others are not evaluated and must not be queried). It throws std::invalid_argument for
 //   such an LSP if a multiplying coefficient is not finite (P_sigma, P_gamma, P_delta, P_epsilon, P_zeta,
 //   P_alpha, P_kappa, P_tau, P_beta; ES_D_mu_A to ES_D_mu_D for ESD; P_omega of an active frequency term), since
 //   Inf·0 gives NaN, or if a frequency term is active (P_gamma or P_delta not 0) but P_omega + f' is not > 0, which
 //   would give a NaN mean and hide the NaN of the std in the limit at 0. P_mu and ES_D_mu_min are not checked
 //   (an infinite value gives no NaN)
-// - 'sp' must hold all keys (output of scenpar_validate), a missing key throws std::out_of_range; 'fc' in [Hz],
-//   finite and > 0 (not validated here)
+// - 'sp' must hold all keys (output of scenpar_validate), a missing key throws std::out_of_range;
+//   'center_frequency' in [Hz], finite and > 0 (not validated here)
 // - set_link() takes the geometry of one link, get() returns the values of one LSP and frequency for it
 class qd_gbsm_lsp_stats
 {
 public:
-    qd_gbsm_lsp_stats(const std::unordered_map<std::string, double> &sp, const arma::vec &fc, unsigned lsps = 0xFFu)
-        : gamma_f(8 * fc.n_elem, 0.0), s_f(8 * fc.n_elem, 0.0)
+    qd_gbsm_lsp_stats(const std::unordered_map<std::string, double> &sp, const arma::vec &center_frequency,
+                      unsigned lsps = 0xFFu)
+        : gamma_f(8 * center_frequency.n_elem, 0.0), s_f(8 * center_frequency.n_elem, 0.0)
     {
         const char *prefix[8] = {"DS", "KF", "SF", "AS_D", "AS_A", "ES_D", "ES_A", "XPR"};
         auto key = [&](int i, const char *suffix)
@@ -122,9 +136,9 @@ public:
             const bool active = p_gamma != 0.0 || p_delta != 0.0;
             if (active)
                 finite(i, "_omega");
-            for (arma::uword k = 0; k < fc.n_elem; ++k)
+            for (arma::uword k = 0; k < center_frequency.n_elem; ++k)
             {
-                const double arg = p_omega + std::max(fc[k] / 1.0e9, fc_min);
+                const double arg = p_omega + std::max(center_frequency[k] / 1.0e9, fc_min);
                 if (active && !(arg > 0.0))
                     throw std::invalid_argument("Scenario parameter '" + std::string(prefix[i]) +
                                                 "_omega' plus the frequency in GHz must be > 0 where " +

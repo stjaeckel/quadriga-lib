@@ -29,7 +29,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: Channel functions](api/cpp/channel-functions.md): 20 functions
 - [C++: Channel generation functions](api/cpp/channel-generation-functions.md): 5 functions
 - [C++: Channel statistics](api/cpp/channel-statistics.md): 5 functions
-- [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 13 functions
+- [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 11 functions
 - [C++: Math functions](api/cpp/math-functions.md): 9 functions
 - [C++: Site-specific simulation tools](api/cpp/site-specific-simulation-tools.md): 35 functions
 - [C++: Sum-of-sinusoids random number generator](api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
@@ -38,7 +38,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [MATLAB / Octave: Channel functions](api/mex/channel-functions.md): 13 functions
 - [MATLAB / Octave: Channel generation functions](api/mex/channel-generation-functions.md): 5 functions
 - [MATLAB / Octave: Channel statistics](api/mex/channel-statistics.md): 5 functions
-- [MATLAB / Octave: Geometry-based stochastic model](api/mex/geometry-based-stochastic-model.md): 13 functions
+- [MATLAB / Octave: Geometry-based stochastic model](api/mex/geometry-based-stochastic-model.md): 11 functions
 - [MATLAB / Octave: Math functions](api/mex/math-functions.md): 5 functions
 - [MATLAB / Octave: Miscellaneous / Tools](api/mex/miscellaneous-tools.md): 2 functions
 - [MATLAB / Octave: Site-specific simulation tools](api/mex/site-specific-simulation-tools.md): 16 functions
@@ -48,7 +48,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [Python: Channel functions](api/python/channel-functions.md): 13 functions
 - [Python: Channel generation functions](api/python/channel-generation-functions.md): 4 functions
 - [Python: Channel statistics](api/python/channel-statistics.md): 5 functions
-- [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 13 functions
+- [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 11 functions
 - [Python: Math functions](api/python/math-functions.md): 2 functions
 - [Python: Miscellaneous / Tools](api/python/miscellaneous-tools.md): 3 functions
 - [Python: Site-specific simulation tools](api/python/site-specific-simulation-tools.md): 14 functions

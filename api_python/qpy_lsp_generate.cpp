@@ -12,11 +12,11 @@ SECTION!*/
 # lsp_generate
 Large-scale parameters of a set of links from normalized random values
 
-- Generates the 8 LSPs of TR 38.901 clause 7.5 step 4 per link and frequency from the random values of [[lsf_draw]], and
-  the absolute TOA offset, the ground permittivity and the EoD offset
+- Generates the 8 LSPs of TR 38.901 clause 7.5 step 4 per link and frequency from the random values of [[gbsm.draw]]
+  (`"lsf"`), and the absolute TOA offset, the ground permittivity and the EoD offset
 - Mean `mu` and standard deviation `sigma` in the log domain (lg for DS and the angular spreads, dB for KF, SF and XPR),
   with the key prefix `P` (`DS`, `KF`, `SF`, `AS_D`, `AS_A`, `ES_D`, `ES_A`, `XPR`), `d = max(d2D, 1e-4)`, `h = max(hBS,
-  1e-4)`, `a = atan(h/d)` and `f' = max(fc/1e9, LSP_fc_min)` in GHz:
+  1e-4)`, `a = atan(h/d)` and `f' = max(center_freq/1e9, LSP_fc_min)` in GHz:
   - `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`
   - `sigma = max(0, max(0, P_sigma + P_delta·lg(P_omega + f')) + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`
   - SF has the mean 0. DS adds `lg(DS_VS_a·DS_VS + DS_VS_b)` if `DS_VS > 0` (V/S of the InF hall, TR 38.901 Table 7.5-6
@@ -32,8 +32,8 @@ Large-scale parameters of a set of links from normalized random values
 - The InF and InH NLOS files set `absTOA_Lmax`, and the InF files `DS_VS`, for the hall or office of their calibration
   scenario; for another hall set these keys in `scenpar`
 - Ground permittivity: QuaDRiGa's fits for dry, medium and wet ground, interpolated linearly over column 9 of `rnd` (0
-  dry, 0.5 medium, 1 wet) with `fc` not limited by `LSP_fc_min`; they are not the materials of TR 38.901 Table 7.6.8-1.
-  The imaginary part is >= 0: the complex value of TR 38.901 eq. (7.6-40) is `gr_eps.conj()`
+  dry, 0.5 medium, 1 wet) with `center_freq` not limited by `LSP_fc_min`; they are not the materials of TR 38.901 Table
+  7.6.8-1. The imaginary part is >= 0: the complex value of TR 38.901 eq. (7.6-40) is `gr_eps.conj()`
 - EoD offset, the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12: `EoD_offset_e + EoD_offset_e_gamma·lg
   f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) + EoD_offset_c +
   EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if `EoD_offset_b > 0`, plus `(atan((EoD_offset_hcl - h)/d) -
@@ -44,7 +44,7 @@ Large-scale parameters of a set of links from normalized random values
 ## Usage:
 ```
 # complex=True (default)
-lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, fc, \
+lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, center_freq, \
     tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
 
 # complex=False
@@ -54,11 +54,11 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga
 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`fc`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
+- **`center_freq`** — Carrier frequencies in Hz, finite and > 0 (messages name it `center_frequency`); `(n_freq,)`
 - **`tx_pos`** — Tx positions in m; `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
-- **`rnd`** — Random values from [[lsf_draw]], finite; column 9 in [0, 1] (the permittivity is always computed); column
-  10 is not used; `(n_link, 11)`
+- **`rnd`** — Random values from [[gbsm.draw]] (`"lsf"`), finite; column 9 in [0, 1] (the permittivity is always
+  computed); column 10 is not used; `(n_link, 11)`
 - **`sf_sigma`** — SF standard deviation in dB (e.g. from [[path_loss]]), finite and >= 0; replaces the value from
   `scenpar`, also in `lsp_sigma`; `None` or empty = the scenario value; `(n_link, n_freq)`; default: None
 - **`cholesky`** — `True`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS, ASD, ASA, ESD, ESA;
@@ -80,13 +80,13 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga
 - **`lsp_sigma`** — Standard deviation `sigma` in the log domain, >= 0; `(n_link, n_freq, 8)`
 
 ## See also:
-- [[lsf_draw]] (the random values `rnd`)
+- [[gbsm.draw]] (the random values `rnd`)
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[ssf_clusters]] (the clusters from the LSPs)
 MD!*/
 
 py::tuple lsp_generate(py::handle scenpar,
-                       const py::array_t<double> &fc,
+                       const py::array_t<double> &center_freq,
                        const py::array_t<double> &tx_pos,
                        const py::array_t<double> &rx_pos,
                        const py::array_t<double> &rnd,
@@ -95,20 +95,19 @@ py::tuple lsp_generate(py::handle scenpar,
                        py::handle clip_spreads,
                        py::handle complex)
 {
-    // Read inputs; the entry 'SubpathMethod' of the scenario dict is not used
-    std::string subpath_method;
-    const auto scenpar_a = qd_python_dict2scenpar(scenpar, subpath_method, "scenpar");
+    // Read inputs
+    const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const bool cholesky_b = qd_python_flag(cholesky, true, "cholesky");
     const bool clip_spreads_b = qd_python_flag(clip_spreads, true, "clip_spreads");
     const bool complex_b = qd_python_flag(complex, true, "complex");
-    const auto fc_a = qd_python_numpy2arma_Col<double>(fc, true);
+    const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
     const auto rnd_a = qd_python_numpy2arma_Mat<double>(rnd, true);
     const auto sf_sigma_a = qd_python_numpy2arma_Mat<double>(sf_sigma, true);
 
     // Output allocation
-    const arma::uword n_link = rx_pos_a.n_rows, n_freq = fc_a.n_elem;
+    const arma::uword n_link = rx_pos_a.n_rows, n_freq = center_freq_a.n_elem;
     arma::cube lsp, lsp_mu, lsp_sigma;
     arma::vec abs_toa;
     arma::mat gr_eps_re, gr_eps_im, eod_offset_deg;
@@ -131,7 +130,7 @@ py::tuple lsp_generate(py::handle scenpar,
     const arma::mat *p_sf_sigma = sf_sigma_a.is_empty() ? nullptr : &sf_sigma_a;
 
     // Call library function
-    quadriga_lib::lsp_generate(scenpar_a, fc_a, tx_pos_a, rx_pos_a, rnd_a, lsp, p_sf_sigma, &abs_toa, &gr_eps_re,
+    quadriga_lib::lsp_generate(scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, rnd_a, lsp, p_sf_sigma, &abs_toa, &gr_eps_re,
                                &gr_eps_im, &eod_offset_deg, &lsp_mu, &lsp_sigma, cholesky_b, clip_spreads_b);
 
     if (complex_b)
@@ -146,7 +145,7 @@ py::tuple lsp_generate(py::handle scenpar,
 // pybind11 declaration:
 // m.def("lsp_generate", &lsp_generate,
 //       py::arg("scenpar"),
-//       py::arg("fc").none(false),
+//       py::arg("center_freq").none(false),
 //       py::arg("tx_pos").none(false),
 //       py::arg("rx_pos").none(false),
 //       py::arg("rnd").none(false),

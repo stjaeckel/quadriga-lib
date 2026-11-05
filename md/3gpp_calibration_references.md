@@ -70,7 +70,7 @@ Points to know [V unless marked]:
 | `lsp_generate` DS, ASD, ASA, ESD (ZSD), ESA (ZSA) | Serving-link spread CDFs of the full calibrations, InF spreads | The spreads come from the generated clusters and rays and are affected by serving-cell selection and the K-factor; an LSP-only check is approximate [I]: closest for DS and ZSD, worst for ASA/ASD in LOS |
 | ESD distance and height terms | ZSD CDF of the full calibration (UMa median about 1.8 to 1.9°, UMi about 0.9°) [V] | |
 | `eod_offset_deg` (ZOD offset) | No direct metric [I]: spreads are invariant to a common shift; the offset enters only coupling loss and SIR of the full calibration with a down-tilted array | CR 0043 postdates all calibrations: unit tests against TR Tables 7.5-7 to 7.5-12 are the only exact check |
-| `lsf_init_phases`, `lsf_draw` | Spatial-consistency cases of 7.8.3 (cross-correlation of LOS state, cluster delay/AoA at 30 GHz) | Mostly SSF variables |
+| `gbsm_init_phases`, `gbsm_draw` ("lsf") | Spatial-consistency cases of 7.8.3 (cross-correlation of LOS state, cluster delay/AoA at 30 GHz) | Mostly SSF variables |
 
 ## 4. Reference numbers
 
