@@ -87,7 +87,7 @@ The conventions a declaration follows, for writing one in the plan or the spec a
 - Declarations are grouped under a comment line such as `// ---- Channel statistics ----` in the header that fits the topic.
 - A comment block above the declaration gives a one-line description and, as `// - ...` lines, the facts a caller needs.
 - Each argument is on its own line with a trailing comment: meaning, unit, index base, and size, e.g. `// Ray origins in GCS, [n_ray, 3]`. In/out and optional arguments are marked in the comment.
-- Argument order: required inputs, optional inputs, outputs, then scalar options; later extensions are appended at the end with a default so that existing callers keep working.
+- Argument order: required inputs, mandatory outputs, then all arguments with a default (options, optional inputs, optional outputs, flags); later extensions are appended at the end with a default so that existing callers keep working.
 - Argument passing — the rule for new declarations:
   - **Mandatory** inputs and outputs (and in-place updated data) are passed by **reference**: `const arma::Mat<dtype> &input`, `arma::Mat<dtype> &output`. No `nullptr` check is needed or possible.
   - **Optional** inputs and outputs are passed by **pointer**, default-initialized to `nullptr`: `const arma::Mat<dtype> *input = nullptr`, `arma::Mat<dtype> *output = nullptr`. A `nullptr` input means "not provided"; a `nullptr` output is not allocated and not computed.
