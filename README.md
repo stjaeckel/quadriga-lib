@@ -149,7 +149,7 @@ Example without MATLAB, with the system compiler:
 make gcc_version= matlab=OFF
 ```
 
-The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENABLE_PYTHON`, `ENABLE_AVX2`, `ENABLE_CUDA`, `ENABLE_SHARED_LIB`, `ENABLE_TESTS`) if you prefer to call CMake directly.
+The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENABLE_PYTHON`, `ENABLE_AVX2`, `ENABLE_CUDA`, `ENABLE_SHARED_LIB`, `ENABLE_TESTS`) if you prefer to call CMake directly. `ENABLE_SANITIZERS` (CMake only, default `OFF`) builds with AddressSanitizer and UndefinedBehaviorSanitizer for testing; it turns MATLAB, Octave and CUDA off.
 
 ### Make targets
 
@@ -160,6 +160,7 @@ The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENA
 | `make python_install` | Copies the Python module into the active environment                |
 | `make test`           | Builds and runs the C++ tests, then the Octave, MATLAB and Python tests that are enabled |
 | `make python_test`    | Runs only the Python tests                                          |
+| `make test-asan`      | Builds the C++ tests with AddressSanitizer and UndefinedBehaviorSanitizer in `build_linux_asan` and runs them |
 | `make docs`           | Writes the documentation as Markdown files into `docs/` from the source comments |
 | `make docs-check`     | Checks that `docs/` matches the source comments; writes nothing     |
 | `make website`        | Builds the website into `website/`                                  |

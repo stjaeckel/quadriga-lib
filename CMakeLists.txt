@@ -28,6 +28,7 @@ option(ENABLE_SHARED_LIB "Build the shared library (Linux only)" OFF)
 option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_CUDA "Enable CUDA GPU Acceleration" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
+option(ENABLE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer for testing (GCC or Clang)" OFF)
 
 set(CATCH2_PATH "" CACHE PATH "Location of the Catch2 library. If left empty, Catch2 is built from sources.")
 set(_CATCH2_PATH ${CATCH2_PATH}) # For internal use
@@ -51,8 +52,16 @@ if(MSVC)
     add_compile_options(/EHsc /Zc:__cplusplus /nologo /MP)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     set(MEX_CXXFLAGS "/std:c++17 /nologo $<$<CONFIG:Debug>:/MTd> $<$<CONFIG:Release>:/MT>")
+    if(ENABLE_SANITIZERS)
+        message(STATUS "Sanitizers need GCC or Clang. ENABLE_SANITIZERS ignored!")
+    endif()
 else()
-    add_compile_options(-O3 -fPIC -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
+    set(OPT_FLAGS -O3)
+    if(ENABLE_SANITIZERS) # -O1 -g instead of -O3 keeps the stack traces in the reports readable
+        set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize-recover=address)
+        add_link_options(-fsanitize=address,undefined)
+    endif()
+    add_compile_options(${OPT_FLAGS} -fPIC -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
     set(MEX_CXXFLAGS "-std=c++17 -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
 endif()
 
@@ -142,6 +151,14 @@ set(BUILD_PYTHON ${ENABLE_PYTHON})
 set(BUILD_STATIC_LIB ${ENABLE_STATIC_LIB})
 set(BUILD_SHARED_LIB ${ENABLE_SHARED_LIB})
 set(BUILD_CUDA ${ENABLE_CUDA})
+
+# The MEX files are compiled with their own fixed flags, and the CUDA runtime does not run under AddressSanitizer
+if(ENABLE_SANITIZERS AND NOT MSVC AND (BUILD_MATLAB OR BUILD_OCTAVE OR BUILD_CUDA))
+    message(STATUS "Sanitizers enabled: MATLAB, Octave and CUDA disabled!")
+    set(BUILD_MATLAB OFF)
+    set(BUILD_OCTAVE OFF)
+    set(BUILD_CUDA OFF)
+endif()
 
 if(MSVC) # Platform Overwrites for MSVC / Windows
     if(BUILD_OCTAVE)
@@ -591,7 +608,7 @@ if (ENABLE_TESTS)
         target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /MP)
         target_compile_definitions(test_bin PRIVATE _USE_MATH_DEFINES ARMA_DONT_USE_BLAS ARMA_DONT_USE_LAPACK)
     else()
-        target_compile_options(test_bin PRIVATE -O3 -fPIC -w)
+        target_compile_options(test_bin PRIVATE -w)
     endif()
 
     # Catch2 and the library headers are parsed once and reused by every test file

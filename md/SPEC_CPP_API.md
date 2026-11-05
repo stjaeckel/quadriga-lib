@@ -35,6 +35,7 @@ quadriga-lib is a C++ radio channel modelling library and the numerical core beh
 - Commands (Linux, from the repository root):
   - `make test matlab=OFF octave=OFF` — configures with tests enabled, builds, and runs the Catch2 suite (`build_linux/test_bin`); without the switches it also runs the MEX suites (both default to ON)
   - `cmake --build build_linux --parallel` — rebuild after `make test`; valid until `make` or `make python` reconfigures with tests off
+  - `make test-asan` — builds the Catch2 suite with AddressSanitizer and UndefinedBehaviorSanitizer in `build_linux_asan` (CMake option `ENABLE_SANITIZERS=ON`) and runs it; stops at the first report. `make test-asan TEST_ARGS='"my_function*"'` runs only the matching cases. Another build folder: `ASAN_BUILD_DIR=<dir>`
   - `build_linux/test_bin "my_function*"` — run only the test cases whose name matches; this is the normal way to iterate on one function
   - Tests are run from the repository root; relative paths such as `tests/data/x.obj` depend on it.
 
