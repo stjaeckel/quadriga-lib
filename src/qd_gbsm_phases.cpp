@@ -410,7 +410,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
         throw std::invalid_argument("Input 'tx_pos' is required for the bias removal with dual mobility.");
 
     const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp) : qd_gbsm_gen_cluster(sp, set_id);
-    const arma::uword n_gen = (arma::uword)gen.size();
+    const arma::uword n_gen = qd_gbsm_n_gen(sp, set_type, set_id);
     if (phase.n_rows != n_coeff || phase.n_cols != n_gen || phase.n_slices != 2)
         phase.set_size(n_coeff, n_gen, 2);
     if (n_gen == 0) // N = 0: empty "cluster" set, sos_init_phases rejects zero generators
@@ -558,7 +558,7 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
         throw std::invalid_argument("Set type 'ray' is not available yet.");
 
     const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp) : qd_gbsm_gen_cluster(sp, set_id);
-    const arma::uword n_gen = (arma::uword)gen.size();
+    const arma::uword n_gen = qd_gbsm_n_gen(sp, set_type, set_id);
 
     // An empty set accepts any empty cube (MATLAB passes zeros(n_coeff, 0, 2) as 0x0x0)
     if (n_gen == 0 ? phase.n_elem != 0 : (phase.n_rows != n_coeff || phase.n_cols != n_gen || phase.n_slices != 2))

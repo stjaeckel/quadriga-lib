@@ -14,6 +14,12 @@
 //                                                                  o2i_loss.cpp
 //   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
 //                                                                  gbsm_init_phases
+//   qd_gbsm_n_gen         number of generators of a random set     qd_gbsm_phases.cpp, MEX and Python wrappers of
+//                                                                  gbsm_init_phases
+//   qd_gbsm_ray_layout    ray and generator counts of a scenario   qd_gbsm_n_gen, ssf_rays.cpp, MEX and Python
+//                                                                  wrappers of ssf_rays
+//   qd_gbsm_cds           cluster delay spread c_DS at a frequency qd_gbsm_phases.cpp, ssf_rays.cpp
+//   qd_gbsm_fresnel       reflection coefficients of the ground    ssf_rays.cpp, ssf_paths.cpp
 //   qd_gbsm_lsp_stats     LSP mean and std per link and frequency  lsp_generate.cpp, path_loss.cpp
 //   qd_gbsm_chol8         Cholesky factorization of an 8x8 matrix  lsp_generate.cpp, qd_scenpar.cpp
 //
@@ -30,6 +36,7 @@
 #include <armadillo>
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -69,6 +76,62 @@ static inline arma::uword qd_gbsm_n_coeff(const std::string &preset)
     int type = 0;
     arma::uword n_coeff = 0;
     return qd_sos_preset_lookup(preset, type, n_coeff) ? n_coeff : 0;
+}
+
+// Counts of the ray level of a completed scenpar (output of scenpar_validate; a missing key throws
+// std::out_of_range): N = NumClusters - 1 NLOS clusters, M = NumSubPaths rays per cluster, G = 1 if GR_enabled > 0
+// else 0, n_ray = 1 + G + N·M rays per link (LOS, GR, then ray m of cluster n at 1 + G + n·M + m) and
+// n_gen = 14·N·M + N generators of a "ray" set
+static inline void qd_gbsm_ray_layout(const std::unordered_map<std::string, double> &sp, arma::uword &N,
+                                      arma::uword &M, arma::uword &G, arma::uword &n_ray, arma::uword &n_gen)
+{
+    N = (arma::uword)sp.at("NumClusters") - 1;
+    M = (arma::uword)sp.at("NumSubPaths");
+    G = (sp.at("GR_enabled") > 0.0) ? 1 : 0;
+    n_ray = 1 + G + N * M;
+    n_gen = 14 * N * M + N;
+}
+
+// Number of generators n_gen of a random set of a completed scenpar: "lsf" 11; "cluster" 9·N for set_id -1 and N
+// for set_id >= 0; "ray" 14·N·M + N for any set_id; 0 for an unknown set type, so that the caller throws its own
+// message in its order of checks
+static inline arma::uword qd_gbsm_n_gen(const std::unordered_map<std::string, double> &sp,
+                                        const std::string &set_type, arma::sword set_id)
+{
+    if (set_type == "lsf")
+        return 11;
+    arma::uword N, M, G, n_ray, n_gen;
+    qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
+    if (set_type == "cluster")
+        return (set_id < 0) ? 9 * N : N;
+    return (set_type == "ray") ? n_gen : 0;
+}
+
+// Cluster delay spread c_DS in [s] of a completed scenpar at the frequency 'fc' in [Hz] (TR 38.901 Table 7.5-6):
+// 3.91 ns if PerClusterDS = 0 (no value in the TR), else
+// max(PerClusterDS_min, PerClusterDS + PerClusterDS_gamma·lg(max(fc / 1e9, PerClusterDS_fc_min))) ns
+static inline double qd_gbsm_cds(const std::unordered_map<std::string, double> &sp, double fc)
+{
+    const double ds = sp.at("PerClusterDS");
+    if (ds == 0.0)
+        return 3.91e-9;
+    const double f_ghz = std::max(fc / 1.0e9, sp.at("PerClusterDS_fc_min"));
+    return 1.0e-9 * std::max(sp.at("PerClusterDS_min"), ds + sp.at("PerClusterDS_gamma") * std::log10(f_ghz));
+}
+
+// Reflection coefficients R_par and R_per of the ground at z = 0 (TR 38.901 eqs. (7.6-38), (7.6-39)) for the
+// permittivity eps = eps_re - j·eps_im (eq. (7.6-40)), Tx and Rx heights h_t, h_r >= 0 and the 2D distance d2D in
+// [m]: cos(theta) = -(h_t + h_r)/d_GR' and sin²(theta) = (d2D/d_GR')² with d_GR' = max(d_GR, 1e-5),
+// d_GR = sqrt(d2D² + (h_t + h_r)²); a zero denominator (grazing incidence with eps = 1) gives that coefficient 0
+static inline void qd_gbsm_fresnel(double eps_re, double eps_im, double h_t, double h_r, double d2D,
+                                   std::complex<double> &R_par, std::complex<double> &R_per)
+{
+    const double d_gr = std::max(std::sqrt(d2D * d2D + (h_t + h_r) * (h_t + h_r)), 1e-5);
+    const double ct = -(h_t + h_r) / d_gr, s2 = (d2D / d_gr) * (d2D / d_gr);
+    const std::complex<double> eps(eps_re, -eps_im);
+    const std::complex<double> q = std::sqrt(eps - s2), a = eps * ct, d_par = a - q, d_per = ct - q;
+    R_par = (d_par == 0.0) ? std::complex<double>(0.0) : (a + q) / d_par;
+    R_per = (d_per == 0.0) ? std::complex<double>(0.0) : (ct + q) / d_per;
 }
 
 // LSP mean and std per link and frequency of a completed scenpar

@@ -26,10 +26,10 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: Array antenna class](api/cpp/array-antenna-class.md): 13 functions
 - [C++: Array antenna functions](api/cpp/array-antenna-functions.md): 19 functions
 - [C++: Channel class](api/cpp/channel-class.md): 4 functions
-- [C++: Channel functions](api/cpp/channel-functions.md): 20 functions
+- [C++: Channel functions](api/cpp/channel-functions.md): 21 functions
 - [C++: Channel generation functions](api/cpp/channel-generation-functions.md): 5 functions
 - [C++: Channel statistics](api/cpp/channel-statistics.md): 5 functions
-- [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 11 functions
+- [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 17 functions
 - [C++: Math functions](api/cpp/math-functions.md): 9 functions
 - [C++: Site-specific simulation tools](api/cpp/site-specific-simulation-tools.md): 35 functions
 - [C++: Sum-of-sinusoids random number generator](api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
