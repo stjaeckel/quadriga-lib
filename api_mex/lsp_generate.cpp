@@ -15,10 +15,10 @@ SECTION!*/
 Large-scale parameters of a set of links from normalized random values
 
 - Generates the 8 LSPs of TR 38.901 clause 7.5 step 4 per link and frequency from the random values
-  of [[lsf_draw]], and the absolute TOA offset, the ground permittivity and the EoD offset
+  of [[gbsm_draw]] (`'lsf'`), and the absolute TOA offset, the ground permittivity and the EoD offset
 - Mean `mu` and standard deviation `sigma` in the log domain (lg for DS and the angular spreads, dB
   for KF, SF and XPR), with the field prefix `P` (`DS`, `KF`, `SF`, `AS_D`, `AS_A`, `ES_D`, `ES_A`,
-  `XPR`), `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(fc/1e9,
+  `XPR`), `d = max(d2D, 1e-4)`, `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(center_freq/1e9,
   LSP_fc_min)` in GHz:
   - `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`
   - `sigma = max(0, max(0, P_sigma + P_delta·lg(P_omega + f')) + P_kappa·lg(d) + P_tau·lg(h) +
@@ -38,9 +38,9 @@ Large-scale parameters of a set of links from normalized random values
 - The InF and InH NLOS files set `absTOA_Lmax`, and the InF files `DS_VS`, for the hall or office of
   their calibration scenario; for another hall set these fields in `scenpar`
 - Ground permittivity: QuaDRiGa's fits for dry, medium and wet ground, interpolated linearly over
-  column 10 of `rnd` (0 dry, 0.5 medium, 1 wet) with `fc` not limited by `LSP_fc_min`; they are not
-  the materials of TR 38.901 Table 7.6.8-1. The imaginary part is >= 0: the complex value of TR
-  38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`
+  column 10 of `rnd` (0 dry, 0.5 medium, 1 wet) with `center_freq` not limited by `LSP_fc_min`; they
+  are not the materials of TR 38.901 Table 7.6.8-1. The imaginary part is >= 0: the complex value of
+  TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`
 - EoD offset, the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12: `EoD_offset_e +
   EoD_offset_e_gamma·lg f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg
   f')·lg(max(EoD_offset_b, d)) + EoD_offset_c + EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if
@@ -51,16 +51,18 @@ Large-scale parameters of a set of links from normalized random values
 ## Usage:
 ```
 [ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ...
-    quadriga_lib.lsp_generate( scenpar, fc, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads );
+    quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads );
 ```
 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0 (messages name it
+  `center_frequency`); `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`rnd`** — Random values from [[lsf_draw]], finite; column 10 in [0, 1] when 3 or more outputs
-  are requested (the error message counts the columns from 0); column 11 is not used; `[n_link, 11]`
+- **`rnd`** — Random values from [[gbsm_draw]] (`'lsf'`), finite; column 10 in [0, 1] when 3 or more
+  outputs are requested (the error message counts the columns from 0); column 11 is not used;
+  `[n_link, 11]`
 - **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite
   and >= 0; replaces the value from `scenpar`, also in `lsp_sigma`; omitted or empty = the scenario
   value; `[n_link, n_freq]`
@@ -80,7 +82,7 @@ Large-scale parameters of a set of links from normalized random values
 - **`lsp_sigma`** — Standard deviation `sigma` in the log domain, >= 0; `[n_link, n_freq, 8]`
 
 ## See also:
-- [[lsf_draw]] (the random values `rnd`)
+- [[gbsm_draw]] (the random values `rnd`)
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[ssf_clusters]] (the clusters from the LSPs)
 MD!*/
@@ -93,10 +95,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs; the field 'SubpathMethod' of the scenario struct is not used
-    std::string subpath_method;
-    const auto scenpar = qd_mex_struct2scenpar(prhs[0], subpath_method, "scenpar");
-    const arma::vec fc = qd_mex_get_Col<double>(prhs[1]);
+    // Read inputs
+    const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
+    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[1]);
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[3]);
     const arma::mat rnd = qd_mex_get_Mat<double>(prhs[4]);
@@ -105,7 +106,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool clip_spreads = (nrhs < 8) ? true : qd_mex_get_scalar<bool>(prhs[7], "clip_spreads", true);
 
     // Output allocation: the requested outputs only, the others are passed to C++ as nullptr
-    const arma::uword n_link = rx_pos.n_rows, n_freq = fc.n_elem;
+    const arma::uword n_link = rx_pos.n_rows, n_freq = center_freq.n_elem;
     arma::cube lsp, lsp_mu, lsp_sigma;
     arma::vec abs_toa;
     arma::mat gr_eps_re, gr_eps_im, eod_offset_deg;
@@ -135,6 +136,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube *p_lsp_sigma = (nlhs > 6) ? &lsp_sigma : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::lsp_generate(scenpar, fc, tx_pos, rx_pos, rnd, lsp, p_sf_sigma, p_abs_toa, p_gr_eps_re,
+    CALL_QD(quadriga_lib::lsp_generate(scenpar, center_freq, tx_pos, rx_pos, rnd, lsp, p_sf_sigma, p_abs_toa, p_gr_eps_re,
                                        p_gr_eps_im, p_eod_offset_deg, p_lsp_mu, p_lsp_sigma, cholesky, clip_spreads));
 }

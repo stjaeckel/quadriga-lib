@@ -23,8 +23,8 @@ Write a QuaDRiGa scenario configuration file
   modelling components; 0 to 7 are those of QuaDRiGa, so its 8 section references can be passed unchanged
 - Numbers have up to 15 significant digits, or 16 or 17 where 15 do not read back to the same double, independent of the
   locale; `Inf`, `-Inf` and `-0` are kept
-- `write_defaults = False`: only keys whose value differs from the default (bit for bit) and `SubpathMethod` if it is
-  not `legacy`; a section without a written key is left out
+- `write_defaults = False`: only keys whose value differs from the default (bit for bit); a section without a written
+  key is left out
 - All inputs are validated before the file is opened: the checks of [[scenpar_validate]]; `model`, the other keys of
   `plpar` and the short names are names, the short names distinct; every `plpar` key has at least one value and no
   `NaN`; `fn`, `ref` and `ref_sec` have no line break
@@ -39,10 +39,9 @@ quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec
 
 ## Inputs:
 - **`fn`** — Path of the conf file to write; str, bytes or path-like object (e.g. `pathlib.Path`)
-- **`scenpar`** — Scenario parameters; dict with any subset of the 172 keys returned by
-  [[conf_file_read]]; numeric values are real scalars (int, float, bool or a numpy value with one
-  element); `SubpathMethod` is a str; missing keys have their default; `None` or `{}` writes the
-  default set
+- **`scenpar`** — Scenario parameters; dict with any subset of the 171 keys returned by
+  [[conf_file_read]]; real scalars (int, float, bool or a numpy value with one element); missing keys
+  have their default; `None` or `{}` writes the default set
 - **`plpar`** — Path-loss parameters; dict with the entry `model` (str) and one real scalar, list or
   1D array per further entry, named without the prefix `PL_`, as returned by [[conf_file_read]];
   written in dict order; `None` or `{}`: no path-loss section; default: None
@@ -74,9 +73,8 @@ void conf_file_write(py::object fn,
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
-    // Scenario parameters: dict of real scalars and the str entry 'SubpathMethod'
-    std::string subpath_method;
-    const auto scenpar_m = qd_python_dict2scenpar(scenpar, subpath_method, "scenpar");
+    // Scenario parameters: dict of real scalars
+    const auto scenpar_m = qd_python_dict2scenpar(scenpar, "scenpar");
 
     // Path-loss parameters: 'model' and the numeric entries; the dict order is the write order
     std::string pl_model;
@@ -98,7 +96,7 @@ void conf_file_write(py::object fn,
     const bool write_defaults_b = qd_python_flag(write_defaults, false, "write_defaults");
 
     // Call library function
-    quadriga_lib::conf_file_write(fn_s, scenpar_m, subpath_method, pl_model, &plpar_m, &pl_order, &short_names_v,
+    quadriga_lib::conf_file_write(fn_s, scenpar_m, pl_model, &plpar_m, &pl_order, &short_names_v,
                                   ref_s, &ref_sec_v, &valid_range_a, write_defaults_b);
 }
 

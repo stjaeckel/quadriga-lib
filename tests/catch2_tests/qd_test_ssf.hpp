@@ -240,14 +240,14 @@ namespace
         lib_t r;
         arma::cube ph;
         arma::mat rnd_l;
-        quadriga_lib::lsf_init_phases(sp, ph, seed);
-        quadriga_lib::lsf_draw(sp, ph, tx, rx, rnd_l);
+        quadriga_lib::gbsm_init_phases(sp, "lsf", ph, seed);
+        quadriga_lib::gbsm_draw(sp, "lsf", ph, tx, rx, rnd_l);
         quadriga_lib::lsp_generate(sp, arma::vec{fc}, tx, rx, rnd_l, r.lsp, nullptr, &r.toa, nullptr, nullptr, &r.eod);
-        quadriga_lib::ssf_init_phases(sp, ph, seed, -1);
-        quadriga_lib::ssf_draw(sp, ph, tx, rx, r.rnd, -1);
-        quadriga_lib::ssf_init_phases(sp, ph, seed, 0);
+        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd);
+        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed, 0);
         r.rnd_freq.set_size(rx.n_rows, (arma::uword)sp.at("NumClusters") - 1, 1);
-        quadriga_lib::ssf_draw(sp, ph, tx, rx, r.rnd_freq.slice(0), 0);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd_freq.slice(0), 0);
         return r;
     }
 

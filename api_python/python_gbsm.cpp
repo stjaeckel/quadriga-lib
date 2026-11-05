@@ -12,14 +12,12 @@ namespace py = pybind11;
 #include "qpy_conf_file_write.cpp"
 #include "qpy_scenpar_validate.cpp"
 #include "qpy_conf_file_list.cpp"
-#include "qpy_lsf_init_phases.cpp"
-#include "qpy_lsf_draw.cpp"
+#include "qpy_gbsm_init_phases.cpp"
+#include "qpy_gbsm_draw.cpp"
 #include "qpy_path_loss.cpp"
 #include "qpy_lsp_generate.cpp"
 #include "qpy_los_probability.cpp"
 #include "qpy_o2i_loss.cpp"
-#include "qpy_ssf_init_phases.cpp"
-#include "qpy_ssf_draw.cpp"
 #include "qpy_ssf_clusters.cpp"
 
 // Mandatory arrays are declared with .none(false): without it pybind11 converts None to a 0-dimensional
@@ -48,30 +46,35 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("dirs"),
           py::arg("parse_shortnames") = true);
 
-    m.def("lsf_init_phases", &lsf_init_phases,
+    m.def("init_phases", &gbsm_init_phases,
           py::arg("scenpar"),
+          py::arg("set_type"),
           py::arg("seed") = -1,
+          py::arg("set_id") = -1,
+          py::arg("preset") = "Comb256",
           py::arg("tx_pos") = py::none(),
           py::arg("rx_pos") = py::none(),
           py::arg("dual_mobility") = false,
           py::arg("remove_bias") = true,
-          py::arg("preset") = "Comb256",
           py::arg("horizontal") = true);
 
-    m.def("lsf_draw", &lsf_draw,
+    m.def("draw", &gbsm_draw,
           py::arg("scenpar"),
+          py::arg("set_type"),
           py::arg("phase").none(false),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
-          py::arg("floor_id") = py::none(),
-          py::arg("dual_mobility") = false,
+          py::arg("set_id") = -1,
           py::arg("preset") = "Comb256",
+          py::arg("floor_id") = py::none(),
+          py::arg("center_freq") = py::none(),
+          py::arg("dual_mobility") = false,
           py::arg("horizontal") = true);
 
     m.def("path_loss", &path_loss,
           py::arg("plpar"),
           py::arg("scenpar"),
-          py::arg("fc").none(false),
+          py::arg("center_freq").none(false),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
           py::arg("d2d_in") = py::none(),
@@ -79,7 +82,7 @@ void quadriga_lib_gbsm(py::module_ &m)
 
     m.def("lsp_generate", &lsp_generate,
           py::arg("scenpar"),
-          py::arg("fc").none(false),
+          py::arg("center_freq").none(false),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
           py::arg("rnd").none(false),
@@ -97,31 +100,14 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("r_clutter") = py::none(),
           py::arg("h_clutter") = py::none(),
           py::arg("rnd_g") = py::none(),
-          py::arg("fc") = py::none());
+          py::arg("center_freq") = py::none());
 
     m.def("o2i_loss", &o2i_loss,
-          py::arg("fc").none(false),
+          py::arg("center_freq").none(false),
           py::arg("rnd").none(false),
           py::arg("models"),
           py::arg("weights").none(false),
           py::arg("d2d_in_max") = 25.0);
-
-    m.def("ssf_init_phases", &ssf_init_phases,
-          py::arg("scenpar"),
-          py::arg("seed") = -1,
-          py::arg("set_id") = -1,
-          py::arg("preset") = "Comb256");
-
-    m.def("ssf_draw", &ssf_draw,
-          py::arg("scenpar"),
-          py::arg("phase").none(false),
-          py::arg("tx_pos").none(false),
-          py::arg("rx_pos").none(false),
-          py::arg("set_id") = -1,
-          py::arg("floor_id") = py::none(),
-          py::arg("dual_mobility") = false,
-          py::arg("preset") = "Comb256",
-          py::arg("horizontal") = true);
 
     m.def("ssf_clusters", &ssf_clusters,
           py::arg("scenpar"),

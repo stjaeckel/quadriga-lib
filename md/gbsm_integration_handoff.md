@@ -3,6 +3,8 @@
 For the agent that integrates the library into QuaDRiGa-NG (NG, `/home/stephan/sjc/QuaDRiGa-NG`, MATLAB/Octave).
 NG line numbers below refer to NG commit 6253027; check them before editing.
 
+Update (2026-11): `lsf_init_phases` and `lsf_draw` are now `gbsm_init_phases` and `gbsm_draw` with `set_type = 'lsf'` (MATLAB: `gbsm_init_phases( scenpar, 'lsf', seed, [], preset, tx_pos, rx_pos, dual_mobility, remove_bias, horizontal )`, `gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], preset, floor_id, [], dual_mobility, horizontal )`); the frequency argument `fc` is now `center_freq` in the wrappers (`center_frequency` in C++); `SubpathMethod` is no longer a `scenpar` field (a file line `SubpathMethod = legacy` is accepted and ignored). Values are unchanged. The text below keeps the old names.
+
 ## 1. Goal, scope, library
 
 Goal: NG replaces its MATLAB implementation of the large-scale model (path loss, shadow fading, the 8 LSPs, the

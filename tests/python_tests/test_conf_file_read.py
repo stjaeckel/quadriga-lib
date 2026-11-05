@@ -31,7 +31,7 @@ test_conf = """% Test file
 DS_mu = -7.5
 NumClusters = 12
 asD_ds = 0.25
-SubpathMethod = mmMAGIC
+SubpathMethod = legacy
 PL_model = logdist
 PL_B = 1 2.5 -3
 PL_A = 4
@@ -65,16 +65,16 @@ class test_case(unittest.TestCase):
         self.assertEqual(len(out), 6)
         scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = out
 
-        # scenpar: 172 entries, float values, 'SubpathMethod' (str) at position 106, the newest keys at the end
+        # scenpar: 171 float entries in the canonical order, the newest keys at the end; SubpathMethod = legacy ignored
         self.assertIsInstance(scenpar, dict)
-        self.assertEqual(len(scenpar), 172)
+        self.assertEqual(len(scenpar), 171)
         keys = list(scenpar)
-        self.assertEqual(keys[105:108], ["absTOA_lambda", "SubpathMethod", "LOS_scatter_radius"])
+        self.assertEqual(keys[105:107], ["absTOA_lambda", "LOS_scatter_radius"])
+        self.assertNotIn("SubpathMethod", scenpar)
         self.assertEqual(keys[-6:], ["LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS", "DS_VS_a", "DS_VS_b"])
         self.assertEqual(keys[0], "NumClusters")
         for key, value in scenpar.items():
-            self.assertIsInstance(value, str if key == "SubpathMethod" else float, key)
-        self.assertEqual(scenpar["SubpathMethod"], "mmMAGIC")
+            self.assertIsInstance(value, float, key)
         self.assertEqual(scenpar["DS_mu"], -7.5)
         self.assertEqual(scenpar["NumClusters"], 12.0)
 
@@ -114,8 +114,8 @@ class test_case(unittest.TestCase):
         for fn in files:
             scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
                 quadriga_lib.gbsm.conf_file_read(fn)
-            self.assertEqual(len(scenpar), 172, fn)
-            self.assertEqual(list(scenpar)[106], "SubpathMethod", fn)
+            self.assertEqual(len(scenpar), 171, fn)
+            self.assertEqual(list(scenpar)[106], "LOS_scatter_radius", fn)
             self.assertEqual(list(plpar)[0], "model", fn)
             self.assertEqual(lsp_xcorr.shape, (8, 8), fn)
             self.assertTrue(lsp_xcorr_chk, fn)
@@ -214,7 +214,7 @@ class test_case(unittest.TestCase):
         self.assertIsInstance(plpar, dict)
         self.assertEqual(short_names, [])
         self.assertEqual(ignored_keys, [])
-        self.assertEqual(scenpar["SubpathMethod"], "legacy")
+        self.assertNotIn("SubpathMethod", scenpar)
         self.assertTrue(lsp_xcorr_chk)
 
         # PL_ keys without PL_model: no 'model' entry
@@ -242,6 +242,14 @@ class test_case(unittest.TestCase):
         self.assertIn("line 2", str(ctx.exception))
         self.assertIn("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.", str(ctx.exception))
         self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, False)[0]["DS_VS"], 4.0)
+
+        # SubpathMethod: only 'legacy' is accepted, also without validation
+        fn = self.write("conf_file_read_subpath.conf", "DS_mu = -7\nSubpathMethod = mmMAGIC\n")
+        for validate in (True, False):
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.gbsm.conf_file_read(fn, validate)
+            self.assertIn("line 2: Value 'mmMAGIC' of 'SubpathMethod' is not supported; only 'legacy' is accepted.",
+                          str(ctx.exception))
 
         # Rejected by pybind11
         with self.assertRaises(TypeError):

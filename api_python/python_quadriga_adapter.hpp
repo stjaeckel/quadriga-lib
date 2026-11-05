@@ -768,17 +768,16 @@ static py::array_t<double, py::array::c_style | py::array::forcecast> qd_python_
     return py::array_t<double, py::array::c_style | py::array::forcecast>::ensure(arr);
 }
 
-// Dict of QuaDRiGa scenario parameters -> map of the numeric values and the str 'SubpathMethod'
-// - Every entry except 'SubpathMethod' must be a real scalar (one element); 'SubpathMethod' must be a str
+// Dict of QuaDRiGa scenario parameters -> map of the numeric values
+// - Every entry except 'SubpathMethod' must be a real scalar (one element)
+// - 'SubpathMethod' (an entry of QuaDRiGa's structs) must be the str 'legacy'; it is accepted and ignored
 // - Key names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
-// - None or an empty dict gives an empty map; 'subpath_method' is "legacy" if not in the dict
+// - None or an empty dict gives an empty map
 // - 'var_name' is used in the error messages
 static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::handle &obj,
-                                                                      std::string &subpath_method,
                                                                       const std::string &var_name = "scenpar")
 {
     std::unordered_map<std::string, double> scenpar;
-    subpath_method = "legacy";
     if (obj.is_none())
         return scenpar;
     if (!py::isinstance<py::dict>(obj))
@@ -793,7 +792,9 @@ static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::
         {
             if (!py::isinstance<py::str>(item.second))
                 throw std::invalid_argument("Entry 'SubpathMethod' of '" + var_name + "' must be a str.");
-            subpath_method = py::cast<std::string>(item.second);
+            const std::string value = py::cast<std::string>(item.second);
+            if (value != "legacy")
+                throw std::invalid_argument("Value '" + value + "' of 'SubpathMethod' is not supported; only 'legacy' is accepted.");
         }
         else
         {
@@ -807,22 +808,14 @@ static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::
     return scenpar;
 }
 
-// Map of QuaDRiGa scenario parameters -> dict of float values
-// - Keys in the order of 'key_order', with the str entry 'SubpathMethod' inserted before 'LOS_scatter_radius'
-//   (its QuaDRiGa position); every name in 'key_order' must be in 'scenpar'
+// Map of QuaDRiGa scenario parameters -> dict of float values, keys in the order of 'key_order'
+// - Every name in 'key_order' must be in 'scenpar'
 static py::dict qd_python_scenpar2dict(const std::unordered_map<std::string, double> &scenpar,
-                                       const std::string &subpath_method,
                                        const std::vector<std::string> &key_order)
 {
     py::dict output;
     for (const auto &key : key_order)
-    {
-        if (key == "LOS_scatter_radius")
-            output["SubpathMethod"] = subpath_method;
         output[py::str(key)] = scenpar.at(key);
-    }
-    if (!output.contains("SubpathMethod"))
-        output["SubpathMethod"] = subpath_method;
     return output;
 }
 

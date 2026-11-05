@@ -12,8 +12,8 @@ SECTION!*/
 # ssf_clusters
 Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
 
-- Turns the LSPs of [[lsp_generate]] and the random values of [[ssf_draw]] into the clusters of each link, by one of
-  three methods (a method and property table is in the C++ documentation of `ssf_clusters`):
+- Turns the LSPs of [[lsp_generate]] and the cluster random values of [[gbsm.draw]] into the clusters of each link, by
+  one of three methods (a method and property table is in the C++ documentation of `ssf_clusters`):
   - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters 25 dB
     below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited to >= -5 dB.
     Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment start and keep
@@ -40,9 +40,9 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   `sqrt(power)·exp(j·arg(R_par))`
 - `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled; `rnd` must be
   empty, `rnd_freq` and `lsp_anchor` are not used
-- Swap reciprocity: with mirrored random values (dual mobility in [[ssf_draw]]) and mirrored LSPs, swapping `tx_pos` and
-  `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link; `"quadriga"`:
-  `eod_offset_deg` = 0)
+- Swap reciprocity: with mirrored random values (dual mobility in [[gbsm.draw]]) and mirrored LSPs, swapping `tx_pos`
+  and `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link;
+  `"quadriga"`: `eod_offset_deg` = 0)
 - `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked
 
 ## Usage:
@@ -58,9 +58,10 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
 - **`rx_pos`** — Rx positions in m; z >= 0 with ground reflection; `(n_link, 3)`
 - **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
   `"38.901"`: one frequency; `(n_link, n_freq, 8)`
-- **`rnd`** — Shared cluster set of [[ssf_draw]] (`set_id = -1`), columns 0 to N-1 in [0, 1]; `(n_link, 9·N)`
+- **`rnd`** — Shared cluster set of [[gbsm.draw]] (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1]; `(n_link,
+  9·N)`
 - **`method`** — `"38.901"`, `"38.901_MF"` or `"quadriga"`; default: `"38.901"`
-- **`rnd_freq`** — Per-frequency sets of [[ssf_draw]], slice `k` from `set_id = k`; required by `"38.901"` and
+- **`rnd_freq`** — Per-frequency cluster sets of [[gbsm.draw]], slice `k` from `set_id = k`; required by `"38.901"` and
   `"38.901_MF"`; `(n_link, N, n_freq)`; default: None
 - **`lsp_anchor`** — LSPs at the anchor frequency (e.g. 2 GHz) from [[lsp_generate]]; required by `"38.901_MF"`;
   `(n_link, 1, 8)`; default: None
@@ -77,14 +78,14 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
   array of non-negative integers; `None` = N; `(n_link,)`; default: None
 
 ## Outputs:
-- **`delay`** — Delays in s; `(n_link, n_slot, n_fd)`, `n_fd = n_freq` for `"38.901_MF"`, else 1
+- **`delay`** — Delays in s; `(n_link, n_slot, n_freq)` for `"38.901_MF"`, else `(n_link, n_slot, 1)`
 - **`power`** — Coefficient powers (linear); `(n_link, n_slot, n_freq)`
-- **`aod`**, **`aoa`** — Azimuth of departure and arrival in rad, in [-pi, pi); `(n_link, n_slot, n_fd)`
-- **`eod`**, **`eoa`** — Elevation of departure and arrival in rad, in [-pi/2, pi/2]; `(n_link, n_slot, n_fd)`
+- **`aod`**, **`aoa`** — Azimuth of departure and arrival in rad, in [-pi, pi); shapes as `delay`
+- **`eod`**, **`eoa`** — Elevation of departure and arrival in rad, in [-pi/2, pi/2]; shapes as `delay`
 - **`n_active`** — Number of NLOS clusters with power > 0; uint64; `(n_link,)`
 
 ## See also:
-- [[ssf_draw]] (the random values `rnd` and `rnd_freq`)
+- [[gbsm.draw]] (the random values `rnd` and `rnd_freq`)
 - [[lsp_generate]] (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [[calc_delay_spread]], [[calc_angular_spread]] (spreads of the output)
 MD!*/
@@ -103,9 +104,8 @@ py::tuple ssf_clusters(py::handle scenpar,
                        py::handle o2i,
                        py::handle n_cluster)
 {
-    // Read inputs; the entry 'SubpathMethod' of the scenario dict is not used
-    std::string subpath_method;
-    const auto scenpar_a = qd_python_dict2scenpar(scenpar, subpath_method, "scenpar");
+    // Read inputs
+    const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
     const auto lsp_a = qd_python_numpy2arma_Cube<double>(lsp, true);
@@ -147,16 +147,42 @@ py::tuple ssf_clusters(py::handle scenpar,
     const std::vector<bool> *p_o2i = o2i.is_none() ? nullptr : &o2i_a;
     const arma::uvec *p_n_cluster = n_cluster.is_none() ? nullptr : &n_cluster_a;
 
-    // Call library function; the output sizes depend on 'scenpar' and 'method', so the outputs are copied afterwards
+    // Output allocation in numpy memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the call
+    // throws before any output is needed
     arma::cube delay, power, aod, eod, aoa, eoa;
     arma::uvec n_active;
+    py::array_t<double> delay_py, power_py, aod_py, eod_py, aoa_py, eoa_py;
+    py::array_t<arma::uword> n_active_py;
+    auto sp = scenpar_a;
+    bool known = true;
+    try
+    {
+        quadriga_lib::scenpar_validate(sp);
+    }
+    catch (const std::exception &)
+    {
+        known = false;
+    }
+    if (known)
+    {
+        const arma::uword n_link = rx_pos_a.n_rows, n_freq = lsp_a.n_cols;
+        const arma::uword n_slot = (arma::uword)sp.at("NumClusters") + (sp.at("GR_enabled") > 0.0 ? 1 : 0);
+        const arma::uword n_fd = (method == "38.901_MF") ? n_freq : 1;
+        delay_py = qd_python_init_output(n_link, n_slot, n_fd, &delay);
+        power_py = qd_python_init_output(n_link, n_slot, n_freq, &power);
+        aod_py = qd_python_init_output(n_link, n_slot, n_fd, &aod);
+        eod_py = qd_python_init_output(n_link, n_slot, n_fd, &eod);
+        aoa_py = qd_python_init_output(n_link, n_slot, n_fd, &aoa);
+        eoa_py = qd_python_init_output(n_link, n_slot, n_fd, &eoa);
+        n_active_py = qd_python_init_output(n_link, &n_active);
+    }
+
+    // Call library function
     quadriga_lib::ssf_clusters(scenpar_a, tx_pos_a, rx_pos_a, lsp_a, rnd_a, delay, power, aod, eod, aoa, eoa, method,
                                p_rnd_freq, p_lsp_anchor, p_eod_offset_deg, p_abs_toa, p_gr_eps_re, p_gr_eps_im, p_o2i,
                                p_n_cluster, &n_active);
 
-    return py::make_tuple(qd_python_copy2numpy(&delay), qd_python_copy2numpy(&power), qd_python_copy2numpy(&aod),
-                          qd_python_copy2numpy(&eod), qd_python_copy2numpy(&aoa), qd_python_copy2numpy(&eoa),
-                          qd_python_copy2numpy(&n_active));
+    return py::make_tuple(delay_py, power_py, aod_py, eod_py, aoa_py, eoa_py, n_active_py);
 }
 
 // pybind11 declaration:

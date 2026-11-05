@@ -337,12 +337,12 @@ TEST_CASE("o2i_loss - input validation")
     SECTION("fc")
     {
         CHECK_THROWS_MATCHES(call(arma::vec(), rnd5, models, w, 25.0), std::invalid_argument,
-                             Message("Input 'fc' cannot be empty."));
+                             Message("Input 'center_frequency' cannot be empty."));
         for (double v : {0.0, -1.0, double(NAN), inf_o2i})
         {
             INFO("value " << v);
             CHECK_THROWS_MATCHES(call(arma::vec{3.5e9, v}, rnd5, models, w, 25.0), std::invalid_argument,
-                                 Message("Input 'fc' must be finite and > 0."));
+                                 Message("Input 'center_frequency' must be finite and > 0."));
         }
     }
     SECTION("rnd")

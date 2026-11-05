@@ -23,36 +23,38 @@ path-loss parameters (`plpar`) and optional short names, read from a conf file b
 [[conf_file_read]]. 23 files for TR 38.901 v19.5.0 come with the library, in `data/config` of the
 source tree and in `share/quadriga-lib/config` of an installed package; [[conf_file_list]] finds
 them and [[conf_file_write]] writes them. Every function that takes `scenpar` accepts the struct of
-[[conf_file_read]] or [[scenpar_validate]] or any subset of its fields (`SubpathMethod` is ignored,
-`[]` = all defaults), completes it with the defaults of missing fields and validates it with
-[[scenpar_validate]]; an invalid value of a field that the function does not use is an error as
-well.<br><br>
+[[conf_file_read]] or [[scenpar_validate]] or any subset of its fields (`[]` = all defaults; a field
+`SubpathMethod` of QuaDRiGa's structs must be `'legacy'`), completes it with the defaults of missing
+fields and validates it with [[scenpar_validate]]; an invalid value of a field that the function
+does not use is an error as well.<br><br>
 
 **Workflow.** Per drop: [[o2i_loss]] gives the penetration loss and the indoor distance of each
 indoor UT, then [[los_probability]] the LOS probability at the outdoor distance `d2D - d2D-in`. The
 caller draws the LOS, indoor and O2I states with [[sos_rand]] / [[sos_randn]] at the correlation
 distances of TR 38.901 clause 7.6.3.3; the fields `LOS_state_lambda` and `IO_state_lambda` apply to
 all links of a scenario and are stated in the NLOS and in the O2I files (0 in the other files means
-"not stated here"). Per BS site and scenario: [[lsf_init_phases]] draws the phases of the
-large-scale generators once, [[lsf_draw]] evaluates them at the links, [[path_loss]] gives the path
-loss and the shadow-fading (SF) standard deviation, and [[lsp_generate]] the LSPs of each link and
-frequency. Small scale: [[ssf_init_phases]] and [[ssf_draw]] do the same for the cluster random
-values, and [[ssf_clusters]] turns the LSPs and random values into cluster delays, powers and
+"not stated here"). Per BS site and scenario: [[gbsm_init_phases]] draws the phases of each random
+set once (`'lsf'`; `'cluster'` with `set_id = 0` and one set per carrier frequency), and
+[[gbsm_draw]] evaluates them at the links. Then [[path_loss]] gives the path loss and the
+shadow-fading (SF) standard deviation, [[lsp_generate]] the LSPs of each link and frequency, and
+[[ssf_clusters]] turns the LSPs and the cluster random values into cluster delays, powers and
 angles.<br><br>
 
-**Large-scale generators.** Columns of the phase array of [[lsf_init_phases]] and of the random
-values of [[lsf_draw]]; a decorrelation distance of 0 is used as 0.1 m:
+**Random sets.** The spatially correlated random values come in sets of generators, one column of
+`rnd` each; `N = NumClusters - 1`, columns `b·N + 1` to `(b + 1)·N` of a `'cluster'` set form block
+`b`, one column per NLOS cluster:
 
-| Column | Generator | Distribution | Decorrelation distance |
-| --- | --- | --- | --- |
-| 1 to 8 | DS, KF, SF, ASD, ASA, ESD, ESA, XPR | Normal(0,1) | `DS_lambda`, `KF_lambda`, `SF_lambda`, `AS_D_lambda`, `AS_A_lambda`, `ES_D_lambda`, `ES_A_lambda`, `XPR_lambda` |
-| 9 | absolute TOA | Normal(0,1) | `absTOA_lambda` |
-| 10 | ground permittivity | Uniform(0,1) | `SC_lambda` |
-| 11 | UMa environment height hE | Uniform(0,1) | `SF_lambda` |
+| `set_type`, `set_id` | `n_gen` | Columns and distributions | Decorrelation distance | Mirror pairs | Used by |
+| --- | --- | --- | --- | --- | --- |
+| `'lsf'` | 11 | 1 to 8 DS, KF, SF, ASD, ASA, ESD, ESA, XPR, Normal(0,1); 9 absolute TOA, Normal(0,1); 10 ground permittivity, 11 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (1 to 8), `absTOA_lambda` (9), `SC_lambda` (10), `SF_lambda` (11) | 4 and 5, 6 and 7 | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 11) |
+| `'cluster'`, 0 | `9·N` | block 0 cluster delay, Uniform(0,1); 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 offset of AOD, AOA; 7, 8 offset of ZOD, ZOA, Normal(0,1) | `SC_lambda` | blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 | [[ssf_clusters]] `rnd` |
+| `'cluster'`, `k` | `N` | cluster shadowing of frequency `k`, Normal(0,1) | `SC_lambda` | none | [[ssf_clusters]] `rnd_freq`, slice `k` |
 
-The Tx side of a phase array (slice 2) exchanges ASD and ASA, ESD and ESA, so that in dual mobility
-(Tx and Rx both move) the departure spreads at the Tx are the arrival spreads of the Tx as a second
-device.<br><br>
+The Tx side of a phase array (slice 2) exchanges the columns of each mirror pair, so that in dual
+mobility (Tx and Rx both move) the departure quantities at the Tx are the arrival quantities of the
+Tx as a second device. A decorrelation distance of 0 is used as 0.1 m. Only the `'lsf'` columns 1 to
+9 take part in the bias removal. A set never changes size: new random quantities come in new sets
+(a new `set_type` or `set_id`).<br><br>
 
 **Conventions.** Positions are in m with the columns x, y, z: `rx_pos` is `[n_link, 3]`, `tx_pos` is
 `[1, 3]` (one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. In 2D mode
@@ -73,15 +75,16 @@ Read and validate a QuaDRiGa scenario configuration file
 - A conf file has one `Key = value` assignment per line; `%` starts a comment; blank lines, LF or
   CRLF line ends and a UTF-8 byte order mark at the start are accepted; keys are case-sensitive
   names of `A-Z`, `a-z`, `0-9` and `_`
-- Four kinds of keys:
+- Three kinds of keys:
   - 171 numeric scenario parameters (see [[scenpar_validate]]), one number each; keys that are not
     in the file have their default value
-  - `SubpathMethod`: one word, default `legacy`
   - `PL_` keys: `PL_model` has one name, the others one or more numbers separated by white space
   - `ShortName`: an alias of the scenario, one name; can occur several times with different values
 - Any other key is reported in `ignored_keys` and its value is not examined; this includes the
   QuaDRiGa key `GR_epsilon` (the complex ground permittivity comes from [[lsp_generate]]). A key
   stated more than once has its last value
+- The line `SubpathMethod = legacy` of QuaDRiGa's files is accepted and ignored; another value of
+  `SubpathMethod` is an error, also with `validate = false`
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`),
   read independent of the locale; `Inf`, `+Inf` and `-Inf` in any case; a number below the smallest
   subnormal reads as 0
@@ -105,9 +108,8 @@ Read and validate a QuaDRiGa scenario configuration file
   grammar is checked; default: true
 
 ## Outputs:
-- **`scenpar`** — Scenario parameters; struct with 172 fields in the QuaDRiGa field order: the 138
-  numeric keys of QuaDRiGa with `SubpathMethod` (string) as field 107, then the 33 new keys; all
-  numeric fields are scalars
+- **`scenpar`** — Scenario parameters; struct with 171 scalar fields in the canonical order: the 138
+  numeric keys of QuaDRiGa, then the 33 new keys
 - **`plpar`** — Path-loss parameters; struct with the field `model` (string, only if the file states
   `PL_model`) followed by one field per `PL_` key in file order, named without the prefix `PL_`;
   each is a row vector with one or more values; `[]` if the file has no `PL_` key
@@ -141,7 +143,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Output allocation
     std::unordered_map<std::string, double> scenpar;
     std::unordered_map<std::string, std::vector<double>> plpar;
-    std::string subpath_method, pl_model;
+    std::string pl_model;
     std::vector<std::string> key_order, pl_order, short_names, ignored_keys;
     arma::mat lsp_xcorr;
     bool lsp_xcorr_chk = false;
@@ -155,11 +157,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> *p_ignored_keys = (nlhs > 5) ? &ignored_keys : nullptr;
 
     // Call library function
-    CALL_QD(lsp_xcorr_chk = quadriga_lib::conf_file_read(fn, scenpar, &subpath_method, &pl_model, &plpar, p_lsp_xcorr,
+    CALL_QD(lsp_xcorr_chk = quadriga_lib::conf_file_read(fn, scenpar, &pl_model, &plpar, p_lsp_xcorr,
                                                          &key_order, &pl_order, p_short_names, p_ignored_keys, validate));
 
-    // Scenario parameters: numeric keys in canonical order, 'SubpathMethod' at its QuaDRiGa position
-    plhs[0] = qd_mex_scenpar2struct(scenpar, subpath_method, key_order);
+    // Scenario parameters: numeric keys in canonical order
+    plhs[0] = qd_mex_scenpar2struct(scenpar, key_order);
 
     // Path-loss parameters: model first, then the numeric keys in file order as row vectors
     if (nlhs > 1)

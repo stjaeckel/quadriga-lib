@@ -350,8 +350,8 @@ SECTION!*/
 # ssf_clusters
 Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
 
-- Turns the LSPs of [[lsp_generate]] and the random values of [[ssf_draw]] into the clusters of each link, by one of
-  three methods:
+- Turns the LSPs of [[lsp_generate]] and the cluster random values of [[gbsm_draw]] into the clusters of each link,
+  by one of three methods:
   - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters
     25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited
     to >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
@@ -387,7 +387,7 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   `sqrt(power)·exp(j·arg(R_par))`
 - `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled; `rnd` must
   be empty, `rnd_freq` and `lsp_anchor` are not used
-- Swap reciprocity: with mirrored random values (dual mobility in [[ssf_draw]]) and mirrored LSPs, swapping `tx_pos`
+- Swap reciprocity: with mirrored random values (dual mobility in [[gbsm_draw]]) and mirrored LSPs, swapping `tx_pos`
   and `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link;
   `"quadriga"`: `eod_offset_deg` = 0)
 - `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked
@@ -425,10 +425,11 @@ void quadriga_lib::ssf_clusters(
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
 - **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
   `"38.901"`: one frequency; `[n_link, n_freq, 8]`
-- **`rnd`** — Shared cluster set of [[ssf_draw]] (`set_id = -1`), columns 0 to N-1 in [0, 1]; `[n_link, 9·N]`
+- **`rnd`** — Shared cluster set of [[gbsm_draw]] (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
+  `[n_link, 9·N]`
 - **`method`** *(optional)* — `"38.901"` (default), `"38.901_MF"` or `"quadriga"`
-- **`rnd_freq`** *(optional)* — Per-frequency sets of [[ssf_draw]], slice `k` from `set_id = k`; required by
-  `"38.901"` and `"38.901_MF"`; `[n_link, N, n_freq]`
+- **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [[gbsm_draw]], slice `k` from `set_id = k`; required
+  by `"38.901"` and `"38.901_MF"`; `[n_link, N, n_freq]`
 - **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz) from [[lsp_generate]]; required by
   `"38.901_MF"`; `[n_link, 1, 8]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]]; used by `"38.901"` and
@@ -443,14 +444,14 @@ void quadriga_lib::ssf_clusters(
   omitted = N; `[n_link]`
 
 ## Outputs:
-- **`delay`** — Delays in [s]; `[n_link, n_slot, n_fd]`, `n_fd = n_freq` for `"38.901_MF"`, else 1
+- **`delay`** — Delays in [s]; `[n_link, n_slot, n_freq]` for `"38.901_MF"`, else `[n_link, n_slot, 1]`
 - **`power`** — Coefficient powers (linear); `[n_link, n_slot, n_freq]`
-- **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); `[n_link, n_slot, n_fd]`
-- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; `[n_link, n_slot, n_fd]`
+- **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); sizes as `delay`
+- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as `delay`
 - **`n_active`** *(optional)* — Number of NLOS clusters with power > 0; `[n_link]`
 
 ## See also:
-- [[ssf_draw]] (the random values `rnd` and `rnd_freq`)
+- [[gbsm_draw]] (the random values `rnd` and `rnd_freq`)
 - [[lsp_generate]] (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [[calc_delay_spread]], [[calc_angular_spreads_sphere]] (spreads of the output)
 MD!*/
@@ -485,7 +486,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
     const arma::uword n_link = rx_pos.n_rows;
 
     std::unordered_map<std::string, double> sp = scenpar;
-    quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, true);
+    quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
     const arma::uword N = (arma::uword)sp.at("NumClusters") - 1;
     const bool G = sp.at("GR_enabled") > 0.0;
 

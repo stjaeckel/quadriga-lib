@@ -694,11 +694,11 @@ TEST_CASE("ssf_clusters - quadriga is swap-reciprocal with dual-mobility fields"
             f.use_eps = f.use_toa = true;
             f.tx.col(2).fill(h), f.rx.col(2).fill(1.5);
             arma::cube ph;
-            quadriga_lib::ssf_init_phases(sp, ph, 23, -1);
-            quadriga_lib::ssf_draw(sp, ph, f.tx, f.rx, f.rnd, -1, nullptr, true);
+            quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23);
+            quadriga_lib::gbsm_draw(sp, "cluster", ph, f.tx, f.rx, f.rnd, -1, "Comb256", nullptr, nullptr, true);
             fix_t s = f;
             s.tx = f.rx, s.rx = f.tx;
-            quadriga_lib::ssf_draw(sp, ph, s.tx, s.rx, s.rnd, -1, nullptr, true);
+            quadriga_lib::gbsm_draw(sp, "cluster", ph, s.tx, s.rx, s.rnd, -1, "Comb256", nullptr, nullptr, true);
             s.lsp.slice(3) = f.lsp.slice(4), s.lsp.slice(4) = f.lsp.slice(3);
             s.lsp.slice(5) = f.lsp.slice(6), s.lsp.slice(6) = f.lsp.slice(5);
             const out_t a = run(sp, f, "quadriga"), b = run(sp, s, "quadriga");

@@ -387,16 +387,16 @@ inline arma::uvec qd_mex_uint_entries(const arma::vec &input, const std::string 
     return out;
 }
 
-// 1x1 struct of QuaDRiGa scenario parameters -> map of the numeric values and the string 'SubpathMethod'
-// - Every field except 'SubpathMethod' must be a real numeric or logical scalar; 'SubpathMethod' must be a string
+// 1x1 struct of QuaDRiGa scenario parameters -> map of the numeric values
+// - Every field except 'SubpathMethod' must be a real numeric or logical scalar
+// - 'SubpathMethod' (a field of QuaDRiGa's structs) must be the string 'legacy'; it is accepted and ignored
 // - Field names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
-// - Empty input ([] or a struct without fields) gives an empty map; 'subpath_method' is "legacy" if not in the struct
+// - Empty input ([] or a struct without fields) gives an empty map
 // - 'var_name' is used in the error message for a wrong input type
-inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArray *input, std::string &subpath_method,
+inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArray *input,
                                                                      const std::string &var_name = "scenpar")
 {
     std::unordered_map<std::string, double> scenpar;
-    subpath_method = "legacy";
     if (mxIsEmpty(input))
         return scenpar;
 
@@ -412,7 +412,9 @@ inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArr
         {
             if (data == nullptr || !mxIsChar(data))
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Field 'SubpathMethod' must be a string.");
-            subpath_method = qd_mex_get_string(data);
+            const std::string value = qd_mex_get_string(data);
+            if (value != "legacy")
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Value '" + value + "' of 'SubpathMethod' is not supported; only 'legacy' is accepted.").c_str());
         }
         else
         {
@@ -425,19 +427,14 @@ inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArr
     return scenpar;
 }
 
-// Map of QuaDRiGa scenario parameters -> 1x1 struct of double scalars
-// - Fields in the order of 'key_order', with the string field 'SubpathMethod' inserted before 'LOS_scatter_radius'
-//   (its QuaDRiGa position); every name in 'key_order' must be in 'scenpar'
+// Map of QuaDRiGa scenario parameters -> 1x1 struct of double scalars, fields in the order of 'key_order'
+// - Every name in 'key_order' must be in 'scenpar'
 inline mxArray *qd_mex_scenpar2struct(const std::unordered_map<std::string, double> &scenpar,
-                                      const std::string &subpath_method,
                                       const std::vector<std::string> &key_order)
 {
-    std::vector<std::string> fields = key_order;
-    fields.insert(std::find(fields.begin(), fields.end(), "LOS_scatter_radius"), "SubpathMethod");
-    mxArray *output = qd_mex_make_struct(fields);
+    mxArray *output = qd_mex_make_struct(key_order);
     for (const auto &key : key_order)
         qd_mex_set_field(output, key, qd_mex_copy2matlab(&scenpar.at(key)));
-    qd_mex_set_field(output, "SubpathMethod", mxCreateString(subpath_method.c_str()));
     return output;
 }
 

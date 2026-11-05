@@ -16,8 +16,8 @@
 //
 // Oracles: key order and defaults are typed from QuaDRiGa's set_scenario_table.m, the validation
 // classes from check_scenario_parameter_table.m with these changes: the counts are bounded by 1000, NaN is an
-// error for every key, the 7 xpr_ correlations are checked like the others, 'subpath_method' is one of three
-// names and an unknown key is an error; the matrix positions from get.lsp_xcorr in qd_builder.m. The positive-definite oracle for 3 coupled LSPs is the
+// error for every key, the 7 xpr_ correlations are checked like the others and an unknown key is an
+// error; the matrix positions from get.lsp_xcorr in qd_builder.m. The positive-definite oracle for 3 coupled LSPs is the
 // determinant of the 3 x 3 correlation matrix.
 
 #include <catch2/catch_test_macros.hpp>
@@ -147,7 +147,7 @@ namespace
         CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp), std::invalid_argument);
         CHECK(sp.size() == 1); // a failed call does not complete the set
 
-        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false));
+        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, nullptr, nullptr, false));
         CHECK(sp.size() == 171);
         CHECK((sp[key] == value || (value != value && sp[key] != sp[key])));
     }
@@ -170,7 +170,7 @@ TEST_CASE("scenpar_validate - an empty map returns the 171 default values")
     arma::mat X;
     std::vector<std::string> order;
 
-    bool ok = quadriga_lib::scenpar_validate(sp, "legacy", &X, &order);
+    bool ok = quadriga_lib::scenpar_validate(sp, &X, &order);
 
     CHECK(ok);
     CHECK(sp.size() == 171);
@@ -211,7 +211,7 @@ TEST_CASE("scenpar_validate - a legacy set with 138 numeric keys passes and grow
     REQUIRE(sp.size() == 138);
 
     arma::mat X;
-    bool ok = quadriga_lib::scenpar_validate(sp, "mmMAGIC", &X);
+    bool ok = quadriga_lib::scenpar_validate(sp, &X);
 
     CHECK(ok);
     CHECK(sp.size() == 171);
@@ -247,7 +247,7 @@ TEST_CASE("scenpar_validate - each correlation key lands in two symmetric positi
         spmap sp;
         sp[XC[i].key] = v;
         arma::mat X;
-        CHECK(quadriga_lib::scenpar_validate(sp, "legacy", &X));
+        CHECK(quadriga_lib::scenpar_validate(sp, &X));
         REQUIRE((X.n_rows == 8 && X.n_cols == 8));
 
         arma::mat ref = arma::eye(8, 8);
@@ -298,9 +298,9 @@ TEST_CASE("scenpar_validate - the return value tells if lsp_xcorr is positive de
 
     // Without checks: values outside [-1, 1] and NaN give 'false', not an error
     sp = {{"ds_kf", 3.0}};
-    CHECK_FALSE(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false));
+    CHECK_FALSE(quadriga_lib::scenpar_validate(sp, nullptr, nullptr, false));
     sp = {{"ds_kf", QNAN}};
-    CHECK_FALSE(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false));
+    CHECK_FALSE(quadriga_lib::scenpar_validate(sp, nullptr, nullptr, false));
 }
 
 TEST_CASE("scenpar_validate - value checks per validation class")
@@ -462,7 +462,7 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp));
         sp = {{"NumClusters", 20.0}, {"NumClusters_min", 21.0}};
         CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp), std::invalid_argument);
-        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false));
+        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, nullptr, nullptr, false));
         rejects_value("NumClusters_min", 7.0); // default NumClusters is 6
 
         sp = {{"NF_alpha", 1.53}, {"NF_beta", 1.42}};
@@ -492,18 +492,6 @@ TEST_CASE("scenpar_validate - value checks per validation class")
         CHECK(m == "Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.");
         CHECK(sp.size() == 3); // a failed call does not complete the set
     }
-
-    SECTION("subpath_method is one of three names")
-    {
-        spmap sp;
-        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy"));
-        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "Laplacian"));
-        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "mmMAGIC"));
-        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "Legacy"), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, ""), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "other"), std::invalid_argument);
-        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "other", nullptr, nullptr, false));
-    }
 }
 
 TEST_CASE("scenpar_validate - input validation")
@@ -515,7 +503,7 @@ TEST_CASE("scenpar_validate - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, "legacy", &X, &order));
+        CHECK_NOTHROW(quadriga_lib::scenpar_validate(sp, &X, &order));
         CHECK(sp.size() == 171);
         CHECK(order.size() == 171);
         CHECK((X.n_rows == 8 && X.n_cols == 8));
@@ -524,8 +512,8 @@ TEST_CASE("scenpar_validate - input validation")
     SECTION("unknown key, with and without value checks")
     {
         sp["DS_mu_typo"] = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "legacy", &X, &order), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "legacy", &X, &order, false), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, &X, &order), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, &X, &order, false), std::invalid_argument);
         CHECK(sp.size() == 2); // nothing was written
         CHECK(order == std::vector<std::string>{"marker"});
         CHECK((X.n_rows == 2 && X.n_cols == 2 && X(1, 1) == 7.0));
@@ -535,7 +523,7 @@ TEST_CASE("scenpar_validate - input validation")
     {
         sp["GR_epsilon"] = 10.0;
         CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "legacy", nullptr, nullptr, false), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, nullptr, nullptr, false), std::invalid_argument);
     }
 
     SECTION("'SubpathMethod' is not a numeric key")
@@ -547,7 +535,7 @@ TEST_CASE("scenpar_validate - input validation")
     SECTION("failed value check leaves the outputs untouched")
     {
         sp["r_DS"] = -1.0;
-        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, "legacy", &X, &order), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::scenpar_validate(sp, &X, &order), std::invalid_argument);
         CHECK(sp.size() == 2);
         CHECK(sp["r_DS"] == -1.0);
         CHECK(order == std::vector<std::string>{"marker"});
@@ -562,7 +550,7 @@ TEST_CASE("scenpar_validate - a pre-sized lsp_xcorr is written in place and the 
     X.fill(7.0);
     const double *mem = X.memptr();
 
-    bool ok = quadriga_lib::scenpar_validate(sp, "legacy", &X);
+    bool ok = quadriga_lib::scenpar_validate(sp, &X);
     CHECK(ok);
     CHECK(X.memptr() == mem);
     arma::mat ref = arma::eye(8, 8);
@@ -573,7 +561,7 @@ TEST_CASE("scenpar_validate - a pre-sized lsp_xcorr is written in place and the 
     // A complete set is a fixed point: validating it again changes nothing
     spmap before = sp;
     arma::mat X2;
-    CHECK(quadriga_lib::scenpar_validate(sp, "legacy", &X2) == ok);
+    CHECK(quadriga_lib::scenpar_validate(sp, &X2) == ok);
     CHECK(sp == before);
     CHECK(arma::approx_equal(X2, ref, "absdiff", 0.0));
 }

@@ -1137,11 +1137,11 @@ TEST_CASE("lsp_generate - input validation")
     SECTION("fc")
     {
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec(), tx, rx, rnd, lsp), std::invalid_argument,
-                             Message("Input 'fc' cannot be empty."));
+                             Message("Input 'center_frequency' cannot be empty."));
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec({3.5e9, 0.0}), tx, rx, rnd, lsp), std::invalid_argument,
-                             Message("Input 'fc' must be finite and > 0."));
+                             Message("Input 'center_frequency' must be finite and > 0."));
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec({NAN}), tx, rx, rnd, lsp), std::invalid_argument,
-                             Message("Input 'fc' must be finite and > 0."));
+                             Message("Input 'center_frequency' must be finite and > 0."));
     }
     SECTION("rnd")
     {

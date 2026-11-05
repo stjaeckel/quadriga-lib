@@ -117,7 +117,7 @@ assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, -sf_i
     'Input ''sf_sigma'' must be finite and >= 0.' );                                                % C++
 assert_throws( @() quadriga_lib.lsp_generate( struct( 'ds_kf', 0.9, 'ds_sf', 0.9, 'sf_kf', -0.9 ), fc, tx_pos, ...
     rx_pos, rnd ), 'LSP cross-correlation matrix in ''scenpar'' is not positive definite.' );       % C++
-assert_throws( @() quadriga_lib.lsp_generate( sp, [], tx_pos, rx_pos, rnd ), 'Input ''fc'' cannot be empty.' );
+assert_throws( @() quadriga_lib.lsp_generate( sp, [], tx_pos, rx_pos, rnd ), 'Input ''center_frequency'' cannot be empty.' );
 
 end
 

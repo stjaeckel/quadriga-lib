@@ -30,11 +30,11 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 ## Usage:
 ```
-loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights, d2d_in_max )
+loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
 ```
 
 ## Inputs:
-- **`fc`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
+- **`center_freq`** — Carrier frequencies in Hz, finite and > 0 (messages name it `center_frequency`); `(n_freq,)`
 - **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column 3
   Normal(0,1), finite (deviation `sigma_P`, car loss); `(n_ut, 4)`, `n_ut = 0` allowed
 - **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; list of str or one str;
@@ -53,14 +53,14 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( fc, rnd, models, weights
 - [[path_loss]] (basic path loss, legacy outdoor distance from `d2d_in`)
 MD!*/
 
-py::tuple o2i_loss(const py::array_t<double> &fc,
+py::tuple o2i_loss(const py::array_t<double> &center_freq,
                    const py::array_t<double> &rnd,
                    py::handle models,
                    const py::array_t<double> &weights,
                    double d2d_in_max)
 {
     // Read inputs
-    const auto fc_a = qd_python_numpy2arma_Col<double>(fc, true);
+    const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const auto rnd_a = qd_python_numpy2arma_Mat<double>(rnd, true);
     const auto models_a = qd_python_list2vector_Strings(models);
     const auto weights_a = qd_python_numpy2arma_Col<double>(weights, true);
@@ -69,19 +69,19 @@ py::tuple o2i_loss(const py::array_t<double> &fc,
     arma::mat loss;
     arma::vec d2d_in;
     arma::uvec model_index;
-    auto loss_py = qd_python_init_output(rnd_a.n_rows, fc_a.n_elem, &loss);
+    auto loss_py = qd_python_init_output(rnd_a.n_rows, center_freq_a.n_elem, &loss);
     auto d2d_in_py = qd_python_init_output(rnd_a.n_rows, &d2d_in);
     auto model_index_py = qd_python_init_output(rnd_a.n_rows, &model_index);
 
     // Call library function
-    quadriga_lib::o2i_loss(fc_a, rnd_a, models_a, weights_a, loss, d2d_in_max, &d2d_in, &model_index);
+    quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, loss, d2d_in_max, &d2d_in, &model_index);
 
     return py::make_tuple(loss_py, d2d_in_py, model_index_py);
 }
 
 // pybind11 declaration:
 // m.def("o2i_loss", &o2i_loss,
-//       py::arg("fc").none(false),
+//       py::arg("center_freq").none(false),
 //       py::arg("rnd").none(false),
 //       py::arg("models"),
 //       py::arg("weights").none(false),
