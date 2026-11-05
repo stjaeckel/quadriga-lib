@@ -2161,10 +2161,19 @@ template <typename dtype>
 std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
 {
 
-    // Assuming that the data has been validated before, we can quickly check if the
-    // data pointers were updated. If not, we can assume that the data is still valid.
+    // Assuming that the data has been validated before, we can quickly check if the data pointers were updated
+    // and if the member sizes still fit together. If neither changed, we can assume that the data is still valid.
+    // The size check is needed because Armadillo can keep the data pointer when a member is resized.
     if (quick_check)
-        quick_check = check_ptr[0] != nullptr && check_ptr[1] != nullptr && check_ptr[2] != nullptr &&
+        quick_check = arma::size(e_theta_im) == arma::size(e_theta_re) &&
+                      arma::size(e_phi_re) == arma::size(e_theta_re) &&
+                      arma::size(e_phi_im) == arma::size(e_theta_re) &&
+                      azimuth_grid.n_elem == e_theta_re.n_cols &&
+                      elevation_grid.n_elem == e_theta_re.n_rows &&
+                      element_pos.n_rows == 3 && element_pos.n_cols == e_theta_re.n_slices &&
+                      coupling_re.n_rows == e_theta_re.n_slices &&
+                      arma::size(coupling_im) == arma::size(coupling_re) &&
+                      check_ptr[0] != nullptr && check_ptr[1] != nullptr && check_ptr[2] != nullptr &&
                       check_ptr[3] != nullptr && check_ptr[4] != nullptr && check_ptr[5] != nullptr &&
                       check_ptr[0] == e_theta_re.memptr() &&
                       check_ptr[1] == e_theta_im.memptr() &&

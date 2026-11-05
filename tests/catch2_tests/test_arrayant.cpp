@@ -9,6 +9,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -65,6 +66,41 @@ TEST_CASE("Arrayant - Default constructor initialises check_ptr")
 
     CHECK(arrayant_check_ptr_helper(true).empty());
     CHECK(!arrayant_check_ptr_helper(false).empty());
+}
+
+// Armadillo can keep the data pointer when a member is resized, e.g. within its built-in storage for small objects
+// or for a heap buffer with the same number of values. The quick is_valid() must still notice that the member sizes
+// no longer fit together, so that interpolate throws instead of reading element_pos and the grids out of bounds.
+// Whether a resize keeps the pointer differs between Armadillo versions, so the test sets check_ptr to the current
+// pointers after the resize. This gives the same state on every version.
+TEST_CASE("Arrayant - Quick is_valid detects resized members with unchanged data pointers")
+{
+    quadriga_lib::arrayant<double> a;
+    arma::mat az = {0.1}, el = {0.0}, vr, vi, hr, hi;
+
+    SECTION("Built-in storage")
+    {
+        a.e_theta_re.zeros(1, 1, 1), a.e_theta_im.zeros(1, 1, 1), a.e_phi_re.zeros(1, 1, 1), a.e_phi_im.zeros(1, 1, 1);
+        a.azimuth_grid = {0.0}, a.elevation_grid = {0.0};
+        REQUIRE(a.validate().empty());
+        a.e_theta_re.ones(1, 1, 64), a.e_theta_im.zeros(1, 1, 64), a.e_phi_re.zeros(1, 1, 64), a.e_phi_im.zeros(1, 1, 64);
+    }
+
+    SECTION("Heap storage, same number of values")
+    {
+        a.e_theta_re.ones(2, 2, 20), a.e_theta_im.zeros(2, 2, 20), a.e_phi_re.zeros(2, 2, 20), a.e_phi_im.zeros(2, 2, 20);
+        a.azimuth_grid = {-0.5, 0.5}, a.elevation_grid = {-0.5, 0.5};
+        REQUIRE(a.validate().empty());
+        a.e_theta_re.ones(2, 1, 40), a.e_theta_im.zeros(2, 1, 40), a.e_phi_re.zeros(2, 1, 40), a.e_phi_im.zeros(2, 1, 40);
+    }
+
+    // Pointers as if the resize had kept them all, so a pointer comparison alone cannot see the change
+    a.check_ptr[0] = a.e_theta_re.memptr(), a.check_ptr[1] = a.e_theta_im.memptr();
+    a.check_ptr[2] = a.e_phi_re.memptr(), a.check_ptr[3] = a.e_phi_im.memptr();
+    REQUIRE(!a.is_valid(false).empty());
+
+    REQUIRE(!a.is_valid().empty()); // stops here if the quick check misses the change
+    CHECK_THROWS_AS(a.interpolate(&az, &el, &vr, &vi, &hr, &hi), std::invalid_argument);
 }
 
 // Append must build the block-diagonal coupling [C1 0; 0 C2] (as arrayant_concat_multi), also when the number
