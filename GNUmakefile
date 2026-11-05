@@ -18,6 +18,7 @@ cuda = OFF
 gcc_version = 12
 
 CMAKE_BUILD_DIR = build_linux
+ASAN_BUILD_DIR = build_linux_asan
 
 # Build tool: Ninja if installed, else Make (override with USE_NINJA=0/1). Switching tools needs "make clean".
 USE_NINJA ?= $(if $(shell command -v ninja),1,0)
@@ -105,6 +106,29 @@ endif
 
 python_test: 
 	PYTHONPATH=$(CURDIR)/lib python3 -m pytest tests/python_tests -x -s
+
+# C++ tests under AddressSanitizer and UndefinedBehaviorSanitizer, in their own build folder. Stops at the first report.
+# TEST_ARGS is passed to test_bin (e.g. TEST_ARGS='"qd_arrayant*"'). ASAN_OPTIONS and UBSAN_OPTIONS from the
+# environment replace the defaults.
+test-asan:
+	cmake -B $(ASAN_BUILD_DIR) $(CMAKE_GENERATOR_ARG) $(CMAKE_CXX_ARG) \
+		-D ENABLE_SANITIZERS=ON \
+		-D ENABLE_TESTS=ON \
+		-D ENABLE_MATLAB=OFF \
+		-D ENABLE_OCTAVE=OFF \
+		-D ENABLE_MEX_DOC=OFF \
+		-D ENABLE_PYTHON=OFF \
+		-D ARMA_EXT=$(arma_internal) \
+		-D ENABLE_AVX2=$(avx2) \
+		-D ENABLE_CUDA=OFF \
+		-D ENABLE_STATIC_LIB=ON \
+		-D ENABLE_SHARED_LIB=OFF
+	cmake --build $(ASAN_BUILD_DIR) --target test_bin --parallel $(shell nproc) $(BUILD_TOOL_ARGS)
+	OMP_WAIT_POLICY=$${OMP_WAIT_POLICY:-passive} \
+		ASAN_OPTIONS=$${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1} \
+		UBSAN_OPTIONS=$${UBSAN_OPTIONS:-print_stacktrace=1:halt_on_error=1} \
+		time $(ASAN_BUILD_DIR)/test_bin $(TEST_ARGS)
+.PHONY: test-asan
 
 # Documentation: docs_builder/README.md and website_builder/README.md
 docs:
@@ -219,6 +243,7 @@ release:
 
 clean:
 	- rm -rf $(CMAKE_BUILD_DIR)
+	- rm -rf $(ASAN_BUILD_DIR)
 	- rm +quadriga_lib/*.mex
 	- rm +quadriga_lib/*.mexa64
 	- rm release/*.deb
