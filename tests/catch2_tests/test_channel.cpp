@@ -52,8 +52,8 @@ TEST_CASE("Channel - Effective Path Gain")
     p = c.calc_effective_path_gain();
     a1 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(10.0)));
     a2 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(10.0) - 20.0 * std::log10(2.0)));
-    CHECK(std::abs(a1 * arma::sum(q1) - p.at(0)) < 1e-19);
-    CHECK(std::abs(a2 * arma::sum(q2) - p.at(1)) < 1e-19);
+    CHECK(std::abs(a1 * arma::sum(q1) - p.at(0)) < 1e-14 * p.at(0));
+    CHECK(std::abs(a2 * arma::sum(q2) - p.at(1)) < 1e-14 * p.at(1));
 
     // Sett different frequencies for snapshots
     c.center_frequency = {12.0e9, 20.0e9};
@@ -62,8 +62,8 @@ TEST_CASE("Channel - Effective Path Gain")
     p = c.calc_effective_path_gain();
     a1 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(12.0)));
     a2 = std::pow(10.0, 0.1 * (-32.45 - 20.0 * std::log10(20.0) - 20.0 * std::log10(2.0)));
-    CHECK(std::abs(a1 * arma::sum(q1) - p.at(0)) < 1e-19);
-    CHECK(std::abs(a2 * arma::sum(q2) - p.at(1)) < 1e-19);
+    CHECK(std::abs(a1 * arma::sum(q1) - p.at(0)) < 1e-14 * p.at(0));
+    CHECK(std::abs(a2 * arma::sum(q2) - p.at(1)) < 1e-14 * p.at(1));
 
     // Set a path gain, this disables FSPL calculation
     l = {0.1};

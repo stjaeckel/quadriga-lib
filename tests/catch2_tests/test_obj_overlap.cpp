@@ -10,7 +10,13 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+
+#ifdef _OPENMP
 #include <omp.h>
+#else // Without OpenMP the thread-count loops repeat the single-thread call
+inline int omp_get_max_threads() { return 1; }
+inline void omp_set_num_threads(int) {}
+#endif
 
 TEST_CASE("Test OBJ Overlap - Identical objects")
 {
