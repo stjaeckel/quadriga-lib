@@ -4,7 +4,7 @@
 
 # Python interface test for quadriga_lib.gbsm.init_phases.
 # Scope: argument and output handling, set types and set index, defaults, error paths.
-# Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, test_gbsm_phases_cluster.cpp).
+# Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, _cluster.cpp, _ray.cpp).
 
 import sys
 import os
@@ -262,11 +262,25 @@ class test_set_types(unittest.TestCase):
             f(self.sp, "LSF", 7)
         self.assertIn("Input 'set_type' must be 'lsf', 'cluster' or 'ray'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            f(self.sp, "ray", 7)
-        self.assertIn("Set type 'ray' is not available yet.", str(ctx.exception))
-        with self.assertRaises(ValueError) as ctx:
             f(self.sp, "cluster", 7, rx_pos=np.zeros((3, 3)))
         self.assertIn("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only.", str(ctx.exception))
+
+    def test_ray(self):
+        # (n_coeff, 14·N·M + N, 2) for every set index; -1 = shared set
+        f = quadriga_lib.gbsm.init_phases
+        sr = {"NumClusters": 4, "NumClusters_min": 1, "NumSubPaths": 5}  # N = 3, M = 5
+        pr = f(sr, "ray", 7)
+        self.assertEqual(pr.shape, (256, 213, 2))
+        self.assertEqual(pr.dtype, np.float64)
+        self.assertTrue(np.all(np.abs(pr) <= np.pi))
+        npt.assert_array_equal(f(sr, "ray", 7, -1), pr)
+        self.assertEqual(f(sr, "ray", 7, 1, "Exp512").shape, (512, 213, 2))
+        self.assertEqual(f(dict(sr, NumSubPaths=1), "ray", 7, 0).shape, (256, 45, 2))
+        self.assertFalse(np.array_equal(f(sr, "ray", 7, 0), pr))
+        self.assertEqual(f(dict(sr, NumClusters=1), "ray", 7).shape, (256, 0, 2))
+        with self.assertRaises(ValueError) as ctx:
+            f(sr, "ray", 7, -2)
+        self.assertIn("Input 'set_id' must be >= -1.", str(ctx.exception))
 
     def test_scenario_dict(self):
         # 'SubpathMethod' = 'legacy' is accepted and ignored, other values and types raise; outputs have no such key

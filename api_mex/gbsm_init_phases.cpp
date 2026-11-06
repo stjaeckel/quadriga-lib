@@ -23,8 +23,8 @@ Draw the random phases of one generator set of a BS site and scenario
 - `'lsf'` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos_remove_bias]] sets the
   sample mean of columns 1 to 9 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode:
   one floor), removing variance
-- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: empty
-  `'cluster'` sets
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: all
+  sets but `'lsf'` empty
 
 ## Usage:
 ```
@@ -33,12 +33,12 @@ phase = quadriga_lib.gbsm_init_phases( scenpar, set_type, seed, set_id, preset, 
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
-- **`set_type`** — `'lsf'` or `'cluster'`; `'ray'` is not available yet; string
+- **`scenpar`** — Scenario parameters; the decorrelation distances, `NumClusters` and `NumSubPaths`
+  are used
+- **`set_type`** — `'lsf'`, `'cluster'` or `'ray'`; string
 - **`seed`** — Seed of the site and scenario; integer from -1 to 2^63-1; -1 = system random device,
   new phases on each call; default: -1
-- **`set_id`** — `'cluster'`: `0` = shared set, `k >= 1` = set of frequency `k`; ignored for
-  `'lsf'`; default: 0
+- **`set_id`** — `0` = shared set, `k >= 1` = set of frequency `k`; ignored for `'lsf'`; default: 0
 - **`preset`** — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`; default: `'Comb256'`
 - **`tx_pos`**, **`rx_pos`** *(optional)* — `'lsf'` only: positions in [m] for the bias removal, as
   in [[gbsm_draw]]
@@ -89,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 'scenpar'; with an unknown preset or set type or an invalid 'scenpar' the call throws before any output
     arma::cube phase;
     const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
-    bool known = nlhs > 0 && n_coeff > 0 && (lsf || set_type == "cluster");
+    bool known = nlhs > 0 && n_coeff > 0 && (lsf || set_type == "cluster" || set_type == "ray");
     auto sp = scenpar;
     try
     {
@@ -101,10 +101,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         known = false;
     }
     if (known)
-    {
-        const arma::uword N = (arma::uword)sp.at("NumClusters") - 1;
-        plhs[0] = qd_mex_init_output(&phase, n_coeff, lsf ? 11 : (set_id < 0 ? 9 * N : N), 2);
-    }
+        plhs[0] = qd_mex_init_output(&phase, n_coeff, qd_gbsm_n_gen(sp, set_type, set_id), 2);
 
     // Call library function
     CALL_QD(quadriga_lib::gbsm_init_phases(scenpar, set_type, phase, seed, set_id, preset, p_tx_pos, p_rx_pos,

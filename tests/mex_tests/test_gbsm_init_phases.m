@@ -1,7 +1,7 @@
 function test_gbsm_init_phases
 % MEX interface test for quadriga_lib.gbsm_init_phases.
 % Scope: argument and output handling, set types and set index, scenario struct rule, defaults, error paths.
-% Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, test_gbsm_phases_cluster.cpp).
+% Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, _cluster.cpp, _ray.cpp).
 
 % ---- Set type 'lsf' ----
 %% Setup: distinct decorrelation distances, 4 Rx positions, one Tx
@@ -174,8 +174,22 @@ assertEqual( quadriga_lib.gbsm_init_phases( sp, 'lsf', 7, 5 ), p_lsf );         
 assertEqual( quadriga_lib.gbsm_init_phases( sp, 'lsf', 7, -1 ), p_lsf );
 assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'LSF', 7 ), ...
     'Input ''set_type'' must be ''lsf'', ''cluster'' or ''ray''.' );                               % C++
-assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'ray', 7 ), 'Set type ''ray'' is not available yet.' );
 assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', 7, 0, [], [], [ 0, 0, 1.5 ] ), ...
+    'Inputs ''tx_pos'' and ''rx_pos'' are used for set type ''lsf'' only.' );                        % C++
+
+%% Set type 'ray': [n_coeff, 14·N·M + N, 2] for every set index
+sr = struct( 'NumClusters', 4, 'NumClusters_min', 1, 'NumSubPaths', 5 );           % N = 3, M = 5
+pr = quadriga_lib.gbsm_init_phases( sr, 'ray', 7 );
+assertEqual( size(pr), [256, 213, 2] );
+assertTrue( isa(pr, 'double') && all( abs(pr(:)) <= pi ) );
+assertEqual( quadriga_lib.gbsm_init_phases( sr, 'ray', 7, 0 ), pr );                  % 0 = shared set (default)
+pr2 = quadriga_lib.gbsm_init_phases( sr, 'ray', 7, 2, 'Exp512' );
+assertEqual( size(pr2), [512, 213, 2] );
+assertEqual( size( quadriga_lib.gbsm_init_phases( setfield( sr, 'NumSubPaths', 1 ), 'ray', 7, 1 ) ), [256, 45, 2] );
+assertFalse( isequal( quadriga_lib.gbsm_init_phases( sr, 'ray', 7, 1 ), pr ) );      % set 1 differs from set 0
+assertTrue( isempty( quadriga_lib.gbsm_init_phases( setfield( sr, 'NumClusters', 1 ), 'ray', 7 ) ) );
+assert_throws( @() quadriga_lib.gbsm_init_phases( sr, 'ray', 7, -1 ), msg_set );
+assert_throws( @() quadriga_lib.gbsm_init_phases( sr, 'ray', 7, 0, [], [ 0, 0, 1.5 ] ), ...
     'Inputs ''tx_pos'' and ''rx_pos'' are used for set type ''lsf'' only.' );                        % C++
 
 %% Scenario struct: SubpathMethod = 'legacy' is accepted, other values and types are errors

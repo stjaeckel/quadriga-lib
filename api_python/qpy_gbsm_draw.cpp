@@ -13,18 +13,17 @@ SECTION!*/
 Spatially correlated normalized random values of one generator set at a set of links
 
 - Evaluates the phases of [[gbsm.init_phases]] at the links, one column per generator; columns, distributions and
-  decorrelation distances: see the set table in the section description. The value of a link does not depend on the
-  other links of the call; in single mobility it does not depend on `tx_pos`
+  decorrelation distances: see the set table in the section description. The value of a link depends neither on the
+  other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
 - Dual mobility: the Tx is a second device on the same maps, its side of each generator uses the mirror generator.
   Every column keeps its distribution; swapping `tx_pos` and `rx_pos` exchanges the columns of each mirror pair and
-  keeps the self-mirrored columns, exactly
+  keeps the self-mirrored columns, exactly. The ray delays (block 14 of the shared `"ray"` set) change 2 to 8 times
+  faster with a Tx move than plane waves at the Tx would (one decorrelation distance, from the cluster ASA)
 - Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are uncorrelated at equal
   horizontal positions, exactly within a block of `n_coeff` consecutive IDs, otherwise up to a random residual of
   standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
 - The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
-- A set never changes size: new random quantities come in new sets (a new `set_type` or `set_id`). A column depends
-  neither on the other columns nor on the other links
-- An empty set (`NumClusters = 1`) gives `(n_link, 0)` and accepts any empty `phase`
+- A set never changes size. An empty set (`NumClusters = 1`) gives `(n_link, 0)` and accepts any empty `phase`
 - The flags take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Usage:
@@ -34,7 +33,7 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, cluster DS and ASA
 - **`set_type`** — Set type of [[gbsm.init_phases]]; str
 - **`phase`** — Phases from [[gbsm.init_phases]], finite; `(n_coeff, n_gen, 2)`
 - **`tx_pos`** — Tx positions in m; used in dual mobility, always validated; `(1, 3)` or `(n_link, 3)`
@@ -45,8 +44,9 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
   `"Comb256"`
 - **`floor_id`** — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901 Table 7.2-1, 0
   for outdoor UTs); int or float array; `None` or empty = floor 0; 2D mode only; `(n_link,)`; default: None
-- **`center_freq`** — Carrier frequencies in Hz (messages name it `center_frequency`); ignored and not checked for the
-  `"lsf"` and `"cluster"` sets; `(n_freq,)`; default: None
+- **`center_freq`** — Carrier frequencies in Hz (messages name it `center_frequency`); required by the shared `"ray"`
+  set, whose block 14 uses their mean cluster delay spread: pass the same list as to `ssf_rays` (another list gives
+  other `quadriga` rays); ignored and not checked for all other sets; `(n_freq,)`; default: None
 - **`dual_mobility`** — `True`: Tx and Rx both move; default: False
 - **`horizontal`** — `True`: 2D mode (TR 38.901); `False`: 3D mode (legacy QuaDRiGa); default: True
 

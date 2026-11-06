@@ -797,9 +797,4 @@ TEST_CASE("gbsm_draw - input validation")
         CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", ph_lsf, tx, rx, b, -5));
         CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
     }
-    SECTION("the ray set is not available yet")
-    {
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", shared, tx, rx, rnd), std::invalid_argument,
-                             Message("Set type 'ray' is not available yet."));
-    }
 }

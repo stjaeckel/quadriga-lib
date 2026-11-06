@@ -4,7 +4,7 @@
 
 # Python interface test for quadriga_lib.gbsm.draw.
 # Scope: argument and output handling, set types and set index, floor IDs, defaults, error paths.
-# Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, test_gbsm_phases_cluster.cpp).
+# Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, _cluster.cpp, _ray.cpp).
 
 import sys
 import os
@@ -362,9 +362,28 @@ class test_set_types(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             f(self.sp, "rays", ph, self.tx_pos, self.rx_pos)
         self.assertIn("Input 'set_type' must be 'lsf', 'cluster' or 'ray'.", str(ctx.exception))
+
+    def test_ray(self):
+        # (n_link, 14·N·M + N); center_freq is required by the shared set (set_id = -1) only
+        f = quadriga_lib.gbsm.draw
+        sr = {"NumClusters": 3, "NumClusters_min": 1, "NumSubPaths": 4, "SC_lambda": 15.0, "PerClusterDS": 11.0,
+              "PerClusterDS_gamma": -2.0, "PerClusterAS_A": 22.0}  # N = 2, M = 4
+        n_link = self.rx_pos.shape[0]
+        pr = quadriga_lib.gbsm.init_phases(sr, "ray", 7)
+        rr = f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[3.5e9])
+        self.assertEqual(rr.shape, (n_link, 114))
+        self.assertTrue(np.all((rr[:, 106:] > 0) & (rr[:, 106:] < 1)))  # block 14, Uniform
+        self.assertFalse(np.array_equal(f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[28e9]), rr))
         with self.assertRaises(ValueError) as ctx:
-            f(self.sp, "ray", ph, self.tx_pos, self.rx_pos)
-        self.assertIn("Set type 'ray' is not available yet.", str(ctx.exception))
+            f(sr, "ray", pr, self.tx_pos, self.rx_pos)
+        self.assertIn("Input 'center_frequency' is required for the shared 'ray' set.", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[np.nan])
+        self.assertIn("Input 'center_frequency' must be finite and > 0.", str(ctx.exception))
+        pk = quadriga_lib.gbsm.init_phases(sr, "ray", 7, 1)
+        rk = f(sr, "ray", pk, self.tx_pos, self.rx_pos, 1)  # k >= 0
+        self.assertEqual(rk.shape, (n_link, 114))
+        npt.assert_array_equal(f(sr, "ray", pk, self.tx_pos, self.rx_pos, 1, center_freq=[-1.0, np.nan]), rk)
 
 
 if __name__ == "__main__":

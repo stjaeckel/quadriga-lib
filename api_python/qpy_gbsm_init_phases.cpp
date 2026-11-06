@@ -19,7 +19,7 @@ Draw the random phases of one generator set of a BS site and scenario
   phases within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos.remove_bias]] sets the sample mean of
   columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
-- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: empty `"cluster"` sets
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: all sets but `"lsf"` empty
 - The flags take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Usage:
@@ -29,10 +29,10 @@ phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, 
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
-- **`set_type`** — `"lsf"` or `"cluster"`; `"ray"` is not available yet; str
+- **`scenpar`** — Scenario parameters; the decorrelation distances, `NumClusters` and `NumSubPaths` are used
+- **`set_type`** — `"lsf"`, `"cluster"` or `"ray"`; str
 - **`seed`** — Seed of the site and scenario; int from -1 to 2^63-1; -1 = system random device; default: -1
-- **`set_id`** — `"cluster"`: `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`; default: -1
+- **`set_id`** — `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`; default: -1
 - **`preset`** — Sum-of-sinusoids preset, see [[sos.preset]]; sets `n_coeff`; default: `"Comb256"`
 - **`tx_pos`**, **`rx_pos`** — `"lsf"` only: positions in m for the bias removal, as in [[gbsm.draw]]; default: None
 - **`dual_mobility`**, **`remove_bias`**, **`horizontal`** — `"lsf"`: Tx and Rx both move; remove the sample mean; 2D
@@ -75,7 +75,7 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
     py::array_t<double> phase_py;
     const bool lsf = set_type == "lsf";
     const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
-    bool known = n_coeff > 0 && (lsf || set_type == "cluster");
+    bool known = n_coeff > 0 && (lsf || set_type == "cluster" || set_type == "ray");
     auto sp = scenpar_a;
     try
     {
@@ -87,10 +87,8 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
         known = false;
     }
     if (known)
-    {
-        const arma::uword N = (arma::uword)sp.at("NumClusters") - 1;
-        phase_py = qd_python_init_output(n_coeff, lsf ? 11 : (set_id < 0 ? 9 * N : N), (arma::uword)2, &phase);
-    }
+        phase_py = qd_python_init_output(n_coeff, qd_gbsm_n_gen(sp, set_type, (arma::sword)set_id), (arma::uword)2,
+                                         &phase);
 
     // Call library function
     quadriga_lib::gbsm_init_phases(scenpar_a, set_type, phase, (arma::sword)seed, (arma::sword)set_id, preset, p_tx_pos,
