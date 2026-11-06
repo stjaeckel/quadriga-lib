@@ -2,12 +2,13 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Tests of the class gbsm_rays: sizes, validation with one message per failed check, and the self-tests of the
-// shared ray fixtures of qd_test_rays.hpp (make_rays, tr_offsets), which the tests of ssf_rays, ssf_paths,
-// gbsm_rays_from_paths, qrt_paths_from_scatterers and gbsm_single_link_channel build on. The scatterer solver and
-// b_med, b_eff are tested in test_gbsm_rays_solve_scatterers.cpp and in cases of this file added with them.
+// Tests of the class gbsm_rays: sizes, validation with one message per failed check, the scatterer distance scales
+// b_med and b_eff, and the self-tests of the shared ray fixtures of qd_test_rays.hpp (make_rays, tr_offsets), which
+// the tests of ssf_rays, ssf_paths, gbsm_rays_from_paths, qrt_paths_from_scatterers and gbsm_single_link_channel
+// build on. The scatterer solver is tested in test_gbsm_rays_solve_scatterers.cpp.
 // Oracles: the hand-made objects of make_rays, the TR 38.901 Table 7.5-3 values and the 6-decimal offsets for
-// M != 20 (rule of tr_offsets) computed independently with NumPy.
+// M != 20 (rule of tr_offsets) computed independently with NumPy, a sorted cumulative sum (weighted median) and the
+// closed form of b_eff in this file.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -15,6 +16,7 @@
 #include "qd_test_diag.hpp"
 #include "qd_test_rays.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <string>
@@ -267,4 +269,175 @@ TEST_CASE("qd_test_rays - tr_offsets has the properties of the ray offsets")
     std::sort(all.begin(), all.end());
     CHECK(all == o.asc);
     CHECK(tr_offsets(19).groups.empty());
+}
+
+namespace
+{
+    // Distance of ray i from end e (0 Tx, 1 Rx): NLOS end to FBS (Tx) or LBS (Rx), LOS d3D, GR length via the image
+    double end_dist(const quadriga_lib::gbsm_rays &r, arma::uword i, int e)
+    {
+        const arma::vec Ri = {r.rx_pos(0), r.rx_pos(1), -r.rx_pos(2)};
+        if (r.path_type(i) == 0)
+            return len3(r.rx_pos - r.tx_pos);
+        if (r.path_type(i) == 1)
+            return len3(Ri - r.tx_pos);
+        return e == 0 ? len3(r.fbs_pos.col(i) - r.tx_pos) : len3(r.lbs_pos.col(i) - r.rx_pos);
+    }
+
+    // Weighted median of (value, weight) pairs: sorted by value (ascending, or descending for the upper median;
+    // ties keep the ray order), the first value whose cumulative weight reaches half the total; NaN without pairs
+    double wmedian(std::vector<std::pair<double, double>> v, bool upper = false)
+    {
+        std::stable_sort(v.begin(), v.end(), [upper](const auto &a, const auto &b)
+                         { return upper ? a.first > b.first : a.first < b.first; });
+        double total = 0.0, cum = 0.0;
+        for (const auto &x : v)
+            total += x.second;
+        for (const auto &x : v)
+            if (2.0 * (cum += x.second) >= total)
+                return x.first;
+        return arma::datum::nan;
+    }
+
+    // b_med oracle: NLOS rays with power > 0 at k (ray 'skip' left out); 'mode' 0 lower, 1 upper, 2 unweighted
+    double oracle_b_med(const quadriga_lib::gbsm_rays &r, arma::uword k, int e, int mode = 0, arma::uword skip = 999)
+    {
+        std::vector<std::pair<double, double>> v;
+        for (arma::uword i = 0; i < r.n_ray(); ++i)
+            if (r.path_type(i) == 2 && r.power(i, k) > 0.0 && i != skip)
+                v.push_back({end_dist(r, i, e), mode == 2 ? 1.0 : r.power(i, k)});
+        return wmedian(v, mode == 1);
+    }
+
+    // b_eff oracle: (sum P / sum (P / b^p))^(1/p) over the rays with P > 0 at k; p = 2 is b_eff, p = -2 the
+    // power-weighted quadratic mean, p = -1 the power-weighted arithmetic mean
+    double oracle_b_eff(const quadriga_lib::gbsm_rays &r, arma::uword k, int e, double p = 2.0)
+    {
+        double sp = 0.0, sq = 0.0;
+        for (arma::uword i = 0; i < r.n_ray(); ++i)
+            if (r.power(i, k) > 0.0)
+                sp += r.power(i, k), sq += r.power(i, k) / std::pow(end_dist(r, i, e), p);
+        return sp > 0.0 ? std::pow(sp / sq, 1.0 / p) : arma::datum::nan;
+    }
+
+    bool both_nan(const arma::vec &b) { return b.n_elem == 2 && std::isnan(b(0)) && std::isnan(b(1)); }
+}
+
+TEST_CASE("gbsm_rays - b_med is the lower weighted median of the NLOS end distances")
+{
+    // Rays: 0 LOS, 1 GR, 2 to 7 NLOS with ray 4 at zero power; frequency 0 with the powers of the fixture,
+    // frequency 1 with the powers 1, 1, 1, 1, 4 on the kept NLOS rays in ascending Tx distance
+    quadriga_lib::gbsm_rays r = make_rays(31, true, true, 6, 2, "38.901", true);
+    std::vector<arma::uword> kept = {2, 3, 5, 6, 7};
+    std::sort(kept.begin(), kept.end(), [&](arma::uword a, arma::uword b)
+              { return end_dist(r, a, 0) < end_dist(r, b, 0); });
+    const double pw[5] = {1.0, 1.0, 1.0, 1.0, 4.0};
+    for (int q = 0; q < 5; ++q)
+        r.power(kept[q], 1) = pw[q];
+    r.fallback.zeros(r.n_ray());
+    r.fallback(kept[0]) = 1; // the nearest ray at the Tx is a fallback ray; it counts
+
+    // Properties of the oracle: Tx and Rx differ; lower, upper and unweighted median differ; leaving out the
+    // fallback ray changes the lower median
+    for (arma::uword k = 0; k < 2; ++k)
+        CHECK(std::abs(oracle_b_med(r, k, 0) - oracle_b_med(r, k, 1)) > 1.0);
+    const double lo = oracle_b_med(r, 1, 0), up = oracle_b_med(r, 1, 0, 1), uw = oracle_b_med(r, 1, 0, 2);
+    CHECK(lo == end_dist(r, kept[3], 0));
+    CHECK(up == end_dist(r, kept[4], 0));
+    CHECK(uw == end_dist(r, kept[2], 0));
+    CHECK(oracle_b_med(r, 1, 0, 0, kept[0]) != lo);
+
+    for (arma::uword k = 0; k < 2; ++k)
+    {
+        INFO("i_freq " << k);
+        const arma::vec b = r.b_med(k);
+        REQUIRE(b.n_elem == 2);
+        CHECK(std::abs(b(0) - oracle_b_med(r, k, 0)) < 1e-12);
+        CHECK(std::abs(b(1) - oracle_b_med(r, k, 1)) < 1e-12);
+        QD_DIAG("# diag: b_med i_freq %u: Tx %.6f (oracle %.6f), Rx %.6f (oracle %.6f)\n", (unsigned)k, b(0),
+                oracle_b_med(r, k, 0), b(1), oracle_b_med(r, k, 1));
+    }
+    CHECK(arma::approx_equal(r.b_med(), r.b_med(0), "absdiff", 0.0));
+
+    // LOS and GR do not count
+    quadriga_lib::gbsm_rays q = r;
+    q.power(0, 0) = 100.0, q.power(1, 0) = 50.0;
+    CHECK(arma::approx_equal(q.b_med(0), r.b_med(0), "absdiff", 0.0));
+
+    // Cumulative power at exactly half: powers 1, 1 give the nearer ray at each end
+    q.power.col(1).zeros(), q.power(3, 1) = 1.0, q.power(6, 1) = 1.0;
+    for (int e = 0; e < 2; ++e)
+    {
+        const double b3 = end_dist(q, 3, e), b6 = end_dist(q, 6, e);
+        REQUIRE(b3 != b6);
+        CHECK(oracle_b_med(q, 1, e) == std::min(b3, b6));
+        CHECK(std::abs(q.b_med(1)(e) - std::min(b3, b6)) < 1e-12);
+    }
+
+    // NaN: without NLOS power at i_freq, without scatterers, n_ray = 0
+    q.power.col(1).zeros(), q.power(0, 1) = 1.0;
+    CHECK(both_nan(q.b_med(1)));
+    CHECK(both_nan(make_rays(31, true, true, 6, 2, "38.901").b_med(0)));
+    CHECK(both_nan(make_rays(31, false, false, 0, 2, "38.901", true).b_med(1)));
+}
+
+TEST_CASE("gbsm_rays - b_eff is the power-weighted inverse-square mean of the end distances")
+{
+    const quadriga_lib::gbsm_rays r = make_rays(32, true, true, 6, 2, "quadriga", true);
+    REQUIRE(r.power(0, 0) > 0.0);
+    REQUIRE(r.power(1, 1) > 0.0);
+    for (arma::uword k = 0; k < 2; ++k)
+        for (int e = 0; e < 2; ++e)
+        {
+            INFO("i_freq " << k << ", end " << e);
+            const double o = oracle_b_eff(r, k, e);
+            CHECK(std::abs(o - oracle_b_eff(r, k, e, -2.0)) > 0.01 * o);
+            CHECK(std::abs(o - oracle_b_eff(r, k, e, -1.0)) > 0.01 * o);
+            CHECK(std::abs(r.b_eff(k)(e) - o) < 1e-12 * o);
+            QD_DIAG("# diag: b_eff i_freq %u end %d: %.6f (oracle %.6f, quadratic mean %.6f)\n", (unsigned)k, e,
+                    r.b_eff(k)(e), o, oracle_b_eff(r, k, e, -2.0));
+        }
+    CHECK(std::abs(oracle_b_eff(r, 0, 0) - oracle_b_eff(r, 1, 0)) > 1e-3); // i_freq selects the powers
+    CHECK(arma::approx_equal(r.b_eff(), r.b_eff(0), "absdiff", 0.0));
+
+    // LOS only: d3D at both ends; GR only: the GR length
+    quadriga_lib::gbsm_rays q = r;
+    q.power.zeros(), q.power(0, 0) = 0.7, q.power(1, 1) = 0.2;
+    const double d3D = len3(r.rx_pos - r.tx_pos), d_gr = end_dist(r, 1, 0);
+    CHECK(arma::approx_equal(q.b_eff(0), arma::vec{d3D, d3D}, "reldiff", 1e-12));
+    CHECK(arma::approx_equal(q.b_eff(1), arma::vec{d_gr, d_gr}, "reldiff", 1e-12));
+
+    // NaN: no power at i_freq, without scatterers, n_ray = 0
+    q.power.col(1).zeros();
+    CHECK(both_nan(q.b_eff(1)));
+    CHECK(both_nan(make_rays(32, true, true, 6, 2, "quadriga").b_eff(0)));
+    CHECK(both_nan(make_rays(32, false, false, 0, 2, "quadriga", true).b_eff(0)));
+}
+
+TEST_CASE("gbsm_rays - b_med and b_eff validate the object and i_freq")
+{
+    quadriga_lib::gbsm_rays r = make_rays(33, true, true, 5, 2, "38.901_MF", true);
+    CHECK_NOTHROW(r.b_med(1));
+    CHECK_NOTHROW(r.b_eff(1));
+    auto msg = [](const std::function<void()> &f)
+    {
+        try
+        {
+            f();
+        }
+        catch (const std::invalid_argument &e)
+        {
+            return std::string(e.what());
+        }
+        return std::string("no throw");
+    };
+    const std::string m_range = "Input 'i_freq' is out of range for 2 frequencies.";
+    CHECK(msg([&] { r.b_med(2); }) == m_range);
+    CHECK(msg([&] { r.b_eff(2); }) == m_range);
+    r.lbs_pos.reset();
+    const std::string m_obj =
+        "Inputs 'rays.fbs_pos' and 'rays.lbs_pos' must both be empty or both have size [3, n_ray].";
+    CHECK(msg([&] { r.b_med(0); }) == m_obj);
+    CHECK(msg([&] { r.b_eff(0); }) == m_obj);
+    CHECK(msg([] { quadriga_lib::gbsm_rays().b_med(0); }) == "Input 'rays.tx_pos' must have 3 elements.");
 }
