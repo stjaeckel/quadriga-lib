@@ -122,10 +122,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::u32_vec n_cluster =
         (nrhs < 14) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[13], false, "n_cluster");
 
-    // Wrap optional pointers; an omitted input or [] (0 x 0) selects the default, an empty input of another shape
-    // (e.g. [0, N] for zero links) counts as given
+    // Wrap optional pointers; an omitted or empty input selects the default; with zero links an empty input other
+    // than [], e.g. [0, N], counts as given
     auto given = [&](int i)
-    { return nrhs > i && (mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0); };
+    {
+        if (nrhs <= i)
+            return false;
+        const bool shaped = mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0; // not [] (0 x 0)
+        return !mxIsEmpty(prhs[i]) || (rx_pos.n_rows == 0 && shaped);
+    };
     const arma::cube *p_rnd_freq = given(6) ? &rnd_freq : nullptr;
     const arma::cube *p_lsp_anchor = given(7) ? &lsp_anchor : nullptr;
     const arma::mat *p_eod_offset_deg = given(8) ? &eod_offset_deg : nullptr;

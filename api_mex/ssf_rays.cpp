@@ -148,9 +148,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_freq' cannot be 0 (1-based index).");
     i_freq -= 1; // 1-based (MATLAB) -> 0-based (C++)
 
-    // An omitted input or [] (0 x 0) selects the default, an empty input of another shape (zero links) counts as given
+    // An omitted or empty input selects the default; with zero links an empty input other than [] counts as given
     auto given = [&](int i)
-    { return nrhs > i && (mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0); };
+    {
+        if (nrhs <= i)
+            return false;
+        const bool shaped = mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0; // not [] (0 x 0)
+        return !mxIsEmpty(prhs[i]) || (rx_pos.n_rows == 0 && shaped);
+    };
     const arma::mat *p_gr_eps_re = given(18) ? &gr_eps_re : nullptr;
     const arma::mat *p_gr_eps_im = given(19) ? &gr_eps_im : nullptr;
 
