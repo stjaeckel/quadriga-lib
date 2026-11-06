@@ -88,30 +88,32 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
   links of the call
 - Ray layout per link, fixed per scenario: index 0 LOS, 1 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` at
   `1 + G + n·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays at power 0
-- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R
-  of the ground reflection (TR eqs. (7.6-38) to (7.6-40), R² = (abs(R_par)² + abs(R_perp)²)/2)
-- NLOS rays: power P_n / `NumSubPaths`; offsets of Table 7.5-3 scaled by the cluster spreads (`PerClusterAS_D`,
-  `PerClusterAS_A`, `PerClusterES_A`, ZSD of eq. (7.5-20)); coupling (step 8): within a cluster or sub-cluster, the
-  ray with the k-th smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA,
-  ZOD and ZOA
+- LOS and GR rays: delay, angles and power of their slot; Jones matrix diag(1, -1) (LOS), GR as in [[ssf_clusters]]
+- NLOS rays: power P_n / `NumSubPaths`; offsets of Table 7.5-3 scaled by the cluster spreads `PerClusterAS_D`,
+  `PerClusterAS_A`, `PerClusterES_A` and the cluster ESD of eq. (7.5-20), `PerClusterES_D_scale`·10^(`lsp_mu` of
+  ESD), or `PerClusterES_D` if the scale is 0; coupling (step 8): within a cluster or sub-cluster, the ray with the k-th
+  smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA, EOD and EOA
+- c_DS, the cluster DS of Table 7.5-6: `max(PerClusterDS_min, PerClusterDS + PerClusterDS_gamma·lg f')` ns with
+  `f' = max(center_frequency/1e9, PerClusterDS_fc_min)`; 3.91 ns where `PerClusterDS` = 0
 - `NumSubPaths` other than 20: the offsets of QuaDRiGa-NG (the MATLAB QuaDRiGa fork that uses this library) below 20
   (mean 0, rms 1), Laplacian quantiles at the rms of Table 7.5-3 above 20; no sub-clusters
 
 | Method | `"38.901"`, `"38.901_MF"` | `"quadriga"` |
 | --- | --- | --- |
 | Frequencies per call | `i_freq` only; slice `i_freq` of `rnd_ray`; `"38.901"` takes one frequency | all; one geometry, per frequency powers, XPR and Jones matrices; the shared "ray" set |
-| Ray delays | cluster delay; sub-clusters + 0, 1.28, 2.56 c_DS (Table 7.5-6) | cluster delay + 2·c_DS·(u - mean of u in the cluster), u of block 14; negative delays set to 0 |
+| Ray delays | cluster delay; sub-clusters + 0, 1.28, 2.56 c_DS (Table 7.5-5) | cluster delay + 2·c_DS·(u - mean of u in the cluster), u of block 14; negative delays set to 0 |
 | Taps | sub-cluster of the two strongest clusters (`NumSubPaths` = 20), else cluster | cluster |
-| c_DS, ZSD | at frequency `i_freq` | mean over the frequencies |
+| c_DS, cluster ESD | at frequency `i_freq` | mean over the frequencies |
 
 | Option | Default (TR) | Alternative (QuaDRiGa-NG) |
 | --- | --- | --- |
-| `angle_model` | `"additive"`: offsets added to azimuth and zenith, zenith folded (step 7) | `"rotation"`: offset pattern rotated to the cluster direction; equal at elevation 0 |
+| `angle_model` | `"additive"`: offsets added to azimuth and elevation, elevation folded at the poles (step 7) | `"rotation"`: offset pattern rotated to the cluster direction; equal at elevation 0 |
 | `pol_model` | `"38.901"`: XPR and four initial phases per ray (steps 9, 10) | `"quadriga"`: rotation polarization model of QuaDRiGa, one phase, XPR per ray and per cluster |
 | `pol_variability` | `false` | `true`: clause 7.6.16 on the NLOS rays with std `PolVar_sigma` (key default 0: no effect); `pol_model = "38.901"` only |
 
 - Sub-clusters (step 11): the two clusters of largest power at frequency `i_freq` (equal powers: lower index first),
-  rays at the positions 0-9, 10-15 and 16-19; every tap is a contiguous block of rays
+  rays at the positions 0-9, 10-15 and 16-19 (TR rays 1-8, 19, 20; 9-12, 17, 18; 13-16); every tap is a contiguous
+  block of rays
 - `pol_model = "quadriga"`: the matrix refers to the owner end, the end with the larger z, then x, then y (ends within
   1 mm count as equal; the Tx if all tie); the Rx as owner transposes it, so UTs dropped separately at equal heights
   on either side of the tie plane get transposed matrices
@@ -149,7 +151,8 @@ void quadriga_lib::ssf_rays(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters
+- **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumSubPaths`, the `PerCluster*` keys, `GR_enabled`,
+  `PolVar_sigma`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`center_frequency`** — Carrier frequencies in [Hz]; `[n_freq]`

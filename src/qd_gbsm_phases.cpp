@@ -353,15 +353,15 @@ SECTION!*/
 
 /*!MD
 # gbsm_init_phases
-Draw the SOS phases of one random set of a BS site and scenario
+SOS phases of one random set of a BS site and scenario
 
 - Draws the SOS phases of one random set (set table in [[gbsm_draw]]): the random phases of the sinusoids of its
   [sum-of-sinusoids (SOS)](cpp_api.html#sec-sum-of-sinusoids-random-number-generator) generators, as [[sos_init_phases]]; [[gbsm_draw]]
   evaluates them at the links. Store `phase` or the seed to evaluate the same fields again along tracks or on maps
 - The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed
   `"lsf"` sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
-- `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos_remove_bias]] sets the sample mean of
-  columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
+- `"lsf"` bias removal (`remove_bias`): [[sos_remove_bias]] sets the sample mean of columns 0 to 8 over the positions
+  (Rx, and Tx in dual mobility; in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop
 - `NumClusters = 1`: all sets but `"lsf"` are empty
 - TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
 
@@ -389,8 +389,9 @@ void quadriga_lib::gbsm_init_phases(
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Bias-removal positions in [m] as in [[gbsm_draw]]; `"lsf"` only, else throws
 - **`dual_mobility`** *(optional)* — `"lsf"` with bias removal: Tx and Rx both move; as in [[gbsm_draw]]
-- **`remove_bias`** *(optional)* — `"lsf"` only: remove the sample mean over the positions
-- **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D (TR), `false` 3D (legacy); as in [[gbsm_draw]]
+- **`remove_bias`** *(optional)* — `"lsf"` only: remove the sample mean over the positions; needs `rx_pos` with at
+  least 3 rows, else no effect
+- **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D, `false` 3D mode; as in [[gbsm_draw]]
 
 ## Output:
 - **`phase`** — SOS phases in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 =
@@ -505,12 +506,15 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
 Spatially correlated normalized random values of one random set at a set of links
 
 - Evaluates the SOS phases of [[gbsm_init_phases]] at the links as [[sos_val]], one column per generator. The value of a link depends
-  neither on the other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
-- Dual mobility: the Tx is a second device on the same maps; its side of each generator uses the mirror generator
-  (e.g. departure and arrival quantities exchange), and every column keeps its distribution
-- Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are uncorrelated at
-  equal horizontal positions, exactly within a block of `n_coeff` consecutive IDs, otherwise up to a random residual
-  of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
+  neither on the other links of the call nor on the other columns; with `dual_mobility = false` not on `tx_pos`
+- `dual_mobility = true`: the Tx is a second device on the same fields; its side of each generator uses the mirror
+  generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
+- 2D mode (`horizontal = true`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
+  field, fields of different floors are uncorrelated at equal horizontal positions (TR 38.901 Table 7.5-6 note 3):
+  exactly for IDs in the same group of `n_coeff` consecutive IDs (0 to `n_coeff - 1`, ...), otherwise up to a random
+  residual of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
+- 3D mode (legacy QuaDRiGa): the height separates the floors, so UTs on different floors are correlated by the ACF of
+  their height difference. The per-link statistics are the same in both modes
 - The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
 - `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts any empty `phase`
 
@@ -520,12 +524,12 @@ new sets), and a decorrelation distance of 0 is used as 0.1 m:
 | `set_type`, `set_id` | `n_gen` | Columns | Decorrelation distance | Used by |
 | --- | --- | --- | --- | --- |
 | `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 8 absolute TOA, Normal(0,1); 9 ground permittivity and 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 10) |
-| `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); 1 to 4 sign of AOD, AOA, ZOD, ZOA; 5 to 8 offset of AOD, AOA, ZOD, ZOA, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd` |
+| `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [[ssf_clusters]] `rnd` |
 | `"cluster"`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd_freq`, slice `k` |
-| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: from the cluster DS and ASA | [[ssf_rays]] `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
+| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: from the cluster DS c_DS and ASA | [[ssf_rays]] `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
 
 A `"ray"` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` in column `b·N·M + n·M + m`: 0 to 3 coupling
-ranks of AOD, AOA, ZOD, ZOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of
+ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of
 the same. Block 13, the XPR per cluster, is in column `13·N·M + n`; block 14, the ray delay of `"quadriga"`, in column
 `13·N·M + N + n·M + m`. All blocks are Normal(0,1) except block 14, Uniform(0,1).
 
@@ -557,10 +561,10 @@ void quadriga_lib::gbsm_draw(
 - **`floor_id`** *(optional)* — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901
   Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
 - **`center_frequency`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
-  uses their mean cluster delay spread: pass the same list as to [[ssf_rays]] (another list gives other `"quadriga"`
+  uses their mean c_DS ([[ssf_rays]]): pass the same list as to [[ssf_rays]] (another list gives other `"quadriga"`
   rays); ignored and not checked for all other sets; `[n_freq]`
 - **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
-- **`horizontal`** *(optional)* — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa)
+- **`horizontal`** *(optional)* — `true`: 2D mode; `false`: 3D mode
 
 ## Output:
 - **`rnd`** — Random values; `[n_link, n_gen]`

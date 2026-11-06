@@ -130,8 +130,8 @@ Path loss and shadow-fading standard deviation of a set of links
     `A·lg d3 + B + C·lg f + D·lg(asin(sa))`, plus the zenith attenuation by atmospheric gases over `sa` (1 to 100 GHz,
     constant beyond) if `usePLa != 0`
   - empty `pl_model`: 0
-- Where the model sets no `sf` (a missing `SF`, `sig` key or no such key): the SF std of [[lsp_generate]] at the geometric distance, so that
-  passing `sf_sigma` to [[lsp_generate]] is neutral
+- Where the model gives no `sf` (an `SF` or `sig` key not set, or a model without one): the SF std of [[lsp_generate]]
+  at the geometric distance, so that passing `sf_sigma` to [[lsp_generate]] is neutral
 - `hE_rand != 0` with `rnd_he` given: the random environment height of TR 38.901 Table 7.4.1-1 note 1, drawn from
   `rnd_he`, which makes it spatially consistent at the decorrelation distance `SF_lambda` (the TR draws it
   independently per link); the UT height is then clamped at `hE + 0.1` instead of `1.1·hE`. Along a track the loss

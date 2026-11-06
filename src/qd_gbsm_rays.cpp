@@ -43,15 +43,14 @@ SECTION!*/
 
 /*!MD
 # gbsm_rays
-Ray data of one link (geometry-based stochastic model)
+Class for the ray data of one link (geometry-based stochastic model)
 
 - Antenna-free rays of one link at one drop: delays, powers, angles and polarization transfer matrices, with the
   positions the data refer to; written by [[ssf_rays]] and [[gbsm_rays_from_paths]], completed by
   .[[solve_scatterers]], read by [[ssf_paths]] and [[gbsm_single_link_channel]], which call `is_valid()` first
 - Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
 - An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
-- Tap convention: 0 for the LOS ray, 3 for a GR ray; without GR, [[ssf_rays]] gives tap 3 to the first NLOS cluster.
-  Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
+- Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
   `is_valid()`) and one `method` for all rays. `.solve_scatterers` overwrites given scatterers, so solve rays without
   scatterers in a separate object and concatenate the attributes
 - Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
@@ -81,7 +80,7 @@ Ray data of one link (geometry-based stochastic model)
 | `empty()` | `true` if `n_ray() == 0` |
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
 | `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
-| `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$ at frequency `i_freq`, with $b$ the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
+| `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0` at frequency `i_freq`, with `b` the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
 | `solve_scatterers(d_min = 2.0)` | `void`; writes `fbs_pos`, `lbs_pos` and `fallback`, see .[[solve_scatterers]] |
 
 - `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`

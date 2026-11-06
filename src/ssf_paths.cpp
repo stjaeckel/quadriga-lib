@@ -77,9 +77,9 @@ void quadriga_lib::ssf_paths(
 
 ## Inputs:
 - **`rays`** — Ray data of the link
-- **`link_gain_dB`** — Link gain (section description) at the position in [dB], per frequency; 0 for data from
-  paths; `[n_freq]`
-- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (phase for the TR methods, drift for `"quadriga"`)
+- **`link_gain_dB`** — [Link gain](cpp_api.html#sec-geometry-based-stochastic-model) at the position in [dB], per
+  frequency; 0 for data from paths; `[n_freq]`
+- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
 - **`kf_ratio`** *(optional)* — KF(position) / KF(drop), >= 0, per frequency; omitted: 1; `[n_freq]`
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
@@ -89,7 +89,7 @@ void quadriga_lib::ssf_paths(
 - **`path_length`** — Path lengths in [m]; `[n_path]`
 - **`M`** — Polarization transfer matrices, rows as in [[get_channels_planar]]; `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Departure and arrival angles in [rad], GCS; `[n_path]`
-- **`fbs_pos`**, **`lbs_pos`** *(optional)* — Scatterer positions in [m]; `[3, n_path]`
+- **`fbs_pos`**, **`lbs_pos`** *(optional)* — Scatterer positions in [m]; `[3, n_path]`, `[3, 0]` in `"phase"`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
 - **`ray_ind`** *(optional)* — Index of the ray in `rays`, 0-based; `[n_path]`
 
