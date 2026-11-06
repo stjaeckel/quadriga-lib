@@ -411,8 +411,8 @@ void quadriga_lib::ssf_clusters(
     const arma::mat *gr_eps_re = nullptr,
     const arma::mat *gr_eps_im = nullptr,
     const std::vector<bool> *o2i = nullptr,
-    const arma::uvec *n_cluster = nullptr,
-    arma::uvec *n_active = nullptr);
+    const arma::u32_vec *n_cluster = nullptr,
+    arma::u32_vec *n_active = nullptr);
 ```
 
 ## Inputs:
@@ -473,8 +473,8 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
                                 const arma::mat *gr_eps_re,
                                 const arma::mat *gr_eps_im,
                                 const std::vector<bool> *o2i,
-                                const arma::uvec *n_cluster,
-                                arma::uvec *n_active)
+                                const arma::u32_vec *n_cluster,
+                                arma::u32_vec *n_active)
 {
     // Validation, before any output is touched
     const bool m_tr = method == "38.901", m_mf = method == "38.901_MF", m_qd = method == "quadriga";
@@ -708,7 +708,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         }
 
         // Write the slots
-        arma::uword act = 0;
+        unsigned act = 0;
         for (arma::uword s = 0; s < n_slot; ++s)
         {
             const bool is_gr = G && s == 1, is_cl = s > (G ? 1 : 0);

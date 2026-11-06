@@ -37,9 +37,9 @@ assertEqual( chan.tx_position, tx_pos' );
 assertEqual( chan.rx_position, rx_pos' );
 assertEqual( fieldnames(par)', { 'tap', 'n_ray_tap', 'fbs_pos', 'lbs_pos', 'gr_pos', 'link_gain_dB', 'b_med', ...
     'b_eff', 'limit', 'ratio', 'ratio_total' } );
-assertTrue( isa(par.tap, 'uint64') && isa(par.n_ray_tap, 'uint64') );
+assertTrue( isa(par.tap, 'uint32') && isa(par.n_ray_tap, 'uint32') );
 assertEqual( par.tap, taps );                                                 % codes, not shifted
-assertEqual( par.tap(1:2), uint64( [0; 3] ) );
+assertEqual( par.tap(1:2), uint32( [0; 3] ) );
 assertEqual( par.link_gain_dB, -90 );
 assertEqual( par.ratio, [0; 0] );
 assertEqual( size(par.fbs_pos), [3, n_path] );

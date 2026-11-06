@@ -72,8 +72,8 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
     const auto path_gain_a = qd_python_numpy2arma_Mat<double>(path_gain, true);
     const auto path_length_a = qd_python_numpy2arma_Col<double>(path_length, true);
     const auto M_a = qd_python_numpy2arma_Cube<double>(M, true);
-    const auto path_type_a = qd_python_uword_entries(path_type, "path_type");
-    const auto tap_a = qd_python_uword_entries(tap, "tap");
+    const auto path_type_a = qd_python_u32_entries(path_type, "path_type");
+    const auto tap_a = qd_python_u32_entries(tap, "tap");
 
     // Complex permittivity -> real and imaginary part (copies); empty as None (the 'gr_eps' of ssf_rays without GR)
     arma::vec gr_eps_re, gr_eps_im;

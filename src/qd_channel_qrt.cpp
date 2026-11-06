@@ -1954,7 +1954,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
     const arma::cube &M,
-    const arma::uvec &path_type,
+    const arma::u32_vec &path_type,
     arma::uword i_cir = 0);
 ```
 
@@ -1983,7 +1983,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
                                                                         const arma::mat &lbs_pos,
                                                                         const arma::mat &path_gain,
                                                                         const arma::cube &M,
-                                                                        const arma::uvec &path_type,
+                                                                        const arma::u32_vec &path_type,
                                                                         arma::uword i_cir)
 {
     const arma::uword n_freq = center_frequency.n_elem, n_path = fbs_pos.n_cols;

@@ -381,7 +381,7 @@ TEST_CASE("gbsm_draw - cluster: dual mobility values follow the two-device formu
     // 5 links, Tx per link; link 2 has Tx = Rx, link 4 a distance of more than 5 decorrelation distances
     const arma::mat rx = {{10.0, -20.0, 1.5}, {-55.0, 30.0, 3.0}, {100.0, 100.0, 1.5}, {-5.0, -5.0, 12.0}, {0.3, 0.7, 1.5}};
     const arma::mat tx = {{12.0, -15.0, 25.0}, {-40.0, 10.0, 30.0}, {100.0, 100.0, 1.5}, {-25.0, 3.0, 12.0}, {150.0, -80.0, 10.0}};
-    const arma::uvec fl = {3, 0, 259, 3, 0};
+    const arma::u32_vec fl = {3, 0, 259, 3, 0};
     const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259);
 
     QD_DIAG("\n# diag: gbsm_draw cluster dual mobility against the two-device formulas, max abs difference\n");
@@ -428,7 +428,7 @@ TEST_CASE("gbsm_draw - cluster: swapping Tx and Rx exchanges the departure and a
     const arma::mat A = rx5();
     arma::mat B = rx5() * 0.7 + 20.0;
     B.col(2).fill(25.0);
-    const arma::uvec fl = {0, 2, 2, 300, 0};
+    const arma::u32_vec fl = {0, 2, 2, 300, 0};
 
     for (int s = 0; s < 2; ++s)
         for (int f = 0; f < 2; ++f)
@@ -494,7 +494,7 @@ TEST_CASE("gbsm_draw - cluster: floors as in the lsf set")
         const auto sp = scen(4.0, 12.0);
         const arma::cube phase = make_phase(256, 3, true, 65);
         const arma::mat rx = rx5();
-        const arma::uvec fl0(5, arma::fill::zeros);
+        const arma::u32_vec fl0(5, arma::fill::zeros);
         arma::mat a, b;
         quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, a);
         quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, b, -1, "Comb256", &fl0);
@@ -507,7 +507,7 @@ TEST_CASE("gbsm_draw - cluster: floors as in the lsf set")
     const arma::mat g0 = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1);
     const arma::uword n = g0.n_rows;
     const arma::mat rx = arma::join_cols(g0, g0);
-    arma::uvec fl(2 * n, arma::fill::zeros);
+    arma::u32_vec fl(2 * n, arma::fill::zeros);
     fl.subvec(n, 2 * n - 1).fill(1);
     arma::mat rnd;
     quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, rnd, -1, "Comb256", &fl);
@@ -662,7 +662,7 @@ TEST_CASE("gbsm_draw - cluster: sizes, empty input and pre-sized output")
     CHECK(rnd.n_cols == 0);
 
     // Pre-sized output with stale content: written in place (same memory) and completely
-    const arma::uvec fl = {0, 3, 3, 259, 1};
+    const arma::u32_vec fl = {0, 3, 3, 259, 1};
     arma::mat ref1, ref2;
     quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref1, -1, "Comb256", &fl);
     quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, ref2, -1, "Comb256", nullptr, nullptr, true);
@@ -688,7 +688,7 @@ TEST_CASE("gbsm_draw - input validation")
     const auto sp = scen(4.0, 12.0); // N = 3
     const arma::cube shared = make_phase(256, 3, true, 72), perf = make_phase(256, 3, false, 73);
     const arma::mat rx = rx5().rows(0, 2), tx = {{0.0, 0.0, 25.0}};
-    const arma::uvec fl = {0, 1, 2};
+    const arma::u32_vec fl = {0, 1, 2};
     arma::mat rnd;
 
     SECTION("valid baseline")
@@ -754,7 +754,7 @@ TEST_CASE("gbsm_draw - input validation")
     }
     SECTION("floor_id")
     {
-        const arma::uvec bad = {0, 1};
+        const arma::u32_vec bad = {0, 1};
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, rnd, -1, "Comb256", &bad), std::invalid_argument,
                              Message("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'."));
         arma::mat keep(2, 2, arma::fill::ones);

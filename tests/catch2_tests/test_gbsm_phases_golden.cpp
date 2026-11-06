@@ -169,7 +169,7 @@ namespace
     {
         const spmap sp = umi_nlos();
         const arma::mat rx3 = RX5.rows(0, 2), tx3 = TX5.rows(0, 2);
-        const arma::uvec fl = {0, 2, 0};
+        const arma::u32_vec fl = {0, 2, 0};
         QD_DIAG("\n# diag: gbsm_draw against the previous version, max abs difference\nset,mode,max_diff\n");
         for (const auto &g : GOLDEN)
         {

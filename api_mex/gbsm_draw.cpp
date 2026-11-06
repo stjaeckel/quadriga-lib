@@ -96,10 +96,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'set_id' must be 0 (shared set) or a frequency index >= 1.");
     const arma::sword set_id = lsf ? -1 : (arma::sword)set_id_in - 1;
 
-    const arma::uvec floor_id = qd_mex_uint_entries(floor_id_in, "floor_id");
+    const arma::u32_vec floor_id = qd_mex_uint_entries(floor_id_in, "floor_id");
 
     // Wrap optional pointers
-    const arma::uvec *p_floor_id = floor_id.empty() ? nullptr : &floor_id;
+    const arma::u32_vec *p_floor_id = floor_id.empty() ? nullptr : &floor_id;
     const arma::vec *p_center_freq = center_freq.empty() ? nullptr : &center_freq;
 
     // Output allocation in MATLAB memory: [n_link, n_gen], n_gen = columns of 'phase' (checked by the library)

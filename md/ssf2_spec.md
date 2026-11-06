@@ -126,7 +126,7 @@ void gbsm_draw(const std::unordered_map<std::string, double> &scenpar, // Scenar
                arma::mat &rnd,                                          // Output: Random values, [n_link, n_gen]
                arma::sword set_id = -1,                                 // As in gbsm_init_phases; ignored for "lsf"
                const std::string &preset = "Comb256",                   // Must match gbsm_init_phases
-               const arma::uvec *floor_id = nullptr,                    // Optional: Floor index per link, [n_link]; nullptr = all on one floor; 2D only
+               const arma::u32_vec *floor_id = nullptr,                 // Optional: Floor index per link, [n_link]; nullptr = all on one floor; 2D only
                const arma::vec *center_frequency = nullptr,             // Optional: Carrier frequencies in [Hz], [n_freq]; required by the shared "ray" set, same list as for ssf_rays
                bool dual_mobility = false,                              // Tx and Rx both move: the Tx side is a second device
                bool horizontal = true);                                 // true: 2D correlation in the x-y plane (TR); false: 3D (legacy)
@@ -196,13 +196,13 @@ public:
     arma::vec aoa;                  // Azimuth of arrival in [rad], GCS, [n_ray]
     arma::vec eoa;                  // Elevation of arrival in [rad], GCS, [n_ray]
     arma::cube M;                   // Polarization transfer matrices incl. initial phases, row order of get_channels_*, [8, n_ray, n_freq]
-    arma::uvec path_type;           // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_ray]
-    arma::uvec tap;                 // Tap index, rays with equal index form one tap, [n_ray]
+    arma::u32_vec path_type;        // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_ray]
+    arma::u32_vec tap;              // Tap index, rays with equal index form one tap, [n_ray]
     arma::vec gr_eps_re;            // Ground permittivity, real part, [n_freq] or empty; needed where a GR ray is recomputed
     arma::vec gr_eps_im;            // Ground permittivity, imaginary part, [n_freq] or empty; needed where a GR ray is recomputed
     arma::mat fbs_pos;              // First-bounce scatterer positions in [m], [3, n_ray]; empty until solve_scatterers
     arma::mat lbs_pos;              // Last-bounce scatterer positions in [m], [3, n_ray]; empty until solve_scatterers
-    arma::uvec fallback;            // 1 = lengthened by the solver fallback, [n_ray]; empty until solve_scatterers
+    arma::u32_vec fallback;         // 1 = lengthened by the solver fallback, [n_ray]; empty until solve_scatterers
     gbsm_rays() {};                 // Default constructor
 
     arma::uword n_ray() const;                     // Number of rays, length of 'delay'
@@ -369,7 +369,7 @@ void ssf_paths(const gbsm_rays &rays,                // Ray data of the link
                arma::vec *eoa = nullptr,             // Optional output: Elevation of arrival in [rad], [n_path]
                arma::mat *fbs_pos = nullptr,         // Optional output: First-bounce scatterer positions in [m], [3, n_path]; "phase": [3, 0]
                arma::mat *lbs_pos = nullptr,         // Optional output: Last-bounce scatterer positions in [m], [3, n_path]; "phase": [3, 0]
-               arma::uvec *path_type = nullptr,      // Optional output: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
+               arma::u32_vec *path_type = nullptr,   // Optional output: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
                arma::uvec *ray_ind = nullptr,        // Optional output: Index of the ray in 'rays', 0-based, [n_path]
                bool oxygen = false);                 // TR 7.6.1 oxygen absorption from each path's own length
 ```
@@ -413,7 +413,7 @@ std::vector<path> qrt_paths_from_scatterers(const arma::vec &center_frequency, /
                                             const arma::mat &lbs_pos,          // Last-bounce scatterer positions in [m], [3, n_path]
                                             const arma::mat &path_gain,        // Path gains (linear), [n_path, n_freq]
                                             const arma::cube &M,               // Polarization transfer matrices, [8, n_path, n_freq]
-                                            const arma::uvec &path_type,       // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
+                                            const arma::u32_vec &path_type,    // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
                                             arma::uword i_cir = 0);            // CIR index, stored in path::iC, < 2^32
 ```
 
@@ -421,7 +421,7 @@ Behaviour:
 
 - Returns n_path objects, EM layout, `n_freq` frequencies, `iC = i_cir`, in input order; the caller appends them to the `path_data` of `qrt_file_append` (one call per origin; `qrt_file_init` takes GHz, documented). `tx_pos` and `rx_pos` must be the `orig_pos` of `qrt_file_append` and the CIR position given to `qrt_file_init` (docs; not checked): `qrt_file_read` recomputes the lengths from the stored coordinates (`coord2path`), so other positions break the folded FSPL and `length`.
 - Interactions (S4): LOS none (`nREF` = `nSCT` = 0); GR one at `lbs_pos` with code 129 (0x81, front reflection, outside; existing code), `nREF` = 1; NLOS two, at `fbs_pos` then `lbs_pos`, both with code 193 (0xC1, the reserved scattering form), `nSCT` = 2. The `length` member is set to the polyline Tx → interactions (the origin form of `calc_length`, float). `nREF`, `nSCT` and `length` are set on the returned objects only: QRT files store the coordinates, the Jones matrices and the interaction codes, not the counters or `length` (`qrt_file_read_raw` returns them at their defaults, `src/qd_channel_qrt.cpp:1750–1751`); the docs say so.
-- Jones per path p and frequency f (algorithm 4.13): J = M(:, p, f) · sqrt(path_gain(p, f)) · L_p · 10^((32.45 + 20·lg(f/10⁹))/20), L_p = polyline length in double; so that `qrt_file_read` (either `normalize_M`, `downlink = true`) returns sqrt(path_gain)·M per complex entry (`normalize_M = 1` scales the stored matrix by a real positive factor and reports it in the path gain, `src/qd_channel_qrt.cpp:1576–1600`), hence path_gain·|M|² within float32 (F2: 4.7e-8), the polyline as `path_length` and `no_int` = `path_type` (as `arma::u32_vec`).
+- Jones per path p and frequency f (algorithm 4.13): J = M(:, p, f) · sqrt(path_gain(p, f)) · L_p · 10^((32.45 + 20·lg(f/10⁹))/20), L_p = polyline length in double; so that `qrt_file_read` (either `normalize_M`, `downlink = true`) returns sqrt(path_gain)·M per complex entry (`normalize_M = 1` scales the stored matrix by a real positive factor and reports it in the path gain, `src/qd_channel_qrt.cpp:1576–1600`), hence path_gain·|M|² within float32 (F2: 4.7e-8), the polyline as `path_length` and `no_int` = `path_type` (both `arma::u32_vec`).
 - Double inputs; the objects are float32 by construction. Local coordinates (F2: path length error 2.7 µm / 0.31 mm / 1.0 mm for coordinates up to 150 m / 5 km / 20 km, phase error 0.003 / 0.39 / 1.29 rad at 60 GHz).
 - Writer memory, documented with its scaling in the snapshot count: about 80–105 B per path object (3–4 GB for 1000 UTs × 100 snapshots × 381 rays at one frequency); at NG's track sampling (58 snapshots per metre at 3.5 GHz, 467 at 28 GHz) 381 rays give 2.2·10⁴ objects per metre and UT, 18–23 GB for 100 UTs × 100 m at 3.5 GHz (estimate, plan 5.9).
 
@@ -433,26 +433,26 @@ Validation (in this order): `Input 'center_frequency' must have 1 to 127 element
 // Ray data of one link from spherical path data (e.g. read with qrt_file_read)
 // - Delays from the path lengths, angles from the scatterer positions, power = path gain
 // - Fills a pre-initialised object in place
-void gbsm_rays_from_paths(const arma::vec &center_frequency,      // Frequencies in [Hz], [n_freq]
-                          const arma::vec &tx_pos,                // Tx position in [m], [3]
-                          const arma::vec &rx_pos,                // Rx position in [m], [3]
-                          const arma::mat &fbs_pos,               // First-bounce scatterer positions in [m], [3, n_path]
-                          const arma::mat &lbs_pos,               // Last-bounce scatterer positions in [m], [3, n_path]
-                          const arma::mat &path_gain,             // Path gains (linear), [n_path, n_freq]
-                          const arma::vec &path_length,           // Path lengths in [m], [n_path]
-                          const arma::cube &M,                    // Polarization transfer matrices, [8, n_path, n_freq]
-                          gbsm_rays &rays,                        // Output: Ray data, n_ray = n_path
-                          const std::string &method = "quadriga", // Value of rays.method: GR power law and default mobility
-                          const arma::uvec *path_type = nullptr,  // Optional: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]; nullptr = LOS where FBS = LBS on the direct line, else NLOS
-                          const arma::uvec *tap = nullptr,        // Optional: Tap index, [n_path]; nullptr = one tap per path
-                          const arma::vec *gr_eps_re = nullptr,   // Optional: Ground permittivity, real part, [n_freq]; needed where a GR path is recomputed
-                          const arma::vec *gr_eps_im = nullptr);  // Optional: Ground permittivity, imaginary part, [n_freq]; needed where a GR path is recomputed
+void gbsm_rays_from_paths(const arma::vec &center_frequency,        // Frequencies in [Hz], [n_freq]
+                          const arma::vec &tx_pos,                  // Tx position in [m], [3]
+                          const arma::vec &rx_pos,                  // Rx position in [m], [3]
+                          const arma::mat &fbs_pos,                 // First-bounce scatterer positions in [m], [3, n_path]
+                          const arma::mat &lbs_pos,                 // Last-bounce scatterer positions in [m], [3, n_path]
+                          const arma::mat &path_gain,               // Path gains (linear), [n_path, n_freq]
+                          const arma::vec &path_length,             // Path lengths in [m], [n_path]
+                          const arma::cube &M,                      // Polarization transfer matrices, [8, n_path, n_freq]
+                          gbsm_rays &rays,                          // Output: Ray data, n_ray = n_path
+                          const std::string &method = "quadriga",   // Value of rays.method: GR power law and default mobility
+                          const arma::u32_vec *path_type = nullptr, // Optional: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]; nullptr = LOS where FBS = LBS on the direct line, else NLOS
+                          const arma::u32_vec *tap = nullptr,       // Optional: Tap index, [n_path]; nullptr = one tap per path
+                          const arma::vec *gr_eps_re = nullptr,     // Optional: Ground permittivity, real part, [n_freq]; needed where a GR path is recomputed
+                          const arma::vec *gr_eps_im = nullptr);    // Optional: Ground permittivity, imaginary part, [n_freq]; needed where a GR path is recomputed
 ```
 
 Behaviour:
 
 - Inputs carry the output names and the order of `qrt_file_read`. `method`, `center_frequency`, `tx_pos`, `rx_pos` copied; `delay` = (`path_length` − |rx_pos − tx_pos|)/c; departure angles from `tx_pos` towards the first point among (`fbs_pos`, `lbs_pos`, `rx_pos`) that differs from `tx_pos`, arrival angles from `rx_pos` towards the first point among (`lbs_pos`, `fbs_pos`, `tx_pos`) that differs from `rx_pos` (LOS with FBS = LBS = midpoint gives the direct line); if no point differs (`tx_pos` = `rx_pos`), the angles are 0; a GR path (`path_type` 1) takes its angles from the image points: departure towards (rx_x, rx_y, −rx_z), arrival towards (tx_x, tx_y, −tx_z) (equal to "towards the GR point" whenever that point differs from the end, and defined for an end on the ground, review round 2); `power` = `path_gain`; `M`, `fbs_pos`, `lbs_pos` copied; `fallback` empty (cleared only if not empty); `gr_eps_re/_im` copied or empty. All attributes are written in place when their sizes match.
-- `path_type = nullptr`: a path is LOS when dist(FBS, LBS) ≤ 0.1 mm and `path_length` − |rx_pos − tx_pos| ≤ 0.1 mm (the LOS tolerance of `get_channels_*`), else NLOS; more than one such path throws. Safe for QRT data at any coordinate size (review round 1): `qrt_file_read` derives positions, FBS = LBS = midpoint and `path_length` of a path without interactions from the same stored float coordinates, so its excess is 0 to double rounding; the float32 error lies between the written double and the stored value, not between the values read back. QRT stores no GR type: a GR path read from a file needs `path_type` (for files of `qrt_paths_from_scatterers` the `no_int` of `qrt_file_read`, converted to `arma::uvec`).
+- `path_type = nullptr`: a path is LOS when dist(FBS, LBS) ≤ 0.1 mm and `path_length` − |rx_pos − tx_pos| ≤ 0.1 mm (the LOS tolerance of `get_channels_*`), else NLOS; more than one such path throws. Safe for QRT data at any coordinate size (review round 1): `qrt_file_read` derives positions, FBS = LBS = midpoint and `path_length` of a path without interactions from the same stored float coordinates, so its excess is 0 to double rounding; the float32 error lies between the written double and the stored value, not between the values read back. QRT stores no GR type: a GR path read from a file needs `path_type` (for files of `qrt_paths_from_scatterers` the `no_int` of `qrt_file_read`, passed without conversion; ray-traced files count the interactions, and values > 2 throw).
 - `tap = nullptr`: the slot convention with one slot per path: the LOS path tap 0, the GR path tap 3, the other paths 6, 9, 12, … in path order; so `taps` lists LOS and GR first and the object joins `ssf_rays` data (P20).
 - A GR path whose interaction point (`lbs_pos`) has |z| > 1 mm throws (P12). The tolerance catches local coordinates shifted in z: float32 rounds each coordinate alone, so the z of a GR point written at z = 0 stays at most 3.55·10⁻¹⁵ m for x/y offsets up to 100 km (review round 1, 20000 links).
 - Used with `link_gain_dB = 0` in `ssf_paths` / `gbsm_single_link_channel`.
@@ -496,8 +496,8 @@ Behaviour:
 
 | Name | Type, size | Content | Present |
 |---|---|---|---|
-| `tap` | `arma::uvec` `[n_tap]` or `[n_path]` | tap index per output tap (`taps`) or per path (`rays`) | always |
-| `n_ray_tap` | `arma::uvec` `[n_tap]` | number of kept rays per tap | `taps` |
+| `tap` | `arma::u32_vec` `[n_tap]` or `[n_path]` | tap index per output tap (`taps`) or per path (`rays`) | always |
+| `n_ray_tap` | `arma::u32_vec` `[n_tap]` | number of kept rays per tap | `taps` |
 | `fbs_pos`, `lbs_pos` | `arma::fmat` `[3, n_kept]` | scatterers of the n_kept kept rays in ray order (LOS and GR at the ray-data positions); float32, the precision of path data in HDF5 files | `drift` and `taps` |
 | `gr_pos` | `arma::fmat` `[3, n_snap]` | GR point per snapshot | `drift`, `taps`, GR ray kept |
 | `link_gain_dB` | `arma::vec` `[n_snap]` | link gain per snapshot | always |
@@ -983,14 +983,14 @@ Python indices stay 0-based (`set_id` −1 = shared). The permittivity is one co
 | `gbsm_draw` `rnd` | yes: `[rows(rx_pos), cols(phase)]` | zero-copy |
 | `ssf_rays` `rays` | yes: n_link entries, n_ray and n_gen from `qd_gbsm_ray_layout`, n_freq_out = 1 (TR) or n_freq | zero-copy init of the struct array / list of dicts (8.5); `gr_eps_*` pre-allocated only with G = 1; `fbs_pos`, `lbs_pos`, `fallback` left empty and not aliased; Python `gr_eps` copied (complex) |
 | `ssf_scatterers` `rays_out`, `b_med`, `b_eff` | yes | MEX, one copy (S13): read `rays_in` borrowed (no copy, read-only); create the 1 × 1 output struct with all field names of 8.5 in their order; allocate `fbs_pos` `[3, n_ray]`, `lbs_pos` `[3, n_ray]`, `fallback` `[n_ray]` in it with `qd_mex_init_output` and point the three C++ attributes at them before the call, so the solver writes into the output, never into the caller's arrays (also when the input is already solved); fill every other field with a plain copy of the input field's data (`mxCreateNumericArray`, `mxCreateLogicalArray` for logical, + `memcpy`; `mxCreateString` for `method`; the class of the input is kept, except that an empty cell or struct becomes an empty double of its size, code review round 2), or an empty array where the input lacks the optional field (8.5), so the output always has all fields (`mxDuplicateArray` of the fields leaks about 1.2 kB per call in Octave 11.1 on all paths, code review round 1; the plain copy is flat over 30 000 calls) (no `mxDuplicateArray` of the whole input plus `mxSetField`: for a field missing in the input `mxSetField` adds nothing and MATLAB R2026a aborts at `clear`, Octave drops the field; measured in review round 2); the copy is about 49 KB per link at 381 rays and one frequency (spec v3 scratch: 48 824 B for `delay`, `power`, angles, `M`, `path_type`, `tap`, positions, frequency), documented. Python: read the dict as a view, point `fbs_pos`, `lbs_pos`, `fallback` at new arrays before the call, return a new dict with all keys of 8.5 that shares the unchanged arrays with the input (no copy; keys missing in the input added empty); the sharing is documented (an in-place edit of `rays_out['delay']` changes `rays['delay']`). `b_med`, `b_eff` copied (`[2, n_freq]` from the members per frequency) |
-| `ssf_paths` (all) | no (n_path) | copied; MEX integer outputs uint64, Python int64 (`md/SPEC_PYTHON_API.md`, copied integer outputs) |
+| `ssf_paths` (all) | no (n_path) | copied; MEX integer outputs in the C++ type (`path_type` uint32, `ray_ind` uint64), Python int64 (`md/SPEC_PYTHON_API.md`, copied integer outputs) |
 | `gbsm_rays_from_paths` `rays` | yes (n_path from the inputs) | zero-copy (init helper with `has_scatterers = true`: `fbs_pos`, `lbs_pos` `[3, n_path]` aliased); `fallback` empty; Python `gr_eps` copied |
 | `gbsm_single_link_channel` | no (by value) | copied (`chan`, `par`), documented |
 | `ssf_clusters` `delay`, `power`, `aod`, `eod`, `aoa`, `eoa`, `n_active` | yes, after `scenpar_validate` on a copy of `scenpar`: n_slot = `NumClusters` + G, slices n_freq for "38.901_MF" (`power` always n_freq), else 1 | zero-copy (R1; today copied in MEX and Python) |
 | `lsp_generate`, `path_loss`, `los_probability`, `o2i_loss`, `scenpar_validate` `lsp_xcorr` | yes | zero-copy already (MEX and Python; Python `gr_eps` of `lsp_generate` stays copied, complex); R1 keeps them |
 | `conf_file_read`, `scenpar_validate` `scenpar_out`, the struct/dict outputs | struct / dict | copied (no change) |
 
-Integer attributes of `gbsm_rays` (`path_type`, `tap`, `fallback`) are uint64 in MATLAB and Python (C++ `arma::uword`, zero-copy); inputs accept every real class: all integer classes, single, double and logical (S14: the generic MEX helpers `qd_mex_copy_convert`, `qd_mex_typecast_CubeVec`, `qd_mex_read_scalar` and the readers `qd_mex_matlab2vector_Col`, `_Mat`, `_Cube`, `_Bool` read all of them through one class dispatch, `qd_mex_visit_data`, which checks the class before it reads the data and names the input in its error (code review round 2), also for `i_freq`; cast, values must be non-negative integers).
+Codes, labels and counts are 32-bit (C++ `arma::u32_vec`, S16), indices into other arrays stay `arma::uvec` (`ssf_paths` `ray_ind`, `o2i_loss` `model_index`). Integer attributes of `gbsm_rays` (`path_type`, `tap`, `fallback`), `ssf_clusters` `n_active` and the `par` entries `tap`, `n_ray_tap` are uint32 in MATLAB and Python (zero-copy or class kept); `floor_id` of `gbsm_draw` and `n_cluster` of `ssf_clusters` must be integers below 2^32 in the wrappers (`Entries in '<name>' must be non-negative integers below 2^32.`, was 2^53); inputs accept every real class: all integer classes, single, double and logical (S14: the generic MEX helpers `qd_mex_copy_convert`, `qd_mex_typecast_CubeVec`, `qd_mex_read_scalar` and the readers `qd_mex_matlab2vector_Col`, `_Mat`, `_Cube`, `_Bool` read all of them through one class dispatch, `qd_mex_visit_data`, which checks the class before it reads the data and names the input in its error (code review round 2), also for `i_freq`; cast, values must be non-negative integers).
 
 ### 8.4 Scenario struct / dict rule (P24, R1)
 
@@ -1007,7 +1007,7 @@ Integer attributes of `gbsm_rays` (`path_type`, `tap`, `fallback`) are uint64 in
 
 `has_scatterers` is false for `ssf_rays` and true for `gbsm_rays_from_paths`. No copy helper (`gbsm_rays` → struct / dict) exists: `ssf_rays` and `gbsm_rays_from_paths` use the init helpers, `ssf_scatterers` the one-copy recipe of 8.3 (S13), so a copy helper would have no caller. The field list below is one constant shared by the MEX init helper and the `ssf_scatterers` wrapper.
 
-- Fields / keys, always all present (empty where empty; MATLAB struct arrays need identical fields, measured in plan review round 2): `method` (char / str), `tx_pos`, `rx_pos`, `center_frequency` (the attribute name, as the channel struct and dict; the function arguments stay `center_freq`, S10), `delay`, `power`, `aod`, `eod`, `aoa`, `eoa`, `M` (real, interleaved, `[8, n_ray, n_freq]` / `(8, n_ray, n_freq)`), `path_type`, `tap`, `gr_eps_re`, `gr_eps_im` (MATLAB) / `gr_eps` (Python, complex), `fbs_pos`, `lbs_pos`, `fallback`. Vectors are columns in MATLAB, 1-D arrays in Python.
+- Fields / keys, always all present (empty where empty; MATLAB struct arrays need identical fields, measured in plan review round 2): `method` (char / str), `tx_pos`, `rx_pos`, `center_frequency` (the attribute name, as the channel struct and dict; the function arguments stay `center_freq`, S10), `delay`, `power`, `aod`, `eod`, `aoa`, `eoa`, `M` (real, interleaved, `[8, n_ray, n_freq]` / `(8, n_ray, n_freq)`), `path_type`, `tap` (uint32), `gr_eps_re`, `gr_eps_im` (MATLAB) / `gr_eps` (Python, complex), `fbs_pos`, `lbs_pos`, `fallback` (uint32, also when empty). Vectors are columns in MATLAB, 1-D arrays in Python.
 - Input: missing `gr_eps*`, `fbs_pos`, `lbs_pos`, `fallback` (and any attribute appended later) mean empty; any other missing field throws `Field '<name>' is missing in '<var_name>'.` (MEX) / `Entry '<name>' of '<var_name>' is missing.` (Python, the wording of the existing dict helpers); unknown fields throw `Unknown field '<name>' in '<var_name>'.` (MEX) / `Entry '<name>' of '<var_name>' is unknown.` (Python); `<var_name>` is the argument's name (`rays`, MEX `ssf_scatterers`: `rays_in`); then `is_valid()` messages.
 - No index attribute is shifted (codes only); `ray_ind` and `i_freq` are shifted in the MEX function wrappers (8.1).
 - Implementations never reset, resize or re-create an aliased attribute (Armadillo throws for aliased memory of another size, measured in plan review round 2); C++ functions clear an attribute only when it is not empty (2.1).

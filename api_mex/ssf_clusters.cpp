@@ -91,7 +91,7 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 - **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); sizes as `delay`
 - **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as
   `delay`
-- **`n_active`** — Number of NLOS clusters with power > 0; uint64; `[n_link, 1]`
+- **`n_active`** — Number of NLOS clusters with power > 0; uint32; `[n_link, 1]`
 
 ## See also:
 - [[gbsm_draw]] (the random values `rnd` and `rnd_freq`)
@@ -124,7 +124,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec n_cluster_in = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13], false, "n_cluster");
 
     // Cluster numbers are counts (no index shift)
-    const arma::uvec n_cluster = qd_mex_uint_entries(n_cluster_in, "n_cluster");
+    const arma::u32_vec n_cluster = qd_mex_uint_entries(n_cluster_in, "n_cluster");
 
     // Wrap optional pointers; empty arrays select the default
     const arma::cube *p_rnd_freq = rnd_freq.empty() ? nullptr : &rnd_freq;
@@ -134,12 +134,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat *p_gr_eps_re = gr_eps_re.empty() ? nullptr : &gr_eps_re;
     const arma::mat *p_gr_eps_im = gr_eps_im.empty() ? nullptr : &gr_eps_im;
     const std::vector<bool> *p_o2i = o2i.empty() ? nullptr : &o2i;
-    const arma::uvec *p_n_cluster = n_cluster.empty() ? nullptr : &n_cluster;
+    const arma::u32_vec *p_n_cluster = n_cluster.empty() ? nullptr : &n_cluster;
 
     // Output allocation in MATLAB memory, sizes from a completed copy of 'scenpar'; an invalid 'scenpar' allocates
     // nothing, the library call then throws its message
     arma::cube delay, power, aod, eod, aoa, eoa;
-    arma::uvec n_active;
+    arma::u32_vec n_active;
     auto sp = scenpar;
     bool known = true;
     try
@@ -163,7 +163,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Call library function
-    arma::uvec *p_n_active = (nlhs > 6) ? &n_active : nullptr;
+    arma::u32_vec *p_n_active = (nlhs > 6) ? &n_active : nullptr;
     CALL_QD(quadriga_lib::ssf_clusters(scenpar, tx_pos, rx_pos, lsp, rnd, delay, power, aod, eod, aoa, eoa, method,
                                        p_rnd_freq, p_lsp_anchor, p_eod_offset_deg, p_abs_toa, p_gr_eps_re,
                                        p_gr_eps_im, p_o2i, p_n_cluster, p_n_active));

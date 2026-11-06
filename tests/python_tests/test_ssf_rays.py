@@ -82,7 +82,7 @@ class test_case(unittest.TestCase):
             self.assertEqual(r["M"].shape, (8, n_ray, 2))
             self.assertEqual(r["M"].dtype, np.float64)
             for k in ["path_type", "tap", "fallback"]:
-                self.assertEqual(r[k].dtype, np.uint64)
+                self.assertEqual(r[k].dtype, np.uint32)
             npt.assert_array_equal(r["path_type"][:3], [0, 1, 2])  # codes
             npt.assert_array_equal(r["tap"][:3], [0, 3, 6])
             self.assertEqual(r["gr_eps"].dtype, np.complex128)

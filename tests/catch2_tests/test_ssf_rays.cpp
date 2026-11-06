@@ -530,22 +530,22 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
     const auto ref = call(in);
     const arma::uword n_ray = ref[0].n_ray();
     std::vector<double> buf(3 * (3 + 3 + 1 + 6 * n_ray + 8 * n_ray + 2), NAN);
-    std::vector<arma::uword> ubuf(3 * 2 * n_ray, 99);
+    std::vector<unsigned> ubuf(3 * 2 * n_ray, 99);
     std::vector<quadriga_lib::gbsm_rays> rays(3);
     std::vector<const void *> ptr;
     double *p = buf.data();
-    arma::uword *u = ubuf.data();
+    unsigned *u = ubuf.data();
     auto vec = [&](arma::vec &x, arma::uword n)
     { x.~Col(), new (&x) arma::vec(p, n, false, true), ptr.push_back(p), p += n; };
-    auto uvec = [&](arma::uvec &x, arma::uword n)
-    { x.~Col(), new (&x) arma::uvec(u, n, false, true), ptr.push_back(u), u += n; };
+    auto u32 = [&](arma::u32_vec &x, arma::uword n)
+    { x.~Col(), new (&x) arma::u32_vec(u, n, false, true), ptr.push_back(u), u += n; };
     for (auto &r : rays)
     {
         vec(r.tx_pos, 3), vec(r.rx_pos, 3), vec(r.center_frequency, 1), vec(r.delay, n_ray);
         r.power.~Mat(), new (&r.power) arma::mat(p, n_ray, 1, false, true), ptr.push_back(p), p += n_ray;
         vec(r.aod, n_ray), vec(r.eod, n_ray), vec(r.aoa, n_ray), vec(r.eoa, n_ray);
         r.M.~Cube(), new (&r.M) arma::cube(p, 8, n_ray, 1, false, true), ptr.push_back(p), p += 8 * n_ray;
-        vec(r.gr_eps_re, 1), vec(r.gr_eps_im, 1), uvec(r.path_type, n_ray), uvec(r.tap, n_ray);
+        vec(r.gr_eps_re, 1), vec(r.gr_eps_im, 1), u32(r.path_type, n_ray), u32(r.tap, n_ray);
     }
     CHECK_NOTHROW(call(in, rays));
     size_t j = 0;
@@ -606,7 +606,7 @@ TEST_CASE("ssf_rays - N = 0, M = 1 and n_link = 0")
         CHECK(r0[l].n_ray() == 2);
         CHECK(r0[l].is_valid() == "");
         CHECK(r0[l].power(0, 0) == in0.cl.power(l, 0, 0));
-        CHECK(arma::all(r0[l].tap == arma::uvec{0, 3}));
+        CHECK(arma::all(r0[l].tap == arma::u32_vec{0, 3}));
     }
 
     // M = 1: one ray per cluster at the cluster angles, delay and power

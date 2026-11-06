@@ -3,8 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Tests of gbsm_rays_from_paths: delays, angles and powers from spherical path data, LOS detection and default
-// taps, GR paths, in-place writes, the round trip through a QRT file, validation. The writing side
-// (qrt_paths_from_scatterers) is tested in test_qrt_paths_from_scatterers.cpp.
+// taps, GR paths, in-place writes, the round trip through a QRT file, `no_int` of a QRT file as path type,
+// validation. The writing side (qrt_paths_from_scatterers) is tested in test_qrt_paths_from_scatterers.cpp.
 // Oracles: the hand-made ray data of make_rays (qd_test_rays.hpp) with scatterers, whose delays and angles are built
 // from the scatterer positions (delay = (polyline - d3D) / c, angles towards the scatterers, GR angles towards the
 // image points); closed-form angles for the special geometries. Tolerances: 1e-12 for double geometry; after the
@@ -39,7 +39,7 @@ namespace
         arma::mat fbs, lbs, pg;
         arma::cube M;
         std::string method = "quadriga";
-        arma::uvec type, tap;
+        arma::u32_vec type, tap;
         bool has_type = true, has_tap = true, has_eps = true;
     };
 
@@ -149,8 +149,8 @@ TEST_CASE("gbsm_rays_from_paths - LOS detection without path_type and the option
         in_t in = permute(in_of(r), {1, 2, 0, 3, 4, 5});
         in.has_type = false, in.has_tap = false;
         run(in, o);
-        CHECK(arma::all(o.path_type == arma::uvec{2, 2, 0, 2, 2, 2}));
-        CHECK(arma::all(o.tap == arma::uvec{6, 9, 0, 12, 15, 18}));
+        CHECK(arma::all(o.path_type == arma::u32_vec{2, 2, 0, 2, 2, 2}));
+        CHECK(arma::all(o.tap == arma::u32_vec{6, 9, 0, 12, 15, 18}));
         CHECK(dir_diff(o.aod(2), o.eod(2), r.aod(0), r.eod(0)) < 1e-12);
         CHECK(dir_diff(o.aoa(2), o.eoa(2), r.aoa(0), r.eoa(0)) < 1e-12);
     }
@@ -160,8 +160,8 @@ TEST_CASE("gbsm_rays_from_paths - LOS detection without path_type and the option
         in_t in = permute(in_of(r), {2, 1, 3, 0, 4, 5});
         in.has_tap = false;
         run(in, o);
-        CHECK(arma::all(o.path_type == arma::uvec{2, 1, 2, 0, 2, 2}));
-        CHECK(arma::all(o.tap == arma::uvec{6, 3, 9, 0, 12, 15}));
+        CHECK(arma::all(o.path_type == arma::u32_vec{2, 1, 2, 0, 2, 2}));
+        CHECK(arma::all(o.tap == arma::u32_vec{6, 3, 9, 0, 12, 15}));
     }
     SECTION("LOS tolerance 0.1 mm in the scatterer distance and the excess length")
     {
@@ -170,17 +170,17 @@ TEST_CASE("gbsm_rays_from_paths - LOS detection without path_type and the option
         in.has_type = false;
         in.pl(0) += 0.9e-4;
         run(in, o);
-        CHECK(arma::all(o.path_type == arma::uvec{0, 2}));
+        CHECK(arma::all(o.path_type == arma::u32_vec{0, 2}));
         in.pl(0) += 0.2e-4; // excess 0.11 mm
         run(in, o);
-        CHECK(arma::all(o.path_type == arma::uvec{2, 2}));
+        CHECK(arma::all(o.path_type == arma::u32_vec{2, 2}));
         in = in_of(r), in.has_type = false;
         in.lbs(0, 0) += 1.1e-4; // FBS and LBS 0.11 mm apart
         run(in, o);
-        CHECK(arma::all(o.path_type == arma::uvec{2, 2}));
+        CHECK(arma::all(o.path_type == arma::u32_vec{2, 2}));
         in.lbs(0, 0) -= 0.2e-4; // 0.09 mm
         run(in, o);
-        CHECK(arma::all(o.path_type == arma::uvec{0, 2}));
+        CHECK(arma::all(o.path_type == arma::u32_vec{0, 2}));
     }
     SECTION("GR angles from the image points, also with an end at z = 0")
     {
@@ -241,7 +241,7 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
                                         &in.pg, &in.pl, &in.M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &no_int);
     std::remove(fn.c_str());
     REQUIRE(no_int.n_elem == n_path);
-    in.type = arma::conv_to<arma::uvec>::from(no_int), in.tap = r.tap, in.er = r.gr_eps_re, in.ei = r.gr_eps_im;
+    in.type = no_int, in.tap = r.tap, in.er = r.gr_eps_re, in.ei = r.gr_eps_im;
 
     quadriga_lib::gbsm_rays o;
     run(in, o);
@@ -295,6 +295,39 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
     CHECK(arma::accu(o.path_type == 0) == 1);
 }
 
+TEST_CASE("gbsm_rays_from_paths - no_int of qrt_file_read passes as path_type")
+{
+    // Files of qrt_paths_from_scatterers: the interaction count (LOS 0, GR 1, NLOS 2) is the path type, and the
+    // u32 vector of qrt_file_read goes into gbsm_rays_from_paths without conversion
+    const quadriga_lib::gbsm_rays r = make_rays(41, true, true, 5, 1, "quadriga", true);
+    const std::string fn = "test_gbsm_rays_from_paths_no_int.qrt";
+    const arma::mat cir_pos = r.rx_pos.t(), cir_ori(1, 3, arma::fill::zeros);
+    quadriga_lib::qrt_file_init<double>(fn, r.center_frequency * 1.0e-9, cir_pos, cir_ori);
+    quadriga_lib::qrt_file_append<double>(
+        fn, quadriga_lib::qrt_paths_from_scatterers(r.center_frequency, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
+                                                    r.power, r.M, r.path_type),
+        r.tx_pos);
+    arma::vec cf, T, R, pl;
+    arma::mat fbs, lbs, pg;
+    arma::cube M;
+    arma::u32_vec no_int;
+    quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &cf, &T, nullptr, &R, nullptr, &fbs, &lbs, &pg, &pl, &M,
+                                        nullptr, nullptr, nullptr, nullptr, nullptr, 1, &no_int);
+    std::remove(fn.c_str());
+
+    quadriga_lib::gbsm_rays o;
+    quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &no_int);
+    CHECK(o.is_valid().empty());
+    CHECK(arma::all(o.path_type == r.path_type));
+    CHECK(arma::accu(o.path_type == 1) == 1);
+
+    // Ray-traced files count the interactions: a path with 3 throws
+    no_int(no_int.n_elem - 1) = 3;
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &no_int),
+                         std::invalid_argument,
+                         Message("Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS)."));
+}
+
 TEST_CASE("gbsm_rays_from_paths - a GR point off the ground throws; permittivity is optional")
 {
     const quadriga_lib::gbsm_rays r = make_rays(41, true, true, 2, 2, "38.901", true);
@@ -336,7 +369,7 @@ TEST_CASE("gbsm_rays_from_paths - a pre-initialised object is written in place")
     const double *p_delay = o.delay.memptr(), *p_power = o.power.memptr(), *p_aod = o.aod.memptr();
     const double *p_eod = o.eod.memptr(), *p_aoa = o.aoa.memptr(), *p_eoa = o.eoa.memptr(), *p_M = o.M.memptr();
     const double *p_fbs = o.fbs_pos.memptr(), *p_lbs = o.lbs_pos.memptr();
-    const arma::uword *p_type = o.path_type.memptr(), *p_tap = o.tap.memptr();
+    const unsigned *p_type = o.path_type.memptr(), *p_tap = o.tap.memptr();
 
     // New data: doubled gains, method "38.901", NLOS path 2 with FBS = Tx, path 3 with LBS = Rx, path 4 with both
     in_t in = in_of(r);

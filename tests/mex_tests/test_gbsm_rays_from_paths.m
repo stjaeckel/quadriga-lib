@@ -32,9 +32,9 @@ assertEqual( rays.power, pg );
 assertEqual( rays.M, M );
 assertEqual( rays.fbs_pos, fb );
 assertEqual( rays.lbs_pos, lb );
-assertTrue( isa(rays.path_type, 'uint64') && isa(rays.tap, 'uint64') && isa(rays.fallback, 'uint64') );
-assertEqual( rays.path_type, uint64( pt ) );                                  % codes, not shifted
-assertEqual( rays.tap, uint64( [0; 3; 6] ) );
+assertTrue( isa(rays.path_type, 'uint32') && isa(rays.tap, 'uint32') && isa(rays.fallback, 'uint32') );
+assertEqual( rays.path_type, uint32( pt ) );                                  % codes, not shifted
+assertEqual( rays.tap, uint32( [0; 3; 6] ) );
 assertTrue( isempty(rays.fallback) && isempty(rays.gr_eps_re) && isempty(rays.gr_eps_im) );
 v = fb(:, 3) - tx;
 assertElementsAlmostEqual( [ rays.aod(3), rays.eod(3) ], [ atan2( v(2), v(1) ), atan2( v(3), norm( v(1:2) ) ) ], ...
@@ -49,21 +49,21 @@ assertElementsAlmostEqual( g2, pg, 'absolute', 1e-20 );
 assertElementsAlmostEqual( l2, pl, 'absolute', 1e-9 );
 assertElementsAlmostEqual( M2, M, 'absolute', 1e-14 );
 assertElementsAlmostEqual( f2, fb, 'absolute', 1e-12 );
-assertEqual( p2, uint64( pt ) );
+assertEqual( p2, uint32( pt ) );
 
 %% Optional inputs: method, path_type, tap, gr_eps_re, gr_eps_im
 r2 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb(:, [1 3]), lb(:, [1 3]), pg([1 3], :), pl([1 3]), ...
     M(:, [1 3], :) );
 assertEqual( r2.method, 'quadriga' );
-assertEqual( r2.path_type, uint64( [0; 2] ) );                                % LOS by geometry
-assertEqual( r2.tap, uint64( [0; 6] ) );
+assertEqual( r2.path_type, uint32( [0; 2] ) );                                % LOS by geometry
+assertEqual( r2.tap, uint32( [0; 6] ) );
 r3 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb(:, [1 3]), lb(:, [1 3]), pg([1 3], :), pl([1 3]), ...
     M(:, [1 3], :), [], [], [], [], [] );
 assertEqual( r3, r2 );
 r4 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb, lb, pg, pl, M, '38.901', int32( pt ), [ 5; 3; 0 ], ...
     [ 5; 7 ], [ 0.1, 0.2 ] );
 assertEqual( r4.method, '38.901' );
-assertEqual( r4.tap, uint64( [5; 3; 0] ) );                                   % codes, not shifted
+assertEqual( r4.tap, uint32( [5; 3; 0] ) );                                   % codes, not shifted
 assertEqual( r4.gr_eps_re, [ 5; 7 ] );
 assertEqual( r4.gr_eps_im, [ 0.1; 0.2 ] );
 r6 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb, lb, pg, pl, M, '38.901', uint8( pt ), int16( [ 5; 3; 0 ] ), ...

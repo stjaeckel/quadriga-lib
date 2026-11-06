@@ -39,8 +39,8 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 
 | Name | Size | Content |
 | --- | --- | --- |
-| `tap` | `(n_tap,)` or `(n_path,)` | Tap index per output tap or per path; uint64 |
-| `n_ray_tap` | `(n_tap,)` | Number of kept rays per tap; uint64; `"taps"` only |
+| `tap` | `(n_tap,)` or `(n_path,)` | Tap index per output tap or per path; uint32 |
+| `n_ray_tap` | `(n_tap,)` | Number of kept rays per tap; uint32; `"taps"` only |
 | `fbs_pos`, `lbs_pos` | `(3, n_kept)` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
 | `gr_pos` | `(3, n_snap)` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only; float32 |
 | `link_gain_dB` | `(n_snap,)` | Link gain per snapshot |

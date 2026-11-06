@@ -44,7 +44,7 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 - **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], > 0; default: 2
 
 ## Outputs:
-- **`rays_out`** — Ray struct with `fbs_pos`, `lbs_pos` `[3, n_ray]` and `fallback` `[n_ray, 1]` (uint64)
+- **`rays_out`** — Ray struct with `fbs_pos`, `lbs_pos` `[3, n_ray]` and `fallback` `[n_ray, 1]` (uint32)
 - **`b_med`**, **`b_eff`** — Validity scales in [m], rows Tx and Rx, column `k` for frequency `k`; `[2, n_freq]`
 
 ## See also:

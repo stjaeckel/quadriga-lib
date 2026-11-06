@@ -2402,8 +2402,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [MATLAB](qua
 
 | Name | Size | Content |
 | --- | --- | --- |
-| `tap` | `(n_tap,)` or `(n_path,)` | Tap index per output tap or per path; uint64 |
-| `n_ray_tap` | `(n_tap,)` | Number of kept rays per tap; uint64; `"taps"` only |
+| `tap` | `(n_tap,)` or `(n_path,)` | Tap index per output tap or per path; uint32 |
+| `n_ray_tap` | `(n_tap,)` | Number of kept rays per tap; uint32; `"taps"` only |
 | `fbs_pos`, `lbs_pos` | `(3, n_kept)` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
 | `gr_pos` | `(3, n_snap)` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only; float32 |
 | `link_gain_dB` | `(n_snap,)` | Link gain per snapshot |
@@ -2834,7 +2834,7 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
 - **`power`** — Coefficient powers (linear); `(n_link, n_slot, n_freq)`
 - **`aod`**, **`aoa`** — Azimuth of departure and arrival in rad, in [-pi, pi); shapes as `delay`
 - **`eod`**, **`eoa`** — Elevation of departure and arrival in rad, in [-pi/2, pi/2]; shapes as `delay`
-- **`n_active`** — Number of NLOS clusters with power > 0; uint64; `(n_link,)`
+- **`n_active`** — Number of NLOS clusters with power > 0; uint32; `(n_link,)`
 
 ### See also:
 - [gbsm.draw](#gbsm.draw) (the random values `rnd` and `rnd_freq`)
@@ -2969,11 +2969,11 @@ one LOS and one GR ray, with tap index 0 and 3; the other rays take any other ta
 | `power` | `(n_ray, n_freq)` | float | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `(n_ray,)` | float | Departure and arrival azimuth and elevation in rad, GCS | yes |
 | `M` | `(8, n_ray, n_freq)` | float | Polarization transfer matrices incl. initial phases, real, rows as in [get_channels_planar](#get_channels_planar) | yes |
-| `path_type` | `(n_ray,)` | uint64 | 0 = LOS, 1 = GR, 2 = NLOS | yes |
-| `tap` | `(n_ray,)` | uint64 | Tap index; rays with equal index form one tap | yes |
+| `path_type` | `(n_ray,)` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS | yes |
+| `tap` | `(n_ray,)` | uint32 | Tap index; rays with equal index form one tap | yes |
 | `gr_eps` | `(n_freq,)` or empty | complex | Ground permittivity, used as `real - j·imag`; needed where a GR ray is recomputed | no |
 | `fbs_pos`, `lbs_pos` | `(3, n_ray)` or empty | float | First- and last-bounce scatterer positions in m | no |
-| `fallback` | `(n_ray,)` or empty | uint64 | 1 = ray lengthened by the solver fallback | no |
+| `fallback` | `(n_ray,)` or empty | uint32 | 1 = ray lengthened by the solver fallback | no |
 
 ### Usage:
 ```python
@@ -3047,7 +3047,7 @@ rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, d_min )
 - **`d_min`** — Minimum distance of the scatterers to both ends in m, > 0; default: 2.0
 
 ### Outputs:
-- **`rays_out`** — Ray dict with `fbs_pos`, `lbs_pos` `(3, n_ray)` and `fallback` `(n_ray,)` (uint64)
+- **`rays_out`** — Ray dict with `fbs_pos`, `lbs_pos` `(3, n_ray)` and `fallback` `(n_ray,)` (uint32)
 - **`b_med`**, **`b_eff`** — Validity scales in m, rows Tx and Rx, column `k` for frequency `k`; `(2, n_freq)`
 
 ### See also:

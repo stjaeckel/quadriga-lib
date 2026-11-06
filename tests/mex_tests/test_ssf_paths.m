@@ -33,12 +33,12 @@ assertEqual( size(aod_p), [n_path, 1] );
 assertEqual( size(eoa_p), [n_path, 1] );
 assertEqual( size(fbs), [3, 0] );
 assertEqual( size(lbs), [3, 0] );
-assertTrue( isa(pt, 'uint64') && isa(ri, 'uint64') && isa(pg, 'double') );
+assertTrue( isa(pt, 'uint32') && isa(ri, 'uint64') && isa(pg, 'double') );
 assertEqual( ri, uint64( kept ) );                                            % 1-based (+1)
 assertEqual( ri(1:2), uint64( [1; 2] ) );
 assertEqual( pt, rays.path_type( ri ) );                                      % codes, not shifted
-assertEqual( pt(1:3), uint64( [0; 1; 2] ) );
-assertEqual( rays.tap( ri(1:2) ), uint64( [0; 3] ) );
+assertEqual( pt(1:3), uint32( [0; 1; 2] ) );
+assertEqual( rays.tap( ri(1:2) ), uint32( [0; 3] ) );
 assertElementsAlmostEqual( pg, rays.power( kept ) * 1e-9, 'absolute', 1e-20 );
 assertElementsAlmostEqual( pl, norm( rx_pos - tx_pos ) + 299792458 * rays.delay( kept ), 'absolute', 1e-9 );
 assertEqual( M, rays.M( :, kept ) );                                          % no displacement
@@ -108,7 +108,7 @@ for mob = { 'phase', 'drift' }
     [ g0, l0, M0, a0, ~, ~, ~, f0, ~, p0, r0 ] = quadriga_lib.ssf_paths( s, [ -90; -90 ], mob{1} );
     assertEqual( { size(g0), size(l0), size(M0), size(a0), size(f0), size(p0), size(r0) }, ...
         { [0, 2], [0, 1], [8, 0, 2], [0, 1], [3, 0], [0, 1], [0, 1] } );
-    assertTrue( isa(p0, 'uint64') && isa(r0, 'uint64') );
+    assertTrue( isa(p0, 'uint32') && isa(r0, 'uint64') );
 end
 
 %% Errors

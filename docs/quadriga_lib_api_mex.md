@@ -2471,8 +2471,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 
 | Name | Size | Content |
 | --- | --- | --- |
-| `tap` | `[n_tap, 1]` or `[n_path, 1]` | Tap index per output tap or per path (a code, not shifted); uint64 |
-| `n_ray_tap` | `[n_tap, 1]` | Number of kept rays per tap; uint64; `'taps'` only |
+| `tap` | `[n_tap, 1]` or `[n_path, 1]` | Tap index per output tap or per path (a code, not shifted); uint32 |
+| `n_ray_tap` | `[n_tap, 1]` | Number of kept rays per tap; uint32; `'taps'` only |
 | `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `'drift'` with `'taps'` only; single, the precision of path data in HDF5 files |
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `'drift'` with `'taps'` and a GR ray only; single |
 | `link_gain_dB` | `[n_snap, 1]` | Link gain per snapshot |
@@ -2929,7 +2929,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
 - **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); sizes as `delay`
 - **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as
   `delay`
-- **`n_active`** — Number of NLOS clusters with power > 0; uint64; `[n_link, 1]`
+- **`n_active`** — Number of NLOS clusters with power > 0; uint32; `[n_link, 1]`
 
 ### See also:
 - [gbsm_draw](#gbsm_draw) (the random values `rnd` and `rnd_freq`)
@@ -2996,7 +2996,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [Python](quadriga_lib_api_p
 - **`M`** — Polarization transfer matrices, rows as in [get_channels_planar](#get_channels_planar); `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in [rad], GCS; `[n_path, 1]`
 - **`fbs_pos`**, **`lbs_pos`** — Scatterer positions in [m]; `[3, n_path]`
-- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted); uint64; `[n_path, 1]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted); uint32; `[n_path, 1]`
 - **`ray_ind`** — Index of the ray in `rays`, 1-based; uint64; `[n_path, 1]`
 
 ### See also:
@@ -3062,11 +3062,11 @@ concatenate the fields.
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |
 | `M` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | yes |
-| `path_type` | `[n_ray, 1]` | uint64 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
-| `tap` | `[n_ray, 1]` | uint64 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
+| `path_type` | `[n_ray, 1]` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
+| `tap` | `[n_ray, 1]` | uint32 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
 | `gr_eps_re`, `gr_eps_im` | `[n_freq, 1]` or empty | double | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | no |
 | `fbs_pos`, `lbs_pos` | `[3, n_ray]` or empty | double | First- and last-bounce scatterer positions in [m] | no |
-| `fallback` | `[n_ray, 1]` or empty | uint64 | 1 = ray lengthened by the solver fallback | no |
+| `fallback` | `[n_ray, 1]` or empty | uint32 | 1 = ray lengthened by the solver fallback | no |
 
 ### Usage:
 ```matlab
@@ -3141,7 +3141,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#.solve_scatterers) · [Python](quadriga_l
 - **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], > 0; default: 2
 
 ### Outputs:
-- **`rays_out`** — Ray struct with `fbs_pos`, `lbs_pos` `[3, n_ray]` and `fallback` `[n_ray, 1]` (uint64)
+- **`rays_out`** — Ray struct with `fbs_pos`, `lbs_pos` `[3, n_ray]` and `fallback` `[n_ray, 1]` (uint32)
 - **`b_med`**, **`b_eff`** — Validity scales in [m], rows Tx and Rx, column `k` for frequency `k`; `[2, n_freq]`
 
 ### See also:

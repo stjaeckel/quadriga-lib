@@ -495,7 +495,7 @@ namespace quadriga_lib
                                                 const arma::mat &lbs_pos,          // Last-bounce scatterer positions in [m], [3, n_path]
                                                 const arma::mat &path_gain,        // Path gains (linear), [n_path, n_freq]
                                                 const arma::cube &M,               // Polarization transfer matrices, [8, n_path, n_freq]
-                                                const arma::uvec &path_type,       // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
+                                                const arma::u32_vec &path_type,    // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
                                                 arma::uword i_cir = 0);            // CIR index, stored in path::iC, < 2^32
 
 }

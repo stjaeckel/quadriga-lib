@@ -66,11 +66,11 @@ concatenate the fields.
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |
 | `M` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | yes |
-| `path_type` | `[n_ray, 1]` | uint64 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
-| `tap` | `[n_ray, 1]` | uint64 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
+| `path_type` | `[n_ray, 1]` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
+| `tap` | `[n_ray, 1]` | uint32 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
 | `gr_eps_re`, `gr_eps_im` | `[n_freq, 1]` or empty | double | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | no |
 | `fbs_pos`, `lbs_pos` | `[3, n_ray]` or empty | double | First- and last-bounce scatterer positions in [m] | no |
-| `fallback` | `[n_ray, 1]` or empty | uint64 | 1 = ray lengthened by the solver fallback | no |
+| `fallback` | `[n_ray, 1]` or empty | uint32 | 1 = ray lengthened by the solver fallback | no |
 
 ## Usage:
 ```

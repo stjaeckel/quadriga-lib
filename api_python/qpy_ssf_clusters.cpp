@@ -82,7 +82,7 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
 - **`power`** — Coefficient powers (linear); `(n_link, n_slot, n_freq)`
 - **`aod`**, **`aoa`** — Azimuth of departure and arrival in rad, in [-pi, pi); shapes as `delay`
 - **`eod`**, **`eoa`** — Elevation of departure and arrival in rad, in [-pi/2, pi/2]; shapes as `delay`
-- **`n_active`** — Number of NLOS clusters with power > 0; uint64; `(n_link,)`
+- **`n_active`** — Number of NLOS clusters with power > 0; uint32; `(n_link,)`
 
 ## See also:
 - [[gbsm.draw]] (the random values `rnd` and `rnd_freq`)
@@ -135,7 +135,7 @@ py::tuple ssf_clusters(py::handle scenpar,
     for (arma::uword i = 0; i < o2i_in.n_elem; ++i)
         o2i_a[i] = o2i_in[i] != 0.0;
 
-    const arma::uvec n_cluster_a = qd_python_uint_entries(n_cluster_in, "n_cluster");
+    const arma::u32_vec n_cluster_a = qd_python_uint_entries(n_cluster_in, "n_cluster");
 
     // Wrap optional pointers; None selects the default
     const arma::cube *p_rnd_freq = rnd_freq.is_none() ? nullptr : &rnd_freq_a;
@@ -145,14 +145,14 @@ py::tuple ssf_clusters(py::handle scenpar,
     const arma::mat *p_gr_eps_re = gr_eps.is_none() ? nullptr : &gr_eps_re;
     const arma::mat *p_gr_eps_im = gr_eps.is_none() ? nullptr : &gr_eps_im;
     const std::vector<bool> *p_o2i = o2i.is_none() ? nullptr : &o2i_a;
-    const arma::uvec *p_n_cluster = n_cluster.is_none() ? nullptr : &n_cluster_a;
+    const arma::u32_vec *p_n_cluster = n_cluster.is_none() ? nullptr : &n_cluster_a;
 
     // Output allocation in numpy memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the call
     // throws before any output is needed
     arma::cube delay, power, aod, eod, aoa, eoa;
-    arma::uvec n_active;
+    arma::u32_vec n_active;
     py::array_t<double> delay_py, power_py, aod_py, eod_py, aoa_py, eoa_py;
-    py::array_t<arma::uword> n_active_py;
+    py::array_t<unsigned> n_active_py;
     auto sp = scenpar_a;
     bool known = true;
     try

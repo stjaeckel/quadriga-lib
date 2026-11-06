@@ -69,7 +69,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(chan["rx_position"], RX.T)
         self.assertIsInstance(par, dict)
         self.assertEqual(list(par.keys()), PAR)
-        self.assertEqual(par["tap"].dtype, np.uint64)
+        self.assertEqual(par["tap"].dtype, np.uint32)
         npt.assert_array_equal(par["tap"], self.taps)  # codes
         npt.assert_array_equal(par["tap"][:2], [0, 3])
         npt.assert_array_equal(par["ratio"], [0.0, 0.0])

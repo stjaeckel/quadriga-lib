@@ -180,7 +180,7 @@ namespace
     void qd_gbsm_eval(const std::vector<qd_gbsm_gen> &gen, const std::vector<arma::mat> &freq,
                       const std::vector<arma::vec> &acf, const std::vector<arma::vec> &dist,
                       const std::vector<arma::uword> &tab, const arma::cube &phase,
-                      const arma::mat &R, const arma::mat &T, const arma::uvec *floor_id,
+                      const arma::mat &R, const arma::mat &T, const arma::u32_vec *floor_id,
                       bool dual_mobility, arma::mat &val)
     {
         const arma::uword n_link = R.n_rows, n_gen = (arma::uword)gen.size(), n_coeff = phase.n_rows;
@@ -540,7 +540,7 @@ void quadriga_lib::gbsm_draw(
     arma::mat &rnd,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::uvec *floor_id = nullptr,
+    const arma::u32_vec *floor_id = nullptr,
     const arma::vec *center_frequency = nullptr,
     bool dual_mobility = false,
     bool horizontal = true);
@@ -581,7 +581,7 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
                              arma::mat &rnd,
                              arma::sword set_id,
                              const std::string &preset,
-                             const arma::uvec *floor_id,
+                             const arma::u32_vec *floor_id,
                              const arma::vec *center_frequency,
                              bool dual_mobility,
                              bool horizontal)

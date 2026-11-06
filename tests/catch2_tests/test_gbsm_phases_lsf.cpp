@@ -573,7 +573,7 @@ TEST_CASE("gbsm_draw - lsf: a link does not depend on the other links")
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 26);
     const arma::mat rx = rx7(), tx = rx7() * 0.5 - 30.0;
-    const arma::uvec fl = {0, 3, 3, 259, 0, 1, 259};
+    const arma::u32_vec fl = {0, 3, 3, 259, 0, 1, 259};
 
     for (int dual = 0; dual < 2; ++dual)
     {
@@ -582,7 +582,7 @@ TEST_CASE("gbsm_draw - lsf: a link does not depend on the other links")
         for (arma::uword l = 0; l < 7; ++l)
         {
             const arma::mat r = rx.row(l), t = tx.row(l);
-            const arma::uvec f = {fl(l)};
+            const arma::u32_vec f = {fl(l)};
             quadriga_lib::gbsm_draw(sp, "lsf", phase, t, r, one, -1, "Comb256", &f, nullptr, dual == 1);
             INFO("dual " << dual << ", link " << l);
             CHECK(qd_equal(one, all.row(l)));
@@ -638,7 +638,7 @@ TEST_CASE("gbsm_draw - lsf: dual mobility values follow the two-device formulas"
         }
 
     // Floors 3 (k = 3, b = 0) and 259 (k = 3, b = 1) mixed with floor 0: the offsets go to both sides
-    const arma::uvec fl = {3, 259, 0, 259, 3, 0};
+    const arma::u32_vec fl = {3, 259, 0, 259, 3, 0};
     const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259);
     quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", &fl, nullptr, true);
     REQUIRE(rnd.n_rows == 6);
@@ -726,13 +726,13 @@ TEST_CASE("gbsm_draw - lsf: floor 0 equals no floor ID and equal IDs share one f
     const arma::mat rx = rx7(), tx = {{10.0, 20.0, 25.0}};
 
     arma::mat a, b;
-    const arma::uvec fl0(7, arma::fill::zeros);
+    const arma::u32_vec fl0(7, arma::fill::zeros);
     quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, a);
     quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, b, -1, "Comb256", &fl0);
     CHECK(qd_equal(a, b));
 
     // Floors 3 (k = 3, b = 0) and 259 (k = 3, b = 1) mixed with floor 0 in one call
-    const arma::uvec fl = {3, 259, 3, 0, 259, 3, 259};
+    const arma::u32_vec fl = {3, 259, 3, 0, 259, 3, 259};
     quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, b, -1, "Comb256", &fl);
     REQUIRE(b.n_rows == 7);
     const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259), off0(256, arma::fill::zeros);
@@ -761,7 +761,7 @@ TEST_CASE("gbsm_draw - lsf: fields of different floors are uncorrelated at equal
     const arma::uword floors[5] = {0, 1, 5, 255, 256};
 
     arma::mat rx(5 * n, 3);
-    arma::uvec fl(5 * n);
+    arma::u32_vec fl(5 * n);
     for (arma::uword f = 0; f < 5; ++f)
         rx.rows(f * n, f * n + n - 1) = g0, fl.subvec(f * n, f * n + n - 1).fill(floors[f]);
     const arma::mat tx = {{0.0, 0.0, 25.0}};
@@ -876,7 +876,7 @@ TEST_CASE("gbsm_draw - lsf: sizes, empty input and pre-sized output")
 
     // Pre-sized output with stale content: written in place (same memory) and completely, single and dual mobility
     const arma::mat rx = rx7(), tx = rx7() + 5.0;
-    const arma::uvec fl = {0, 3, 3, 259, 0, 1, 259};
+    const arma::u32_vec fl = {0, 3, 3, 259, 0, 1, 259};
     arma::mat ref, ref1;
     quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, ref1, -1, "Comb256", &fl);
     quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, ref, -1, "Comb256", nullptr, nullptr, true);
@@ -902,7 +902,7 @@ TEST_CASE("gbsm_draw - lsf: input validation")
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 36);
     const arma::mat rx = rx7().rows(0, 2), tx = {{0.0, 0.0, 25.0}};
-    const arma::uvec fl = {0, 1, 2};
+    const arma::u32_vec fl = {0, 1, 2};
     arma::mat rnd;
 
     SECTION("valid baseline")
@@ -948,13 +948,13 @@ TEST_CASE("gbsm_draw - lsf: input validation")
     }
     SECTION("floor_id")
     {
-        const arma::uvec bad = {0, 1};
+        const arma::u32_vec bad = {0, 1};
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", &bad), std::invalid_argument,
                              Message("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'."));
 
         // 3D mode: the height separates the floors, floor IDs are rejected (also all zero); the output is untouched
         const std::string msg = "Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.";
-        const arma::uvec fl0 = {0, 0, 0};
+        const arma::u32_vec fl0 = {0, 0, 0};
         arma::mat keep(2, 2, arma::fill::ones);
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, keep, -1, "Comb256", &fl, nullptr,
                                                      false, false),

@@ -715,18 +715,17 @@ static bool qd_python_flag(const py::handle &value, bool default_value, const st
     throw py::type_error("Input '" + name + "' must be a bool or None.");
 }
 
-// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> uvec
-// - Every entry must be an integer in [0, 2^53) (larger integers are not exact in a double); otherwise
-//   std::invalid_argument naming the input 'name'
-static arma::uvec qd_python_uint_entries(const arma::vec &input, const std::string &name)
+// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> u32_vec
+// - Every entry must be an integer in [0, 2^32); otherwise std::invalid_argument naming the input 'name'
+static arma::u32_vec qd_python_uint_entries(const arma::vec &input, const std::string &name)
 {
-    arma::uvec out(input.n_elem);
+    arma::u32_vec out(input.n_elem);
     for (arma::uword i = 0; i < input.n_elem; ++i)
     {
         const double v = input[i];
-        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
-            throw std::invalid_argument("Entries in '" + name + "' must be non-negative integers below 2^53.");
-        out[i] = (arma::uword)v;
+        if (!(v >= 0.0 && v < 4294967296.0 && v == std::floor(v)))
+            throw std::invalid_argument("Entries in '" + name + "' must be non-negative integers below 2^32.");
+        out[i] = (unsigned)v;
     }
     return out;
 }
@@ -892,13 +891,13 @@ static const char *const qd_python_gbsm_rays_keys[] = {
     "eoa", "M", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
 static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap"
 
-// Labels or codes (non-negative integers, no index shift) -> uvec; None gives an empty vector
-// - A uint64 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float and
+// Labels or codes (non-negative integers, no index shift) -> u32_vec; None gives an empty vector
+// - A uint32 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float and
 //   checked with qd_python_uint_entries, naming 'name'
-static arma::uvec qd_python_uword_entries(const py::handle &obj, const std::string &name)
+static arma::u32_vec qd_python_u32_entries(const py::handle &obj, const std::string &name)
 {
-    if (py::isinstance<py::array_t<arma::uword>>(obj))
-        return qd_python_numpy2arma_Col<arma::uword>(obj, true);
+    if (py::isinstance<py::array_t<unsigned>>(obj))
+        return qd_python_numpy2arma_Col<unsigned>(obj, true);
     return qd_python_uint_entries(qd_python_numpy2arma_Col<double>(obj, true), name);
 }
 
@@ -936,11 +935,11 @@ static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const
     r.aoa = qd_python_numpy2arma_Col<double>(get("aoa"), true);
     r.eoa = qd_python_numpy2arma_Col<double>(get("eoa"), true);
     r.M = qd_python_numpy2arma_Cube<double>(get("M"), true);
-    r.path_type = qd_python_uword_entries(get("path_type"), var_name + ".path_type");
-    r.tap = qd_python_uword_entries(get("tap"), var_name + ".tap");
+    r.path_type = qd_python_u32_entries(get("path_type"), var_name + ".path_type");
+    r.tap = qd_python_u32_entries(get("tap"), var_name + ".tap");
     r.fbs_pos = qd_python_numpy2arma_Mat<double>(get("fbs_pos"), true);
     r.lbs_pos = qd_python_numpy2arma_Mat<double>(get("lbs_pos"), true);
-    r.fallback = qd_python_uword_entries(get("fallback"), var_name + ".fallback");
+    r.fallback = qd_python_u32_entries(get("fallback"), var_name + ".fallback");
     const py::object gr_eps = get("gr_eps");
     if (!gr_eps.is_none())
     {
@@ -953,7 +952,7 @@ static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const
 
 // Creates a list of n_link gbsm_rays dicts with all keys and aliases the attributes of 'rays' (resized to n_link)
 // whose size is known, as qd_mex_init_gbsm_rays; with 'has_gr', 'gr_eps_re' and 'gr_eps_im' are allocated in C++
-// - The other keys are empty arrays ('gr_eps' complex, 'fallback' uint64); the caller sets 'method' and, with
+// - The other keys are empty arrays ('gr_eps' complex, 'fallback' uint32); the caller sets 'method' and, with
 //   'has_gr', 'gr_eps' after the call
 static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
                                          bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
@@ -989,7 +988,7 @@ static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, 
         }
         else
             d["fbs_pos"] = py::array_t<double>(0), d["lbs_pos"] = py::array_t<double>(0);
-        d["fallback"] = py::array_t<arma::uword>(0);
+        d["fallback"] = py::array_t<unsigned>(0);
         out.append(d);
     }
     return out;
