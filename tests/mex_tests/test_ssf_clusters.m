@@ -178,6 +178,60 @@ assertEqual( size(d0), [ 0, size(delay, 2) ] );
 assertEqual( size(p0), [ 0, size(delay, 2) ] );
 assertTrue( isempty(n0) && isa(n0, 'uint32') );
 
+%% Zero links: all methods, LOS with ground reflection and NLOS; empty inputs of the right shape count as given
+fc = [ 6e9; 30e9 ];
+r0 = zeros(0, 3);
+for s = { sg, sn }
+    sc = s{1};
+    G = double( sc.GR_enabled > 0 );
+    N0 = sc.NumClusters - 1;
+    phase = quadriga_lib.gbsm_init_phases( sc, 'lsf', 13 );
+    [ l0, at0, gre0, gim0, eo0, mu0, sig0 ] = quadriga_lib.lsp_generate( sc, fc, tx_pos, r0, ...
+        quadriga_lib.gbsm_draw( sc, 'lsf', phase, tx_pos, r0 ) );
+    rn0 = quadriga_lib.gbsm_draw( sc, 'cluster', quadriga_lib.gbsm_init_phases( sc, 'cluster', 13 ), tx_pos, r0 );
+    rf0 = zeros(0, N0, 2);
+    rr0 = zeros(0, 14 * N0 * sc.NumSubPaths + N0, 2);
+    for k = 1 : 2
+        rf0(:, :, k) = quadriga_lib.gbsm_draw( sc, 'cluster', quadriga_lib.gbsm_init_phases( sc, 'cluster', 13, k ), ...
+            tx_pos, r0, k );
+        rr0(:, :, k) = quadriga_lib.gbsm_draw( sc, 'ray', quadriga_lib.gbsm_init_phases( sc, 'ray', 13, k ), ...
+            tx_pos, r0, k );
+    end
+    rq0 = quadriga_lib.gbsm_draw( sc, 'ray', quadriga_lib.gbsm_init_phases( sc, 'ray', 13 ), tx_pos, r0, 0, [], ...
+        [], fc );
+    assertEqual( [ size(l0), size(at0), size(gre0), size(eo0), size(rf0), size(rq0) ], ...
+        [ 0, 2, 8, 0, 1, 0, 2, 0, 2, 0, N0, 2, 0, size(rq0, 2) ] );
+    la0 = quadriga_lib.lsp_generate( sc, 2e9, tx_pos, r0, quadriga_lib.gbsm_draw( sc, 'lsf', phase, tx_pos, r0 ) );
+    clu = cell(3, 7);
+    [ clu{1, :} ] = quadriga_lib.ssf_clusters( sc, tx_pos, r0, l0(:, 1, :), rn0, '38.901', rf0(:, :, 1), [], ...
+        eo0(:, 1), at0, gre0(:, 1), gim0(:, 1), false(0, 1), zeros(0, 1) );
+    [ clu{2, :} ] = quadriga_lib.ssf_clusters( sc, tx_pos, r0, l0, rn0, '38.901_MF', rf0, la0, [], at0, gre0, gim0 );
+    [ clu{3, :} ] = quadriga_lib.ssf_clusters( sc, tx_pos, r0, l0, rn0, 'quadriga', [], [], eo0, at0, gre0, gim0 );
+    n_slot = N0 + 1 + G;
+    for m = 1 : 3
+        n_fd = 1 + (m == 2);                                                  % '38.901_MF': delays per frequency
+        for o = [ 1, 3, 4, 5, 6 ]
+            assertEqual( size( clu{m, o}, 1 ), 0 );
+            assertEqual( [ size( clu{m, o}, 2 ), size( clu{m, o}, 3 ) ], [ n_slot, n_fd ] );
+        end
+        assertEqual( [ size( clu{m, 2}, 1 ), size( clu{m, 2}, 2 ), size( clu{m, 2}, 3 ) ], [ 0, n_slot, 1 + (m > 1) ] );
+        assertTrue( isa( clu{m, 7}, 'uint32' ) && isempty( clu{m, 7} ) );
+    end
+    % The rays of the zero-link clusters: a 1 x 0 struct array with all fields
+    rays = cell(1, 3);
+    rays{1} = quadriga_lib.ssf_rays( sc, tx_pos, r0, fc(1), l0(:, 1, :), mu0(:, 1, :), sig0(:, 1, :), clu{1, 1:6}, ...
+        rr0(:, :, 1), '38.901', [], [], [], gre0(:, 1), gim0(:, 1) );
+    rays{2} = quadriga_lib.ssf_rays( sc, tx_pos, r0, fc, l0, mu0, sig0, clu{2, 1:6}, rr0, '38.901_MF', 2, [], [], ...
+        gre0, gim0 );
+    rays{3} = quadriga_lib.ssf_rays( sc, tx_pos, r0, fc, l0, mu0, sig0, clu{3, 1:6}, rq0, 'quadriga', [], [], [], ...
+        gre0, gim0 );
+    for m = 1 : 3
+        assertTrue( isstruct( rays{m} ) );
+        assertEqual( size( rays{m} ), [1, 0] );
+        assertEqual( numel( fieldnames( rays{m} ) ), 18 );
+    end
+end
+
 end
 
 % LSPs and the random values of one scenario at the links

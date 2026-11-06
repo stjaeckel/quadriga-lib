@@ -114,13 +114,8 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
 - Sub-clusters (step 11): the two clusters of largest power at frequency `i_freq` (equal powers: lower index first),
   rays at the positions 0-9, 10-15 and 16-19 (TR rays 1-8, 19, 20; 9-12, 17, 18; 13-16); every tap is a contiguous
   block of rays
-- `pol_model = "quadriga"`: the matrix refers to the owner end, the end with the larger z, then x, then y (ends within
-  1 mm count as equal; the Tx if all tie); the Rx as owner transposes it, so UTs dropped separately at equal heights
-  on either side of the tie plane get transposed matrices
-- Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm_draw]], mirrored LSPs, no EoD offset and no O2I
-  flag in [[ssf_clusters]], equal per-cluster spreads at both ends, `PerClusterES_D_scale` = 0), swapping `tx_pos`
-  and `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = "quadriga"` with the
-  ends within 1 mm of each other)
+- `pol_model = "quadriga"`: the matrix refers to the end with the larger z, then x, then y (coordinates within 1 mm
+  count as equal; the Tx if all tie), so UTs dropped separately at equal heights may get transposed matrices
 
 ## Declaration:
 ```

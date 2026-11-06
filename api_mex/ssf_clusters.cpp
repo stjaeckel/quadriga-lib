@@ -121,15 +121,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::u32_vec n_cluster =
         (nrhs < 14) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[13], false, "n_cluster");
 
-    // Wrap optional pointers; empty arrays select the default
-    const arma::cube *p_rnd_freq = rnd_freq.empty() ? nullptr : &rnd_freq;
-    const arma::cube *p_lsp_anchor = lsp_anchor.empty() ? nullptr : &lsp_anchor;
-    const arma::mat *p_eod_offset_deg = eod_offset_deg.empty() ? nullptr : &eod_offset_deg;
-    const arma::vec *p_abs_toa = abs_toa.empty() ? nullptr : &abs_toa;
-    const arma::mat *p_gr_eps_re = gr_eps_re.empty() ? nullptr : &gr_eps_re;
-    const arma::mat *p_gr_eps_im = gr_eps_im.empty() ? nullptr : &gr_eps_im;
-    const std::vector<bool> *p_o2i = o2i.empty() ? nullptr : &o2i;
-    const arma::u32_vec *p_n_cluster = n_cluster.empty() ? nullptr : &n_cluster;
+    // Wrap optional pointers; an omitted input or [] (0 x 0) selects the default, an empty input of another shape
+    // (e.g. [0, N] for zero links) counts as given
+    auto given = [&](int i)
+    { return nrhs > i && (mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0); };
+    const arma::cube *p_rnd_freq = given(6) ? &rnd_freq : nullptr;
+    const arma::cube *p_lsp_anchor = given(7) ? &lsp_anchor : nullptr;
+    const arma::mat *p_eod_offset_deg = given(8) ? &eod_offset_deg : nullptr;
+    const arma::vec *p_abs_toa = given(9) ? &abs_toa : nullptr;
+    const arma::mat *p_gr_eps_re = given(10) ? &gr_eps_re : nullptr;
+    const arma::mat *p_gr_eps_im = given(11) ? &gr_eps_im : nullptr;
+    const std::vector<bool> *p_o2i = given(12) ? &o2i : nullptr;
+    const arma::u32_vec *p_n_cluster = given(13) ? &n_cluster : nullptr;
 
     // Output allocation in MATLAB memory, sizes from a completed copy of 'scenpar'; an invalid 'scenpar' allocates
     // nothing, the library call then throws its message
