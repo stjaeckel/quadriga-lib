@@ -9,9 +9,9 @@
 //
 // Helpers and their users:
 //   qd_gbsm_check_links   common validation of tx_pos / rx_pos     qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp,
-//                                                                  ssf_clusters.cpp
+//                                                                  ssf_clusters.cpp, ssf_rays.cpp
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
-//                                                                  o2i_loss.cpp
+//                                                                  o2i_loss.cpp, ssf_rays.cpp
 //   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
 //                                                                  gbsm_init_phases
 //   qd_gbsm_n_gen         number of generators of a random set     qd_gbsm_phases.cpp, MEX and Python wrappers of
