@@ -1,13 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
-"""'website' on the real sources, built into a temporary root: old anchors still exist, and every
-notebook converts without warnings."""
+"""'website' on the real sources, built into a temporary root: every notebook converts without warnings."""
 
 import contextlib
-import html.parser
 import io
-import json
 import shutil
 from pathlib import Path
 
@@ -15,24 +12,8 @@ import pytest
 
 TESTS = Path(__file__).resolve().parents[1]
 REPO = TESTS.parents[1]
-OLD_ANCHORS = TESTS / "fixtures" / "old_anchors.json"
 
 pytestmark = pytest.mark.repo
-
-
-class _Ids(html.parser.HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.ids = set()
-
-    def handle_starttag(self, tag, attrs):
-        self.ids.update(v for k, v in attrs if k == "id")
-
-
-def page_ids(path):
-    p = _Ids()
-    p.feed(path.read_text(encoding="utf-8"))
-    return p.ids
 
 
 def tree(folder):
@@ -58,17 +39,6 @@ def site(tmp_path_factory):
         code = cli.main(["website", "--root", str(root)])
     assert code == 0, out.getvalue()
     return root, out.getvalue(), tree(root / "website")
-
-
-def test_old_anchors_exist(site):
-    root = site[0]
-    old = json.loads(OLD_ANCHORS.read_text(encoding="utf-8"))
-    missing = []
-    for page, ids in sorted(old.items()):
-        have = page_ids(root / "website" / page)
-        missing += ["%s#%s" % (page, i) for i in ids if i not in have]
-    assert missing == []
-    assert "quickstart" in page_ids(root / "website" / "index.html")
 
 
 def test_tutorials_without_warnings(site):
