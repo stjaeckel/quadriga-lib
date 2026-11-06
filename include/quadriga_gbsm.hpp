@@ -71,14 +71,14 @@ namespace quadriga_lib
 
     // ---- Random sets ----
 
-    // Draw the random phases of one random set of a BS site and scenario
+    // Draw the SOS phases of one random set of a BS site and scenario: the random phases of the sinusoids of its generators
     // - Set types: "lsf" large-scale generators, "cluster" cluster random values, "ray" ray random values; generators
     //   and columns: see gbsm_draw
-    // - The phases are a fixed function of seed, set_type and set_id, equal on all platforms; the sets are independent
+    // - The SOS phases are a fixed function of seed, set_type and set_id, equal on all platforms; the sets are independent
     // - "lsf": bias removal over the positions in 'rx_pos' (and 'tx_pos' for dual mobility) when given and n_link > 2
     void gbsm_init_phases(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances; NumClusters; NumSubPaths for "ray")
                           const std::string &set_type,                            // "lsf", "cluster" or "ray"
-                          arma::cube &phase,                                      // Output: Phases in [rad], [n_coeff, n_gen, 2]; slice 0 = Rx side, slice 1 = Tx side
+                          arma::cube &phase,                                      // Output: SOS phases in [rad], [n_coeff, n_gen, 2]; slice 0 = Rx side, slice 1 = Tx side
                           arma::sword seed = -1,                                  // Seed of the site and scenario, the same for all set types; -1 = system random device
                           arma::sword set_id = -1,                                // "cluster", "ray": -1 = shared set, k >= 0 = set of frequency k (0-based); ignored for "lsf"
                           const std::string &preset = "Comb256",                  // SOS preset, see sos_preset
@@ -94,7 +94,7 @@ namespace quadriga_lib
     // - Links with different floor IDs are uncorrelated at equal horizontal positions (2D mode only)
     void gbsm_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances, NumClusters, NumSubPaths, PerCluster* for "ray")
                    const std::string &set_type,                             // "lsf", "cluster" or "ray"; must match gbsm_init_phases
-                   const arma::cube &phase,                                 // Phases from gbsm_init_phases, [n_coeff, n_gen, 2]
+                   const arma::cube &phase,                                 // SOS phases from gbsm_init_phases, [n_coeff, n_gen, 2]
                    const arma::mat &tx_pos,                                 // Tx positions in [m], [1, 3] or [n_link, 3]
                    const arma::mat &rx_pos,                                 // Rx positions in [m], [n_link, 3]
                    arma::mat &rnd,                                          // Output: Random values, [n_link, n_gen]

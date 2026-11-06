@@ -99,7 +99,7 @@ lang: en-US
 | [conf_file_read](#conf_file_read) | Geometry-based stochastic model | Read and validate a QuaDRiGa scenario configuration file |
 | [conf_file_write](#conf_file_write) | Geometry-based stochastic model | Write a QuaDRiGa scenario configuration file |
 | [gbsm_draw](#gbsm_draw) | Geometry-based stochastic model | Spatially correlated normalized random values of one random set at a set of links |
-| [gbsm_init_phases](#gbsm_init_phases) | Geometry-based stochastic model | Draw the random phases of one random set of a BS site and scenario |
+| [gbsm_init_phases](#gbsm_init_phases) | Geometry-based stochastic model | Draw the SOS phases of one random set of a BS site and scenario |
 | [gbsm_rays](#gbsm_rays) | Geometry-based stochastic model | Ray data of one link (geometry-based stochastic model) |
 | [gbsm_rays_from_paths](#gbsm_rays_from_paths) | Geometry-based stochastic model | Ray data of one link from spherical path data (e.g. read with qrt_file_read) |
 | [gbsm_single_link_channel](#gbsm_single_link_channel) | Geometry-based stochastic model | Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model) |
@@ -3323,7 +3323,7 @@ through; an invalid value of a key that the function does not use throws as well
    `LOS_state_lambda`). The caller chooses the `los_probability` model and the `o2i_loss` models and weights (TR 38.901
    Tables 7.4.2-1, 7.4.3-2); the conf files state `LOS_state_lambda` in the NLOS files and `IO_state_lambda` in the
    O2I files (0 in the others). The states assign each link to a scenario; steps 3 to 7 run per scenario
-3. Per BS site and scenario, once: [gbsm_init_phases](#gbsm_init_phases) for the random sets `"lsf"`, `"cluster"` (`set_id` -1 and one
+3. Per BS site and scenario, once: [gbsm_init_phases](#gbsm_init_phases), the SOS phases of the random sets `"lsf"`, `"cluster"` (`set_id` -1 and one
    per frequency) and `"ray"` (-1 for the method `"quadriga"`, one per frequency for the TR methods)
 4. [gbsm_draw](#gbsm_draw) of each set at the links; [path_loss](#path_loss) (`PL`, `sf_sigma`; column 10 of the `"lsf"` set as
    `rnd_he`); [lsp_generate](#lsp_generate) with `sf_sigma` (`lsp` and the optional outputs the later steps take, incl. `lsp_mu`,
@@ -3335,7 +3335,7 @@ through; an invalid value of a key that the function does not use throws as well
    [ssf_paths](#ssf_paths) and the QRT route ([qrt_paths_from_scatterers](#qrt_paths_from_scatterers), [qrt_file_append](#qrt_file_append); back with [qrt_file_read](#qrt_file_read)
    and [gbsm_rays_from_paths](#gbsm_rays_from_paths)). Other path sources fill a [gbsm_rays](#gbsm_rays) object directly
 
-For moved positions, evaluate [gbsm_draw](#gbsm_draw) (`"lsf"`), [path_loss](#path_loss) and [lsp_generate](#lsp_generate) again with the same phases:
+For moved positions, evaluate [gbsm_draw](#gbsm_draw) (`"lsf"`), [path_loss](#path_loss) and [lsp_generate](#lsp_generate) again with the same SOS phases:
 they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) from slice 1 of `lsp`.
 
 **Terms.** TR 38.901 names where they exist; QuaDRiGa names are marked:
@@ -3359,7 +3359,8 @@ they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) fro
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
 | link gain | `-PL - O2I + 10·lg(SF)` in dB of a link at a position (`link_gain_dB`), with SF the linear shadow fading, slice 2 of `lsp` |
 | random set | the spatially correlated random values of one `set_type` and `set_id` (table in [gbsm_draw](#gbsm_draw)) |
-| generator | one spatially correlated random field; one column of a random set |
+| generator | one spatially correlated random field, a [sum-of-sinusoids (SOS)](#sec-sum-of-sinusoids-random-number-generator) generator; one column of a random set |
+| SOS phases | the random phases of the sinusoids of the generators of a random set (`phase`); evaluated at positions, they give its random values. "Phase" alone is the phase of a coefficient or ray |
 | block | the generators of one random quantity in a set |
 
 **Codes.** Path type: 0 LOS, 1 GR, 2 NLOS. Tap index: 3·slot + i, with i the sub-cluster (0, 1, 2) of a split cluster
@@ -3566,7 +3567,7 @@ Spatially correlated normalized random values of one random set at a set of link
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_draw) · [Python](quadriga_lib_api_python.md#gbsm.draw)
 
-- Evaluates the phases of [gbsm_init_phases](#gbsm_init_phases) at the links, one column per generator. The value of a link depends
+- Evaluates the SOS phases of [gbsm_init_phases](#gbsm_init_phases) at the links as [sos_val](#sos_val), one column per generator. The value of a link depends
   neither on the other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
 - Dual mobility: the Tx is a second device on the same maps; its side of each generator uses the mirror generator
   (e.g. departure and arrival quantities exchange), and every column keeps its distribution
@@ -3611,7 +3612,7 @@ void quadriga_lib::gbsm_draw(
 ### Inputs:
 - **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, cluster DS and ASA
 - **`set_type`** — Set type of [gbsm_init_phases](#gbsm_init_phases)
-- **`phase`** — Phases from [gbsm_init_phases](#gbsm_init_phases), finite; `[n_coeff, n_gen, 2]`
+- **`phase`** — SOS phases from [gbsm_init_phases](#gbsm_init_phases), finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
 - **`set_id`** *(optional)* — Set of [gbsm_init_phases](#gbsm_init_phases); ignored for `"lsf"`
@@ -3628,7 +3629,7 @@ void quadriga_lib::gbsm_draw(
 - **`rnd`** — Random values; `[n_link, n_gen]`
 
 ### See also:
-- [gbsm_init_phases](#gbsm_init_phases) (the phases)
+- [gbsm_init_phases](#gbsm_init_phases) (the SOS phases)
 - [lsp_generate](#lsp_generate) (the large-scale parameters from the `"lsf"` set)
 - [path_loss](#path_loss) (column 10 of the `"lsf"` set as `rnd_he`)
 - [ssf_clusters](#ssf_clusters) (the clusters from the `"cluster"` sets)
@@ -3637,14 +3638,15 @@ void quadriga_lib::gbsm_draw(
 ---
 <a id="gbsm_init_phases"></a>
 ## gbsm_init_phases
-Draw the random phases of one random set of a BS site and scenario
+Draw the SOS phases of one random set of a BS site and scenario
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_init_phases) · [Python](quadriga_lib_api_python.md#gbsm.init_phases)
 
-- Draws the phases of one random set (set table in [gbsm_draw](#gbsm_draw)) for [gbsm_draw](#gbsm_draw); store `phase` or the seed to
-  evaluate the same fields again along tracks or on maps
-- The phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed `"lsf"`
-  phases within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
+- Draws the SOS phases of one random set (set table in [gbsm_draw](#gbsm_draw)): the random phases of the sinusoids of its
+  [sum-of-sinusoids (SOS)](#sec-sum-of-sinusoids-random-number-generator) generators, as [sos_init_phases](#sos_init_phases); [gbsm_draw](#gbsm_draw)
+  evaluates them at the links. Store `phase` or the seed to evaluate the same fields again along tracks or on maps
+- The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed
+  `"lsf"` sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [sos_remove_bias](#sos_remove_bias) sets the sample mean of
   columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
 - `NumClusters = 1`: all sets but `"lsf"` are empty
@@ -3669,7 +3671,7 @@ void quadriga_lib::gbsm_init_phases(
 ### Inputs:
 - **`scenpar`** — Scenario parameters; the decorrelation distances, `NumClusters` and `NumSubPaths` are used
 - **`set_type`** — `"lsf"`, `"cluster"` or `"ray"`
-- **`seed`** *(optional)* — Seed of the site and scenario, >= -1; -1 = system random device, new phases on each call
+- **`seed`** *(optional)* — Seed of the site and scenario, >= -1; -1 = system random device, new SOS phases on each call
 - **`set_id`** *(optional)* — `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [sos_preset](#sos_preset); sets `n_coeff`
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Bias-removal positions in [m] as in [gbsm_draw](#gbsm_draw); `"lsf"` only, else throws
@@ -3678,11 +3680,12 @@ void quadriga_lib::gbsm_init_phases(
 - **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D (TR), `false` 3D (legacy); as in [gbsm_draw](#gbsm_draw)
 
 ### Output:
-- **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side; `[n_coeff, n_gen, 2]`
+- **`phase`** — SOS phases in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 =
+  Tx side; `[n_coeff, n_gen, 2]`
 
 ### See also:
-- [gbsm_draw](#gbsm_draw) (evaluates the phases at the links)
-- [sos_remove_bias](#sos_remove_bias) (the bias removal of one generator)
+- [gbsm_draw](#gbsm_draw) (evaluates the SOS phases at the links)
+- [sos_init_phases](#sos_init_phases), [sos_val](#sos_val) (SOS phases and evaluation of one generator), [sos_remove_bias](#sos_remove_bias) (its bias removal)
 
 ---
 <a id="gbsm_rays"></a>
