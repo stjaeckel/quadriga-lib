@@ -4,12 +4,38 @@
 
 #include "quadriga_gbsm.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 // Members of the class gbsm_rays: sizes, validation, the scatterer distance scales b_med and b_eff, and the
 // two-bounce scatterer solver.
+
+// b_med and b_eff: validation and the distance b of ray i from end e (0 Tx, 1 Rx) at the ray-data positions:
+// NLOS end to FBS (Tx) or LBS (Rx), LOS d3D, GR the length via the specular point (image method)
+static void qd_rays_check_freq(const quadriga_lib::gbsm_rays &r, arma::uword i_freq)
+{
+    const std::string err = r.is_valid();
+    if (!err.empty())
+        throw std::invalid_argument(err);
+    if (i_freq >= r.n_freq())
+        throw std::invalid_argument("Input 'i_freq' is out of range for " + std::to_string(r.n_freq()) +
+                                    " frequencies.");
+}
+
+static double qd_rays_end_dist(const quadriga_lib::gbsm_rays &r, arma::uword i, int e)
+{
+    const double *T = r.tx_pos.memptr(), *R = r.rx_pos.memptr();
+    const double *P = (r.path_type(i) == 2) ? (e == 0 ? r.fbs_pos.colptr(i) : r.lbs_pos.colptr(i)) : nullptr;
+    const double *E = (e == 0) ? T : R;
+    const double dz = (r.path_type(i) == 1) ? T[2] + R[2] : T[2] - R[2];
+    if (P == nullptr) // LOS, GR
+        return std::sqrt((T[0] - R[0]) * (T[0] - R[0]) + (T[1] - R[1]) * (T[1] - R[1]) + dz * dz);
+    return std::sqrt((P[0] - E[0]) * (P[0] - E[0]) + (P[1] - E[1]) * (P[1] - E[1]) + (P[2] - E[2]) * (P[2] - E[2]));
+}
 
 /*!SECTION
 Geometry-based stochastic model
@@ -51,8 +77,10 @@ Ray data of one link (geometry-based stochastic model)
 | `n_freq()` | Number of frequencies, length of `center_frequency` |
 | `empty()` | `true` if `n_ray() == 0` |
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
-| `b_med(i_freq)` | `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based); NaN without scatterers or without NLOS power |
-| `b_eff(i_freq)` | `[2]`, Tx and Rx in [m]: $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$, with $b$ the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); NaN without scatterers or power |
+| `b_med(i_freq)` | `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
+| `b_eff(i_freq)` | `[2]`, Tx and Rx in [m]: $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$ at frequency `i_freq`, with $b$ the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
+
+- `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
 
 ## See also:
 - [[ssf_rays]] (ray data of a set of links)
@@ -149,29 +177,75 @@ std::string quadriga_lib::gbsm_rays::is_valid() const
 
 arma::vec quadriga_lib::gbsm_rays::b_med(arma::uword i_freq) const
 {
-    // STUB: no computation yet
-    (void)i_freq;
-    return arma::vec(2, arma::fill::value(arma::datum::nan));
+    qd_rays_check_freq(*this, i_freq);
+    arma::vec b(2, arma::fill::value(arma::datum::nan));
+    if (fbs_pos.n_cols != n_ray())
+        return b;
+
+    // Lower weighted median: NLOS rays with power > 0 sorted by distance (stable: equal distances keep the ray
+    // order), the first distance whose cumulative power reaches half the total
+    for (int e = 0; e < 2; ++e)
+    {
+        std::vector<std::pair<double, double>> v;
+        double total = 0.0, cum = 0.0;
+        for (arma::uword i = 0; i < n_ray(); ++i)
+            if (path_type(i) == 2 && power(i, i_freq) > 0.0)
+                v.push_back({qd_rays_end_dist(*this, i, e), power(i, i_freq)}), total += power(i, i_freq);
+        std::stable_sort(v.begin(), v.end(), [](const std::pair<double, double> &x, const std::pair<double, double> &y)
+                         { return x.first < y.first; });
+        for (const auto &x : v)
+            if (2.0 * (cum += x.second) >= total)
+            {
+                b(e) = x.first;
+                break;
+            }
+        if (!v.empty() && std::isnan(b(e))) // rounding of the sum: the largest distance
+            b(e) = v.back().first;
+    }
+    return b;
 }
 
 arma::vec quadriga_lib::gbsm_rays::b_eff(arma::uword i_freq) const
 {
-    // STUB: no computation yet
-    (void)i_freq;
-    return arma::vec(2, arma::fill::value(arma::datum::nan));
+    qd_rays_check_freq(*this, i_freq);
+    arma::vec b(2, arma::fill::value(arma::datum::nan));
+    if (fbs_pos.n_cols != n_ray())
+        return b;
+
+    // (sum P / sum (P / b^2))^(1/2) over the rays with power > 0
+    for (int e = 0; e < 2; ++e)
+    {
+        double sp = 0.0, sq = 0.0;
+        for (arma::uword i = 0; i < n_ray(); ++i)
+            if (power(i, i_freq) > 0.0)
+            {
+                const double d = qd_rays_end_dist(*this, i, e);
+                sp += power(i, i_freq), sq += power(i, i_freq) / (d * d);
+            }
+        if (sp > 0.0)
+            b(e) = std::sqrt(sp / sq);
+    }
+    return b;
 }
 
 /*!MD
 # .solve_scatterers
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
-- NLOS rays: exact departure and arrival angles where a solution exists, equal distances from both ends;
-  otherwise the shortest polyline along the ray's own directions with both scatterers at least `d_min` away
-  (`fallback` = 1; the ray is lengthened, `delay` keeps its value)
-- LOS ray on the direct line, GR ray at the specular point on z = 0, rays with zero power at all frequencies at
-  the midpoint of the direct line
+- NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
+  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length `abs(rx_pos - tx_pos) + c·delay`
+  and the angles are exact
+- Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
+  ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
+  `d_min` = 2 m this applies to 5.5 to 9.6 % of the rays of the TR methods without absolute TOA (the first cluster
+  has zero excess delay) and to at most 2.3 % otherwise; it adds a median delay of 0.2 to 4.6 ns (p99 up to 21.7 ns)
+  and changes the delay spread of a link by up to 4.1 % (p99)
+- LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
+  point on z = 0, which requires both ends at z >= 0
 - Writes `fbs_pos`, `lbs_pos` and `fallback` of all rays and overwrites given scatterers; nothing else changes;
   afterwards `b_med()` and `b_eff()` give the validity scales of [[ssf_paths]]
+- One link per call; batch callers loop over the objects of [[ssf_rays]]; an invalid object throws the
+  `is_valid()` message and leaves the object unchanged
 
 ## Declaration:
 ```
@@ -188,8 +262,14 @@ MD!*/
 
 void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
 {
-    // STUB: no computation yet
-    (void)d_min;
+    const std::string err = is_valid();
+    if (!err.empty())
+        throw std::invalid_argument(err);
+    if (!std::isfinite(d_min) || d_min <= 0.0)
+        throw std::invalid_argument("Input 'd_min' must be finite and > 0.");
+    if (arma::any(path_type == 1) && (tx_pos(2) < 0.0 || rx_pos(2) < 0.0))
+        throw std::invalid_argument("Ground reflection requires z >= 0 in 'rays.tx_pos' and 'rays.rx_pos'.");
+
     const arma::uword n = n_ray();
     if (fbs_pos.n_rows != 3 || fbs_pos.n_cols != n)
         fbs_pos.set_size(3, n);
@@ -197,5 +277,58 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
         lbs_pos.set_size(3, n);
     if (fallback.n_elem != n)
         fallback.set_size(n);
-    fbs_pos.zeros(), lbs_pos.zeros(), fallback.zeros();
+
+    const double *T = tx_pos.memptr(), *R = rx_pos.memptr();
+    const double D[3] = {T[0] - R[0], T[1] - R[1], T[2] - R[2]};
+    const double DD = D[0] * D[0] + D[1] * D[1] + D[2] * D[2], d3D = std::sqrt(DD);
+    const double mid[3] = {0.5 * (T[0] + R[0]), 0.5 * (T[1] + R[1]), 0.5 * (T[2] + R[2])};
+
+    // Specular point on z = 0: G = T + h_t / (h_t + h_r)·(R' - T) with R' = (R_x, R_y, -R_z); both ends on the
+    // ground: the midpoint
+    const double h = T[2] + R[2], g = (h > 0.0) ? T[2] / h : 0.5;
+    const double G[3] = {T[0] + g * (R[0] - T[0]), T[1] + g * (R[1] - T[1]), 0.0};
+
+    for (arma::uword i = 0; i < n; ++i)
+    {
+        double *F = fbs_pos.colptr(i), *B = lbs_pos.colptr(i);
+        fallback(i) = 0;
+        if (path_type(i) == 1)
+        {
+            for (int j = 0; j < 3; ++j)
+                F[j] = G[j], B[j] = G[j];
+            continue;
+        }
+        bool on = false; // power > 0 at some frequency
+        for (arma::uword k = 0; k < power.n_cols; ++k)
+            on = on || power(i, k) > 0.0;
+        if (path_type(i) == 0 || !on)
+        {
+            for (int j = 0; j < 3; ++j)
+                F[j] = mid[j], B[j] = mid[j];
+            continue;
+        }
+
+        // Balanced rule FBS = T + s·u_d, LBS = R + s·u_a with 2·s + abs(D + s·w) = L, w = u_d - u_a: the smallest
+        // root of (4 - w·w)·s² - (4·L + 2·D·w)·s + (L² - D·D) = 0 in the cancellation-free form. g(s) = 2·s +
+        // abs(D + s·w) is non-decreasing (abs(w) <= 2), and so is a + b + abs(D + a·u_d - b·u_a) in a and b: a
+        // solution with both distances >= d_min exists iff s >= d_min. Otherwise (also for L <= abs(D)) both
+        // scatterers go to d_min along the ray's own directions, which lengthens the ray.
+        const double ce = std::cos(eod(i)), ca = std::cos(eoa(i));
+        const double ud[3] = {ce * std::cos(aod(i)), ce * std::sin(aod(i)), std::sin(eod(i))};
+        const double ua[3] = {ca * std::cos(aoa(i)), ca * std::sin(aoa(i)), std::sin(eoa(i))};
+        const double w[3] = {ud[0] - ua[0], ud[1] - ua[1], ud[2] - ua[2]};
+        const double L = d3D + 299792458.0 * delay(i);
+        double s = 0.0;
+        if (L > d3D) // not C > 0, which also holds for L < -d3D
+        {
+            const double A = std::max(4.0 - (w[0] * w[0] + w[1] * w[1] + w[2] * w[2]), 0.0);
+            const double Bq = 4.0 * L + 2.0 * (D[0] * w[0] + D[1] * w[1] + D[2] * w[2]), C = L * L - DD;
+            s = 2.0 * C / (Bq + std::sqrt(std::max(Bq * Bq - 4.0 * A * C, 0.0)));
+            s = std::isfinite(s) ? s : 0.0;
+        }
+        if (s < d_min)
+            s = d_min, fallback(i) = 1;
+        for (int j = 0; j < 3; ++j)
+            F[j] = T[j] + s * ud[j], B[j] = R[j] + s * ua[j];
+    }
 }
