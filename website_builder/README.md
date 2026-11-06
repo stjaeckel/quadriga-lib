@@ -80,7 +80,7 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `static/quadriga_lib_material_model.md` | The material model description, hand-made. | `quadriga_lib_material_model.md` |
 | `content/impressum.md`, `content/privacy.md` | Legal pages. | `impressum.html`, `privacy.html` |
 | `content/404.md` | Title and sentence of the not-found page. | `404.html` |
-| `content/tutorials.md` | Title, lead and placeholder note of the tutorial index. | `tutorials.html`, `tutorials.md` |
+| `content/tutorials.md` | Title, lead, placeholder note and the common text (e.g. the setup) of the tutorial index; see [The tutorial index page](#the-tutorial-index-page). | `tutorials.html`, `tutorials.md` |
 | `skill/quadriga-lib/SKILL.md` | The agent skill (a placeholder for now); build variables are filled in. | `skill/SKILL.md` |
 | `pandoc_math.yaml` | pandoc defaults file of the formula step. | — |
 | `logo/` | Logo sources (SVG and PNG); not deployed. | — |
@@ -112,13 +112,13 @@ The content pages with twins (Get started, formats, FAQ, AI agents, API intros, 
 
 ## Tutorials
 
-Tutorials are Jupyter notebooks in `tutorials/` at the repository root, `tutorials/<stem>.ipynb` with a stem of lower-case letters, digits, `_` and `-` (starting with a letter or digit). They are committed with their outputs; the builder reads them with the standard library and never runs or changes them. To refresh one, run it in an environment with `quadriga-lib`, `numpy`, `matplotlib` and `jupyter` installed and commit the result:
+Tutorials are Jupyter notebooks in `tutorials/` at the repository root, `tutorials/<stem>.ipynb` with a stem of lower-case letters, digits, `_` and `-` (starting with a letter or digit). They are committed cleared, without outputs. The tutorial build runs them into executed copies `tutorials/executed/<stem>.ipynb` (ignored by git), in an environment with `quadriga-lib`, `numpy`, `matplotlib` and `jupyter`; see `tutorials/README.md`:
 
 ```bash
-jupyter nbconvert --to notebook --execute --inplace tutorials/<stem>.ipynb
+make tutorials
 ```
 
-The stored outputs must contain no warning text, and no cell may end in an error.
+The website builder publishes one tutorial per notebook `tutorials/<stem>.ipynb` and reads its content from the executed copy, with the standard library; it never runs, converts or changes anything in `tutorials/`. Its messages name the notebook, `tutorials/<stem>.ipynb`. Without `tutorials/executed/` the tutorial index lists no tutorial; a notebook without an executed copy is left out. Both give the warning `not-executed`, which is an error with `--release`, so a release build has every tutorial. The executed copies must contain no warning text, and no cell may end in an error.
 
 Notebook metadata `metadata.quadriga_tutorial`:
 
@@ -135,9 +135,25 @@ The language comes from `metadata.kernelspec.language` (`python`, `matlab` or `o
 
 Headings: a notebook starts its sections with `##`; the page title comes from the metadata, so a `#` heading is an error. `##` becomes `h2`, `###` `h3`, deeper headings `h4`; ids are made as on content pages. The Markdown version keeps the heading levels as written.
 
+Links in Markdown cells are written as on content pages, as site paths from the site root (e.g. `faq.html#cite`, `tutorials.html#setup`, `publications/2018_sum_of_sinusoids.pdf`); the builder makes them relative to the tutorial page. A path relative to the notebook, such as `../tutorials.html`, gives `link target missing`.
+
 What is shown: Markdown cells like a content page; code cells as "In [n]" with the code coloured; `stream` output as text (colour codes removed); of each result or display bundle the first of SVG, PNG and plain text. Images are written to `tutorials/<stem>/fig-<cell>-<output>.<ext>`. A bundle with none of the three is left out (warning `output-type`); a code cell without execution count gives `not-run`; an `error` output stops the build.
 
-Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<stem>.md`, the notebook `tutorials/<stem>.ipynb` for download and its figures; the page links "Download notebook .ipynb" and "Markdown .md". The index `tutorials.html` and its twin `tutorials.md` list the tutorials; with no notebook they say "No tutorials yet.". The tutorial pages and their twins exist only on the website, never in `docs/`.
+Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<stem>.md`, the executed notebook as `tutorials/<stem>.ipynb` for download and its figures; the page links "Download notebook .ipynb" and "Markdown .md". The index `tutorials.html` and its twin `tutorials.md` show the common part of `content/tutorials.md` and list the tutorials; without tutorials the list is left out. The tutorial pages and their twins exist only on the website, never in `docs/`.
+
+### The tutorial index page
+
+`website_builder/content/tutorials.md` is a content page in the format of the docs builder (see "Content pages" and "File format" in the docs-builder README): TOML front matter between two `+++` lines, then the Markdown body. It holds the part of the tutorial index that is common to all tutorials:
+
+| Part | Shown |
+|------|-------|
+| `title` | Page title (`h1`) and title of the twin |
+| `description` | Meta description of the page |
+| `lead` | Lead paragraph under the title |
+| `dummy_note` | Warning box above the list when every tutorial is a placeholder (`dummy` in its metadata) |
+| Body | Between the lead and the list of tutorials: the setup that all tutorials need, and anything else that applies to all of them; `##` sections with ids as on other content pages (e.g. `## Setup` gets the id `setup`, so a notebook can link to `../tutorials.html#setup`) |
+
+Notes on a single tutorial or a family of tutorials (e.g. extra packages of one series) belong in the notebooks, not here. Gap markers are allowed in all parts; each fails `--release`.
 
 Notebook errors stop the build; each names the notebook, and the cell where there is one:
 
@@ -150,7 +166,8 @@ Notebook errors stop the build; each names the notebook, and the cell where ther
 | `metadata.quadriga_tutorial.level: one of beginner, intermediate, advanced` | Another level | Use one of the three |
 | `metadata.kernelspec.language: missing or not one of python, matlab, octave` | The notebook was saved without a kernel, or with another one | Select the Python, MATLAB or Octave kernel and save |
 | `cell N: a notebook starts its sections with ##; ...` | A `#` heading in a Markdown cell | Make it `##`; the page title is `title` of the metadata |
-| `cell N: the notebook was committed with a failing cell (...)` | An `error` output is stored | Fix the cell, run the notebook again, commit |
+| `cell N: the notebook was committed with a failing cell (...)` | An `error` output is stored in the executed copy | Fix the cell, run the tutorials again |
+| `tutorials/executed: missing: ...`, `no executed copy ...` (with `--release`) | The tutorials have not been run, or a notebook was added since | `make tutorials` |
 | `cell N: E-anchor: ...` | Two headings with the same explicit id, or an id the templates use | Change one of the ids |
 
 ## Formulas

@@ -14,8 +14,6 @@
 {% endif %}
 {% if cards %}
   <div class="grid-2">{% for c in cards %}<a class="card tut-card" href="tutorials/{{ c.stem }}.html"><div class="meta"><span class="tag lang">{{ c.language }}</span><span class="tag">{{ c.level }}</span></div><h3>{{ c.title }}</h3><p>{{ c.summary }}</p></a>{% endfor %}</div>
-{% else %}
-  <p class="prose">No tutorials yet.</p>
 {% endif %}
 </div>
 {% endblock %}

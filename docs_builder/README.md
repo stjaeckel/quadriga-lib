@@ -359,7 +359,8 @@ Errors stop the build; nothing is written. Warnings are printed and do not stop 
 | `code-span` | warning | docs | A backtick run has no closing run in its paragraph. | Close the code span or escape the backtick. |
 | `fence-language` | warning | website | A code fence has an info string the colouring does not know. | Use one of the names in [Writing pitfalls](#writing-pitfalls), or `text`. |
 | `size` | warning | website | A page or the landing page exceeds its size budget. | See "Checks" in the website README. |
-| `not-run` | warning | website | A notebook code cell has no execution count. | Run the notebook and commit it with its outputs. |
+| `not-executed` | warning | website | `tutorials/executed/` is missing, or a notebook has no executed copy there; the tutorial is left out. With `--release` it is an error. | Run the tutorials: `make tutorials` (see `tutorials/README.md`). |
+| `not-run` | warning | website | A code cell of an executed copy has no execution count. | Run the tutorials again: `make -C tutorials clean` and `make tutorials`. |
 | `output-type` | warning | website | A notebook output has no SVG, PNG or plain-text representation; it is left out. | Change the cell so that it produces one of these. |
 | `figure-alt` | warning | website | A notebook image has no alt text. | Set the cell metadata `quadriga_tutorial.alt`. |
 
