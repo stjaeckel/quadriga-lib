@@ -378,8 +378,7 @@ def render_site(model, diag):
     cards = [{"stem": t.stem, "title": t.title, "summary": ctx.inline(t.summary, t.path), "language": t.language,
               "level": t.level.capitalize()} for t in tuts]
     page("tutorials.html", "tutorials_index.html", current="tutorials", twin="tutorials.md", page=idx,
-         lead=ctx.inline(idx.lead, idx.path), note=ctx.inline(idx.extra.get("dummy_note", ""), idx.path),
-         dummy=bool(tuts) and all(t.dummy for t in tuts), body=_prose(ctx, idx), cards=cards,
+         lead=ctx.inline(idx.lead, idx.path), body=_prose(ctx, idx), cards=cards,
          title=idx.title, description=idx.description)
     for t in tuts:
         path = "tutorials/%s.html" % t.stem

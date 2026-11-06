@@ -145,7 +145,6 @@ Text ...
 | `description` | yes | Meta description and preview text. |
 | `lead` | no | Lead paragraph below the title (inline Markdown), also in the twin. |
 | `llms_summary` | only in `ai_agents.md` | The summary paragraph of `llms.txt` and `docs/README.md`. |
-| `dummy_note` | only in `website_builder/content/tutorials.md` | See the website README. |
 
 A missing required key, an unknown key or a value that is not a string stops the build with file and key.
 

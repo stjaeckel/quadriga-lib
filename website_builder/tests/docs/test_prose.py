@@ -44,7 +44,7 @@ def test_front_matter(tmp_path):
 @pytest.mark.parametrize("text, message", [
     ("title = 1\n", "page.md: error: front matter: title: not a string"),
     ('title = "T"\n', "page.md: error: front matter: description: missing"),
-    ('title = "T"\ndescription = "D"\ndummy_note = "x"\n', "page.md: error: front matter: dummy_note: unknown key"),
+    ('title = "T"\ndescription = "D"\nllms_summary = "x"\n', "page.md: error: front matter: llms_summary: unknown key"),
     ('title = = "T"\n', "page.md:2: error: TOML: "),
 ])
 def test_front_matter_errors(tmp_path, text, message):
@@ -177,9 +177,9 @@ def test_raw_html_stays_text_in_prose_twins(tmp_path):
 
 def test_check_keys_types_and_missing_once():
     found = []
-    spec = {"dummy": (bool, False), "order": (int, True), "title": (str, True)}
-    prose.check_keys({"dummy": "no", "order": True}, spec, "m.", found.append)
-    assert found == ["m.dummy: not true or false", "m.order: not an integer", "m.title: missing"]
+    spec = {"draft": (bool, False), "order": (int, True), "title": (str, True)}
+    prose.check_keys({"draft": "no", "order": True}, spec, "m.", found.append)
+    assert found == ["m.draft: not true or false", "m.order: not an integer", "m.title: missing"]
 
 
 def test_gap_text_with_build_variables(tmp_path):

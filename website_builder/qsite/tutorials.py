@@ -16,7 +16,7 @@ STEM_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 LANGUAGES = {"python": ("Python", "python"), "matlab": ("MATLAB", "matlab"), "octave": ("Octave", "matlab")}
 META_KEYS = {"title": (str, True), "summary": (str, True), "level": (str, True), "duration_min": (int, True),
-             "order": (int, True), "dummy": (bool, False)}
+             "order": (int, True)}
 LEVELS = ("beginner", "intermediate", "advanced")
 FOLDER = "tutorials"
 EXECUTED = "tutorials/executed"  # written by the tutorial build (tutorials/GNUmakefile), not by this builder
@@ -49,7 +49,6 @@ class Tutorial:
     level: str
     duration: int
     order: int
-    dummy: bool
     language: str       # display name
     lexer: str          # fence language of the code cells
     cells: list
@@ -132,7 +131,7 @@ def read(p, rel, diag):
         return None
     language, lexer = LANGUAGES[kernel]
     t = Tutorial(stem, rel, info["title"], info["summary"], info["level"], info["duration_min"], info["order"],
-                 bool(info.get("dummy")), language, lexer, [], {"%s/%s.ipynb" % (FOLDER, stem): raw})
+                 language, lexer, [], {"%s/%s.ipynb" % (FOLDER, stem): raw})
     md_lines, offsets = [], []
     for n, c in enumerate(nb.get("cells", []), 1):
         lines = _text(c.get("source")).split("\n")

@@ -32,12 +32,14 @@ def test_metadata_errors(mini_repo, run_site):
         del meta["title"]
         meta["level"] = "expert"
         meta["order"] = "1"
+        meta["dummy"] = True
         del nb["metadata"]["kernelspec"]["language"]
     edit(mini_repo, bad, "tutorials/Bad Name.ipynb")
     code, out = run_site(mini_repo)
     assert code == 1
     for msg in ("notebook file name must match", "metadata.quadriga_tutorial.title: missing",
                 "metadata.quadriga_tutorial.order: not an integer", "metadata.quadriga_tutorial.level: one of",
+                "metadata.quadriga_tutorial.dummy: unknown key",
                 "metadata.kernelspec.language: missing"):
         assert "tutorials/Bad Name.ipynb: error: " + msg in out
 
@@ -122,7 +124,6 @@ def test_pages_twins_and_index(mini_repo, run_site):
     index = site(mini_repo, "tutorials.html")
     assert 'href="tutorials/mini_demo.html"' in index and ">Python</span>" in index and ">Beginner</span>" in index
     assert "<h3>Mini demo</h3>" in index
-    assert '<div class="note-box warn"><b>Placeholder</b>These cards are examples.</div>' in index
     md = site(mini_repo, "tutorials.md")
     assert "- [Mini demo](tutorials/mini_demo.md) · Python · beginner · A *small* notebook for the tests." in md
 
@@ -131,7 +132,7 @@ def test_no_tutorials(mini_repo, run_site):
     (mini_repo / NB).unlink()
     code, out = run_site(mini_repo)
     assert code == 0 and "not-executed" not in out
-    assert "tut-card" not in site(mini_repo, "tutorials.html") and "note-box" not in site(mini_repo, "tutorials.html")
+    assert "tut-card" not in site(mini_repo, "tutorials.html")
     assert "tutorials/mini_demo" not in site(mini_repo, "tutorials.md")
     assert not (mini_repo / "website/tutorials/mini_demo.html").exists()
 

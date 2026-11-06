@@ -76,7 +76,6 @@ The notebook metadata `metadata.quadriga_tutorial` describes the tutorial:
 | `level` | `beginner`, `intermediate` or `advanced` | Tag on card and page |
 | `duration_min` | integer | Reading time in minutes |
 | `order` | integer | Position on the index (then by title); leave gaps between series (e.g. 10, 11, 12 for one series, 20, 21 for the next) so that tutorials can be inserted |
-| `dummy` | boolean, optional | Placeholder notebook; if every notebook is a placeholder, the index shows the `dummy_note` of `content/tutorials.md` as a warning box |
 
 Example, as it appears in the notebook metadata:
 
