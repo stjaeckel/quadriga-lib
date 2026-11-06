@@ -3766,11 +3766,41 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 
 Not in: MATLAB, Python
 
-- Per snapshot [get_channels_planar](#get_channels_planar) (`"phase"`, arrays at the positions of `rays`) or
-  [get_channels_spherical](#get_channels_spherical) (`"drift"`) with the paths of [ssf_paths](#ssf_paths)
-- `"taps"`: rays summed per tap, LOS and GR taps always present, tap count fixed per call; `"rays"`: one path per
-  ray
-- Validity: see [ssf_paths](#ssf_paths); the channel's `par` reports the largest displacement relative to the limit
+- Snapshot t: the paths of [ssf_paths](#ssf_paths) at the positions of t, at `rays.center_frequency(i_freq)` with the link gain
+  and K ratio of t, for the rays with power > 0 at `i_freq` plus LOS and GR
+- `"phase"`: [get_channels_planar](#get_channels_planar) with the arrays at the positions of `rays` and the orientations of t; delays,
+  path lengths and angles stay those of the ray-data positions. `"drift"`: [get_channels_spherical](#get_channels_spherical) with the arrays
+  at the positions and orientations of t
+- `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
+  per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
+  element pair is the mean of the rays' delays weighted by `rays.power` at `i_freq` (equal weights where they sum to
+  0), `[n_rx, n_tx, n_tap]`; reduce it to `[1, 1, n_tap]` where needed. TR 38.901 LOS gives two taps at delay 0
+- `"taps"` is exact at the phase centre for the TR methods (the rays of a tap share one delay); for `"quadriga"` only
+  at the carrier: in UMi NLOS a tap varies over the band by 0.18, 0.52 and 0.79 (in-band selectivity) for 20, 100 and
+  400 MHz. `"rays"`: one path per kept ray in ray order, exact at any bandwidth, the form of the QRT route; the path
+  data are the outputs of [ssf_paths](#ssf_paths) at t (in `"phase"` with the displacement phase in `M`, for the arrays at the
+  ray-data positions)
+- `n_snap` is the largest row count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
+  rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries; one row or entry applies to all snapshots. One position
+  is a `[1, 3]` row; a `[3]` vector is rejected. A static link with a gain per snapshot repeats its position
+- `use_absolute_delays` in `"phase"` adds the LOS delay of the ray-data positions
+- No power correction and no initial position; validity limits and their meaning: see [ssf_paths](#ssf_paths)
+- Errors: an invalid array (message after `Transmit antenna: ` or `Receive antenna: `), the errors of [ssf_paths](#ssf_paths)
+  in `"drift"`, a row or entry count other than 1 or `n_snap`
+
+### Entries of par:
+
+| Name | Size | Content |
+| --- | --- | --- |
+| `tap` | `[n_tap]` or `[n_path]` | Tap index per output tap or per path, `arma::uvec` |
+| `n_ray_tap` | `[n_tap]` | Number of kept rays per tap, `arma::uvec`; `"taps"` only |
+| `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only |
+| `gr_pos` | `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
+| `link_gain_dB` | `[n_snap]` | Link gain per snapshot |
+| `b_med`, `b_eff` | `[2]` | Of [gbsm_rays](#gbsm_rays) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
+| `limit` | `[2]` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`"phase"`) or $0.2 b_{\mathrm{med}}$ (`"drift"`); Inf where b is NaN |
+| `ratio` | `[2]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
+| `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `"drift"`: new segment from 2.5 |
 
 ### Declaration:
 ```cpp
@@ -3795,23 +3825,27 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
 - **`rays`** — Ray data of the link, see [gbsm_rays](#gbsm_rays)
 - **`link_gain_dB`** — Link gain `-PL - O2I + SF` at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
-- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (phase for the TR methods, drift for quadriga)
+- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (phase for the TR methods, drift for `"quadriga"`)
 - **`output`** *(optional)* — `"taps"` or `"rays"`
 - **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 0-based
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in [m]; omitted: the positions of `rays`;
   `[n_snap, 3]` or `[1, 3]`
 - **`tx_orientation`**, **`rx_orientation`** *(optional)* — Euler angles (bank, tilt, heading) in [rad]; omitted: 0;
   `[n_snap, 3]` or `[1, 3]`
-- **`kf_ratio`** *(optional)* — K(snapshot) / K(drop); omitted: 1; `[n_snap]` or `[1]`
-- **`oxygen`** *(optional)* — TR 7.6.1 oxygen absorption from each path's own length
+- **`kf_ratio`** *(optional)* — K(snapshot) / K(drop), >= 0; omitted: 1; `[n_snap]` or `[1]`
+- **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1, see [ssf_paths](#ssf_paths)
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays
 
 ### Returns:
-- Channel object with `n_snap` snapshots
+- Channel object: `center_frequency` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
+  `rx_orientation` `[3, n_snap]`; per snapshot `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap]` (`"taps"`) or
+  `[n_rx, n_tx, n_path]` (`"rays"`); `"rays"` also `path_gain`, `path_length`, `path_polarization`, `path_angles`
+  and in `"drift"` `path_fbs_pos`, `path_lbs_pos`; `par_names`, `par_data` as above
 
 ### See also:
-- [ssf_paths](#ssf_paths) (paths of one link at one position)
-- [gbsm_rays](#gbsm_rays) (input data)
+- [ssf_paths](#ssf_paths) (paths of one link at one position, validity limits)
+- [gbsm_rays](#gbsm_rays) (input data, `b_med` and `b_eff`)
+- [gbsm_rays_from_paths](#gbsm_rays_from_paths) (ray data from path data, e.g. of a QRT file; taps 0, 3, 6, ... without `tap`)
 
 ---
 <a id="los_probability"></a>
