@@ -555,7 +555,8 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`no_int`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries `(n_path,)`
 - **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(no_int))`
 - **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
-  entries `(sum(no_int),)`. Empty for v4 legacy files.
+  entries `(sum(no_int),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
+  193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
 - [generate](array-antenna-functions.md#generate) (for generating antenna arrays)

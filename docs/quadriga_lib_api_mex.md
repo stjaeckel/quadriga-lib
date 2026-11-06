@@ -1330,7 +1330,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(no_int)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files.
+  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
 - [arrayant_generate](#arrayant_generate) (for generating antenna arrays)
