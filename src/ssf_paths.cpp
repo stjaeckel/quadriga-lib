@@ -7,7 +7,6 @@
 
 #include <cmath>
 #include <complex>
-#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -27,11 +26,11 @@ Antenna-free paths of one link at one position
 - `"drift"`: use the outputs at the new positions with [[get_channels_spherical]] or [[get_channels_multifreq]], or
   pass them to [[qrt_paths_from_scatterers]]; needs the scatterers of .[[solve_scatterers]]
 - Kept rays: LOS and GR rays always (also at zero power), NLOS rays with power > 0 at some frequency; paths in ray
-  order, `ray_ind` maps them to the rays (e.g. `rays.tap(ray_ind)`, `rays.fallback(ray_ind)`)
+  order, `ray_ind` maps them to the rays (e.g. `rays.tap(ray_ind)`); outputs must not share memory with `rays`
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
-| Path length | `abs(rays.rx_pos - rays.tx_pos) + c·delay` | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
+| Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
 | `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `[3, 0]` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
@@ -179,24 +178,6 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
             u->set_size(n_path);
 
     const double c0 = 299792458.0, pi2 = 6.283185307179586;
-    auto dist = [](const double *a, const double *b)
-    {
-        const double x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
-        return std::sqrt(x * x + y * y + z * z);
-    };
-
-    // Angles from O towards the first of the points P that differs from O; 0 if none differs
-    auto direction = [](const double *O, std::initializer_list<const double *> P, double &az, double &el)
-    {
-        az = 0.0, el = 0.0;
-        for (const double *x : P)
-            if (x[0] != O[0] || x[1] != O[1] || x[2] != O[2])
-            {
-                const double dx = x[0] - O[0], dy = x[1] - O[1], dz = x[2] - O[2];
-                az = std::atan2(dy, dx), el = std::atan2(dz, std::sqrt(dx * dx + dy * dy));
-                return;
-            }
-    };
 
     // K rescale per frequency (TR coefficient powers with K' = kf_ratio·K_c, K_c = S_L / S_N the K-factor of the
     // coefficient powers): a_L = r·(S_L + S_N) / (r·S_L + S_N) for LOS and GR, a_N = (S_L + S_N) / (r·S_L + S_N)
@@ -217,27 +198,30 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         const double tab[17] = {0.0, 1.0, 2.2, 4.0, 6.6, 9.7, 12.6, 14.6, 15.0,
                                 14.6, 14.3, 10.5, 6.8, 3.9, 1.9, 1.0, 0.0};
         const double f = rays.center_frequency(k) * 1e-9 - 52.0;
-        const int j = (int)std::floor(f);
-        alpha(k) = (!oxygen || f <= 0.0 || f >= 16.0) ? 0.0 : tab[j] + (f - (double)j) * (tab[j + 1] - tab[j]);
+        alpha(k) = 0.0;
+        if (oxygen && f > 0.0 && f < 16.0) // index only inside the table: the cast of a larger f overflows int
+        {
+            const int j = (int)f;
+            alpha(k) = tab[j] + (f - (double)j) * (tab[j + 1] - tab[j]);
+        }
     }
 
-    // Ground reflection at the ray-data and the new positions: specular point G (z = 0; both ends on the ground: the
-    // midpoint), Fresnel coefficients and power law g = (d3D / d_GR')², d_GR' = max(d_GR, 1e-5), for the TR methods,
-    // 1 for quadriga
-    const double h = T[2] + R[2], s = (h > 0.0) ? T[2] / h : 0.5;
-    const double G[3] = {T[0] + s * (R[0] - T[0]), T[1] + s * (R[1] - T[1]), 0.0};
+    // Ground reflection at the ray-data and the new positions: specular point G, Fresnel coefficients and power law
+    // g = (d3D / d_GR')², d_GR' = max(d_GR, 1e-5), for the TR methods, 1 for quadriga
+    double G[3];
+    qd_gbsm_specular_point(T, R, G);
     const double mid[3] = {0.5 * (T[0] + R[0]), 0.5 * (T[1] + R[1]), 0.5 * (T[2] + R[2])};
     const double R_img[3] = {R[0], R[1], -R[2]}, T_img[3] = {T[0], T[1], -T[2]};
     auto gr_law = [&](const double *a, const double *b)
     {
-        const double d3D = dist(a, b), d2D = std::hypot(b[0] - a[0], b[1] - a[1]);
+        const double d3D = qd_gbsm_dist(a, b), d2D = std::hypot(b[0] - a[0], b[1] - a[1]);
         const double d_gr = std::max(std::sqrt(d2D * d2D + (a[2] + b[2]) * (a[2] + b[2])), 1e-5);
         return (rays.method == "quadriga") ? 1.0 : (d3D / d_gr) * (d3D / d_gr);
     };
     const double g_ratio = gr_new && gr_law(T0, R0) > 0.0 ? gr_law(T, R) / gr_law(T0, R0) : 1.0;
 
     const double dT[3] = {T[0] - T0[0], T[1] - T0[1], T[2] - T0[2]}, dR[3] = {R[0] - R0[0], R[1] - R0[1], R[2] - R0[2]};
-    const double d3D_0 = dist(T0, R0);
+    const double d3D_0 = qd_gbsm_dist(T0, R0);
     for (arma::uword p = 0; p < n_path; ++p)
     {
         const arma::uword i = keep[p], type = rays.path_type(i);
@@ -253,18 +237,18 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         else if (type == 2)
         {
             F = rays.fbs_pos.colptr(i), B = rays.lbs_pos.colptr(i);
-            L = dist(T, F) + dist(F, B) + dist(B, R);
-            direction(T, {F, B, R}, ang[0], ang[1]), direction(R, {B, F, T}, ang[2], ang[3]);
+            L = qd_gbsm_dist(T, F) + qd_gbsm_dist(F, B) + qd_gbsm_dist(B, R);
+            qd_gbsm_direction(T, {F, B, R}, ang[0], ang[1]), qd_gbsm_direction(R, {B, F, T}, ang[2], ang[3]);
         }
         else if (type == 0)
         {
-            L = dist(T, R);
-            direction(T, {R}, ang[0], ang[1]), direction(R, {T}, ang[2], ang[3]);
+            L = qd_gbsm_dist(T, R);
+            qd_gbsm_direction(T, {R}, ang[0], ang[1]), qd_gbsm_direction(R, {T}, ang[2], ang[3]);
         }
         else // GR: angles towards the image points, also defined for an end on the ground
         {
-            F = G, B = G, L = dist(T, G) + dist(G, R);
-            direction(T, {R_img}, ang[0], ang[1]), direction(R, {T_img}, ang[2], ang[3]);
+            F = G, B = G, L = qd_gbsm_dist(T, G) + qd_gbsm_dist(G, R);
+            qd_gbsm_direction(T, {R_img}, ang[0], ang[1]), qd_gbsm_direction(R, {T_img}, ang[2], ang[3]);
         }
 
         for (arma::uword k = 0; k < n_freq; ++k)

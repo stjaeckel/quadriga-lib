@@ -506,6 +506,12 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
         const double l2 = b.gain(2, 1) / a.gain(2, 1), l3 = b.gain(3, 1) / a.gain(3, 1);
         CHECK(std::abs(10.0 * std::log10(l2 / l3)) > 1e-3);
     }
+
+    // Far outside the table (fc·1e-9 - 52 beyond the int range): no loss, with and without oxygen
+    rays_t h = r;
+    h.center_frequency(5) = 1e300;
+    const po_t c = pth(h, "phase", nullptr, &R), d = pth(h, "phase", nullptr, &R, nullptr, true);
+    CHECK(arma::approx_equal(c.gain.col(5), d.gain.col(5), "absdiff", 0.0));
 }
 
 TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give the same values")

@@ -419,10 +419,15 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`method`** — Value of `rays["method"]`; sets the GR power law and the default mobility; default: `"quadriga"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `(n_path,)`; default: None
 - **`tap`** — Tap index; `None`: LOS 0, GR 3, the others 6, 9, ... in path order; `(n_path,)`; default: None
-- **`gr_eps`** — Ground permittivity (complex), used as `real - j·imag`; `(n_freq,)`; default: None
+- **`gr_eps`** — Ground permittivity (complex), used as `real - j·imag`; `(n_freq,)`; default: None (also if empty)
 
 ### Output:
 - **`rays`** — Ray dict with `n_ray = n_path`, see [ssf_rays](#ssf_rays)
+
+### See also:
+- [qrt_file_read](channel-functions.md#qrt_file_read) (source of the path data)
+- [ssf_paths](#ssf_paths) (paths at other positions)
+- [gbsm.single_link_channel](#gbsm.single_link_channel) (channel coefficients of the link)
 
 ---
 <a id="gbsm.single_link_channel"></a>
@@ -463,7 +468,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 | `fbs_pos`, `lbs_pos` | `(3, n_kept)` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only |
 | `gr_pos` | `(3, n_snap)` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `(n_snap,)` | Link gain per snapshot |
-| `b_med`, `b_eff` | `(2,)` | Validity scales of [ssf_scatterers](#ssf_scatterers) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
+| `b_med`, `b_eff` | `(2,)` | Validity scales of [ssf_scatterers](#ssf_scatterers) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m), NaN if a GR ray has an end below z = 0 |
 | `limit` | `(2,)` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`"phase"`) or $0.2 b_{\mathrm{med}}$ (`"drift"`); Inf where b is NaN |
 | `ratio` | `(2,)` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `"drift"`: new segment from 2.5 |
@@ -914,7 +919,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_paths) · [MATLAB](
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
-| Path length | `norm(rx_pos - tx_pos) + c·delay` of `rays` | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
+| Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
 | `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `(3, 0)` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
@@ -980,7 +985,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_rays) · [MATLAB](.
   links of the call
 - Ray layout per link, fixed per scenario: index 0 LOS, 1 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` at
   `1 + G + n·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays at power 0
-- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_per)/R of
+- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R of
   the ground reflection (TR eqs. (7.6-38) to (7.6-40))
 - NLOS rays: power P_n/M; offsets of Table 7.5-3 scaled by the cluster spreads; coupling (step 8) by the rank blocks
   of `rnd_ray`; `M` other than 20: QuaDRiGa-NG's offsets below 20, Laplacian quantiles above 20, no sub-clusters
@@ -1004,7 +1009,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_rays) · [MATLAB](.
   1 mm count as equal; the Tx if all tie); the Rx as owner transposes it
 - Swap reciprocity: with mirrored inputs (dual mobility in [gbsm.draw](#gbsm.draw), mirrored LSPs and clusters,
   `PerClusterAS_D` = `PerClusterAS_A`, `PerClusterES_D` = `PerClusterES_A`, `PerClusterES_D_scale` = 0), swapping
-  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M`
+  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = "quadriga"`
+  with ends within 1 mm of each other, where the Tx stays the owner)
 - Messages name the argument `center_freq` as `'center_frequency'` and the real and imaginary part of `gr_eps` as
   `gr_eps_re` and `gr_eps_im`; the flags take a bool or `numpy.bool_`, `None` selects the default, any other type
   raises `TypeError`
@@ -1020,7 +1026,7 @@ one LOS and one GR ray, with tap index 0 and 3; the other rays take any other ta
 | `method` | — | `str` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | yes |
 | `tx_pos`, `rx_pos` | `(3,)` | float | Tx and Rx position the ray data refer to in m | yes |
 | `center_frequency` | `(n_freq,)` | float | Carrier frequencies in Hz | yes |
-| `delay` | `(n_ray,)` | float | Delays in s relative to the LOS delay `norm(rx_pos - tx_pos) / c` | yes |
+| `delay` | `(n_ray,)` | float | Delays in s relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `(n_ray, n_freq)` | float | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `(n_ray,)` | float | Departure and arrival azimuth and elevation in rad, GCS | yes |
 | `M` | `(8, n_ray, n_freq)` | float | Polarization transfer matrices incl. initial phases, real, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | yes |
@@ -1073,17 +1079,19 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 Also in: [C++](../cpp/geometry-based-stochastic-model.md#.solve_scatterers) · [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_scatterers)
 
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal distances
-  from their end, so that the polyline Tx, FBS, LBS, Rx has the length `norm(rx_pos - tx_pos) + c·delay` and the
-  angles are exact
+  from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx distance) and
+  the angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
   ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With `d_min`
-  = 2 m this applies to 5.5 to 9.6 % of the rays of the TR methods without absolute TOA and to at most 2.3 %
-  otherwise; it adds a median delay of 0.2 to 4.6 ns (p99 up to 21.7 ns)
+  = 2 m (UMi, UMa, RMa, InF and indoor scenarios) this applies to 5.5 to 13 % of the rays of the TR methods without
+  absolute TOA, to 1.0 to 9.8 % in `"quadriga"` and to at most 2.3 % with absolute TOA; it adds a median delay of up
+  to 5.5 ns (p99 up to 21.7 ns)
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
-- `rays_out` is a new dict with all keys; it shares the unchanged arrays with `rays` (no copy: an in-place edit of
-  `rays_out["delay"]` changes `rays["delay"]`) and has new arrays `fbs_pos`, `lbs_pos` and `fallback`; `rays` and its
-  arrays are not changed, also when it already holds scatterers
+- `rays_out` is a new dict with all keys; it shares the unchanged entries with `rays` as they are (no copy and no
+  conversion: a list stays a list, and an in-place edit of `rays_out["delay"]` changes `rays["delay"]`) and has new
+  arrays `fbs_pos`, `lbs_pos` and `fallback`; `rays` and its arrays are not changed, also when it already holds
+  scatterers
 - `b_med` and `b_eff` are the validity scales of [ssf_paths](#ssf_paths) for planning segments: `b_med` the lower power-weighted
   median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 (`drift`, NaN without NLOS
   power); $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$, with $b$ the

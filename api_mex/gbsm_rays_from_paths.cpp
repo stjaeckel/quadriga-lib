@@ -48,6 +48,11 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 
 ## Output:
 - **`rays`** — Ray struct with `n_ray = n_path`, see [[ssf_rays]]
+
+## See also:
+- [[qrt_file_read]] (source of the path data)
+- [[ssf_paths]] (paths at other positions)
+- [[gbsm_single_link_channel]] (channel coefficients of the link)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -61,11 +66,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec center_freq = qd_mex_get_Col<double>(prhs[0], false, "center_freq");
     const arma::vec tx_pos = qd_mex_get_Col<double>(prhs[1], false, "tx_pos");
     const arma::vec rx_pos = qd_mex_get_Col<double>(prhs[2], false, "rx_pos");
-    const arma::mat fbs_pos = qd_mex_get_Mat<double>(prhs[3], false, "fbs_pos");
-    const arma::mat lbs_pos = qd_mex_get_Mat<double>(prhs[4], false, "lbs_pos");
-    const arma::mat path_gain = qd_mex_get_Mat<double>(prhs[5], false, "path_gain");
+    // Empty arrays keep their dimensions, so that a link without paths ([3, 0], [0, n_freq], [8, 0, n_freq]) passes
+    auto dim = [](const mxArray *a, mwSize d) -> arma::uword
+    { return d < mxGetNumberOfDimensions(a) ? (arma::uword)mxGetDimensions(a)[d] : 1; };
+    auto mat = [&](const mxArray *a, const char *name)
+    { return mxIsEmpty(a) ? arma::mat(dim(a, 0), dim(a, 1)) : qd_mex_get_Mat<double>(a, false, name); };
+    const arma::mat fbs_pos = mat(prhs[3], "fbs_pos"), lbs_pos = mat(prhs[4], "lbs_pos");
+    const arma::mat path_gain = mat(prhs[5], "path_gain");
     const arma::vec path_length = qd_mex_get_Col<double>(prhs[6], false, "path_length");
-    const arma::cube M = qd_mex_get_Cube<double>(prhs[7], false, "M");
+    const arma::cube M = mxIsEmpty(prhs[7]) ? arma::cube(dim(prhs[7], 0), dim(prhs[7], 1), dim(prhs[7], 2))
+                                            : qd_mex_get_Cube<double>(prhs[7], false, "M");
     const std::string method = (nrhs < 9) ? std::string("quadriga") : qd_mex_get_string(prhs[8], "quadriga");
     const arma::uvec path_type = (nrhs < 10) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[9], false, "path_type");
     const arma::uvec tap = (nrhs < 11) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[10], false, "tap");

@@ -11,6 +11,7 @@
 // closed form of b_eff in this file.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
 
 #include "quadriga_gbsm.hpp"
 #include "qd_test_diag.hpp"
@@ -19,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -102,6 +104,8 @@ TEST_CASE("gbsm_rays - is_valid reports each failed check")
     fails([](R &r) { r.path_type(3) = 3; }, "Values of 'rays.path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS).");
     SECTION("8 path_type two LOS rays")
     fails([](R &r) { r.path_type(4) = 0; }, "Input 'rays.path_type' can hold at most one LOS and one GR ray.");
+    SECTION("8 path_type two GR rays")
+    fails([](R &r) { r.path_type(4) = 1; }, "Input 'rays.path_type' can hold at most one LOS and one GR ray.");
     SECTION("9 tap size")
     fails([&](R &r) { r.tap.resize(n_ray + 1); }, "Input 'rays.tap' must have n_ray elements.");
     SECTION("10 permittivity sizes")
@@ -114,6 +118,18 @@ TEST_CASE("gbsm_rays - is_valid reports each failed check")
     SECTION("11 scatterer sizes")
     fails([](R &r) { r.lbs_pos.reset(); },
           "Inputs 'rays.fbs_pos' and 'rays.lbs_pos' must both be empty or both have size [3, n_ray].");
+    SECTION("11 scatterer sizes [0, n_ray]: no elements, but n_ray columns")
+    {
+        const std::string m = "Inputs 'rays.fbs_pos' and 'rays.lbs_pos' must both be empty or both have size [3, n_ray].";
+        fails([&](R &r) { r.fbs_pos.set_size(0, n_ray), r.lbs_pos.set_size(0, n_ray); }, m);
+        R r = base;
+        r.fbs_pos.set_size(0, n_ray), r.lbs_pos.set_size(0, n_ray);
+        arma::mat pg;
+        arma::vec pl;
+        arma::cube M;
+        CHECK_THROWS_MATCHES(quadriga_lib::ssf_paths(r, arma::vec(2, arma::fill::zeros), pg, pl, M, "drift"),
+                             std::invalid_argument, Catch::Matchers::Message(m));
+    }
     SECTION("11 fbs_pos finite")
     fails([&](R &r) { r.fbs_pos(2, 4) = nan; }, "Input 'rays.fbs_pos' must be finite.");
     SECTION("11 lbs_pos finite")

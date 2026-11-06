@@ -24,7 +24,7 @@ Antenna-free paths of one link at one position
 
 | Quantity | `'phase'` | `'drift'` |
 | --- | --- | --- |
-| Path length | `norm(rays.rx_pos - rays.tx_pos) + c·delay` | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
+| Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
 | `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `[3, 0]` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
@@ -107,27 +107,36 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                     (nlhs > 8) ? &lbs_pos : nullptr, (nlhs > 9) ? &path_type : nullptr,
                                     (nlhs > 10) ? &ray_ind : nullptr, oxygen));
 
-    // Empty matrices keep their size (e.g. 'fbs_pos' [3, 0] in "phase")
+    // Empty outputs keep their size: matrices as returned (e.g. 'fbs_pos' [3, 0] in "phase"), vectors [0, 1], 'M'
+    // [8, 0, n_freq]
     auto mat = [](const arma::mat &x)
     { return x.empty() ? mxCreateNumericMatrix(x.n_rows, x.n_cols, mxDOUBLE_CLASS, mxREAL) : qd_mex_copy2matlab(&x); };
+    auto col = [](const auto &x)
+    {
+        using T = typename std::decay_t<decltype(x)>::elem_type;
+        return x.empty() ? mxCreateNumericMatrix(0, 1, qd_mex_class_id<T>(), mxREAL) : qd_mex_copy2matlab(&x);
+    };
     if (nlhs > 0)
         plhs[0] = mat(path_gain);
     if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&path_length);
+        plhs[1] = col(path_length);
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&M);
+    {
+        const mwSize d[3] = {8, 0, (mwSize)M.n_slices};
+        plhs[2] = M.empty() ? mxCreateNumericArray(3, d, mxDOUBLE_CLASS, mxREAL) : qd_mex_copy2matlab(&M);
+    }
     arma::vec *ang[4] = {&aod, &eod, &aoa, &eoa};
     for (int k = 3; k < 7 && k < nlhs; ++k)
-        plhs[k] = qd_mex_copy2matlab(ang[k - 3]);
+        plhs[k] = col(*ang[k - 3]);
     if (nlhs > 7)
         plhs[7] = mat(fbs_pos);
     if (nlhs > 8)
         plhs[8] = mat(lbs_pos);
     if (nlhs > 9)
-        plhs[9] = qd_mex_copy2matlab(&path_type); // Codes, not shifted
+        plhs[9] = col(path_type); // Codes, not shifted
     if (nlhs > 10)
     {
         ray_ind += 1; // 0-based (C++) -> 1-based (MATLAB)
-        plhs[10] = qd_mex_copy2matlab(&ray_ind);
+        plhs[10] = col(ray_ind);
     }
 }

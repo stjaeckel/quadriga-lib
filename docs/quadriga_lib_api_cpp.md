@@ -2428,7 +2428,7 @@ Not in: MATLAB, Python
 - Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
   0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
 - Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
-- A path of length 0 (LOS with `tx_pos` = `rx_pos`) throws: `qrt_file_read` would return an infinite gain
+- Throws for a path of length 0 in float32 (e.g. LOS with `tx_pos` = `rx_pos`) and for values beyond float32
 
 ### Declaration:
 ```cpp
@@ -2451,7 +2451,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`M`** — Polarization transfer matrices, row order of [get_channels_spherical](#get_channels_spherical); `[8, n_path, n_freq]`
-- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
 
 ### Returns:
@@ -3721,6 +3721,9 @@ Not in: MATLAB, Python
 - Rays from several sources in one object: at most one LOS and one GR ray, with tap index 0 and 3; the other rays
   take any other tap indices; one `method` for all rays; `.solve_scatterers` overwrites given scatterers, so solve
   rays without scatterers in a separate object and concatenate the attributes
+- Extreme but finite inputs overflow: XPR, polarization or spread statistics far outside the TR tables (e.g. 1000 dB)
+  give rays that `is_valid()` rejects by attribute, not by input, in the consumer; `kf_ratio` or positions near the
+  range of double give outputs of [ssf_paths](#ssf_paths) that are not finite
 
 ### Attributes:
 | Attribute | Size | Meaning | Set by |
@@ -3728,7 +3731,7 @@ Not in: MATLAB, Python
 | `method` | string | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
 | `tx_pos`, `rx_pos` | `[3]` | Tx and Rx position the ray data refer to in [m] | all |
 | `center_frequency` | `[n_freq]` | Carrier frequencies in [Hz] | all |
-| `delay` | `[n_ray]` | Delays in [s] relative to the LOS delay `abs(rx_pos - tx_pos) / c` | all |
+| `delay` | `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
 | `M` | `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | all |
@@ -3769,7 +3772,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quad
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
   NLOS; a GR path needs `path_type` (`no_int` for files of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers))
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0; permittivity only for `drift` away from `tx_pos`, `rx_pos`
-- Use in [ssf_paths](#ssf_paths) and [gbsm_single_link_channel](#gbsm_single_link_channel) with `link_gain_dB = 0` and without `kf_ratio`
 
 ### Declaration:
 ```cpp
@@ -3803,7 +3805,10 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; `[n_freq]`
 
 ### Output:
-- **`rays`** — Ray data with `n_ray = n_path`, see [gbsm_rays](#gbsm_rays)
+- **`rays`** — Ray data with `n_ray = n_path`, see [gbsm_rays](#gbsm_rays); use with `link_gain_dB = 0` and without `kf_ratio`
+
+### See also:
+- [qrt_file_read](#qrt_file_read), [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) (QRT route), [ssf_paths](#ssf_paths), [gbsm_single_link_channel](#gbsm_single_link_channel)
 
 ---
 <a id="gbsm_single_link_channel"></a>
@@ -3843,7 +3848,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_single_link_channel) · [Python](
 | `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only |
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `[n_snap]` | Link gain per snapshot |
-| `b_med`, `b_eff` | `[2]` | Of [gbsm_rays](#gbsm_rays) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
+| `b_med`, `b_eff` | `[2]` | Of [gbsm_rays](#gbsm_rays) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m), NaN if a GR ray has an end below z = 0 |
 | `limit` | `[2]` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`"phase"`) or $0.2 b_{\mathrm{med}}$ (`"drift"`); Inf where b is NaN |
 | `ratio` | `[2]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `"drift"`: new segment from 2.5 |
@@ -4362,11 +4367,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_paths) · [Python](quadriga_lib_ap
 - `"drift"`: use the outputs at the new positions with [get_channels_spherical](#get_channels_spherical) or [get_channels_multifreq](#get_channels_multifreq), or
   pass them to [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); needs the scatterers of [.solve_scatterers](#.solve_scatterers)
 - Kept rays: LOS and GR rays always (also at zero power), NLOS rays with power > 0 at some frequency; paths in ray
-  order, `ray_ind` maps them to the rays (e.g. `rays.tap(ray_ind)`, `rays.fallback(ray_ind)`)
+  order, `ray_ind` maps them to the rays (e.g. `rays.tap(ray_ind)`); outputs must not share memory with `rays`
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
-| Path length | `abs(rays.rx_pos - rays.tx_pos) + c·delay` | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
+| Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
 | `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `[3, 0]` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
@@ -4446,8 +4451,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_rays) · [Python](quadriga_lib_api
   links of the call
 - Ray layout per link, fixed per scenario: index 0 LOS, 1 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` at
   `1 + G + n·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays at power 0
-- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_per)/R of
-  the ground reflection (TR eqs. (7.6-38) to (7.6-40), R² = (abs(R_par)² + abs(R_per)²)/2)
+- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R
+  of the ground reflection (TR eqs. (7.6-38) to (7.6-40), R² = (abs(R_par)² + abs(R_perp)²)/2)
 - NLOS rays: power P_n/M; offsets of Table 7.5-3 scaled by the cluster spreads (`PerClusterAS_D`, `PerClusterAS_A`,
   `PerClusterES_A`, ZSD of eq. (7.5-20)); coupling (step 8): within a cluster or sub-cluster, the ray with the k-th
   smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA, ZOD and ZOA
@@ -4475,7 +4480,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_rays) · [Python](quadriga_lib_api
   on either side of the tie plane get transposed matrices
 - Swap reciprocity: with mirrored inputs (dual mobility in [gbsm_draw](#gbsm_draw), mirrored LSPs and clusters,
   `PerClusterAS_D` = `PerClusterAS_A`, `PerClusterES_D` = `PerClusterES_A`, `PerClusterES_D_scale` = 0), swapping
-  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (both polarisation models)
+  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (both polarisation models; not
+  for `pol_model = "quadriga"` with ends within 1 mm of each other, where the Tx stays the owner)
 
 ### Declaration:
 ```cpp
@@ -4542,13 +4548,14 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_scatterers) · [Python](quadriga_lib_api_python.md#ssf_scatterers)
 
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
-  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length `abs(rx_pos - tx_pos) + c·delay`
-  and the angles are exact
+  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
+  distance) and the angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
   ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
-  `d_min` = 2 m this applies to 5.5 to 9.6 % of the rays of the TR methods without absolute TOA (the first cluster
-  has zero excess delay) and to at most 2.3 % otherwise; it adds a median delay of 0.2 to 4.6 ns (p99 up to 21.7 ns)
-  and changes the delay spread of a link by up to 4.1 % (p99)
+  `d_min` = 2 m (UMi, UMa, RMa, InF and indoor scenarios) this applies to 5.5 to 13 % of the rays of the TR methods
+  without absolute TOA (the first cluster has zero excess delay), to 1.0 to 9.8 % in `"quadriga"` and to at most
+  2.3 % with absolute TOA; it adds a median delay of up to 5.5 ns (p99 up to 21.7 ns) and changes the delay spread
+  of a link at p99 by up to 4.1 % in UMi, UMa and InF, 10 % indoor and 21 % in RMa LOS (small LOS delay spreads)
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
 - Writes `fbs_pos`, `lbs_pos` and `fallback` of all rays and overwrites given scatterers; nothing else changes;

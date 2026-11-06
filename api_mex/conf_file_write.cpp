@@ -45,12 +45,11 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 ## Inputs:
 - **`fn`** — Path of the conf file to write; string
 - **`scenpar`** — Scenario parameters; struct with any subset of the 171 fields returned by
-  [[conf_file_read]]; real scalars of class double, single, int32, uint32, int64, uint64 or logical;
-  missing fields have their default; `[]` writes the default set
-- **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one
-  real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further
-  field, named without the prefix `PL_`, as returned by [[conf_file_read]]; a matrix is an error;
-  written in struct order; if omitted or `[]`, no path-loss section
+  [[conf_file_read]]; real scalars of any numeric class or logical; missing fields have their default; `[]` writes
+  the default set
+- **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one real vector (row
+  or column) of any numeric class per further field, named without the prefix `PL_`, as returned by
+  [[conf_file_read]]; a matrix is an error; written in struct order; if omitted or `[]`, no path-loss section
 - **`short_names`** *(optional)* — Short names of the scenario; cell array of strings or one string;
   each one name of the characters `A-Z`, `a-z`, `0-9`, `_`; distinct
 - **`ref`** — Literature reference; written in the header and before each non-empty entry of

@@ -66,6 +66,17 @@ assertEqual( r4.method, '38.901' );
 assertEqual( r4.tap, uint64( [5; 3; 0] ) );                                   % codes, not shifted
 assertEqual( r4.gr_eps_re, [ 5; 7 ] );
 assertEqual( r4.gr_eps_im, [ 0.1; 0.2 ] );
+r6 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb, lb, pg, pl, M, '38.901', uint8( pt ), int16( [ 5; 3; 0 ] ), ...
+    [ 5; 7 ], [ 0.1, 0.2 ] );
+assertEqual( r6, r4 );                                                        % integer codes of any real class
+
+%% A link without paths
+r7 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, zeros( 3, 0 ), zeros( 3, 0 ), zeros( 0, 2 ), zeros( 0, 1 ), ...
+    zeros( 8, 0, 2 ) );
+assertTrue( isempty(r7.delay) && isempty(r7.path_type) );
+assertEqual( { size(r7.power), size(r7.fbs_pos), size(r7.M, 1), size(r7.M, 2) }, { [0, 2], [3, 0], 8, 0 } );
+assertEqual( r7.center_frequency, fc );
+assertTrue( isempty( quadriga_lib.ssf_paths( r7, [0; 0], 'drift' ) ) );
 
 %% Outputs and type handling
 quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb, lb, pg, pl, M, 'quadriga', pt );

@@ -61,6 +61,7 @@ c4 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], 2 );
 assertEqual( c4.center_frequency, fc(2) );
 assertTrue( max( abs( c4.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );
 c5 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], int32(2) );
+assertEqual( quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], uint8(2) ), c5 );
 assertEqual( c5.coeff_re, c4.coeff_re );
 c6 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], 1, tx_pos, [ rx_pos; rx_pos + [ 1, 0, 0 ] ] );
 assertEqual( size(c6.coeff_re), [2, 1, n_tap, 2] );

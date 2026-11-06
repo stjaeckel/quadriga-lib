@@ -23,6 +23,7 @@
 
 #include "quadriga_lib.hpp"
 #include "quadriga_gbsm.hpp"
+#include "qd_test_diag.hpp"
 #include "qd_test_rays.hpp"
 
 #include <algorithm>
@@ -40,6 +41,8 @@
 #endif
 
 using Catch::Matchers::Message;
+
+QD_TEST_DIAG_SWITCH("QD_DIAG_GBSM")
 
 namespace
 {
@@ -215,11 +218,14 @@ namespace
     void check_rays(const chan_t &c, const args_t &a, const std::vector<snap_t> &e)
     {
         REQUIRE(c.n_snap() == e.size());
+        QD_DIAG("\n# diag: rays output vs oracle, %s\nsnapshot,coeff_err,delay_err\n", a.drift() ? "drift" : "phase");
         for (arma::uword t = 0; t < e.size(); ++t)
         {
             INFO("snapshot " << t);
-            CHECK(cdiff(c.coeff_re[t], c.coeff_im[t], e[t].cr, e[t].ci) <= 1e-12);
-            CHECK(rdiff(c.delay[t], e[t].dl) <= 1e-12);
+            const double dc = cdiff(c.coeff_re[t], c.coeff_im[t], e[t].cr, e[t].ci), dd = rdiff(c.delay[t], e[t].dl);
+            QD_DIAG("%d,%.2e,%.2e\n", (int)t, dc, dd);
+            CHECK(dc <= 1e-12);
+            CHECK(dd <= 1e-12);
             CHECK(rdiff(c.path_gain[t], e[t].gain) <= 1e-12);
             CHECK(rdiff(c.path_length[t], e[t].len) <= 1e-12);
             CHECK(arma::approx_equal(c.path_polarization[t], e[t].M, "absdiff", 1e-12));
@@ -238,12 +244,15 @@ namespace
     void check_taps(const chan_t &c, const args_t &a, const std::vector<snap_t> &e)
     {
         REQUIRE(c.n_snap() == e.size());
+        QD_DIAG("\n# diag: taps output vs oracle, %s\nsnapshot,coeff_err,delay_err\n", a.drift() ? "drift" : "phase");
         for (arma::uword t = 0; t < e.size(); ++t)
         {
             INFO("snapshot " << t);
             const tap_t x = ref_taps(*a.r, a.i_freq, e[t]);
-            CHECK(cdiff(c.coeff_re[t], c.coeff_im[t], x.cr, x.ci) <= 1e-12);
-            CHECK(rdiff(c.delay[t], x.dl) <= 1e-12);
+            const double dc = cdiff(c.coeff_re[t], c.coeff_im[t], x.cr, x.ci), dd = rdiff(c.delay[t], x.dl);
+            QD_DIAG("%d,%.2e,%.2e\n", (int)t, dc, dd);
+            CHECK(dc <= 1e-12);
+            CHECK(dd <= 1e-12);
             CHECK(arma::all(par<arma::uvec>(c, "tap") == x.tap));
             CHECK(arma::all(par<arma::uvec>(c, "n_ray_tap") == x.n));
             CHECK(c.path_gain.empty());
@@ -406,7 +415,8 @@ TEST_CASE("gbsm_single_link_channel - the phase speed-up equals per-snapshot pla
     a.T = arma::mat{{3.0, -4.0, 25.0}, {3.1, -4.2, 25.0}, {3.3, -4.4, 25.2}, {3.5, -4.5, 25.2}, {3.6, -4.7, 25.3}};
     a.R = arma::mat{{120.1, 45.0, 1.5}, {120.3, 45.4, 1.5}, {120.5, 45.6, 1.7}, {120.7, 45.7, 1.5}, {120.9, 45.9, 1.5}};
     a.To = arma::mat{{0.0, 0.1, 0.5}, {0.0, 0.1, 0.5}, {0.0, 0.1, 0.9}, {0.0, 0.1, 0.9}, {0.2, 0.1, 0.9}};
-    a.Ro = arma::mat{{0.0, 0.0, 1.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, -2.5}};
+    // Orientation changes: snapshot 1 Rx only, 2 Tx only, 4 both
+    a.Ro = arma::mat{{0.0, 0.0, 1.0}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, -2.5}};
     a.lg = {-70.0, -71.0, -71.0, -72.0, -72.0};
     const std::vector<snap_t> e = ref(a);
     check_rays(a.run(), a, e);
@@ -538,9 +548,11 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
         const arma::vec pm = par<arma::vec>(c, "b_med"), pe = par<arma::vec>(c, "b_eff");
         const arma::vec lim = par<arma::vec>(c, "limit"), rat = par<arma::vec>(c, "ratio");
         const double d[2] = {d_tx, d_rx};
+        QD_DIAG("\n# diag: validity report, %s\nend,b_med,b_eff,limit,ratio\n", drift ? "drift" : "phase");
         for (int e = 0; e < 2; ++e)
         {
             INFO("end " << e);
+            QD_DIAG("%s,%.4f,%.4f,%.4f,%.4f\n", e == 0 ? "Tx" : "Rx", pm(e), pe(e), lim(e), rat(e));
             CHECK(same(pm(e), b_med[e]));
             CHECK(same(pe(e), b_eff[e]));
             const double l = drift ? 0.2 * b_med[e] : std::sqrt(lam * b_eff[e] / 8.0);
@@ -564,6 +576,15 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
         ref_b(v, 0, bm, be);
         a.r = &u, a.mob = "phase";
         check(a.run(), bm, be, false);
+    }
+    SECTION("phase without scatterers, GR ray and the Tx below z = 0: no solved copy, b NaN, limits Inf")
+    {
+        rays_t u = make_rays(59, true, true, 6, 1, "38.901");
+        u.tx_pos(2) = -1.0; // hand-made object: valid, but without a specular point
+        REQUIRE(u.is_valid().empty());
+        a.r = &u, a.mob = "phase";
+        const double b_nan[2] = {nan_v, nan_v};
+        check(a.run(), b_nan, b_nan, false);
     }
     SECTION("LOS-only link, d3D = 100 m: limits 1.0347 m at 3.5 GHz and 0.3658 m at 28 GHz")
     {

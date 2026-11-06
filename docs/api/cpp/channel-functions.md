@@ -969,7 +969,7 @@ Not in: MATLAB, Python
 - Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
   0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
 - Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
-- A path of length 0 (LOS with `tx_pos` = `rx_pos`) throws: `qrt_file_read` would return an infinite gain
+- Throws for a path of length 0 in float32 (e.g. LOS with `tx_pos` = `rx_pos`) and for values beyond float32
 
 ### Declaration:
 ```cpp
@@ -992,7 +992,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`M`** — Polarization transfer matrices, row order of [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_path, n_freq]`
-- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
 
 ### Returns:

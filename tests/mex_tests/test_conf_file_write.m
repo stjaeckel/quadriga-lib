@@ -101,6 +101,11 @@ assertEqual( sp4.NumClusters, 7 );
 assertEqual( sp4.SC_lambda, 50 );
 assertEqual( pl4.A, [20, 30] );
 assertEqual( numel( strfind( fileread( fn ), 'NumSubPaths =' ) ), 1 );   % write_defaults = 1
+quadriga_lib.conf_file_write( fn, struct( 'NumClusters', uint8(9), 'GR_enabled', true ), ...
+    struct( 'model', 'logdist', 'A', int16([20, 30]) ) );                     % 8- and 16-bit classes
+[ sp5, pl5 ] = quadriga_lib.conf_file_read( fn );
+assertEqual( [ sp5.NumClusters, sp5.GR_enabled ], [ 9, 1 ] );
+assertEqual( pl5.A, [20, 30] );
 
 %% Path-loss fields: row and column vectors are accepted and written in their element order
 quadriga_lib.conf_file_write( fn, s, struct( 'A', [1, 2, 3], 'B', [4; 5; 6] ) );
@@ -128,8 +133,6 @@ assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', [1, 2; 3, 4
     'Field ''A'' must be a real numeric vector.' );                    % a matrix is not a vector
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', ones(1, 1, 2) ) ), ...
     'Field ''A'' must be a real numeric vector.' );
-assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'NumClusters', uint8(7) ) ), ...
-    'unsupported data type' );                                         % 8- and 16-bit classes
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], 5 ), ...
     'Input ''short_names'' must be a cell array of strings.' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {}, '', 'T1' ), ...

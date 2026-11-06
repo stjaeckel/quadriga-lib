@@ -8,6 +8,8 @@
 #include "quadriga_lib.hpp"
 #include "python_arma_adapter.hpp"
 
+#include <iterator>
+
 namespace py = pybind11;
 
 static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
@@ -883,10 +885,12 @@ static py::dict qd_python_plpar2dict(const std::string &pl_model,
 
 // -------------------------------- gbsm_rays dict --------------------------------
 
-// Keys of the gbsm_rays dict in their order; the last four are optional as input (missing or None = empty)
-static const char *const qd_python_gbsm_rays_keys[17] = {
+// Keys of the gbsm_rays dict in their order; the first qd_python_gbsm_rays_n_required are required as input, the
+// others optional (missing or None = empty), also any key appended later
+static const char *const qd_python_gbsm_rays_keys[] = {
     "method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa",
     "eoa", "M", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
+static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap"
 
 // Labels or codes (non-negative integers, no index shift) -> uvec; None gives an empty vector
 // - A uint64 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float and
@@ -904,14 +908,14 @@ static arma::uvec qd_python_uword_entries(const py::handle &obj, const std::stri
 // - Validation is left to is_valid()
 static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const std::string &var_name = "rays")
 {
-    const auto *K = qd_python_gbsm_rays_keys;
+    const auto *K = qd_python_gbsm_rays_keys, *K_end = K + std::size(qd_python_gbsm_rays_keys);
     for (auto item : d)
     {
         const std::string key = py::cast<std::string>(py::str(item.first));
-        if (std::find_if(K, K + 17, [&](const char *k) { return key == k; }) == K + 17)
+        if (std::find_if(K, K_end, [&](const char *k) { return key == k; }) == K_end)
             throw std::invalid_argument("Entry '" + key + "' of '" + var_name + "' is unknown.");
     }
-    for (int k = 0; k < 13; ++k)
+    for (size_t k = 0; k < qd_python_gbsm_rays_n_required; ++k)
         if (!d.contains(K[k]))
             throw std::invalid_argument("Entry '" + std::string(K[k]) + "' of '" + var_name + "' is missing.");
     auto get = [&](const char *k) -> py::object
