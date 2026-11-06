@@ -778,11 +778,14 @@ TEST_CASE("IEEE Chan - Doppler from moving vehicle")
     arma::vec dpp = arma::sum(P, 0).t();
     dpp.transform(linear_2_dB);
 
+    // The seed gives the same channel on all platforms: total level of this realization, path loss and shadow fading
     double peak = arma::max(dpp);
-    CHECK(std::abs(peak + 55.0) < 2.0);
+    CHECK(std::abs(peak + 48.2) < 2.0);
 
-    peak = dpp[429];
-    CHECK(std::abs(peak + 77.0) < 2.0);
+    // Bin 429 is the spike of the moving vehicle at 89 Hz (40 km/h at 2.4 GHz), checked relative to the peak, so the
+    // check does not depend on the path loss and the shadow fading
+    double spike = dpp[429] - peak;
+    CHECK(std::abs(spike + 24.7) < 2.0);
 }
 
 TEST_CASE("IEEE Chan - Reciprocity")

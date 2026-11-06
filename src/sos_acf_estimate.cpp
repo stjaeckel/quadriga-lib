@@ -128,10 +128,10 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
     const double half_edge = 0.4 * (double)bins.at(n_bin - 1);
 
     // Random positions: rows 0 ... n_pos-1 first device, rows n_pos ... 2·n_pos-1 second device
-    std::mt19937_64 rng = qd_sos_rng(seed);
+    std::mt19937_64 rng = qd_rng(seed);
     arma::mat pos(n_all, 3, arma::fill::none);
     for (arma::uword i = 0; i < pos.n_elem; ++i)
-        pos.at(i) = (2.0 * qd_sos_uniform(rng) - 1.0) * half_edge;
+        pos.at(i) = (2.0 * qd_rng_uniform(rng) - 1.0) * half_edge;
 
     // Upper limit of each bin; the lower limit is the upper limit of the previous bin
     std::vector<double> upper(n_bin);

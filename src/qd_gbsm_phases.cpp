@@ -185,8 +185,8 @@ namespace
         const bool one_group = floors.size() == 1; // all links in their order, no copies of the positions
 
         // Phase offsets of floor q, [n_coeff]: 2·pi·(q mod N)·n/N + psi_(q div N)(n)
-        // - N = n_coeff; psi_0 = 0; psi_b(n) = 2·pi·u_n for b >= 1, with u_n the n-th value of qd_sos_uniform of the
-        //   stream qd_sos_rng(b)
+        // - N = n_coeff; psi_0 = 0; psi_b(n) = 2·pi·u_n for b >= 1, with u_n the n-th value of qd_rng_uniform of the
+        //   stream qd_rng(b)
         // - Two floors in the same block of N IDs have the cross-correlation (1/N)·sum_n cos(Delta_q(n) - Delta_q'(n))
         //   = 0 at zero horizontal lag; floors in different blocks a random one with standard deviation 1/sqrt(2N)
         // - Phase offsets instead of a coordinate offset per floor: they work in 2D and 3D mode, keep the mirror
@@ -206,9 +206,9 @@ namespace
                 offset.at(n) = two_pi * (double)((k * n) % n_coeff) / (double)n_coeff;
             if (blk > 0)
             {
-                std::mt19937_64 rng = qd_sos_rng((arma::sword)blk);
+                std::mt19937_64 rng = qd_rng((arma::sword)blk);
                 for (arma::uword n = 0; n < n_coeff; ++n)
-                    offset.at(n) += two_pi * qd_sos_uniform(rng);
+                    offset.at(n) += two_pi * qd_rng_uniform(rng);
             }
             return offset;
         };

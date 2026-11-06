@@ -76,7 +76,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
 - **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
 - **`Doppler_effect`** *(optional)* — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); `0.0` disables
-- **`seed`** *(optional)* — RNG seed for repeatability; `-1` uses the system random device
+- **`seed`** *(optional)* — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device
 - **`KF_linear`** *(optional)* — Overrides model KF (linear scale); NAN or negative restores model default
 - **`XPR_NLOS_linear`** *(optional)* — Overrides NLOS cross-polarization ratio (linear scale); NAN restores model default; must otherwise be finite and > 0 (0, negative and Inf throw)
 - **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default
@@ -187,8 +187,8 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         return n_data;
     };
 
-    // Initialize RNG
-    static thread_local std::mt19937_64 rng;
+    // Random number generator; the draws use the portable helpers qd_rng_uniform and qd_rng_normal
+    std::mt19937_64 rng;
     if (seed != -1)
         rng.seed(seed + 1); // Use different seed as for "qd_ieee_indoor_param"
     else
@@ -204,14 +204,11 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         arma::uvec out = in; // copy
         for (arma::uword i = out.n_elem; i > 1; --i)
         {
-            std::uniform_int_distribution<arma::uword> dist(0, i - 1);
-            arma::uword j = dist(rng);
+            arma::uword j = std::min((arma::uword)(qd_rng_uniform(rng) * (double)i), i - 1); // 0 ... i-1
             std::swap(out[i - 1], out[j]);
         }
         return out;
     };
-
-    std::uniform_real_distribution<double> U(0.0, 1.0);
 
     // ---------- CHANNEL GENERATION ----------
 
@@ -260,21 +257,18 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         // Small frequency jitter (Hz) around each harmonic
         const double sigma_f = 0.3; // tweak 0.2–0.5 Hz as you like
 
-        std::normal_distribution<double> Nf(0.0, sigma_f);
-        std::uniform_real_distribution<double> Uphase(0.0, 2.0 * V_PI);
-
         double dt = update_rate;
 
         for (int n = 0; n < N_lamp; ++n)
         {
             // jittered freqs for this lamp
-            double f0n = f0 + Nf(rng);
-            double f1n = f1 + Nf(rng);
-            double f2n = f2 + Nf(rng);
+            double f0n = f0 + sigma_f * qd_rng_normal(rng);
+            double f1n = f1 + sigma_f * qd_rng_normal(rng);
+            double f2n = f2 + sigma_f * qd_rng_normal(rng);
 
-            double phi0 = Uphase(rng);
-            double phi1 = Uphase(rng);
-            double phi2 = Uphase(rng);
+            double phi0 = 2.0 * V_PI * qd_rng_uniform(rng);
+            double phi1 = 2.0 * V_PI * qd_rng_uniform(rng);
+            double phi2 = 2.0 * V_PI * qd_rng_uniform(rng);
 
             // scale per lamp so total amplitude across lamps ~ A*_lin
             double s0 = A0_lin / std::sqrt(N_lamp);
@@ -441,7 +435,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                     double f = 0.0;
                     for (int iter = 0; iter < 10; ++iter) // rejection sampling for truncated Cauchy
                     {
-                        double u = U(rng);
+                        double u = qd_rng_uniform(rng);
                         f = gamma_spike * std::tan(V_PI * (u - 0.5)); // Cauchy draw
 
                         if (std::abs(f) <= 0.1 * f_spike)
@@ -457,7 +451,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
             double f = 0.0;
             for (int iter = 0; iter < 10; ++iter) // rejection sampling for truncated Cauchy
             {
-                double u = U(rng);
+                double u = qd_rng_uniform(rng);
                 f = gamma_bell * std::tan(V_PI * (u - 0.5)); // Cauchy draw
 
                 if (std::abs(f) <= 5.0 * f_d_env)
@@ -551,9 +545,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         if (use_fluor)
         {
             // RNG for IEEE 802.11-03/940r4, eq. (29)
-            std::normal_distribution<double> N_ic(0.0203, 0.0107);
-
-            double X = N_ic(rng); // Draw I/C = X^2, with X ~ N(0.0203, 0.0107^2)
+            double X = 0.0203 + 0.0107 * qd_rng_normal(rng); // Draw I/C = X^2, with X ~ N(0.0203, 0.0107^2)
             double IC = X * X;    // Linear
             double C_total = 0.0; // Total carrier energy C over all snapshots & all paths
             double denom = 0.0;   // Denominator: sum |g[n]|^2 * |c_p[n]|^2 over modulated taps
