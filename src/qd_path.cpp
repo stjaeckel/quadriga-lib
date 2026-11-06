@@ -130,10 +130,10 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | Attribute            | Size   | Description                                                       |
 | -------------------- | ------ | ----------------------------------------------------------------- |
 | `unsigned iC`        | scalar | Channel ID: the channel to which the path belongs                 |
-| `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255)            |
+| `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255 except 193) |
 | `uint8_t nTRA`       | scalar | Number of transmissions / refractions (type codes 1-127)          |
 | `uint8_t nSUB`       | scalar | Number of subdivisions                                            |
-| `uint8_t nSCT`       | scalar | Number of scattering events                                       |
+| `uint8_t nSCT`       | scalar | Number of scattering events (interaction type code 193, set by [[qrt_paths_from_scatterers]]; QRT files store the codes, not the counter) |
 | `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
 
 ## Data buffer layout (EM mode):<br>
