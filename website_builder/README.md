@@ -80,7 +80,7 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `static/quadriga_lib_material_model.md` | The material model description, hand-made. | `quadriga_lib_material_model.md` |
 | `content/impressum.md`, `content/privacy.md` | Legal pages. | `impressum.html`, `privacy.html` |
 | `content/404.md` | Title and sentence of the not-found page. | `404.html` |
-| `content/tutorials.md` | Title, lead, placeholder note and the common text (e.g. the setup) of the tutorial index; see [The tutorial index page](#the-tutorial-index-page). | `tutorials.html`, `tutorials.md` |
+| `content/tutorials.md` | Title, lead and the common text (e.g. the setup) of the tutorial index; see [The tutorial index page](#the-tutorial-index-page). | `tutorials.html`, `tutorials.md` |
 | `skill/quadriga-lib/SKILL.md` | The agent skill (a placeholder for now); build variables are filled in. | `skill/SKILL.md` |
 | `pandoc_math.yaml` | pandoc defaults file of the formula step. | — |
 | `logo/` | Logo sources (SVG and PNG); not deployed. | — |
@@ -131,7 +131,6 @@ Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<st
 | `title` | Page title (`h1`) and title of the twin |
 | `description` | Meta description of the page |
 | `lead` | Lead paragraph under the title |
-| `dummy_note` | Warning box above the list when every tutorial is a placeholder (`dummy` in its metadata) |
 | Body | Between the lead and the list of tutorials: the setup that all tutorials need, and anything else that applies to all of them; `##` sections with ids as on other content pages (e.g. `## Setup` gets the id `setup`, so a notebook links to it as `tutorials.html#setup`) |
 
 Notes on a single tutorial or a family of tutorials (e.g. extra packages of one series) belong in the notebooks, not here. Gap markers are allowed in all parts; each fails `--release`.
