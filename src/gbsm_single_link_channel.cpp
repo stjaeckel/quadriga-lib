@@ -34,12 +34,11 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 - `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
   per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
   element pair is the mean of the rays' delays weighted by `rays.power` at `i_freq` (equal weights where they sum to
-  0), `[n_rx, n_tx, n_tap]`; reduce it to `[1, 1, n_tap]` where needed. In the TR methods an NLOS tap can have the
-  delay 0 of the LOS tap
+  0), `[n_rx, n_tx, n_tap]`; reduce it to `[1, 1, n_tap]` where needed
 - `"taps"` is exact at the phase center for the TR methods (the rays of a tap share one delay); for `"quadriga"` only
   at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `"rays"` for
   wide bands. `"rays"`: one path per kept ray in ray order, exact at any bandwidth, the form of the QRT route; the
-  path data are those of `ssf_paths` at the snapshot
+  path data are those of `ssf_paths` at the snapshot for these rays
 - `n_snap` is the largest row count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
   rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
   per frequency); one row or entry applies to all snapshots. A static link with a gain per snapshot repeats its
@@ -71,8 +70,9 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ## Inputs:
 - **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
 - **`rays`** — Ray data of the link, see [[gbsm_rays]]
-- **`link_gain_dB`** — Link gain (section description) at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
-- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (phase for the TR methods, drift for `"quadriga"`)
+- **`link_gain_dB`** — [Link gain](cpp_api.html#sec-geometry-based-stochastic-model) at `rays.center_frequency(i_freq)`
+  in [dB]; `[n_snap]` or `[1]`
+- **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`output`** *(optional)* — `"taps"` or `"rays"`
 - **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 0-based; ray data of the TR methods hold
   one frequency: 0

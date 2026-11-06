@@ -698,42 +698,49 @@ SECTION!*/
 /*!SECTION_DESC
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
 *scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
-functions of this section implement 3GPP TR 38.901 clause 7.5 steps 1 to 11 (path loss, LOS probability, O2I
-penetration loss, large-scale parameters (LSPs), clusters and rays, without antennas) with the spatial consistency of
-clause 7.6.3, oxygen absorption (clause 7.6.1) and polarization power variability (clause 7.6.16);
-[[gbsm_single_link_channel]] computes the channel coefficients of a link with its antennas.<br><br>
+functions of this section implement 3GPP TR 38.901 clause 7.5 steps 2 to 10 and the sub-cluster split of step 11
+(LOS probability, path loss, O2I penetration loss, large-scale parameters (LSPs), clusters and rays, without antennas)
+with the spatial consistency of clause 7.6.3, oxygen absorption (clause 7.6.1) and polarization power variability
+(clause 7.6.16); [[gbsm_single_link_channel]] computes the coefficients of step 11 with the antennas.<br><br>
 
 **Scenario parameters.** A scenario is a set of numeric keys (`scenpar`), a path-loss model with its parameters and
 optional short names, read from a conf file by [[conf_file_read]]. 23 files for TR 38.901 v19.5.0 come with the
 library, one per scenario and LOS and indoor state (e.g. `3GPP_38.901_v19_UMa_LOS`, `_NLOS`, `_LOS_O2I`,
-`_NLOS_O2I`), in `data/config` of the source tree and in `share/quadriga-lib/config` of an installed package;
-[[conf_file_list]] finds them. Their comments give the meaning and unit of each key; [[conf_file_write]] with
-`write_defaults = true` writes the complete default set with these comments. The functions that read `scenpar`
-complete a copy with the defaults of missing keys and validate it with [[scenpar_validate]], whose messages pass
-through; an invalid value of a key that the function does not use throws as well.<br><br>
+`_NLOS_O2I`; InH is `Indoor`, InF NLOS has one file per clutter type), in `data/config` of the source tree and in
+`share/quadriga-lib/config` of an installed package; [[conf_file_list]] finds them. Their comments give the meaning
+and unit of each key; [[conf_file_write]] with `write_defaults = true` writes the complete default set with these
+comments. The functions that read `scenpar` complete a copy with the defaults of missing keys and validate it with
+[[scenpar_validate]], whose messages pass through, also for keys the function does not use.<br><br>
 
 **Workflow** for one drop of a set of links:
 
 1. [[conf_file_read]]: the scenarios, one per LOS and indoor state
-2. Per link, by the caller: the indoor state ([[sos_rand]] at `IO_state_lambda`); for indoor UTs [[o2i_loss]] (loss
-   `O2I`, indoor distance `d2d_in`); [[los_probability]] at `d2D - d2d_in` and the LOS state ([[sos_rand]] at
-   `LOS_state_lambda`). The caller chooses the `los_probability` model and the `o2i_loss` models and weights (TR 38.901
-   Tables 7.4.2-1, 7.4.3-2); the conf files state `LOS_state_lambda` in the NLOS files and `IO_state_lambda` in the
-   O2I files (0 in the others). The states assign each link to a scenario; steps 3 to 7 run per scenario
-3. Per BS site and scenario, once: [[gbsm_init_phases]], the SOS phases of the random sets `"lsf"`, `"cluster"` (`set_id` -1 and one
-   per frequency) and `"ray"` (-1 for the method `"quadriga"`, one per frequency for the TR methods)
+2. Per link, by the caller with own SOS generators ([[sos_init_phases]], [[sos_rand]], [[sos_randn]]): the indoor
+   state (uniform value at `IO_state_lambda` of the O2I files against an indoor ratio of the caller's choice, e.g. TR
+   38.901 Table 7.2-1); for indoor UTs [[o2i_loss]] (loss `O2I`, indoor distance `d2d_in`); [[los_probability]] at
+   `d2D - d2d_in` and the LOS state (uniform value at `LOS_state_lambda` of the NLOS file against `p_los`). The caller
+   chooses the `los_probability` model and the `o2i_loss` models and weights (TR 38.901 Tables 7.4.2-1, 7.4.3-2). The
+   states assign each link to a scenario and give the `o2i` flags of [[ssf_clusters]]; steps 3 to 6 run per scenario
+3. Per BS site and scenario, once: [[gbsm_init_phases]] of the random sets in the table below; `"lsf"` with the link
+   positions for the bias removal
 4. [[gbsm_draw]] of each set at the links; [[path_loss]] (`PL`, `sf_sigma`; column 10 of the `"lsf"` set as
-   `rnd_he`); [[lsp_generate]] with `sf_sigma` (`lsp` and the optional outputs the later steps take, incl. `lsp_mu`,
-   `lsp_sigma`)
-5. [[ssf_clusters]]. The method `"38.901"` takes one frequency: call steps 5 and 6 once per frequency with the
-   one-frequency slices of all per-frequency inputs (`center_frequency`, `lsp`, `rnd_freq`, `rnd_ray`, ...)
-6. [[ssf_rays]]: one [[gbsm_rays]] object per link; `"38.901_MF"`: one call per frequency (`i_freq`)
-7. Per link and segment: .[[solve_scatterers]] if the mobility is `drift`; then [[gbsm_single_link_channel]], or
-   [[ssf_paths]] and the QRT route ([[qrt_paths_from_scatterers]], [[qrt_file_append]]; back with [[qrt_file_read]]
-   and [[gbsm_rays_from_paths]]). Other path sources fill a [[gbsm_rays]] object directly
+   `rnd_he`); [[lsp_generate]] with `sf_sigma`, with the optional outputs that step 5 takes
+5. [[ssf_clusters]] (`n_cluster` is the caller's choice) and [[ssf_rays]] (one [[gbsm_rays]] object per link), called
+   as in the table below
+6. Per link and segment: .[[solve_scatterers]] if the mobility is `drift`; then [[gbsm_single_link_channel]] (once
+   per object; `"quadriga"`: per `i_freq`), or [[ssf_paths]] and the QRT route ([[qrt_paths_from_scatterers]],
+   [[qrt_file_append]]; back with [[qrt_file_read]] and [[gbsm_rays_from_paths]]). Other path sources fill a
+   [[gbsm_rays]] object directly
 
-For moved positions, evaluate [[gbsm_draw]] (`"lsf"`), [[path_loss]] and [[lsp_generate]] again with the same SOS phases:
-they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) from slice 1 of `lsp`.<br><br>
+| Method | Random sets | Calls in step 5 |
+| --- | --- | --- |
+| `"38.901"` | `"lsf"`; `"cluster"` -1 and one per frequency; `"ray"` one per frequency | per frequency `k`: [[ssf_clusters]] and [[ssf_rays]] (`i_freq = 0`) with slice `k` of all per-frequency inputs (`center_frequency`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
+| `"38.901_MF"` | as `"38.901"` | [[ssf_clusters]] once, with `lsp_anchor`; [[ssf_rays]] per frequency `k` with `i_freq = k` |
+| `"quadriga"` | `"lsf"`; `"cluster"` -1; `"ray"` -1 | [[ssf_clusters]] and [[ssf_rays]] once for all frequencies |
+
+For moved positions, evaluate [[gbsm_draw]] (`"lsf"`), [[path_loss]], [[lsp_generate]] and for indoor UTs
+[[o2i_loss]] again with the same SOS phases: they give the link gain (see Terms) and `kf_ratio` = KF(position) /
+KF(drop) from slice 1 of `lsp`.<br><br>
 
 **Terms.** TR 38.901 names where they exist; QuaDRiGa names are marked:
 
@@ -750,7 +757,7 @@ they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) fro
 | tap | rays summed in one output tap: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`"quadriga"`) |
 | snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
 | segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |
-| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting) |
+| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting); `auto`: `phase` for the TR methods, `drift` for `"quadriga"` |
 | scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
 | coefficient power | power of a ray without link gain and oxygen loss (`gbsm_rays.power`): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [[ssf_clusters]] sets it; for data from paths the path gain |
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
@@ -760,25 +767,26 @@ they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) fro
 | SOS phases | the random phases of the sinusoids of the generators of a random set (`phase`); evaluated at positions, they give its random values. "Phase" alone is the phase of a coefficient or ray |
 | block | the generators of one random quantity in a set |
 
-**Codes.** Path type: 0 LOS, 1 GR, 2 NLOS. Tap index: 3·slot + i, with i the sub-cluster (0, 1, 2) of a split cluster
-and 0 otherwise, so LOS 0, GR 3 and NLOS cluster `n` (from 0) 3·(1 + G + n) + i, with G = 1 if GR is enabled.<br><br>
+**Codes.** Path type: 0 LOS, 1 GR, 2 NLOS. Tap index: rays with equal index form one tap; [[ssf_rays]] gives 3·slot +
+i, with i the sub-cluster (0, 1, 2) of a split cluster and 0 otherwise: LOS 0, GR 3 if enabled, NLOS cluster `n` (from
+0) 3·(1 + G + n) + i with G = 1 if GR is enabled (without GR the first cluster has 3).<br><br>
 
-**Model properties.** Separately dropped UTs keep correlated taps over tens to hundreds of wavelengths, while measured
-fading decorrelates within about one wavelength: for UTs a few wavelengths apart, use one drop and move the UTs with
-[[ssf_paths]] or [[gbsm_single_link_channel]]. Across bands, the taps of `"quadriga"` are correlated and those of the
-TR methods independent (TR 38.901 clause 7.6.5).<br><br>
+**Model properties.** UTs closer than the decorrelation distance `SC_lambda` get correlated clusters and rays, so
+separately dropped UTs a few wavelengths apart have unrealistically correlated fading: drop once and move the UTs with
+[[ssf_paths]] or [[gbsm_single_link_channel]]. Across bands, `"quadriga"` uses one ray set, so the fading is
+correlated; the TR methods draw coupling, XPR and phases per frequency, so it is independent, also with
+`"38.901_MF"`, which keeps the delays and angles.<br><br>
 
 **Conventions.** `N = NumClusters - 1` is the number of NLOS clusters: `NumClusters` counts the LOS slot, as in
-QuaDRiGa. Positions are in m. The batch functions take one row (x, y, z) per link: `rx_pos` is `[n_link, 3]`,
-`tx_pos` is `[1, 3]` (one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. The one-link functions
-take a position as a `[3]` vector, except [[gbsm_single_link_channel]], which takes one row per snapshot; scatterer
-positions are `[3, n]`. In 2D mode (`horizontal = true`, the TR behavior) the random values are correlated in the x-y
-plane, and `floor_id` separates the floors, which are uncorrelated (TR 38.901 Table 7.5-6 note 3). In 3D mode
-(`horizontal = false`, legacy QuaDRiGa) the height separates the floors, so UTs on different floors are correlated by
-the ACF of their height difference; the per-link statistics are the same in both modes. Defaults follow TR 38.901;
-QuaDRiGa variants are options. Outputs must not share memory with the inputs or with each other unless stated
-otherwise. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, spreads in
-degrees.
+QuaDRiGa. Positions are in m; in the batch functions one row (x, y, z) per link: `rx_pos` is `[n_link, 3]`, `tx_pos` is
+`[1, 3]` (one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. The one-link functions take a position
+as a `[3]` vector, except [[gbsm_single_link_channel]], which takes one row per snapshot; scatterer positions are
+`[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the conf-file keys): in
+rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR 38.901 except two
+deliberate library choices: the SOS preset `Comb256` with bias removal ([[gbsm_init_phases]], [[gbsm_draw]]) and
+`method = "quadriga"` of [[gbsm_rays_from_paths]]; QuaDRiGa variants are options. Outputs must not share memory with the
+inputs or with each other unless stated otherwise. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
+linear power ratios, spreads and `_deg` offsets in degrees.
 SECTION_DESC!*/
 
 /*!MD
@@ -800,7 +808,6 @@ Read and validate a QuaDRiGa scenario configuration file
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read
   independent of the global locale; `Inf`, `+Inf` and `-Inf` in any case; a number below the smallest subnormal
   reads as 0
-- Elevation angles are used throughout (+90 deg is up); no key refers to a zenith angle
 - Throws `std::runtime_error` if the file cannot be opened or is a directory
 - Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment and not
   a well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required
@@ -840,7 +847,7 @@ bool quadriga_lib::conf_file_read(
 - **`ignored_keys`** *(optional)* — Unknown keys, each once, in the order of their first occurrence; `[n_ignored]`
 
 ## Returns:
-- `true` if `lsp_xcorr` is positive definite; a matrix that is not is no error
+- `true` if `lsp_xcorr` is positive definite; `false` is no error here, but [[lsp_generate]] throws for the scenario
 
 ## See also:
 - [[scenpar_validate]] (value checks and defaults)
@@ -982,9 +989,9 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
 # scenpar_validate
 Validate scenario parameters and complete them with default values
 
-- Checks scenario parameters that did not come from a conf file and adds every missing key with its default value,
-  so that `scenpar` has all `n_key = 171` keys on return: the 138 numeric keys of QuaDRiGa and 33 keys for TR 38.901
-  v19.5.0, which have no effect at their default of 0. An empty `scenpar` gives the complete default set
+- Checks scenario parameters, e.g. ones built in code, and adds every missing key with its default value, so that
+  `scenpar` has all `n_key = 171` keys on return: the 138 numeric keys of QuaDRiGa and 33 keys for TR 38.901 v19.5.0,
+  which have no effect at their default of 0. An empty `scenpar` gives the complete default set
 - A name that is not one of the keys is an error, also with `validate = false`
 - Value checks with `validate = true`; `NaN` is an error for every key:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
@@ -1002,6 +1009,7 @@ Validate scenario parameters and complete them with default values
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
+- `LOS_scatter_radius`, `NF_*` and `SNS_*` are checked but not used by any function of this version
 - Throws `std::invalid_argument`; a failed call leaves `scenpar` and the outputs untouched
 
 ## Declaration:
@@ -1026,7 +1034,7 @@ bool quadriga_lib::scenpar_validate(
 
 ## Returns:
 - `true` if `lsp_xcorr` is positive definite (all pivots of its Cholesky factorization > 0); `false` also if it
-  contains `NaN`; a matrix that is not positive definite is no error
+  contains `NaN`; `false` is no error here, but [[lsp_generate]] throws for such parameters
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
@@ -1196,7 +1204,7 @@ Write a QuaDRiGa scenario configuration file
 - `write_defaults = false`: only keys whose value differs from the default (bit for bit); a section without a
   written key is left out
 - All inputs are validated before the file is opened: the checks of [[scenpar_validate]]; `pl_model`, the keys of
-  `plpar` (other than `model`) and the short names are names, the short names distinct; every `plpar` key has at
+  `plpar` and the short names are names, the short names distinct; `plpar` has no key `model`, and every key has at
   least one value and no `NaN`; `pl_order` names each key of `plpar` once; `fn`, `ref` and `ref_sec` have no line
   break
 - The text is written to a temporary file in the same directory, which must be writable, and renamed to `fn`: a

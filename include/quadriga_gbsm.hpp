@@ -199,7 +199,7 @@ namespace quadriga_lib
                       const arma::vec *abs_toa = nullptr,                     // Optional: Absolute TOA offset in [s] from lsp_generate, [n_link]; required by quadriga in NLOS if absTOA_mu > -30
                       const arma::mat *gr_eps_re = nullptr,                   // Optional: Ground permittivity, real part, [n_link, n_freq]; required if GR_enabled
                       const arma::mat *gr_eps_im = nullptr,                   // Optional: Ground permittivity, imaginary part, [n_link, n_freq]; required if GR_enabled
-                      const std::vector<bool> *o2i = nullptr,                 // Optional: O2I flag per link (mean ZOA 90 deg in 38.901), [n_link]; nullptr = none
+                      const std::vector<bool> *o2i = nullptr,                 // Optional: O2I flag per link (mean arrival elevation 0 in 38.901), [n_link]; nullptr = none
                       const arma::u32_vec *n_cluster = nullptr,               // Optional: Number of NLOS clusters per link (TR clause 7.6.15), [n_link]; nullptr = N
                       arma::u32_vec *n_active = nullptr);                     // Optional output: Number of NLOS clusters with power > 0, [n_link]
 
@@ -260,7 +260,7 @@ namespace quadriga_lib
                   std::vector<gbsm_rays> &rays,                           // Output: Ray data, n_link entries; fbs_pos, lbs_pos, fallback empty
                   const std::string &method = "38.901",                   // Method of ssf_clusters: "38.901", "38.901_MF" or "quadriga"
                   arma::uword i_freq = 0,                                 // TR methods: index into center_frequency and slice of rnd_ray, 0-based; quadriga: must be 0
-                  const std::string &angle_model = "additive",            // "additive" (TR, zenith fold) or "rotation" (3-D rotation of the offsets)
+                  const std::string &angle_model = "additive",            // "additive" (TR, elevation fold) or "rotation" (3-D rotation of the offsets)
                   const std::string &pol_model = "38.901",                // "38.901" (kappa, four phases) or "quadriga" (rotation model)
                   const arma::mat *gr_eps_re = nullptr,                   // Optional: Ground permittivity, real part, from lsp_generate, [n_link, n_freq]; required if GR_enabled
                   const arma::mat *gr_eps_im = nullptr,                   // Optional: Ground permittivity, imaginary part, from lsp_generate, [n_link, n_freq]; required if GR_enabled
