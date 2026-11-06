@@ -49,8 +49,7 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   `sqrt(power)·exp(j·arg(R_par))`
 - `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled; `rnd` must be
   empty, `rnd_freq` and `lsp_anchor` are not used
-- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked; at least one
-  link is required
+- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked
 
 ## Usage:
 ```
@@ -67,27 +66,27 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   `'38.901'`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [[gbsm_draw]] (`'cluster'`, `set_id = 0`), columns 1 to N in [0, 1];
   `[n_link, 9·N]`
-- **`method`** *(optional)* — `'38.901'` (default), `'38.901_MF'` or `'quadriga'`
+- **`method`** — `'38.901'`, `'38.901_MF'` or `'quadriga'`; default: `'38.901'`
 - **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [[gbsm_draw]], slice `k` from `set_id = k` (`'38.901'`:
   one slice, the set of the frequency in `lsp`); required by the TR methods; `[n_link, N, n_freq]`
 - **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz) from [[lsp_generate]]; required by
   `'38.901_MF'`; `[n_link, 1, 8]`
-- **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]]; used by `'38.901'` and `'quadriga'` in
-  NLOS scenarios; omitted or empty = 0; `[n_link, n_freq]`
-- **`abs_toa`** *(optional)* — Absolute TOA offset in [s] from [[lsp_generate]], >= 0; required by `'quadriga'` in NLOS
-  scenarios with `absTOA_mu > -30`; omitted or empty = no offset; `[n_link]`
+- **`eod_offset_deg`** — EoD offset in [deg] from [[lsp_generate]]; used by `'38.901'` and `'quadriga'` in NLOS
+  scenarios; `[n_link, n_freq]`; default: 0
+- **`abs_toa`** — Absolute TOA offset in [s] from [[lsp_generate]], >= 0; required by `'quadriga'` in NLOS scenarios
+  with `absTOA_mu > -30`; `[n_link]`; default: no offset
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity `gr_eps_re - j·gr_eps_im` from [[lsp_generate]],
   real part >= 1, imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
-- **`o2i`** *(optional)* — O2I flag per link (mean arrival elevation 0), logical or numeric; used by `'38.901'` in NLOS
-  scenarios; omitted or empty = none; `[n_link]`
-- **`n_cluster`** *(optional)* — Active NLOS clusters per link (a count) in `[min(max(1, NumClusters_min - 1), N), N]`;
-  omitted or empty = N; `[n_link]`
+- **`o2i`** — O2I flag per link (mean arrival elevation 0), logical or numeric; used by `'38.901'` in NLOS scenarios;
+  `[n_link]`; default: no O2I link
+- **`n_cluster`** — Active NLOS clusters per link (a count) in `[min(max(1, NumClusters_min - 1), N), N]`; `[n_link]`;
+  default: N
 
 ## Outputs:
 - **`delay`** — Delays in [s]; `[n_link, n_slot, n_freq]` for `'38.901_MF'`, else `[n_link, n_slot, 1]`
 - **`power`** — Coefficient powers (linear); `[n_link, n_slot, n_freq]`
-- **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); sizes as `delay`
-- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as `delay`
+- **`aod`**, **`eod`** — Azimuth in [-pi, pi) and elevation in [-pi/2, pi/2] of departure in [rad]; sizes as `delay`
+- **`aoa`**, **`eoa`** — Azimuth and elevation of arrival in [rad], ranges as departure; sizes as `delay`
 - **`n_active`** — Number of NLOS clusters with power > 0; uint32; `[n_link, 1]`
 
 ## See also:

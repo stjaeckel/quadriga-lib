@@ -25,8 +25,8 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 - `38.811_*`: TR 38.811 Table 6.6.1-1 over the elevation `atan2(hBS, d2d_out)`, linearly interpolated; `Suburban` and
   `Rural` share one table
 - `QuaDRiGa_Industrial`: `min(1, exp(-(d2d_out + 20)/80)·exp(min(hBS, 8)/5 - 1))`; `LOS`: 1; `NLOS`: 0
-- The `LOS_state_lambda` of the InF conf files is `d_clutter/2` of the TR defaults; with another `d_clutter` pass a
-  matching correlation distance
+- The `LOS_state_lambda` of the InF conf files is `d_clutter/2` of the TR defaults; with another `d_clutter` draw the
+  LOS state at a matching decorrelation distance
 
 ## Usage:
 ```
@@ -49,8 +49,7 @@ p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut,
 - **`h_clutter`** — Clutter height in m of InF-SH (default 2 m) and InF-DH (6 m), >= 0; `None` or nan = default. The
   other models ignore the clutter arguments, which are validated for every model; default: None
 - **`rnd_g`** — Normal(0,1) value per link, G of eq. (7.6-18); `(n_link,)`; default: None
-- **`center_freq`** — Carrier frequencies in Hz, finite and > 0 (messages name it `center_frequency`); `(n_freq,)`;
-  default: None
+- **`center_freq`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`; default: None
 
 ## Outputs:
 - **`p_los`** — LOS probability in [0, 1]; `(n_link,)`

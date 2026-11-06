@@ -21,8 +21,8 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
   angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the ray's
   own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With `d_min` = 2 m
-  this applies to up to about 13 % of the rays (most in the TR methods without absolute TOA, where the first cluster
-  has zero excess delay) and lengthens them by a few ns
+  this applies to up to about 23 % of the rays (Indoor LOS, RMa NLOS; most in the TR methods without absolute TOA)
+  and lengthens them by a few ns
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular point
   on z = 0, which requires both ends at z >= 0
 - `rays_out` is a copy of `rays` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and
@@ -40,7 +40,7 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 ## Inputs:
 - **`rays`** — Ray struct of one link, see [[ssf_rays]]; `[1, 1]` struct
-- **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0; default: 2
+- **`d_min`** — Minimum distance of the scatterers to both ends in [m], finite and > 0; default: 2
 
 ## Outputs:
 - **`rays_out`** — Ray struct with `fbs_pos`, `lbs_pos` `[3, n_ray]` and `fallback` `[n_ray, 1]` (uint32)

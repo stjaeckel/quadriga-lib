@@ -12,7 +12,7 @@ SECTION!*/
 
 /*!MD
 # GBSM_RAYS_FROM_PATHS
-Ray data of one link from spherical path data (e.g. read with qrt_file_read)
+Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Returns the ray struct of [[ssf_rays]] (`fallback` empty) from path data in the names and order of [[qrt_file_read]],
   read with `downlink = true` and `normalize_M = 1` (an uplink read gives swapped ends and a conjugated `M`, which this
@@ -21,10 +21,9 @@ Ray data of one link from spherical path data (e.g. read with qrt_file_read)
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
-  GR path needs `path_type`: for GBSM paths written by the C++ API pass the `no_int` of [[qrt_file_read]] (interaction
-  count = path type); for ray-traced files the user sets it (values > 2 are an error)
+  GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `no_int` of
+  [[qrt_file_read]] (interaction count = path type); for ray-traced files the user sets it (values > 2 are an error)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
-- Messages name the argument `center_freq` as `'center_frequency'`
 
 ## Usage:
 ```
@@ -38,11 +37,11 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
-- **`method`** *(optional)* — Value of `rays.method`; sets the GR power law and the default mobility; default:
-  `'quadriga'`
+- **`M`** — Polarization transfer matrices, rows as in [[get_channels_planar]]; `[8, n_path, n_freq]`
+- **`method`** — Value of `rays.method`; sets the GR power law and the default mobility; default: `'quadriga'`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
-- **`tap`** *(optional)* — Tap index; omitted: LOS 0, GR 3, the others 6, 9, ... in path order; `[n_path]`
+- **`tap`** — Tap index; `[n_path]`; default: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also
+  without a GR path)
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; needed only where a GR ray is
   recomputed, i.e. in the mobility `drift` at moved ends; `[n_freq]`
 

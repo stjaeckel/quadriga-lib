@@ -55,15 +55,14 @@ Large-scale parameters of a set of links from normalized random values
 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0 (messages name it
-  `center_frequency`); `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [[gbsm_draw]] (`'lsf'`), finite; column 10 in [0, 1] when 3 or more
   outputs are requested; column 11 is not used; `[n_link, 11]`
-- **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite
-  and >= 0; replaces the value from `scenpar`, also in `lsp_sigma`; omitted or empty = the scenario
-  value; `[n_link, n_freq]`
+- **`sf_sigma`** — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite and >= 0;
+  replaces the value from `scenpar`, also in `lsp_sigma`; `[n_link, n_freq]`; default: the scenario
+  value
 - **`cholesky`** — `true`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS,
   ASD, ASA, ESD, ESA; XPR last); `false`: symmetric square root (legacy QuaDRiGa); default: true
 - **`clip_spreads`** — `true`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause

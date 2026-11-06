@@ -28,7 +28,7 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 - `QuaDRiGa_Industrial`: `min(1, exp(-(d2d_out + 20)/80)·exp(min(hBS, 8)/5 - 1))`; `LOS`: 1; `NLOS`:
   0
 - The `LOS_state_lambda` of the InF conf files is `d_clutter/2` of the TR defaults; with another
-  `d_clutter` pass a matching correlation distance
+  `d_clutter` draw the LOS state at a matching decorrelation distance
 
 ## Usage:
 ```
@@ -54,8 +54,7 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
   NaN or empty = default. The other models ignore the clutter arguments, which are validated for every
   model; default: NaN
 - **`rnd_g`** *(optional)* — Normal(0,1) value per link, G of eq. (7.6-18); `[n_link]`
-- **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0 (messages name it
-  `center_frequency`); `[n_freq]`
+- **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 
 ## Outputs:
 - **`p_los`** — LOS probability in [0, 1]; `[n_link, 1]`

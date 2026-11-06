@@ -33,14 +33,14 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models
 ```
 
 ## Inputs:
-- **`center_freq`** — Carrier frequencies in Hz, finite and > 0 (messages name it `center_frequency`); `(n_freq,)`
+- **`center_freq`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
 - **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column 3
   Normal(0,1), finite (deviation `sigma_P`, car loss); `(n_ut, 4)`, `n_ut = 0` allowed
 - **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; list of str or one str;
   `n_model` entries
 - **`weights`** — Probability of each model, finite and >= 0, sum 1 within 1e-6; `(n_model,)`
-- **`d2d_in_max`** — Maximum indoor 2D distance in m, finite and >= 0 (key `O2I_d2D_in_max`; TR: 25 m for UMa, UMi and
-  SMa commercial buildings, 10 m for RMa and SMa residential buildings); default: 25.0
+- **`d2d_in_max`** — Maximum indoor 2D distance in m, finite and >= 0 (`scenpar["O2I_d2D_in_max"]` of the O2I conf
+  files; TR: 25 m for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings); default: 25.0
 
 ## Outputs:
 - **`loss`** — Penetration loss in dB; `(n_ut, n_freq)`

@@ -356,8 +356,9 @@ SECTION!*/
 SOS phases of one random set of a BS site and scenario
 
 - Draws the SOS phases of one random set (set table in [[gbsm_draw]]): the random phases of the sinusoids of its
-  [sum-of-sinusoids (SOS)](cpp_api.html#sec-sum-of-sinusoids-random-number-generator) generators, as [[sos_init_phases]]; [[gbsm_draw]]
-  evaluates them at the links. Store `phase` or the seed to evaluate the same fields again along tracks or on maps
+  [sum-of-sinusoids (SOS)](cpp_api.html#sec-sum-of-sinusoids-random-number-generator) generators, as
+  [[sos_init_phases]]; [[gbsm_draw]] evaluates them at the links. Store `phase` or the seed to evaluate the same fields
+  again along tracks or on maps
 - The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed
   `"lsf"` sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`): [[sos_remove_bias]] sets the sample mean of columns 0 to 8 over the positions
@@ -505,8 +506,9 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
 # gbsm_draw
 Spatially correlated normalized random values of one random set at a set of links
 
-- Evaluates the SOS phases of [[gbsm_init_phases]] at the links as [[sos_val]], one column per generator. The value of a link depends
-  neither on the other links of the call nor on the other columns; with `dual_mobility = false` not on `tx_pos`
+- Evaluates the SOS phases of [[gbsm_init_phases]] at the links as [[sos_val]], one column per generator. The value of a
+  link depends neither on the other links of the call nor on the other columns; with `dual_mobility = false` not on
+  `tx_pos`
 - `dual_mobility = true`: the Tx is a second device on the same fields; its side of each generator uses the mirror
   generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
 - 2D mode (`horizontal = true`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
@@ -526,7 +528,7 @@ new sets), and a decorrelation distance of 0 is used as 0.1 m:
 | `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 8 absolute TOA, Normal(0,1); 9 ground permittivity and 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 10) |
 | `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [[ssf_clusters]] `rnd` |
 | `"cluster"`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd_freq`, slice `k` |
-| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: from the cluster DS c_DS and ASA | [[ssf_rays]] `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
+| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km | [[ssf_rays]] `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
 
 A `"ray"` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` in column `b·N·M + n·M + m`: 0 to 3 coupling
 ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of

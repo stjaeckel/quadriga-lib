@@ -65,7 +65,8 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
   `(n_link, 9·N)`
 - **`method`** — `"38.901"`, `"38.901_MF"` or `"quadriga"`; default: `"38.901"`
 - **`rnd_freq`** — Per-frequency cluster sets of [[gbsm.draw]], slice `k` from `set_id = k` (`"38.901"`: one slice,
-  the set of the frequency in `lsp`); required by the TR methods; `(n_link, N, n_freq)`; default: None
+  the set of the frequency in `lsp`, also as `(n_link, N)`); required by the TR methods; `(n_link, N, n_freq)`;
+  default: None
 - **`lsp_anchor`** — LSPs at the anchor frequency (e.g. 2 GHz) from [[lsp_generate]]; required by `"38.901_MF"`;
   `(n_link, 1, 8)`; default: None
 - **`eod_offset_deg`** — EoD offset in deg from [[lsp_generate]]; used by `"38.901"` and `"quadriga"` in NLOS
@@ -83,8 +84,8 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
 ## Outputs:
 - **`delay`** — Delays in s; `(n_link, n_slot, n_freq)` for `"38.901_MF"`, else `(n_link, n_slot, 1)`
 - **`power`** — Coefficient powers (linear); `(n_link, n_slot, n_freq)`
-- **`aod`**, **`aoa`** — Azimuth of departure and arrival in rad, in [-pi, pi); shapes as `delay`
-- **`eod`**, **`eoa`** — Elevation of departure and arrival in rad, in [-pi/2, pi/2]; shapes as `delay`
+- **`aod`**, **`eod`** — Azimuth in [-pi, pi) and elevation in [-pi/2, pi/2] of departure in rad; shapes as `delay`
+- **`aoa`**, **`eoa`** — Azimuth and elevation of arrival in rad, ranges as departure; shapes as `delay`
 - **`n_active`** — Number of NLOS clusters with power > 0; uint32; `(n_link,)`
 
 ## See also:

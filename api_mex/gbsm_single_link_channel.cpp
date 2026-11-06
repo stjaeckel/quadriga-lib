@@ -12,18 +12,18 @@ SECTION!*/
 
 /*!MD
 # GBSM_SINGLE_LINK_CHANNEL
-Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
+Channel coefficients of one link at one frequency over one segment
 
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
   `rays.center_frequency(i_freq)`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
-  gain and K-factor ratio of the snapshot, for the kept rays (power > 0 at `i_freq`, plus LOS and GR)
+  gain and K-factor ratio of the snapshot, for the kept rays (see Terms)
 - `'phase'`: [[get_channels_planar]] with the arrays at the positions of `rays` and the orientations of the snapshot;
   delays, path lengths and angles stay those of the ray-data positions. `'drift'`: [[get_channels_spherical]] with the
   arrays at the positions and orientations of the snapshot
 - `'taps'`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
   per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
   element pair is the mean of the rays' delays weighted by `rays.power` at `i_freq` (equal weights where they sum to
-  0), `[n_rx, n_tx, n_tap]`; reduce it to `[1, 1, n_tap]` where needed
+  0)
 - `'taps'` is exact at the phase center for the TR methods (the rays of a tap share one delay); for `'quadriga'` only
   at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `'rays'` for
   wide bands. `'rays'`: one path per kept ray in ray order, exact at any bandwidth; the path data are those of
@@ -33,10 +33,9 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
   per frequency); one row or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `chan` has no `initial_position`. Validity limits: see `ssf_paths`
-- An error is raised for an invalid array (message after `Transmit antenna: ` or `Receive antenna: `), invalid `rays`,
-  `'drift'` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a row or entry
-  count other than 1 or `n_snap`
-- `chan` and `par` are copies of the library result
+- An error is raised for an invalid array (message prefixed with `Transmit antenna: ` or `Receive antenna: `), invalid
+  `rays`, `'drift'` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a row or
+  entry count other than 1 or `n_snap`
 
 ## Usage:
 ```
@@ -48,20 +47,20 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 - **`tx_array`**, **`rx_array`** — Structs containing the arrayant data with `n_tx` and `n_rx` ports; field layout
   as documented in [[arrayant_generate]]
 - **`rays`** — Ray struct of the link, see [[ssf_rays]]; `[1, 1]` struct
-- **`link_gain_dB`** — [Link gain](mex_api.html#sec-geometry-based-stochastic-model) at `rays.center_frequency(i_freq)`
-  in [dB]; `[n_snap]` or `[1]`
-- **`mobility`** *(optional)* — `'phase'`, `'drift'` or `'auto'` (see Terms); default: `'auto'`
-- **`output`** *(optional)* — `'taps'` (default) or `'rays'`
-- **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 1-based; ray data of the TR methods hold one
-  frequency: 1; default: 1
-- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in [m]; omitted: the positions of `rays`;
-  `[n_snap, 3]` or `[1, 3]` (a `[3, 1]` column is rejected)
-- **`tx_orientation`**, **`rx_orientation`** *(optional)* — Euler angles (bank, tilt, heading) in [rad]; omitted:
-  0; `[n_snap, 3]` or `[1, 3]`
-- **`kf_ratio`** *(optional)* — KF(snapshot) / KF(drop) at `i_freq`, >= 0; omitted: 1; `[n_snap]` or `[1]`
-- **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `false`
-- **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays (`'phase'`: of the ray-data positions);
-  default: `false`
+- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
+- **`mobility`** — `'phase'`, `'drift'` or `'auto'` (see Terms; `'auto'` is `'drift'` for `'quadriga'` rays, which then
+  need [[ssf_scatterers]]); default: `'auto'`
+- **`output`** — `'taps'` or `'rays'`; default: `'taps'`
+- **`i_freq`** — Frequency index in `rays.center_frequency`, 1-based; ray data of the TR methods hold one frequency: 1;
+  default: 1
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in [m]; `[n_snap, 3]` or `[1, 3]` (a `[3, 1]` column is rejected);
+  default: the positions of `rays`
+- **`tx_orientation`**, **`rx_orientation`** — Euler angles (bank, tilt, heading) in [rad]; `[n_snap, 3]` or `[1, 3]`;
+  default: 0
+- **`kf_ratio`** — KF(snapshot) / KF(drop) at `i_freq`, >= 0; `[n_snap]` or `[1]`; default: 1
+- **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `false`
+- **`use_absolute_delays`** — Include the LOS delay in all delays (`'phase'`: of the ray-data positions); default:
+  `false`
 
 ## Outputs:
 - **`chan`** — Channel struct, layout as documented in [[hdf5_read_channel]]: `center_frequency` scalar;
@@ -81,11 +80,12 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `'drift'` with `'taps'` and a GR ray only; single |
 | `link_gain_dB` | `[n_snap, 1]` | Link gain per snapshot |
 | `b_med`, `b_eff` | `[2, 1]` | Of [[ssf_scatterers]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
-| `limit` | `[2, 1]` | Validity limit of `ssf_paths` per end in [m]; Inf where b is NaN |
+| `limit` | `[2, 1]` | Validity limit per end in [m] (see [[ssf_paths]]): `sqrt(λ·b_eff/8)` in `'phase'`, `0.2·b_med` in `'drift'`; Inf where `b_eff` or `b_med` is NaN |
 | `ratio` | `[2, 1]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | scalar | `sqrt(ratio(1)² + ratio(2)²)`; valid up to 1 |
 
 ## See also:
+- [[ssf_rays]] (the ray struct)
 - [[ssf_paths]] (paths of one link at one position, validity limits)
 - [[ssf_scatterers]] (scatterers for `'drift'`, `b_med` and `b_eff`)
 - [[gbsm_rays_from_paths]] (ray data from path data)
