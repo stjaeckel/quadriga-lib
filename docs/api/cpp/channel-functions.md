@@ -565,10 +565,10 @@ Not in: MATLAB, Python
 | Attribute            | Size   | Description                                                       |
 | -------------------- | ------ | ----------------------------------------------------------------- |
 | `unsigned iC`        | scalar | Channel ID: the channel to which the path belongs                 |
-| `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255)            |
+| `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255 except 193) |
 | `uint8_t nTRA`       | scalar | Number of transmissions / refractions (type codes 1-127)          |
 | `uint8_t nSUB`       | scalar | Number of subdivisions                                            |
-| `uint8_t nSCT`       | scalar | Number of scattering events                                       |
+| `uint8_t nSCT`       | scalar | Number of scattering events (interaction type code 193, set by [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); QRT files store the codes, not the counter) |
 | `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
 
 ### Data buffer layout (EM mode):
@@ -886,7 +886,8 @@ void quadriga_lib::qrt_file_read(
 - **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
 - **`coord`** — Interaction coordinates; `[3, sum(no_int)]`
 - **`interact_type`** — Interaction type codes, concatenated per path and segmented by `no_int`; `[sum(no_int)]`.
-  Empty for v4 legacy files.
+  Empty for v4 legacy files. GBSM paths of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) carry 129 (GR) and 193 (NLOS); LOS and GR
+  paths are not marked as GBSM.
 
 ### Example:
 ```cpp
@@ -955,9 +956,20 @@ Path objects of one CIR from spherical path data, for qrt_file_append
 
 Not in: MATLAB, Python
 
-- The path gain and the inverse free-space loss of the polyline length are folded into the stored Jones matrices
-- LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
-- Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
+- Converts the paths of one Tx-Rx pair (e.g. of [ssf_paths](geometry-based-stochastic-model.md#ssf_paths) with `drift` mobility) into [path](#path) objects for
+  [qrt_file_append](#qrt_file_append); one call per CIR, the objects of all CIRs of one origin appended together
+- Interactions: LOS none; GR one reflection at `lbs_pos` (code 129, `nREF` = 1); NLOS two point scatterers at
+  `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
+  and `length` exist on the returned objects only ([qrt_file_read_raw](#qrt_file_read_raw) returns 0): files store the codes
+- The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
+  [qrt_file_read](#qrt_file_read) (`downlink = true`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
+  within float32 accuracy, the polyline as `path_length` and `path_type` as `no_int`
+- `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init) (which
+  takes GHz): `qrt_file_read` recomputes the lengths from the stored positions; not checked
+- Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
+  0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
+- Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
+- A path of length 0 (LOS with `tx_pos` = `rx_pos`) throws: `qrt_file_read` would return an infinite gain
 
 ### Declaration:
 ```cpp
@@ -977,18 +989,18 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`center_frequency`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
 - **`tx_pos`** — Tx (origin) position in [m]; `[3]`
 - **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
-- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
-- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`M`** — Polarization transfer matrices, row order of [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_path, n_freq]`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
-- **`i_cir`** *(optional)* — CIR index, stored in `path::iC`, < 2^32
+- **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
 
 ### Returns:
-- Path objects in input order; `[n_path]`
+- Path objects in input order, EM layout with `n_freq` frequencies; `[n_path]`
 
 ### See also:
 - [qrt_file_append](#qrt_file_append) (writes the paths)
-- [ssf_paths](geometry-based-stochastic-model.md#ssf_paths) (path data of the geometry-based stochastic model)
+- [gbsm_rays_from_paths](geometry-based-stochastic-model.md#gbsm_rays_from_paths) (ray data from the paths read back)
 
 ---
 <a id="qrt_read_cache_init"></a>
