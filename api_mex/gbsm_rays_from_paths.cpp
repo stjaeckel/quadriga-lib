@@ -14,15 +14,16 @@ SECTION!*/
 # GBSM_RAYS_FROM_PATHS
 Ray data of one link from spherical path data (e.g. read with qrt_file_read)
 
-- Returns the ray struct of [[ssf_rays]] (`fallback` empty) from path data in the names and order of
-  [[qrt_file_read]], read with `downlink = true` (an uplink read swaps the ends and conjugates `M`)
+- Returns the ray struct of [[ssf_rays]] (`fallback` empty) from path data in the names and order of [[qrt_file_read]],
+  read with `downlink = true` and `normalize_M = 1` (an uplink read gives swapped ends and a conjugated `M`, which this
+  function does not undo; `normalize_M = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
-- QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
-  NLOS; a GR path needs `path_type`
-- The GR point (`lbs_pos`) must be within 1 mm of z = 0; permittivity only for `drift` away from `tx_pos`, `rx_pos`
-- Use in [[ssf_paths]] and [[gbsm_single_link_channel]] with `link_gain_dB = 0` and without `kf_ratio`
+- QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
+  GR path needs `path_type`: for GBSM paths written by the C++ API pass the `no_int` of [[qrt_file_read]] (interaction
+  count = path type); for ray-traced files the user sets it (values > 2 are an error)
+- The GR point (`lbs_pos`) must be within 1 mm of z = 0
 - Messages name the argument `center_freq` as `'center_frequency'`
 
 ## Usage:
@@ -40,19 +41,18 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
 - **`method`** *(optional)* — Value of `rays.method`; sets the GR power law and the default mobility; default:
   `'quadriga'`
-- **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted), at most one LOS and
-  one GR; `[n_path]`
-- **`tap`** *(optional)* — Tap index (a code, not shifted); omitted: LOS 0, GR 3, the others 6, 9, ... in path
-  order; `[n_path]`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; `[n_freq]`
+- **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
+- **`tap`** *(optional)* — Tap index; omitted: LOS 0, GR 3, the others 6, 9, ... in path order; `[n_path]`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; needed only where a GR ray is
+  recomputed, i.e. in the mobility `drift` at moved ends; `[n_freq]`
 
 ## Output:
-- **`rays`** — Ray struct with `n_ray = n_path`, see [[ssf_rays]]
+- **`rays`** — Ray struct with `n_ray = n_path`, see [[ssf_rays]]; use with `link_gain_dB = 0` and without `kf_ratio`
 
 ## See also:
-- [[qrt_file_read]] (source of the path data)
-- [[ssf_paths]] (paths at other positions)
-- [[gbsm_single_link_channel]] (channel coefficients of the link)
+- [[qrt_file_read]] (source of the path data, `downlink = true`)
+- [[ssf_paths]] (paths at moved positions)
+- [[gbsm_single_link_channel]] (channel of the link)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

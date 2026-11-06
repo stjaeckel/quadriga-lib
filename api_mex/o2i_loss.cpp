@@ -17,9 +17,8 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 - Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier
   frequency; the caller adds `loss` to the path loss of the UT
 - Models of TR 38.901 v19.5.0: `low`, `high`, `low_A` (Table 7.4.3-2 with the materials of Table
-  7.4.3-1), `legacy_6GHz` (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz; the O2I conf
-  files of UMa and UMi have its `SF_sigma = 7`), `car` and `car_metal` (clause 7.4.3.2, metallized
-  windows)
+  7.4.3-1), `legacy_6GHz` (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz), `car` and
+  `car_metal` (clause 7.4.3.2, metallized windows)
 - Model of UT `u`: the first model `j` with `rnd(u, 1)` below the sum of the weights up to `j`, else
   the last model with a weight > 0; a model with weight 0 is never chosen
 - Indoor distance: the minimum of columns 2 and 3 of `rnd` times `d2d_in_max` (`low`, `high`,
@@ -27,8 +26,8 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 - Draw `rnd` with [[sos_rand]] and [[sos_randn]] at the correlation distances of TR 38.901 clause
   7.6.3.3: 50 m for column 1, 25 m for columns 2 and 3, 10 m for column 4
 - TR applicability (Table 7.4.3-2): RMa `low` only, InF `high` only, UMa and UMi `low` and `high`,
-  SMa all three. SMa has 90 % residential and 10 % commercial buildings (Table 7.2-5) with different
-  maximum indoor distances: call `o2i_loss` once per building type
+  SMa `low`, `high` and `low_A`. SMa has 90 % residential and 10 % commercial buildings (Table 7.2-5)
+  with different maximum indoor distances: call `o2i_loss` once per building type
 
 ## Usage:
 ```

@@ -57,7 +57,7 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 - **`ref_sec`** *(optional)* — Reference per section, numbered as listed above; cell array of up to
   10 strings; an empty or missing entry writes no reference
 - **`valid_range`** *(optional)* — Validity range, written as comment; rows: frequency in GHz,
-  distance, BS height, MT height in m; columns: lower and upper end, one value is written if both
+  distance, BS height, UT height in m; columns: lower and upper end, one value is written if both
   are equal; a row with `NaN` is not written; `[4, 2]`
 - **`write_defaults`** — `true`: write all fields; `false`: write only fields that differ from their
   default; default: false

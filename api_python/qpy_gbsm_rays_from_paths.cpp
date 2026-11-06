@@ -13,14 +13,15 @@ SECTION!*/
 Ray data of one link from spherical path data (e.g. read with qrt_file_read)
 
 - Returns the ray dict of [[ssf_rays]] (`fallback` empty) from path data in the names and order of [[qrt_file_read]],
-  read with `downlink = True` (an uplink read swaps the ends and conjugates `M`)
+  read with `downlink = True` and `normalize_M = 1` (an uplink read gives swapped ends and a conjugated `M`, which this
+  function does not undo; `normalize_M = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
-- QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS;
-  a GR path needs `path_type`
-- The GR point (`lbs_pos`) must be within 1 mm of z = 0; permittivity only for `drift` away from `tx_pos`, `rx_pos`
-- Use in [[ssf_paths]] and [[gbsm.single_link_channel]] with `link_gain_dB = 0` and without `kf_ratio`
+- QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
+  GR path needs `path_type`: for GBSM paths written by the C++ API pass the `no_int` of [[qrt_file_read]] (interaction
+  count = path type); for ray-traced files the user sets it (values > 2 raise `ValueError`)
+- The GR point (`lbs_pos`) must be within 1 mm of z = 0
 - Messages name the argument `center_freq` as `'center_frequency'` and the parts of `gr_eps` as `gr_eps_re`, `gr_eps_im`
 
 ## Usage:
@@ -39,15 +40,16 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`method`** — Value of `rays["method"]`; sets the GR power law and the default mobility; default: `"quadriga"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `(n_path,)`; default: None
 - **`tap`** — Tap index; `None`: LOS 0, GR 3, the others 6, 9, ... in path order; `(n_path,)`; default: None
-- **`gr_eps`** — Ground permittivity (complex), used as `real - j·imag`; `(n_freq,)`; default: None (also if empty)
+- **`gr_eps`** — Ground permittivity (complex), used as `real - j·imag`; needed only where a GR ray is recomputed, i.e.
+  in the mobility `drift` at moved ends; `(n_freq,)`; default: None (also if empty)
 
 ## Output:
-- **`rays`** — Ray dict with `n_ray = n_path`, see [[ssf_rays]]
+- **`rays`** — Ray dict with `n_ray = n_path`, see [[ssf_rays]]; use with `link_gain_dB = 0` and without `kf_ratio`
 
 ## See also:
-- [[qrt_file_read]] (source of the path data)
-- [[ssf_paths]] (paths at other positions)
-- [[gbsm.single_link_channel]] (channel coefficients of the link)
+- [[qrt_file_read]] (source of the path data, `downlink = True`)
+- [[ssf_paths]] (paths at moved positions)
+- [[gbsm.single_link_channel]] (channel of the link)
 MD!*/
 
 py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,

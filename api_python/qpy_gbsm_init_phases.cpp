@@ -11,15 +11,18 @@ SECTION!*/
 
 /*!MD
 # gbsm.init_phases
-Draw the random phases of one generator set of a BS site and scenario
+SOS phases of one random set of a BS site and scenario
 
-- Draws the phases of one random set (set table in the section description) for [[gbsm.draw]]; store `phase` or the
-  seed to evaluate the same fields again along tracks or on maps
-- The phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed `"lsf"`
-  phases within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
-- `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos.remove_bias]] sets the sample mean of
-  columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
-- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: all sets but `"lsf"` empty
+- Draws the SOS phases of one random set (set table in [[gbsm.draw]]): the random phases of the sinusoids of its
+  [sum-of-sinusoids (SOS)](python_api.html#sec-sum-of-sinusoids-random-number-generator) generators, as
+  [[sos.init_phases]]; [[gbsm.draw]] evaluates them at the links. Store `phase` or the seed to evaluate the same fields
+  again along tracks or on maps
+- The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed `"lsf"`
+  sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
+- `"lsf"` bias removal (`remove_bias`): [[sos.remove_bias]] sets the sample mean of columns 0 to 8 over the positions
+  (Rx, and Tx in dual mobility; in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop
+- `NumClusters = 1`: all sets but `"lsf"` are empty
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
 - The flags take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Usage:
@@ -31,19 +34,24 @@ phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the decorrelation distances, `NumClusters` and `NumSubPaths` are used
 - **`set_type`** — `"lsf"`, `"cluster"` or `"ray"`; str
-- **`seed`** — Seed of the site and scenario; int from -1 to 2^63-1; -1 = system random device; default: -1
+- **`seed`** — Seed of the site and scenario; int from -1 to 2^63-1; -1 = system random device, new SOS phases on each
+  call; default: -1
 - **`set_id`** — `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`; default: -1
 - **`preset`** — Sum-of-sinusoids preset, see [[sos.preset]]; sets `n_coeff`; default: `"Comb256"`
-- **`tx_pos`**, **`rx_pos`** — `"lsf"` only: positions in m for the bias removal, as in [[gbsm.draw]]; default: None
-- **`dual_mobility`**, **`remove_bias`**, **`horizontal`** — `"lsf"`: Tx and Rx both move; remove the sample mean; 2D
-  bias removal (TR 38.901), `False`: 3D (legacy QuaDRiGa); default: False, True, True
+- **`tx_pos`**, **`rx_pos`** — Bias-removal positions in m as in [[gbsm.draw]]; `"lsf"` only, else `ValueError`;
+  default: None
+- **`dual_mobility`** — `"lsf"` with bias removal: Tx and Rx both move; as in [[gbsm.draw]]; default: False
+- **`remove_bias`** — `"lsf"` only: remove the sample mean over the positions; needs `rx_pos` with at least 3 rows, else
+  no effect; default: True
+- **`horizontal`** — `"lsf"` with bias removal: `True` 2D, `False` 3D mode; as in [[gbsm.draw]]; default: True
 
 ## Output:
-- **`phase`** — Phases in rad, in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side; `(n_coeff, n_gen, 2)`
+- **`phase`** — SOS phases in rad, in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 = Tx
+  side; `(n_coeff, n_gen, 2)`
 
 ## See also:
-- [[gbsm.draw]] (evaluates the phases at the links)
-- [[sos.remove_bias]] (the bias removal of one generator)
+- [[gbsm.draw]] (evaluates the SOS phases at the links)
+- [[sos.init_phases]], [[sos.val]] (SOS phases and evaluation of one generator), [[sos.remove_bias]] (its bias removal)
 MD!*/
 
 py::array_t<double> gbsm_init_phases(py::handle scenpar,
