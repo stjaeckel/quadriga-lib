@@ -49,29 +49,29 @@ Ray data of one link (geometry-based stochastic model)
   positions the data refer to; written by [[ssf_rays]] and [[gbsm_rays_from_paths]], completed by
   .[[solve_scatterers]], read by [[ssf_paths]] and [[gbsm_single_link_channel]], which call `is_valid()` first
 - Plain data: the class does not normalize or reorder; later versions append attributes, so set them by name
-- An object has scatterers when `fbs_pos` has `n_ray` columns; every object with `n_ray = 0` has them
-- Rays from several sources in one object: at most one LOS and one GR ray, with tap index 0 and 3; the other rays
-  take any other tap indices; one `method` for all rays; `.solve_scatterers` overwrites given scatterers, so solve
-  rays without scatterers in a separate object and concatenate the attributes
-- Extreme but finite inputs overflow: XPR, polarization or spread statistics far outside the TR tables (e.g. 1000 dB)
-  give rays that `is_valid()` rejects by attribute, not by input, in the consumer; `kf_ratio` or positions near the
-  range of double give outputs of [[ssf_paths]] that are not finite
+- An object has scatterers when `fbs_pos` has `n_ray` columns (an empty object counts as having them)
+- Tap convention: 0 for the LOS ray, 3 for a GR ray; without GR, [[ssf_rays]] gives tap 3 to the first NLOS cluster.
+  Rays added from another source take tap indices the object does not use; at most one LOS and one GR ray (checked by
+  `is_valid()`) and one `method` for all rays. `.solve_scatterers` overwrites given scatterers, so solve rays without
+  scatterers in a separate object and concatenate the attributes
+- Extreme but finite inputs (e.g. an XPR of 1000 dB, `kf_ratio` or positions near the range of double) can give
+  non-finite attributes or outputs; the consumer's `is_valid()` message then names the attribute, not the input
 
 ## Attributes:
-| Attribute | Size | Meaning | Set by |
+| Attribute | Type, size | Meaning | Set by |
 | --- | --- | --- | --- |
-| `method` | string | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
-| `tx_pos`, `rx_pos` | `[3]` | Tx and Rx position the ray data refer to in [m] | all |
-| `center_frequency` | `[n_freq]` | Carrier frequencies in [Hz] | all |
-| `delay` | `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
-| `power` | `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
-| `aod`, `eod`, `aoa`, `eoa` | `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
-| `M` | `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | all |
-| `path_type` | `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
-| `tap` | `[n_ray]` | Tap index; rays with equal index form one tap | all |
-| `gr_eps_re`, `gr_eps_im` | `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [[ssf_rays]], [[gbsm_rays_from_paths]] |
-| `fbs_pos`, `lbs_pos` | `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | .[[solve_scatterers]], [[gbsm_rays_from_paths]] |
-| `fallback` | `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | .[[solve_scatterers]] |
+| `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
+| `tx_pos`, `rx_pos` | `arma::vec`, `[3]` | Tx and Rx position the ray data refer to in [m] | all |
+| `center_frequency` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
+| `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
+| `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
+| `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
+| `M` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | all |
+| `path_type` | `arma::uvec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
+| `tap` | `arma::uvec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
+| `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [[ssf_rays]], [[gbsm_rays_from_paths]] |
+| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | .[[solve_scatterers]], [[gbsm_rays_from_paths]] |
+| `fallback` | `arma::uvec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | .[[solve_scatterers]] |
 
 ## Member functions:
 | Member | Returns |
@@ -80,14 +80,18 @@ Ray data of one link (geometry-based stochastic model)
 | `n_freq()` | Number of frequencies, length of `center_frequency` |
 | `empty()` | `true` if `n_ray() == 0` |
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
-| `b_med(i_freq)` | `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
-| `b_eff(i_freq)` | `[2]`, Tx and Rx in [m]: $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$ at frequency `i_freq`, with $b$ the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
+| `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
+| `b_eff(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$ at frequency `i_freq`, with $b$ the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR); validity scale of the mobility `phase`; NaN without scatterers or power |
+| `solve_scatterers(d_min = 2.0)` | `void`; writes `fbs_pos`, `lbs_pos` and `fallback`, see .[[solve_scatterers]] |
 
 - `b_med` and `b_eff` throw the `is_valid()` message for an invalid object and an error for `i_freq >= n_freq()`
 
 ## See also:
 - [[ssf_rays]] (ray data of a set of links)
+- [[gbsm_rays_from_paths]] (ray data from path data)
+- .[[solve_scatterers]] (scatterers for the mobility `drift`)
 - [[ssf_paths]] (paths of one link at one position)
+- [[gbsm_single_link_channel]] (channel of the link)
 MD!*/
 
 arma::uword quadriga_lib::gbsm_rays::n_ray() const
@@ -235,21 +239,20 @@ arma::vec quadriga_lib::gbsm_rays::b_eff(arma::uword i_freq) const
 # .solve_scatterers
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
+- Member of [[gbsm_rays]]: places the scatterers that the mobility `drift` needs, in place
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
   distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
   distance) and the angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
   ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
-  `d_min` = 2 m (UMi, UMa, RMa, InF and indoor scenarios) this applies to 5.5 to 13 % of the rays of the TR methods
-  without absolute TOA (the first cluster has zero excess delay), to 1.0 to 9.8 % in `"quadriga"` and to at most
-  2.3 % with absolute TOA; it adds a median delay of up to 5.5 ns (p99 up to 21.7 ns) and changes the delay spread
-  of a link at p99 by up to 4.1 % in UMi, UMa and InF, 10 % indoor and 21 % in RMa LOS (small LOS delay spreads)
+  `d_min` = 2 m this applies to up to about 13 % of the rays (most in the TR methods without absolute TOA, where the
+  first cluster has zero excess delay) and lengthens them by a few ns
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
 - Writes `fbs_pos`, `lbs_pos` and `fallback` of all rays and overwrites given scatterers; nothing else changes;
   afterwards `b_med()` and `b_eff()` give the validity scales of [[ssf_paths]]
-- One link per call; batch callers loop over the objects of [[ssf_rays]]; an invalid object throws the
-  `is_valid()` message and leaves the object unchanged
+- One link per call; batch callers loop over the objects of [[ssf_rays]]. Throws `std::invalid_argument` with the
+  `is_valid()` message for an invalid object, which stays unchanged
 
 ## Declaration:
 ```

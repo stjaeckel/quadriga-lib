@@ -353,7 +353,7 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 - Turns the LSPs of [[lsp_generate]] and the cluster random values of [[gbsm_draw]] into the clusters of each link,
   by one of three methods:
   - `"38.901"` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters
-    25 dB below the strongest get power 0 (no renormalisation); the K-factor in the scaling factors is limited
+    25 dB below the strongest get power 0 (no renormalization); the K-factor in the scaling factors is limited
     to >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` at the drop or segment
     start and keep them along the track
   - `"38.901_MF"`: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs `lsp_anchor`; where the multi-frequency
@@ -383,13 +383,10 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   `abs_toa(l) > 0`)
 - Ground reflection (TR clause 7.6.8) on the plane z = 0: slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of
   the other slots) or `K/(K+1)·R²` (`"quadriga"`), with `R²` the mean of `abs(R_par)²` and `abs(R_perp)²` of TR
-  eqs. (7.6-38), (7.6-39); the coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation
+  eqs. (7.6-38), (7.6-39); the coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarization
   `sqrt(power)·exp(j·arg(R_par))`
 - `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled; `rnd` must
   be empty, `rnd_freq` and `lsp_anchor` are not used
-- Swap reciprocity: with mirrored random values (dual mobility in [[gbsm_draw]]) and mirrored LSPs, swapping `tx_pos`
-  and `rx_pos` exchanges the departure and arrival angles (`"38.901"`: `eod_offset_deg` = 0 and no O2I link;
-  `"quadriga"`: `eod_offset_deg` = 0)
 - `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked
 
 ## Declaration:
@@ -424,12 +421,12 @@ void quadriga_lib::ssf_clusters(
 - **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
 - **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
-  `"38.901"`: one frequency; `[n_link, n_freq, 8]`
+  `"38.901"`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [[gbsm_draw]] (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
   `[n_link, 9·N]`
 - **`method`** *(optional)* — `"38.901"` (default), `"38.901_MF"` or `"quadriga"`
-- **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [[gbsm_draw]], slice `k` from `set_id = k`; required
-  by `"38.901"` and `"38.901_MF"`; `[n_link, N, n_freq]`
+- **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [[gbsm_draw]], slice `k` from `set_id = k`
+  (`"38.901"`: one slice, the set of the frequency in `lsp`); required by the TR methods; `[n_link, N, n_freq]`
 - **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz) from [[lsp_generate]]; required by
   `"38.901_MF"`; `[n_link, 1, 8]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]]; used by `"38.901"` and
@@ -453,6 +450,7 @@ void quadriga_lib::ssf_clusters(
 ## See also:
 - [[gbsm_draw]] (the random values `rnd` and `rnd_freq`)
 - [[lsp_generate]] (the LSPs, EoD offset, absolute TOA and ground permittivity)
+- [[ssf_rays]] (the rays of the clusters)
 - [[calc_delay_spread]], [[calc_angular_spreads_sphere]] (spreads of the output)
 MD!*/
 

@@ -104,7 +104,7 @@ namespace quadriga_lib
     channel<double> gbsm_single_link_channel(const arrayant<double> &tx_array,          // Tx array antenna, n_tx ports
                                              const arrayant<double> &rx_array,          // Rx array antenna, n_rx ports
                                              const gbsm_rays &rays,                     // Ray data of the link
-                                             const arma::vec &link_gain_dB,             // Link gain -PL - O2I + SF at rays.center_frequency(i_freq) in [dB], [n_snap] or [1]
+                                             const arma::vec &link_gain_dB,             // Link gain -PL - O2I + 10·lg(SF) at rays.center_frequency(i_freq) in [dB], [n_snap] or [1]
                                              const std::string &mobility = "auto",      // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
                                              const std::string &output = "taps",        // "taps" or "rays"
                                              arma::uword i_freq = 0,                    // Frequency index in rays.center_frequency, 0-based; TR methods: 0 (one entry)

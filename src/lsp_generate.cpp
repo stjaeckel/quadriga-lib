@@ -161,13 +161,15 @@ void quadriga_lib::lsp_generate(
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary
   part >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
-- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; `[n_link, n_freq, 8]`
-- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; `[n_link, n_freq, 8]`
+- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
+- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; required by [[ssf_rays]];
+  `[n_link, n_freq, 8]`
 
 ## See also:
 - [[gbsm_draw]] (the random values `rnd`)
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[ssf_clusters]] (the clusters from the LSPs)
+- [[ssf_rays]] (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 MD!*/
 
 void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &scenpar,

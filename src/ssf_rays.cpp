@@ -90,35 +90,35 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
   `1 + G + n·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays at power 0
 - LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R
   of the ground reflection (TR eqs. (7.6-38) to (7.6-40), R² = (abs(R_par)² + abs(R_perp)²)/2)
-- NLOS rays: power P_n/M; offsets of Table 7.5-3 scaled by the cluster spreads (`PerClusterAS_D`, `PerClusterAS_A`,
-  `PerClusterES_A`, ZSD of eq. (7.5-20)); coupling (step 8): within a cluster or sub-cluster, the ray with the k-th
-  smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA, ZOD and ZOA
-- `M` other than 20: QuaDRiGa-NG's offsets below 20 (mean 0, rms 1), Laplacian quantiles at the rms of Table 7.5-3
-  above 20; no sub-clusters
+- NLOS rays: power P_n / `NumSubPaths`; offsets of Table 7.5-3 scaled by the cluster spreads (`PerClusterAS_D`,
+  `PerClusterAS_A`, `PerClusterES_A`, ZSD of eq. (7.5-20)); coupling (step 8): within a cluster or sub-cluster, the
+  ray with the k-th smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA,
+  ZOD and ZOA
+- `NumSubPaths` other than 20: the offsets of QuaDRiGa-NG (the MATLAB QuaDRiGa fork that uses this library) below 20
+  (mean 0, rms 1), Laplacian quantiles at the rms of Table 7.5-3 above 20; no sub-clusters
 
 | Method | `"38.901"`, `"38.901_MF"` | `"quadriga"` |
 | --- | --- | --- |
-| Frequencies per call | `i_freq` only; slice `i_freq` of `rnd_ray` | all; one geometry, per frequency powers, XPR and Jones matrices; the shared "ray" set |
+| Frequencies per call | `i_freq` only; slice `i_freq` of `rnd_ray`; `"38.901"` takes one frequency | all; one geometry, per frequency powers, XPR and Jones matrices; the shared "ray" set |
 | Ray delays | cluster delay; sub-clusters + 0, 1.28, 2.56 c_DS (Table 7.5-6) | cluster delay + 2·c_DS·(u - mean of u in the cluster), u of block 14; negative delays set to 0 |
-| Taps | sub-cluster of the two strongest clusters (`M` = 20), else cluster | cluster |
+| Taps | sub-cluster of the two strongest clusters (`NumSubPaths` = 20), else cluster | cluster |
 | c_DS, ZSD | at frequency `i_freq` | mean over the frequencies |
 
 | Option | Default (TR) | Alternative (QuaDRiGa-NG) |
 | --- | --- | --- |
 | `angle_model` | `"additive"`: offsets added to azimuth and zenith, zenith folded (step 7) | `"rotation"`: offset pattern rotated to the cluster direction; equal at elevation 0 |
-| `pol_model` | `"38.901"`: XPR and four initial phases per ray (steps 9, 10) | `"quadriga"`: rotation polarisation model of QuaDRiGa, one phase, XPR per ray and per cluster |
+| `pol_model` | `"38.901"`: XPR and four initial phases per ray (steps 9, 10) | `"quadriga"`: rotation polarization model of QuaDRiGa, one phase, XPR per ray and per cluster |
 | `pol_variability` | `false` | `true`: clause 7.6.16 on the NLOS rays with std `PolVar_sigma` (key default 0: no effect); `pol_model = "38.901"` only |
 
 - Sub-clusters (step 11): the two clusters of largest power at frequency `i_freq` (equal powers: lower index first),
   rays at the positions 0-9, 10-15 and 16-19; every tap is a contiguous block of rays
-- `"quadriga"` sets 0.2 to 1.4 % of the active NLOS rays to delay 0 (at most 2.9 % of the NLOS power)
 - `pol_model = "quadriga"`: the matrix refers to the owner end, the end with the larger z, then x, then y (ends within
   1 mm count as equal; the Tx if all tie); the Rx as owner transposes it, so UTs dropped separately at equal heights
   on either side of the tie plane get transposed matrices
-- Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm_draw]], mirrored LSPs and clusters,
-  `PerClusterAS_D` = `PerClusterAS_A`, `PerClusterES_D` = `PerClusterES_A`, `PerClusterES_D_scale` = 0), swapping
-  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (both polarisation models; not
-  for `pol_model = "quadriga"` with ends within 1 mm of each other, where the Tx stays the owner)
+- Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm_draw]], mirrored LSPs, no EoD offset and no O2I
+  flag in [[ssf_clusters]], equal per-cluster spreads at both ends, `PerClusterES_D_scale` = 0), swapping `tx_pos`
+  and `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = "quadriga"` with the
+  ends within 1 mm of each other)
 
 ## Declaration:
 ```
@@ -158,22 +158,22 @@ void quadriga_lib::ssf_rays(
 - **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [[ssf_clusters]]
   (`n_slot` slots); `[n_link, n_slot, n_freq]` for `"38.901_MF"`, else `[n_link, n_slot, 1]`
 - **`power`** — Cluster powers from [[ssf_clusters]]; `[n_link, n_slot, n_freq]`
-- **`rnd_ray`** — "ray" sets from [[gbsm_draw]], `n_gen` = 14·N·M + N with N = `NumClusters` - 1; TR methods:
-  slice `k` = set `k`, `[n_link, n_gen, n_freq]`; `"quadriga"`: the shared set, `[n_link, n_gen, 1]`
+- **`rnd_ray`** — `"ray"` sets from [[gbsm_draw]] (`n_gen` columns); TR methods: slice `k` = set `k`,
+  `[n_link, n_gen, n_freq]`; `"quadriga"`: the shared set, `[n_link, n_gen, 1]`
 - **`method`** *(optional)* — Method of [[ssf_clusters]]: `"38.901"`, `"38.901_MF"` or `"quadriga"`
-- **`i_freq`** *(optional)* — TR methods: index into `center_frequency`, 0-based (`rays.center_frequency` then has
-  one entry, so `i_freq` = 0 in [[gbsm_single_link_channel]]); `"quadriga"`: 0
+- **`i_freq`** *(optional)* — TR methods: index into `center_frequency`, 0-based; `"quadriga"`: must be 0
 - **`angle_model`**, **`pol_model`** *(optional)* — See the option table
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [[lsp_generate]]; required if
   `GR_enabled`, else ignored; `[n_link, n_freq]`
-- **`pol_variability`** *(optional)* — TR 7.6.16 polarisation power variability, see the option table
+- **`pol_variability`** *(optional)* — TR 7.6.16 polarization power variability, see the option table
 - **`random_phase`** *(optional)* — `false`: all initial phases 0
 
 ## Output:
-- **`rays`** — Ray data, one entry per link; entries with attributes of the right size are written in place;
-  `[n_link]`
+- **`rays`** — Ray data, one entry per link, TR methods at frequency `i_freq` only; resized to `n_link`, existing
+  entries are overwritten (their memory is reused); `[n_link]`
 
 ## See also:
+- [[ssf_clusters]] (the clusters)
 - [[gbsm_rays]] (attributes of the output)
 - [[ssf_paths]] (paths of one link)
 MD!*/
