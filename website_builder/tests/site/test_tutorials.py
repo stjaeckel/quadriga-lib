@@ -4,6 +4,7 @@
 """Tutorial notebooks: executed copies, metadata checks, outputs, headings, pages and twins."""
 
 import json
+import re
 import shutil
 
 NB = "tutorials/mini_demo.ipynb"            # the notebook (cleared); messages name it
@@ -164,3 +165,37 @@ def test_executed_copy_without_notebook_is_ignored(mini_repo, run_site):
     code, out = run_site(mini_repo)
     assert code == 0 and "mini_demo" not in out
     assert not (mini_repo / "website/tutorials/mini_demo.html").exists()
+
+
+def link_to_tutorials(root, *stems):
+    """Append a link to each tutorials/<stem>.html to a content page that becomes faq.html and faq.md."""
+    with open(root / "docs_builder/content/faq.md", "a", encoding="utf-8") as f:
+        f.write("\n" + " ".join("[%s](tutorials/%s.html)" % (s, s) for s in stems) + "\n")
+
+
+def test_link_to_unrun_tutorial(mini_repo, run_site):
+    link_to_tutorials(mini_repo, "mini_demo")
+    code, out = run_site(mini_repo)
+    assert code == 0 and "link target" not in out, out  # with its executed copy the link resolves
+    for remove in (lambda: (mini_repo / RUN).unlink(), lambda: shutil.rmtree(mini_repo / "tutorials/executed")):
+        remove()
+        code, out = run_site(mini_repo)
+        assert code == 0, out
+        assert re.search(r"website/faq\.html:\d+: warning: link target left out: tutorials/mini_demo\.html "
+                         r"\(tutorial not run, make tutorials\) \[not-executed\]", out)
+        assert re.search(r"website/faq\.md:\d+: warning: link target left out: "
+                         r"http://quadriga-lib\.org/tutorials/mini_demo\.md \(tutorial not run", out)
+        assert "link target missing" not in out
+        code, out = run_site(mini_repo, "--release")
+        assert code == 1 and re.search(r"tutorials/(mini_demo\.ipynb|executed): error: ", out), out
+
+
+def test_link_to_missing_tutorial(mini_repo, run_site):
+    link_to_tutorials(mini_repo, "mini_dmeo")  # no notebook of that name: an error with or without executed copies
+    for remove in (lambda: None, lambda: shutil.rmtree(mini_repo / "tutorials/executed")):
+        remove()
+        code, out = run_site(mini_repo)
+        assert code == 1
+        assert re.search(r"website/faq\.html:\d+: error: link target missing: tutorials/mini_dmeo\.html", out)
+        assert re.search(r"website/faq\.md:\d+: error: link target missing: "
+                         r"http://quadriga-lib\.org/tutorials/mini_dmeo\.md", out)
