@@ -178,6 +178,20 @@ assertEqual( size(d0), [ 0, size(delay, 2) ] );
 assertEqual( size(p0), [ 0, size(delay, 2) ] );
 assertTrue( isempty(n0) && isa(n0, 'uint32') );
 
+%% Links: an empty optional input of any shape selects the default (scenario without absolute TOA)
+l3 = 1 : 3;
+c_ref = cell(2, 7);
+c_emp = cell(2, 7);
+[ c_ref{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), '38.901', ...
+    rnd_f(l3, :) );
+[ c_emp{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), '38.901', ...
+    rnd_f(l3, :), [], [], zeros(0, 1) );
+[ c_ref{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), 'quadriga' );
+[ c_emp{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), 'quadriga', ...
+    zeros(0, 1), zeros(0, 1, 8), zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), false(0, 1), zeros(0, 1) );
+assertEqual( size( c_emp{1, 1} ), [ 3, N + 1 ] );
+assertEqual( c_emp, c_ref );
+
 %% Zero links: all methods, LOS with ground reflection and NLOS; empty inputs of the right shape count as given
 fc = [ 6e9; 30e9 ];
 r0 = zeros(0, 3);

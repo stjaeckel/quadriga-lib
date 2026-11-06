@@ -67,6 +67,13 @@ assertEqual( fieldnames(r0)', fields );
 assertTrue( isempty(r0(1).gr_eps_re) && isempty(r0(1).gr_eps_im) );
 assertEqual( r0(1).tap(1:2), uint32( [0; 3] ) );
 
+% Links: empty permittivities select the default (unused without, missing with ground reflection)
+re = quadriga_lib.ssf_rays( sn, tx_pos, rx_pos, fc, lsp, mu, sig, d0, p0, a0, e0, b0, f0, rq, 'quadriga', [], [], ...
+    [], zeros(0, 1), zeros(0, 2) );
+assertEqual( re, r0 );
+assert_throws( @() quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rq, ...
+    'quadriga', [], [], [], zeros(0, 2), zeros(0, 2) ), 'are required when ''GR_enabled'' is set.' );
+
 %% Optional inputs: method, i_freq (1-based), angle_model, pol_model, pol_variability, random_phase
 r2 = mf( 1, [], [], gre, gim );
 assertEqual( r2(1).center_frequency, fc(1) );
