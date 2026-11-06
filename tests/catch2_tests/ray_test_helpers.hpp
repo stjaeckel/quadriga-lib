@@ -2149,6 +2149,11 @@ namespace ub
 // where the ray is back in air and summed at its polyline's point, in front of the wall into R and
 // behind it into T. eps 0 sums every series, eps 1.5 follows every bounce. inc: the sum of the path
 // powers, which no interference enters.
+//
+// maxdepth: 200 at most. Every level of the recursion keeps an event on the stack, 3.3 KB with GCC,
+// and the main thread on Windows has a 1 MB stack: 200 levels need about 0.7 MB, 400 overflow it.
+// 200 is deep enough for the walls in the tests: a lossless 1 mm slab at 85 deg keeps 0.9999 of the
+// power, where 150 keeps 0.998.
 namespace bf
 {
     struct Acc
@@ -2225,7 +2230,8 @@ namespace cf
     };
     // bf::walk with a half-space: a ray is collected where it is in air or has entered the sink
     // medium, into T where it runs towards +x. The first event of a ray launched inside a medium
-    // forms no series there. kt: the transverse wavenumber of the launch
+    // forms no series there. kt: the transverse wavenumber of the launch. maxdepth: 200 at most, the
+    // stack limit of bf::walk
     static void walk(const ub::Pal &pal, const arma::mat &mesh, const arma::uvec &mi, int tr, double f, double kt, double eps, int sink, const ub::Ev *in,
                      bool first, const arma::mat &o, const arma::mat &d, std::complex<double> a0, std::complex<double> a1, double Lin, double y0,
                      int depth, int maxdepth, Acc &A)
