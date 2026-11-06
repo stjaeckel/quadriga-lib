@@ -24,7 +24,7 @@ Ray data of one link from spherical path data (e.g. read with qrt_file_read)
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
   NLOS; a GR path needs `path_type` (`no_int` for files of [[qrt_paths_from_scatterers]])
-- The GR point (`lbs_pos`) must be within 1 mm of z = 0; permittivity only for `drift` away from `tx_pos`, `rx_pos`
+- The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
 ## Declaration:
 ```
@@ -55,13 +55,17 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`method`** *(optional)* — Value of `rays.method`; sets the GR power law and the default mobility
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** *(optional)* — Tap index; omitted: LOS 0, GR 3, the others 6, 9, ... in path order; `[n_path]`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; `[n_freq]`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; needed only where a GR ray is
+  recomputed, i.e. in the mobility `drift` at moved ends; `[n_freq]`
 
 ## Output:
 - **`rays`** — Ray data with `n_ray = n_path`, see [[gbsm_rays]]; use with `link_gain_dB = 0` and without `kf_ratio`
 
 ## See also:
-- [[qrt_file_read]], [[qrt_paths_from_scatterers]] (QRT route), [[ssf_paths]], [[gbsm_single_link_channel]]
+- [[qrt_file_read]] (source of the path data, `downlink = true`)
+- [[qrt_paths_from_scatterers]] (write the paths of [[ssf_paths]] to a QRT file)
+- [[ssf_paths]] (paths at moved positions)
+- [[gbsm_single_link_channel]] (channel of the link)
 MD!*/
 
 void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,

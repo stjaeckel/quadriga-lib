@@ -21,7 +21,7 @@
 // phases (gbsm_init_phases) and their evaluation at the links (gbsm_draw). The machinery in the anonymous namespace
 // is generic over a generator table (qd_gbsm_gen_lsf, qd_gbsm_gen_cluster, qd_gbsm_gen_ray): mirroring, floors,
 // 2D / 3D, dual mobility and bias removal work the same for every set type. The column layouts are documented in
-// the set table of the section description (qd_scenpar.cpp).
+// the set table of the gbsm_draw doc block below.
 //
 // Phase cube of a set, [n_coeff, n_gen, 2]: slice 0 = Rx side, slice 1 = Tx side, slice1.col(g) = slice0.col(m(g)):
 // at the Tx position, generator g evaluates the field of its mirror generator m(g).
@@ -51,8 +51,8 @@ namespace
         bool bias;          // Remove the sample mean in the bias removal
     };
 
-    // The 11 generators of the "lsf" set from a completed scenpar; column layout in the set table of the section
-    // description (qd_scenpar.cpp)
+    // The 11 generators of the "lsf" set from a completed scenpar; column layout in the set table of the gbsm_draw
+    // doc block
     // - 'sp' must hold all keys (output of scenpar_validate); a missing key throws std::out_of_range
     std::vector<qd_gbsm_gen> qd_gbsm_gen_lsf(const std::unordered_map<std::string, double> &sp)
     {
@@ -72,8 +72,8 @@ namespace
         return gen;
     }
 
-    // Generators of the "cluster" sets from a completed scenpar (column layout in the set table): set_id = -1 shared
-    // set (9·N), >= 0 per-frequency set (N); N = NumClusters - 1, empty for N = 0
+    // Generators of the "cluster" sets from a completed scenpar (column layout in the gbsm_draw set table):
+    // set_id = -1 shared set (9·N), >= 0 per-frequency set (N); N = NumClusters - 1, empty for N = 0
     std::vector<qd_gbsm_gen> qd_gbsm_gen_cluster(const std::unordered_map<std::string, double> &sp, arma::sword set_id)
     {
         const arma::uword mirror_b[9] = {0, 2, 1, 4, 3, 6, 5, 8, 7};
@@ -93,9 +93,10 @@ namespace
         return gen;
     }
 
-    // Generators of the "ray" sets from a completed scenpar (column layout in the set table): 14·N·M + N for every
-    // set_id; blocks b <= 12 at b·N·M + n·M + m with the mirror blocks (1, 0, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10, 12),
-    // block 13 at 13·N·M + n, block 14 (Uniform) at 13·N·M + N + n·M + m, both self-mirrored
+    // Generators of the "ray" sets from a completed scenpar (column layout in the gbsm_draw set table):
+    // 14·N·M + N for every set_id; blocks b <= 12 at b·N·M + n·M + m with the mirror blocks
+    // (1, 0, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10, 12), block 13 at 13·N·M + n, block 14 (Uniform) at 13·N·M + N + n·M + m,
+    // both self-mirrored
     // - 'lambda_14': decorrelation distance of block 14 in [m], > 0; the other blocks use SC_lambda (0 -> 0.1 m)
     std::vector<qd_gbsm_gen> qd_gbsm_gen_ray(const std::unordered_map<std::string, double> &sp, double lambda_14)
     {
@@ -352,15 +353,16 @@ SECTION!*/
 
 /*!MD
 # gbsm_init_phases
-Draw the random phases of one generator set of a BS site and scenario
+Draw the random phases of one random set of a BS site and scenario
 
-- Draws the phases of one random set (set table in the section description) for [[gbsm_draw]]; store `phase` or the
-  seed to evaluate the same fields again along tracks or on maps
+- Draws the phases of one random set (set table in [[gbsm_draw]]) for [[gbsm_draw]]; store `phase` or the seed to
+  evaluate the same fields again along tracks or on maps
 - The phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed `"lsf"`
   phases within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos_remove_bias]] sets the sample mean of
   columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
-- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: all sets but `"lsf"` empty
+- `NumClusters = 1`: all sets but `"lsf"` are empty
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
 
 ## Declaration:
 ```
@@ -384,9 +386,10 @@ void quadriga_lib::gbsm_init_phases(
 - **`seed`** *(optional)* — Seed of the site and scenario, >= -1; -1 = system random device, new phases on each call
 - **`set_id`** *(optional)* — `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
-- **`tx_pos`**, **`rx_pos`** *(optional)* — `"lsf"` only: positions in [m] for the bias removal, as in [[gbsm_draw]]
-- **`dual_mobility`**, **`remove_bias`**, **`horizontal`** *(optional)* — `"lsf"`: Tx and Rx both move; remove the
-  sample mean; 2D bias removal (TR 38.901), `false`: 3D (legacy QuaDRiGa)
+- **`tx_pos`**, **`rx_pos`** *(optional)* — Bias-removal positions in [m] as in [[gbsm_draw]]; `"lsf"` only, else throws
+- **`dual_mobility`** *(optional)* — `"lsf"` with bias removal: Tx and Rx both move; as in [[gbsm_draw]]
+- **`remove_bias`** *(optional)* — `"lsf"` only: remove the sample mean over the positions
+- **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D (TR), `false` 3D (legacy); as in [[gbsm_draw]]
 
 ## Output:
 - **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side; `[n_coeff, n_gen, 2]`
@@ -497,21 +500,32 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
 
 /*!MD
 # gbsm_draw
-Spatially correlated normalized random values of one generator set at a set of links
+Spatially correlated normalized random values of one random set at a set of links
 
-- Evaluates the phases of [[gbsm_init_phases]] at the links, one column per generator; columns, distributions and
-  decorrelation distances: see the set table in the section description. The value of a link depends neither on the
-  other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
-- Dual mobility: the Tx is a second device on the same maps, its side of each generator uses the mirror generator.
-  Every column keeps its distribution; swapping `tx_pos` and `rx_pos` exchanges the columns of each mirror pair and
-  keeps the self-mirrored columns, exactly. The ray delays (block 14 of the shared `"ray"` set) change 2 to 8 times
-  faster with a Tx move than plane waves at the Tx would (one decorrelation distance, from the cluster ASA)
+- Evaluates the phases of [[gbsm_init_phases]] at the links, one column per generator. The value of a link depends
+  neither on the other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
+- Dual mobility: the Tx is a second device on the same maps; its side of each generator uses the mirror generator
+  (e.g. departure and arrival quantities exchange), and every column keeps its distribution
 - Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are uncorrelated at
   equal horizontal positions, exactly within a block of `n_coeff` consecutive IDs, otherwise up to a random residual
   of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
-- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation (AVX2 kernel of [[sos_val]])
-- A set never changes size. `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts
-  any empty `phase`
+- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
+- `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts any empty `phase`
+
+Random sets, with `N = NumClusters - 1` and `M = NumSubPaths`; a set never changes size (new random quantities come in
+new sets), and a decorrelation distance of 0 is used as 0.1 m:
+
+| `set_type`, `set_id` | `n_gen` | Columns | Decorrelation distance | Used by |
+| --- | --- | --- | --- | --- |
+| `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 8 absolute TOA, Normal(0,1); 9 ground permittivity and 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 10) |
+| `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); 1 to 4 sign of AOD, AOA, ZOD, ZOA; 5 to 8 offset of AOD, AOA, ZOD, ZOA, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd` |
+| `"cluster"`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd_freq`, slice `k` |
+| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: from the cluster DS and ASA | [[ssf_rays]] `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
+
+A `"ray"` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` in column `b·N·M + n·M + m`: 0 to 3 coupling
+ranks of AOD, AOA, ZOD, ZOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of
+the same. Block 13, the XPR per cluster, is in column `13·N·M + n`; block 14, the ray delay of `"quadriga"`, in column
+`13·N·M + N + n·M + m`. All blocks are Normal(0,1) except block 14, Uniform(0,1).
 
 ## Declaration:
 ```
@@ -541,7 +555,7 @@ void quadriga_lib::gbsm_draw(
 - **`floor_id`** *(optional)* — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901
   Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
 - **`center_frequency`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
-  uses their mean cluster delay spread: pass the same list as to [[ssf_rays]] (another list gives other `quadriga`
+  uses their mean cluster delay spread: pass the same list as to [[ssf_rays]] (another list gives other `"quadriga"`
   rays); ignored and not checked for all other sets; `[n_freq]`
 - **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
 - **`horizontal`** *(optional)* — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa)
@@ -550,6 +564,7 @@ void quadriga_lib::gbsm_draw(
 - **`rnd`** — Random values; `[n_link, n_gen]`
 
 ## See also:
+- [[gbsm_init_phases]] (the phases)
 - [[lsp_generate]] (the large-scale parameters from the `"lsf"` set)
 - [[path_loss]] (column 10 of the `"lsf"` set as `rnd_he`)
 - [[ssf_clusters]] (the clusters from the `"cluster"` sets)

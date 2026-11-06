@@ -66,12 +66,12 @@ namespace quadriga_lib
                          const std::vector<std::string> *short_names = nullptr,                       // Optional input: Values of 'ShortName'
                          const std::string &ref = "",                                                 // Literature reference for the header, empty: none
                          const std::vector<std::string> *ref_sec = nullptr,                           // Optional input: Reference per section, up to n_sec = 10 entries, empty entry: none
-                         const arma::mat *valid_range = nullptr,                                      // Optional input: Validity range of frequency [GHz], distance, BS height, MT height [m], [4, 2]
+                         const arma::mat *valid_range = nullptr,                                      // Optional input: Validity range of frequency [GHz], distance, BS height, UT height [m], [4, 2]
                          bool write_defaults = false);                                                // true: write all keys; false: only keys whose value differs from the default
 
     // ---- Random sets ----
 
-    // Draw the random phases of one generator set of a BS site and scenario
+    // Draw the random phases of one random set of a BS site and scenario
     // - Set types: "lsf" large-scale generators, "cluster" cluster random values, "ray" ray random values; generators
     //   and columns: see gbsm_draw
     // - The phases are a fixed function of seed, set_type and set_id, equal on all platforms; the sets are independent
@@ -88,8 +88,8 @@ namespace quadriga_lib
                           bool remove_bias = true,                                // "lsf": remove the sample mean over the positions
                           bool horizontal = true);                                // "lsf": 2D bias removal in the x-y plane (TR); false: 3D (legacy)
 
-    // Spatially correlated normalized random values of one generator set at a set of links
-    // - Columns, distributions and decorrelation distances of each set type: see the set table in the documentation
+    // Spatially correlated normalized random values of one random set at a set of links
+    // - Columns, distributions and decorrelation distances of each set type: see the set table in the gbsm_draw documentation
     // - Dual mobility: the Tx side uses the mirror generator; swapping 'tx_pos' and 'rx_pos' exchanges the mirror pairs
     // - Links with different floor IDs are uncorrelated at equal horizontal positions (2D mode only)
     void gbsm_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances, NumClusters, NumSubPaths, PerCluster* for "ray")
@@ -106,7 +106,7 @@ namespace quadriga_lib
                    bool horizontal = true);                                 // true: 2D correlation in the x-y plane (TR); false: 3D (legacy)
 
     // ---- Large-scale fading ----
-    // Large-scale generators ("lsf" set of gbsm_init_phases and gbsm_draw): see the set table in the documentation
+    // Large-scale generators ("lsf" set of gbsm_init_phases and gbsm_draw): see the set table in the gbsm_draw documentation
 
     // Path loss and shadow-fading standard deviation of a set of links
     // - Models: logdist, logdist_simple, constant, winner_los, winner_nlos, winner_pathloss, dual_slope,
@@ -176,7 +176,7 @@ namespace quadriga_lib
     // ---- Small-scale fading ----
     // Cluster level (ssf_clusters) and ray level (gbsm_rays, ssf_rays, ssf_paths) of TR 38.901 clause 7.5;
     // N = NumClusters - 1 NLOS clusters, M = NumSubPaths rays per cluster. The column layout of the random values:
-    // see the set table in the documentation
+    // see the set table in the gbsm_draw documentation
 
     // Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
     // - Methods "38.901", "38.901_MF" (clause 7.6.5.1), "quadriga"
@@ -274,7 +274,7 @@ namespace quadriga_lib
     // - Validity: "phase" up to about sqrt(lambda * b_eff / 8) per moving end (see gbsm_rays::b_eff),
     //   "drift" up to about 0.2 * b_med per moving end
     void ssf_paths(const gbsm_rays &rays,                // Ray data of the link
-                   const arma::vec &link_gain_dB,        // Link gain -PL - O2I + SF at the position in [dB], [n_freq]; 0 for data from paths
+                   const arma::vec &link_gain_dB,        // Link gain -PL - O2I + 10·lg(SF) at the position in [dB], [n_freq]; 0 for data from paths
                    arma::mat &path_gain,                 // Output: Path gains (linear), [n_path, n_freq]
                    arma::vec &path_length,               // Output: Path lengths in [m], [n_path]
                    arma::cube &M,                        // Output: Polarization transfer matrices, [8, n_path, n_freq]
