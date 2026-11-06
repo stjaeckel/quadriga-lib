@@ -86,7 +86,7 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `logo/` | Logo sources (SVG and PNG); not deployed. | — |
 | `pytest.ini`, `tests/` | Tests of both builders (see [Tests](#tests)). | — |
 
-Everything below `static/` is copied unchanged, except files named `README.md`. Every file of `docs/` except `docs/README.md` is copied byte for byte to the same path in `website/`. `website/` is fully owned by the builder: files it does not make are deleted. It never writes below `download/` or `releases/`, which exist only on the server. `make clean` keeps `website/`; `make tidy` removes it with the `__pycache__/` and `.ipynb_checkpoints/` folders below the builders and `tutorials/`.
+Everything below `static/` is copied unchanged, except files named `README.md`. Every file of `docs/` except `docs/README.md` is copied byte for byte to the same path in `website/`. `website/` is fully owned by the builder: files it does not make are deleted. It never writes below `download/` or `releases/`, which exist only on the server. `make clean` keeps `website/`; `make tidy` removes it with the `__pycache__/` and `.ipynb_checkpoints/` folders below the builders and `tutorials/`, and clears the tutorials (deletes `tutorials/executed/` and the outputs of the notebooks).
 
 The root `.gitignore` has unanchored patterns that would silently ignore new files at any depth: do not name a file `build.log`, `build*.log`, `test*.txt` or `deploy.py`, and do not name a folder `release`, `dist` or `wheelhouse`.
 
@@ -112,30 +112,11 @@ The content pages with twins (Get started, formats, FAQ, AI agents, API intros, 
 
 ## Tutorials
 
-Tutorials are Jupyter notebooks in `tutorials/` at the repository root, `tutorials/<stem>.ipynb` with a stem of lower-case letters, digits, `_` and `-` (starting with a letter or digit). They are committed cleared, without outputs. The tutorial build runs them into executed copies `tutorials/executed/<stem>.ipynb` (ignored by git), in an environment with `quadriga-lib`, `numpy`, `matplotlib` and `jupyter`; see `tutorials/README.md`:
+Tutorials are Jupyter notebooks `tutorials/<stem>.ipynb` at the repository root, committed without outputs. The tutorial build (`make tutorials`) runs them into executed copies `tutorials/executed/<stem>.ipynb`, which git ignores. How tutorials are written, named, run and checked, including the notebook metadata, headings, alt texts, links and outputs, is described in [tutorials/README.md](../tutorials/README.md); this section covers what the builder does with them.
 
-```bash
-make tutorials
-```
+The builder publishes one tutorial per notebook `tutorials/<stem>.ipynb` and reads its content from the executed copy, with the standard library; it never runs, converts or changes anything in `tutorials/`. Its messages name the notebook. Without `tutorials/executed/` the tutorial index lists no tutorial; a notebook without an executed copy is left out. Both give the warning `not-executed`, which is an error with `--release`, so a release build has every tutorial. An executed copy whose notebook was deleted is ignored.
 
-The website builder publishes one tutorial per notebook `tutorials/<stem>.ipynb` and reads its content from the executed copy, with the standard library; it never runs, converts or changes anything in `tutorials/`. Its messages name the notebook, `tutorials/<stem>.ipynb`. Without `tutorials/executed/` the tutorial index lists no tutorial; a notebook without an executed copy is left out. Both give the warning `not-executed`, which is an error with `--release`, so a release build has every tutorial. The executed copies must contain no warning text, and no cell may end in an error.
-
-Notebook metadata `metadata.quadriga_tutorial`:
-
-| Key | Type | Use |
-|-----|------|-----|
-| `title` | string | Page title and card title |
-| `summary` | string, inline Markdown | Card text; as plain text the page description |
-| `level` | `beginner`, `intermediate` or `advanced` | Tag on card and page |
-| `duration_min` | integer | Reading time in minutes |
-| `order` | integer | Position on the index (then by title) |
-| `dummy` | boolean, optional | Placeholder notebook; if every notebook is a dummy, the index shows `dummy_note` of `content/tutorials.md` as a warning box |
-
-The language comes from `metadata.kernelspec.language` (`python`, `matlab` or `octave`). The cell metadata `quadriga_tutorial.alt` is the alt text of that cell's images; without it the image gets "Figure output of cell n" and the warning `figure-alt`.
-
-Headings: a notebook starts its sections with `##`; the page title comes from the metadata, so a `#` heading is an error. `##` becomes `h2`, `###` `h3`, deeper headings `h4`; ids are made as on content pages. The Markdown version keeps the heading levels as written.
-
-Links in Markdown cells are written as on content pages, as site paths from the site root (e.g. `faq.html#cite`, `tutorials.html#setup`, `publications/2018_sum_of_sinusoids.pdf`); the builder makes them relative to the tutorial page. A path relative to the notebook, such as `../tutorials.html`, gives `link target missing`.
+It checks the metadata `metadata.quadriga_tutorial` (keys and types as in the tutorials README) and `metadata.kernelspec.language` (`python`, `matlab` or `octave`), and takes the alt text of a cell's images from the cell metadata `quadriga_tutorial.alt` (without it: "Figure output of cell n" and the warning `figure-alt`). Headings: `##` becomes `h2`, `###` `h3`, deeper headings `h4`; ids are made as on content pages; a `#` heading is an error, because the page title comes from the metadata. The Markdown version keeps the heading levels as written. Links in Markdown cells are site paths from the site root, as on content pages, and are made relative to the tutorial page.
 
 What is shown: Markdown cells like a content page; code cells as "In [n]" with the code coloured; `stream` output as text (colour codes removed); of each result or display bundle the first of SVG, PNG and plain text. Images are written to `tutorials/<stem>/fig-<cell>-<output>.<ext>`. A bundle with none of the three is left out (warning `output-type`); a code cell without execution count gives `not-run`; an `error` output stops the build.
 
@@ -151,7 +132,7 @@ Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<st
 | `description` | Meta description of the page |
 | `lead` | Lead paragraph under the title |
 | `dummy_note` | Warning box above the list when every tutorial is a placeholder (`dummy` in its metadata) |
-| Body | Between the lead and the list of tutorials: the setup that all tutorials need, and anything else that applies to all of them; `##` sections with ids as on other content pages (e.g. `## Setup` gets the id `setup`, so a notebook can link to `../tutorials.html#setup`) |
+| Body | Between the lead and the list of tutorials: the setup that all tutorials need, and anything else that applies to all of them; `##` sections with ids as on other content pages (e.g. `## Setup` gets the id `setup`, so a notebook links to it as `tutorials.html#setup`) |
 
 Notes on a single tutorial or a family of tutorials (e.g. extra packages of one series) belong in the notebooks, not here. Gap markers are allowed in all parts; each fails `--release`.
 
@@ -161,8 +142,8 @@ Notebook errors stop the build; each names the notebook, and the cell where ther
 |-------|-------|-----|
 | `notebook file name must match [a-z0-9][a-z0-9_-]*.ipynb` | Upper-case letters, spaces or other characters in the file name | Rename the file |
 | `not a JSON notebook: ...` | The file is not valid JSON (for example a merge conflict) | Repair or re-save it in Jupyter |
-| `metadata.quadriga_tutorial: missing` | The notebook has no tutorial metadata | Add the keys of the table above |
-| `metadata.quadriga_tutorial.<key>: missing`, `not a string`, `not an integer`, `unknown key` | A key of the table above is absent, of the wrong type or misspelt | Correct the metadata |
+| `metadata.quadriga_tutorial: missing` | The notebook has no tutorial metadata | Add the keys listed in the tutorials README |
+| `metadata.quadriga_tutorial.<key>: missing`, `not a string`, `not an integer`, `unknown key` | A key of the metadata table in the tutorials README is absent, of the wrong type or misspelt | Correct the metadata |
 | `metadata.quadriga_tutorial.level: one of beginner, intermediate, advanced` | Another level | Use one of the three |
 | `metadata.kernelspec.language: missing or not one of python, matlab, octave` | The notebook was saved without a kernel, or with another one | Select the Python, MATLAB or Octave kernel and save |
 | `cell N: a notebook starts its sections with ##; ...` | A `#` heading in a Markdown cell | Make it `##`; the page title is `title` of the metadata |
