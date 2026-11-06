@@ -48,9 +48,9 @@ for l = 1 : 3
     assertEqual( size(r.power), [n_ray, 2] );
     assertEqual( size(r.eoa), [n_ray, 1] );
     assertEqual( size(r.M), [8, n_ray, 2] );
-    assertTrue( isa(r.path_type, 'uint64') && isa(r.tap, 'uint64') && isa(r.fallback, 'uint64') );
-    assertEqual( r.path_type(1:3), uint64( [0; 1; 2] ) );                     % codes, not shifted
-    assertEqual( r.tap(1:3), uint64( [0; 3; 6] ) );
+    assertTrue( isa(r.path_type, 'uint32') && isa(r.tap, 'uint32') && isa(r.fallback, 'uint32') );
+    assertEqual( r.path_type(1:3), uint32( [0; 1; 2] ) );                     % codes, not shifted
+    assertEqual( r.tap(1:3), uint32( [0; 3; 6] ) );
     assertEqual( r.gr_eps_re, gre(l, :)' );
     assertEqual( r.gr_eps_im, gim(l, :)' );
     assertTrue( isempty(r.fbs_pos) && isempty(r.lbs_pos) && isempty(r.fallback) );
@@ -65,7 +65,7 @@ r0 = quadriga_lib.ssf_rays( sn, tx_pos, rx_pos, fc, lsp, mu, sig, d0, p0, a0, e0
 assertEqual( size(r0(1).delay), [n_ray - 1, 1] );
 assertEqual( fieldnames(r0)', fields );
 assertTrue( isempty(r0(1).gr_eps_re) && isempty(r0(1).gr_eps_im) );
-assertEqual( r0(1).tap(1:2), uint64( [0; 3] ) );
+assertEqual( r0(1).tap(1:2), uint32( [0; 3] ) );
 
 %% Optional inputs: method, i_freq (1-based), angle_model, pol_model, pol_variability, random_phase
 r2 = mf( 1, [], [], gre, gim );

@@ -399,7 +399,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         {
             r.delay(s) = delay(l, s, g);
             r.aod(s) = aod(l, s, g), r.eod(s) = eod(l, s, g), r.aoa(s) = aoa(l, s, g), r.eoa(s) = eoa(l, s, g);
-            r.path_type(s) = s, r.tap(s) = 3 * s;
+            r.path_type(s) = (unsigned)s, r.tap(s) = (unsigned)(3 * s);
         }
         for (arma::uword k = k0; k <= k1; ++k)
         {
@@ -493,7 +493,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                     r.delay(i) = std::max(delay(l, s, g) + (2.0 * c_ds * xr[b14 + n * M + m] - tau_mean), 0.0);
                 else
                     r.delay(i) = delay(l, s, g) + (sub == 0 ? 0.0 : (sub == 1 ? 1.28 : 2.56)) * c_ds;
-                r.tap(i) = 3 * s + sub, r.path_type(i) = 2;
+                r.tap(i) = (unsigned)(3 * s + sub), r.path_type(i) = 2;
                 for (arma::uword k = k0; k <= k1; ++k)
                     r.power(i, k - k0) = power(l, s, k) / (double)M;
 

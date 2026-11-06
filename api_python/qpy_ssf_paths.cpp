@@ -95,7 +95,8 @@ py::tuple ssf_paths(const py::dict &rays,
     arma::mat path_gain, fbs_pos, lbs_pos;
     arma::vec path_length, aod, eod, aoa, eoa;
     arma::cube M;
-    arma::uvec path_type, ray_ind;
+    arma::u32_vec path_type;
+    arma::uvec ray_ind;
     quadriga_lib::ssf_paths(rays_a, link_gain_dB_a, path_gain, path_length, M, mobility,
                             tx_pos.is_none() ? nullptr : &tx_pos_a, rx_pos.is_none() ? nullptr : &rx_pos_a,
                             kf_ratio.is_none() ? nullptr : &kf_ratio_a, &aod, &eod, &aoa, &eoa, &fbs_pos, &lbs_pos,
@@ -104,7 +105,7 @@ py::tuple ssf_paths(const py::dict &rays,
     return py::make_tuple(qd_python_copy2numpy(&path_gain), qd_python_copy2numpy(&path_length),
                           qd_python_copy2numpy(&M), qd_python_copy2numpy(&aod), qd_python_copy2numpy(&eod),
                           qd_python_copy2numpy(&aoa), qd_python_copy2numpy(&eoa), qd_python_copy2numpy(&fbs_pos),
-                          qd_python_copy2numpy(&lbs_pos), qd_python_copy2numpy<arma::uword, py::ssize_t>(&path_type),
+                          qd_python_copy2numpy(&lbs_pos), qd_python_copy2numpy<unsigned, py::ssize_t>(&path_type),
                           qd_python_copy2numpy<arma::uword, py::ssize_t>(&ray_ind));
 }
 

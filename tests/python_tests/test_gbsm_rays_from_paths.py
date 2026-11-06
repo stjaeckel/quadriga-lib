@@ -59,7 +59,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(r["fbs_pos"], self.fb)
         npt.assert_array_equal(r["lbs_pos"], self.lb)
         for k in ["path_type", "tap", "fallback"]:
-            self.assertEqual(r[k].dtype, np.uint64)
+            self.assertEqual(r[k].dtype, np.uint32)
         npt.assert_array_equal(r["path_type"], self.pt)  # codes
         npt.assert_array_equal(r["tap"], [0, 3, 6])
         self.assertEqual(r["fallback"].size, 0)

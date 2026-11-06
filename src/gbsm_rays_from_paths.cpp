@@ -23,7 +23,8 @@ Ray data of one link from spherical path data (e.g. read with qrt_file_read)
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
-  NLOS; a GR path needs `path_type` (`no_int` for files of [[qrt_paths_from_scatterers]])
+  NLOS. A GR path needs `path_type`: for files of [[qrt_paths_from_scatterers]] the `no_int` of [[qrt_file_read]]
+  (interaction count = path type); for ray-traced files the user sets it (values > 2 throw)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
 ## Declaration:
@@ -39,8 +40,8 @@ void quadriga_lib::gbsm_rays_from_paths(
     const arma::cube &M,
     gbsm_rays &rays,
     const std::string &method = "quadriga",
-    const arma::uvec *path_type = nullptr,
-    const arma::uvec *tap = nullptr,
+    const arma::u32_vec *path_type = nullptr,
+    const arma::u32_vec *tap = nullptr,
     const arma::vec *gr_eps_re = nullptr,
     const arma::vec *gr_eps_im = nullptr);
 ```
@@ -78,8 +79,8 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
                                         const arma::cube &M,
                                         gbsm_rays &rays,
                                         const std::string &method,
-                                        const arma::uvec *path_type,
-                                        const arma::uvec *tap,
+                                        const arma::u32_vec *path_type,
+                                        const arma::u32_vec *tap,
                                         const arma::vec *gr_eps_re,
                                         const arma::vec *gr_eps_im)
 {
@@ -118,7 +119,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
     const double *T = tx_pos.memptr(), *R = rx_pos.memptr(), d3D = qd_gbsm_dist(T, R);
 
     // Path types: given, or LOS where FBS = LBS on the direct line (the LOS tolerance 0.1 mm of get_channels_*)
-    arma::uvec type(n_path);
+    arma::u32_vec type(n_path);
     if (path_type)
     {
         if (path_type->n_elem != n_path)
@@ -180,7 +181,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
     else // One slot per path: LOS 0, GR 3, the others 6, 9, ... in path order
     {
         rays.tap.set_size(n_path);
-        arma::uword slot = 2; // slot of the next NLOS path
+        unsigned slot = 2; // slot of the next NLOS path
         for (arma::uword p = 0; p < n_path; ++p)
             rays.tap(p) = (type(p) == 0) ? 0 : (type(p) == 1) ? 3 : 3 * slot++;
     }

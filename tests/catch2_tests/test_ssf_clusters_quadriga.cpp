@@ -305,7 +305,7 @@ TEST_CASE("ssf_clusters - quadriga matches the algorithm at one and several freq
             fix_t f = make_fix(N, 4, F, 301 + 10 * (unsigned)F + (unsigned)gr, true);
             f.use_eod = f.use_toa = true, f.use_eps = gr, f.use_ncl = c[2] == 1;
             if (c[2] == 1)
-                f.ncl = arma::uvec{N, N - 1, 6, 9};
+                f.ncl = arma::u32_vec{(unsigned)N, (unsigned)N - 1, 6, 9};
             for (arma::uword l = 0; l < 4 && F == 2; ++l)
                 f.lsp(l, 1, 0) = f.lsp(l, 0, 0), f.lsp(l, 1, 3) = f.lsp(l, 0, 3);
             const out_t o = run(sp, f, "quadriga");

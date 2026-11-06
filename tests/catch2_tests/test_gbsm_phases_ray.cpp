@@ -370,7 +370,7 @@ TEST_CASE("gbsm_draw - ray: swapping Tx and Rx exchanges the mirror blocks")
     const arma::mat A = rx5();
     arma::mat B = rx5() * 0.7 + 20.0;
     B.col(2).fill(25.0);
-    const arma::uvec fl = {0, 2, 2, 300, 0};
+    const arma::u32_vec fl = {0, 2, 2, 300, 0};
 
     for (arma::sword set : {-1, 2})
         for (int f = 0; f < 2; ++f)
@@ -503,7 +503,7 @@ TEST_CASE("gbsm_draw - ray: input validation")
     const arma::cube phase = make_phase(2, 3, 95);
     const arma::mat rx = rx5().rows(0, 2), tx = {{0.0, 0.0, 25.0}};
     const arma::vec fc = {3.5e9};
-    const arma::uvec fl = {0, 1, 2}, fl_bad = {0, 1};
+    const arma::u32_vec fl = {0, 1, 2}, fl_bad = {0, 1};
     arma::mat rnd;
 
     CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", &fl, &fc, true));

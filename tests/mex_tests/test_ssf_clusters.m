@@ -29,7 +29,7 @@ assertEqual( size(aod), [4, N + 1] );
 assertEqual( size(eoa), [4, N + 1] );
 assertEqual( size(n_active), [4, 1] );
 assertTrue( isa(delay, 'double') && isa(power, 'double') && isa(eod, 'double') && isa(aoa, 'double') );
-assertTrue( isa(n_active, 'uint64') );
+assertTrue( isa(n_active, 'uint32') );
 assertEqual( delay(:, 1), zeros(4, 1) );
 assertElementsAlmostEqual( aod(:, 1), aod_l, 'absolute', 1e-14 );
 assertElementsAlmostEqual( eod(:, 1), eod_l, 'absolute', 1e-14 );
@@ -38,7 +38,7 @@ assertElementsAlmostEqual( eoa(:, 1), -eod_l, 'absolute', 1e-14 );
 K = lsp(:, 1, 2);
 assertElementsAlmostEqual( power(:, 1), K ./ (K + 1), 'absolute', 1e-14 );     % LOS slot
 assertTrue( all( sum(power, 2) <= 1 + 1e-12 ) );                              % -25 dB removal, no renormalisation
-assertEqual( n_active, uint64( sum( power(:, 2:end) > 0, 2 ) ) );
+assertEqual( n_active, uint32( sum( power(:, 2:end) > 0, 2 ) ) );
 assertTrue( all( abs( aod(:) ) <= pi & abs( eod(:) ) <= pi / 2 ) );
 
 % NLOS scenario: zero LOS power, the NLOS powers sum to 1
@@ -54,7 +54,7 @@ assertEqual( p2, power );
 [ dq, pq, ~, ~, ~, ~, nq ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga' );
 assertEqual( size(dq), [4, N + 1] );
 assertElementsAlmostEqual( sum(pq, 2), ones(4, 1), 'absolute', 1e-12 );      % no removal in 'quadriga'
-assertEqual( nq, uint64( N * ones(4, 1) ) );
+assertEqual( nq, uint32( N * ones(4, 1) ) );
 assertTrue( max(abs(dq(:) - delay(:))) > 1e-9 );
 
 % '38.901_MF' with two frequencies and anchor LSPs: delays and angles per frequency
@@ -126,7 +126,7 @@ assertEqual( pc(2, 8:end), zeros(1, 6) );                                     % 
 assertEqual( dc(2, 8:end), zeros(1, 6) );
 assertElementsAlmostEqual( ac(2, 8:end), repmat( aod_l(2), 1, 6 ), 'absolute', 1e-14 );
 assertEqual( pc(3, 11:end), zeros(1, 3) );
-assertEqual( nac, uint64(nc) );
+assertEqual( nac, uint32(nc) );
 assertEqual( quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], [], ...
     uint32(nc') ), dc );
 assertEqual( quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], [], ...
@@ -145,7 +145,7 @@ s1.NumClusters_min = 1;
 [ d1, p1, ~, ~, ~, ~, n1 ] = quadriga_lib.ssf_clusters( s1, tx_pos, rx_pos, lsp, zeros(4, 0) );
 assertEqual( size(d1), [4, 1] );
 assertEqual( p1, ones(4, 1) );
-assertEqual( n1, uint64( zeros(4, 1) ) );
+assertEqual( n1, uint32( zeros(4, 1) ) );
 
 %% Type handling
 [ ds, ps ] = quadriga_lib.ssf_clusters( sp, single(tx_pos), single(rx_pos), lsp, rnd, '38.901', rnd_f );
@@ -157,7 +157,7 @@ assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp ), 'Wrong 
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [], 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out8( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga' ), 'Wrong number of output arguments.' );
-msg_nc = 'Entries in ''n_cluster'' must be non-negative integers below 2^53.';
+msg_nc = 'Entries in ''n_cluster'' must be non-negative integers below 2^32.';
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [ 12; 6.5; 9; 12 ] ), msg_nc );
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...

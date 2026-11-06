@@ -91,8 +91,8 @@ class test_lsf(unittest.TestCase):
         npt.assert_array_equal(f(*args, floor_id=self.fl.tolist()), rf)
         npt.assert_array_equal(f(*args, floor_id=self.fl.reshape(1, 5)), rf)
 
-        # The largest exact ID is 2^53 - 1; larger values would be rounded when read as float64
-        big = np.array([2**53 - 1, 1, 0, 2, 1], dtype=np.int64)
+        # The largest ID is 2^32 - 1 (32-bit labels)
+        big = np.array([2**32 - 1, 1, 0, 2, 1], dtype=np.int64)
         self.assertEqual(f(*args, floor_id=big).shape, (5, 11))
 
     def test_dual_mobility(self):
@@ -173,11 +173,11 @@ class test_lsf(unittest.TestCase):
     def test_errors(self):
         f = quadriga_lib.gbsm.draw
         args = (self.scenpar, "lsf", self.phase, self.tx_pos, self.rx_pos)
-        for bad in ([0, -1, 0, 0, 0], [0, 1.5, 0, 0, 0], [0, np.nan, 0, 0, 0], [0, 2.0**53, 0, 0, 0],
-                    np.array([0, 2**53 + 1, 0, 0, 0], dtype=np.int64)):  # wrapper
+        for bad in ([0, -1, 0, 0, 0], [0, 1.5, 0, 0, 0], [0, np.nan, 0, 0, 0], [0, 2.0**32, 0, 0, 0],
+                    np.array([0, 2**32, 0, 0, 0], dtype=np.int64)):  # wrapper
             with self.assertRaises(ValueError) as ctx:
                 f(*args, floor_id=bad)
-            self.assertIn("Entries in 'floor_id' must be non-negative integers below 2^53.", str(ctx.exception))
+            self.assertIn("Entries in 'floor_id' must be non-negative integers below 2^32.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.scenpar, "lsf", self.phase[:, :10, :], self.tx_pos, self.rx_pos)
         self.assertIn("Input 'phase' must have size [256, 11, 2] for preset 'Comb256'.", str(ctx.exception))
@@ -324,7 +324,7 @@ class test_cluster(unittest.TestCase):
         args = (self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos)
         with self.assertRaises(ValueError) as ctx:
             f(*args, set_id=-1, floor_id=np.array([0, -1, 0, 0, 0]))
-        self.assertIn("Entries in 'floor_id' must be non-negative integers below 2^53.", str(ctx.exception))
+        self.assertIn("Entries in 'floor_id' must be non-negative integers below 2^32.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             f(*args, set_id=-2)
         self.assertIn("Input 'set_id' must be >= -1.", str(ctx.exception))

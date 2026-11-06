@@ -20,7 +20,7 @@ assertEqual( size(r), [1, 1] );
 assertEqual( size(r.fbs_pos), [3, n_ray] );
 assertEqual( size(r.lbs_pos), [3, n_ray] );
 assertEqual( size(r.fallback), [n_ray, 1] );
-assertTrue( isa(r.fallback, 'uint64') && all( r.fallback <= 1 ) && any( r.fallback == 0 ) );
+assertTrue( isa(r.fallback, 'uint32') && all( r.fallback <= 1 ) && any( r.fallback == 0 ) );
 for f = fields( 1 : 15 )
     assertEqual( r.(f{1}), rays(1).(f{1}) );
 end
@@ -83,7 +83,7 @@ s.tap = uint16( s.tap );
 s.fallback = logical( s.fallback );
 rs = quadriga_lib.ssf_scatterers( s );
 assertEqual( rs.fbs_pos, r.fbs_pos );
-assertTrue( isa(rs.path_type, 'int8') && isa(rs.tap, 'uint16') && isa(rs.fallback, 'uint64') );
+assertTrue( isa(rs.path_type, 'int8') && isa(rs.tap, 'uint16') && isa(rs.fallback, 'uint32') );
 assertEqual( rs.tap, s.tap );
 s.tap = mod( (1 : numel(s.tap))', 2 ) == 1;                                   % logical labels
 rs = quadriga_lib.ssf_scatterers( s );

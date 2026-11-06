@@ -82,10 +82,10 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
     const bool dual_mobility_b = qd_python_flag(dual_mobility, false, "dual_mobility");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-    const arma::uvec floor_id_a = qd_python_uint_entries(floor_id_in, "floor_id");
+    const arma::u32_vec floor_id_a = qd_python_uint_entries(floor_id_in, "floor_id");
 
     // Wrap optional pointers
-    const arma::uvec *p_floor_id = floor_id_a.is_empty() ? nullptr : &floor_id_a;
+    const arma::u32_vec *p_floor_id = floor_id_a.is_empty() ? nullptr : &floor_id_a;
     const arma::vec *p_center_freq = center_freq.is_none() ? nullptr : &center_freq_a;
 
     // Output allocation in numpy memory: (n_link, n_gen), n_gen = columns of 'phase' (checked by the library)

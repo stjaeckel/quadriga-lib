@@ -981,7 +981,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
     const arma::cube &M,
-    const arma::uvec &path_type,
+    const arma::u32_vec &path_type,
     arma::uword i_cir = 0);
 ```
 

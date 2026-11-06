@@ -67,11 +67,11 @@ Ray data of one link (geometry-based stochastic model)
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
 | `M` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | all |
-| `path_type` | `arma::uvec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
-| `tap` | `arma::uvec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
+| `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
+| `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [[ssf_rays]], [[gbsm_rays_from_paths]] |
 | `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | .[[solve_scatterers]], [[gbsm_rays_from_paths]] |
-| `fallback` | `arma::uvec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | .[[solve_scatterers]] |
+| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | .[[solve_scatterers]] |
 
 ## Member functions:
 | Member | Returns |

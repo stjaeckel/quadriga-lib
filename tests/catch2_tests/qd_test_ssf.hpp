@@ -62,7 +62,7 @@ namespace
         arma::cube lsp, anchor, rnd_freq;
         arma::vec toa;
         std::vector<bool> o2i;
-        arma::uvec ncl;
+        arma::u32_vec ncl;
         bool use_rf = true, use_anchor = true, use_eod = false, use_toa = false, use_eps = false, use_o2i = false,
              use_ncl = false;
     };
@@ -112,14 +112,14 @@ namespace
         for (arma::uword l = 0; l < n_link; ++l)
             f.toa(l) = U(10e-9, 300e-9), f.o2i.push_back(l % 2 == 0);
         f.ncl.set_size(n_link);
-        f.ncl.fill(N);
+        f.ncl.fill((unsigned)N);
         return f;
     }
 
     struct out_t
     {
         arma::cube delay, power, aod, eod, aoa, eoa;
-        arma::uvec n_active;
+        arma::u32_vec n_active;
     };
 
     out_t run(const spmap &sp, const fix_t &f, const std::string &method = "38.901")

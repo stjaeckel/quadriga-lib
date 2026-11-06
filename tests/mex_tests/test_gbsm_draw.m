@@ -94,13 +94,13 @@ assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos
     'Wrong number of input arguments.' );
 assert_throws( @() out2( scenpar, 'lsf', phase, tx_pos, rx_pos ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; -1; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
+    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; 1.5; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
+    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; NaN; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
-assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; 2^53; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^53.' );
+    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
+assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; 2^32; 0; 0; 0 ] ), ...
+    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase(:, 1:10, :), tx_pos, rx_pos ), ...
     'Input ''phase'' must have size [256, 11, 2] for preset ''Comb256''.' );                        % C++
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], 'Comb1024', [], [], [] ), ...
@@ -209,7 +209,7 @@ assert_throws( @() out2( sp, 'cluster', phase, tx_pos, rx_pos ), 'Wrong number o
 msg_set = 'Input ''set_id'' must be 0 (shared set) or a frequency index >= 1.';
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, -1 ), msg_set );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0.5 ), msg_set );
-msg_fl = 'Entries in ''floor_id'' must be non-negative integers below 2^53.';
+msg_fl = 'Entries in ''floor_id'' must be non-negative integers below 2^32.';
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0, [], [ 0; -1; 0; 0; 0 ] ), msg_fl );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0, [], [ 0; 1.5; 0; 0; 0 ] ), msg_fl );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase_f, tx_pos, rx_pos ), ...

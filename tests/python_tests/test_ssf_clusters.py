@@ -63,7 +63,7 @@ class test_case(unittest.TestCase):
             self.assertEqual(x.shape, (4, N + 1, 1))
             self.assertEqual(x.dtype, np.float64)
         self.assertEqual(n_active.shape, (4,))
-        self.assertEqual(n_active.dtype, np.uint64)
+        self.assertEqual(n_active.dtype, np.uint32)
         npt.assert_array_equal(delay[:, 0, 0], np.zeros(4))
         npt.assert_allclose(aod[:, 0, 0], self.aod_l, atol=1e-14, rtol=0)
         npt.assert_allclose(eod[:, 0, 0], self.eod_l, atol=1e-14, rtol=0)
@@ -175,7 +175,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=nc.astype(float))[0], dc)
         with self.assertRaises(ValueError) as ctx:
             f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 6.5, 9, 12])
-        self.assertIn("Entries in 'n_cluster' must be non-negative integers below 2^53.", str(ctx.exception))
+        self.assertIn("Entries in 'n_cluster' must be non-negative integers below 2^32.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 3, 9, 12])
         self.assertIn("Entries of 'n_cluster' must be in [6, 12].", str(ctx.exception))

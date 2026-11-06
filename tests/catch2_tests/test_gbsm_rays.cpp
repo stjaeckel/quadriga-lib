@@ -182,8 +182,8 @@ TEST_CASE("qd_test_rays - make_rays gives valid objects with the stated properti
         const quadriga_lib::gbsm_rays r = make_rays(21, true, true, 7, 2, "quadriga", sc);
         CHECK(arma::approx_equal(r.tx_pos, T, "absdiff", 0.0));
         CHECK(arma::approx_equal(r.rx_pos, R, "absdiff", 0.0));
-        CHECK(arma::all(r.path_type == arma::uvec({0, 1, 2, 2, 2, 2, 2, 2, 2})));
-        CHECK(arma::all(r.tap == arma::uvec({0, 3, 6, 6, 9, 12, 15, 18, 21})));
+        CHECK(arma::all(r.path_type == arma::u32_vec({0, 1, 2, 2, 2, 2, 2, 2, 2})));
+        CHECK(arma::all(r.tap == arma::u32_vec({0, 3, 6, 6, 9, 12, 15, 18, 21})));
 
         // The 1 : 4 tap pair (rays 2, 3), the zero-power ray (4), the zero-excess ray (5, without scatterers)
         CHECK(r.delay(2) != r.delay(3));

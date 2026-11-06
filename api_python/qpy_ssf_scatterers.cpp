@@ -42,7 +42,7 @@ rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, d_min )
 - **`d_min`** — Minimum distance of the scatterers to both ends in m, > 0; default: 2.0
 
 ## Outputs:
-- **`rays_out`** — Ray dict with `fbs_pos`, `lbs_pos` `(3, n_ray)` and `fallback` `(n_ray,)` (uint64)
+- **`rays_out`** — Ray dict with `fbs_pos`, `lbs_pos` `(3, n_ray)` and `fallback` `(n_ray,)` (uint32)
 - **`b_med`**, **`b_eff`** — Validity scales in m, rows Tx and Rx, column `k` for frequency `k`; `(2, n_freq)`
 
 ## See also:

@@ -94,8 +94,8 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 
 | Name | Type, size | Content |
 | --- | --- | --- |
-| `tap` | `arma::uvec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
-| `n_ray_tap` | `arma::uvec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
+| `tap` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
+| `n_ray_tap` | `arma::u32_vec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
 | `fbs_pos`, `lbs_pos` | `arma::fmat`, `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
 | `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `arma::vec`, `[n_snap]` | Link gain per snapshot |
@@ -222,9 +222,10 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
 
     // Taps: index of each kept ray's tap (ascending tap values) and its delay weight w / sum(w) with w the ray
     // power at i_freq (equal weights where the sum is 0)
-    const arma::uvec tap_val = arma::unique(rr.tap);
+    const arma::u32_vec tap_val = arma::unique(rr.tap);
     const arma::uword n_tap = tap_val.n_elem, n_rx = rx_array.n_ports(), n_tx = tx_array.n_ports();
-    arma::uvec q_of(n_kept), n_ray_tap(n_tap, arma::fill::zeros);
+    arma::uvec q_of(n_kept);
+    arma::u32_vec n_ray_tap(n_tap, arma::fill::zeros);
     arma::vec w(n_kept), w_sum(n_tap, arma::fill::zeros);
     for (arma::uword r = 0; r < n_kept; ++r)
     {
@@ -411,7 +412,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     // GR ray is its length by the image method).
     if (rr.fbs_pos.n_cols != n_kept)
     {
-        const arma::uvec type = rr.path_type;
+        const arma::u32_vec type = rr.path_type;
         if (rr.tx_pos(2) < 0.0 || rr.rx_pos(2) < 0.0)
             rr.path_type.replace(1, 2);
         rr.solve_scatterers();

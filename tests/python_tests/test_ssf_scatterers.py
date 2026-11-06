@@ -57,7 +57,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(r["fbs_pos"].shape, (3, n_ray))
         self.assertEqual(r["lbs_pos"].shape, (3, n_ray))
         self.assertEqual(r["fallback"].shape, (n_ray,))
-        self.assertEqual(r["fallback"].dtype, np.uint64)
+        self.assertEqual(r["fallback"].dtype, np.uint32)
         self.assertTrue(np.all(r["fallback"] <= 1))
         npt.assert_allclose(r["fbs_pos"][:, 0], (TX[0] + RX[0]) / 2, atol=1e-12, rtol=0)  # LOS midpoint
         self.assertEqual(self.rays[0]["fbs_pos"].size, 0)  # input unchanged

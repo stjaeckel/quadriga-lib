@@ -70,7 +70,7 @@ void quadriga_lib::ssf_paths(
     arma::vec *eoa = nullptr,
     arma::mat *fbs_pos = nullptr,
     arma::mat *lbs_pos = nullptr,
-    arma::uvec *path_type = nullptr,
+    arma::u32_vec *path_type = nullptr,
     arma::uvec *ray_ind = nullptr,
     bool oxygen = false);
 ```
@@ -115,7 +115,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
                              arma::vec *eoa,
                              arma::mat *fbs_pos,
                              arma::mat *lbs_pos,
-                             arma::uvec *path_type,
+                             arma::u32_vec *path_type,
                              arma::uvec *ray_ind,
                              bool oxygen)
 {
@@ -176,9 +176,10 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
     for (arma::mat *m : {fbs_pos, lbs_pos})
         if (m != nullptr && (m->n_rows != 3 || m->n_cols != n_sc))
             m->set_size(3, n_sc);
-    for (arma::uvec *u : {path_type, ray_ind})
-        if (u != nullptr && u->n_elem != n_path)
-            u->set_size(n_path);
+    if (path_type != nullptr && path_type->n_elem != n_path)
+        path_type->set_size(n_path);
+    if (ray_ind != nullptr && ray_ind->n_elem != n_path)
+        ray_ind->set_size(n_path);
 
     const double c0 = 299792458.0, pi2 = 6.283185307179586;
 
@@ -227,7 +228,8 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
     const double d3D_0 = qd_gbsm_dist(T0, R0);
     for (arma::uword p = 0; p < n_path; ++p)
     {
-        const arma::uword i = keep[p], type = rays.path_type(i);
+        const arma::uword i = keep[p];
+        const unsigned type = rays.path_type(i);
         double L = d3D_0 + c0 * rays.delay(i), ang[4] = {rays.aod(i), rays.eod(i), rays.aoa(i), rays.eoa(i)};
         double proj = 0.0;                 // "phase": r_rx·dR + r_tx·dT
         const double *F = mid, *B = mid; // "drift": scatterers of the path

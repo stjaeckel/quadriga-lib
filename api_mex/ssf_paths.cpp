@@ -67,7 +67,7 @@ Antenna-free paths of one link at one position
 - **`M`** — Polarization transfer matrices, rows as in [[get_channels_planar]]; `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in [rad], GCS; `[n_path, 1]`
 - **`fbs_pos`**, **`lbs_pos`** — Scatterer positions in [m]; `[3, n_path]`
-- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted); uint64; `[n_path, 1]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted); uint32; `[n_path, 1]`
 - **`ray_ind`** — Index of the ray in `rays`, 1-based; uint64; `[n_path, 1]`
 
 ## See also:
@@ -98,7 +98,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat path_gain, fbs_pos, lbs_pos;
     arma::vec path_length, aod, eod, aoa, eoa;
     arma::cube M;
-    arma::uvec path_type, ray_ind;
+    arma::u32_vec path_type;
+    arma::uvec ray_ind;
     CALL_QD(quadriga_lib::ssf_paths(rays, link_gain_dB, path_gain, path_length, M, mobility,
                                     tx_pos.empty() ? nullptr : &tx_pos, rx_pos.empty() ? nullptr : &rx_pos,
                                     kf_ratio.empty() ? nullptr : &kf_ratio, (nlhs > 3) ? &aod : nullptr,

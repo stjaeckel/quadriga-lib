@@ -370,19 +370,18 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
     return chan;
 }
 
-// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> uvec
-// - Every entry must be an integer in [0, 2^53) (larger integers are not exact in a double); otherwise a MATLAB
-//   error naming the input 'var_name'
-inline arma::uvec qd_mex_uint_entries(const arma::vec &input, const std::string &var_name)
+// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> u32_vec
+// - Every entry must be an integer in [0, 2^32); otherwise a MATLAB error naming the input 'var_name'
+inline arma::u32_vec qd_mex_uint_entries(const arma::vec &input, const std::string &var_name)
 {
-    arma::uvec out(input.n_elem);
+    arma::u32_vec out(input.n_elem);
     for (arma::uword i = 0; i < input.n_elem; ++i)
     {
         const double v = input[i];
-        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
+        if (!(v >= 0.0 && v < 4294967296.0 && v == std::floor(v)))
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s",
-                              ("Entries in '" + var_name + "' must be non-negative integers below 2^53.").c_str());
-        out[i] = (arma::uword)v;
+                              ("Entries in '" + var_name + "' must be non-negative integers below 2^32.").c_str());
+        out[i] = (unsigned)v;
     }
     return out;
 }
@@ -677,7 +676,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
 // Creates the 1 x n_link gbsm_rays struct array with all fields and aliases the attributes of 'rays' (resized to
 // n_link) whose size is known: positions [3, 1], 'center_frequency', 'delay', 'power', angles, 'M', 'path_type',
 // 'tap', 'gr_eps_re' and 'gr_eps_im' if 'has_gr', 'fbs_pos' and 'lbs_pos' [3, n_ray] if 'has_scatterers'
-// - The other fields are empty ('fallback' uint64); 'method' is left unset for the caller to fill after the call
+// - The other fields are empty ('fallback' uint32); 'method' is left unset for the caller to fill after the call
 inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
                                       bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
 {
@@ -707,7 +706,7 @@ inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arm
         set("gr_eps_im", has_gr ? qd_mex_init_output(&r.gr_eps_im, n_freq) : empty());
         set("fbs_pos", has_scatterers ? qd_mex_init_output(&r.fbs_pos, 3, n_ray) : empty());
         set("lbs_pos", has_scatterers ? qd_mex_init_output(&r.lbs_pos, 3, n_ray) : empty());
-        set("fallback", mxCreateNumericMatrix(0, 0, mxUINT64_CLASS, mxREAL));
+        set("fallback", mxCreateNumericMatrix(0, 0, mxUINT32_CLASS, mxREAL));
     }
     return s;
 }

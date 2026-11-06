@@ -326,7 +326,7 @@ void quadriga_lib::gbsm_draw(
     arma::mat &rnd,
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
-    const arma::uvec *floor_id = nullptr,
+    const arma::u32_vec *floor_id = nullptr,
     const arma::vec *center_frequency = nullptr,
     bool dual_mobility = false,
     bool horizontal = true);
@@ -439,11 +439,11 @@ Not in: MATLAB, Python
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
 | `M` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | all |
-| `path_type` | `arma::uvec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
-| `tap` | `arma::uvec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
+| `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
+| `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
 | `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_ray]` or empty | First- and last-bounce scatterer positions in [m] | [.solve_scatterers](#.solve_scatterers), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
-| `fallback` | `arma::uvec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [.solve_scatterers](#.solve_scatterers) |
+| `fallback` | `arma::u32_vec`, `[n_ray]` or empty | 1 = ray lengthened by the solver fallback | [.solve_scatterers](#.solve_scatterers) |
 
 ### Member functions:
 | Member | Returns |
@@ -478,7 +478,8 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
-  NLOS; a GR path needs `path_type` (`no_int` for files of [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers))
+  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers) the `no_int` of [qrt_file_read](channel-functions.md#qrt_file_read)
+  (interaction count = path type); for ray-traced files the user sets it (values > 2 throw)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
 ### Declaration:
@@ -494,8 +495,8 @@ void quadriga_lib::gbsm_rays_from_paths(
     const arma::cube &M,
     gbsm_rays &rays,
     const std::string &method = "quadriga",
-    const arma::uvec *path_type = nullptr,
-    const arma::uvec *tap = nullptr,
+    const arma::u32_vec *path_type = nullptr,
+    const arma::u32_vec *tap = nullptr,
     const arma::vec *gr_eps_re = nullptr,
     const arma::vec *gr_eps_im = nullptr);
 ```
@@ -598,8 +599,8 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 
 | Name | Type, size | Content |
 | --- | --- | --- |
-| `tap` | `arma::uvec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
-| `n_ray_tap` | `arma::uvec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
+| `tap` | `arma::u32_vec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
+| `n_ray_tap` | `arma::u32_vec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
 | `fbs_pos`, `lbs_pos` | `arma::fmat`, `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
 | `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `arma::vec`, `[n_snap]` | Link gain per snapshot |
@@ -1028,8 +1029,8 @@ void quadriga_lib::ssf_clusters(
     const arma::mat *gr_eps_re = nullptr,
     const arma::mat *gr_eps_im = nullptr,
     const std::vector<bool> *o2i = nullptr,
-    const arma::uvec *n_cluster = nullptr,
-    arma::uvec *n_active = nullptr);
+    const arma::u32_vec *n_cluster = nullptr,
+    arma::u32_vec *n_active = nullptr);
 ```
 
 ### Inputs:
@@ -1127,7 +1128,7 @@ void quadriga_lib::ssf_paths(
     arma::vec *eoa = nullptr,
     arma::mat *fbs_pos = nullptr,
     arma::mat *lbs_pos = nullptr,
-    arma::uvec *path_type = nullptr,
+    arma::u32_vec *path_type = nullptr,
     arma::uvec *ray_ind = nullptr,
     bool oxygen = false);
 ```

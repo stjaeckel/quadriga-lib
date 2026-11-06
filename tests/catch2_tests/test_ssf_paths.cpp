@@ -50,7 +50,8 @@ namespace
         arma::mat gain, fbs, lbs;
         arma::vec len, aod, eod, aoa, eoa;
         arma::cube M;
-        arma::uvec type, ind;
+        arma::u32_vec type;
+        arma::uvec ind;
     };
 
     // ssf_paths with all optional outputs; link gain 'lg' in [dB] per frequency (omitted: 0 dB)
@@ -178,7 +179,8 @@ TEST_CASE("ssf_paths - phase at the ray-data positions returns the ray data")
     const po_t o2 = pth(r, "phase", &T, &R, nullptr, false, &lg);
 
     // The zero-power NLOS ray (index 4) is dropped; LOS and GR are kept
-    const arma::uvec ind = {0, 1, 2, 3, 5, 6, 7}, type = {0, 1, 2, 2, 2, 2, 2};
+    const arma::uvec ind = {0, 1, 2, 3, 5, 6, 7};
+    const arma::u32_vec type = {0, 1, 2, 2, 2, 2, 2};
     REQUIRE(o.ind.n_elem == 7);
     CHECK(arma::all(o.ind == ind));
     CHECK(arma::all(o.type == type));
@@ -545,6 +547,7 @@ TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give
         arma::mat g, fb, lb;
         arma::vec l, v;
         arma::cube M;
+        arma::u32_vec ut;
         arma::uvec u;
         quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R);
         const po_t d = pth(r, "drift", nullptr, &R, nullptr, false, &lg);
@@ -562,8 +565,8 @@ TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give
                                 nullptr, &lb);
         CHECK((arma::approx_equal(fb, d.fbs, "absdiff", 0.0) && arma::approx_equal(lb, d.lbs, "absdiff", 0.0)));
         quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                nullptr, nullptr, &u);
-        CHECK(arma::all(u == d.type));
+                                nullptr, nullptr, &ut);
+        CHECK(arma::all(ut == d.type));
         quadriga_lib::ssf_paths(r, lg, g, l, M, "drift", nullptr, &R, nullptr, nullptr, nullptr, nullptr, nullptr,
                                 nullptr, nullptr, nullptr, &u);
         CHECK(arma::all(u == d.ind));
@@ -578,7 +581,7 @@ TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give
         arma::uvec st(b_t.data(), n, false, true);
         arma::mat lb2(2, 2, arma::fill::value(5.0));
         arma::vec eo(n + 3, arma::fill::value(5.0)), aa(1, arma::fill::value(5.0)), ee;
-        arma::uvec pt(1, arma::fill::value(5));
+        arma::u32_vec pt(1, arma::fill::value(5));
         quadriga_lib::ssf_paths(r, lg, sg, sl, sM, "drift", nullptr, &R, nullptr, &sa, &eo, &aa, &ee, &sf, &lb2, &pt,
                                 &st);
         CHECK((sg.memptr() == b_g.data() && sl.memptr() == b_l.data() && sM.memptr() == b_M.data() &&

@@ -282,10 +282,10 @@ TEST_CASE("gbsm_rays::solve_scatterers - pre-sized scatterer attributes are writ
     rays_t r = make_rays(10, true, true, 5, 2, "38.901_MF");
     const arma::uword n = r.n_ray();
     arma::mat F(3, n, arma::fill::value(-7.0)), B(3, n, arma::fill::value(-7.0));
-    arma::uvec fb(n, arma::fill::value(1));
+    arma::u32_vec fb(n, arma::fill::value(1));
     r.fbs_pos.~Mat(), ::new (&r.fbs_pos) arma::mat(F.memptr(), 3, n, false, true); // strict external memory
     r.lbs_pos.~Mat(), ::new (&r.lbs_pos) arma::mat(B.memptr(), 3, n, false, true);
-    r.fallback.~Col(), ::new (&r.fallback) arma::uvec(fb.memptr(), n, false, true);
+    r.fallback.~Col(), ::new (&r.fallback) arma::u32_vec(fb.memptr(), n, false, true);
     r.solve_scatterers();
     CHECK(r.fbs_pos.memptr() == F.memptr());
     CHECK(r.lbs_pos.memptr() == B.memptr());

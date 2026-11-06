@@ -112,7 +112,8 @@ namespace
             arma::mat pg, fbs, lbs;
             arma::vec pl, aod, eod, aoa, eoa;
             arma::cube M;
-            arma::uvec type, ind;
+            arma::u32_vec type;
+            arma::uvec ind;
             quadriga_lib::ssf_paths(r, lgv, pg, pl, M, a.drift() ? "drift" : "phase", &T, &R,
                                     a.kf.empty() ? nullptr : &kfv, &aod, &eod, &aoa, &eoa, &fbs, &lbs, &type, &ind,
                                     a.o2);
@@ -152,11 +153,11 @@ namespace
     struct tap_t
     {
         arma::cube cr, ci, dl;
-        arma::uvec tap, n;
+        arma::u32_vec tap, n;
     };
     tap_t ref_taps(const rays_t &r, arma::uword f, const snap_t &s, const arma::vec *w_in = nullptr)
     {
-        const arma::uvec tp = r.tap.elem(s.ind);
+        const arma::u32_vec tp = r.tap.elem(s.ind);
         tap_t o;
         o.tap = arma::unique(tp), o.n.zeros(o.tap.n_elem);
         o.cr.zeros(s.cr.n_rows, s.cr.n_cols, o.tap.n_elem), o.ci = o.cr, o.dl = o.cr;
@@ -237,7 +238,7 @@ namespace
                 CHECK((c.path_fbs_pos.empty() && c.path_lbs_pos.empty()));
         }
         if (!e.empty())
-            CHECK(arma::all(par<arma::uvec>(c, "tap") == a.r->tap.elem(e[0].ind)));
+            CHECK(arma::all(par<arma::u32_vec>(c, "tap") == a.r->tap.elem(e[0].ind)));
     }
 
     // Channel of taps output against the tap oracle
@@ -253,8 +254,8 @@ namespace
             QD_DIAG("%d,%.2e,%.2e\n", (int)t, dc, dd);
             CHECK(dc <= 1e-12);
             CHECK(dd <= 1e-12);
-            CHECK(arma::all(par<arma::uvec>(c, "tap") == x.tap));
-            CHECK(arma::all(par<arma::uvec>(c, "n_ray_tap") == x.n));
+            CHECK(arma::all(par<arma::u32_vec>(c, "tap") == x.tap));
+            CHECK(arma::all(par<arma::u32_vec>(c, "n_ray_tap") == x.n));
             CHECK(c.path_gain.empty());
         }
     }
@@ -383,7 +384,7 @@ TEST_CASE("gbsm_single_link_channel - taps of data from paths use the default ta
     arma::mat pg, fbs, lbs;
     arma::vec pl;
     arma::cube M;
-    arma::uvec type;
+    arma::u32_vec type;
     quadriga_lib::ssf_paths(s, arma::vec{-90.0}, pg, pl, M, "drift", nullptr, nullptr, nullptr, nullptr, nullptr,
                             nullptr, nullptr, &fbs, &lbs, &type);
     rays_t d;
@@ -396,8 +397,8 @@ TEST_CASE("gbsm_single_link_channel - taps of data from paths use the default ta
     const chan_t c = a.run();
     REQUIRE(c.n_snap() == 2);
     const arma::uword n = pg.n_rows;
-    CHECK(arma::all(par<arma::uvec>(c, "tap") == arma::regspace<arma::uvec>(0, 3, 3 * (n - 1))));
-    CHECK(arma::all(par<arma::uvec>(c, "n_ray_tap") == 1));
+    CHECK(arma::all(par<arma::u32_vec>(c, "tap") == arma::regspace<arma::u32_vec>(0, 3, 3 * (n - 1))));
+    CHECK(arma::all(par<arma::u32_vec>(c, "n_ray_tap") == 1));
     a.out = "rays";
     const chan_t cr = a.run();
     REQUIRE(cr.n_snap() == 2);
@@ -484,7 +485,7 @@ TEST_CASE("gbsm_single_link_channel - n_ray = 0 and a single kept ray")
             REQUIRE(c.n_snap() == 2);
             CHECK(arma::size(c.coeff_re[1]) == arma::size(2, 8, 0));
             CHECK(arma::size(c.delay[1]) == arma::size(2, 8, 0));
-            CHECK(par<arma::uvec>(c, "tap").n_elem == 0);
+            CHECK(par<arma::u32_vec>(c, "tap").n_elem == 0);
             CHECK(c.is_valid().empty());
 
             a.r = &one;
@@ -509,7 +510,7 @@ TEST_CASE("gbsm_single_link_channel - LOS and GR taps are always present and tap
         r.tap(2) = r.tap(3) = 20, r.tap(5) = 9, r.tap(6) = 15, r.tap(7) = 11; // labels out of order
         const chan_t c = a.run();
         REQUIRE(c.n_snap() == 1);
-        CHECK(arma::all(par<arma::uvec>(c, "tap") == arma::uvec{0, 3, 9, 11, 15, 20}));
+        CHECK(arma::all(par<arma::u32_vec>(c, "tap") == arma::u32_vec{0, 3, 9, 11, 15, 20}));
         CHECK((c.coeff_re[0](0, 0, 0) == 0.0 && c.coeff_im[0](0, 0, 1) == 0.0));
         check_taps(c, a, ref(a));
     }
@@ -518,8 +519,8 @@ TEST_CASE("gbsm_single_link_channel - LOS and GR taps are always present and tap
         REQUIRE(r.delay(5) == 0.0); // make_rays: zero-excess ray in its own tap
         const chan_t c = a.run();
         REQUIRE(c.n_snap() == 1);
-        const arma::uvec tp = par<arma::uvec>(c, "tap");
-        CHECK(arma::all(tp == arma::uvec{0, 3, 6, 12, 15, 18}));
+        const arma::u32_vec tp = par<arma::u32_vec>(c, "tap");
+        CHECK(arma::all(tp == arma::u32_vec{0, 3, 6, 12, 15, 18}));
         CHECK((std::abs(c.delay[0](0, 0, 0)) < 1e-15 && std::abs(c.delay[0](0, 0, 3)) < 1e-15));
         CHECK(arma::accu(arma::abs(arma::vectorise(c.delay[0])) < 1e-15) == 2);
     }
@@ -654,9 +655,9 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                 for (const char *x : {"link_gain_dB", "b_med", "b_eff", "limit", "ratio", "ratio_total"})
                     names.push_back(x);
                 CHECK(c.par_names == names);
-                CHECK(par<arma::uvec>(c, "tap").n_elem == (taps ? n_tap : n_kept));
+                CHECK(par<arma::u32_vec>(c, "tap").n_elem == (taps ? n_tap : n_kept));
                 if (taps)
-                    CHECK(par<arma::uvec>(c, "n_ray_tap").n_elem == n_tap);
+                    CHECK(par<arma::u32_vec>(c, "n_ray_tap").n_elem == n_tap);
                 if (drift && taps)
                 {
                     const arma::uvec kk = gr ? arma::uvec{0, 1, 2, 3, 5, 6, 7} : arma::uvec{0, 1, 2, 4, 5, 6};
@@ -733,7 +734,7 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
         arma::mat pg = e[t].gain;
         arma::cube M(8, e[t].ind.n_elem, 1);
         M.slice(0) = e[t].M;
-        const arma::uvec type = r.path_type.elem(e[t].ind);
+        const arma::u32_vec type = r.path_type.elem(e[t].ind);
         const auto p = quadriga_lib::qrt_paths_from_scatterers(r.center_frequency, r.tx_pos, R, e[t].fbs, e[t].lbs,
                                                                pg, M, type, t);
         all.insert(all.end(), p.begin(), p.end());
@@ -750,9 +751,9 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
         arma::u32_vec no_int;
         quadriga_lib::qrt_file_read<double>(fn, t, 0, true, &cf, &T, nullptr, &R, nullptr, &fbs, &lbs, &pg, &pl, &M,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 1, &no_int);
-        const arma::uvec type = arma::conv_to<arma::uvec>::from(no_int), tap = r.tap.elem(e[t].ind);
+        const arma::u32_vec tap = r.tap.elem(e[t].ind);
         rays_t q;
-        quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, q, "quadriga", &type, &tap, &r.gr_eps_re,
+        quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, q, "quadriga", &no_int, &tap, &r.gr_eps_re,
                                            &r.gr_eps_im);
         const chan_t cq = quadriga_lib::gbsm_single_link_channel(a2, a2, q, arma::vec{0.0}, "drift", "rays");
         REQUIRE(cq.coeff_re[0].n_slices == e[t].ind.n_elem);
