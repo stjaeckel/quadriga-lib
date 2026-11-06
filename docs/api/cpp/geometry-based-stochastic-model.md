@@ -24,9 +24,10 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-geomet
 
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of environment, the
 *scenario* (e.g. urban macro-cell with or without line of sight), instead of from the geometry of one site. The
-functions of this section implement 3GPP TR 38.901 clause 7.5 steps 1 to 7 (path loss, LOS probability, O2I
-penetration loss, large-scale parameters (LSPs) and clusters) with the spatial consistency of clause 7.6.3. The ray
-level (steps 8 to 12) follows in a later version.
+functions of this section implement 3GPP TR 38.901 clause 7.5 steps 1 to 11 (path loss, LOS probability, O2I
+penetration loss, large-scale parameters (LSPs), clusters and rays, without antennas) with the spatial consistency of
+clause 7.6.3, oxygen absorption (clause 7.6.1) and polarisation power variability (clause 7.6.16);
+[gbsm_single_link_channel](#gbsm_single_link_channel) computes the channel coefficients of a link with its antennas.
 
 **Scenario parameters.** A scenario is a set of numeric keys (`scenpar`), a path-loss model with its parameters and
 optional short names, read from a conf file by [conf_file_read](#conf_file_read). 23 files for TR 38.901 v19.5.0 come with the
@@ -40,10 +41,55 @@ value of a key that the function does not use throws as well.
 O2I states with [sos_rand](sum-of-sinusoids-random-number-generator.md#sos_rand) / [sos_randn](sum-of-sinusoids-random-number-generator.md#sos_randn) at the correlation distances of TR 38.901 clause 7.6.3.3; the keys
 `LOS_state_lambda` and `IO_state_lambda` apply to all links of a scenario and are stated in the NLOS and in the O2I
 files (0 in the other files means "not stated here"). Per BS site and scenario: [gbsm_init_phases](#gbsm_init_phases) draws the
-phases of each random set once (`"lsf"`; `"cluster"` and `"ray"` with `set_id = -1` and one set per carrier
-frequency), and [gbsm_draw](#gbsm_draw) evaluates them at the links. Then [path_loss](#path_loss) gives the path loss and the
-shadow-fading (SF) standard deviation, [lsp_generate](#lsp_generate) the LSPs of each link and frequency, and [ssf_clusters](#ssf_clusters)
-turns the LSPs and the cluster random values into cluster delays, powers and angles.
+phases of each random set once (`"lsf"`; `"cluster"` with `set_id = -1` and one set per carrier frequency; `"ray"`
+with `set_id = -1` for the method `"quadriga"`, one set per carrier frequency for the TR methods), and [gbsm_draw](#gbsm_draw)
+evaluates them at the links. Then [path_loss](#path_loss) gives the path loss and the shadow-fading (SF) standard deviation,
+[lsp_generate](#lsp_generate) the LSPs of each link and frequency, [ssf_clusters](#ssf_clusters) the cluster delays, powers and angles, and
+[ssf_rays](#ssf_rays) the rays of each link as a [gbsm_rays](#gbsm_rays) object (one call for `"quadriga"`, one per frequency for the TR
+methods). For the mobility `drift`, [.solve_scatterers](#.solve_scatterers) places the scatterers of each link (MATLAB and Python:
+`ssf_scatterers`, which also returns `b_med` and `b_eff`), and the member `b_med` sets the segment length. Per link and
+segment, [gbsm_single_link_channel](#gbsm_single_link_channel) computes the coefficients with `link_gain_dB` = -PL - O2I + 10·lg SF and
+`kf_ratio` = K(position) / K(drop) from the large-scale functions; the sum and the ratio are the caller's. QRT route:
+[ssf_paths](#ssf_paths) (`drift`), [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers), [qrt_file_append](channel-functions.md#qrt_file_append), and back [qrt_file_read](channel-functions.md#qrt_file_read),
+[gbsm_rays_from_paths](#gbsm_rays_from_paths); other path sources fill a [gbsm_rays](#gbsm_rays) object directly.
+
+**Terms.** TR 38.901 names where they exist; QuaDRiGa names are marked:
+
+| Term | Meaning |
+| --- | --- |
+| scenario | type of environment with its statistics: numeric keys `scenpar`, path-loss model, short names (one conf file) |
+| link | one Tx-Rx pair of a batch (row `l` of `rx_pos`) |
+| drop | one realisation of LSPs, clusters and rays at the link positions; the positions the ray data refer to |
+| cluster | one of the N NLOS clusters of a link: delay, power, angles (TR 38.901 clause 7.5 steps 5 to 7) |
+| slot | index in the [ssf_clusters](#ssf_clusters) outputs: 0 LOS, 1 GR (if enabled), then the N clusters |
+| sub-cluster | one of the three parts of a split cluster (step 11, Table 7.5-5) |
+| ray | one of the M rays of a cluster, or the LOS or GR ray (QuaDRiGa: sub-path) |
+| path | a propagation path as `get_channels_*` and QRT take it; [ssf_paths](#ssf_paths) makes one per kept ray (QuaDRiGa also says path for a cluster) |
+| tap | rays summed in the `taps` output: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`"quadriga"`) |
+| snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
+| segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |
+| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting) |
+| scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
+| coefficient power | power of a ray without link gain and oxygen loss (`gbsm_rays.power`): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [ssf_clusters](#ssf_clusters) sets it; for data from paths the path gain |
+| path gain | linear power gain of a path incl. link gain and oxygen loss |
+| link gain | -PL - O2I + SF in dB of a link at a position (`link_gain_dB`) |
+| random set | the random values of one `set_type` and `set_id`, drawn from one phase array; never changes size |
+| generator | one spatially consistent random field; one column of `rnd` |
+| block | the generators of one random quantity in a set (N or N·M columns) |
+
+**Codes.** Path type: 0 LOS, 1 GR, 2 NLOS. Tap index: 3·slot + i, with i the sub-cluster (0, 1, 2) of a split cluster
+and 0 otherwise, so LOS 0, GR 3 and NLOS cluster `n` (from 0) 3·(1 + G + n) + i; `taps` lists the taps in ascending
+index. Both are codes, which the MATLAB and Python wrappers do not shift.
+
+**Model properties.**
+
+- Separately dropped UTs keep correlated taps over 43 to 440 wavelengths, while measured fading decorrelates within
+  about 0.4 to 1 wavelength: for UTs a few wavelengths apart, use one drop and move the UTs (see [ssf_paths](#ssf_paths))
+- `"quadriga"`: the per-tap correlation across bands follows the intra-cluster delays of one random field; TR methods:
+  independent per band (TR 38.901 clause 7.6.5)
+- `pol_model = "quadriga"` gives a nearly unitary 2x2 cluster matrix (singular-value ratio 0.10 to 0.22 dB, TR model
+  7.6 to 8.3 dB)
+- The validity of the mobilities `phase` and `drift` is stated in [ssf_paths](#ssf_paths)
 
 **Random sets.** The spatially correlated random values come in sets of generators, one column of `rnd` each;
 `N = NumClusters - 1`, column `b·N + n` of a `"cluster"` set belongs to block `b` and NLOS cluster `n`:
@@ -436,7 +482,7 @@ Not in: MATLAB, Python
 ## gbsm_rays_from_paths
 Ray data of one link from spherical path data (e.g. read with qrt_file_read)
 
-Not in: MATLAB, Python
+Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths) · [Python](../python/geometry-based-stochastic-model.md#gbsm.rays_from_paths)
 
 - Fills a [gbsm_rays](#gbsm_rays) object in place (`fallback` cleared) from path data in the names and order of
   [qrt_file_read](channel-functions.md#qrt_file_read), read with `downlink = true` (an uplink read swaps the ends and conjugates `M`)
@@ -487,7 +533,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 ## gbsm_single_link_channel
 Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
 
-Not in: MATLAB, Python
+Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_single_link_channel) · [Python](../python/geometry-based-stochastic-model.md#gbsm.single_link_channel)
 
 - Snapshot t: the paths of [ssf_paths](#ssf_paths) at the positions of t, at `rays.center_frequency(i_freq)` with the link gain
   and K ratio of t, for the rays with power > 0 at `i_freq` plus LOS and GR
@@ -1031,7 +1077,7 @@ void quadriga_lib::ssf_clusters(
 ## ssf_paths
 Antenna-free paths of one link at one position
 
-Not in: MATLAB, Python
+Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_paths) · [Python](../python/geometry-based-stochastic-model.md#ssf_paths)
 
 - `"phase"`: use the outputs with [get_channels_planar](channel-generation-functions.md#get_channels_planar) and the arrays at the positions of `rays`; the displacement
   phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer
@@ -1114,7 +1160,7 @@ void quadriga_lib::ssf_paths(
 ## ssf_rays
 Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16)
 
-Not in: MATLAB, Python
+Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_rays) · [Python](../python/geometry-based-stochastic-model.md#ssf_rays)
 
 - Splits the clusters of [ssf_clusters](#ssf_clusters) into rays and writes one [gbsm_rays](#gbsm_rays) object per link: delays, coefficient
   powers, angles, polarization transfer matrices with initial phases, path types and tap indices; `fbs_pos`, `lbs_pos`
@@ -1216,7 +1262,7 @@ void quadriga_lib::ssf_rays(
 ## .solve_scatterers
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
-Not in: MATLAB, Python
+Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_scatterers) · [Python](../python/geometry-based-stochastic-model.md#ssf_scatterers)
 
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
   distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length `abs(rx_pos - tx_pos) + c·delay`

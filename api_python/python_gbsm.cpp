@@ -19,6 +19,11 @@ namespace py = pybind11;
 #include "qpy_los_probability.cpp"
 #include "qpy_o2i_loss.cpp"
 #include "qpy_ssf_clusters.cpp"
+#include "qpy_ssf_rays.cpp"
+#include "qpy_ssf_scatterers.cpp"
+#include "qpy_ssf_paths.cpp"
+#include "qpy_gbsm_rays_from_paths.cpp"
+#include "qpy_gbsm_single_link_channel.cpp"
 
 // Mandatory arrays are declared with .none(false): without it pybind11 converts None to a 0-dimensional
 // array holding NaN.
@@ -123,4 +128,66 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("gr_eps") = py::none(),
           py::arg("o2i") = py::none(),
           py::arg("n_cluster") = py::none());
+    m.def("ssf_rays", &ssf_rays,
+          py::arg("scenpar"),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
+          py::arg("center_freq").none(false),
+          py::arg("lsp").none(false),
+          py::arg("lsp_mu").none(false),
+          py::arg("lsp_sigma").none(false),
+          py::arg("delay").none(false),
+          py::arg("power").none(false),
+          py::arg("aod").none(false),
+          py::arg("eod").none(false),
+          py::arg("aoa").none(false),
+          py::arg("eoa").none(false),
+          py::arg("rnd_ray").none(false),
+          py::arg("method") = "38.901",
+          py::arg("i_freq") = 0,
+          py::arg("angle_model") = "additive",
+          py::arg("pol_model") = "38.901",
+          py::arg("gr_eps") = py::none(),
+          py::arg("pol_variability") = false,
+          py::arg("random_phase") = true);
+    m.def("ssf_scatterers", &ssf_scatterers,
+          py::arg("rays"),
+          py::arg("d_min") = 2.0);
+    m.def("ssf_paths", &ssf_paths,
+          py::arg("rays"),
+          py::arg("link_gain_dB").none(false),
+          py::arg("mobility") = "auto",
+          py::arg("tx_pos") = py::none(),
+          py::arg("rx_pos") = py::none(),
+          py::arg("kf_ratio") = py::none(),
+          py::arg("oxygen") = false);
+    m.def("rays_from_paths", &gbsm_rays_from_paths,
+          py::arg("center_freq").none(false),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
+          py::arg("fbs_pos").none(false),
+          py::arg("lbs_pos").none(false),
+          py::arg("path_gain").none(false),
+          py::arg("path_length").none(false),
+          py::arg("M").none(false),
+          py::arg("method") = "quadriga",
+          py::arg("path_type") = py::none(),
+          py::arg("tap") = py::none(),
+          py::arg("gr_eps") = py::none());
+    m.def("single_link_channel", &gbsm_single_link_channel,
+          py::arg("tx_array"),
+          py::arg("rx_array"),
+          py::arg("rays"),
+          py::arg("link_gain_dB").none(false),
+          py::arg("mobility") = "auto",
+          py::arg("output") = "taps",
+          py::arg("i_freq") = 0,
+          py::arg("tx_pos") = py::none(),
+          py::arg("rx_pos") = py::none(),
+          py::arg("tx_orientation") = py::none(),
+          py::arg("rx_orientation") = py::none(),
+          py::arg("kf_ratio") = py::none(),
+          py::arg("oxygen") = false,
+          py::arg("use_absolute_delays") = false,
+          py::arg("stack") = false);
 }

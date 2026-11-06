@@ -54,7 +54,7 @@ rnd = quadriga_lib.gbsm_draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
   `[n_link]`
 - **`center_freq`** *(optional)* — Carrier frequencies in [Hz] (messages name it
   `center_frequency`); required by the shared `'ray'` set, whose block 14 uses their mean cluster
-  delay spread: pass the same list as to `ssf_rays` (another list gives other `quadriga` rays);
+  delay spread: pass the same list as to [[ssf_rays]] (another list gives other `quadriga` rays);
   ignored and not checked for all other sets; `[n_freq]`
 - **`dual_mobility`** — `true`: Tx and Rx both move; default: false
 - **`horizontal`** — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa); default: true
@@ -66,6 +66,7 @@ rnd = quadriga_lib.gbsm_draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
 - [[lsp_generate]] (the large-scale parameters from the `'lsf'` set)
 - [[path_loss]] (column 11 of the `'lsf'` set as `rnd_he`)
 - [[ssf_clusters]] (the clusters from the `'cluster'` sets)
+- [[ssf_rays]] (the rays from the `'ray'` sets)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

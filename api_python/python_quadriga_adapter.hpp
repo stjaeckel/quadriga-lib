@@ -881,4 +881,114 @@ static py::dict qd_python_plpar2dict(const std::string &pl_model,
     return output;
 }
 
+// -------------------------------- gbsm_rays dict --------------------------------
+
+// Keys of the gbsm_rays dict in their order; the last four are optional as input (missing or None = empty)
+static const char *const qd_python_gbsm_rays_keys[17] = {
+    "method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa",
+    "eoa", "M", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
+
+// Labels or codes (non-negative integers, no index shift) -> uvec; None gives an empty vector
+// - A uint64 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float and
+//   checked with qd_python_uint_entries, naming 'name'
+static arma::uvec qd_python_uword_entries(const py::handle &obj, const std::string &name)
+{
+    if (py::isinstance<py::array_t<arma::uword>>(obj))
+        return qd_python_numpy2arma_Col<arma::uword>(obj, true);
+    return qd_python_uint_entries(qd_python_numpy2arma_Col<double>(obj, true), name);
+}
+
+// Dict -> gbsm_rays, aliasing the numpy memory where dtype and layout allow (read-only)
+// - 'gr_eps' (complex, a real array = imaginary part 0) is copied into 'gr_eps_re' and 'gr_eps_im'
+// - Missing optional keys mean empty; a missing other key or an unknown key throws, naming 'var_name'
+// - Validation is left to is_valid()
+static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const std::string &var_name = "rays")
+{
+    const auto *K = qd_python_gbsm_rays_keys;
+    for (auto item : d)
+    {
+        const std::string key = py::cast<std::string>(py::str(item.first));
+        if (std::find_if(K, K + 17, [&](const char *k) { return key == k; }) == K + 17)
+            throw std::invalid_argument("Entry '" + key + "' of '" + var_name + "' is unknown.");
+    }
+    for (int k = 0; k < 13; ++k)
+        if (!d.contains(K[k]))
+            throw std::invalid_argument("Entry '" + std::string(K[k]) + "' of '" + var_name + "' is missing.");
+    auto get = [&](const char *k) -> py::object
+    { return d.contains(k) ? py::object(d[k]) : py::object(py::none()); };
+
+    quadriga_lib::gbsm_rays r;
+    const py::object method = get("method");
+    if (!py::isinstance<py::str>(method))
+        throw std::invalid_argument("Entry 'method' of '" + var_name + "' must be a str.");
+    r.method = py::cast<std::string>(method);
+    r.tx_pos = qd_python_numpy2arma_Col<double>(get("tx_pos"), true);
+    r.rx_pos = qd_python_numpy2arma_Col<double>(get("rx_pos"), true);
+    r.center_frequency = qd_python_numpy2arma_Col<double>(get("center_frequency"), true);
+    r.delay = qd_python_numpy2arma_Col<double>(get("delay"), true);
+    r.power = qd_python_numpy2arma_Mat<double>(get("power"), true);
+    r.aod = qd_python_numpy2arma_Col<double>(get("aod"), true);
+    r.eod = qd_python_numpy2arma_Col<double>(get("eod"), true);
+    r.aoa = qd_python_numpy2arma_Col<double>(get("aoa"), true);
+    r.eoa = qd_python_numpy2arma_Col<double>(get("eoa"), true);
+    r.M = qd_python_numpy2arma_Cube<double>(get("M"), true);
+    r.path_type = qd_python_uword_entries(get("path_type"), var_name + ".path_type");
+    r.tap = qd_python_uword_entries(get("tap"), var_name + ".tap");
+    r.fbs_pos = qd_python_numpy2arma_Mat<double>(get("fbs_pos"), true);
+    r.lbs_pos = qd_python_numpy2arma_Mat<double>(get("lbs_pos"), true);
+    r.fallback = qd_python_uword_entries(get("fallback"), var_name + ".fallback");
+    const py::object gr_eps = get("gr_eps");
+    if (!gr_eps.is_none())
+    {
+        arma::cube re, im;
+        qd_python_copy2arma(py::cast<py::array_t<std::complex<double>>>(gr_eps), re, im);
+        r.gr_eps_re = arma::vectorise(re), r.gr_eps_im = arma::vectorise(im);
+    }
+    return r;
+}
+
+// Creates a list of n_link gbsm_rays dicts with all keys and aliases the attributes of 'rays' (resized to n_link)
+// whose size is known, as qd_mex_init_gbsm_rays; with 'has_gr', 'gr_eps_re' and 'gr_eps_im' are allocated in C++
+// - The other keys are empty arrays ('gr_eps' complex, 'fallback' uint64); the caller sets 'method' and, with
+//   'has_gr', 'gr_eps' after the call
+static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
+                                         bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
+{
+    py::list out;
+    rays.clear();
+    rays.resize(n_link);
+    const arma::uword n3 = 3, n8 = 8;
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        auto &r = rays[l];
+        py::dict d;
+        d["method"] = "";
+        d["tx_pos"] = qd_python_init_output(n3, &r.tx_pos);
+        d["rx_pos"] = qd_python_init_output(n3, &r.rx_pos);
+        d["center_frequency"] = qd_python_init_output(n_freq, &r.center_frequency);
+        d["delay"] = qd_python_init_output(n_ray, &r.delay);
+        d["power"] = qd_python_init_output(n_ray, n_freq, &r.power);
+        d["aod"] = qd_python_init_output(n_ray, &r.aod);
+        d["eod"] = qd_python_init_output(n_ray, &r.eod);
+        d["aoa"] = qd_python_init_output(n_ray, &r.aoa);
+        d["eoa"] = qd_python_init_output(n_ray, &r.eoa);
+        d["M"] = qd_python_init_output(n8, n_ray, n_freq, &r.M);
+        d["path_type"] = qd_python_init_output(n_ray, &r.path_type);
+        d["tap"] = qd_python_init_output(n_ray, &r.tap);
+        d["gr_eps"] = py::array_t<std::complex<double>>(0);
+        if (has_gr)
+            r.gr_eps_re.set_size(n_freq), r.gr_eps_im.set_size(n_freq);
+        if (has_scatterers)
+        {
+            d["fbs_pos"] = qd_python_init_output(n3, n_ray, &r.fbs_pos);
+            d["lbs_pos"] = qd_python_init_output(n3, n_ray, &r.lbs_pos);
+        }
+        else
+            d["fbs_pos"] = py::array_t<double>(0), d["lbs_pos"] = py::array_t<double>(0);
+        d["fallback"] = py::array_t<arma::uword>(0);
+        out.append(d);
+    }
+    return out;
+}
+
 #endif
