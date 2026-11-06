@@ -182,7 +182,7 @@ def _outputs(t, c, n, rel, diag):
         if kind == "stream":
             out.append(Output("text", ANSI_RE.sub("", _text(o.get("text"))).rstrip("\n")))
         elif kind == "error":
-            diag.error(rel, None, "cell %d: the notebook was committed with a failing cell (%s)" % (n, o.get("ename")))
+            diag.error(rel, None, "cell %d: the executed copy has a failing cell (%s)" % (n, o.get("ename")))
         elif kind in ("execute_result", "display_data"):
             data = o.get("data", {})
             src = "%s/fig-%d-%d" % (t.stem, n, k)

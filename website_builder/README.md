@@ -146,7 +146,7 @@ Notebook errors stop the build; each names the notebook, and the cell where ther
 | `metadata.quadriga_tutorial.level: one of beginner, intermediate, advanced` | Another level | Use one of the three |
 | `metadata.kernelspec.language: missing or not one of python, matlab, octave` | The notebook was saved without a kernel, or with another one | Select the Python, MATLAB or Octave kernel and save |
 | `cell N: a notebook starts its sections with ##; ...` | A `#` heading in a Markdown cell | Make it `##`; the page title is `title` of the metadata |
-| `cell N: the notebook was committed with a failing cell (...)` | An `error` output is stored in the executed copy | Fix the cell, run the tutorials again |
+| `cell N: the executed copy has a failing cell (...)` | An `error` output is stored in the executed copy, e.g. a copy made outside `make tutorials` | Fix the cell, run the tutorials again |
 | `tutorials/executed: missing: ...`, `no executed copy ...` (with `--release`) | The tutorials have not been run, or a notebook was added since | `make tutorials` |
 | `cell N: E-anchor: ...` | Two headings with the same explicit id, or an id the templates use | Change one of the ids |
 

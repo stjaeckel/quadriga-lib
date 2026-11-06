@@ -75,7 +75,7 @@ def test_output_warnings_and_error(mini_repo, run_site):
     edit(mini_repo, lambda nb: nb["cells"][1]["outputs"].append(
         {"output_type": "error", "ename": "ValueError", "evalue": "x", "traceback": []}))
     code, out = run_site(mini_repo)
-    assert code == 1 and "cell 2: the notebook was committed with a failing cell (ValueError)" in out
+    assert code == 1 and "cell 2: the executed copy has a failing cell (ValueError)" in out
 
 
 def test_headings(mini_repo, run_site):
