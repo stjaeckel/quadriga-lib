@@ -14,9 +14,10 @@ SECTION!*/
 A **geometry-based stochastic model** (GBSM) generates channels from statistics of a type of
 environment, the *scenario* (e.g. urban macro-cell with or without line of sight), instead of from
 the geometry of one site. The functions of this section implement 3GPP TR 38.901 clause 7.5 steps 1
-to 7 (path loss, LOS probability, O2I penetration loss, large-scale parameters (LSPs) and clusters)
-with the spatial consistency of clause 7.6.3. The ray level (steps 8 to 12) follows in a later
-version.<br><br>
+to 11 (path loss, LOS probability, O2I penetration loss, large-scale parameters (LSPs), clusters and
+rays, without antennas) with the spatial consistency of clause 7.6.3, oxygen absorption (clause
+7.6.1) and polarisation power variability (clause 7.6.16); [[gbsm_single_link_channel]] computes the
+channel coefficients of a link with its antennas.<br><br>
 
 **Scenario parameters.** A scenario is a struct of numeric parameters (`scenpar`), a struct of
 path-loss parameters (`plpar`) and optional short names, read from a conf file by
@@ -34,11 +35,60 @@ caller draws the LOS, indoor and O2I states with [[sos_rand]] / [[sos_randn]] at
 distances of TR 38.901 clause 7.6.3.3; the fields `LOS_state_lambda` and `IO_state_lambda` apply to
 all links of a scenario and are stated in the NLOS and in the O2I files (0 in the other files means
 "not stated here"). Per BS site and scenario: [[gbsm_init_phases]] draws the phases of each random
-set once (`'lsf'`; `'cluster'` and `'ray'` with `set_id = 0` and one set per carrier frequency), and
+set once (`'lsf'`; `'cluster'` with `set_id = 0` and one set per carrier frequency; `'ray'` with
+`set_id = 0` for the method `'quadriga'`, one set per carrier frequency for the TR methods), and
 [[gbsm_draw]] evaluates them at the links. Then [[path_loss]] gives the path loss and the
-shadow-fading (SF) standard deviation, [[lsp_generate]] the LSPs of each link and frequency, and
-[[ssf_clusters]] turns the LSPs and the cluster random values into cluster delays, powers and
-angles.<br><br>
+shadow-fading (SF) standard deviation, [[lsp_generate]] the LSPs of each link and frequency,
+[[ssf_clusters]] the cluster delays, powers and angles, and [[ssf_rays]] the rays of each link as a
+ray struct (one call for `'quadriga'`, one per frequency for the TR methods). For the mobility
+`drift`, [[ssf_scatterers]] places the scatterers of each link and returns `b_med`, which sets the
+segment length, and `b_eff`. Per link and segment, [[gbsm_single_link_channel]] computes the
+coefficients with `link_gain_dB` = -PL - O2I + 10·lg SF and `kf_ratio` = K(position) / K(drop) from
+the large-scale functions; the sum and the ratio are the caller's. Path data read with
+[[qrt_file_read]] become a ray struct with [[gbsm_rays_from_paths]]; other path sources fill a ray
+struct directly.<br><br>
+
+**Terms.** TR 38.901 names where they exist; QuaDRiGa names are marked:
+
+| Term | Meaning |
+| --- | --- |
+| scenario | type of environment with its statistics: numeric fields `scenpar`, path-loss model, short names (one conf file) |
+| link | one Tx-Rx pair of a batch (row `l` of `rx_pos`) |
+| drop | one realisation of LSPs, clusters and rays at the link positions; the positions the ray data refer to |
+| cluster | one of the N NLOS clusters of a link: delay, power, angles (TR 38.901 clause 7.5 steps 5 to 7) |
+| slot | column of the [[ssf_clusters]] outputs: 1 LOS, 2 GR (if enabled), then the N clusters |
+| sub-cluster | one of the three parts of a split cluster (step 11, Table 7.5-5) |
+| ray | one of the M rays of a cluster, or the LOS or GR ray (QuaDRiGa: sub-path) |
+| path | a propagation path as `get_channels_*` take it; [[ssf_paths]] makes one per kept ray (QuaDRiGa also says path for a cluster) |
+| tap | rays summed in the `'taps'` output: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`'quadriga'`) |
+| snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
+| segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |
+| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting) |
+| scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
+| coefficient power | power of a ray without link gain and oxygen loss (field `power` of the ray struct): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [[ssf_clusters]] sets it; for data from paths the path gain |
+| path gain | linear power gain of a path incl. link gain and oxygen loss |
+| link gain | -PL - O2I + SF in dB of a link at a position (`link_gain_dB`) |
+| random set | the random values of one `set_type` and `set_id`, drawn from one phase array; never changes size |
+| generator | one spatially consistent random field; one column of `rnd` |
+| block | the generators of one random quantity in a set (N or N·M columns) |
+
+**Codes.** Path type: 0 LOS, 1 GR, 2 NLOS. Tap index: 3·(s - 1) + i, with s the column of the
+[[ssf_clusters]] outputs and i the sub-cluster (0, 1, 2) of a split cluster and 0 otherwise, so LOS
+0, GR 3 and NLOS cluster `n` (from 1) 3·(G + n) + i; `'taps'` lists the taps in ascending index.
+Both are codes, not indices: the wrappers do not shift them.<br><br>
+
+**Model properties.**
+
+- Separately dropped UTs keep correlated taps over 43 to 440 wavelengths, while measured fading
+  decorrelates within about 0.4 to 1 wavelength: for UTs a few wavelengths apart, use one drop and
+  move the UTs (see [[ssf_paths]])
+- `'quadriga'`: the per-tap correlation across bands follows the intra-cluster delays of one random
+  field; TR methods: independent per band (TR 38.901 clause 7.6.5)
+- `pol_model = 'quadriga'` gives a nearly unitary 2x2 cluster matrix (singular-value ratio 0.10 to
+  0.22 dB, TR model 7.6 to 8.3 dB)
+- The validity of the mobilities `phase` and `drift` is stated in [[ssf_paths]]
+
+
 
 **Random sets.** The spatially correlated random values come in sets of generators, one column of
 `rnd` each; `N = NumClusters - 1`, columns `b·N + 1` to `(b + 1)·N` of a `'cluster'` set form block
@@ -49,8 +99,8 @@ angles.<br><br>
 | `'lsf'` | 11 | 1 to 8 DS, KF, SF, ASD, ASA, ESD, ESA, XPR, Normal(0,1); 9 absolute TOA, Normal(0,1); 10 ground permittivity, 11 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (1 to 8), `absTOA_lambda` (9), `SC_lambda` (10), `SF_lambda` (11) | 4 and 5, 6 and 7 | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 11) |
 | `'cluster'`, 0 | `9·N` | block 0 cluster delay, Uniform(0,1); 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 offset of AOD, AOA; 7, 8 offset of ZOD, ZOA, Normal(0,1) | `SC_lambda` | blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 | [[ssf_clusters]] `rnd` |
 | `'cluster'`, `k` | `N` | cluster shadowing of frequency `k`, Normal(0,1) | `SC_lambda` | none | [[ssf_clusters]] `rnd_freq`, slice `k` |
-| `'ray'`, 0 | `14·N·M + N` | blocks 0 to 14 (below) | `SC_lambda`; block 14: $\lambda_\tau$ | below | `ssf_rays` `rnd_ray`, method `'quadriga'` |
-| `'ray'`, `k` | `14·N·M + N` | blocks 0 to 14 (below), block 14 unused | `SC_lambda` | below | `ssf_rays` `rnd_ray`, slice `k`, TR methods |
+| `'ray'`, 0 | `14·N·M + N` | blocks 0 to 14 (below) | `SC_lambda`; block 14: $\lambda_\tau$ | below | [[ssf_rays]] `rnd_ray`, method `'quadriga'` |
+| `'ray'`, `k` | `14·N·M + N` | blocks 0 to 14 (below), block 14 unused | `SC_lambda` | below | [[ssf_rays]] `rnd_ray`, slice `k`, TR methods |
 
 A `'ray'` set holds, with `M = NumSubPaths` and ray `m` of NLOS cluster `n` (both from 1), block `b`
 up to 12 in column `b·N·M + (n - 1)·M + m`, block 13 in column `13·N·M + n` and block 14 in column

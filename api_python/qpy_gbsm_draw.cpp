@@ -45,7 +45,7 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
 - **`floor_id`** — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901 Table 7.2-1, 0
   for outdoor UTs); int or float array; `None` or empty = floor 0; 2D mode only; `(n_link,)`; default: None
 - **`center_freq`** — Carrier frequencies in Hz (messages name it `center_frequency`); required by the shared `"ray"`
-  set, whose block 14 uses their mean cluster delay spread: pass the same list as to `ssf_rays` (another list gives
+  set, whose block 14 uses their mean cluster delay spread: pass the same list as to [[ssf_rays]] (another list gives
   other `quadriga` rays); ignored and not checked for all other sets; `(n_freq,)`; default: None
 - **`dual_mobility`** — `True`: Tx and Rx both move; default: False
 - **`horizontal`** — `True`: 2D mode (TR 38.901); `False`: 3D mode (legacy QuaDRiGa); default: True
@@ -57,6 +57,7 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
 - [[lsp_generate]] (the large-scale parameters from the `"lsf"` set)
 - [[path_loss]] (column 10 of the `"lsf"` set as `rnd_he`)
 - [[ssf_clusters]] (the clusters from the `"cluster"` sets)
+- [[ssf_rays]] (the rays from the `"ray"` sets)
 MD!*/
 
 py::array_t<double> gbsm_draw(py::handle scenpar,
