@@ -4,6 +4,9 @@
 
 #include "quadriga_gbsm.hpp"
 
+#include <cmath>
+#include <initializer_list>
+#include <stdexcept>
 #include <string>
 
 /*!SECTION
@@ -14,9 +17,15 @@ SECTION!*/
 # gbsm_rays_from_paths
 Ray data of one link from spherical path data (e.g. read with qrt_file_read)
 
-- Delays from the path lengths, angles from the scatterer positions, power = path gain
-- Fills a pre-initialised object in place; use the result with `link_gain_dB = 0` in [[ssf_paths]] and
-  [[gbsm_single_link_channel]]
+- Fills a [[gbsm_rays]] object in place (`fallback` cleared) from path data in the names and order of
+  [[qrt_file_read]], read with `downlink = true` (an uplink read swaps the ends and conjugates `M`)
+- `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
+  `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
+  GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
+- QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
+  NLOS; a GR path needs `path_type` (`no_int` for files of [[qrt_paths_from_scatterers]])
+- The GR point (`lbs_pos`) must be within 1 mm of z = 0; permittivity only for `drift` away from `tx_pos`, `rx_pos`
+- Use in [[ssf_paths]] and [[gbsm_single_link_channel]] with `link_gain_dB = 0` and without `kf_ratio`
 
 ## Declaration:
 ```
@@ -44,19 +53,13 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
 - **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
-- **`method`** *(optional)* — Value of `rays.method`: GR power law and default mobility
-- **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS; omitted: LOS where FBS = LBS on the direct
-  line, else NLOS; `[n_path]`
-- **`tap`** *(optional)* — Tap index; omitted: one tap per path; `[n_path]`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity; needed where a GR path is recomputed;
-  `[n_freq]`
+- **`method`** *(optional)* — Value of `rays.method`; sets the GR power law and the default mobility
+- **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
+- **`tap`** *(optional)* — Tap index; omitted: LOS 0, GR 3, the others 6, 9, ... in path order; `[n_path]`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; `[n_freq]`
 
 ## Output:
 - **`rays`** — Ray data with `n_ray = n_path`, see [[gbsm_rays]]
-
-## See also:
-- [[qrt_file_read]] (reads path data from QRT files)
-- [[ssf_paths]] (paths of one link at one position)
 MD!*/
 
 void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
@@ -74,21 +77,130 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
                                         const arma::vec *gr_eps_re,
                                         const arma::vec *gr_eps_im)
 {
-    // STUB: no computation yet; outputs sized with zeros
-    (void)tx_pos, (void)rx_pos, (void)lbs_pos, (void)path_gain, (void)path_length, (void)M, (void)path_type;
-    (void)tap, (void)gr_eps_re, (void)gr_eps_im;
+    const arma::uword n_freq = center_frequency.n_elem, n_path = fbs_pos.n_cols;
+    if (n_freq == 0)
+        throw std::invalid_argument("Input 'center_frequency' cannot be empty.");
+    if (!center_frequency.is_finite() || arma::any(center_frequency <= 0.0))
+        throw std::invalid_argument("Input 'center_frequency' must be finite and > 0.");
+    auto check_pos = [](const arma::vec &x, const std::string &name)
+    {
+        if (x.n_elem != 3)
+            throw std::invalid_argument("Input '" + name + "' must have 3 elements.");
+        if (!x.is_finite())
+            throw std::invalid_argument("Input '" + name + "' must be finite.");
+    };
+    check_pos(tx_pos, "tx_pos"), check_pos(rx_pos, "rx_pos");
+    if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || lbs_pos.n_cols != n_path)
+        throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have size [3, n_path].");
+    if (!fbs_pos.is_finite() || !lbs_pos.is_finite())
+        throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must be finite.");
+    if (path_gain.n_rows != n_path || path_gain.n_cols != n_freq)
+        throw std::invalid_argument("Input 'path_gain' must have size [n_path, n_freq].");
+    if (!path_gain.is_finite() || arma::any(arma::vectorise(path_gain) < 0.0))
+        throw std::invalid_argument("Input 'path_gain' must be finite and >= 0.");
+    if (path_length.n_elem != n_path)
+        throw std::invalid_argument("Input 'path_length' must have n_path elements.");
+    if (!path_length.is_finite() || arma::any(path_length < 0.0))
+        throw std::invalid_argument("Input 'path_length' must be finite and >= 0.");
+    if (M.n_rows != 8 || M.n_cols != n_path || M.n_slices != n_freq)
+        throw std::invalid_argument("Input 'M' must have size [8, n_path, n_freq].");
+    if (!M.is_finite())
+        throw std::invalid_argument("Input 'M' must be finite.");
+    if (method != "38.901" && method != "38.901_MF" && method != "quadriga")
+        throw std::invalid_argument("Input 'method' must be '38.901', '38.901_MF' or 'quadriga'.");
 
-    const arma::uword n_path = fbs_pos.n_cols, n_freq = center_frequency.n_elem;
+    auto dist = [](const double *a, const double *b)
+    {
+        const double x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
+        return std::sqrt(x * x + y * y + z * z);
+    };
+    const double *T = tx_pos.memptr(), *R = rx_pos.memptr(), d3D = dist(T, R);
+
+    // Path types: given, or LOS where FBS = LBS on the direct line (the LOS tolerance 0.1 mm of get_channels_*)
+    arma::uvec type(n_path);
+    if (path_type)
+    {
+        if (path_type->n_elem != n_path)
+            throw std::invalid_argument("Input 'path_type' must have n_path elements.");
+        if (arma::any(*path_type > 2))
+            throw std::invalid_argument("Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS).");
+        if (arma::accu(*path_type == 0) > 1 || arma::accu(*path_type == 1) > 1)
+            throw std::invalid_argument("Input 'path_type' can hold at most one LOS and one GR path.");
+        type = *path_type;
+    }
+    else
+    {
+        for (arma::uword p = 0; p < n_path; ++p)
+            type(p) = (dist(fbs_pos.colptr(p), lbs_pos.colptr(p)) <= 1.0e-4 && path_length(p) - d3D <= 1.0e-4) ? 0 : 2;
+        if (arma::accu(type == 0) > 1)
+            throw std::invalid_argument("More than one path matches the LOS geometry; pass 'path_type'.");
+    }
+    if (tap && tap->n_elem != n_path)
+        throw std::invalid_argument("Input 'tap' must have n_path elements.");
+    if ((gr_eps_re == nullptr) != (gr_eps_im == nullptr))
+        throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must both be given or both be omitted.");
+    if (gr_eps_re)
+    {
+        if (gr_eps_re->n_elem != n_freq || gr_eps_im->n_elem != n_freq)
+            throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must have n_freq elements.");
+        if (!gr_eps_re->is_finite() || !gr_eps_im->is_finite() || arma::any(*gr_eps_re < 1.0) ||
+            arma::any(*gr_eps_im < 0.0))
+            throw std::invalid_argument("Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
+    }
+    // 1 mm: float32 keeps z = 0 of a GR point for any x, y offset; a larger z means coordinates shifted in z
+    for (arma::uword p = 0; p < n_path; ++p)
+        if (type(p) == 1 && std::abs(lbs_pos(2, p)) > 1.0e-3)
+            throw std::invalid_argument("The interaction point of the GR path must be on the ground (z = 0); "
+                                        "shift local coordinates in x and y only.");
+
+    // Direction from O towards the first of the points P that differs from O; angles 0 if none differs
+    auto direction = [](const double *O, std::initializer_list<const double *> P, double &az, double &el)
+    {
+        az = 0.0, el = 0.0;
+        for (const double *x : P)
+            if (x[0] != O[0] || x[1] != O[1] || x[2] != O[2])
+            {
+                const double dx = x[0] - O[0], dy = x[1] - O[1], dz = x[2] - O[2];
+                az = std::atan2(dy, dx), el = std::atan2(dz, std::sqrt(dx * dx + dy * dy));
+                return;
+            }
+    };
+
+    rays.delay.set_size(n_path), rays.aod.set_size(n_path), rays.eod.set_size(n_path);
+    rays.aoa.set_size(n_path), rays.eoa.set_size(n_path);
+    const double R_img[3] = {R[0], R[1], -R[2]}, T_img[3] = {T[0], T[1], -T[2]};
+    for (arma::uword p = 0; p < n_path; ++p)
+    {
+        const double *F = fbs_pos.colptr(p), *B = lbs_pos.colptr(p);
+        rays.delay(p) = (path_length(p) - d3D) / 299792458.0;
+        if (type(p) == 1) // GR: towards the image points, also defined for an end on the ground
+            direction(T, {R_img}, rays.aod(p), rays.eod(p)), direction(R, {T_img}, rays.aoa(p), rays.eoa(p));
+        else
+            direction(T, {F, B, R}, rays.aod(p), rays.eod(p)), direction(R, {B, F, T}, rays.aoa(p), rays.eoa(p));
+    }
+
     rays.method = method;
-    rays.tx_pos.zeros(3), rays.rx_pos.zeros(3), rays.center_frequency.zeros(n_freq);
-    rays.delay.zeros(n_path), rays.power.zeros(n_path, n_freq);
-    rays.aod.zeros(n_path), rays.eod.zeros(n_path), rays.aoa.zeros(n_path), rays.eoa.zeros(n_path);
-    rays.M.zeros(8, n_path, n_freq), rays.path_type.zeros(n_path), rays.tap.zeros(n_path);
-    rays.fbs_pos.zeros(3, n_path), rays.lbs_pos.zeros(3, n_path);
-    if (!rays.gr_eps_re.empty())
-        rays.gr_eps_re.reset();
-    if (!rays.gr_eps_im.empty())
-        rays.gr_eps_im.reset();
+    rays.center_frequency = center_frequency, rays.tx_pos = tx_pos, rays.rx_pos = rx_pos;
+    rays.power = path_gain, rays.M = M, rays.fbs_pos = fbs_pos, rays.lbs_pos = lbs_pos;
+    rays.path_type = type;
+    if (tap)
+        rays.tap = *tap;
+    else // One slot per path: LOS 0, GR 3, the others 6, 9, ... in path order
+    {
+        rays.tap.set_size(n_path);
+        arma::uword slot = 2; // slot of the next NLOS path
+        for (arma::uword p = 0; p < n_path; ++p)
+            rays.tap(p) = (type(p) == 0) ? 0 : (type(p) == 1) ? 3 : 3 * slot++;
+    }
+    if (gr_eps_re)
+        rays.gr_eps_re = *gr_eps_re, rays.gr_eps_im = *gr_eps_im;
+    else
+    {
+        if (!rays.gr_eps_re.empty())
+            rays.gr_eps_re.reset();
+        if (!rays.gr_eps_im.empty())
+            rays.gr_eps_im.reset();
+    }
     if (!rays.fallback.empty())
         rays.fallback.reset();
 }
