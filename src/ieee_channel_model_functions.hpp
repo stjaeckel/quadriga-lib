@@ -14,6 +14,8 @@
 #include <cstddef>
 #include <optional>
 
+#include "quadriga_lib_helper_functions.hpp"
+
 // Generate channel parameters for the IEEE indoor channel models as defined by TGn, TGac, TGah and TGax
 // - Outputs non-zero paths and clusters where the max. n_path_out = n_cluster * n_path (+1) from the IEEE tables (+1 additional LOS cluster, if present)
 // - Sub-path aod and aoa do not include AP or Station orientation
@@ -381,8 +383,8 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
 
     // ---------- HELPER FUNCTIONS ----------
 
-    // Random number generator
-    static thread_local std::mt19937_64 rng;
+    // Random number generator; the draws use the portable helpers qd_rng_uniform and qd_rng_normal
+    std::mt19937_64 rng;
     if (seed != -1)
         rng.seed(seed);
     else
@@ -454,11 +456,9 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
             return;
         }
 
-        // RNG, Open-interval (0,1): avoid log(0)
-        std::uniform_real_distribution<double> U(std::nextafter(0.0, 1.0), std::nextafter(1.0, 0.0));
-
+        // Uniform in the open interval (0, 1) from the upper 52 bits of the generator output: avoids log(0)
         auto u01 = [&]
-        { return U(rng); };
+        { return ((double)(rng() >> 12) + 0.5) * (1.0 / 4503599627370496.0); };
 
         auto laplace_icdf = [](double u, double b)
         { return (u < 0.5) ? b * std::log(2.0 * u) : -b * std::log(2.0 * (1.0 - u)); };
@@ -542,13 +542,11 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         if (!M_local || XPR_lin <= 0.0)
             return;
 
-        std::uniform_real_distribution<double> U(0.0, 1.0);
-
         const double alpha = std::sqrt(XPR_lin / (1.0 + XPR_lin)); // co-pol magnitude
         const double beta = std::sqrt(1.0 / (1.0 + XPR_lin));      // cross-pol magnitude
 
-        const double phi0 = V_2PI * U(rng);  // common path phase
-        const double theta = V_2PI * U(rng); // **shared** absolute phase for both columns
+        const double phi0 = V_2PI * qd_rng_uniform(rng);  // common path phase
+        const double theta = V_2PI * qd_rng_uniform(rng); // **shared** absolute phase for both columns
 
         const double Delta = V_PI_2;            // ±90° for max lin→circ mixing
         const double theta_a = theta;           // column H
@@ -638,7 +636,6 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
     }
 
     // Generate Shadow Fading for each user
-    std::normal_distribution<double> N(0.0, 1.0);
     arma::vec Shadow_Fading_dB(n_users);
     for (arma::uword i_user = 0; i_user < n_users; ++i_user)
     {
@@ -659,7 +656,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
                 SF_std_dB = 1.5;
         }
 
-        Shadow_Fading_dB[i_user] = N(rng);     // standard normal sample
+        Shadow_Fading_dB[i_user] = qd_rng_normal(rng); // standard normal sample
         Shadow_Fading_dB[i_user] *= SF_std_dB; // Multiply by SF STD
     }
 

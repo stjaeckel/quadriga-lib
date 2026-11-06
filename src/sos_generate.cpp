@@ -167,7 +167,7 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
                 out[s] = std::cos(f * dn[s]);
     };
 
-    std::mt19937_64 rng = qd_sos_rng(seed);
+    std::mt19937_64 rng = qd_rng(seed);
 
     // Directions of the sinusoids and test directions, unit vectors
     std::vector<double> ux(n_coeff), uy(n_coeff), uz(n_coeff), tx(n_test), ty(n_test), tz(n_test), az(n_test), el(n_test);
@@ -177,9 +177,9 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
     else
         for (arma::uword n = 0; n < n_coeff; ++n)
         {
-            double a = two_pi * (qd_sos_uniform(rng) - 0.5), z = 0.0;
+            double a = two_pi * (qd_rng_uniform(rng) - 0.5), z = 0.0;
             if (n_dim == 3)
-                z = 2.0 * qd_sos_uniform(rng) - 1.0;
+                z = 2.0 * qd_rng_uniform(rng) - 1.0;
             double r = std::sqrt(1.0 - z * z);
             ux[n] = r * std::cos(a), uy[n] = r * std::sin(a), uz[n] = z;
         }
@@ -202,8 +202,8 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
         const double top = std::min(3.141592653589793, f_hi_n);
         for (arma::uword n = 0; n < n_coeff; ++n)
         {
-            double mag = (top > f_lo_n) ? f_lo_n + qd_sos_uniform(rng) * (top - f_lo_n) : f_lo_n;
-            fn[n] = (qd_sos_uniform(rng) < 0.5) ? -mag : mag;
+            double mag = (top > f_lo_n) ? f_lo_n + qd_rng_uniform(rng) * (top - f_lo_n) : f_lo_n;
+            fn[n] = (qd_rng_uniform(rng) < 0.5) ? -mag : mag;
         }
     }
 
@@ -316,7 +316,7 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
             }
 
             // A cosine does not have a sign of its frequency; it is drawn at random
-            if (qd_sos_uniform(rng) < 0.5)
+            if (qd_rng_uniform(rng) < 0.5)
                 f = -f;
 
             // Keep the new frequency only if the error over the test directions decreases

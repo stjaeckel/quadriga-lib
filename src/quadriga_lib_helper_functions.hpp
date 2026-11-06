@@ -16,6 +16,9 @@
 #include <stdexcept>
 #include <random>
 #include <cmath>
+#include <algorithm>
+#include <cstdint>
+#include <limits>
 
 // Calculate length
 template <typename dtype>
@@ -535,14 +538,13 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
     }
 }
 
-// ---- Helpers of the sum-of-sinusoids functions (sos_*.cpp) ----
-#include <algorithm>
-#include <cstdint>
-#include <limits>
+// ---- Portable random numbers ----
+// The draws are computed from the raw output of std::mt19937_64, whose sequence the C++ standard fixes. No
+// distribution class of the standard library is used, as their algorithms differ between platforms, so a seed gives
+// the same values on all platforms (up to the rounding of log and cos).
 
-// Random stream of the sum-of-sinusoids functions
-// A seed >= 0 gives the same stream on all platforms, -1 seeds from the system random device
-static inline std::mt19937_64 qd_sos_rng(arma::sword seed)
+// Random number generator: a seed >= 0 gives the same stream on all platforms, -1 seeds from the system random device
+static inline std::mt19937_64 qd_rng(arma::sword seed)
 {
     std::mt19937_64 rng;
     if (seed >= 0)
@@ -557,10 +559,20 @@ static inline std::mt19937_64 qd_sos_rng(arma::sword seed)
 }
 
 // Uniform random number in [0, 1) from the upper 53 bits of the generator output
-static inline double qd_sos_uniform(std::mt19937_64 &rng)
+static inline double qd_rng_uniform(std::mt19937_64 &rng)
 {
     return (double)(rng() >> 11) * (1.0 / 9007199254740992.0);
 }
+
+// Standard normal random number from two uniform draws (Box-Muller, cosine branch)
+static inline double qd_rng_normal(std::mt19937_64 &rng)
+{
+    const double u1 = 1.0 - qd_rng_uniform(rng); // (0, 1], avoids log(0)
+    const double u2 = qd_rng_uniform(rng);
+    return std::sqrt(-2.0 * std::log(u1)) * std::cos(6.283185307179586 * u2);
+}
+
+// ---- Helpers of the sum-of-sinusoids functions (sos_*.cpp) ----
 
 // Linear interpolation of a table y(x) at x0 (e.g. an ACF table y = acf at the distances x = dist), the last value
 // is used beyond the last sample point and the first value below the first sample point; 'x' must increase strictly

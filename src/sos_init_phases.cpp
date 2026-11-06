@@ -71,11 +71,11 @@ void quadriga_lib::sos_init_phases(arma::uword n_coeff,
     const double two_pi = 6.283185307179586;
     const dtype pi = (dtype)3.141592653589793;
 
-    std::mt19937_64 rng = qd_sos_rng(seed);
+    std::mt19937_64 rng = qd_rng(seed);
     dtype *p = phase.memptr();
     for (arma::uword i = 0; i < n_coeff * n_gen; ++i)
     {
-        dtype v = (dtype)(two_pi * (qd_sos_uniform(rng) - 0.5));
+        dtype v = (dtype)(two_pi * (qd_rng_uniform(rng) - 0.5));
         p[i] = (v >= pi) ? -pi : v; // A double just below pi can round up to pi in single precision
     }
 }
