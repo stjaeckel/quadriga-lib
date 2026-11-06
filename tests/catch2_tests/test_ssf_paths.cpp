@@ -413,6 +413,14 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
     const po_t o = pth(r, "drift");
     CHECK(arma::approx_equal(o.M.col(1), r.M.col(1), "absdiff", 0.0));
     CHECK(arma::approx_equal(o.gain.row(1), r.power.row(1), "absdiff", 0.0));
+
+    // Rx moved to directly below the Tx (vertical LOS): EOD -pi/2 and EOA +pi/2
+    const rays_t q = make_rays(16, true, true, 6, 2, "38.901", true);
+    const arma::vec Rv = {q.tx_pos(0), q.tx_pos(1), 1.5};
+    const po_t v = pth(q, "drift", nullptr, &Rv);
+    REQUIRE(v.type(0) == 0);
+    CHECK(std::abs(v.eod(0) + 0.5 * arma::datum::pi) < 1e-12);
+    CHECK(std::abs(v.eoa(0) - 0.5 * arma::datum::pi) < 1e-12);
 }
 
 TEST_CASE("ssf_paths - drift path lengths change by at most the displacement")
@@ -507,11 +515,13 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
         CHECK(std::abs(10.0 * std::log10(l2 / l3)) > 1e-3);
     }
 
-    // Far outside the table (fc·1e-9 - 52 beyond the int range): no loss, with and without oxygen
+    // The table ends at 52 and 68 GHz (0 dB/km) and far outside the table (fc·1e-9 - 52 beyond the int range): no
+    // loss, with and without oxygen
     rays_t h = r;
-    h.center_frequency(5) = 1e300;
+    h.center_frequency(0) = 52e9, h.center_frequency(4) = 68e9, h.center_frequency(5) = 1e300;
     const po_t c = pth(h, "phase", nullptr, &R), d = pth(h, "phase", nullptr, &R, nullptr, true);
-    CHECK(arma::approx_equal(c.gain.col(5), d.gain.col(5), "absdiff", 0.0));
+    for (arma::uword k : {0, 4, 5})
+        CHECK(arma::approx_equal(c.gain.col(k), d.gain.col(k), "absdiff", 0.0));
 }
 
 TEST_CASE("ssf_paths - auto mobility and optional outputs alone or together give the same values")

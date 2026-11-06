@@ -111,6 +111,11 @@ assertEqual( eo([1, 3, 4], :), ea([1, 3, 4], :) );
 assertTrue( max(abs(eo(2, 2:end) - ea(2, 2:end))) > 1e-3 );
 eo2 = ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, int32([ 0, 2, 0, 0 ]) );                % numeric, row
 assertEqual( eo2, eo );
+for cls = { 'uint8', 'int8', 'int16', 'single' }                              % any real class
+    assertEqual( ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, cast( [ 0; 1; 0; 0 ], cls{1} ) ), eo );
+end
+assert_throws( @() ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, { 0; 1; 0; 0 } ), ...
+    'Input ''o2i'' has an unsupported data type.' );
 assertEqual( ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, [] ), ea );
 
 %% Optional inputs: n_cluster (counts, no index shift)

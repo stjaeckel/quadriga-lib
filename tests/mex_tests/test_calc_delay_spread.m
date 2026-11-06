@@ -104,4 +104,10 @@ powers = [1.0, 1.0, 1.0, 1.0];
 assertTrue( mean_delay > 0 );
 assertTrue( ds > 0 );
 
+% --- Any real class: 8- and 16-bit integers and logical arrays as their double values ---
+[ds_i, mean_i] = quadriga_lib.calc_delay_spread( int8([0; 2; 5]), [true; false; true] );
+[ds_d, mean_d] = quadriga_lib.calc_delay_spread( [0; 2; 5], [1; 0; 1] );
+assertEqual( [ds_i, mean_i], [ds_d, mean_d] );
+assertEqual( quadriga_lib.calc_delay_spread( uint16([0; 2; 5]), [1; 0; 1] ), ds_d );
+
 end

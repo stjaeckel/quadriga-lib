@@ -44,7 +44,7 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 | `fbs_pos`, `lbs_pos` | `(3, n_kept)` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only |
 | `gr_pos` | `(3, n_snap)` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `(n_snap,)` | Link gain per snapshot |
-| `b_med`, `b_eff` | `(2,)` | Validity scales of [[ssf_scatterers]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m), NaN if a GR ray has an end below z = 0 |
+| `b_med`, `b_eff` | `(2,)` | Validity scales of [[ssf_scatterers]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
 | `limit` | `(2,)` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`"phase"`) or $0.2 b_{\mathrm{med}}$ (`"drift"`); Inf where b is NaN |
 | `ratio` | `(2,)` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `"drift"`: new segment from 2.5 |

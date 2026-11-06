@@ -56,7 +56,7 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 | `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only |
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `[n_snap]` | Link gain per snapshot |
-| `b_med`, `b_eff` | `[2]` | Of [[gbsm_rays]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m), NaN if a GR ray has an end below z = 0 |
+| `b_med`, `b_eff` | `[2]` | Of [[gbsm_rays]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
 | `limit` | `[2]` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`"phase"`) or $0.2 b_{\mathrm{med}}$ (`"drift"`); Inf where b is NaN |
 | `ratio` | `[2]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `"drift"`: new segment from 2.5 |
@@ -402,10 +402,16 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     // Validity report: b_med, b_eff at i_freq (without scatterers from the solved copy), limits per end
     // ("phase" sqrt(lambda · b_eff / 8), "drift" 0.2 · b_med, Inf where b is NaN) and the largest displacement
     // from the ray-data positions relative to the limit. A GR ray with an end below z = 0 (possible in "phase") has
-    // no specular point: no solved copy, b NaN.
-    const bool gr_below = arma::any(rr.path_type == 1) && (rr.tx_pos(2) < 0.0 || rr.rx_pos(2) < 0.0);
-    if (rr.fbs_pos.n_cols != n_kept && !gr_below)
+    // no specular point, which the solver needs: it is solved as an NLOS ray, since b uses no GR scatterer (b of the
+    // GR ray is its length by the image method).
+    if (rr.fbs_pos.n_cols != n_kept)
+    {
+        const arma::uvec type = rr.path_type;
+        if (rr.tx_pos(2) < 0.0 || rr.rx_pos(2) < 0.0)
+            rr.path_type.replace(1, 2);
         rr.solve_scatterers();
+        rr.path_type = type;
+    }
     const arma::vec b_med = rr.b_med(0), b_eff = rr.b_eff(0);
     arma::vec limit(2), ratio(2, arma::fill::zeros);
     for (int e = 0; e < 2; ++e)

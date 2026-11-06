@@ -608,6 +608,12 @@ inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
     "eoa", "M", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
 inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
 
+// Size of dimension d (0-based) of a MATLAB array, 1 beyond its dimensions; gives the shape of empty inputs
+inline arma::uword qd_mex_dim(const mxArray *a, mwSize d)
+{
+    return d < mxGetNumberOfDimensions(a) ? (arma::uword)mxGetDimensions(a)[d] : 1;
+}
+
 // Element i of a gbsm_rays struct array -> gbsm_rays
 // - Borrows the MATLAB memory (read-only) unless 'copy'; integer fields accept any real class (cast and checked)
 // - Missing optional fields mean empty; a missing other field or an unknown field throws, naming 'var_name'
@@ -628,11 +634,9 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
         if (mxGetFieldNumber(s, F[k].c_str()) < 0)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + F[k] + "' is missing in '" + var_name + "'.").c_str());
 
-    // Field data or nullptr (missing or unset); dimensions of an empty array
+    // Field data or nullptr (missing or unset)
     auto get = [&](const std::string &f) -> const mxArray *
     { return mxGetField(s, (mwIndex)i, f.c_str()); };
-    auto dim = [](const mxArray *a, mwSize d) -> arma::uword
-    { return d < mxGetNumberOfDimensions(a) ? (arma::uword)mxGetDimensions(a)[d] : 1; };
 
     quadriga_lib::gbsm_rays r;
     const mxArray *a = get("method");
@@ -656,7 +660,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
     auto mat = [&](const std::string &f, arma::mat &x)
     {
         if ((a = get(f)) != nullptr)
-            x = mxIsEmpty(a) ? arma::mat(dim(a, 0), dim(a, 1) * dim(a, 2))
+            x = mxIsEmpty(a) ? arma::mat(qd_mex_dim(a, 0), qd_mex_dim(a, 1) * qd_mex_dim(a, 2))
                              : qd_mex_get_Mat<double>(a, copy, var_name + "." + f);
     };
     col("tx_pos", r.tx_pos), col("rx_pos", r.rx_pos), col("center_frequency", r.center_frequency);
@@ -665,7 +669,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
     col("fallback", r.fallback);
     mat("power", r.power), mat("fbs_pos", r.fbs_pos), mat("lbs_pos", r.lbs_pos);
     if ((a = get("M")) != nullptr)
-        r.M = mxIsEmpty(a) ? arma::cube(dim(a, 0), dim(a, 1), dim(a, 2))
+        r.M = mxIsEmpty(a) ? arma::cube(qd_mex_dim(a, 0), qd_mex_dim(a, 1), qd_mex_dim(a, 2))
                            : qd_mex_get_Cube<double>(a, copy, var_name + ".M");
     return r;
 }

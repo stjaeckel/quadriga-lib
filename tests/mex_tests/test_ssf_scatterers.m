@@ -89,6 +89,13 @@ s.tap = mod( (1 : numel(s.tap))', 2 ) == 1;                                   % 
 rs = quadriga_lib.ssf_scatterers( s );
 assertTrue( islogical(rs.tap) );
 assertEqual( rs.tap, s.tap );
+s = rays(1);                                                                  % empty cell or struct: empty
+s.gr_eps_re = cell( 0, 1 );
+s.gr_eps_im = struct( [] );
+rs = quadriga_lib.ssf_scatterers( s );
+assertEqual( rs.fbs_pos, r.fbs_pos );
+assertEqual( { class(rs.gr_eps_re), size(rs.gr_eps_re), class(rs.gr_eps_im), size(rs.gr_eps_im) }, ...
+    { 'double', [0, 1], 'double', [0, 0] } );
 
 %% Errors
 assert_throws( @() quadriga_lib.ssf_scatterers(), 'Wrong number of input arguments.' );
