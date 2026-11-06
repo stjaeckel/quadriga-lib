@@ -2263,12 +2263,11 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 ### Inputs:
 - **`fn`** — Path of the conf file to write; string
 - **`scenpar`** — Scenario parameters; struct with any subset of the 171 fields returned by
-  [conf_file_read](#conf_file_read); real scalars of class double, single, int32, uint32, int64, uint64 or logical;
-  missing fields have their default; `[]` writes the default set
-- **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one
-  real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further
-  field, named without the prefix `PL_`, as returned by [conf_file_read](#conf_file_read); a matrix is an error;
-  written in struct order; if omitted or `[]`, no path-loss section
+  [conf_file_read](#conf_file_read); real scalars of any numeric class or logical; missing fields have their default; `[]` writes
+  the default set
+- **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one real vector (row
+  or column) of any numeric class per further field, named without the prefix `PL_`, as returned by
+  [conf_file_read](#conf_file_read); a matrix is an error; written in struct order; if omitted or `[]`, no path-loss section
 - **`short_names`** *(optional)* — Short names of the scenario; cell array of strings or one string;
   each one name of the characters `A-Z`, `a-z`, `0-9`, `_`; distinct
 - **`ref`** — Literature reference; written in the header and before each non-empty entry of
@@ -2434,6 +2433,11 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 ### Output:
 - **`rays`** — Ray struct with `n_ray = n_path`, see [ssf_rays](#ssf_rays)
 
+### See also:
+- [qrt_file_read](#qrt_file_read) (source of the path data)
+- [ssf_paths](#ssf_paths) (paths at other positions)
+- [gbsm_single_link_channel](#gbsm_single_link_channel) (channel coefficients of the link)
+
 ---
 <a id="gbsm_single_link_channel"></a>
 ## gbsm_single_link_channel
@@ -2472,7 +2476,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 | `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `'drift'` with `'taps'` only |
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `'drift'` with `'taps'` and a GR ray only |
 | `link_gain_dB` | `[n_snap, 1]` | Link gain per snapshot |
-| `b_med`, `b_eff` | `[2, 1]` | Validity scales of [ssf_scatterers](#ssf_scatterers) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
+| `b_med`, `b_eff` | `[2, 1]` | Validity scales of [ssf_scatterers](#ssf_scatterers) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m), NaN if a GR ray has an end below z = 0 |
 | `limit` | `[2, 1]` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`'phase'`) or $0.2 b_{\mathrm{med}}$ (`'drift'`); Inf where b is NaN |
 | `ratio` | `[2, 1]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `'drift'`: new segment from 2.5 |
@@ -2825,8 +2829,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#scenpar_validate) · [Python](quadriga_li
 
 ### Inputs:
 - **`scenpar_in`** *(optional)* — Scenario parameters; struct with any subset of the 171 fields;
-  numeric fields are real scalars of class double, single, int32, uint32, int64, uint64 or
-  logical; if omitted or empty, the default set is returned
+  numeric fields are real scalars of any numeric class or logical; if omitted or empty, the default set is returned
 - **`validate`** — `false`: only complete with defaults, no value checks; default: true
 
 ### Outputs:
@@ -2950,7 +2953,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [Python](quadriga_lib_api_p
 
 | Quantity | `'phase'` | `'drift'` |
 | --- | --- | --- |
-| Path length | `norm(rays.rx_pos - rays.tx_pos) + c·delay` | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
+| Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
 | `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `[3, 0]` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
@@ -3015,7 +3018,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_rays) · [Python](quadriga_lib_api_py
   other links of the call
 - Ray layout per link, fixed per scenario: ray 1 LOS, 2 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` (both
   from 1) at `1 + G + (n - 1)·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays
-- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_per)/R of
+- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R of
   the ground reflection (TR eqs. (7.6-38) to (7.6-40))
 - NLOS rays: power P_n/M; offsets of Table 7.5-3 scaled by the cluster spreads; coupling (step 8) by the rank blocks
   of `rnd_ray`; `M` other than 20: QuaDRiGa-NG's offsets below 20, Laplacian quantiles above 20, no sub-clusters
@@ -3039,7 +3042,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_rays) · [Python](quadriga_lib_api_py
   within 1 mm count as equal; the Tx if all tie); the Rx as owner transposes it
 - Swap reciprocity: with mirrored inputs (dual mobility in [gbsm_draw](#gbsm_draw), mirrored LSPs and clusters,
   `PerClusterAS_D` = `PerClusterAS_A`, `PerClusterES_D` = `PerClusterES_A`, `PerClusterES_D_scale` = 0), swapping
-  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M`
+  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = 'quadriga'`
+  with ends within 1 mm of each other, where the Tx stays the owner)
 - Messages name the argument `center_freq` as `'center_frequency'`
 
 ### Ray struct:
@@ -3054,7 +3058,7 @@ concatenate the fields.
 | `method` | string | char | `'38.901'`, `'38.901_MF'` or `'quadriga'`; GR power law and default mobility | yes |
 | `tx_pos`, `rx_pos` | `[3, 1]` | double | Tx and Rx position the ray data refer to in [m] | yes |
 | `center_frequency` | `[n_freq, 1]` | double | Carrier frequencies in [Hz] | yes |
-| `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay `norm(rx_pos - tx_pos) / c` | yes |
+| `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |
 | `M` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | yes |
@@ -3109,16 +3113,18 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 Also in: [C++](quadriga_lib_api_cpp.md#.solve_scatterers) · [Python](quadriga_lib_api_python.md#ssf_scatterers)
 
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
-  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length `norm(rx_pos - tx_pos) + c·delay`
-  and the angles are exact
+  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
+  distance) and the angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
   ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
-  `d_min` = 2 m this applies to 5.5 to 9.6 % of the rays of the TR methods without absolute TOA and to at most
-  2.3 % otherwise; it adds a median delay of 0.2 to 4.6 ns (p99 up to 21.7 ns)
+  `d_min` = 2 m (UMi, UMa, RMa, InF and indoor scenarios) this applies to 5.5 to 13 % of the rays of the TR methods
+  without absolute TOA, to 1.0 to 9.8 % in `'quadriga'` and to at most 2.3 % with absolute TOA; it adds a median
+  delay of up to 5.5 ns (p99 up to 21.7 ns)
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
-- `rays_out` is a copy of `rays_in` (all fields, about 49 KB per link at 381 rays and one frequency) with new
-  `fbs_pos`, `lbs_pos` and `fallback`; `rays_in` is not changed, also when it already holds scatterers
+- `rays_out` is a copy of `rays_in` (all fields, about 49 KB per link at 381 rays and one frequency; unchanged fields
+  keep their class) with new `fbs_pos`, `lbs_pos` and `fallback`; `rays_in` is not changed, also when it already
+  holds scatterers
 - `b_med` and `b_eff` are the validity scales of [ssf_paths](#ssf_paths) for planning segments: `b_med` the lower
   power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 (`drift`, NaN
   without NLOS power); $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power

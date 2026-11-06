@@ -93,6 +93,9 @@ class test_case(unittest.TestCase):
         self.assertEqual(r3["gr_eps"].dtype, np.complex128)
         r4 = gbsm.rays_from_paths(*self.args, path_type=self.pt, gr_eps=[5.0, 7.0])  # real: imaginary part 0
         npt.assert_array_equal(r4["gr_eps"], [5.0, 7.0])
+        r5 = gbsm.rays_from_paths(*self.args, path_type=self.pt, gr_eps=np.zeros(0, complex))  # empty: as None
+        self.assertEqual(r5["gr_eps"].size, 0)
+        self.assertEqual(r5["gr_eps"].dtype, np.complex128)
 
     def test_array_handling(self):
         args = (list(self.fc), self.tx.astype(np.float32), self.rx, np.asfortranarray(self.fb),

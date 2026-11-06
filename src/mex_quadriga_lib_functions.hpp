@@ -601,10 +601,12 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
 
 // -------------------------------- gbsm_rays struct --------------------------------
 
-// Field names of the gbsm_rays struct in their order; the last five are optional as input (missing = empty)
+// Field names of the gbsm_rays struct in their order; the first qd_mex_gbsm_rays_n_required are required as input,
+// the others optional (missing = empty), also any field appended later
 inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
     "method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa",
     "eoa", "M", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
+inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
 
 // Element i of a gbsm_rays struct array -> gbsm_rays
 // - Borrows the MATLAB memory (read-only) unless 'copy'; integer fields accept any real class (cast and checked)
@@ -622,7 +624,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
             const std::string msg = "Unknown field '" + std::string(mxGetFieldNameByNumber(s, f)) + "' in '" + var_name + "'.";
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
         }
-    for (size_t k = 0; k < 13; ++k)
+    for (size_t k = 0; k < qd_mex_gbsm_rays_n_required; ++k)
         if (mxGetFieldNumber(s, F[k].c_str()) < 0)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + F[k] + "' is missing in '" + var_name + "'.").c_str());
 

@@ -114,7 +114,9 @@ vs = quadriga_lib.scenpar_validate( struct('DS_VS', 4), false );
 assertEqual( vs.DS_VS, 4 );
 
 % Errors of the shared helpers carry the identifier of the library
-assert_identifier( @() quadriga_lib.scenpar_validate( struct('NumClusters', int8(7)) ), 'quadriga_lib:CPPerror' );
+assert_identifier( @() quadriga_lib.scenpar_validate( struct('NumClusters', 7 + 1i) ), 'quadriga_lib:CPPerror' );
+vi = quadriga_lib.scenpar_validate( struct('NumClusters', int8(7)) );            % all real classes are read
+assertEqual( vi.NumClusters, 7 );
 
 end
 

@@ -274,6 +274,8 @@ TEST_CASE("qrt_paths_from_scatterers - input validation")
     {
         fails([](R &r, U &) { r.path_type.resize(3); }, "Input 'path_type' must have n_path elements.");
         fails([](R &r, U &) { r.path_type(3) = 3; }, "Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS).");
+        fails([](R &r, U &) { r.path_type(3) = 0; }, "Input 'path_type' can hold at most one LOS and one GR path.");
+        fails([](R &r, U &) { r.path_type(3) = 1; }, "Input 'path_type' can hold at most one LOS and one GR path.");
     }
     SECTION("i_cir")
     {
@@ -287,5 +289,15 @@ TEST_CASE("qrt_paths_from_scatterers - input validation")
         R r = base;
         r.rx_pos = r.tx_pos, r.path_type(0) = 2;
         CHECK_NOTHROW(paths_of(r));
+        // Ends 1 nm apart: length 1e-9 m in double, 0 in the float32 coordinates that qrt_file_read uses
+        fails([](R &r, U &) { r.rx_pos = r.tx_pos + arma::vec{0.0, 0.0, 1e-9}; },
+              "Inputs 'tx_pos' and 'rx_pos' must differ for a path of zero length.");
+    }
+    SECTION("float32 range")
+    {
+        fails([](R &r, U &) { r.fbs_pos(0, 3) = 1e39; },
+              "Inputs 'tx_pos', 'rx_pos', 'fbs_pos' and 'lbs_pos' must be within the float32 range of QRT files.");
+        fails([](R &r, U &) { r.power(2, 0) = 1e80; },
+              "Inputs 'path_gain' and 'M' give stored Jones matrices beyond the float32 range of QRT files.");
     }
 }

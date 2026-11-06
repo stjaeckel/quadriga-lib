@@ -287,7 +287,7 @@ TEST_CASE("ssf_rays - rotation angle model equals additive at the horizon and ke
     }
 }
 
-TEST_CASE("ssf_rays - rotation polarisation model is NG's matrix with the owner-end rule")
+TEST_CASE("ssf_rays - rotation polarisation model is QuaDRiGa-NG's matrix with the owner-end rule")
 {
     // One link per position pair, Rx = Tx + (dz, dx, dy); the owner end has the larger z, then x, then y, with ties
     // within 1 mm, and is the Tx if all three tie. NLOS rays: J = e^(j·Phi)·[[c·e^(-j·kappa), s·e^(j·kappa)],

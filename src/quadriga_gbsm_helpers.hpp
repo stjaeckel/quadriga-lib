@@ -11,15 +11,19 @@
 //   qd_gbsm_check_links   common validation of tx_pos / rx_pos     qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp,
 //                                                                  ssf_clusters.cpp, ssf_rays.cpp
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
-//                                                                  o2i_loss.cpp, ssf_rays.cpp
+//                                                                  o2i_loss.cpp, ssf_rays.cpp, qd_gbsm_phases.cpp
 //   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
 //                                                                  gbsm_init_phases
 //   qd_gbsm_n_gen         number of generators of a random set     qd_gbsm_phases.cpp, MEX and Python wrappers of
 //                                                                  gbsm_init_phases
-//   qd_gbsm_ray_layout    ray and generator counts of a scenario   qd_gbsm_n_gen, ssf_rays.cpp, MEX and Python
-//                                                                  wrappers of ssf_rays
+//   qd_gbsm_ray_layout    ray and generator counts of a scenario   qd_gbsm_n_gen, qd_gbsm_phases.cpp, ssf_rays.cpp,
+//                                                                  MEX and Python wrappers of ssf_rays
 //   qd_gbsm_cds           cluster delay spread c_DS at a frequency qd_gbsm_phases.cpp, ssf_rays.cpp
 //   qd_gbsm_fresnel       reflection coefficients of the ground    ssf_rays.cpp, ssf_paths.cpp
+//   qd_gbsm_dist          distance of two points                   qd_gbsm_rays.cpp, ssf_paths.cpp,
+//                                                                  gbsm_rays_from_paths.cpp
+//   qd_gbsm_direction     angles towards the next distinct point   ssf_paths.cpp, gbsm_rays_from_paths.cpp
+//   qd_gbsm_specular_point  ground reflection point on z = 0       qd_gbsm_rays.cpp, ssf_paths.cpp
 //   qd_gbsm_lsp_stats     LSP mean and std per link and frequency  lsp_generate.cpp, path_loss.cpp
 //   qd_gbsm_chol8         Cholesky factorization of an 8x8 matrix  lsp_generate.cpp, qd_scenpar.cpp
 //
@@ -37,6 +41,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -132,6 +137,33 @@ static inline void qd_gbsm_fresnel(double eps_re, double eps_im, double h_t, dou
     const std::complex<double> q = std::sqrt(eps - s2), a = eps * ct, d_par = a - q, d_per = ct - q;
     R_par = (d_par == 0.0) ? std::complex<double>(0.0) : (a + q) / d_par;
     R_per = (d_per == 0.0) ? std::complex<double>(0.0) : (ct + q) / d_per;
+}
+
+// Distance of the points a and b in [m], [3] each
+static inline double qd_gbsm_dist(const double *a, const double *b)
+{
+    return qd_calc_length(a[0], a[1], a[2], b[0], b[1], b[2]);
+}
+
+// Azimuth and elevation in [rad] from O towards the first of the points P that differs from O; 0 if none differs
+static inline void qd_gbsm_direction(const double *O, std::initializer_list<const double *> P, double &az, double &el)
+{
+    az = 0.0, el = 0.0;
+    for (const double *x : P)
+        if (x[0] != O[0] || x[1] != O[1] || x[2] != O[2])
+        {
+            const double dx = x[0] - O[0], dy = x[1] - O[1], dz = x[2] - O[2];
+            az = std::atan2(dy, dx), el = std::atan2(dz, std::sqrt(dx * dx + dy * dy));
+            return;
+        }
+}
+
+// Specular point G on z = 0 of the ground reflection between T and R (z >= 0): G = T + h_t / (h_t + h_r)·(R' - T)
+// with R' = (R_x, R_y, -R_z); both ends on the ground: the midpoint
+static inline void qd_gbsm_specular_point(const double *T, const double *R, double *G)
+{
+    const double h = T[2] + R[2], s = (h > 0.0) ? T[2] / h : 0.5;
+    G[0] = T[0] + s * (R[0] - T[0]), G[1] = T[1] + s * (R[1] - T[1]), G[2] = 0.0;
 }
 
 // LSP mean and std per link and frequency of a completed scenpar

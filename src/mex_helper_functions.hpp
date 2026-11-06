@@ -104,6 +104,41 @@ inline dtype qd_mex_cast(stype v, bool &bad)
     return ok ? (dtype)v : dtype(0);
 }
 
+// Helper: calls f with a typed pointer to the data of a real numeric or logical array (all integer classes, single,
+// double, logical); returns false for any other class
+template <typename F>
+inline bool qd_mex_visit_data(const mxArray *input, F &&f)
+{
+    const void *d = mxGetData(input);
+    switch (mxGetClassID(input))
+    {
+    case mxDOUBLE_CLASS:
+        return f((const double *)d), true;
+    case mxSINGLE_CLASS:
+        return f((const float *)d), true;
+    case mxINT8_CLASS:
+        return f((const signed char *)d), true;
+    case mxUINT8_CLASS:
+        return f((const unsigned char *)d), true;
+    case mxINT16_CLASS:
+        return f((const short *)d), true;
+    case mxUINT16_CLASS:
+        return f((const unsigned short *)d), true;
+    case mxINT32_CLASS:
+        return f((const int *)d), true;
+    case mxUINT32_CLASS:
+        return f((const unsigned *)d), true;
+    case mxINT64_CLASS:
+        return f((const long long *)d), true;
+    case mxUINT64_CLASS:
+        return f((const unsigned long long *)d), true;
+    case mxLOGICAL_CLASS:
+        return f((const mxLogical *)d), true;
+    default:
+        return false;
+    }
+}
+
 // Helper: error for integer input that does not fit dtype, e.g. "Input 'x' must be an integer from 0 to 4294967295."
 template <typename dtype>
 inline void qd_mex_integer_error(const std::string &var_name, bool scalar)
@@ -165,22 +200,11 @@ inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_nam
 
     qd_mex_check_input(input, var_name); // Rejects complex and sparse input
 
-    // Assign the MATLAB data to the correct pointer; integer classes are read without a detour through double
-    if (mxIsDouble(input))
-        return qd_mex_cast<dtype>(*(const double *)mxGetData(input), bad);
-    else if (mxIsSingle(input))
-        return qd_mex_cast<dtype>(*(const float *)mxGetData(input), bad);
-    else if (mxIsClass(input, "uint32"))
-        return qd_mex_cast<dtype>(*(const unsigned *)mxGetData(input), bad);
-    else if (mxIsClass(input, "int32"))
-        return qd_mex_cast<dtype>(*(const int *)mxGetData(input), bad);
-    else if (mxIsClass(input, "uint64"))
-        return qd_mex_cast<dtype>(*(const unsigned long long *)mxGetData(input), bad);
-    else if (mxIsClass(input, "int64"))
-        return qd_mex_cast<dtype>(*(const long long *)mxGetData(input), bad);
-    else if (mxIsClass(input, "logical"))
-        return qd_mex_cast<dtype>(*(const bool *)mxGetData(input), bad);
-    else if (var_name.empty())
+    // Integer classes are read without a detour through double
+    dtype value = default_value;
+    if (qd_mex_visit_data(input, [&](auto *p) { value = qd_mex_cast<dtype>(*p, bad); }))
+        return value;
+    if (var_name.empty())
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
     else
     {
@@ -436,19 +460,7 @@ inline void qd_mex_copy_convert(const mxArray *input, dtype *ptr, size_t n_data,
             ptr[m] = qd_mex_cast<dtype>(src[m], b);
         bad = b;
     };
-    if (qd_mex_type_matches<double>(input))
-        copy((const double *)mxGetData(input));
-    else if (qd_mex_type_matches<float>(input))
-        copy((const float *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned>(input))
-        copy((const unsigned *)mxGetData(input));
-    else if (qd_mex_type_matches<int>(input))
-        copy((const int *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned long long>(input))
-        copy((const unsigned long long *)mxGetData(input));
-    else if (qd_mex_type_matches<long long>(input))
-        copy((const long long *)mxGetData(input));
-    else
+    if (!qd_mex_visit_data(input, copy))
     {
         std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
@@ -523,19 +535,7 @@ inline std::vector<arma::Cube<dtype>> qd_mex_typecast_CubeVec(const mxArray *inp
         bad = b;
     };
 
-    if (qd_mex_type_matches<double>(input))
-        copy((const double *)mxGetData(input));
-    else if (qd_mex_type_matches<float>(input))
-        copy((const float *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned>(input))
-        copy((const unsigned *)mxGetData(input));
-    else if (qd_mex_type_matches<int>(input))
-        copy((const int *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned long long>(input))
-        copy((const unsigned long long *)mxGetData(input));
-    else if (qd_mex_type_matches<long long>(input))
-        copy((const long long *)mxGetData(input));
-    else
+    if (!qd_mex_visit_data(input, copy))
     {
         std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());

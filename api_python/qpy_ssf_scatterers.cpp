@@ -13,17 +13,19 @@ SECTION!*/
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal distances
-  from their end, so that the polyline Tx, FBS, LBS, Rx has the length `norm(rx_pos - tx_pos) + c·delay` and the
-  angles are exact
+  from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx distance) and
+  the angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
   ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With `d_min`
-  = 2 m this applies to 5.5 to 9.6 % of the rays of the TR methods without absolute TOA and to at most 2.3 %
-  otherwise; it adds a median delay of 0.2 to 4.6 ns (p99 up to 21.7 ns)
+  = 2 m (UMi, UMa, RMa, InF and indoor scenarios) this applies to 5.5 to 13 % of the rays of the TR methods without
+  absolute TOA, to 1.0 to 9.8 % in `"quadriga"` and to at most 2.3 % with absolute TOA; it adds a median delay of up
+  to 5.5 ns (p99 up to 21.7 ns)
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
-- `rays_out` is a new dict with all keys; it shares the unchanged arrays with `rays` (no copy: an in-place edit of
-  `rays_out["delay"]` changes `rays["delay"]`) and has new arrays `fbs_pos`, `lbs_pos` and `fallback`; `rays` and its
-  arrays are not changed, also when it already holds scatterers
+- `rays_out` is a new dict with all keys; it shares the unchanged entries with `rays` as they are (no copy and no
+  conversion: a list stays a list, and an in-place edit of `rays_out["delay"]` changes `rays["delay"]`) and has new
+  arrays `fbs_pos`, `lbs_pos` and `fallback`; `rays` and its arrays are not changed, also when it already holds
+  scatterers
 - `b_med` and `b_eff` are the validity scales of [[ssf_paths]] for planning segments: `b_med` the lower power-weighted
   median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 (`drift`, NaN without NLOS
   power); $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power $P > 0$, with $b$ the

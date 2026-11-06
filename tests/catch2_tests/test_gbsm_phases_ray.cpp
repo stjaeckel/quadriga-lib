@@ -351,6 +351,15 @@ TEST_CASE("gbsm_draw - ray: block 14 of the shared set uses lambda_tau")
     const arma::vec f10 = {10e9};
     CHECK(lambda_tau(sp, f10) == 0.1);
     check_set(sp, f10, 0.1, 12.0);
+
+    // Clamps of 1.6·c·cDS/cASA at cDS = 11 ns: cASA = 1e4 deg gives 0.030 m (-> 0.1 m), 1e-4 deg 3.0e6 m (-> 10 km)
+    sp = scen(2.0, 2.0, 12.0);
+    sp["PerClusterAS_A"] = 1e4;
+    CHECK(lambda_tau(sp, f35) == 0.1);
+    check_set(sp, f35, 0.1, 12.0);
+    sp["PerClusterAS_A"] = 1e-4;
+    CHECK(lambda_tau(sp, f35) == 1e4);
+    check_set(sp, f35, 1e4, 12.0);
 }
 
 TEST_CASE("gbsm_draw - ray: swapping Tx and Rx exchanges the mirror blocks")

@@ -39,10 +39,15 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`method`** — Value of `rays["method"]`; sets the GR power law and the default mobility; default: `"quadriga"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `(n_path,)`; default: None
 - **`tap`** — Tap index; `None`: LOS 0, GR 3, the others 6, 9, ... in path order; `(n_path,)`; default: None
-- **`gr_eps`** — Ground permittivity (complex), used as `real - j·imag`; `(n_freq,)`; default: None
+- **`gr_eps`** — Ground permittivity (complex), used as `real - j·imag`; `(n_freq,)`; default: None (also if empty)
 
 ## Output:
 - **`rays`** — Ray dict with `n_ray = n_path`, see [[ssf_rays]]
+
+## See also:
+- [[qrt_file_read]] (source of the path data)
+- [[ssf_paths]] (paths at other positions)
+- [[gbsm.single_link_channel]] (channel coefficients of the link)
 MD!*/
 
 py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
@@ -70,7 +75,7 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
     const auto path_type_a = qd_python_uword_entries(path_type, "path_type");
     const auto tap_a = qd_python_uword_entries(tap, "tap");
 
-    // Complex permittivity -> real and imaginary part (copies)
+    // Complex permittivity -> real and imaginary part (copies); empty as None (the 'gr_eps' of ssf_rays without GR)
     arma::vec gr_eps_re, gr_eps_im;
     if (!gr_eps.is_none())
     {
@@ -78,20 +83,21 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
         qd_python_copy2arma(py::cast<py::array_t<std::complex<double>>>(gr_eps), re, im);
         gr_eps_re = arma::vectorise(re), gr_eps_im = arma::vectorise(im);
     }
+    const bool has_gr = !gr_eps_re.empty();
 
     // Output dict in numpy memory (n_path from 'fbs_pos'; wrong sizes throw in the library call before any write)
     std::vector<quadriga_lib::gbsm_rays> rays;
-    py::list rays_py = qd_python_init_gbsm_rays(1, fbs_pos_a.n_cols, center_freq_a.n_elem, !gr_eps.is_none(), true, rays);
+    py::list rays_py = qd_python_init_gbsm_rays(1, fbs_pos_a.n_cols, center_freq_a.n_elem, has_gr, true, rays);
 
     quadriga_lib::gbsm_rays_from_paths(center_freq_a, tx_pos_a, rx_pos_a, fbs_pos_a, lbs_pos_a, path_gain_a,
                                        path_length_a, M_a, rays[0], method,
                                        path_type.is_none() ? nullptr : &path_type_a, tap.is_none() ? nullptr : &tap_a,
-                                       gr_eps.is_none() ? nullptr : &gr_eps_re, gr_eps.is_none() ? nullptr : &gr_eps_im);
+                                       has_gr ? &gr_eps_re : nullptr, has_gr ? &gr_eps_im : nullptr);
 
     // The method string and the complex permittivity cannot be aliased
     py::dict rays_out = rays_py[0];
     rays_out["method"] = rays[0].method;
-    if (!gr_eps.is_none())
+    if (has_gr)
         rays_out["gr_eps"] = qd_python_copy2numpy<double, std::complex<double>>(&rays[0].gr_eps_re, &rays[0].gr_eps_im);
     return rays_out;
 }

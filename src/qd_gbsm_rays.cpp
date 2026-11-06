@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -30,11 +31,10 @@ static double qd_rays_end_dist(const quadriga_lib::gbsm_rays &r, arma::uword i, 
 {
     const double *T = r.tx_pos.memptr(), *R = r.rx_pos.memptr();
     const double *P = (r.path_type(i) == 2) ? (e == 0 ? r.fbs_pos.colptr(i) : r.lbs_pos.colptr(i)) : nullptr;
-    const double *E = (e == 0) ? T : R;
-    const double dz = (r.path_type(i) == 1) ? T[2] + R[2] : T[2] - R[2];
+    const double R_img[3] = {R[0], R[1], -R[2]};
     if (P == nullptr) // LOS, GR
-        return std::sqrt((T[0] - R[0]) * (T[0] - R[0]) + (T[1] - R[1]) * (T[1] - R[1]) + dz * dz);
-    return std::sqrt((P[0] - E[0]) * (P[0] - E[0]) + (P[1] - E[1]) * (P[1] - E[1]) + (P[2] - E[2]) * (P[2] - E[2]));
+        return qd_gbsm_dist(T, (r.path_type(i) == 1) ? R_img : R);
+    return qd_gbsm_dist(P, (e == 0) ? T : R);
 }
 
 /*!SECTION
@@ -53,6 +53,9 @@ Ray data of one link (geometry-based stochastic model)
 - Rays from several sources in one object: at most one LOS and one GR ray, with tap index 0 and 3; the other rays
   take any other tap indices; one `method` for all rays; `.solve_scatterers` overwrites given scatterers, so solve
   rays without scatterers in a separate object and concatenate the attributes
+- Extreme but finite inputs overflow: XPR, polarization or spread statistics far outside the TR tables (e.g. 1000 dB)
+  give rays that `is_valid()` rejects by attribute, not by input, in the consumer; `kf_ratio` or positions near the
+  range of double give outputs of [[ssf_paths]] that are not finite
 
 ## Attributes:
 | Attribute | Size | Meaning | Set by |
@@ -60,7 +63,7 @@ Ray data of one link (geometry-based stochastic model)
 | `method` | string | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
 | `tx_pos`, `rx_pos` | `[3]` | Tx and Rx position the ray data refer to in [m] | all |
 | `center_frequency` | `[n_freq]` | Carrier frequencies in [Hz] | all |
-| `delay` | `[n_ray]` | Delays in [s] relative to the LOS delay `abs(rx_pos - tx_pos) / c` | all |
+| `delay` | `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
 | `M` | `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | all |
@@ -233,13 +236,14 @@ arma::vec quadriga_lib::gbsm_rays::b_eff(arma::uword i_freq) const
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
-  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length `abs(rx_pos - tx_pos) + c·delay`
-  and the angles are exact
+  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
+  distance) and the angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
   ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
-  `d_min` = 2 m this applies to 5.5 to 9.6 % of the rays of the TR methods without absolute TOA (the first cluster
-  has zero excess delay) and to at most 2.3 % otherwise; it adds a median delay of 0.2 to 4.6 ns (p99 up to 21.7 ns)
-  and changes the delay spread of a link by up to 4.1 % (p99)
+  `d_min` = 2 m (UMi, UMa, RMa, InF and indoor scenarios) this applies to 5.5 to 13 % of the rays of the TR methods
+  without absolute TOA (the first cluster has zero excess delay), to 1.0 to 9.8 % in `"quadriga"` and to at most
+  2.3 % with absolute TOA; it adds a median delay of up to 5.5 ns (p99 up to 21.7 ns) and changes the delay spread
+  of a link at p99 by up to 4.1 % in UMi, UMa and InF, 10 % indoor and 21 % in RMa LOS (small LOS delay spreads)
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
 - Writes `fbs_pos`, `lbs_pos` and `fallback` of all rays and overwrites given scatterers; nothing else changes;
@@ -283,10 +287,8 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
     const double DD = D[0] * D[0] + D[1] * D[1] + D[2] * D[2], d3D = std::sqrt(DD);
     const double mid[3] = {0.5 * (T[0] + R[0]), 0.5 * (T[1] + R[1]), 0.5 * (T[2] + R[2])};
 
-    // Specular point on z = 0: G = T + h_t / (h_t + h_r)·(R' - T) with R' = (R_x, R_y, -R_z); both ends on the
-    // ground: the midpoint
-    const double h = T[2] + R[2], g = (h > 0.0) ? T[2] / h : 0.5;
-    const double G[3] = {T[0] + g * (R[0] - T[0]), T[1] + g * (R[1] - T[1]), 0.0};
+    double G[3];
+    qd_gbsm_specular_point(T, R, G);
 
     for (arma::uword i = 0; i < n; ++i)
     {
@@ -319,7 +321,7 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min)
         const double w[3] = {ud[0] - ua[0], ud[1] - ua[1], ud[2] - ua[2]};
         const double L = d3D + 299792458.0 * delay(i);
         double s = 0.0;
-        if (L > d3D) // not C > 0, which also holds for L < -d3D
+        if (L > d3D) // zero or negative excess length: fallback (also avoids the 0 / 0 of L = -d3D)
         {
             const double A = std::max(4.0 - (w[0] * w[0] + w[1] * w[1] + w[2] * w[2]), 0.0);
             const double Bq = 4.0 * L + 2.0 * (D[0] * w[0] + D[1] * w[1] + D[2] * w[2]), C = L * L - DD;

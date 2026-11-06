@@ -22,7 +22,7 @@ Antenna-free paths of one link at one position
 
 | Quantity | `"phase"` | `"drift"` |
 | --- | --- | --- |
-| Path length | `norm(rx_pos - tx_pos) + c·delay` of `rays` | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
+| Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
 | `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `(3, 0)` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |

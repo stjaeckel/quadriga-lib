@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <any>
 #include <cmath>
+#include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -55,7 +56,7 @@ Channel coefficients of one link at one frequency over one segment (geometry-bas
 | `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only |
 | `gr_pos` | `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `[n_snap]` | Link gain per snapshot |
-| `b_med`, `b_eff` | `[2]` | Of [[gbsm_rays]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
+| `b_med`, `b_eff` | `[2]` | Of [[gbsm_rays]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m), NaN if a GR ray has an end below z = 0 |
 | `limit` | `[2]` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`"phase"`) or $0.2 b_{\mathrm{med}}$ (`"drift"`); Inf where b is NaN |
 | `ratio` | `[2]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `"drift"`: new segment from 2.5 |
@@ -228,6 +229,37 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     for (arma::uword r = 0; r < n_kept; ++r)
         w(r) = (w_sum(q_of(r)) > 0.0) ? rr.power(r, 0) / w_sum(q_of(r)) : 1.0 / (double)n_ray_tap(q_of(r));
 
+    // Runs f(i) for i < n, in parallel when 'par'. The serial branch opens no parallel region, so that
+    // get_channels_* keep their own threads (an inactive region would make them start new nested teams). The first
+    // exception of the parallel branch is rethrown after the loop with its type: OMP_SAFE_CALL keeps only the
+    // message, and the "drift" errors of ssf_paths must stay std::invalid_argument.
+    auto loop = [](int n, bool par, const auto &f)
+    {
+        if (!par)
+        {
+            for (int i = 0; i < n; ++i)
+                f((arma::uword)i);
+            return;
+        }
+        std::exception_ptr err;
+#pragma omp parallel for
+        for (int i = 0; i < n; ++i)
+        {
+            try
+            {
+                f((arma::uword)i);
+            }
+            catch (...)
+            {
+#pragma omp critical
+                if (!err)
+                    err = std::current_exception();
+            }
+        }
+        if (err)
+            std::rethrow_exception(err);
+    };
+
     // "phase" (TR 38.901 eq. (7.5-22)): c_r(t) = c_r(unit gain, orientations of t) · sqrt(g_r(t)) · exp(j·phi_r(t))
     // by the linearity of get_channels_planar in M; the unit coefficients are computed once per run of equal
     // orientations and the path gains once per run of equal link gain and K ratio (exact comparisons)
@@ -254,7 +286,8 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                 const arma::vec lg_t = {lg(t)}, kf_t = {kf(t)};
                 ssf_paths(rr, lg_t, pg, L_ph, pM, "phase", nullptr, nullptr, kf_ratio ? &kf_t : nullptr, nullptr,
                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, oxygen);
-                g_ph[t] = pg.col(0);
+                if (n_kept > 0) // col(0) of a [0, 1] matrix would bind a null reference
+                    g_ph[t] = pg.col(0);
             }
         }
         for (arma::uword r = 0; r < n_kept; ++r)
@@ -275,22 +308,13 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                                 &u_im[t], &u_dl[t], fc, use_absolute_delays);
         };
         const int n_o = (int)o_start.size();
-        if (n_o > 1 && (arma::uword)n_o * n_kept * n_rx * n_tx >= L_chan)
-        {
-#pragma omp parallel for
-            for (int s = 0; s < n_o; ++s)
-                unit((arma::uword)o_start[s]);
-        }
-        else
-            for (int s = 0; s < n_o; ++s)
-                unit((arma::uword)o_start[s]);
+        loop(n_o, n_o > 1 && (arma::uword)n_o * n_kept * n_rx * n_tx >= L_chan,
+             [&](arma::uword s) { unit((arma::uword)o_start[s]); });
     }
 
     // Snapshot loop. OpenMP pays from 2 snapshots in "drift" (about 1 µs per element pair and path) and from
     // n_snap · n_kept · n_rx · n_tx = L_chan in "phase" (5 to 50 ns per unit; measured with 1 to 16 element pairs and
-    // 10 to 380 rays). The serial branch opens no parallel region, so that get_channels_* keep their own threads (an
-    // inactive region would make them start new nested teams). Exceptions in the parallel branch are collected and
-    // rethrown after the loop.
+    // 10 to 380 rays).
     c.coeff_re.resize(n_snap), c.coeff_im.resize(n_snap), c.delay.resize(n_snap);
     if (!taps)
     {
@@ -342,7 +366,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
             ssf_paths(rr, lg_t, pg, pl, pM, "drift", &T, &R, kf_ratio ? &kf_t : nullptr, &aod, &eod, &aoa, &eoa,
                       &fbs, &lbs, nullptr, nullptr, oxygen);
             M = arma::mat(pM.slice_memptr(0), 8, n_kept);
-            const arma::vec g = pg.col(0);
+            const arma::vec g = (n_kept > 0) ? arma::vec(pg.col(0)) : arma::vec();
             const double *To = c.tx_orientation.colptr(t), *Ro = c.rx_orientation.colptr(t);
             get_channels_spherical(&tx_array, &rx_array, T(0), T(1), T(2), To[0], To[1], To[2], R(0), R(1), R(2),
                                    Ro[0], Ro[1], Ro[2], &fbs, &lbs, &g, &pl, &M, &cr, &ci, &dl, fc,
@@ -373,35 +397,14 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                 c.path_fbs_pos[t] = fbs, c.path_lbs_pos[t] = lbs;
         }
     };
-    if (n_snap > 1 && (drift || n_snap * n_kept * n_rx * n_tx >= L_chan))
-    {
-        std::string loop_err;
-        const int n_loop = (int)n_snap;
-#pragma omp parallel for
-        for (int it = 0; it < n_loop; ++it)
-        {
-            try
-            {
-                snap((arma::uword)it);
-            }
-            catch (const std::exception &ex)
-            {
-#pragma omp critical
-                if (loop_err.empty())
-                    loop_err = ex.what();
-            }
-        }
-        if (!loop_err.empty())
-            throw std::invalid_argument(loop_err);
-    }
-    else
-        for (arma::uword t = 0; t < n_snap; ++t)
-            snap(t);
+    loop((int)n_snap, n_snap > 1 && (drift || n_snap * n_kept * n_rx * n_tx >= L_chan), snap);
 
     // Validity report: b_med, b_eff at i_freq (without scatterers from the solved copy), limits per end
     // ("phase" sqrt(lambda · b_eff / 8), "drift" 0.2 · b_med, Inf where b is NaN) and the largest displacement
-    // from the ray-data positions relative to the limit
-    if (rr.fbs_pos.n_cols != n_kept)
+    // from the ray-data positions relative to the limit. A GR ray with an end below z = 0 (possible in "phase") has
+    // no specular point: no solved copy, b NaN.
+    const bool gr_below = arma::any(rr.path_type == 1) && (rr.tx_pos(2) < 0.0 || rr.rx_pos(2) < 0.0);
+    if (rr.fbs_pos.n_cols != n_kept && !gr_below)
         rr.solve_scatterers();
     const arma::vec b_med = rr.b_med(0), b_eff = rr.b_eff(0);
     arma::vec limit(2), ratio(2, arma::fill::zeros);

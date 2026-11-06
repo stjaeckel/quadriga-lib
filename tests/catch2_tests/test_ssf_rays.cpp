@@ -752,6 +752,7 @@ TEST_CASE("ssf_rays - input validation")
             {[](rays_in_t &x) { x.f.eps_im(2, 0) = -1e-9; },
              "Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0."},
             {[](rays_in_t &x) { x.f.rx(1, 2) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
+            {[](rays_in_t &x) { x.f.tx(1, 2) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
             {[](rays_in_t &x) { x.cl.power(1, 4, x.i_freq) = -1e-12; }, "Input 'power' must be finite and >= 0."},
             {[](rays_in_t &x) { x.st.mu(2, x.i_freq, 5) = NAN; }, "Input 'lsp_mu' must be finite."},
             {[](rays_in_t &x) { x.st.mu(0, x.i_freq, 7) = INFINITY; }, "Input 'lsp_mu' must be finite."},

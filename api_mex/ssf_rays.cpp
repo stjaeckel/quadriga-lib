@@ -22,7 +22,7 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
   other links of the call
 - Ray layout per link, fixed per scenario: ray 1 LOS, 2 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` (both
   from 1) at `1 + G + (n - 1)·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays
-- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_per)/R of
+- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R of
   the ground reflection (TR eqs. (7.6-38) to (7.6-40))
 - NLOS rays: power P_n/M; offsets of Table 7.5-3 scaled by the cluster spreads; coupling (step 8) by the rank blocks
   of `rnd_ray`; `M` other than 20: QuaDRiGa-NG's offsets below 20, Laplacian quantiles above 20, no sub-clusters
@@ -46,7 +46,8 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
   within 1 mm count as equal; the Tx if all tie); the Rx as owner transposes it
 - Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm_draw]], mirrored LSPs and clusters,
   `PerClusterAS_D` = `PerClusterAS_A`, `PerClusterES_D` = `PerClusterES_A`, `PerClusterES_D_scale` = 0), swapping
-  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M`
+  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = 'quadriga'`
+  with ends within 1 mm of each other, where the Tx stays the owner)
 - Messages name the argument `center_freq` as `'center_frequency'`
 
 ## Ray struct:
@@ -61,7 +62,7 @@ concatenate the fields.
 | `method` | string | char | `'38.901'`, `'38.901_MF'` or `'quadriga'`; GR power law and default mobility | yes |
 | `tx_pos`, `rx_pos` | `[3, 1]` | double | Tx and Rx position the ray data refer to in [m] | yes |
 | `center_frequency` | `[n_freq, 1]` | double | Carrier frequencies in [Hz] | yes |
-| `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay `norm(rx_pos - tx_pos) / c` | yes |
+| `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |
 | `M` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | yes |

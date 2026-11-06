@@ -5,6 +5,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 #include "qd_atmospheric_absorption.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include <limits>
 
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
@@ -1941,7 +1942,7 @@ Path objects of one CIR from spherical path data, for qrt_file_append
 - Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
   0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
 - Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
-- A path of length 0 (LOS with `tx_pos` = `rx_pos`) throws: `qrt_file_read` would return an infinite gain
+- Throws for a path of length 0 in float32 (e.g. LOS with `tx_pos` = `rx_pos`) and for values beyond float32
 
 ## Declaration:
 ```
@@ -1964,7 +1965,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`M`** — Polarization transfer matrices, row order of [[get_channels_spherical]]; `[8, n_path, n_freq]`
-- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
+- **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
 
 ## Returns:
@@ -2014,15 +2015,13 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
         throw std::invalid_argument("Input 'path_type' must have n_path elements.");
     if (arma::any(path_type > 2))
         throw std::invalid_argument("Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS).");
+    if (arma::accu(path_type == 0) > 1 || arma::accu(path_type == 1) > 1) // gbsm_rays_from_paths rejects them
+        throw std::invalid_argument("Input 'path_type' can hold at most one LOS and one GR path.");
     if (i_cir > 4294967295ULL)
         throw std::invalid_argument("Input 'i_cir' must be < 2^32.");
 
     // Polyline lengths in double: LOS the direct line, GR via its point in lbs_pos, NLOS T -> FBS -> LBS -> R
-    auto dist = [](const double *a, const double *b)
-    {
-        const double x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
-        return std::sqrt(x * x + y * y + z * z);
-    };
+    auto dist = [](const double *a, const double *b) { return qd_calc_length(a[0], a[1], a[2], b[0], b[1], b[2]); };
     const double *T = tx_pos.memptr(), *R = rx_pos.memptr();
     arma::vec L(n_path);
     for (arma::uword p = 0; p < n_path; ++p)
@@ -2031,8 +2030,6 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
         L(p) = (path_type(p) == 0)   ? dist(T, R)
                : (path_type(p) == 1) ? dist(T, B) + dist(B, R)
                                      : dist(T, F) + dist(F, B) + dist(B, R);
-        if (L(p) == 0.0) // qrt_file_read would apply the free-space loss of a zero length
-            throw std::invalid_argument("Inputs 'tx_pos' and 'rx_pos' must differ for a path of zero length.");
     }
 
     // Amplitude of the inverse free-space loss at 1 m that qrt_file_read applies, per frequency
@@ -2062,7 +2059,13 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
             q.set_interaction_type_codes({193, 193});
             q.nSCT = 2;
         }
-        q.calc_length(Rf, Tf);
+        // The stored float32 values must give qrt_file_read a length > 0 and finite Jones matrices
+        const float len = q.calc_length(Rf, Tf);
+        if (len == 0.0f) // the free-space loss of a zero length is infinite
+            throw std::invalid_argument("Inputs 'tx_pos' and 'rx_pos' must differ for a path of zero length.");
+        if (!std::isfinite(len))
+            throw std::invalid_argument("Inputs 'tx_pos', 'rx_pos', 'fbs_pos' and 'lbs_pos' must be within the float32 "
+                                        "range of QRT files.");
 
         // Stored Jones matrix: M·sqrt(path_gain)·L·a_1m, so that qrt_file_read returns sqrt(path_gain)·M
         for (arma::uword f = 0; f < n_freq; ++f)
@@ -2071,7 +2074,12 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
             const double *m = M.slice_colptr(f, p);
             float *J = q.xpr_coeff(f);
             for (int e = 0; e < 8; ++e)
+            {
                 J[e] = (float)(m[e] * s);
+                if (!std::isfinite(J[e]))
+                    throw std::invalid_argument("Inputs 'path_gain' and 'M' give stored Jones matrices beyond the "
+                                                "float32 range of QRT files.");
+            }
         }
     }
     return out;

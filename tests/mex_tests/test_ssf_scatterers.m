@@ -77,6 +77,18 @@ assertEqual( fieldnames(rs)', fields );                                       % 
 assertTrue( isempty(rs.gr_eps_re) && isempty(rs.gr_eps_im) );
 assertEqual( rs.fbs_pos, r.fbs_pos );
 assertEqual( rs.path_type, double( r.path_type ) );                           % copied as given
+s = r;
+s.path_type = int8( s.path_type );
+s.tap = uint16( s.tap );
+s.fallback = logical( s.fallback );
+rs = quadriga_lib.ssf_scatterers( s );
+assertEqual( rs.fbs_pos, r.fbs_pos );
+assertTrue( isa(rs.path_type, 'int8') && isa(rs.tap, 'uint16') && isa(rs.fallback, 'uint64') );
+assertEqual( rs.tap, s.tap );
+s.tap = mod( (1 : numel(s.tap))', 2 ) == 1;                                   % logical labels
+rs = quadriga_lib.ssf_scatterers( s );
+assertTrue( islogical(rs.tap) );
+assertEqual( rs.tap, s.tap );
 
 %% Errors
 assert_throws( @() quadriga_lib.ssf_scatterers(), 'Wrong number of input arguments.' );

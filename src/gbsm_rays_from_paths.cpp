@@ -3,9 +3,9 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 #include <cmath>
-#include <initializer_list>
 #include <stdexcept>
 #include <string>
 
@@ -25,7 +25,6 @@ Ray data of one link from spherical path data (e.g. read with qrt_file_read)
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
   NLOS; a GR path needs `path_type` (`no_int` for files of [[qrt_paths_from_scatterers]])
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0; permittivity only for `drift` away from `tx_pos`, `rx_pos`
-- Use in [[ssf_paths]] and [[gbsm_single_link_channel]] with `link_gain_dB = 0` and without `kf_ratio`
 
 ## Declaration:
 ```
@@ -59,7 +58,10 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity, given together; `[n_freq]`
 
 ## Output:
-- **`rays`** — Ray data with `n_ray = n_path`, see [[gbsm_rays]]
+- **`rays`** — Ray data with `n_ray = n_path`, see [[gbsm_rays]]; use with `link_gain_dB = 0` and without `kf_ratio`
+
+## See also:
+- [[qrt_file_read]], [[qrt_paths_from_scatterers]] (QRT route), [[ssf_paths]], [[gbsm_single_link_channel]]
 MD!*/
 
 void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
@@ -109,12 +111,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
     if (method != "38.901" && method != "38.901_MF" && method != "quadriga")
         throw std::invalid_argument("Input 'method' must be '38.901', '38.901_MF' or 'quadriga'.");
 
-    auto dist = [](const double *a, const double *b)
-    {
-        const double x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
-        return std::sqrt(x * x + y * y + z * z);
-    };
-    const double *T = tx_pos.memptr(), *R = rx_pos.memptr(), d3D = dist(T, R);
+    const double *T = tx_pos.memptr(), *R = rx_pos.memptr(), d3D = qd_gbsm_dist(T, R);
 
     // Path types: given, or LOS where FBS = LBS on the direct line (the LOS tolerance 0.1 mm of get_channels_*)
     arma::uvec type(n_path);
@@ -131,7 +128,9 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
     else
     {
         for (arma::uword p = 0; p < n_path; ++p)
-            type(p) = (dist(fbs_pos.colptr(p), lbs_pos.colptr(p)) <= 1.0e-4 && path_length(p) - d3D <= 1.0e-4) ? 0 : 2;
+            type(p) = (qd_gbsm_dist(fbs_pos.colptr(p), lbs_pos.colptr(p)) <= 1.0e-4 && path_length(p) - d3D <= 1.0e-4)
+                          ? 0
+                          : 2;
         if (arma::accu(type == 0) > 1)
             throw std::invalid_argument("More than one path matches the LOS geometry; pass 'path_type'.");
     }
@@ -153,19 +152,6 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
             throw std::invalid_argument("The interaction point of the GR path must be on the ground (z = 0); "
                                         "shift local coordinates in x and y only.");
 
-    // Direction from O towards the first of the points P that differs from O; angles 0 if none differs
-    auto direction = [](const double *O, std::initializer_list<const double *> P, double &az, double &el)
-    {
-        az = 0.0, el = 0.0;
-        for (const double *x : P)
-            if (x[0] != O[0] || x[1] != O[1] || x[2] != O[2])
-            {
-                const double dx = x[0] - O[0], dy = x[1] - O[1], dz = x[2] - O[2];
-                az = std::atan2(dy, dx), el = std::atan2(dz, std::sqrt(dx * dx + dy * dy));
-                return;
-            }
-    };
-
     rays.delay.set_size(n_path), rays.aod.set_size(n_path), rays.eod.set_size(n_path);
     rays.aoa.set_size(n_path), rays.eoa.set_size(n_path);
     const double R_img[3] = {R[0], R[1], -R[2]}, T_img[3] = {T[0], T[1], -T[2]};
@@ -174,9 +160,11 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
         const double *F = fbs_pos.colptr(p), *B = lbs_pos.colptr(p);
         rays.delay(p) = (path_length(p) - d3D) / 299792458.0;
         if (type(p) == 1) // GR: towards the image points, also defined for an end on the ground
-            direction(T, {R_img}, rays.aod(p), rays.eod(p)), direction(R, {T_img}, rays.aoa(p), rays.eoa(p));
+            qd_gbsm_direction(T, {R_img}, rays.aod(p), rays.eod(p)),
+                qd_gbsm_direction(R, {T_img}, rays.aoa(p), rays.eoa(p));
         else
-            direction(T, {F, B, R}, rays.aod(p), rays.eod(p)), direction(R, {B, F, T}, rays.aoa(p), rays.eoa(p));
+            qd_gbsm_direction(T, {F, B, R}, rays.aod(p), rays.eod(p)),
+                qd_gbsm_direction(R, {B, F, T}, rays.aoa(p), rays.eoa(p));
     }
 
     rays.method = method;

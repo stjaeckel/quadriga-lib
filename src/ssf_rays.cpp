@@ -88,8 +88,8 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
   links of the call
 - Ray layout per link, fixed per scenario: index 0 LOS, 1 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` at
   `1 + G + n·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays at power 0
-- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_per)/R of
-  the ground reflection (TR eqs. (7.6-38) to (7.6-40), R² = (abs(R_par)² + abs(R_per)²)/2)
+- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R
+  of the ground reflection (TR eqs. (7.6-38) to (7.6-40), R² = (abs(R_par)² + abs(R_perp)²)/2)
 - NLOS rays: power P_n/M; offsets of Table 7.5-3 scaled by the cluster spreads (`PerClusterAS_D`, `PerClusterAS_A`,
   `PerClusterES_A`, ZSD of eq. (7.5-20)); coupling (step 8): within a cluster or sub-cluster, the ray with the k-th
   smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA, ZOD and ZOA
@@ -117,7 +117,8 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
   on either side of the tie plane get transposed matrices
 - Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm_draw]], mirrored LSPs and clusters,
   `PerClusterAS_D` = `PerClusterAS_A`, `PerClusterES_D` = `PerClusterES_A`, `PerClusterES_D_scale` = 0), swapping
-  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (both polarisation models)
+  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (both polarisation models; not
+  for `pol_model = "quadriga"` with ends within 1 mm of each other, where the Tx stays the owner)
 
 ## Declaration:
 ```
@@ -392,7 +393,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         r.M.zeros();
 
         // LOS and GR rays: the slot values; Jones matrices diag(1, -1) (TR 38.901 eq. (7.5-29)) and
-        // diag(R_par, -R_per) / R with R² = (abs(R_par)² + abs(R_per)²) / 2 (eqs. (7.6-38) to (7.6-40); R = 0 gives 0)
+        // diag(R_par, -R_perp) / R with R² = (abs(R_par)² + abs(R_perp)²) / 2 (eqs. (7.6-38) to (7.6-40); R = 0 gives 0)
         const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1);
         for (arma::uword s = 0; s < 1 + G; ++s)
         {
@@ -407,13 +408,13 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
             if (!G)
                 continue;
             r.power(1, o) = power(l, 1, k);
-            std::complex<double> R_par, R_per;
+            std::complex<double> R_par, R_perp;
             qd_gbsm_fresnel((*gr_eps_re)(l, k), (*gr_eps_im)(l, k), tx_pos(t, 2), rx_pos(l, 2),
-                            std::sqrt(dx * dx + dy * dy), R_par, R_per);
-            const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_per)));
+                            std::sqrt(dx * dx + dy * dy), R_par, R_perp);
+            const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
             if (R > 0.0)
-                r.M(0, 1, o) = R_par.real() / R, r.M(1, 1, o) = R_par.imag() / R, r.M(6, 1, o) = -R_per.real() / R,
-                          r.M(7, 1, o) = -R_per.imag() / R;
+                r.M(0, 1, o) = R_par.real() / R, r.M(1, 1, o) = R_par.imag() / R,
+                          r.M(6, 1, o) = -R_perp.real() / R, r.M(7, 1, o) = -R_perp.imag() / R;
         }
         if (N == 0)
             return;
