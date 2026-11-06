@@ -109,8 +109,10 @@ dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = ""); // flo
 // Seed of a random number generator: -1 (random) or 0 ... 2^63-1; -1 for empty input
 long long qd_mex_get_seed(const mxArray *input, const std::string &var_name = "seed");
 
-// Char array -> std::string; returns default_value for empty input (the second argument is NOT a name)
-std::string qd_mex_get_string(const mxArray *input, std::string default_value = "");
+// Char array -> std::string; returns default_value for empty input (the second argument is NOT a name);
+// errors name 'var_name' if given
+std::string qd_mex_get_string(const mxArray *input, std::string default_value = "",
+                              const std::string &var_name = "");
 
 // Cell array of strings (or a single char array) -> vector of strings; empty input -> empty vector
 std::vector<std::string> qd_mex_get_strings(const mxArray *input, const std::string &var_name = "");
