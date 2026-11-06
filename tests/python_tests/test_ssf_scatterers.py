@@ -108,6 +108,13 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(b_med, self.out[1])
         d["gr_eps"] = None
         npt.assert_array_equal(gbsm.ssf_scatterers(d)[0]["lbs_pos"], self.out[0]["lbs_pos"])
+        # No rays, the 1-D keys given as None: empty arrays with the dtype of the key table
+        z = dict(self.rays[0], power=np.zeros((0, 2)), M=np.zeros((8, 0, 2)))
+        z.update({k: None for k in ["delay", "aod", "eod", "aoa", "eoa", "path_type", "tap"]})
+        rz = gbsm.ssf_scatterers(z)[0]
+        for k in ["delay", "aod", "eod", "aoa", "eoa", "path_type", "tap"]:
+            self.assertEqual(rz[k].shape, (0,), k)
+            self.assertEqual(rz[k].dtype, np.uint32 if k in ["path_type", "tap"] else np.float64, k)
 
     def test_errors(self):
         r = self.rays[0]
@@ -122,7 +129,7 @@ class test_case(unittest.TestCase):
         self.assertIn("Entry 'method' of 'rays' must be a str.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.ssf_scatterers(dict(r, tap=-np.ones(self.n_ray)))
-        self.assertIn("Entries in 'rays.tap' must be non-negative integers", str(ctx.exception))
+        self.assertIn("Entries in 'rays.tap' must be integers from 0 to 4294967295.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.ssf_scatterers(dict(r, delay=np.full(self.n_ray, np.nan)))
         self.assertIn("Input 'rays.delay' must be finite.", str(ctx.exception))

@@ -715,21 +715,6 @@ static bool qd_python_flag(const py::handle &value, bool default_value, const st
     throw py::type_error("Input '" + name + "' must be a bool or None.");
 }
 
-// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> u32_vec
-// - Every entry must be an integer in [0, 2^32); otherwise std::invalid_argument naming the input 'name'
-static arma::u32_vec qd_python_uint_entries(const arma::vec &input, const std::string &name)
-{
-    arma::u32_vec out(input.n_elem);
-    for (arma::uword i = 0; i < input.n_elem; ++i)
-    {
-        const double v = input[i];
-        if (!(v >= 0.0 && v < 4294967296.0 && v == std::floor(v)))
-            throw std::invalid_argument("Entries in '" + name + "' must be non-negative integers below 2^32.");
-        out[i] = (unsigned)v;
-    }
-    return out;
-}
-
 // Python path -> std::string; returns false if 'value' is not a path
 // - str and bytes as they are; an object with '__fspath__' is converted with os.fspath first
 static bool qd_python_try_path(const py::handle &value, std::string &path)
@@ -891,14 +876,22 @@ static const char *const qd_python_gbsm_rays_keys[] = {
     "eoa", "M", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
 static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap"
 
-// Labels or codes (non-negative integers, no index shift) -> u32_vec; None gives an empty vector
-// - A uint32 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float and
-//   checked with qd_python_uint_entries, naming 'name'
+// Labels, codes or counts (non-negative integers, no index shift) -> u32_vec; None gives an empty vector
+// - A uint32 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float (exact
+//   below 2^53) and every entry must be an integer from 0 to 2^32 - 1, else std::invalid_argument naming 'name'
 static arma::u32_vec qd_python_u32_entries(const py::handle &obj, const std::string &name)
 {
     if (py::isinstance<py::array_t<unsigned>>(obj))
         return qd_python_numpy2arma_Col<unsigned>(obj, true);
-    return qd_python_uint_entries(qd_python_numpy2arma_Col<double>(obj, true), name);
+    const arma::vec in = qd_python_numpy2arma_Col<double>(obj, true);
+    arma::u32_vec out(in.n_elem);
+    for (arma::uword i = 0; i < in.n_elem; ++i)
+    {
+        if (!(in[i] >= 0.0 && in[i] < 4294967296.0 && in[i] == std::floor(in[i])))
+            throw std::invalid_argument("Entries in '" + name + "' must be integers from 0 to 4294967295.");
+        out[i] = (unsigned)in[i];
+    }
+    return out;
 }
 
 // Dict -> gbsm_rays, aliasing the numpy memory where dtype and layout allow (read-only)

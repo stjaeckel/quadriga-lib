@@ -101,20 +101,20 @@ assertEqual( { class(rs.gr_eps_re), size(rs.gr_eps_re), class(rs.gr_eps_im), siz
 assert_throws( @() quadriga_lib.ssf_scatterers(), 'Wrong number of input arguments.' );
 assert_throws( @() quadriga_lib.ssf_scatterers( rays(1), 2, 3 ), 'Wrong number of input arguments.' );
 assert_throws( @() out4( rays(1) ), 'Wrong number of output arguments.' );
-assert_throws( @() quadriga_lib.ssf_scatterers( rays ), 'Input ''rays_in'' must be a 1x1 struct.' );
-assert_throws( @() quadriga_lib.ssf_scatterers( 1 ), 'Input ''rays_in'' must be a 1x1 struct.' );
+assert_throws( @() quadriga_lib.ssf_scatterers( rays ), 'Input ''rays'' must be a 1x1 struct.' );
+assert_throws( @() quadriga_lib.ssf_scatterers( 1 ), 'Input ''rays'' must be a 1x1 struct.' );
 assert_throws( @() quadriga_lib.ssf_scatterers( rmfield( rays(1), 'delay' ) ), ...
-    'Field ''delay'' is missing in ''rays_in''.' );
+    'Field ''delay'' is missing in ''rays''.' );
 s = rays(1);
 s.foo = 1;
-assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Unknown field ''foo'' in ''rays_in''.' );
+assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Unknown field ''foo'' in ''rays''.' );
 s = rays(1);
 s.method = 1;
-assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Field ''method'' of ''rays_in'' must be a string.' );
+assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Field ''method'' of ''rays'' must be a string.' );
 s = rays(1);
 s.tap = double( s.tap );
 s.tap(1) = -1;
-assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Entries in ''rays_in.tap'' must be integers' );
+assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Entries in ''rays.tap'' must be integers' );
 s = rays(1);
 s.delay(2) = NaN;
 assert_throws( @() quadriga_lib.ssf_scatterers( s ), 'Input ''rays.delay'' must be finite.' );

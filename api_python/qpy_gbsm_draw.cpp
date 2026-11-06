@@ -94,12 +94,10 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
     const auto phase_a = qd_python_numpy2arma_Cube<double>(phase, true);
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
-    const auto floor_id_in = qd_python_numpy2arma_Col<double>(floor_id, true);
+    const arma::u32_vec floor_id_a = qd_python_u32_entries(floor_id, "floor_id");
     const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const bool dual_mobility_b = qd_python_flag(dual_mobility, false, "dual_mobility");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
-
-    const arma::u32_vec floor_id_a = qd_python_uint_entries(floor_id_in, "floor_id");
 
     // Wrap optional pointers
     const arma::u32_vec *p_floor_id = floor_id_a.is_empty() ? nullptr : &floor_id_a;

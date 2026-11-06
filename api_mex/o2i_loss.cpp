@@ -66,7 +66,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[0]);
+    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[0], false, "center_freq");
     const arma::mat rnd = qd_mex_get_Mat<double>(prhs[1]);
     const std::vector<std::string> models = qd_mex_get_strings(prhs[2], "models");
     const arma::vec weights = qd_mex_get_Col<double>(prhs[3]);

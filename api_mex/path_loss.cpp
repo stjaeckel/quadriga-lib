@@ -105,7 +105,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> pl_order;
     const auto plpar = qd_mex_struct2plpar(prhs[0], pl_model, pl_order, "plpar");
     const auto scenpar = qd_mex_struct2scenpar(prhs[1], "scenpar");
-    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[2]);
+    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[2], false, "center_freq");
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3]);
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4]);
     const arma::vec d2d_in = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);

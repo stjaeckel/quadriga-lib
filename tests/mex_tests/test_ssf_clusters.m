@@ -157,7 +157,7 @@ assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp ), 'Wrong 
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [], 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out8( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga' ), 'Wrong number of output arguments.' );
-msg_nc = 'Entries in ''n_cluster'' must be non-negative integers below 2^32.';
+msg_nc = 'Entries in ''n_cluster'' must be integers from 0 to 4294967295.';
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [ 12; 6.5; 9; 12 ] ), msg_nc );
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
@@ -172,8 +172,11 @@ assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp2, rnd, '38
     'Method ''38.901'' supports one frequency only' );                                              % C++
 assert_throws( @() quadriga_lib.ssf_clusters( sg, tx_pos, rx_pos, lsp, rnd, 'quadriga' ), ...
     'Inputs ''gr_eps_re'' and ''gr_eps_im'' are required when ''GR_enabled'' is set.' );              % C++
-assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, zeros(0, 3), lsp(1:0, :, :), rnd(1:0, :), ...
-    'quadriga' ), 'rx_pos' );                                                                       % zero links
+[ d0, p0, ~, ~, ~, ~, n0 ] = quadriga_lib.ssf_clusters( sp, tx_pos, zeros(0, 3), lsp(1:0, :, :), rnd(1:0, :), ...
+    'quadriga' );                                                                                   % zero links
+assertEqual( size(d0), [ 0, size(delay, 2) ] );
+assertEqual( size(p0), [ 0, size(delay, 2) ] );
+assertTrue( isempty(n0) && isa(n0, 'uint32') );
 
 end
 

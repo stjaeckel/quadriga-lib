@@ -409,6 +409,16 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
             CHECK(arma::abs(arma::vectorise(o1.M.col(1) - r.M.col(1))).max() > 0.0);
         }
 
+    // A GR matrix with off-diagonal entries: after a move the same matrix as from its diagonal part (the projection
+    // uses the diagonal; the recomputed matrix is diagonal)
+    {
+        rays_t d = make_rays(15, true, true, 6, 2, "38.901", true), f = d;
+        for (arma::uword k = 0; k < 2; ++k)
+            f.M(2, 1, k) = 0.3, f.M(5, 1, k) = -0.2;
+        const arma::vec R = d.rx_pos + dR;
+        CHECK(arma::approx_equal(pth(f, "drift", nullptr, &R).M, pth(d, "drift", nullptr, &R).M, "absdiff", 0.0));
+    }
+
     // Without permittivity at the ray-data positions: no recomputation needed, GR unchanged
     rays_t r = make_rays(16, true, true, 6, 2, "38.901", true);
     r.gr_eps_re.reset(), r.gr_eps_im.reset();
@@ -515,6 +525,22 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
         // The two rays of one tap (rays 2 and 3) have their own lengths and losses at 60 GHz
         const double l2 = b.gain(2, 1) / a.gain(2, 1), l3 = b.gain(3, 1) / a.gain(3, 1);
         CHECK(std::abs(10.0 * std::log10(l2 / l3)) > 1e-3);
+    }
+
+    // Every node of TR Table 7.6.1-1 inside the table (53 to 67 GHz, dB/km)
+    {
+        const double node[15] = {1.0, 2.2, 4.0, 6.6, 9.7, 12.6, 14.6, 15.0, 14.6, 14.3, 10.5, 6.8, 3.9, 1.9, 1.0};
+        rays_t q = make_rays(19, true, true, 6, 15, "38.901");
+        for (arma::uword k = 0; k < 15; ++k)
+            q.center_frequency(k) = (53.0 + (double)k) * 1e9;
+        const po_t a = pth(q, "phase", nullptr, &R), b = pth(q, "phase", nullptr, &R, nullptr, true);
+        for (arma::uword p = 0; p < a.len.n_elem; ++p)
+            for (arma::uword k = 0; k < 15; ++k)
+            {
+                INFO("path " << p << ", " << 53 + k << " GHz");
+                const double ex = a.gain(p, k) * std::pow(10.0, -node[k] * a.len(p) / 1e4);
+                CHECK(std::abs(b.gain(p, k) - ex) <= 1e-12 * ex);
+            }
     }
 
     // The table ends at 52 and 68 GHz (0 dB/km) and far outside the table (fc·1e-9 - 52 beyond the int range): no

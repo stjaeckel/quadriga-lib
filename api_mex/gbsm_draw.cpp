@@ -89,13 +89,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
-    const std::string set_type = qd_mex_get_string(prhs[1]);
-    const arma::cube phase = qd_mex_get_Cube<double>(prhs[2]);
-    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3]);
-    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4]);
+    const std::string set_type = qd_mex_get_string(prhs[1], "", "set_type");
+    const arma::cube phase = qd_mex_get_Cube<double>(prhs[2], false, "phase");
+    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3], false, "tx_pos");
+    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4], false, "rx_pos");
     const double set_id_in = (nrhs < 6) ? 0.0 : qd_mex_get_scalar<double>(prhs[5], "set_id", 0.0);
-    const std::string preset = (nrhs < 7) ? std::string("Comb256") : qd_mex_get_string(prhs[6], "Comb256");
-    const arma::vec floor_id_in = (nrhs < 8) ? arma::vec() : qd_mex_get_Col<double>(prhs[7], false, "floor_id");
+    const std::string preset = (nrhs < 7) ? std::string("Comb256") : qd_mex_get_string(prhs[6], "Comb256", "preset");
+    const arma::u32_vec floor_id = (nrhs < 8) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[7], false, "floor_id");
     const arma::vec center_freq = (nrhs < 9) ? arma::vec() : qd_mex_get_Col<double>(prhs[8], false, "center_freq");
     const bool dual_mobility = (nrhs < 10) ? false : qd_mex_get_scalar<bool>(prhs[9], "dual_mobility", false);
     const bool horizontal = (nrhs < 11) ? true : qd_mex_get_scalar<bool>(prhs[10], "horizontal", true);
@@ -105,8 +105,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!lsf && !(set_id_in >= 0.0 && set_id_in < 9007199254740992.0 && set_id_in == std::floor(set_id_in)))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'set_id' must be 0 (shared set) or a frequency index >= 1.");
     const arma::sword set_id = lsf ? -1 : (arma::sword)set_id_in - 1;
-
-    const arma::u32_vec floor_id = qd_mex_uint_entries(floor_id_in, "floor_id");
 
     // Wrap optional pointers
     const arma::u32_vec *p_floor_id = floor_id.empty() ? nullptr : &floor_id;

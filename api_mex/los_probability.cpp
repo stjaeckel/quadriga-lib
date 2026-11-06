@@ -45,13 +45,13 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
   at 0 by the caller; the 2D distance in indoor scenarios; `[n_link]`
 - **`h_bs`** — BS height in [m], finite; `[n_link]` or `[1]` for all links
 - **`h_ut`** — UT height in [m], finite; `[n_link]` or `[1]` for all links
-- **`d_clutter`** — Clutter size in [m] of the InF and SMa models, > 0; NaN or empty = TR default
-  (InF-SL and InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m); default: NaN
+- **`d_clutter`** — Clutter size in [m] of the InF and SMa models, > 0, scalar; NaN or empty = TR
+  default (InF-SL and InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m); default: NaN
 - **`r_clutter`** — Clutter density of the InF models (default 0.2 for SL and SH, 0.6 for DL and
-  DH), vegetation density of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1); NaN or empty =
-  default; default: NaN
-- **`h_clutter`** — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0; NaN or
-  empty = default. The other models ignore the clutter arguments, which are validated for every
+  DH), vegetation density of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1), scalar; NaN or
+  empty = default; default: NaN
+- **`h_clutter`** — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0, scalar;
+  NaN or empty = default. The other models ignore the clutter arguments, which are validated for every
   model; default: NaN
 - **`rnd_g`** *(optional)* — Normal(0,1) value per link, G of eq. (7.6-18); `[n_link]`
 - **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0 (messages name it
@@ -81,11 +81,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec d2d_out = qd_mex_get_Col<double>(prhs[1]);
     const arma::vec h_bs = qd_mex_get_Col<double>(prhs[2]);
     const arma::vec h_ut = qd_mex_get_Col<double>(prhs[3]);
-    const double d_clutter = (nrhs < 5) ? NAN : qd_mex_get_scalar<double>(prhs[4], "d_clutter", NAN);
-    const double r_clutter = (nrhs < 6) ? NAN : qd_mex_get_scalar<double>(prhs[5], "r_clutter", NAN);
-    const double h_clutter = (nrhs < 7) ? NAN : qd_mex_get_scalar<double>(prhs[6], "h_clutter", NAN);
+    auto clutter = [&](int k, const std::string &name) // omitted or [] = NaN (TR default), else a scalar
+    {
+        if (nrhs > k && mxGetNumberOfElements(prhs[k]) > 1)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + name + "' must be a scalar.").c_str());
+        return (nrhs <= k) ? NAN : qd_mex_get_scalar<double>(prhs[k], name, NAN);
+    };
+    const double d_clutter = clutter(4, "d_clutter"), r_clutter = clutter(5, "r_clutter");
+    const double h_clutter = clutter(6, "h_clutter");
     const arma::vec rnd_g = (nrhs < 8) ? arma::vec() : qd_mex_get_Col<double>(prhs[7]);
-    const arma::vec center_freq = (nrhs < 9) ? arma::vec() : qd_mex_get_Col<double>(prhs[8]);
+    const arma::vec center_freq = (nrhs < 9) ? arma::vec() : qd_mex_get_Col<double>(prhs[8], false, "center_freq");
 
     // Output allocation; the soft LOS state needs both 'rnd_g' and 'center_freq', else it is returned as []
     const bool soft = nlhs > 1 && !rnd_g.empty() && !center_freq.empty();

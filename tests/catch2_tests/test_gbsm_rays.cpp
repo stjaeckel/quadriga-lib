@@ -76,6 +76,8 @@ TEST_CASE("gbsm_rays - is_valid reports each failed check")
     fails([&](R &r) { r.delay(3) = nan; }, "Input 'rays.delay' must be finite.");
     SECTION("5 power size")
     fails([&](R &r) { r.power.zeros(n_ray, 3); }, "Input 'rays.power' must have size [n_ray, n_freq].");
+    SECTION("5 power rows")
+    fails([&](R &r) { r.power.zeros(n_ray - 1, 2); }, "Input 'rays.power' must have size [n_ray, n_freq].");
     SECTION("5 power value")
     fails([](R &r) { r.power(4, 1) = -1e-9; }, "Input 'rays.power' must be finite and >= 0.");
     SECTION("6 aod size")
