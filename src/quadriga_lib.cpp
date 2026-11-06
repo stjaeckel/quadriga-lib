@@ -46,6 +46,20 @@ std::string quadriga_lib::quadriga_lib_armadillo_version()
     return versionStream.str();
 }
 
+// Random number generator of Armadillo 10.4.0 to 12.6.1 (e.g. Armadillo 10.8.2 on Ubuntu 22.04)
+// With a system Armadillo of these versions, its headers declare the generator as an external variable that is
+// defined in the Armadillo wrapper library (libarmadillo). quadriga-lib uses Armadillo as headers only and does not
+// link that library, so the variable is defined here. Without it, every program that calls arma::randu, arma::randn
+// or arma::arma_rng::set_seed and links quadriga-lib but not libarmadillo fails to link (e.g. test_bin).
+// Armadillo 12.6.2 and later keep the generator in the headers and never define ARMA_USE_EXTERN_RNG; 10.0 to 10.3
+// use another variable. For both the block below is empty.
+#if defined(ARMA_USE_EXTERN_RNG) && (ARMA_VERSION_MAJOR > 10 || (ARMA_VERSION_MAJOR == 10 && ARMA_VERSION_MINOR >= 4))
+namespace arma
+{
+    thread_local std::mt19937_64 mt19937_64_instance;
+}
+#endif
+
 // Check if AVX2 is supported
 bool quadriga_lib::quadriga_lib_has_AVX2()
 {
