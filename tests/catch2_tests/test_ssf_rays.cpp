@@ -5,12 +5,12 @@
 // Diagnostic output: off by default. QD_DIAG_GBSM=1 prints the tables of this file (see qd_test_diag.hpp).
 
 // Tests of ssf_rays with the TR methods "38.901" and "38.901_MF" (additive angle model, TR polarisation model): the
-// ray layout, the transcription of TR 38.901 clause 7.5 steps 7 to 11 (antenna-free part) for all attributes of all
-// rays, the sub-clusters of Table 7.5-5 with the c_DS of Table 7.5-6, the coupling of step 8, the offsets for
-// NumSubPaths other than 20, the per-frequency slices of "38.901_MF", the LOS and ground-reflection rays, the delay
-// spread, batch independence, pre-sized outputs, zero initial phases, the edge cases N = 0, M = 1, no link, zero
-// cluster spread, thread count, the zenith fold at the poles and the input validation. The QuaDRiGa models and
-// clause 7.6.16 are tested in test_ssf_rays_quadriga.cpp.
+// transcription of TR 38.901 clause 7.5 steps 7 to 11 (antenna-free part) for all attributes of all rays, the
+// sub-clusters of Table 7.5-5 with the c_DS of Table 7.5-6, the coupling of step 8, the offsets for NumSubPaths other
+// than 20, the per-frequency slices of "38.901_MF", the LOS and ground-reflection rays, the delay spread, pre-sized
+// outputs, zero initial phases, the edge cases N = 0, M = 1, no link, zero cluster spread and the zenith fold at the
+// poles; with all three methods: the ray layout, batch independence, thread count and the input validation. The
+// QuaDRiGa models and clause 7.6.16 are tested in test_ssf_rays_quadriga.cpp.
 // Oracles: ref_rays_tr and tr_offsets of qd_test_rays.hpp (typed from the TR text), the Fresnel oracle of the
 // ssf_clusters tests, closed forms in the cases. Inputs: clusters of ssf_clusters on make_fix (qd_test_ssf.hpp, v19
 // UMi LOS, UMi NLOS, UMa LOS with the ground reflection), make_lsp_stats and make_rnd_ray (distinct values).
@@ -44,65 +44,8 @@ using Catch::Matchers::Message;
 
 namespace
 {
-    // All inputs of one ssf_rays call: scenario, fixture, clusters of ssf_clusters, LSP statistics, "ray" values,
-    // frequencies and options
-    struct in_t
-    {
-        spmap sp;
-        fix_t f;
-        out_t cl;
-        lsp_stats_t st;
-        arma::cube rnd;
-        arma::vec fc;
-        std::string method = "38.901", angle_model = "additive", pol_model = "38.901";
-        arma::uword i_freq = 0, N = 0, M = 0, G = 0;
-        bool pol_variability = false, random_phase = true;
-    };
-
-    // Inputs for n_link links with F frequencies (3.5 and 28 GHz); the ground reflection as set in sp
-    in_t make_in(const spmap &sp, arma::uword n_link, const std::string &method, unsigned seed, arma::uword F = 1)
-    {
-        in_t in;
-        in.sp = sp, in.method = method;
-        spmap c = sp;
-        quadriga_lib::scenpar_validate(c);
-        in.N = (arma::uword)c.at("NumClusters") - 1, in.M = (arma::uword)c.at("NumSubPaths");
-        in.G = c.at("GR_enabled") > 0.0 ? 1 : 0;
-        in.f = make_fix(in.N, n_link, F, seed, true);
-        in.f.use_eps = in.G == 1;
-        in.cl = run(sp, in.f, method);
-        in.st = make_lsp_stats(in.f, seed + 1);
-        in.rnd = make_rnd_ray(n_link, in.N, in.M, F, seed + 2);
-        in.fc = (F == 1) ? arma::vec{3.5e9} : arma::vec{3.5e9, 28e9};
-        return in;
-    }
-
-    void call(const in_t &in, std::vector<quadriga_lib::gbsm_rays> &rays)
-    {
-        const bool e = in.f.use_eps;
-        quadriga_lib::ssf_rays(in.sp, in.f.tx, in.f.rx, in.fc, in.f.lsp, in.st.mu, in.st.sigma, in.cl.delay,
-                               in.cl.power, in.cl.aod, in.cl.eod, in.cl.aoa, in.cl.eoa, in.rnd, rays, in.method,
-                               in.i_freq, in.angle_model, in.pol_model, e ? &in.f.eps_re : nullptr,
-                               e ? &in.f.eps_im : nullptr, in.pol_variability, in.random_phase);
-    }
-
-    std::vector<quadriga_lib::gbsm_rays> call(const in_t &in)
-    {
-        std::vector<quadriga_lib::gbsm_rays> rays;
-        call(in, rays);
-        return rays;
-    }
-
-    spmap scen(const char *name, bool gr = false)
-    {
-        spmap sp = read_v19(name);
-        if (gr)
-            sp["GR_enabled"] = 1.0;
-        return sp;
-    }
-
     // Link l against the transcription at frequency in.i_freq
-    void check_link(const quadriga_lib::gbsm_rays &r, const in_t &in, arma::uword l)
+    void check_link(const quadriga_lib::gbsm_rays &r, const rays_in_t &in, arma::uword l)
     {
         const ref_rays_t e = ref_rays_tr(in.sp, in.f, in.cl, in.st, in.rnd, in.fc, l, in.i_freq,
                                          in.method == "38.901_MF", in.random_phase);
@@ -132,23 +75,10 @@ namespace
         CHECK(d_J < 1e-12);
     }
 
-    // Exact equality of two ray objects
-    bool same(const quadriga_lib::gbsm_rays &a, const quadriga_lib::gbsm_rays &b)
-    {
-        auto eq = [](const auto &x, const auto &y)
-        { return arma::size(x) == arma::size(y) && arma::all(arma::vectorise(x) == arma::vectorise(y)); };
-        return a.method == b.method && eq(a.tx_pos, b.tx_pos) && eq(a.rx_pos, b.rx_pos) &&
-               eq(a.center_frequency, b.center_frequency) && eq(a.delay, b.delay) && eq(a.power, b.power) &&
-               eq(a.aod, b.aod) && eq(a.eod, b.eod) && eq(a.aoa, b.aoa) && eq(a.eoa, b.eoa) && eq(a.M, b.M) &&
-               eq(a.path_type, b.path_type) && eq(a.tap, b.tap) && eq(a.gr_eps_re, b.gr_eps_re) &&
-               eq(a.gr_eps_im, b.gr_eps_im) && a.fbs_pos.empty() && b.fbs_pos.empty() && a.lbs_pos.empty() &&
-               b.lbs_pos.empty() && a.fallback.empty() && b.fallback.empty();
-    }
-
     // Inputs of the links 'rows' only
-    in_t subset(const in_t &in, const arma::uvec &rows)
+    rays_in_t subset(const rays_in_t &in, const arma::uvec &rows)
     {
-        in_t s = in;
+        rays_in_t s = in;
         s.f.tx = in.f.tx.rows(rows), s.f.rx = in.f.rx.rows(rows);
         s.f.eps_re = in.f.eps_re.rows(rows), s.f.eps_im = in.f.eps_im.rows(rows);
         for (auto p : {std::make_pair(&s.f.lsp, &in.f.lsp), std::make_pair(&s.st.mu, &in.st.mu),
@@ -166,7 +96,7 @@ namespace
 
     // Offset of ray i of NLOS cluster n per unit spread, recovered from the azimuth (q = 0 AOD, 1 AOA) or, without
     // a zenith fold, the elevation (q = 2 ZOD, 3 ZOA): alpha = (angle - centre) / c, in degrees
-    double offset_of(const quadriga_lib::gbsm_rays &r, const in_t &in, arma::uword l, arma::uword n, arma::uword i,
+    double offset_of(const quadriga_lib::gbsm_rays &r, const rays_in_t &in, arma::uword l, arma::uword n, arma::uword i,
                      int q, double c)
     {
         const arma::uword s = 1 + in.G + n;
@@ -187,15 +117,15 @@ namespace
 
 TEST_CASE("ssf_rays - output layout: entries, sizes, path types, taps and empty scatterers")
 {
+    // TR methods: frequency i_freq = n_freq - 1 only; "quadriga": all frequencies, no sub-clusters
     for (const char *method : qd_methods)
     {
-        if (std::string(method) == "quadriga")
-            continue; // until the QuaDRiGa models are implemented
         for (bool gr : {false, true})
         {
-            const arma::uword F = std::string(method) == "38.901" ? 1 : 2;
-            in_t in = make_in(scen("UMa_LOS", gr), 3, method, 11, F);
-            in.i_freq = F - 1;
+            const bool qd = std::string(method) == "quadriga";
+            const arma::uword F = std::string(method) == "38.901" ? 1 : 2, Fo = qd ? F : 1;
+            rays_in_t in = make_rays_in(scen("UMa_LOS", gr), 3, method, 11, F);
+            in.i_freq = qd ? 0 : F - 1;
             std::vector<quadriga_lib::gbsm_rays> rays(7); // resized to n_link
             call(in, rays);
             INFO("method " << method << ", GR " << gr);
@@ -208,10 +138,10 @@ TEST_CASE("ssf_rays - output layout: entries, sizes, path types, taps and empty 
                 CHECK(r.method == method);
                 CHECK(arma::all(r.tx_pos == in.f.tx.row(l).t()));
                 CHECK(arma::all(r.rx_pos == in.f.rx.row(l).t()));
-                CHECK(arma::all(r.center_frequency == arma::vec{in.fc(F - 1)}));
+                CHECK(arma::all(r.center_frequency == (qd ? in.fc : arma::vec{in.fc(F - 1)})));
                 CHECK(r.n_ray() == n_ray);
-                CHECK(arma::size(r.power) == arma::size(n_ray, 1));
-                CHECK(arma::size(r.M) == arma::size(8, n_ray, 1));
+                CHECK(arma::size(r.power) == arma::size(n_ray, Fo));
+                CHECK(arma::size(r.M) == arma::size(8, n_ray, Fo));
                 for (const arma::vec *a : {&r.aod, &r.eod, &r.aoa, &r.eoa})
                     CHECK(a->n_elem == n_ray);
                 REQUIRE((r.path_type.n_elem == n_ray && r.tap.n_elem == n_ray));
@@ -221,17 +151,18 @@ TEST_CASE("ssf_rays - output layout: entries, sizes, path types, taps and empty 
                 {
                     CHECK(r.path_type(1) == 1);
                     CHECK(r.tap(1) == 3);
-                    CHECK(r.gr_eps_re(0) == in.f.eps_re(l, F - 1));
-                    CHECK(r.gr_eps_im(0) == in.f.eps_im(l, F - 1));
+                    const arma::uword k0 = qd ? 0 : F - 1;
+                    CHECK(arma::all(r.gr_eps_re == in.f.eps_re(arma::span(l), arma::span(k0, F - 1)).t()));
+                    CHECK(arma::all(r.gr_eps_im == in.f.eps_im(arma::span(l), arma::span(k0, F - 1)).t()));
                 }
-                CHECK(r.gr_eps_re.n_elem == G);
-                CHECK(r.gr_eps_im.n_elem == G);
+                CHECK(r.gr_eps_re.n_elem == G * Fo);
+                CHECK(r.gr_eps_im.n_elem == G * Fo);
                 for (arma::uword n = 0; n < N; ++n)
                     for (arma::uword m = 0; m < M; ++m)
                     {
                         const arma::uword i = 1 + G + n * M + m, base = 3 * (1 + G + n);
                         CHECK(r.path_type(i) == 2);
-                        CHECK((r.tap(i) >= base && r.tap(i) <= base + 2));
+                        CHECK((r.tap(i) >= base && r.tap(i) <= base + (qd ? 0 : 2)));
                         CHECK((m == 0 || r.tap(i) >= r.tap(i - 1))); // every tap a contiguous block
                     }
                 CHECK(r.fbs_pos.empty());
@@ -251,7 +182,7 @@ TEST_CASE("ssf_rays - 38.901 matches TR 7.5 steps 7 to 10")
     for (const auto &c : cases)
     {
         INFO("scenario " << c.first);
-        const in_t in = make_in(scen(c.first, c.second), 6, "38.901", seed++);
+        const rays_in_t in = make_rays_in(scen(c.first, c.second), 6, "38.901", seed++);
         const auto rays = call(in);
         REQUIRE(rays.size() == 6);
         for (arma::uword l = 0; l < 6; ++l)
@@ -263,8 +194,8 @@ TEST_CASE("ssf_rays - 38.901 splits the two strongest clusters into the sub-clus
 {
     // Expected split set: given clusters, checked by delays (slot delay + 0, 1.28, 2.56 c_DS at the positions 0-9,
     // 10-15, 16-19), taps (3·slot + sub-cluster) and the unsplit clusters (slot delay, 3·slot)
-    auto check = [](const quadriga_lib::gbsm_rays &r, const in_t &in, arma::uword l, std::vector<arma::uword> split,
-                    double c_ds)
+    auto check = [](const quadriga_lib::gbsm_rays &r, const rays_in_t &in, arma::uword l,
+                    std::vector<arma::uword> split, double c_ds)
     {
         const arma::uword g = in.method == "38.901_MF" ? in.i_freq : 0;
         for (arma::uword n = 0; n < in.N; ++n)
@@ -291,7 +222,7 @@ TEST_CASE("ssf_rays - 38.901 splits the two strongest clusters into the sub-clus
 
     SECTION("two strongest by coefficient power")
     {
-        const in_t in = make_in(scen("UMi_NLOS"), 4, "38.901", 31);
+        const rays_in_t in = make_rays_in(scen("UMi_NLOS"), 4, "38.901", 31);
         const auto rays = call(in);
         for (arma::uword l = 0; l < 4; ++l)
         {
@@ -304,7 +235,7 @@ TEST_CASE("ssf_rays - 38.901 splits the two strongest clusters into the sub-clus
     }
     SECTION("equal powers: lower index first; one active cluster; no active cluster")
     {
-        in_t in = make_in(scen("UMi_NLOS"), 3, "38.901", 32);
+        rays_in_t in = make_rays_in(scen("UMi_NLOS"), 3, "38.901", 32);
         for (arma::uword n = 0; n < in.N; ++n)
         {
             const arma::uword s = 1 + in.G + n;
@@ -323,7 +254,7 @@ TEST_CASE("ssf_rays - 38.901 splits the two strongest clusters into the sub-clus
     {
         spmap sp = scen("UMi_NLOS");
         sp["NumSubPaths"] = 19.0;
-        const in_t in = make_in(sp, 2, "38.901", 33);
+        const rays_in_t in = make_rays_in(sp, 2, "38.901", 33);
         const auto rays = call(in);
         for (arma::uword l = 0; l < 2; ++l)
             check(rays[l], in, l, {}, 11e-9);
@@ -332,7 +263,7 @@ TEST_CASE("ssf_rays - 38.901 splits the two strongest clusters into the sub-clus
     {
         spmap sp = scen("UMi_NLOS");
         sp["PerClusterDS"] = 0.0;
-        const in_t in = make_in(sp, 2, "38.901", 34);
+        const rays_in_t in = make_rays_in(sp, 2, "38.901", 34);
         const auto rays = call(in);
         for (arma::uword l = 0; l < 2; ++l)
         {
@@ -345,7 +276,7 @@ TEST_CASE("ssf_rays - 38.901 splits the two strongest clusters into the sub-clus
     }
     SECTION("UMa: c_DS at 3.5 and 28 GHz, split per frequency")
     {
-        in_t in = make_in(scen("UMa_LOS"), 3, "38.901_MF", 35, 2);
+        rays_in_t in = make_rays_in(scen("UMa_LOS"), 3, "38.901_MF", 35, 2);
         for (arma::uword k = 0; k < 2; ++k)
         {
             in.i_freq = k;
@@ -367,7 +298,7 @@ TEST_CASE("ssf_rays - coupling gives each quantity a permutation of the offsets 
     // Cluster elevations 0.1 rad, so that no zenith fold occurs and the offsets follow from the angles. Per group and
     // quantity: each recovered offset is one of the group's offsets (1e-9), each offset is used once, and the k-th
     // smallest value of the rank block gets the k-th smallest offset (exact)
-    in_t in = make_in(scen("UMi_NLOS"), 3, "38.901", 41);
+    rays_in_t in = make_rays_in(scen("UMi_NLOS"), 3, "38.901", 41);
     in.cl.eod.fill(0.1), in.cl.eoa.fill(0.1);
     const auto rays = call(in);
     spmap sp = in.sp;
@@ -440,7 +371,7 @@ TEST_CASE("ssf_rays - ray offsets for M other than 20")
         REQUIRE(asc.size() == M);
         spmap sp = scen("UMi_NLOS");
         sp["NumClusters"] = sp["NumClusters_min"] = 4.0, sp["NumSubPaths"] = (double)M;
-        const in_t in = make_in(sp, 2, "38.901", 50 + t);
+        const rays_in_t in = make_rays_in(sp, 2, "38.901", 50 + t);
         const auto rays = call(in);
         const double rms_target = M < 20 ? 1.0 : tr_offsets(20).rms_table;
         for (arma::uword l = 0; l < 2; ++l)
@@ -475,10 +406,10 @@ TEST_CASE("ssf_rays - 38.901_MF computes frequency i_freq with its own slices")
 {
     // UMa NLOS at 3.5 and 28 GHz with the ground reflection; frequency 1 equals a call with only the slices and
     // columns of frequency 1, and the split clusters differ between the frequencies
-    in_t in = make_in(scen("UMa_NLOS", true), 4, "38.901_MF", 61, 2);
+    rays_in_t in = make_rays_in(scen("UMa_NLOS", true), 4, "38.901_MF", 61, 2);
     in.i_freq = 1;
     const auto r1 = call(in);
-    in_t one = in;
+    rays_in_t one = in;
     one.fc = arma::vec{28e9}, one.i_freq = 0;
     for (auto p : {std::make_pair(&one.f.lsp, &in.f.lsp), std::make_pair(&one.st.mu, &in.st.mu),
                    std::make_pair(&one.st.sigma, &in.st.sigma)})
@@ -512,7 +443,7 @@ TEST_CASE("ssf_rays - LOS and GR rays carry the slot values and the TR Jones mat
 {
     for (const char *name : {"UMa_LOS", "UMi_NLOS"})
     {
-        const in_t in = make_in(scen(name, true), 4, "38.901", 71);
+        const rays_in_t in = make_rays_in(scen(name, true), 4, "38.901", 71);
         const auto rays = call(in);
         const bool los = std::string(name) == "UMa_LOS";
         for (arma::uword l = 0; l < 4; ++l)
@@ -546,7 +477,7 @@ TEST_CASE("ssf_rays - ray delay spread with sub-clusters equals the analytic val
 {
     // Analytic: each split cluster as three paths of power 10/20, 6/20, 4/20 of P_n at delays tau_n + 0, 1.28, 2.56
     // c_DS (UMi LOS 3.5 GHz: c_DS = 5 ns), the other slots as one path each
-    const in_t in = make_in(scen("UMi_LOS"), 6, "38.901", 81);
+    const rays_in_t in = make_rays_in(scen("UMi_LOS"), 6, "38.901", 81);
     const auto rays = call(in);
     auto ds = [](const std::vector<double> &p, const std::vector<double> &t)
     {
@@ -580,11 +511,9 @@ TEST_CASE("ssf_rays - a link does not depend on the other links")
 {
     for (const char *method : qd_methods)
     {
-        if (std::string(method) == "quadriga")
-            continue; // until the QuaDRiGa models are implemented
         const arma::uword F = std::string(method) == "38.901" ? 1 : 2;
-        in_t in = make_in(scen("UMa_LOS", true), 5, method, 91, F);
-        in.i_freq = F - 1;
+        rays_in_t in = make_rays_in(scen("UMa_LOS", true), 5, method, 91, F);
+        in.i_freq = std::string(method) == "quadriga" ? 0 : F - 1;
         const auto all = call(in);
         const auto sub = call(subset(in, arma::uvec{3, 1}));
         INFO("method " << method);
@@ -597,7 +526,7 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
 {
     // Every attribute on strict external memory of the right size, filled with NaN: written completely, no
     // reallocation; entries of other sizes are resized
-    const in_t in = make_in(scen("UMa_LOS", true), 3, "38.901", 101);
+    const rays_in_t in = make_rays_in(scen("UMa_LOS", true), 3, "38.901", 101);
     const auto ref = call(in);
     const arma::uword n_ray = ref[0].n_ray();
     std::vector<double> buf(3 * (3 + 3 + 1 + 6 * n_ray + 8 * n_ray + 2), NAN);
@@ -646,7 +575,7 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
 
 TEST_CASE("ssf_rays - random_phase false gives zero initial phases")
 {
-    in_t in = make_in(scen("UMi_NLOS", true), 3, "38.901", 111);
+    rays_in_t in = make_rays_in(scen("UMi_NLOS", true), 3, "38.901", 111);
     in.random_phase = false;
     const auto rays = call(in);
     for (arma::uword l = 0; l < 3; ++l)
@@ -668,7 +597,7 @@ TEST_CASE("ssf_rays - N = 0, M = 1 and n_link = 0")
     // N = 0: the LOS and GR rays only
     spmap sp = scen("UMa_LOS", true);
     sp["NumClusters"] = sp["NumClusters_min"] = 1.0;
-    const in_t in0 = make_in(sp, 2, "38.901", 121);
+    const rays_in_t in0 = make_rays_in(sp, 2, "38.901", 121);
     REQUIRE(in0.rnd.n_cols == 0);
     const auto r0 = call(in0);
     REQUIRE(r0.size() == 2);
@@ -683,7 +612,7 @@ TEST_CASE("ssf_rays - N = 0, M = 1 and n_link = 0")
     // M = 1: one ray per cluster at the cluster angles, delay and power
     sp = scen("UMi_LOS");
     sp["NumSubPaths"] = 1.0;
-    const in_t in1 = make_in(sp, 2, "38.901", 122);
+    const rays_in_t in1 = make_rays_in(sp, 2, "38.901", 122);
     const auto r1 = call(in1);
     for (arma::uword l = 0; l < 2; ++l)
     {
@@ -703,7 +632,7 @@ TEST_CASE("ssf_rays - N = 0, M = 1 and n_link = 0")
     }
 
     // No link: the vector is emptied
-    const in_t e = make_in(scen("UMi_LOS"), 0, "38.901", 123);
+    const rays_in_t e = make_rays_in(scen("UMi_LOS"), 0, "38.901", 123);
     std::vector<quadriga_lib::gbsm_rays> rays(3);
     call(e, rays);
     CHECK(rays.empty());
@@ -713,7 +642,7 @@ TEST_CASE("ssf_rays - c_ASA = 0 gives AOA offsets 0")
 {
     spmap sp = scen("UMi_NLOS");
     sp["PerClusterAS_A"] = 0.0;
-    const in_t in = make_in(sp, 3, "38.901", 131);
+    const rays_in_t in = make_rays_in(sp, 3, "38.901", 131);
     const auto rays = call(in);
     for (arma::uword l = 0; l < 3; ++l)
         for (arma::uword i = 1; i < rays[l].n_ray(); ++i)
@@ -725,10 +654,8 @@ TEST_CASE("ssf_rays - results do not depend on the thread count")
 #ifdef _OPENMP
     for (const char *method : qd_methods)
     {
-        if (std::string(method) == "quadriga")
-            continue; // until the QuaDRiGa models are implemented
         const arma::uword F = std::string(method) == "38.901" ? 1 : 2;
-        const in_t in = make_in(scen("UMa_LOS", true), 24, method, 141, F);
+        const rays_in_t in = make_rays_in(scen("UMa_LOS", true), 24, method, 141, F);
         const int n_threads = omp_get_max_threads();
         omp_set_num_threads(1);
         const auto serial = call(in);
@@ -746,7 +673,7 @@ TEST_CASE("ssf_rays - zenith fold at the poles")
     // pole. All rays against the transcription; in addition, per cluster, the zenith angles of arrival form the set
     // fold(90 - el_c + c_ZSA·alpha) over the 20 offsets of Table 7.5-3 (the sub-cluster groups together hold all 20),
     // with fold(t) = t mod 360, then 360 - t above 180 deg
-    in_t in = make_in(scen("UMi_NLOS"), 2, "38.901", 151);
+    rays_in_t in = make_rays_in(scen("UMi_NLOS"), 2, "38.901", 151);
     for (arma::uword s = 1; s < 1 + in.N; ++s)
         for (arma::uword l = 0; l < 2; ++l)
             in.cl.eoa(l, s, 0) = (s % 2 ? 89.0 : -89.0) * pi / 180.0, in.cl.eod(l, s, 0) = -in.cl.eoa(l, s, 0);
@@ -778,66 +705,64 @@ TEST_CASE("ssf_rays - zenith fold at the poles")
 TEST_CASE("ssf_rays - input validation")
 {
     // UMa LOS (N = 12, M = 20, n_gen = 3372) with the ground reflection, 3 links; "38.901" with one frequency,
-    // "38.901_MF" with two and i_freq = 1. Each case changes one thing and expects the message
-    typedef std::function<void(in_t &)> mut_t;
-    for (const char *method : {"38.901", "38.901_MF"})
+    // "38.901_MF" with two and i_freq = 1, "quadriga" with two. Each case changes one thing and expects the message
+    typedef std::function<void(rays_in_t &)> mut_t;
+    for (const char *method : qd_methods)
     {
-        const bool mf = std::string(method) == "38.901_MF";
-        in_t base = make_in(scen("UMa_LOS", true), 3, method, 161, mf ? 2 : 1);
+        const bool mf = std::string(method) == "38.901_MF", is_qd = std::string(method) == "quadriga";
+        rays_in_t base = make_rays_in(scen("UMa_LOS", true), 3, method, 161, std::string(method) == "38.901" ? 1 : 2);
         base.i_freq = mf ? 1 : 0;
-        const std::string nf = mf ? "2" : "1";
-        auto qd = [](in_t &x) { x.method = "quadriga", x.i_freq = 0, x.rnd = x.rnd.slices(0, 0); };
+        auto qd = [](rays_in_t &x) { x.method = "quadriga", x.i_freq = 0, x.rnd = x.rnd.slices(0, 0); };
         std::vector<std::pair<mut_t, std::string>> bad = {
-            {[](in_t &x) { x.method = "QuaDRiGa"; }, "Input 'method' must be '38.901', '38.901_MF' or 'quadriga'."},
-            {[](in_t &x) { x.angle_model = "Additive"; }, "Input 'angle_model' must be 'additive' or 'rotation'."},
-            {[](in_t &x) { x.pol_model = "TR"; }, "Input 'pol_model' must be '38.901' or 'quadriga'."},
-            {[](in_t &x) { x.pol_model = "quadriga", x.pol_variability = true; },
+            {[](rays_in_t &x) { x.method = "QuaDRiGa"; },
+             "Input 'method' must be '38.901', '38.901_MF' or 'quadriga'."},
+            {[](rays_in_t &x) { x.angle_model = "Additive"; }, "Input 'angle_model' must be 'additive' or 'rotation'."},
+            {[](rays_in_t &x) { x.pol_model = "TR"; }, "Input 'pol_model' must be '38.901' or 'quadriga'."},
+            {[](rays_in_t &x) { x.pol_model = "quadriga", x.pol_variability = true; },
              "Input 'pol_variability' needs pol_model '38.901'."},
-            {[](in_t &x) { x.sp["NumSubPaths"] = 0.0; },
+            {[](rays_in_t &x) { x.sp["NumSubPaths"] = 0.0; },
              "Value of 'NumSubPaths' must be an integer from 1 to 1000."},
-            {[](in_t &x) { x.f.rx = x.f.rx.cols(0, 1); }, "Input 'rx_pos' must have 3 columns."},
-            {[](in_t &x) { x.f.tx = x.f.tx.rows(0, 1); },
+            {[](rays_in_t &x) { x.f.rx = x.f.rx.cols(0, 1); }, "Input 'rx_pos' must have 3 columns."},
+            {[](rays_in_t &x) { x.f.tx = x.f.tx.rows(0, 1); },
              "Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."},
-            {[](in_t &x) { x.fc.reset(); }, "Input 'center_frequency' cannot be empty."},
-            {[](in_t &x) { x.fc(0) = 0.0; }, "Input 'center_frequency' must be finite and > 0."},
-            {[](in_t &x) { x.i_freq = x.fc.n_elem; },
-             "Input 'i_freq' is out of range for " + std::to_string(base.fc.n_elem) + " frequencies."},
-            {[qd](in_t &x) { qd(x), x.i_freq = 1, x.fc = arma::vec{3.5e9, 28e9}; },
+            {[](rays_in_t &x) { x.fc.reset(); }, "Input 'center_frequency' cannot be empty."},
+            {[](rays_in_t &x) { x.fc(0) = 0.0; }, "Input 'center_frequency' must be finite and > 0."},
+            {[](rays_in_t &x) { x.i_freq = x.fc.n_elem; },
+             is_qd ? "Input 'i_freq' must select the first frequency for method 'quadriga'."
+                   : "Input 'i_freq' is out of range for " + std::to_string(base.fc.n_elem) + " frequencies."},
+            {[qd](rays_in_t &x) { qd(x), x.i_freq = 1, x.fc = arma::vec{3.5e9, 28e9}; },
              "Input 'i_freq' must select the first frequency for method 'quadriga'."},
-            {[](in_t &x) { x.f.lsp = x.f.lsp.rows(0, 1); }, "Input 'lsp' must have size [n_link, n_freq, 8]."},
-            {[](in_t &x) { x.st.mu = x.st.mu.slices(0, 6); }, "Input 'lsp_mu' must have size [n_link, n_freq, 8]."},
-            {[](in_t &x) { x.st.sigma = x.st.sigma.rows(1, 2); },
+            {[](rays_in_t &x) { x.f.lsp = x.f.lsp.rows(0, 1); }, "Input 'lsp' must have size [n_link, n_freq, 8]."},
+            {[](rays_in_t &x) { x.st.mu = x.st.mu.slices(0, 6); },
+             "Input 'lsp_mu' must have size [n_link, n_freq, 8]."},
+            {[](rays_in_t &x) { x.st.sigma = x.st.sigma.rows(1, 2); },
              "Input 'lsp_sigma' must have size [n_link, n_freq, 8]."},
-            {[](in_t &x) { x.cl.power = x.cl.power.cols(0, 5); },
+            {[](rays_in_t &x) { x.cl.power = x.cl.power.cols(0, 5); },
              "Input 'power' must have size [n_link, n_slot, n_freq]."},
-            {[](in_t &x) { x.rnd = x.rnd.cols(0, 3370); },
+            {[](rays_in_t &x) { x.rnd = x.rnd.cols(0, 3370); },
              "Input 'rnd_ray' must have size [n_link, 3372, n_freq] for the TR methods or [n_link, 3372, 1] for "
              "'quadriga'."},
-            {[](in_t &x) { x.f.use_eps = false; },
+            {[](rays_in_t &x) { x.f.use_eps = false; },
              "Inputs 'gr_eps_re' and 'gr_eps_im' are required when 'GR_enabled' is set."},
-            {[](in_t &x) { x.f.eps_im = x.f.eps_im.rows(0, 1); },
+            {[](rays_in_t &x) { x.f.eps_im = x.f.eps_im.rows(0, 1); },
              "Inputs 'gr_eps_re' and 'gr_eps_im' must have size [n_link, n_freq]."},
-            {[](in_t &x) { x.f.eps_re(0, 0) = NAN; }, "Inputs 'gr_eps_re' and 'gr_eps_im' must be finite."},
-            {[](in_t &x) { x.f.eps_re(1, 0) = 0.99; },
+            {[](rays_in_t &x) { x.f.eps_re(0, 0) = NAN; }, "Inputs 'gr_eps_re' and 'gr_eps_im' must be finite."},
+            {[](rays_in_t &x) { x.f.eps_re(1, 0) = 0.99; },
              "Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0."},
-            {[](in_t &x) { x.f.eps_im(2, 0) = -1e-9; },
+            {[](rays_in_t &x) { x.f.eps_im(2, 0) = -1e-9; },
              "Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0."},
-            {[](in_t &x) { x.f.rx(1, 2) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
-            {[](in_t &x) { x.cl.power(1, 4, x.i_freq) = -1e-12; }, "Input 'power' must be finite and >= 0."},
-            {[](in_t &x) { x.st.mu(2, x.i_freq, 5) = NAN; }, "Input 'lsp_mu' must be finite."},
-            {[](in_t &x) { x.st.mu(0, x.i_freq, 7) = INFINITY; }, "Input 'lsp_mu' must be finite."},
-            {[](in_t &x) { x.st.sigma(1, x.i_freq, 7) = -0.1; }, "Input 'lsp_sigma' must be finite and >= 0."},
-            {[](in_t &x) { x.pol_model = "quadriga", x.f.lsp(1, x.i_freq, 7) = 0.0; },
+            {[](rays_in_t &x) { x.f.rx(1, 2) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
+            {[](rays_in_t &x) { x.cl.power(1, 4, x.i_freq) = -1e-12; }, "Input 'power' must be finite and >= 0."},
+            {[](rays_in_t &x) { x.st.mu(2, x.i_freq, 5) = NAN; }, "Input 'lsp_mu' must be finite."},
+            {[](rays_in_t &x) { x.st.mu(0, x.i_freq, 7) = INFINITY; }, "Input 'lsp_mu' must be finite."},
+            {[](rays_in_t &x) { x.st.sigma(1, x.i_freq, 7) = -0.1; }, "Input 'lsp_sigma' must be finite and >= 0."},
+            {[](rays_in_t &x) { x.pol_model = "quadriga", x.f.lsp(1, x.i_freq, 7) = 0.0; },
              "Input 'lsp' must be finite and > 0."},
-            {[](in_t &x) { x.rnd(2, 1000, x.i_freq) = NAN; }, "Input 'rnd_ray' must be finite."},
-            // Until the QuaDRiGa models are implemented
-            {[](in_t &x) { x.angle_model = "rotation"; }, "Option 'angle_model = rotation' is not available yet."},
-            {[](in_t &x) { x.pol_model = "quadriga"; }, "Option 'pol_model = quadriga' is not available yet."},
-            {[](in_t &x) { x.pol_variability = true; }, "Option 'pol_variability' is not available yet."}};
+            {[](rays_in_t &x) { x.rnd(2, 1000, x.i_freq) = NAN; }, "Input 'rnd_ray' must be finite."}};
         const char *geo[5] = {"delay", "aod", "eod", "aoa", "eoa"};
         for (int a = 0; a < 5; ++a)
         {
-            bad.push_back({[a](in_t &x)
+            bad.push_back({[a](rays_in_t &x)
                            {
                                arma::cube *c[5] = {&x.cl.delay, &x.cl.aod, &x.cl.eod, &x.cl.aoa, &x.cl.eoa};
                                *c[a] = c[a]->cols(0, 5);
@@ -845,7 +770,7 @@ TEST_CASE("ssf_rays - input validation")
                            "Input '" + std::string(geo[a]) +
                                "' must have size [n_link, n_slot, n_freq] for method '38.901_MF', else [n_link, "
                                "n_slot, 1]."});
-            bad.push_back({[a](in_t &x)
+            bad.push_back({[a](rays_in_t &x)
                            {
                                arma::cube *c[5] = {&x.cl.delay, &x.cl.aod, &x.cl.eod, &x.cl.aoa, &x.cl.eoa};
                                (*c[a])(2, 7, x.method == "38.901_MF" ? x.i_freq : 0) = NAN;
@@ -853,37 +778,47 @@ TEST_CASE("ssf_rays - input validation")
                            "Input '" + std::string(geo[a]) + "' must be finite."});
         }
         if (mf)
-            bad.push_back({[](in_t &x) { x.cl.delay = x.cl.delay.slices(0, 0); },
+            bad.push_back({[](rays_in_t &x) { x.cl.delay = x.cl.delay.slices(0, 0); },
                            "Input 'delay' must have size [n_link, n_slot, n_freq] for method '38.901_MF', else "
                            "[n_link, n_slot, 1]."});
-        else // "quadriga" takes the one-frequency inputs of the "38.901" base as they are
+        else if (!is_qd) // "quadriga" takes the one-frequency inputs of the "38.901" base as they are
         {
-            bad.push_back({[](in_t &x) { x.fc = arma::vec{3.5e9, 28e9}; },
+            bad.push_back({[](rays_in_t &x) { x.fc = arma::vec{3.5e9, 28e9}; },
                            "Method '38.901' supports one frequency only; use '38.901_MF' or 'quadriga' for several "
                            "frequencies."});
-            bad.push_back({[qd](in_t &x) { qd(x), x.rnd(0, 3371, 0) = 1.5; },
+            bad.push_back({[qd](rays_in_t &x) { qd(x), x.rnd(0, 3371, 0) = 1.5; },
                            "Values of block 14 of 'rnd_ray' must be in [0, 1]."});
-            bad.push_back({qd, "Option 'method = quadriga' is not available yet."}); // until implemented
+        }
+        else // all frequencies are used
+        {
+            bad.push_back({[](rays_in_t &x) { x.rnd = arma::join_slices(x.rnd, x.rnd); },
+                           "Input 'rnd_ray' must have size [n_link, 3372, n_freq] for the TR methods or [n_link, "
+                           "3372, 1] for 'quadriga'."});
+            bad.push_back({[](rays_in_t &x) { x.cl.power(1, 4, 1) = NAN; }, "Input 'power' must be finite and >= 0."});
+            bad.push_back({[](rays_in_t &x) { x.st.mu(2, 1, 5) = NAN; }, "Input 'lsp_mu' must be finite."});
+            bad.push_back({[](rays_in_t &x) { x.st.sigma(1, 1, 7) = -1.0; },
+                           "Input 'lsp_sigma' must be finite and >= 0."});
         }
 
-        // Values that are not used: other frequencies, other LSP slices, block 14 for the TR methods, heights and
+        // Values that are not used: other frequencies and block 14 for the TR methods, other LSP slices, heights and
         // permittivity without the ground reflection
         const std::vector<mut_t> good = {
-            [](in_t &) {},
-            [](in_t &x)
+            [](rays_in_t &) {},
+            [](rays_in_t &x)
             {
                 const arma::uword k = 1 - x.i_freq;
-                if (x.fc.n_elem == 2)
+                if (x.fc.n_elem == 2 && x.method != "quadriga")
                     x.cl.power(1, 4, k) = NAN, x.st.mu(2, k, 5) = NAN, x.st.sigma(1, k, 7) = -1.0,
                     x.rnd(2, 1000, k) = NAN, x.cl.delay(2, 7, k) = NAN;
             },
-            [](in_t &x) { x.st.mu(0, x.i_freq, 0) = NAN, x.st.sigma(0, x.i_freq, 3) = NAN, x.f.lsp(1, 0, 7) = NAN; },
-            [](in_t &x) { x.rnd(0, 3371, x.i_freq) = 1.5; },
-            [](in_t &x) { x.sp["GR_enabled"] = 0.0, x.f.use_eps = false, x.f.rx(1, 2) = -0.1; },
-            [](in_t &x) { x.sp["GR_enabled"] = 0.0, x.f.eps_re = arma::mat(1, 1, arma::fill::zeros); }};
+            [](rays_in_t &x)
+            { x.st.mu(0, x.i_freq, 0) = NAN, x.st.sigma(0, x.i_freq, 3) = NAN, x.f.lsp(1, 0, 7) = NAN; },
+            [](rays_in_t &x) { x.rnd(0, 3371, x.i_freq) = (x.method == "quadriga") ? 1.0 : 1.5; },
+            [](rays_in_t &x) { x.sp["GR_enabled"] = 0.0, x.f.use_eps = false, x.f.rx(1, 2) = -0.1; },
+            [](rays_in_t &x) { x.sp["GR_enabled"] = 0.0, x.f.eps_re = arma::mat(1, 1, arma::fill::zeros); }};
         for (size_t i = 0; i < bad.size() + good.size(); ++i)
         {
-            in_t x = base;
+            rays_in_t x = base;
             if (i < bad.size())
                 bad[i].first(x);
             else
@@ -905,7 +840,7 @@ TEST_CASE("ssf_rays - input validation")
         // The output is untouched on error
         std::vector<quadriga_lib::gbsm_rays> rays(2);
         rays[0].delay = arma::vec(4, arma::fill::value(7.0));
-        in_t x = base;
+        rays_in_t x = base;
         x.cl.power(0, 0, x.i_freq) = -1.0;
         CHECK_THROWS_AS(call(x, rays), std::invalid_argument);
         CHECK(rays.size() == 2);
