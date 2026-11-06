@@ -140,6 +140,11 @@ website:
 	python3 website_builder/build.py website
 .PHONY: docs docs-check website
 
+# Tutorial notebooks: tutorials/README.md; runs them into tutorials/executed/, in parallel (JOBS=4 by default)
+tutorials:
+	$(MAKE) -C tutorials
+.PHONY: tutorials
+
 moxunit-lib:
 	- rm -rf external/MOxUnit-master
 	unzip external/MOxUnit.zip -d external/
@@ -272,5 +277,6 @@ tidy:   clean
 	- rm -rf wheelhouse 
 	- rm -rf external/MOxUnit-master
 	- rm -rf website
+	- $(MAKE) -C tutorials clean
 	- find docs_builder website_builder tutorials \( -name __pycache__ -o -name .ipynb_checkpoints \) -type d -prune -exec rm -rf {} +
 	
