@@ -37,10 +37,10 @@ as well. Invalid input raises
 states with [sos.rand](sum-of-sinusoids-random-number-generator.md#sos.rand) / [sos.randn](sum-of-sinusoids-random-number-generator.md#sos.randn) at the correlation distances of TR 38.901 clause 7.6.3.3; the keys
 `LOS_state_lambda` and `IO_state_lambda` apply to all links of a scenario and are stated in the NLOS and in the O2I
 files (0 in the other files means "not stated here"). Per BS site and scenario: [gbsm.init_phases](#gbsm.init_phases) draws the phases of
-each random set once (`"lsf"`; `"cluster"` with `set_id = -1` and one set per carrier frequency), and [gbsm.draw](#gbsm.draw)
-evaluates them at the links. Then [path_loss](#path_loss) gives the path loss and the shadow-fading (SF) standard deviation,
-[lsp_generate](#lsp_generate) the LSPs of each link and frequency, and [ssf_clusters](#ssf_clusters) turns the LSPs and the cluster random values
-into cluster delays, powers and angles.
+each random set once (`"lsf"`; `"cluster"` and `"ray"` with `set_id = -1` and one set per carrier frequency), and
+[gbsm.draw](#gbsm.draw) evaluates them at the links. Then [path_loss](#path_loss) gives the path loss and the shadow-fading (SF) standard
+deviation, [lsp_generate](#lsp_generate) the LSPs of each link and frequency, and [ssf_clusters](#ssf_clusters) turns the LSPs and the cluster
+random values into cluster delays, powers and angles.
 
 **Random sets.** The spatially correlated random values come in sets of generators, one column of `rnd` each;
 `N = NumClusters - 1`, column `b·N + n` of a `"cluster"` set belongs to block `b` and NLOS cluster `n`:
@@ -50,11 +50,36 @@ into cluster delays, powers and angles.
 | `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR, Normal(0,1); 8 absolute TOA, Normal(0,1); 9 ground permittivity, 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | 3 and 4, 5 and 6 | [lsp_generate](#lsp_generate) `rnd`, [path_loss](#path_loss) `rnd_he` (column 10) |
 | `"cluster"`, -1 | `9·N` | block 0 cluster delay, Uniform(0,1); 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 offset of AOD, AOA; 7, 8 offset of ZOD, ZOA, Normal(0,1) | `SC_lambda` | blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 | [ssf_clusters](#ssf_clusters) `rnd` |
 | `"cluster"`, `k` | `N` | cluster shadowing of frequency `k`, Normal(0,1) | `SC_lambda` | none | [ssf_clusters](#ssf_clusters) `rnd_freq`, slice `k` |
+| `"ray"`, -1 | `14·N·M + N` | blocks 0 to 14 (below) | `SC_lambda`; block 14: $\lambda_\tau$ | below | `ssf_rays` `rnd_ray`, method `"quadriga"` |
+| `"ray"`, `k` | `14·N·M + N` | blocks 0 to 14 (below), block 14 unused | `SC_lambda` | below | `ssf_rays` `rnd_ray`, slice `k`, TR methods |
+
+A `"ray"` set holds, with `M = NumSubPaths`, block `b` up to 12 for ray `m` of NLOS cluster `n` in column
+`b·N·M + n·M + m`, block 13 in column `13·N·M + n` and block 14 in column `13·N·M + N + n·M + m`; all blocks are
+Normal(0,1) except block 14, Uniform(0,1):
+
+| Block | Random value | Mirror pair | Used by |
+| --- | --- | --- | --- |
+| 0, 1 | coupling rank of AOD, AOA (TR 38.901 clause 7.5 step 8) | 0 and 1 | all methods |
+| 2, 3 | coupling rank of ZOD, ZOA | 2 and 3 | all methods |
+| 4 | XPR per ray | none | both `pol_model` |
+| 5 | initial phase θθ (`pol_model = "quadriga"`: its only phase) | none | both `pol_model` |
+| 6, 7 | initial phases θφ, φθ | 6 and 7 | `pol_model = "38.901"` |
+| 8 | initial phase φφ | none | `pol_model = "38.901"` |
+| 9 | polarisation power variability θθ (TR 38.901 clause 7.6.16) | none | `pol_variability` |
+| 10, 11 | the same, θφ and φθ | 10 and 11 | `pol_variability` |
+| 12 | the same, φφ | none | `pol_variability` |
+| 13 | XPR per cluster (`N` columns) | none | `pol_model = "quadriga"` |
+| 14 | ray delay | none | method `"quadriga"` |
+
+Block 14 of the shared `"ray"` set has the decorrelation distance
+$\lambda_\tau = 1.6 \cdot c \cdot \bar{c}_\mathrm{DS} / c_\mathrm{ASA}$, limited to 0.1 m to 10 km, with
+$\bar{c}_\mathrm{DS}$ the mean cluster delay spread (TR 38.901 Table 7.5-6) over the frequencies passed to
+[gbsm.draw](#gbsm.draw) and $c_\mathrm{ASA}$ the cluster ASA in rad.
 
 The Tx side of a phase array (slice 1) exchanges the columns of each mirror pair, so that in dual mobility (Tx and Rx
 both move) the departure quantities at the Tx are the arrival quantities of the Tx as a second device. A decorrelation
-distance of 0 is used as 0.1 m. Only the `"lsf"` columns 0 to 8 take part in the bias removal. A set never changes size:
-new random quantities come in new sets (a new `set_type` or `set_id`).
+distance of 0 is used as 0.1 m, except for $\lambda_\tau$. Only the `"lsf"` columns 0 to 8 take part in the bias
+removal. A set never changes size: new random quantities come in new sets (a new `set_type` or `set_id`).
 
 **Conventions.** Positions are in m with the columns x, y, z: `rx_pos` is `(n_link, 3)`, `tx_pos` is `(1, 3)` (one Tx
 for all links) or `(n_link, 3)`; heights are the z coordinates. In 2D mode (`horizontal = True`, the TR behaviour) the
@@ -223,18 +248,17 @@ Spatially correlated normalized random values of one generator set at a set of l
 Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_draw) · [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_draw)
 
 - Evaluates the phases of [gbsm.init_phases](#gbsm.init_phases) at the links, one column per generator; columns, distributions and
-  decorrelation distances: see the set table in the section description. The value of a link does not depend on the
-  other links of the call; in single mobility it does not depend on `tx_pos`
+  decorrelation distances: see the set table in the section description. The value of a link depends neither on the
+  other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
 - Dual mobility: the Tx is a second device on the same maps, its side of each generator uses the mirror generator.
   Every column keeps its distribution; swapping `tx_pos` and `rx_pos` exchanges the columns of each mirror pair and
-  keeps the self-mirrored columns, exactly
+  keeps the self-mirrored columns, exactly. The ray delays (block 14 of the shared `"ray"` set) change 2 to 8 times
+  faster with a Tx move than plane waves at the Tx would (one decorrelation distance, from the cluster ASA)
 - Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are uncorrelated at equal
   horizontal positions, exactly within a block of `n_coeff` consecutive IDs, otherwise up to a random residual of
   standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
 - The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
-- A set never changes size: new random quantities come in new sets (a new `set_type` or `set_id`). A column depends
-  neither on the other columns nor on the other links
-- An empty set (`NumClusters = 1`) gives `(n_link, 0)` and accepts any empty `phase`
+- A set never changes size. An empty set (`NumClusters = 1`) gives `(n_link, 0)` and accepts any empty `phase`
 - The flags take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Usage:
@@ -244,7 +268,7 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
 ```
 
 ### Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, cluster DS and ASA
 - **`set_type`** — Set type of [gbsm.init_phases](#gbsm.init_phases); str
 - **`phase`** — Phases from [gbsm.init_phases](#gbsm.init_phases), finite; `(n_coeff, n_gen, 2)`
 - **`tx_pos`** — Tx positions in m; used in dual mobility, always validated; `(1, 3)` or `(n_link, 3)`
@@ -255,8 +279,9 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
   `"Comb256"`
 - **`floor_id`** — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901 Table 7.2-1, 0
   for outdoor UTs); int or float array; `None` or empty = floor 0; 2D mode only; `(n_link,)`; default: None
-- **`center_freq`** — Carrier frequencies in Hz (messages name it `center_frequency`); ignored and not checked for the
-  `"lsf"` and `"cluster"` sets; `(n_freq,)`; default: None
+- **`center_freq`** — Carrier frequencies in Hz (messages name it `center_frequency`); required by the shared `"ray"`
+  set, whose block 14 uses their mean cluster delay spread: pass the same list as to `ssf_rays` (another list gives
+  other `quadriga` rays); ignored and not checked for all other sets; `(n_freq,)`; default: None
 - **`dual_mobility`** — `True`: Tx and Rx both move; default: False
 - **`horizontal`** — `True`: 2D mode (TR 38.901); `False`: 3D mode (legacy QuaDRiGa); default: True
 
@@ -281,7 +306,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_init_phases) · [M
   phases within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [sos.remove_bias](sum-of-sinusoids-random-number-generator.md#sos.remove_bias) sets the sample mean of
   columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
-- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: empty `"cluster"` sets
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: all sets but `"lsf"` empty
 - The flags take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Usage:
@@ -291,10 +316,10 @@ phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, 
 ```
 
 ### Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
-- **`set_type`** — `"lsf"` or `"cluster"`; `"ray"` is not available yet; str
+- **`scenpar`** — Scenario parameters; the decorrelation distances, `NumClusters` and `NumSubPaths` are used
+- **`set_type`** — `"lsf"`, `"cluster"` or `"ray"`; str
 - **`seed`** — Seed of the site and scenario; int from -1 to 2^63-1; -1 = system random device; default: -1
-- **`set_id`** — `"cluster"`: `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`; default: -1
+- **`set_id`** — `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`; default: -1
 - **`preset`** — Sum-of-sinusoids preset, see [sos.preset](sum-of-sinusoids-random-number-generator.md#sos.preset); sets `n_coeff`; default: `"Comb256"`
 - **`tx_pos`**, **`rx_pos`** — `"lsf"` only: positions in m for the bias removal, as in [gbsm.draw](#gbsm.draw); default: None
 - **`dual_mobility`**, **`remove_bias`**, **`horizontal`** — `"lsf"`: Tx and Rx both move; remove the sample mean; 2D

@@ -1,7 +1,7 @@
 function test_gbsm_draw
 % MEX interface test for quadriga_lib.gbsm_draw.
 % Scope: argument and output handling, set types and set index, defaults, error paths.
-% Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, test_gbsm_phases_cluster.cpp).
+% Physics validation lives in the Catch2 suite (test_gbsm_phases_lsf.cpp, _cluster.cpp, _ray.cpp).
 
 % ---- Set type 'lsf' ----
 %% Setup: phases of a scenario with distinct decorrelation distances, 5 links
@@ -229,7 +229,26 @@ rc = quadriga_lib.gbsm_draw( sp, 'cluster', pc, tx_pos, rx_pos );
 assertEqual( quadriga_lib.gbsm_draw( sp, 'cluster', pc, tx_pos, rx_pos, 0, [], [], 3.5e9 ), rc );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'rays', ph, tx_pos, rx_pos ), ...
     'Input ''set_type'' must be ''lsf'', ''cluster'' or ''ray''.' );                               % C++
-assert_throws( @() quadriga_lib.gbsm_draw( sp, 'ray', ph, tx_pos, rx_pos ), 'Set type ''ray'' is not available yet.' );
+
+%% Set type 'ray': [n_link, 14·N·M + N]; center_freq is required by the shared set (set_id = 0) only
+sr = struct( 'NumClusters', 3, 'NumClusters_min', 1, 'NumSubPaths', 4, 'SC_lambda', 15, ...
+    'PerClusterDS', 11, 'PerClusterDS_gamma', -2, 'PerClusterAS_A', 22 );            % N = 2, M = 4
+n_link = size( rx_pos, 1 );
+pr = quadriga_lib.gbsm_init_phases( sr, 'ray', 7 );
+rr = quadriga_lib.gbsm_draw( sr, 'ray', pr, tx_pos, rx_pos, 0, [], [], 3.5e9 );
+assertEqual( size(rr), [n_link, 114] );
+assertTrue( all( all( rr(:, 107:114) > 0 & rr(:, 107:114) < 1 ) ) );               % block 14, Uniform
+assertTrue( max(max(abs(rr(:, 1:106)))) < 6 && std(rr(:)) > 0.1 );
+assertFalse( isequal( quadriga_lib.gbsm_draw( sr, 'ray', pr, tx_pos, rx_pos, 0, [], [], 28e9 ), rr ) );
+assert_throws( @() quadriga_lib.gbsm_draw( sr, 'ray', pr, tx_pos, rx_pos ), ...
+    'Input ''center_frequency'' is required for the shared ''ray'' set.' );                       % C++
+assert_throws( @() quadriga_lib.gbsm_draw( sr, 'ray', pr, tx_pos, rx_pos, 0, [], [], -1 ), ...
+    'Input ''center_frequency'' must be finite and > 0.' );                                      % C++
+pk = quadriga_lib.gbsm_init_phases( sr, 'ray', 7, 2 );
+rk = quadriga_lib.gbsm_draw( sr, 'ray', pk, tx_pos, rx_pos, 2 );                         % k >= 1
+assertEqual( size(rk), [n_link, 114] );
+assertEqual( quadriga_lib.gbsm_draw( sr, 'ray', pk, tx_pos, rx_pos, 2, [], [], [ -1, NaN ] ), rk );
+assert_throws( @() quadriga_lib.gbsm_draw( sr, 'ray', pk, tx_pos, rx_pos, -1 ), msg_set );
 
 end
 % Request 2 outputs so that the output-count guard fires

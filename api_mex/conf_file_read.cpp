@@ -34,7 +34,7 @@ caller draws the LOS, indoor and O2I states with [[sos_rand]] / [[sos_randn]] at
 distances of TR 38.901 clause 7.6.3.3; the fields `LOS_state_lambda` and `IO_state_lambda` apply to
 all links of a scenario and are stated in the NLOS and in the O2I files (0 in the other files means
 "not stated here"). Per BS site and scenario: [[gbsm_init_phases]] draws the phases of each random
-set once (`'lsf'`; `'cluster'` with `set_id = 0` and one set per carrier frequency), and
+set once (`'lsf'`; `'cluster'` and `'ray'` with `set_id = 0` and one set per carrier frequency), and
 [[gbsm_draw]] evaluates them at the links. Then [[path_loss]] gives the path loss and the
 shadow-fading (SF) standard deviation, [[lsp_generate]] the LSPs of each link and frequency, and
 [[ssf_clusters]] turns the LSPs and the cluster random values into cluster delays, powers and
@@ -49,12 +49,37 @@ angles.<br><br>
 | `'lsf'` | 11 | 1 to 8 DS, KF, SF, ASD, ASA, ESD, ESA, XPR, Normal(0,1); 9 absolute TOA, Normal(0,1); 10 ground permittivity, 11 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (1 to 8), `absTOA_lambda` (9), `SC_lambda` (10), `SF_lambda` (11) | 4 and 5, 6 and 7 | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 11) |
 | `'cluster'`, 0 | `9·N` | block 0 cluster delay, Uniform(0,1); 1, 2 sign of AOD, AOA; 3, 4 sign of ZOD, ZOA; 5, 6 offset of AOD, AOA; 7, 8 offset of ZOD, ZOA, Normal(0,1) | `SC_lambda` | blocks 1 and 2, 3 and 4, 5 and 6, 7 and 8 | [[ssf_clusters]] `rnd` |
 | `'cluster'`, `k` | `N` | cluster shadowing of frequency `k`, Normal(0,1) | `SC_lambda` | none | [[ssf_clusters]] `rnd_freq`, slice `k` |
+| `'ray'`, 0 | `14·N·M + N` | blocks 0 to 14 (below) | `SC_lambda`; block 14: $\lambda_\tau$ | below | `ssf_rays` `rnd_ray`, method `'quadriga'` |
+| `'ray'`, `k` | `14·N·M + N` | blocks 0 to 14 (below), block 14 unused | `SC_lambda` | below | `ssf_rays` `rnd_ray`, slice `k`, TR methods |
+
+A `'ray'` set holds, with `M = NumSubPaths` and ray `m` of NLOS cluster `n` (both from 1), block `b`
+up to 12 in column `b·N·M + (n - 1)·M + m`, block 13 in column `13·N·M + n` and block 14 in column
+`13·N·M + N + (n - 1)·M + m`; all blocks are Normal(0,1) except block 14, Uniform(0,1):
+
+| Block | Random value | Mirror pair | Used by |
+| --- | --- | --- | --- |
+| 0, 1 | coupling rank of AOD, AOA (TR 38.901 clause 7.5 step 8) | 0 and 1 | all methods |
+| 2, 3 | coupling rank of ZOD, ZOA | 2 and 3 | all methods |
+| 4 | XPR per ray | none | both `pol_model` |
+| 5 | initial phase θθ (`pol_model = 'quadriga'`: its only phase) | none | both `pol_model` |
+| 6, 7 | initial phases θφ, φθ | 6 and 7 | `pol_model = '38.901'` |
+| 8 | initial phase φφ | none | `pol_model = '38.901'` |
+| 9 | polarisation power variability θθ (TR 38.901 clause 7.6.16) | none | `pol_variability` |
+| 10, 11 | the same, θφ and φθ | 10 and 11 | `pol_variability` |
+| 12 | the same, φφ | none | `pol_variability` |
+| 13 | XPR per cluster (`N` columns) | none | `pol_model = 'quadriga'` |
+| 14 | ray delay | none | method `'quadriga'` |
+
+Block 14 of the shared `'ray'` set has the decorrelation distance
+$\lambda_\tau = 1.6 \cdot c \cdot \bar{c}_\mathrm{DS} / c_\mathrm{ASA}$, limited to 0.1 m to
+10 km, with $\bar{c}_\mathrm{DS}$ the mean cluster delay spread (TR 38.901 Table 7.5-6) over the
+frequencies passed to [[gbsm_draw]] and $c_\mathrm{ASA}$ the cluster ASA in rad.
 
 The Tx side of a phase array (slice 2) exchanges the columns of each mirror pair, so that in dual
 mobility (Tx and Rx both move) the departure quantities at the Tx are the arrival quantities of the
-Tx as a second device. A decorrelation distance of 0 is used as 0.1 m. Only the `'lsf'` columns 1 to
-9 take part in the bias removal. A set never changes size: new random quantities come in new sets
-(a new `set_type` or `set_id`).<br><br>
+Tx as a second device. A decorrelation distance of 0 is used as 0.1 m, except for $\lambda_\tau$.
+Only the `'lsf'` columns 1 to 9 take part in the bias removal. A set never changes size: new random
+quantities come in new sets (a new `set_type` or `set_id`).<br><br>
 
 **Conventions.** Positions are in m with the columns x, y, z: `rx_pos` is `[n_link, 3]`, `tx_pos` is
 `[1, 3]` (one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. In 2D mode

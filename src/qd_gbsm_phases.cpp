@@ -7,6 +7,7 @@
 #include "quadriga_sos.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -18,9 +19,9 @@
 
 // Random sets of the geometry-based stochastic model: the spatially correlated sum-of-sinusoids generators, their
 // phases (gbsm_init_phases) and their evaluation at the links (gbsm_draw). The machinery in the anonymous namespace
-// is generic over a generator table (qd_gbsm_gen_lsf, qd_gbsm_gen_cluster): mirroring, floors, 2D / 3D, dual
-// mobility and bias removal work the same for every set type. The column layouts are documented in the set table of
-// the section description (qd_scenpar.cpp).
+// is generic over a generator table (qd_gbsm_gen_lsf, qd_gbsm_gen_cluster, qd_gbsm_gen_ray): mirroring, floors,
+// 2D / 3D, dual mobility and bias removal work the same for every set type. The column layouts are documented in
+// the set table of the section description (qd_scenpar.cpp).
 //
 // Phase cube of a set, [n_coeff, n_gen, 2]: slice 0 = Rx side, slice 1 = Tx side, slice1.col(g) = slice0.col(m(g)):
 // at the Tx position, generator g evaluates the field of its mirror generator m(g).
@@ -28,10 +29,11 @@
 // Units: positions in [m], rows {x, y, z}; frequencies of the sum-of-sinusoids tables in [1/m]; decorrelation
 // distances in [m], 0 used as 0.1 m (as in sos_randn).
 //
-// Seeds: the "lsf" set uses the seed directly; the "cluster" sets use SplitMix64 of the seed and a set tag (1 for
-// the shared set, 2 + k for frequency k; see derive_seed), so the sets are independent streams, distinct from the
-// "lsf" phases; seed -1 passes on (system random device). No "cluster" generator is bias-corrected; NumClusters = 1
-// (N = 0) gives empty "cluster" sets without a sum-of-sinusoids call.
+// Seeds: the "lsf" set uses the seed directly; the "cluster" and "ray" sets use SplitMix64 of the seed and a set tag
+// ("cluster": 1 for the shared set, 2 + k for frequency k; "ray": 2^63 + 2^32 + 1 and 2^63 + 2^32 + 2 + k; see
+// derive_seed), so the sets are independent streams, distinct from the "lsf" phases; seed -1 passes on (system random
+// device). No "cluster" or "ray" generator is bias-corrected; NumClusters = 1 (N = 0) gives empty "cluster" and "ray"
+// sets without a sum-of-sinusoids call.
 //
 // A set never changes size: new random quantities come in new sets (a new set type or set id). sos_init_phases fills
 // column g from one stream independently of n_gen, and gbsm_draw evaluates each column with its own phases only, so
@@ -91,6 +93,30 @@ namespace
         return gen;
     }
 
+    // Generators of the "ray" sets from a completed scenpar (column layout in the set table): 14·N·M + N for every
+    // set_id; blocks b <= 12 at b·N·M + n·M + m with the mirror blocks (1, 0, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10, 12),
+    // block 13 at 13·N·M + n, block 14 (Uniform) at 13·N·M + N + n·M + m, both self-mirrored
+    // - 'lambda_14': decorrelation distance of block 14 in [m], > 0; the other blocks use SC_lambda (0 -> 0.1 m)
+    std::vector<qd_gbsm_gen> qd_gbsm_gen_ray(const std::unordered_map<std::string, double> &sp, double lambda_14)
+    {
+        const arma::uword mirror_b[13] = {1, 0, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10, 12};
+        arma::uword N, M, G, n_ray, n_gen;
+        qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
+        const arma::uword NM = N * M;
+        const double lambda = sp.at("SC_lambda");
+
+        std::vector<qd_gbsm_gen> gen(n_gen);
+        for (arma::uword g = 0; g < n_gen; ++g)
+        {
+            const bool b14 = g >= 13 * NM + N;
+            gen[g].lambda = b14 ? lambda_14 : ((lambda > 0.0) ? lambda : 0.1);
+            gen[g].uniform = b14;
+            gen[g].mirror = (g < 13 * NM) ? mirror_b[g / NM] * NM + g % NM : g;
+            gen[g].bias = false;
+        }
+        return gen;
+    }
+
     // Frequency tables, one per distinct decorrelation distance of 'gen' (in order of first appearance):
     // sos_preset(preset, freq[t], &acf[t], &dist[t], lambda_t); tab[g] = table index of generator g
     // - 'preset' must be a known preset (checked by the caller with qd_gbsm_n_coeff)
@@ -137,7 +163,7 @@ namespace
     }
 
     // Normalized values of a phase set at a set of links
-    // - gen, freq, acf, dist, tab: generator table (qd_gbsm_gen_lsf or qd_gbsm_gen_cluster) and frequency tables
+    // - gen, freq, acf, dist, tab: generator table (qd_gbsm_gen_lsf, _cluster or _ray) and frequency tables
     //   (qd_gbsm_freq)
     // - phase [n_coeff, n_gen, 2]: slice 0 Rx side, slice 1 Tx side (mirror of slice 0)
     // - R, T [n_link, 3], n_link >= 1: positions from qd_gbsm_positions (T unused without dual mobility)
@@ -334,7 +360,7 @@ Draw the random phases of one generator set of a BS site and scenario
   phases within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos_remove_bias]] sets the sample mean of
   columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
-- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: empty `"cluster"` sets
+- TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal; `NumClusters = 1`: all sets but `"lsf"` empty
 
 ## Declaration:
 ```
@@ -353,10 +379,10 @@ void quadriga_lib::gbsm_init_phases(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
-- **`set_type`** — `"lsf"` or `"cluster"`; `"ray"` is not available yet
+- **`scenpar`** — Scenario parameters; the decorrelation distances, `NumClusters` and `NumSubPaths` are used
+- **`set_type`** — `"lsf"`, `"cluster"` or `"ray"`
 - **`seed`** *(optional)* — Seed of the site and scenario, >= -1; -1 = system random device, new phases on each call
-- **`set_id`** *(optional)* — `"cluster"`: `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`
+- **`set_id`** *(optional)* — `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
 - **`tx_pos`**, **`rx_pos`** *(optional)* — `"lsf"` only: positions in [m] for the bias removal, as in [[gbsm_draw]]
 - **`dual_mobility`**, **`remove_bias`**, **`horizontal`** *(optional)* — `"lsf"`: Tx and Rx both move; remove the
@@ -400,8 +426,6 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
 
     if (!lsf && (tx_pos != nullptr || rx_pos != nullptr))
         throw std::invalid_argument("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only.");
-    if (set_type == "ray")
-        throw std::invalid_argument("Set type 'ray' is not available yet.");
 
     qd_gbsm_check_links(tx_pos, rx_pos);
     const arma::uword n_link = (rx_pos != nullptr) ? rx_pos->n_rows : 0;
@@ -409,15 +433,18 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
     if (do_bias && dual_mobility && tx_pos == nullptr)
         throw std::invalid_argument("Input 'tx_pos' is required for the bias removal with dual mobility.");
 
-    const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp) : qd_gbsm_gen_cluster(sp, set_id);
+    // The decorrelation distances of the "ray" generators are not used here (no bias removal)
+    const bool ray = set_type == "ray";
+    const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp)
+                                             : (ray ? qd_gbsm_gen_ray(sp, 0.1) : qd_gbsm_gen_cluster(sp, set_id));
     const arma::uword n_gen = qd_gbsm_n_gen(sp, set_type, set_id);
     if (phase.n_rows != n_coeff || phase.n_cols != n_gen || phase.n_slices != 2)
         phase.set_size(n_coeff, n_gen, 2);
-    if (n_gen == 0) // N = 0: empty "cluster" set, sos_init_phases rejects zero generators
+    if (n_gen == 0) // N = 0: empty "cluster" or "ray" set, sos_init_phases rejects zero generators
         return;
 
-    // Seed of a "cluster" set: SplitMix64 of the seed and the set tag; -1 passes on
-    auto derive_seed = [](arma::sword seed, arma::sword set_id) -> arma::sword
+    // Seed of a "cluster" or "ray" set: SplitMix64 of the seed and the set tag; -1 passes on
+    auto derive_seed = [ray](arma::sword seed, arma::sword set_id) -> arma::sword
     {
         if (seed == -1)
             return -1;
@@ -428,7 +455,8 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
             z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
             return z ^ (z >> 31);
         };
-        const std::uint64_t tag = (set_id < 0) ? 1ULL : 2ULL + (std::uint64_t)set_id;
+        // Tag set_id + 2 (set_id >= -1): "cluster" 1 shared, 2 + k frequency k; "ray" the same plus 2^63 + 2^32
+        const std::uint64_t tag = (ray ? (1ULL << 63) + (1ULL << 32) : 0ULL) + (std::uint64_t)(set_id + 2);
         return (arma::sword)(splitmix64(splitmix64((std::uint64_t)seed) ^ tag) >> 1);
     };
 
@@ -472,18 +500,18 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
 Spatially correlated normalized random values of one generator set at a set of links
 
 - Evaluates the phases of [[gbsm_init_phases]] at the links, one column per generator; columns, distributions and
-  decorrelation distances: see the set table in the section description. The value of a link does not depend on the
-  other links of the call; in single mobility it does not depend on `tx_pos`
+  decorrelation distances: see the set table in the section description. The value of a link depends neither on the
+  other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
 - Dual mobility: the Tx is a second device on the same maps, its side of each generator uses the mirror generator.
   Every column keeps its distribution; swapping `tx_pos` and `rx_pos` exchanges the columns of each mirror pair and
-  keeps the self-mirrored columns, exactly
+  keeps the self-mirrored columns, exactly. The ray delays (block 14 of the shared `"ray"` set) change 2 to 8 times
+  faster with a Tx move than plane waves at the Tx would (one decorrelation distance, from the cluster ASA)
 - Floors (2D mode): links with equal `floor_id` share one field; fields of different floors are uncorrelated at
   equal horizontal positions, exactly within a block of `n_coeff` consecutive IDs, otherwise up to a random residual
   of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
 - The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation (AVX2 kernel of [[sos_val]])
-- A set never changes size: new random quantities come in new sets (a new `set_type` or `set_id`). A column depends
-  neither on the other columns nor on the other links
-- `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts any empty `phase`
+- A set never changes size. `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts
+  any empty `phase`
 
 ## Declaration:
 ```
@@ -503,7 +531,7 @@ void quadriga_lib::gbsm_draw(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; the decorrelation distances and `NumClusters` are used
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, cluster DS and ASA
 - **`set_type`** — Set type of [[gbsm_init_phases]]
 - **`phase`** — Phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
@@ -512,8 +540,9 @@ void quadriga_lib::gbsm_draw(
 - **`preset`** *(optional)* — Preset of [[gbsm_init_phases]]; another preset with the same `n_coeff` is not detected
 - **`floor_id`** *(optional)* — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901
   Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
-- **`center_frequency`** *(optional)* — Carrier frequencies in [Hz]; ignored and not checked for the `"lsf"` and
-  `"cluster"` sets; `[n_freq]`
+- **`center_frequency`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
+  uses their mean cluster delay spread: pass the same list as to [[ssf_rays]] (another list gives other `quadriga`
+  rays); ignored and not checked for all other sets; `[n_freq]`
 - **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
 - **`horizontal`** *(optional)* — `true`: 2D mode (TR 38.901); `false`: 3D mode (legacy QuaDRiGa)
 
@@ -524,6 +553,7 @@ void quadriga_lib::gbsm_draw(
 - [[lsp_generate]] (the large-scale parameters from the `"lsf"` set)
 - [[path_loss]] (column 10 of the `"lsf"` set as `rnd_he`)
 - [[ssf_clusters]] (the clusters from the `"cluster"` sets)
+- [[ssf_rays]] (the rays from the `"ray"` sets)
 MD!*/
 
 void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scenpar,
@@ -540,7 +570,6 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
                              bool horizontal)
 {
     // Validation, before any output is touched; 'center_frequency' is used by the shared "ray" set only
-    (void)center_frequency;
     const bool lsf = set_type == "lsf";
     if (!lsf && set_type != "cluster" && set_type != "ray")
         throw std::invalid_argument("Input 'set_type' must be 'lsf', 'cluster' or 'ray'.");
@@ -554,10 +583,6 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
 
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
-    if (set_type == "ray")
-        throw std::invalid_argument("Set type 'ray' is not available yet.");
-
-    const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp) : qd_gbsm_gen_cluster(sp, set_id);
     const arma::uword n_gen = qd_gbsm_n_gen(sp, set_type, set_id);
 
     // An empty set accepts any empty cube (MATLAB passes zeros(n_coeff, 0, 2) as 0x0x0)
@@ -570,6 +595,11 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
         throw std::invalid_argument("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'.");
     if (floor_id != nullptr && !horizontal)
         throw std::invalid_argument("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.");
+    const bool shared_ray = set_type == "ray" && set_id == -1;
+    if (shared_ray && center_frequency == nullptr)
+        throw std::invalid_argument("Input 'center_frequency' is required for the shared 'ray' set.");
+    if (shared_ray)
+        qd_gbsm_check_fc(*center_frequency);
 
     if (n_link == 0 || n_gen == 0)
     {
@@ -577,6 +607,28 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
             rnd.set_size(n_link, n_gen);
         return;
     }
+
+    // Decorrelation distance of the ray delays (block 14 of the shared "ray" set; TR 38.901 Table 7.5-6)
+    // - lambda_tau = 1.6·c·cDS/cASA, limited to 0.1 m ... 10 km; cDS the mean cluster delay spread over the
+    //   frequencies, cASA the cluster ASA in rad; cDS = 0 gives 0.1 m, cASA = 0 < cDS gives 10 km
+    // - Block 14 of the per-frequency sets uses SC_lambda (0 -> 0.1 m), as all other "ray" generators
+    double lambda_14 = sp.at("SC_lambda") > 0.0 ? sp.at("SC_lambda") : 0.1;
+    if (shared_ray)
+    {
+        double cds = 0.0;
+        for (arma::uword k = 0; k < center_frequency->n_elem; ++k)
+            cds += qd_gbsm_cds(sp, center_frequency->at(k));
+        cds /= (double)center_frequency->n_elem;
+        const double casa = sp.at("PerClusterAS_A") * 0.017453292519943295;
+        if (cds <= 0.0)
+            lambda_14 = 0.1;
+        else
+            lambda_14 = (casa > 0.0) ? std::min(std::max(1.6 * 299792458.0 * cds / casa, 0.1), 1.0e4) : 1.0e4;
+    }
+
+    const bool ray = set_type == "ray";
+    const std::vector<qd_gbsm_gen> gen = lsf ? qd_gbsm_gen_lsf(sp)
+                                             : (ray ? qd_gbsm_gen_ray(sp, lambda_14) : qd_gbsm_gen_cluster(sp, set_id));
 
     std::vector<arma::mat> freq;
     std::vector<arma::vec> acf, dist;

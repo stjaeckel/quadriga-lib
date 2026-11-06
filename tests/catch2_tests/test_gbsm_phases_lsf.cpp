@@ -459,11 +459,6 @@ TEST_CASE("gbsm_init_phases - input validation")
                                  Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
         }
     }
-    SECTION("the ray set is not available yet")
-    {
-        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1), std::invalid_argument,
-                             Message("Set type 'ray' is not available yet."));
-    }
 }
 
 TEST_CASE("gbsm_draw - lsf: single mobility values equal the sum of sinusoids of each generator")
