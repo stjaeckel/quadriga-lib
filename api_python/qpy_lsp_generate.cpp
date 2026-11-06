@@ -44,12 +44,12 @@ Large-scale parameters of a set of links from normalized random values
 ## Usage:
 ```
 # complex=True (default)
-lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, center_freq, \
-    tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
+lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
+    center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
 
 # complex=False
-lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., \
-    complex=False )
+lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
+    lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., complex=False )
 ```
 
 ## Inputs:

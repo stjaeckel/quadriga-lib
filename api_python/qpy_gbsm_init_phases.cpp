@@ -26,8 +26,8 @@ SOS phases of one random set of a BS site and scenario
 
 ## Usage:
 ```
-phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, dual_mobility, \
-    remove_bias, horizontal )
+phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, \
+    dual_mobility, remove_bias, horizontal )
 ```
 
 ## Inputs:

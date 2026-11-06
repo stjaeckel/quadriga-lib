@@ -73,8 +73,9 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 
 ## Usage:
 ```
-rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, power, \
-    aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, pol_variability, random_phase )
+rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, \
+    delay, power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, \
+    pol_variability, random_phase )
 ```
 
 ## Inputs:

@@ -49,13 +49,16 @@ Also in: [C++](../cpp/channel-functions.md#baseband_freq_response) · [MATLAB](.
 ### Usage:
 ```python
 # Single-freq, bandwidth + evenly spaced carriers
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, carriers=128 )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, \
+    carriers=128 )
 
 # Single-freq, absolute frequencies
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, freq_out=freq_out )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, \
+    freq_out=freq_out )
 
 # Multi-freq, split real / imaginary parts
-hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, freq_in=freq_in, freq_out=freq_out )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, \
+    freq_in=freq_in, freq_out=freq_out )
 ```
 
 ### Inputs:
@@ -109,8 +112,9 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../
 
 ### Usage:
 ```python
-quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, radius_min, \
-    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, coeff_re, coeff_im, i_snap )
+quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, \
+    radius_max, radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, \
+    coeff_re, coeff_im, i_snap )
 ```
 
 ### Inputs:
@@ -515,8 +519,9 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [MATLAB](../mex/cha
 
 ### Usage:
 ```python
-center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, aoa, eoa, \
-    path_coord, no_int, coord, interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M )
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
+    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, \
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M )
 ```
 
 ### Inputs:

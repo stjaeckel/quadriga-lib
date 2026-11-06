@@ -484,8 +484,8 @@ speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.16
     sensitivity=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]), \
-    angular_resolution=5.0)
+speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, \
+    10000.0]), angular_resolution=5.0)
 ```
 
 ### Inputs:
@@ -557,11 +557,12 @@ v, h = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, complex=
 
 # Projected distance / local angles (single-frequency only)
 vr, vi, hr, hi, dist = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, dist=True )
-vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \
-    elevation, orientation=ori, local_angles=True )
+vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, \
+    azimuth, elevation, orientation=ori, local_angles=True )
 
 # Element selection, orientation, element positions
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, orientation, element_pos )
+vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
+    orientation, element_pos )
 
 # Multi-frequency interpolation — output gains a frequency axis
 vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, frequency=freqs )
@@ -799,13 +800,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [MATLAB](quadr
 ### Usage:
 ```python
 # Single-freq, bandwidth + evenly spaced carriers
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, carriers=128 )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, \
+    carriers=128 )
 
 # Single-freq, absolute frequencies
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, freq_out=freq_out )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, \
+    freq_out=freq_out )
 
 # Multi-freq, split real / imaginary parts
-hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, freq_in=freq_in, freq_out=freq_out )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, \
+    freq_in=freq_in, freq_out=freq_out )
 ```
 
 ### Inputs:
@@ -859,8 +863,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#.write_paths_to_obj_file) · [MATLAB](qua
 
 ### Usage:
 ```python
-quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, radius_min, \
-    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, coeff_re, coeff_im, i_snap )
+quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, \
+    radius_max, radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, \
+    coeff_re, coeff_im, i_snap )
 ```
 
 ### Inputs:
@@ -1265,8 +1270,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [MATLAB](quadriga_lib_a
 
 ### Usage:
 ```python
-center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, aoa, eoa, \
-    path_coord, no_int, coord, interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M )
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
+    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, \
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M )
 ```
 
 ### Inputs:
@@ -1616,7 +1622,8 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_t
 
 coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
 
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
+coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., \
+    angles=True )
 
 coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
 ```
@@ -2193,7 +2200,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_write) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, write_defaults )
+quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, \
+    write_defaults )
 ```
 
 ### Inputs:
@@ -2257,8 +2265,8 @@ the same. Block 13, the XPR per cluster, is in column `13·N·M + n`; block 14, 
 
 ### Usage:
 ```python
-rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, center_freq, \
-    dual_mobility, horizontal )
+rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, \
+    center_freq, dual_mobility, horizontal )
 ```
 
 ### Inputs:
@@ -2311,8 +2319,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_init_phases) · [MATLAB](quadriga_li
 
 ### Usage:
 ```python
-phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, dual_mobility, \
-    remove_bias, horizontal )
+phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, \
+    dual_mobility, remove_bias, horizontal )
 ```
 
 ### Inputs:
@@ -2358,8 +2366,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [MATLAB](quadrig
 
 ### Usage:
 ```python
-rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, path_length, \
-    M, method, path_type, tap, gr_eps )
+rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, \
+    path_length, M, method, path_type, tap, gr_eps )
 ```
 
 ### Inputs:
@@ -2416,8 +2424,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [MATLAB](qua
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, output, \
-    i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, use_absolute_delays, stack )
+chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, \
+    output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
+    use_absolute_delays, stack )
 ```
 
 ### Inputs:
@@ -2558,12 +2567,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [MATLAB](quadriga_lib_ap
 ### Usage:
 ```python
 # complex=True (default)
-lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, center_freq, \
-    tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
+lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
+    center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
 
 # complex=False
-lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., \
-    complex=False )
+lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
+    lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., complex=False )
 ```
 
 ### Inputs:
@@ -2817,8 +2826,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [MATLAB](quadriga_lib_ap
 
 ### Usage:
 ```python
-delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( scenpar, tx_pos, rx_pos, lsp, rnd, \
-    method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
+delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( scenpar, tx_pos, rx_pos, \
+    lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
 ```
 
 ### Inputs:
@@ -2995,8 +3004,9 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 
 ### Usage:
 ```python
-rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, power, \
-    aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, pol_variability, random_phase )
+rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, \
+    delay, power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, \
+    pol_variability, random_phase )
 ```
 
 ### Inputs:
@@ -3399,7 +3409,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#mitsuba_xml_file_write) · Not in: MATLAB
 
 ### Usage:
 ```python
-quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf, map_to_itu )
+quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
+    mtl_names, bsdf, map_to_itu )
 ```
 
 ### Input Arguments:
@@ -3504,9 +3515,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_write) · [MATLAB](quadriga_lib_
 
 ### Usage:
 ```python
-vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, \
-    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults, \
-    split_loose_parts )
+vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, \
+    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, \
+    csv_write_defaults, split_loose_parts )
 ```
 
 ### Inputs:
@@ -3738,7 +3749,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_triangle_intersect) · [MATLAB](quadr
 data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
 
 # Unpacked outputs
-fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
+fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, \
+    sub_mesh_index, aabb, use_kernel, gpu_id )
 ```
 
 ### Inputs:

@@ -144,17 +144,20 @@ Also in: [C++](quadriga_lib_api_cpp.md#.calc_beamwidth_deg) · [Python](quadriga
 ### Usage:
 ```matlab
 % Input as struct (struct mode)
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant );
 
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
 
 % Separate inputs (split mode)
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = ...
-    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, ...
+    e_phi_im, azimuth_grid, elevation_grid );
 
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = ...
-    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
-    i_element, threshold_dB );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, ...
+    e_phi_im, azimuth_grid, elevation_grid, i_element, threshold_dB );
 ```
 
 ### Inputs (struct mode):
@@ -252,9 +255,9 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_n
     coupling_im, center_freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 
 % Separate inputs (split-mode, single-freq only); propagation_speed is the 16th input
-arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, elevation_grid_new, ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
-    coupling_im, center_freq, name, propagation_speed );
+arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, ...
+    elevation_grid_new, e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
+    element_pos, coupling_re, coupling_im, center_freq, name, propagation_speed );
 ```
 
 ### Inputs:
@@ -410,20 +413,26 @@ ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3dB, bfr);
 ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, pol, [], spacing);
 
 % Uniform linear array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, [], [], [], [], pattern);
+ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, [], [], ...
+    [], [], pattern);
 
 % 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
+    Ng, dgv, dgh);
 
 % 3GPP-NR array with custom element beamwidth
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, bfr, M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, bfr, M, N, pol, tilt, ...
+    spacing, Mg, Ng, dgv, dgh);
 
 % 3GPP-NR array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
+    Ng, dgv, dgh, pattern);
 
 % Multi-beam M×N array (one combined beam / one beam per direction)
-ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
-ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
+ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, ...
+    spacing);
+ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, ...
+    dir, spacing);
 
 % Separate outputs (2 to 11 outputs)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
@@ -905,8 +914,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#.write_paths_to_obj_file) · [Python](qua
 
 ### Usage:
 ```matlab
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,  radius_min, ...
-    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, coeff_im, i_snap );
+quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
+     radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, ...
+    coeff_im, i_snap );
 ```
 
 ### Inputs:
@@ -1739,9 +1749,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, rx_array, ...
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    center_freq, use_absolute_delays, add_fake_los_path, use_avx2 );
+[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
+    rx_array, fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, ...
+    rx_orientation, center_freq, use_absolute_delays, add_fake_los_path, use_avx2 );
 ```
 
 ### Inputs:
@@ -1899,7 +1909,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [Python
 
 ### Usage:
 ```matlab
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los, window_size );
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, ...
+    include_los, window_size );
 ```
 
 ### Inputs:
@@ -2441,8 +2452,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 
 ### Usage:
 ```matlab
-[ chan, par ] = quadriga_lib.gbsm_single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, ...
-    output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, use_absolute_delays );
+[ chan, par ] = quadriga_lib.gbsm_single_link_channel( tx_array, rx_array, rays, link_gain_dB, ...
+    mobility, output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, ...
+    use_absolute_delays );
 ```
 
 ### Inputs:
@@ -2593,8 +2605,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_ap
 
 ### Usage:
 ```matlab
-[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ...
-    quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads );
+[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, ...
+    lsp_sigma ] = quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma, ...
+    cholesky, clip_spreads );
 ```
 
 ### Inputs:
@@ -2857,8 +2870,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
 
 ### Usage:
 ```matlab
-[ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, rx_pos, ...
-    lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, o2i, n_cluster );
+[ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, ...
+    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, ...
+    o2i, n_cluster );
 ```
 
 ### Inputs:
@@ -3034,9 +3048,9 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 
 ### Usage:
 ```matlab
-rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, power, ...
-    aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps_re, gr_eps_im, ...
-    pol_variability, random_phase );
+rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, ...
+    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps_re, ...
+    gr_eps_im, pol_variability, random_phase );
 ```
 
 ### Inputs:
@@ -3612,9 +3626,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_write) · [Python](quadriga_lib_
 
 ### Usage:
 ```matlab
-[ vert_list_out, face_ind_out ] = quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, ...
-    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults, ...
-    split_loose_parts );
+[ vert_list_out, face_ind_out ] = quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, ...
+    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, ...
+    csv_write_defaults, split_loose_parts );
 ```
 
 ### Inputs:

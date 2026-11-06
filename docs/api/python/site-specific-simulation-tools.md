@@ -183,7 +183,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#mitsuba_xml_file_write) 
 
 ### Usage:
 ```python
-quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf, map_to_itu )
+quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
+    mtl_names, bsdf, map_to_itu )
 ```
 
 ### Input Arguments:
@@ -288,9 +289,9 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_write) · [MATL
 
 ### Usage:
 ```python
-vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, \
-    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults, \
-    split_loose_parts )
+vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, \
+    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, \
+    csv_write_defaults, split_loose_parts )
 ```
 
 ### Inputs:
@@ -522,7 +523,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_triangle_intersect) 
 data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
 
 # Unpacked outputs
-fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
+fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, \
+    sub_mesh_index, aabb, use_kernel, gpu_id )
 ```
 
 ### Inputs:
