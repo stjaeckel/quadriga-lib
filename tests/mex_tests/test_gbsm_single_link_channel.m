@@ -43,6 +43,10 @@ assertEqual( par.tap(1:2), uint64( [0; 3] ) );
 assertEqual( par.link_gain_dB, -90 );
 assertEqual( par.ratio, [0; 0] );
 assertEqual( size(par.fbs_pos), [3, n_path] );
+kept = any( rays.power > 0, 2 ) | rays.path_type < 2;
+assertEqual( par.fbs_pos, single( rays.fbs_pos(:, kept) ) );                 % float32 copies
+assertEqual( par.lbs_pos, single( rays.lbs_pos(:, kept) ) );
+assertTrue( isa(par.gr_pos, 'single') && isequal( size(par.gr_pos), [3, 1] ) );
 
 %% Optional inputs: mobility, output, i_freq (1-based), positions, orientations, kf_ratio, flags
 [ c2, p2 ] = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], [], [], [], [], [], [], [], [] );

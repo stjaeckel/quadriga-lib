@@ -96,8 +96,8 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 | --- | --- | --- |
 | `tap` | `arma::uvec`, `[n_tap]` or `[n_path]` | Tap index per output tap or per path |
 | `n_ray_tap` | `arma::uvec`, `[n_tap]` | Number of kept rays per tap; `"taps"` only |
-| `fbs_pos`, `lbs_pos` | `arma::mat`, `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only |
-| `gr_pos` | `arma::mat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
+| `fbs_pos`, `lbs_pos` | `arma::fmat`, `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
+| `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `arma::vec`, `[n_snap]` | Link gain per snapshot |
 | `b_med`, `b_eff` | `arma::vec`, `[2]` | Of [[gbsm_rays]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
 | `limit` | `arma::vec`, `[2]` | Validity limit of `ssf_paths` per end in [m]; Inf where b is NaN |
@@ -437,11 +437,13 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         c.par_names.push_back("n_ray_tap"), c.par_data.push_back(n_ray_tap);
     if (drift && taps)
     {
-        c.par_names.push_back("fbs_pos"), c.par_data.push_back(arma::mat(arma::reshape(rr.fbs_pos, 3, n_kept)));
-        c.par_names.push_back("lbs_pos"), c.par_data.push_back(arma::mat(arma::reshape(rr.lbs_pos, 3, n_kept)));
+        c.par_names.push_back("fbs_pos");
+        c.par_data.push_back(arma::conv_to<arma::fmat>::from(arma::reshape(rr.fbs_pos, 3, n_kept)));
+        c.par_names.push_back("lbs_pos");
+        c.par_data.push_back(arma::conv_to<arma::fmat>::from(arma::reshape(rr.lbs_pos, 3, n_kept)));
     }
     if (with_gr)
-        c.par_names.push_back("gr_pos"), c.par_data.push_back(gr_pos);
+        c.par_names.push_back("gr_pos"), c.par_data.push_back(arma::conv_to<arma::fmat>::from(gr_pos));
     const std::pair<std::string, arma::vec> rep[5] = {
         {"link_gain_dB", lg}, {"b_med", b_med}, {"b_eff", b_eff}, {"limit", limit}, {"ratio", ratio}};
     for (const auto &x : rep)
