@@ -18,44 +18,52 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
 - Splits the clusters of [[ssf_clusters]] into rays and returns one ray struct per link (fields below): delays,
   coefficient powers, angles, polarization transfer matrices with initial phases, path types and tap indices;
   `fbs_pos`, `lbs_pos` and `fallback` stay empty (see [[ssf_scatterers]])
-- A pure function of the clusters, the LSPs and the random values, without a seed: a link does not depend on the
-  other links of the call
+- A pure function of the clusters, the LSPs and the random values, without a seed: a link does not depend on the other
+  links of the call
 - Ray layout per link, fixed per scenario: ray 1 LOS, 2 GR (if `GR_enabled`), then ray `m` of NLOS cluster `n` (both
-  from 1) at `1 + G + (n - 1)·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays
-- LOS and GR rays: delay, angles and power of their slot; Jones matrices diag(1, -1) and diag(R_par, -R_perp)/R of
-  the ground reflection (TR eqs. (7.6-38) to (7.6-40))
-- NLOS rays: power P_n/M; offsets of Table 7.5-3 scaled by the cluster spreads; coupling (step 8) by the rank blocks
-  of `rnd_ray`; `M` other than 20: QuaDRiGa-NG's offsets below 20, Laplacian quantiles above 20, no sub-clusters
+  from 1) at `1 + G + (n - 1)·M + m` (`G` = 1 with GR, `M` = `NumSubPaths`); clusters at power 0 keep their rays at
+  power 0
+- LOS and GR rays: delay, angles and power of their slot; Jones matrix diag(1, -1) (LOS), GR as in [[ssf_clusters]]
+- NLOS rays: power P_n / `NumSubPaths`; offsets of Table 7.5-3 scaled by the cluster spreads `PerClusterAS_D`,
+  `PerClusterAS_A`, `PerClusterES_A` and the cluster ESD of eq. (7.5-20), `PerClusterES_D_scale`·10^(`lsp_mu` of
+  ESD), or `PerClusterES_D` if the scale is 0; coupling (step 8): within a cluster or sub-cluster, the ray with the k-th
+  smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA, EOD and EOA
+- c_DS, the cluster DS of Table 7.5-6: `max(PerClusterDS_min, PerClusterDS + PerClusterDS_gamma·lg f')` ns with
+  `f' = max(center_freq/1e9, PerClusterDS_fc_min)`; 3.91 ns where `PerClusterDS` = 0
+- `NumSubPaths` other than 20: the offsets of QuaDRiGa-NG (the MATLAB QuaDRiGa fork that uses this library) below 20
+  (mean 0, rms 1), Laplacian quantiles at the rms of Table 7.5-3 above 20; no sub-clusters
 
 | Method | `'38.901'`, `'38.901_MF'` | `'quadriga'` |
 | --- | --- | --- |
-| Frequencies per call | `i_freq` only; slice `i_freq` of `rnd_ray` | all; one geometry, per frequency powers, XPR and Jones matrices; the shared "ray" set |
-| Ray delays | cluster delay; sub-clusters + 0, 1.28, 2.56 c_DS (Table 7.5-6) | cluster delay + 2·c_DS·(u - mean of u in the cluster), u of block 14; negative delays set to 0 |
-| Taps | sub-cluster of the two strongest clusters (`M` = 20), else cluster | cluster |
-| c_DS, ZSD | at frequency `i_freq` | mean over the frequencies |
+| Frequencies per call | `i_freq` only; slice `i_freq` of `rnd_ray`; `'38.901'` takes one frequency | all; one geometry, per frequency powers, XPR and Jones matrices; the shared "ray" set |
+| Ray delays | cluster delay; sub-clusters + 0, 1.28, 2.56 c_DS (Table 7.5-5) | cluster delay + 2·c_DS·(u - mean of u in the cluster), u of block 14; negative delays set to 0 |
+| Taps | sub-cluster of the two strongest clusters (`NumSubPaths` = 20), else cluster | cluster |
+| c_DS, cluster ESD | at frequency `i_freq` | mean over the frequencies |
 
 | Option | Default (TR) | Alternative (QuaDRiGa-NG) |
 | --- | --- | --- |
-| `angle_model` | `'additive'`: offsets added to azimuth and zenith, zenith folded (step 7) | `'rotation'`: offset pattern rotated to the cluster direction; equal at elevation 0 |
-| `pol_model` | `'38.901'`: XPR and four initial phases per ray (steps 9, 10) | `'quadriga'`: rotation polarisation model of QuaDRiGa, one phase, XPR per ray and per cluster |
-| `pol_variability` | `false` | `true`: clause 7.6.16 on the NLOS rays with std `PolVar_sigma`; `pol_model = '38.901'` only |
+| `angle_model` | `'additive'`: offsets added to azimuth and elevation, elevation folded at the poles (step 7) | `'rotation'`: offset pattern rotated to the cluster direction; equal at elevation 0 |
+| `pol_model` | `'38.901'`: XPR and four initial phases per ray (steps 9, 10) | `'quadriga'`: rotation polarization model of QuaDRiGa, one phase, XPR per ray and per cluster |
+| `pol_variability` | `false` | `true`: clause 7.6.16 on the NLOS rays with std `PolVar_sigma` (field default 0: no effect); `pol_model = '38.901'` only |
 
-- Sub-clusters (step 11): the two clusters of largest power at frequency `i_freq`; every tap is a contiguous block
-- `'quadriga'` sets 0.2 to 1.4 % of the active NLOS rays to delay 0 (at most 2.9 % of the NLOS power)
-- `pol_model = 'quadriga'`: the matrix refers to the owner end, the end with the larger z, then x, then y (ends
-  within 1 mm count as equal; the Tx if all tie); the Rx as owner transposes it
-- Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm_draw]], mirrored LSPs and clusters,
-  `PerClusterAS_D` = `PerClusterAS_A`, `PerClusterES_D` = `PerClusterES_A`, `PerClusterES_D_scale` = 0), swapping
-  `tx_pos` and `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = 'quadriga'`
-  with ends within 1 mm of each other, where the Tx stays the owner)
+- Sub-clusters (step 11): the two clusters of largest power at frequency `i_freq` (equal powers: lower index first),
+  rays at the positions 1-10, 11-16 and 17-20 (TR rays 1-8, 19, 20; 9-12, 17, 18; 13-16); every tap is a contiguous
+  block of rays
+- `pol_model = 'quadriga'`: the matrix refers to the owner end, the end with the larger z, then x, then y (ends within
+  1 mm count as equal; the Tx if all tie); the Rx as owner transposes it, so UTs dropped separately at equal heights on
+  either side of the tie plane get transposed matrices
+- Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm_draw]], mirrored LSPs, no EoD offset and no O2I flag
+  in [[ssf_clusters]], equal per-cluster spreads at both ends, `PerClusterES_D_scale` = 0), swapping `tx_pos` and
+  `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = 'quadriga'` with the ends
+  within 1 mm of each other)
 - Messages name the argument `center_freq` as `'center_frequency'`
 
 ## Ray struct:
-One link; all fields are present on output (empty where empty). As input, missing optional fields are empty, other
-missing or unknown fields are an error; integer fields accept any real class. Rays from several sources in one
-struct: at most one LOS and one GR ray, with tap index 0 and 3; the other rays take any other tap indices; one
-`method`; [[ssf_scatterers]] overwrites given scatterers, so solve rays without scatterers separately and
-concatenate the fields.
+One link at one drop. All fields are present on output (empty where empty). As input, missing optional fields are
+empty, other missing or unknown fields are an error; integer fields accept any real class. The struct has scatterers
+when `fbs_pos` has `n_ray` columns (an empty struct counts as having them). Rays added from another source take tap
+indices the struct does not use; at most one LOS and one GR ray and one `method` for all rays. [[ssf_scatterers]]
+overwrites given scatterers, so solve rays without scatterers separately and concatenate the fields.
 
 | Field | Size | Type | Meaning | Required |
 | --- | --- | --- | --- | --- |
@@ -80,34 +88,34 @@ rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu,
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters
+- **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumSubPaths`, the `PerCluster*` fields, `GR_enabled`,
+  `PolVar_sigma`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
-- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]]; `[n_link,
-  n_freq, 8]`
-- **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [[ssf_clusters]];
-  `[n_link, n_slot, n_freq]` for `'38.901_MF'`, else `[n_link, n_slot, 1]`
+- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]]; used: the ESD mean
+  and the XPR mean and std, the XPR LSP for `pol_model = 'quadriga'`; `[n_link, n_freq, 8]`
+- **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [[ssf_clusters]] (`n_slot`
+  slots); `[n_link, n_slot, n_freq]` for `'38.901_MF'`, else `[n_link, n_slot, 1]`
 - **`power`** — Cluster powers from [[ssf_clusters]]; `[n_link, n_slot, n_freq]`
-- **`rnd_ray`** — "ray" sets from [[gbsm_draw]], `n_gen` = 14·N·M + N; TR methods: slice `k` = set `k`, `[n_link,
-  n_gen, n_freq]`; `'quadriga'`: the shared set (`set_id = 0`), `[n_link, n_gen]`
+- **`rnd_ray`** — `'ray'` sets from [[gbsm_draw]] (`n_gen` columns); TR methods: slice `k` = set `k`,
+  `[n_link, n_gen, n_freq]`; `'quadriga'`: the shared set (`set_id = 0`), `[n_link, n_gen]`
 - **`method`** *(optional)* — Method of [[ssf_clusters]]: `'38.901'` (default), `'38.901_MF'` or `'quadriga'`
-- **`i_freq`** *(optional)* — TR methods: index into `center_freq`, 1-based (`center_frequency` of the output then
-  has one entry, so `i_freq` = 1 in [[gbsm_single_link_channel]]); `'quadriga'`: 1; default: 1
-- **`angle_model`** *(optional)* — `'additive'` (default) or `'rotation'`
-- **`pol_model`** *(optional)* — `'38.901'` (default) or `'quadriga'`
+- **`i_freq`** *(optional)* — TR methods: index into `center_freq`, 1-based; `'quadriga'`: must be 1; default: 1
+- **`angle_model`**, **`pol_model`** *(optional)* — See the option table; default: `'additive'`, `'38.901'`
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [[lsp_generate]]; required if
   `GR_enabled`, else ignored; `[n_link, n_freq]`
-- **`pol_variability`** *(optional)* — TR 7.6.16 polarisation power variability; default: `false`
+- **`pol_variability`** *(optional)* — TR 7.6.16 polarization power variability, see the option table; default:
+  `false`
 - **`random_phase`** *(optional)* — `false`: all initial phases 0; default: `true`
 
 ## Output:
-- **`rays`** — Ray structs, one per link; `[1, n_link]` struct array
+- **`rays`** — Ray structs, one per link, TR methods at frequency `i_freq` only; `[1, n_link]` struct array
 
 ## See also:
+- [[ssf_clusters]] (the clusters)
 - [[ssf_scatterers]] (scatterer positions and validity scales of one link)
 - [[ssf_paths]] (paths of one link)
-- [[gbsm_single_link_channel]] (channel coefficients of one link)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

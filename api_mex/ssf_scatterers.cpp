@@ -15,23 +15,22 @@ SECTION!*/
 # SSF_SCATTERERS
 First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
-- NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
-  distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
-  distance) and the angles are exact
-- Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
-  ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
-  `d_min` = 2 m (UMi, UMa, RMa, InF and indoor scenarios) this applies to 5.5 to 13 % of the rays of the TR methods
-  without absolute TOA, to 1.0 to 9.8 % in `'quadriga'` and to at most 2.3 % with absolute TOA; it adds a median
-  delay of up to 5.5 ns (p99 up to 21.7 ns)
-- LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
-  point on z = 0, which requires both ends at z >= 0
-- `rays_out` is a copy of `rays_in` (all fields, about 49 KB per link at 381 rays and one frequency; unchanged fields
-  keep their class) with new `fbs_pos`, `lbs_pos` and `fallback`; `rays_in` is not changed, also when it already
-  holds scatterers
-- `b_med` and `b_eff` are the validity scales of [[ssf_paths]] for planning segments: `b_med` the lower
-  power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 (`drift`, NaN
-  without NLOS power); $b_\text{eff} = \left(\sum P / \sum (P / b^2)\right)^{1/2}$ over the rays with power
-  $P > 0$, with $b$ the end-to-scatterer distance (NLOS), d3D (LOS) or the GR path length (GR) (`phase`)
+- Places the scatterers that the mobility `drift` needs and returns the validity scales of [[ssf_paths]]
+- NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal distances
+  from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx distance) and the
+  angles are exact
+- Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the ray's
+  own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With `d_min` = 2 m
+  this applies to up to about 13 % of the rays (most in the TR methods without absolute TOA, where the first cluster
+  has zero excess delay) and lengthens them by a few ns
+- LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular point
+  on z = 0, which requires both ends at z >= 0
+- `rays_out` is a copy of `rays_in` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and
+  `fallback`; `rays_in` is not changed, also when it already holds scatterers
+- `b_med`, the scale of `drift`: the lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS
+  rays with power > 0, fallback rays included; NaN without NLOS power. `b_eff`, the scale of `phase`:
+  `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0`, with `b` the end-to-scatterer distance (NLOS), d3D
+  (LOS) or the GR path length (GR)
 - One link per call; loop over the elements of a struct array: `rays(l) = quadriga_lib.ssf_scatterers( rays(l) )`
 
 ## Usage:
@@ -41,7 +40,7 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 ## Inputs:
 - **`rays_in`** — Ray struct of one link, see [[ssf_rays]]; `[1, 1]` struct
-- **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], > 0; default: 2
+- **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0; default: 2
 
 ## Outputs:
 - **`rays_out`** — Ray struct with `fbs_pos`, `lbs_pos` `[3, n_ray]` and `fallback` `[n_ray, 1]` (uint32)

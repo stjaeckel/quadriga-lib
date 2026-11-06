@@ -14,44 +14,43 @@ SECTION!*/
 # SSF_CLUSTERS
 Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 5 to 7)
 
-- Turns the LSPs of [[lsp_generate]] and the cluster random values of [[gbsm_draw]] into the
-  clusters of each link, by one of three methods (a method and property table is in the C++
-  documentation of `ssf_clusters`):
-  - `'38.901'` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based
-    calibration. Clusters 25 dB below the strongest get power 0 (no renormalisation); the K-factor
-    in the scaling factors is limited to >= -5 dB. Under spatial consistency (clause 7.6.3.1)
-    evaluate the blocks 1 to 8 of `rnd` (columns N + 1 to 9·N) at the drop or segment start and keep
-    them along the track
-  - `'38.901_MF'`: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs `lsp_anchor`; where the
-    multi-frequency method of the TR is required
-  - `'quadriga'`: S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model
-    for Multiple Frequencies", 2019, with the LOS direction added to the cluster offsets; for
-    tracks, several frequencies and device-to-device links
-- Slots per link: 1 = LOS path, 2 = ground reflection if `GR_enabled > 0` (`G = 1`), then the `N =
-  NumClusters - 1` NLOS clusters; `n_slot = NumClusters + G`. NLOS cluster `n = 1 ... N` is in slot
-  `1 + G + n` and belongs to the columns `b·N + n` of `rnd` (no sorting). Clusters `n >
-  n_cluster(l)` (TR clause 7.6.15) get delay 0, power 0 and the LOS angles. Identify the LOS path by
-  its slot, never by delay or path length: NLOS clusters of the TR methods can have delay 0
-- A scenario is LOS if `KF_mu > -30` dB. In an NLOS scenario the LOS and ground-reflection powers
-  are 0 whatever `lsp` holds (`NumClusters > 1`); legacy QuaDRiGa "NLOS" files with `KF_mu > -30`
-  run as LOS
-- Delays in [s] relative to the LOS delay `d3D/c`; angles in [rad], GCS, elevation convention; slot
-  1 holds the geometric LOS direction. Powers are the coefficient powers of TR eq. (7.5-30), LOS
-  `K/(K+1)`, NLOS clusters `P_n/(K+1)`, without path loss and shadow fading
-- Absolute TOA (TR clause 7.6.9), NLOS scenarios only: `'38.901'`, `'38.901_MF'` add `abs_toa` to
-  the NLOS delays; `'quadriga'` places the first NLOS cluster at `abs_toa` (where `absTOA_mu <=
-  -30`: only where `abs_toa > 0`)
-- Ground reflection (TR clause 7.6.8) on the plane z = 0: slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR
-  methods, on top of the other slots) or `K/(K+1)·R²` (`'quadriga'`), with `R²` the mean of
-  `abs(R_par)²` and `abs(R_perp)²` of TR eqs. (7.6-38), (7.6-39); the coefficient is
-  `sqrt(power)·diag(R_par, -R_perp)/R`, without polarisation `sqrt(power)·exp(j·arg(R_par))`
-- `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if
-  enabled; `rnd` must be empty, `rnd_freq` and `lsp_anchor` are not used
-- Swap reciprocity: with mirrored random values (dual mobility in [[gbsm_draw]]) and mirrored LSPs,
-  swapping `tx_pos` and `rx_pos` exchanges the departure and arrival angles (`'38.901'`:
-  `eod_offset_deg` = 0 and no O2I link; `'quadriga'`: `eod_offset_deg` = 0)
-- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are
-  checked; at least one link is required
+- Turns the LSPs of [[lsp_generate]] and the cluster random values of [[gbsm_draw]] into the clusters of each link, by
+  one of three methods:
+  - `'38.901'` (default): TR 38.901 clause 7.5 steps 5 to 7 at one frequency, for drop-based calibration. Clusters
+    25 dB below the strongest get power 0 (no renormalization); the K-factor in the scaling factors is
+    limited to >= -5 dB. Under spatial consistency (clause 7.6.3.1) evaluate the blocks 1 to 8 of `rnd` (columns
+    N + 1 to 9·N) at the drop or segment start and keep them along the track
+  - `'38.901_MF'`: TR 38.901 clause 7.6.5.1 as written, with the anchor LSPs `lsp_anchor`; where the multi-frequency
+    method of the TR is required
+  - `'quadriga'`: S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple
+    Frequencies", 2019, with the LOS direction added to the cluster offsets; for tracks, several frequencies and
+    device-to-device links
+
+| Property | `'38.901'` | `'38.901_MF'` | `'quadriga'` |
+| --- | --- | --- | --- |
+| Continuous along tracks | no | NLOS only | yes |
+| Same delays and angles at all frequencies | n/a | NLOS, or K the same at all frequencies | yes |
+| Output spreads equal the input spreads | no | no | DS, and AS below the caps, at one frequency without ground reflection |
+| Per-cluster shadowing | yes | yes, per frequency | no |
+
+- `n_slot = NumClusters + G` slots per link (see Terms), `G = 1` if `GR_enabled > 0`. NLOS cluster `n` (from 1) is in
+  slot `1 + G + n` and belongs to the columns `b·N + n` of `rnd` (no sorting). Clusters `n > n_cluster(l)` (TR clause
+  7.6.15) get delay 0, power 0 and the LOS angles. Identify the LOS path by its slot: NLOS clusters of the TR methods
+  can have delay 0
+- A scenario is LOS if `KF_mu > -30` dB. In an NLOS scenario the LOS and ground-reflection powers are 0 whatever `lsp`
+  holds (`NumClusters > 1`); legacy QuaDRiGa "NLOS" files with `KF_mu > -30` run as LOS
+- Delays in [s] relative to the LOS delay `d3D/c`; slot 1 holds the geometric LOS direction. Powers are the coefficient
+  powers of TR eq. (7.5-30), LOS `K/(K+1)`, NLOS clusters `P_n/(K+1)`, without path loss and shadow fading
+- Absolute TOA (TR clause 7.6.9), NLOS scenarios only: `'38.901'`, `'38.901_MF'` add `abs_toa(l)` to the NLOS delays;
+  `'quadriga'` places the first NLOS cluster at `abs_toa(l)` (where `absTOA_mu <= -30`: only where `abs_toa(l) > 0`)
+- Ground reflection (TR clause 7.6.8) on the plane z = 0: slot power `K/(K+1)·(d3D/d_GR)²·R²` (TR methods, on top of
+  the other slots) or `K/(K+1)·R²` (`'quadriga'`), with `R²` the mean of `abs(R_par)²` and `abs(R_perp)²` of TR eqs.
+  (7.6-38), (7.6-39); the coefficient is `sqrt(power)·diag(R_par, -R_perp)/R`, without polarization
+  `sqrt(power)·exp(j·arg(R_par))`
+- `NumClusters = 1`: the LOS path only, power 1 in all scenarios, plus the ground reflection if enabled; `rnd` must be
+  empty, `rnd_freq` and `lsp_anchor` are not used
+- `scenpar`, `lsp`, `rnd` and `rnd_freq` must come from the same scenario; only their sizes are checked; at least one
+  link is required
 
 ## Usage:
 ```
@@ -60,42 +59,41 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`, `KF_mu`, `absTOA_mu`,
-  `r_DS`, `LNS_ksi`, `GR_enabled`
+- **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`, `KF_mu`, `absTOA_mu`, `r_DS`, `LNS_ksi`,
+  `GR_enabled`
 - **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
-- **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0, KF (slice
-  2) >= 0; `'38.901'`: one frequency; `[n_link, n_freq, 8]`
-- **`rnd`** — Shared cluster set of [[gbsm_draw]] (`'cluster'`, `set_id = 0`), columns 1 to N in [0,
-  1]; `[n_link, 9·N]`
+- **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0, KF (slice 2) >= 0;
+  `'38.901'`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
+- **`rnd`** — Shared cluster set of [[gbsm_draw]] (`'cluster'`, `set_id = 0`), columns 1 to N in [0, 1];
+  `[n_link, 9·N]`
 - **`method`** *(optional)* — `'38.901'` (default), `'38.901_MF'` or `'quadriga'`
-- **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [[gbsm_draw]], slice `k` from `set_id
-  = k`; required by `'38.901'` and `'38.901_MF'`; `[n_link, N, n_freq]`
-- **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz); required by
+- **`rnd_freq`** *(optional)* — Per-frequency cluster sets of [[gbsm_draw]], slice `k` from `set_id = k` (`'38.901'`:
+  one slice, the set of the frequency in `lsp`); required by the TR methods; `[n_link, N, n_freq]`
+- **`lsp_anchor`** *(optional)* — LSPs at the anchor frequency (e.g. 2 GHz) from [[lsp_generate]]; required by
   `'38.901_MF'`; `[n_link, 1, 8]`
-- **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]]; used by `'38.901'`
-  and `'quadriga'` in NLOS scenarios; omitted or empty = 0; `[n_link, n_freq]`
-- **`abs_toa`** *(optional)* — Absolute TOA offset in [s] from [[lsp_generate]], >= 0; required by
-  `'quadriga'` in NLOS scenarios with `absTOA_mu > -30`; omitted or empty = no offset; `[n_link]`
-- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity `gr_eps_re - j·gr_eps_im`,
+- **`eod_offset_deg`** *(optional)* — EoD offset in [deg] from [[lsp_generate]]; used by `'38.901'` and `'quadriga'` in
+  NLOS scenarios; omitted or empty = 0; `[n_link, n_freq]`
+- **`abs_toa`** *(optional)* — Absolute TOA offset in [s] from [[lsp_generate]], >= 0; required by `'quadriga'` in NLOS
+  scenarios with `absTOA_mu > -30`; omitted or empty = no offset; `[n_link]`
+- **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity `gr_eps_re - j·gr_eps_im` from [[lsp_generate]],
   real part >= 1, imaginary part >= 0; required if `GR_enabled > 0`; `[n_link, n_freq]`
-- **`o2i`** *(optional)* — O2I flag per link (mean ZOA 90 deg), logical or numeric; used by
-  `'38.901'` in NLOS scenarios; omitted or empty = none; `[n_link]`
-- **`n_cluster`** *(optional)* — Active NLOS clusters per link (a count) in `[min(max(1,
-  NumClusters_min - 1), N), N]`; omitted or empty = N; `[n_link]`
+- **`o2i`** *(optional)* — O2I flag per link (mean arrival elevation 0), logical or numeric; used by `'38.901'` in NLOS
+  scenarios; omitted or empty = none; `[n_link]`
+- **`n_cluster`** *(optional)* — Active NLOS clusters per link (a count) in `[min(max(1, NumClusters_min - 1), N), N]`;
+  omitted or empty = N; `[n_link]`
 
 ## Outputs:
-- **`delay`** — Delays in [s]; `[n_link, n_slot, n_freq]` for `'38.901_MF'`, else `[n_link, n_slot,
-  1]`
+- **`delay`** — Delays in [s]; `[n_link, n_slot, n_freq]` for `'38.901_MF'`, else `[n_link, n_slot, 1]`
 - **`power`** — Coefficient powers (linear); `[n_link, n_slot, n_freq]`
 - **`aod`**, **`aoa`** — Azimuth of departure and arrival in [rad], in [-pi, pi); sizes as `delay`
-- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as
-  `delay`
+- **`eod`**, **`eoa`** — Elevation of departure and arrival in [rad], in [-pi/2, pi/2]; sizes as `delay`
 - **`n_active`** — Number of NLOS clusters with power > 0; uint32; `[n_link, 1]`
 
 ## See also:
 - [[gbsm_draw]] (the random values `rnd` and `rnd_freq`)
 - [[lsp_generate]] (the LSPs, EoD offset, absolute TOA and ground permittivity)
+- [[ssf_rays]] (the rays of the clusters)
 - [[calc_delay_spread]], [[calc_angular_spread]] (spreads of the output)
 MD!*/
 

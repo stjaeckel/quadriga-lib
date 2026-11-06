@@ -12,42 +12,30 @@ SECTION!*/
 # gbsm.single_link_channel
 Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
 
-- Snapshot t: the paths of [[ssf_paths]] at the positions of t, at `rays["center_frequency"][i_freq]` with the link
-  gain and K ratio of t, for the rays with power > 0 at `i_freq` plus LOS and GR
-- `"phase"`: [[get_channels_planar]] with the arrays at the positions of `rays` and the orientations of t; delays,
-  path lengths and angles stay those of the ray-data positions. `"drift"`: [[get_channels_spherical]] with the
-  arrays at the positions and orientations of t
-- `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays
-  (fixed per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap
-  per element pair is the mean of the rays' delays weighted by `rays["power"]` at `i_freq` (equal weights where they sum
-  to 0), `(n_rx, n_tx, n_tap)`; reduce it to `(1, 1, n_tap)` where needed. TR 38.901 LOS gives two taps at delay 0
-- `"taps"` is exact at the phase centre for the TR methods (the rays of a tap share one delay); for `"quadriga"` only
-  at the carrier: in UMi NLOS a tap varies over the band by 0.18, 0.52 and 0.79 (in-band selectivity) for 20, 100 and
-  400 MHz. `"rays"`: one path per kept ray in ray order, exact at any bandwidth; the path data are the outputs of
-  [[ssf_paths]] at t (in `"phase"` with the displacement phase in `M`, for the arrays at the ray-data positions)
+- Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
+  `rays["center_frequency"][i_freq]`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
+  gain and K-factor ratio of the snapshot, for the kept rays (power > 0 at `i_freq`, plus LOS and GR)
+- `"phase"`: [[get_channels_planar]] with the arrays at the positions of `rays` and the orientations of the snapshot;
+  delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [[get_channels_spherical]] with the
+  arrays at the positions and orientations of the snapshot
+- `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
+  per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
+  element pair is the mean of the rays' delays weighted by `rays["power"]` at `i_freq` (equal weights where they sum
+  to 0), `(n_rx, n_tx, n_tap)`; reduce it to `(1, 1, n_tap)` where needed
+- `"taps"` is exact at the phase center for the TR methods (the rays of a tap share one delay); for `"quadriga"` only
+  at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `"rays"` for
+  wide bands. `"rays"`: one path per kept ray in ray order, exact at any bandwidth; the path data are those of
+  `ssf_paths` at the snapshot for these rays
 - `n_snap` is the largest row count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
-  rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries; one row or entry applies to all snapshots. One position
-  is a `(1, 3)` row; a `(3,)` array is rejected. A static link with a gain per snapshot repeats its position
-- `use_absolute_delays` in `"phase"` adds the LOS delay of the ray-data positions
-- No power correction and no initial position; validity limits and their meaning: see [[ssf_paths]]
-- Errors: an invalid array (message after `Transmit antenna: ` or `Receive antenna: `), the errors of [[ssf_paths]]
-  in `"drift"`, a row or entry count other than 1 or `n_snap`
+  rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
+  per frequency); one row or entry applies to all snapshots. A static link with a gain per snapshot repeats its
+  position
+- Powers are not renormalized, and `initial_position` of `chan` stays 0. Validity limits: see `ssf_paths`
+- Raises `ValueError` for an invalid array (message after `Transmit antenna: ` or `Receive antenna: `), invalid
+  `rays`, `"drift"` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a row or
+  entry count other than 1 or `n_snap`
 - `chan` and `par` are copies of the library result; `chan` is one dict; the flags take a bool or `numpy.bool_`,
   `None` selects the default, any other type raises `TypeError`
-
-## Keys of par:
-
-| Name | Size | Content |
-| --- | --- | --- |
-| `tap` | `(n_tap,)` or `(n_path,)` | Tap index per output tap or per path; uint32 |
-| `n_ray_tap` | `(n_tap,)` | Number of kept rays per tap; uint32; `"taps"` only |
-| `fbs_pos`, `lbs_pos` | `(3, n_kept)` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
-| `gr_pos` | `(3, n_snap)` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only; float32 |
-| `link_gain_dB` | `(n_snap,)` | Link gain per snapshot |
-| `b_med`, `b_eff` | `(2,)` | Validity scales of [[ssf_scatterers]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
-| `limit` | `(2,)` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`"phase"`) or $0.2 b_{\mathrm{med}}$ (`"drift"`); Inf where b is NaN |
-| `ratio` | `(2,)` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
-| `ratio_total` | scalar | $\sqrt{r_{\mathrm{Tx}}^2 + r_{\mathrm{Rx}}^2}$ of the two ratios; valid up to 1; `"drift"`: new segment from 2.5 |
 
 ## Usage:
 ```
@@ -59,18 +47,20 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`tx_array`**, **`rx_array`** — Dicts containing the arrayant data with `n_tx` and `n_rx` ports; layout as
   documented in [[generate]]
 - **`rays`** — Ray dict of the link, see [[ssf_rays]]
-- **`link_gain_dB`** — Link gain `-PL - O2I + SF` at frequency `i_freq` of `rays` in dB; `(n_snap,)` or `(1,)`
-- **`mobility`** — `"phase"`, `"drift"` or `"auto"` (phase for the TR methods, drift for `"quadriga"`); default:
-  `"auto"`
+- **`link_gain_dB`** — [Link gain](python_api.html#sec-geometry-based-stochastic-model) at frequency `i_freq` of `rays`
+  in dB; `(n_snap,)` or `(1,)`
+- **`mobility`** — `"phase"`, `"drift"` or `"auto"` (see Terms); default: `"auto"`
 - **`output`** — `"taps"` or `"rays"`; default: `"taps"`
-- **`i_freq`** — Frequency index in `rays["center_frequency"]`, 0-based; default: 0
-- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `None`: the positions of `rays`; `(n_snap, 3)` or `(1, 3)`;
-  default: None
+- **`i_freq`** — Frequency index in `rays["center_frequency"]`, 0-based; ray data of the TR methods hold one frequency:
+  0; default: 0
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `None`: the positions of `rays`; `(n_snap, 3)` or `(1, 3)`
+  (a `(3,)` array is rejected); default: None
 - **`tx_orientation`**, **`rx_orientation`** — Euler angles (bank, tilt, heading) in rad; `None`: 0; `(n_snap, 3)`
   or `(1, 3)`; default: None
-- **`kf_ratio`** — K(snapshot) / K(drop), >= 0; `None`: 1; `(n_snap,)` or `(1,)`; default: None
-- **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see [[ssf_paths]]; default: `False`
-- **`use_absolute_delays`** — Include the LOS delay in all delays; default: `False`
+- **`kf_ratio`** — KF(snapshot) / KF(drop) at `i_freq`, >= 0; `None`: 1; `(n_snap,)` or `(1,)`; default: None
+- **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `False`
+- **`use_absolute_delays`** — Include the LOS delay in all delays (`"phase"`: of the ray-data positions); default:
+  `False`
 - **`stack`** — Snapshot layout of `chan` as in [[hdf5_read_channel]]; default: `False`
 
 ## Outputs:
@@ -78,12 +68,26 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
   `tx_position`, `rx_position` (the snapshot positions), `tx_orientation`, `rx_orientation` `(3, n_snap)`; per
   snapshot `coeff`, `delay` `(n_rx, n_tx, n_tap)` (`"taps"`) or `(n_rx, n_tx, n_path)` (`"rays"`); `"rays"` also
   `path_gain`, `path_length`, `path_polarization`, `path_angles` and in `"drift"` `fbs_pos`, `lbs_pos`
-- **`par`** — Dict with the keys above
+- **`par`** — Dict with the keys below
+
+## Keys of par:
+
+| Name | Size | Content |
+| --- | --- | --- |
+| `tap` | `(n_tap,)` or `(n_path,)` | Tap index per output tap or per path; uint32 |
+| `n_ray_tap` | `(n_tap,)` | Number of kept rays per tap; uint32; `"taps"` only |
+| `fbs_pos`, `lbs_pos` | `(3, n_kept)` | Scatterers of the kept rays at the ray-data positions; `"drift"` with `"taps"` only; float32, the precision of path data in HDF5 files |
+| `gr_pos` | `(3, n_snap)` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only; float32 |
+| `link_gain_dB` | `(n_snap,)` | Link gain per snapshot |
+| `b_med`, `b_eff` | `(2,)` | Of [[ssf_scatterers]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
+| `limit` | `(2,)` | Validity limit of `ssf_paths` per end in m; Inf where b is NaN |
+| `ratio` | `(2,)` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
+| `ratio_total` | scalar | `sqrt(ratio[0]² + ratio[1]²)`; valid up to 1 |
 
 ## See also:
 - [[ssf_paths]] (paths of one link at one position, validity limits)
-- [[ssf_scatterers]] (scatterers, `b_med` and `b_eff`)
-- [[gbsm.rays_from_paths]] (ray data from path data, e.g. of a QRT file; taps 0, 3, 6, ... without `tap`)
+- [[ssf_scatterers]] (scatterers for `"drift"`, `b_med` and `b_eff`)
+- [[gbsm.rays_from_paths]] (ray data from path data)
 MD!*/
 
 py::tuple gbsm_single_link_channel(const py::dict &tx_array,

@@ -52,7 +52,7 @@ quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec
 - **`ref_sec`** — Reference per section, indexed as listed above; list of up to 10 str; an empty or
   missing entry writes no reference; default: None
 - **`valid_range`** — Validity range, written as comment; rows: frequency in GHz, distance, BS
-  height, MT height in m; columns: lower and upper end, one value is written if both are equal; a
+  height, UT height in m; columns: lower and upper end, one value is written if both are equal; a
   row with `NaN` is not written; `(4, 2)`; default: None
 - **`write_defaults`** — `True`: write all keys; `False`: write only keys that differ from their
   default; bool or `numpy.bool_`; default: False; `None` selects the default

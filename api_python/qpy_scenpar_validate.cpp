@@ -12,11 +12,10 @@ SECTION!*/
 # scenpar_validate
 Validate scenario parameters and complete them with default values
 
-- Checks scenario parameters that did not come from a conf file and adds every missing key with its default value, so
-  that `scenpar_out` has all 171 keys: the 138 numeric keys of QuaDRiGa and 33 keys for TR 38.901 v19.5.0, which have
-  no effect at their default of 0. `None` or an empty dict gives the complete default set
-- A name that is not one of the keys is an error, also with `validate = False`; this includes the QuaDRiGa key
-  `GR_epsilon`, which is not supported
+- Checks scenario parameters, e.g. ones built in code, and adds every missing key with its default value, so that
+  `scenpar_out` has all 171 keys: the 138 numeric keys of QuaDRiGa and 33 keys for TR 38.901 v19.5.0, which have no
+  effect at their default of 0. `None` or an empty dict gives the complete default set
+- A name that is not one of the keys is an error, also with `validate = False`
 - Value checks with `validate = True`; `NaN` is an error for every key:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
@@ -33,7 +32,7 @@ Validate scenario parameters and complete them with default values
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
-- With `validate = False` no value is checked: `NaN` is accepted
+- `LOS_scatter_radius`, `NF_*` and `SNS_*` are checked but not used by any function of this version
 
 ## Usage:
 ```
@@ -44,7 +43,7 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scen
 - **`scenpar_in`** — Scenario parameters; dict with any subset of the 171 keys returned by
   [[conf_file_read]]; real scalars (int, float, bool or a numpy value with one element); `None` or
   `{}` returns the default set; default: None
-- **`validate`** — `False`: only complete with defaults, no value checks; bool or `numpy.bool_`;
+- **`validate`** — `False`: only complete with defaults, no value checks (`NaN` is accepted); bool or `numpy.bool_`;
   default: True; `None` selects the default
 
 ## Outputs:
@@ -53,8 +52,8 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scen
   the 33 new keys
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `(8, 8)`
-- **`lsp_xcorr_chk`** — `True` if `lsp_xcorr` is positive definite; `False` also if it contains
-  `NaN`; bool
+- **`lsp_xcorr_chk`** — `True` if `lsp_xcorr` is positive definite; `False` also if it contains `NaN`; `False` is no
+  error here, but [[lsp_generate]] raises `ValueError` for such parameters; bool
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)

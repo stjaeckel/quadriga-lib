@@ -39,8 +39,7 @@ Large-scale parameters of a set of links from normalized random values
   their calibration scenario; for another hall set these fields in `scenpar`
 - Ground permittivity: QuaDRiGa's fits for dry, medium and wet ground, interpolated linearly over
   column 10 of `rnd` (0 dry, 0.5 medium, 1 wet) with `center_freq` not limited by `LSP_fc_min`; they
-  are not the materials of TR 38.901 Table 7.6.8-1. The imaginary part is >= 0: the complex value of
-  TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`
+  are not the materials of TR 38.901 Table 7.6.8-1
 - EoD offset, the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12: `EoD_offset_e +
   EoD_offset_e_gamma·lg f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg
   f')·lg(max(EoD_offset_b, d)) + EoD_offset_c + EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if
@@ -75,16 +74,17 @@ Large-scale parameters of a set of links from normalized random values
 - **`lsp`** — Large-scale parameters; slices: 1 DS in [s], 2 KF, 3 SF, 4 ASD, 5 ASA, 6 ESD, 7 ESA in
   [deg], 8 XPR; `[n_link, n_freq, 8]`
 - **`abs_toa`** — Absolute TOA offset in [s], 0 if not active; `[n_link, 1]`
-- **`gr_eps_re`**, **`gr_eps_im`** — Relative permittivity of the ground, real part and imaginary
-  part >= 0; `[n_link, n_freq]`
+- **`gr_eps_re`**, **`gr_eps_im`** — Relative permittivity of the ground, real part and imaginary part >= 0; the
+  complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** — EoD offset in [deg], positive = up; `[n_link, n_freq]`
-- **`lsp_mu`** — Mean `mu` in the log domain; `[n_link, n_freq, 8]`
-- **`lsp_sigma`** — Standard deviation `sigma` in the log domain, >= 0; `[n_link, n_freq, 8]`
+- **`lsp_mu`** — Mean `mu` in the log domain; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
+- **`lsp_sigma`** — Standard deviation `sigma` in the log domain, >= 0; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
 
 ## See also:
 - [[gbsm_draw]] (the random values `rnd`)
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[ssf_clusters]] (the clusters from the LSPs)
+- [[ssf_rays]] (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

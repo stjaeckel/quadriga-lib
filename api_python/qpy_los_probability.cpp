@@ -38,7 +38,7 @@ p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut,
 - **`model`** — Model name: `38.901_RMa`, `38.901_UMi`, `38.901_UMa`, `38.901_InH_Mixed`, `38.901_InH_Open`,
   `38.901_InF_SL`, `38.901_InF_DL`, `38.901_InF_SH`, `38.901_InF_DH`, `38.901_InF_HH`, `38.901_SMa`,
   `38.811_DenseUrban`, `38.811_Urban`, `38.811_Suburban`, `38.811_Rural`, `QuaDRiGa_Industrial`, `LOS`, `NLOS`
-- **`d2d_out`** — 2D outdoor distance in m, finite and >= 0: `d2D - d2D-in` for O2I UTs, clamped at 0 by the caller; the
+- **`d2d_out`** — 2D outdoor distance in m, finite and >= 0: `d2D - d2d_in` for O2I UTs, clamped at 0 by the caller; the
   2D distance in indoor scenarios; `(n_link,)`
 - **`h_bs`** — BS height in m, finite; float or `(n_link,)`
 - **`h_ut`** — UT height in m, finite; float or `(n_link,)`

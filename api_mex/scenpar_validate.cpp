@@ -14,12 +14,10 @@ SECTION!*/
 # SCENPAR_VALIDATE
 Validate scenario parameters and complete them with default values
 
-- Checks scenario parameters that did not come from a conf file and adds every missing field with
-  its default value, so that `scenpar_out` has all 171 fields: the 138 numeric fields of QuaDRiGa
-  and 33 fields for TR 38.901 v19.5.0, which have no effect at their default of 0.
-  An empty input (`[]` or a struct without fields) gives the complete default set
-- A name that is not one of the fields is an error, also with `validate = false`; this includes the
-  QuaDRiGa field `GR_epsilon`, which is not supported
+- Checks scenario parameters, e.g. ones built in code, and adds every missing field with its default value, so that
+  `scenpar_out` has all 171 fields: the 138 numeric fields of QuaDRiGa and 33 fields for TR 38.901 v19.5.0, which have
+  no effect at their default of 0. An empty input (`[]` or a struct without fields) gives the complete default set
+- A name that is not one of the fields is an error, also with `validate = false`
 - Value checks with `validate = true`; `NaN` is an error for every field:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
@@ -36,7 +34,7 @@ Validate scenario parameters and complete them with default values
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
-- With `validate = false` no value is checked: `NaN` is accepted
+- `LOS_scatter_radius`, `NF_*` and `SNS_*` are checked but not used by any function of this version
 
 ## Usage:
 ```
@@ -46,7 +44,7 @@ Validate scenario parameters and complete them with default values
 ## Inputs:
 - **`scenpar_in`** *(optional)* — Scenario parameters; struct with any subset of the 171 fields;
   numeric fields are real scalars of any numeric class or logical; if omitted or empty, the default set is returned
-- **`validate`** — `false`: only complete with defaults, no value checks; default: true
+- **`validate`** — `false`: only complete with defaults, no value checks (`NaN` is accepted); default: true
 
 ## Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing fields have their
@@ -54,8 +52,8 @@ Validate scenario parameters and complete them with default values
   QuaDRiGa, then the 33 new keys
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
-- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains
-  `NaN`; logical
+- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains `NaN`; `false` is no
+  error here, but [[lsp_generate]] raises an error for such parameters; logical
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
