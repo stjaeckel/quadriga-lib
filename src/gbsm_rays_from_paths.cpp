@@ -15,7 +15,7 @@ SECTION!*/
 
 /*!MD
 # gbsm_rays_from_paths
-Ray data of one link from spherical path data (e.g. read with qrt_file_read)
+Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Fills a [[gbsm_rays]] object in place (`fallback` cleared) from path data in the names and order of
   [[qrt_file_read]], read as `qrt_file_read<double>` with `downlink = true` and `normalize_M = 1` (an uplink read gives

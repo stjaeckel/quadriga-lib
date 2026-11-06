@@ -25,7 +25,6 @@ Spatially correlated normalized random values of one random set at a set of link
   residual of standard deviation `1/sqrt(2·n_coeff)`. In dual mobility both devices of a link are on the link's floor
 - 3D mode (legacy QuaDRiGa): the height separates the floors, so UTs on different floors are correlated by the ACF of
   their height difference. The per-link statistics are the same in both modes
-- The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
 - An empty set (`NumClusters = 1`) gives `[n_link, 0]` and accepts any empty `phase`
 
 Random sets, with `N = NumClusters - 1`, `M = NumSubPaths`, columns from 1 and blocks from 0; a set never changes size
@@ -36,7 +35,7 @@ Random sets, with `N = NumClusters - 1`, `M = NumSubPaths`, columns from 1 and b
 | `'lsf'` | 11 | 1 to 8 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 9 absolute TOA, Normal(0,1); 10 ground permittivity and 11 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (1 to 8), `absTOA_lambda` (9), `SC_lambda` (10), `SF_lambda` (11) | [[lsp_generate]] `rnd`, [[path_loss]] `rnd_he` (column 11) |
 | `'cluster'`, 0 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n` (from 1): block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [[ssf_clusters]] `rnd` |
 | `'cluster'`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [[ssf_clusters]] `rnd_freq`, slice `k` |
-| `'ray'`, 0 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set 0: from the cluster DS c_DS and ASA | [[ssf_rays]] `rnd_ray`: 0 for `'quadriga'`, `k` as slice `k` for the TR methods |
+| `'ray'`, 0 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set 0: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km | [[ssf_rays]] `rnd_ray`: 0 for `'quadriga'`, `k` as slice `k` for the TR methods |
 
 A `'ray'` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` (both from 1) in column
 `b·N·M + (n - 1)·M + m`: 0 to 3 coupling ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to
@@ -51,20 +50,21 @@ rnd = quadriga_lib.gbsm_draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, cluster DS and ASA
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*` and
+  `PerClusterAS_A`
 - **`set_type`** — Set type of [[gbsm_init_phases]]; string
 - **`phase`** — SOS phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
 - **`set_id`** — Set of [[gbsm_init_phases]]: `0` = shared set, `k >= 1` = set of frequency `k`; ignored for `'lsf'`;
-  default: 0
+  another set with the same `n_gen` is not detected; default: 0
 - **`preset`** — Preset of [[gbsm_init_phases]]; another preset with the same `n_coeff` is not detected; default:
   `'Comb256'`
-- **`floor_id`** *(optional)* — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901
-  Table 7.2-1, 0 for outdoor UTs); omitted or empty = floor 0; 2D mode only; `[n_link]`
-- **`center_freq`** *(optional)* — Carrier frequencies in [Hz] (messages name it `center_frequency`); required by the
-  shared `'ray'` set, whose block 14 uses their mean c_DS ([[ssf_rays]]): pass the same list as to [[ssf_rays]] (another
-  list gives other `'quadriga'` rays); ignored and not checked for all other sets; `[n_freq]`
+- **`floor_id`** — Floor number of the UT per link, ground floor 0 (a label, not shifted; `n_fl - 1` for the UT heights
+  of TR 38.901 Table 7.2-1, 0 for outdoor UTs); 2D mode only; `[n_link]`; default: all 0
+- **`center_freq`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `'ray'` set, whose block 14 uses
+  their mean c_DS ([[ssf_rays]]): pass the same list as to [[ssf_rays]] (another list gives other `'quadriga'` rays);
+  ignored and not checked for all other sets; `[n_freq]`
 - **`dual_mobility`** — `true`: Tx and Rx both move; default: false
 - **`horizontal`** — `true`: 2D mode; `false`: 3D mode; default: true
 

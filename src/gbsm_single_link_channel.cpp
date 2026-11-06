@@ -23,7 +23,7 @@ SECTION!*/
 
 /*!MD
 # gbsm_single_link_channel
-Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
+Channel coefficients of one link at one frequency over one segment
 
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
   `rays.center_frequency(i_freq)`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
@@ -70,8 +70,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ## Inputs:
 - **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
 - **`rays`** — Ray data of the link, see [[gbsm_rays]]
-- **`link_gain_dB`** — [Link gain](cpp_api.html#sec-geometry-based-stochastic-model) at `rays.center_frequency(i_freq)`
-  in [dB]; `[n_snap]` or `[1]`
+- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`output`** *(optional)* — `"taps"` or `"rays"`
 - **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 0-based; ray data of the TR methods hold
@@ -100,7 +99,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 | `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `arma::vec`, `[n_snap]` | Link gain per snapshot |
 | `b_med`, `b_eff` | `arma::vec`, `[2]` | Of [[gbsm_rays]] at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
-| `limit` | `arma::vec`, `[2]` | Validity limit of `ssf_paths` per end in [m]; Inf where b is NaN |
+| `limit` | `arma::vec`, `[2]` | Validity limit per end in [m] (see [[ssf_paths]]): `sqrt(λ·b_eff/8)` in `"phase"`, `0.2·b_med` in `"drift"`; Inf where `b_eff` or `b_med` is NaN |
 | `ratio` | `arma::vec`, `[2]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | `double` | `sqrt(ratio(0)² + ratio(1)²)`; valid up to 1 |
 

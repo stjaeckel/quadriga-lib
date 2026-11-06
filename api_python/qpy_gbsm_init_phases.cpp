@@ -23,7 +23,6 @@ SOS phases of one random set of a BS site and scenario
   (Rx, and Tx in dual mobility; in 2D mode all on floor 0) to 0, so these means do not vary from drop to drop
 - `NumClusters = 1`: all sets but `"lsf"` are empty
 - TR 38.901 clause 7.4.4 literally: preset `Exp256` without bias removal
-- The flags take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Usage:
 ```

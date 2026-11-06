@@ -101,8 +101,8 @@ lang: en-US
 | [gbsm_draw](#gbsm_draw) | Geometry-based stochastic model | Spatially correlated normalized random values of one random set at a set of links |
 | [gbsm_init_phases](#gbsm_init_phases) | Geometry-based stochastic model | SOS phases of one random set of a BS site and scenario |
 | [gbsm_rays](#gbsm_rays) | Geometry-based stochastic model | Class for the ray data of one link (geometry-based stochastic model) |
-| [gbsm_rays_from_paths](#gbsm_rays_from_paths) | Geometry-based stochastic model | Ray data of one link from spherical path data (e.g. read with qrt_file_read) |
-| [gbsm_single_link_channel](#gbsm_single_link_channel) | Geometry-based stochastic model | Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model) |
+| [gbsm_rays_from_paths](#gbsm_rays_from_paths) | Geometry-based stochastic model | Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read |
+| [gbsm_single_link_channel](#gbsm_single_link_channel) | Geometry-based stochastic model | Channel coefficients of one link at one frequency over one segment |
 | [los_probability](#los_probability) | Geometry-based stochastic model | LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named models |
 | [lsp_generate](#lsp_generate) | Geometry-based stochastic model | Large-scale parameters of a set of links from normalized random values |
 | [o2i_loss](#o2i_loss) | Geometry-based stochastic model | O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3 |
@@ -3574,8 +3574,9 @@ Spatially correlated normalized random values of one random set at a set of link
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_draw) · [Python](quadriga_lib_api_python.md#gbsm.draw)
 
-- Evaluates the SOS phases of [gbsm_init_phases](#gbsm_init_phases) at the links as [sos_val](#sos_val), one column per generator. The value of a link depends
-  neither on the other links of the call nor on the other columns; with `dual_mobility = false` not on `tx_pos`
+- Evaluates the SOS phases of [gbsm_init_phases](#gbsm_init_phases) at the links as [sos_val](#sos_val), one column per generator. The value of a
+  link depends neither on the other links of the call nor on the other columns; with `dual_mobility = false` not on
+  `tx_pos`
 - `dual_mobility = true`: the Tx is a second device on the same fields; its side of each generator uses the mirror
   generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
 - 2D mode (`horizontal = true`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
@@ -3595,7 +3596,7 @@ new sets), and a decorrelation distance of 0 is used as 0.1 m:
 | `"lsf"` | 11 | 0 to 7 DS, KF, SF, ASD, ASA, ESD, ESA, XPR and 8 absolute TOA, Normal(0,1); 9 ground permittivity and 10 UMa environment height hE, Uniform(0,1) | `DS_lambda` ... `XPR_lambda` (0 to 7), `absTOA_lambda` (8), `SC_lambda` (9), `SF_lambda` (10) | [lsp_generate](#lsp_generate) `rnd`, [path_loss](#path_loss) `rnd_he` (column 10) |
 | `"cluster"`, -1 | `9·N` | column `b·N + n` for block `b` and NLOS cluster `n`: block 0 delay, Uniform(0,1); blocks 1 to 8 Normal(0,1): 1 to 4 sign of AOD, AOA, EOD, EOA, 5 to 8 offset of the same | `SC_lambda` | [ssf_clusters](#ssf_clusters) `rnd` |
 | `"cluster"`, `k` | `N` | cluster shadowing at frequency `k`, Normal(0,1) | `SC_lambda` | [ssf_clusters](#ssf_clusters) `rnd_freq`, slice `k` |
-| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: from the cluster DS c_DS and ASA | [ssf_rays](#ssf_rays) `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
+| `"ray"`, -1 or `k` | `14·N·M + N` | blocks 0 to 14, below | `SC_lambda`; block 14 of set -1: 1.6·c·c_DS / `PerClusterAS_A` (in rad), within 0.1 m to 10 km | [ssf_rays](#ssf_rays) `rnd_ray`: -1 for `"quadriga"`, `k` as slice `k` for the TR methods |
 
 A `"ray"` set holds block `b` up to 12 for ray `m` of NLOS cluster `n` in column `b·N·M + n·M + m`: 0 to 3 coupling
 ranks of AOD, AOA, EOD, EOA; 4 XPR; 5 to 8 initial phases θθ, θφ, φθ, φφ; 9 to 12 polarization power variability of
@@ -3653,8 +3654,9 @@ SOS phases of one random set of a BS site and scenario
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_init_phases) · [Python](quadriga_lib_api_python.md#gbsm.init_phases)
 
 - Draws the SOS phases of one random set (set table in [gbsm_draw](#gbsm_draw)): the random phases of the sinusoids of its
-  [sum-of-sinusoids (SOS)](#sec-sum-of-sinusoids-random-number-generator) generators, as [sos_init_phases](#sos_init_phases); [gbsm_draw](#gbsm_draw)
-  evaluates them at the links. Store `phase` or the seed to evaluate the same fields again along tracks or on maps
+  [sum-of-sinusoids (SOS)](#sec-sum-of-sinusoids-random-number-generator) generators, as
+  [sos_init_phases](#sos_init_phases); [gbsm_draw](#gbsm_draw) evaluates them at the links. Store `phase` or the seed to evaluate the same fields
+  again along tracks or on maps
 - The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed
   `"lsf"` sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`): [sos_remove_bias](#sos_remove_bias) sets the sample mean of columns 0 to 8 over the positions
@@ -3755,7 +3757,7 @@ Not in: MATLAB, Python
 ---
 <a id="gbsm_rays_from_paths"></a>
 ## gbsm_rays_from_paths
-Ray data of one link from spherical path data (e.g. read with qrt_file_read)
+Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quadriga_lib_api_python.md#gbsm.rays_from_paths)
 
@@ -3815,7 +3817,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 ---
 <a id="gbsm_single_link_channel"></a>
 ## gbsm_single_link_channel
-Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
+Channel coefficients of one link at one frequency over one segment
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_single_link_channel) · [Python](quadriga_lib_api_python.md#gbsm.single_link_channel)
 
@@ -3864,8 +3866,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ### Inputs:
 - **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
 - **`rays`** — Ray data of the link, see [gbsm_rays](#gbsm_rays)
-- **`link_gain_dB`** — [Link gain](#sec-geometry-based-stochastic-model) at `rays.center_frequency(i_freq)`
-  in [dB]; `[n_snap]` or `[1]`
+- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`output`** *(optional)* — `"taps"` or `"rays"`
 - **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 0-based; ray data of the TR methods hold
@@ -3894,7 +3895,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 | `gr_pos` | `arma::fmat`, `[3, n_snap]` | GR point per snapshot; `"drift"` with `"taps"` and a GR ray only |
 | `link_gain_dB` | `arma::vec`, `[n_snap]` | Link gain per snapshot |
 | `b_med`, `b_eff` | `arma::vec`, `[2]` | Of [gbsm_rays](#gbsm_rays) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
-| `limit` | `arma::vec`, `[2]` | Validity limit of `ssf_paths` per end in [m]; Inf where b is NaN |
+| `limit` | `arma::vec`, `[2]` | Validity limit per end in [m] (see [ssf_paths](#ssf_paths)): `sqrt(λ·b_eff/8)` in `"phase"`, `0.2·b_med` in `"drift"`; Inf where `b_eff` or `b_med` is NaN |
 | `ratio` | `arma::vec`, `[2]` | Largest distance of the end from its ray-data position over the snapshots, divided by `limit` |
 | `ratio_total` | `double` | `sqrt(ratio(0)² + ratio(1)²)`; valid up to 1 |
 
@@ -4136,8 +4137,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#path_loss) · [Python](quadriga_lib_ap
     0.1)`, `hm = max(hUT, 1.1·hE, 0.1)`, `dBP = E·f·(hb - hE)·(hm - hE)`, `dBP3 = sqrt(dBP² + (hb - hm)²)`;
     `PL1(d3)`, `sf = sig1` for `d2 <= dBP`, else `PL1(dBP3) + A2·lg(d3/dBP3)`, `sf = sig2`
   - `tripple_slope`, spelled as in QuaDRiGa (A1 or A, B, E1 or E; A2 = A1, A3 = A2, C = 0, D = 0, E2 = E1, hE1 = 0,
-    hE2 = 0, sig1..sig3): the `dual_slope` rule with the breakpoints `dBP1 = min(dBP1, dBP2)` and `dBP2` of `E1, hE1`
-    and `E2, hE2`, the slopes `A1`, `A2`, `A3` and `sf = sig1`, `sig2`, `sig3`
+    hE2 = 0, sig1..sig3): the `dual_slope` rule with the breakpoints `dBP1` of `E1, hE1` (at most `dBP2`) and `dBP2`
+    of `E2, hE2`, the slopes `A1`, `A2`, `A3` and `sf = sig1`, `sig2`, `sig3`
   - `nlos` (An, Bn; Cn, Dn, D1n, D2n, D3n, En, E1n, E2n, E3n, Fn, G1n = 0, G2n = 1, LOSmax = 1, Ax, Bx, Cx, sig):
     `hb = max(hBS, 0.1)`, `hm = max(hUT, 0.1)`; `An·lg d3 + Bn + Cn·lg f + Dn·lg hb + D1n·lg(hb)/hb +
     D2n·lg(hb)/hb² + D3n·hb + En·lg hm + E1n·lg(hm)/hm + E2n·lg(hm)/hm² + E3n·hm + Fn·lg(hb)·lg(d3) +
@@ -4423,8 +4424,7 @@ void quadriga_lib::ssf_paths(
 
 ### Inputs:
 - **`rays`** — Ray data of the link
-- **`link_gain_dB`** — [Link gain](#sec-geometry-based-stochastic-model) at the position in [dB], per
-  frequency; 0 for data from paths; `[n_freq]`
+- **`link_gain_dB`** — Link gain (see Terms) at the position in [dB], per frequency; 0 for data from paths; `[n_freq]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
 - **`kf_ratio`** *(optional)* — KF(position) / KF(drop), >= 0, per frequency; omitted: 1; `[n_freq]`
@@ -4564,8 +4564,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ssf_scatterers) · [Python](quadriga_l
   distance) and the angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
   ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
-  `d_min` = 2 m this applies to up to about 13 % of the rays (most in the TR methods without absolute TOA, where the
-  first cluster has zero excess delay) and lengthens them by a few ns
+  `d_min` = 2 m this applies to up to about 23 % of the rays (Indoor LOS, RMa NLOS; most in the TR methods without
+  absolute TOA) and lengthens them by a few ns
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
 - Writes `fbs_pos`, `lbs_pos` and `fallback` of all rays and overwrites given scatterers; nothing else changes;

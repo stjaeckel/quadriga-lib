@@ -15,9 +15,8 @@ SECTION!*/
 Antenna-free paths of one link at one position
 
 - Computes the antenna-free paths (gains, lengths, polarization matrices, angles and scatterers) of the kept rays of
-  `rays` at new Tx and Rx positions (default: the ray-data positions). Kept are LOS and GR rays always (also at zero
-  power) and NLOS rays with power > 0 at some frequency; paths in ray order, `ray_ind` maps them to the rays (e.g.
-  `rays.tap(ray_ind)`)
+  `rays` (see Terms) at new Tx and Rx positions (default: the ray-data positions), LOS and GR also at zero power; paths
+  in ray order, `ray_ind` maps them to the rays (e.g. `rays.tap(ray_ind)`)
 - `'phase'`: use the outputs with [[get_channels_planar]] and the arrays at the positions of `rays`; the displacement
   phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer identified
   and the displacement phase counts twice, without an error
@@ -54,12 +53,12 @@ Antenna-free paths of one link at one position
 
 ## Inputs:
 - **`rays`** — Ray struct of the link, see [[ssf_rays]]; `[1, 1]` struct
-- **`link_gain_dB`** — [Link gain](mex_api.html#sec-geometry-based-stochastic-model) at the position in [dB], per
-  frequency; 0 for data from paths; `[n_freq]`
-- **`mobility`** *(optional)* — `'phase'`, `'drift'` or `'auto'` (see Terms); default: `'auto'`
-- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
-- **`kf_ratio`** *(optional)* — KF(position) / KF(drop), >= 0, per frequency; omitted: 1; `[n_freq]`
-- **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1; default: `false`
+- **`link_gain_dB`** — Link gain (see Terms) at the position in [dB], per frequency; 0 for data from paths; `[n_freq]`
+- **`mobility`** — `'phase'`, `'drift'` or `'auto'` (see Terms; `'auto'` is `'drift'` for `'quadriga'` rays, which then
+  need [[ssf_scatterers]]); default: `'auto'`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3]`; default: the positions of `rays`
+- **`kf_ratio`** — KF(position) / KF(drop), >= 0, per frequency; `[n_freq]`; default: 1
+- **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1; default: `false`
 
 ## Outputs:
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`

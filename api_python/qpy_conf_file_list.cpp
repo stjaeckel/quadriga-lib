@@ -32,7 +32,7 @@ scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, parse
 - **`dirs`** — Directories, searched in this order; one path or a list or tuple of paths, each a str,
   bytes or path-like object (e.g. `pathlib.Path`); an empty list or `None` lists nothing
 - **`parse_shortnames`** — `True`: read the files and add their short names; `False`: list the files
-  only, which is faster; bool or `numpy.bool_`; default: True; `None` selects the default
+  only, which is faster; default: True
 
 ## Outputs:
 - **`scenarios`** — Scenario names and short names; list of str; length `n_scen`

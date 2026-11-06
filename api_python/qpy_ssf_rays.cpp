@@ -32,7 +32,7 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
 
 | Method | `"38.901"`, `"38.901_MF"` | `"quadriga"` |
 | --- | --- | --- |
-| Frequencies per call | `i_freq` only; slice `i_freq` of `rnd_ray`; `"38.901"` takes one frequency | all; one geometry, per frequency powers, XPR and Jones matrices; the shared "ray" set |
+| Frequencies per call | `i_freq` only; slice `i_freq` of `rnd_ray`; `"38.901"` takes one frequency | all; one geometry, per frequency powers, XPR and Jones matrices; the shared `"ray"` set |
 | Ray delays | cluster delay; sub-clusters + 0, 1.28, 2.56 c_DS (Table 7.5-5) | cluster delay + 2·c_DS·(u - mean of u in the cluster), u of block 14; negative delays set to 0 |
 | Taps | sub-cluster of the two strongest clusters (`NumSubPaths` = 20), else cluster | cluster |
 | c_DS, cluster ESD | at frequency `i_freq` | mean over the frequencies |
@@ -46,23 +46,15 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
 - Sub-clusters (step 11): the two clusters of largest power at frequency `i_freq` (equal powers: lower index first),
   rays at the positions 0-9, 10-15 and 16-19 (TR rays 1-8, 19, 20; 9-12, 17, 18; 13-16); every tap is a contiguous
   block of rays
-- `pol_model = "quadriga"`: the matrix refers to the owner end, the end with the larger z, then x, then y (ends within
-  1 mm count as equal; the Tx if all tie); the Rx as owner transposes it, so UTs dropped separately at equal heights on
-  either side of the tie plane get transposed matrices
-- Swap reciprocity: with mirrored inputs (dual mobility in [[gbsm.draw]], mirrored LSPs, no EoD offset and no O2I flag
-  in [[ssf_clusters]], equal per-cluster spreads at both ends, `PerClusterES_D_scale` = 0), swapping `tx_pos` and
-  `rx_pos` exchanges departure and arrival per ray and transposes `M` (not for `pol_model = "quadriga"` with the ends
-  within 1 mm of each other)
-- Messages name the argument `center_freq` as `'center_frequency'` and the real and imaginary part of `gr_eps` as
-  `gr_eps_re` and `gr_eps_im`; the flags take a bool or `numpy.bool_`, `None` selects the default, any other type
-  raises `TypeError`
+- `pol_model = "quadriga"`: the matrix refers to the end with the larger z, then x, then y (coordinates within 1 mm
+  count as equal; the Tx if all tie), so UTs dropped separately at equal heights may get transposed matrices
 
 ## Ray dict:
 One link at one drop. All keys are present on output (empty where empty). As input, missing optional keys are empty,
 other missing or unknown keys raise `ValueError`; integer keys accept any real dtype. The dict has scatterers when
-`fbs_pos` has `n_ray` columns (an empty dict counts as having them). Rays added from another source take tap indices the
-dict does not use; at most one LOS and one GR ray and one `method` for all rays. [[ssf_scatterers]] overwrites given
-scatterers, so solve rays without scatterers separately and concatenate the arrays.
+`fbs_pos` has `n_ray` columns (a dict with no rays counts as having them). Rays added from another source take tap
+indices the dict does not use; at most one LOS and one GR ray and one `method` for all rays. [[ssf_scatterers]]
+overwrites given scatterers, so solve rays without scatterers separately and concatenate the arrays.
 
 | Key | Shape | Type | Meaning | Required |
 | --- | --- | --- | --- | --- |
@@ -93,11 +85,12 @@ rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, ls
 - **`center_freq`** — Carrier frequencies in Hz; `(n_freq,)`
 - **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]]; used: the ESD mean
   and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `(n_link, n_freq, 8)`
-- **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [[ssf_clusters]] (`n_slot`
-  slots); `(n_link, n_slot, n_freq)` for `"38.901_MF"`, else `(n_link, n_slot, 1)`
-- **`power`** — Cluster powers from [[ssf_clusters]]; `(n_link, n_slot, n_freq)`
+- **`delay`**, **`power`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays, powers and angles, outputs 0 to
+  5 of [[ssf_clusters]] in this order (`n_slot` slots); `power` `(n_link, n_slot, n_freq)`, the others
+  `(n_link, n_slot, n_freq)` for `"38.901_MF"`, else `(n_link, n_slot, 1)`
 - **`rnd_ray`** — `"ray"` sets from [[gbsm.draw]] (`n_gen` columns); TR methods: slice `k` = set `k`,
-  `(n_link, n_gen, n_freq)`; `"quadriga"`: the shared set (`set_id = -1`), `(n_link, n_gen, 1)` or `(n_link, n_gen)`
+  `(n_link, n_gen, n_freq)`, one set also `(n_link, n_gen)`; `"quadriga"`: the shared set (`set_id = -1`),
+  `(n_link, n_gen)` or `(n_link, n_gen, 1)`
 - **`method`** — Method of [[ssf_clusters]]: `"38.901"`, `"38.901_MF"` or `"quadriga"`; default: `"38.901"`
 - **`i_freq`** — TR methods: index into `center_freq`, 0-based; `"quadriga"`: must be 0; default: 0
 - **`angle_model`**, **`pol_model`** — See the option table; default: `"additive"`, `"38.901"`
@@ -113,6 +106,8 @@ rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, ls
 - [[ssf_clusters]] (the clusters)
 - [[ssf_scatterers]] (scatterer positions and validity scales of one link)
 - [[ssf_paths]] (paths of one link)
+- [[gbsm.single_link_channel]] (channel coefficients from a ray dict)
+- [[gbsm.rays_from_paths]] (ray dict from path data)
 MD!*/
 
 py::list ssf_rays(py::handle scenpar,

@@ -54,7 +54,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga
 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`center_freq`** — Carrier frequencies in Hz, finite and > 0 (messages name it `center_frequency`); `(n_freq,)`
+- **`center_freq`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
 - **`tx_pos`** — Tx positions in m; `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
 - **`rnd`** — Random values from [[gbsm.draw]] (`"lsf"`), finite; column 9 in [0, 1] (the permittivity is always
@@ -65,8 +65,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
 - **`clip_spreads`** — `True`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause 7.5 step 4);
   `lsp_mu` and `lsp_sigma` are not affected; default: True
-- **`complex`** — See the description; bool or `numpy.bool_`, `None` selects the default, another type raises
-  `TypeError`; default: True
+- **`complex`** — See the description; default: True
 
 ## Outputs:
 - **`lsp`** — Large-scale parameters; slices: 0 DS in s, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA in deg, 7 XPR; `(n_link,

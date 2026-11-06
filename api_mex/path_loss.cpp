@@ -39,8 +39,8 @@ Path loss and shadow-fading standard deviation of a set of links
     sqrt(dBP² + (hb - hm)²)`; `PL1(d3)`, `sf = sig1` for `d2 <= dBP`, else `PL1(dBP3) +
     A2·lg(d3/dBP3)`, `sf = sig2`
   - `tripple_slope`, spelled as in QuaDRiGa (A1 or A, B, E1 or E; A2 = A1, A3 = A2, C = 0, D = 0, E2 = E1,
-    hE1 = 0, hE2 = 0, sig1..sig3): the `dual_slope` rule with the breakpoints `dBP1 = min(dBP1, dBP2)` and `dBP2`
-    of `E1, hE1` and `E2, hE2`, the slopes `A1`, `A2`, `A3` and `sf = sig1`, `sig2`, `sig3`
+    hE1 = 0, hE2 = 0, sig1..sig3): the `dual_slope` rule with the breakpoints `dBP1` of `E1, hE1` (at most `dBP2`)
+    and `dBP2` of `E2, hE2`, the slopes `A1`, `A2`, `A3` and `sf = sig1`, `sig2`, `sig3`
   - `nlos` (An, Bn; Cn, Dn, D1n, D2n, D3n, En, E1n, E2n, E3n, Fn, G1n = 0, G2n = 1, LOSmax = 1, Ax,
     Bx, Cx, sig): `hb = max(hBS, 0.1)`, `hm = max(hUT, 0.1)`; `An·lg d3 + Bn + Cn·lg f + Dn·lg hb +
     D1n·lg(hb)/hb + D2n·lg(hb)/hb² + D3n·hb + En·lg hm + E1n·lg(hm)/hm + E2n·lg(hm)/hm² + E3n·hm +
@@ -71,17 +71,17 @@ Path loss and shadow-fading standard deviation of a set of links
 
 ## Inputs:
 - **`plpar`** — Path-loss parameters; struct as returned by [[conf_file_read]]: the field `model`
-  (string) and one numeric field per parameter, named without "PL_"; fields not read are ignored
+  (string) and one numeric field per parameter, named without "PL_"; fields not read are ignored; `[]`:
+  no model (loss 0)
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
-- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0 (messages name it
-  `center_frequency`); `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from
-  [[o2i_loss]]), finite and >= 0; given = legacy outdoor distance; 0 = outdoor link; omitted or
-  empty = geometric distance; `[n_link]`
-- **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column
-  11 of [[gbsm_draw]] (`'lsf'`); omitted or empty = fixed `hE`; `[n_link]`
+- **`d2d_in`** — Indoor 2D distance in [m] of the UT of each link, legacy QuaDRiGa only (leave it empty
+  for TR 38.901, which uses the geometric distance); finite and >= 0; 0 = outdoor link; `[n_link]`;
+  default: the geometric distance
+- **`rnd_he`** — Uniform(0,1) value per link for the random environment height, column 11 of
+  [[gbsm_draw]] (`'lsf'`); `[n_link]`; default: fixed `hE`
 
 ## Outputs:
 - **`pl`** — Path loss in [dB]; `[n_link, n_freq]`
@@ -89,7 +89,7 @@ Path loss and shadow-fading standard deviation of a set of links
 
 ## See also:
 - [[lsp_generate]] (takes `sf_sigma`)
-- [[o2i_loss]] (penetration loss and indoor distance)
+- [[o2i_loss]] (penetration loss, added by the caller)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

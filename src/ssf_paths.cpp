@@ -77,8 +77,7 @@ void quadriga_lib::ssf_paths(
 
 ## Inputs:
 - **`rays`** — Ray data of the link
-- **`link_gain_dB`** — [Link gain](cpp_api.html#sec-geometry-based-stochastic-model) at the position in [dB], per
-  frequency; 0 for data from paths; `[n_freq]`
+- **`link_gain_dB`** — Link gain (see Terms) at the position in [dB], per frequency; 0 for data from paths; `[n_freq]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
 - **`kf_ratio`** *(optional)* — KF(position) / KF(drop), >= 0, per frequency; omitted: 1; `[n_freq]`

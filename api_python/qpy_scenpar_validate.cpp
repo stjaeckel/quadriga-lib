@@ -40,16 +40,14 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scen
 ```
 
 ## Inputs:
-- **`scenpar_in`** — Scenario parameters; dict with any subset of the 171 keys returned by
+- **`scenpar_in`** — Scenario parameters; dict with any subset of the keys returned by
   [[conf_file_read]]; real scalars (int, float, bool or a numpy value with one element); `None` or
   `{}` returns the default set; default: None
-- **`validate`** — `False`: only complete with defaults, no value checks (`NaN` is accepted); bool or `numpy.bool_`;
-  default: True; `None` selects the default
+- **`validate`** — `False`: only complete with defaults, no value checks (`NaN` is accepted); default: True
 
 ## Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing keys have their
-  default; dict with 171 float entries in the canonical order: the 138 numeric keys of QuaDRiGa, then
-  the 33 new keys
+  default; dict with all keys as floats in the canonical order, QuaDRiGa's keys first
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `(8, 8)`
 - **`lsp_xcorr_chk`** — `True` if `lsp_xcorr` is positive definite; `False` also if it contains `NaN`; `False` is no

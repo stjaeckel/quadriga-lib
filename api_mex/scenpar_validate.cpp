@@ -42,14 +42,13 @@ Validate scenario parameters and complete them with default values
 ```
 
 ## Inputs:
-- **`scenpar_in`** *(optional)* — Scenario parameters; struct with any subset of the 171 fields;
-  numeric fields are real scalars of any numeric class or logical; if omitted or empty, the default set is returned
+- **`scenpar_in`** — Scenario parameters; struct with any subset of the fields; numeric fields are real
+  scalars of any numeric class or logical; default: `[]` (the complete default set)
 - **`validate`** — `false`: only complete with defaults, no value checks (`NaN` is accepted); default: true
 
 ## Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing fields have their
-  default; struct with 171 double scalar fields in the canonical order: the 138 numeric keys of
-  QuaDRiGa, then the 33 new keys
+  default; struct with all fields as double scalars in the canonical order, QuaDRiGa's fields first
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
 - **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains `NaN`; `false` is no
