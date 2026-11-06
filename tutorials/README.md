@@ -182,7 +182,7 @@ python3 -m http.server --directory website       # then open http://localhost:80
 ```
 
 - The build prints warnings and errors for the whole site, including many that have nothing to do with tutorials. Those of a tutorial name its notebook, `tutorials/<stem>.ipynb`, or its page, `website/tutorials/<stem>.html` (e.g. a broken link); a tutorial is ready when none of them name it.
-- Without `tutorials/executed/` the index lists no tutorial, and a notebook without an executed copy is left out; both give the warning `not-executed`. The release build, `python3 website_builder/build.py website --release`, treats them as errors, so a published site has every tutorial.
+- Without `tutorials/executed/` the index lists no tutorial, and a notebook without an executed copy is left out; both give the warning `not-executed`, and so does a link from another page to a tutorial left out this way. The release build, `python3 website_builder/build.py website --release`, treats them as errors, so a published site has every tutorial.
 - `make website` also regenerates `docs/` from the sources of the documentation. Changes there do not come from the tutorial and are not part of its pull request.
 - The common part of the index (title, lead, the setup that all tutorials need) is the content page `website_builder/content/tutorials.md`; its format is described in [The tutorial index page](../website_builder/README.md#the-tutorial-index-page) in the website README.
 

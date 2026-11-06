@@ -92,6 +92,20 @@ def read_all(root, diag, release=False):
     return sorted(out, key=lambda t: (t.order, t.title))
 
 
+def left_out(root):
+    """The site files of the tutorials that read_all leaves out because they have not been run: {site path:
+    (warning kind, note)} for tutorials/<stem>.html, .md and .ipynb of each notebook without an executed copy.
+    The link checks report links to them as warnings; links to tutorials without a notebook stay errors."""
+    folder = root / FOLDER
+    sources = sorted(folder.glob("*.ipynb")) if folder.is_dir() else []
+    out = {}
+    for p in sources:
+        if not (root / EXECUTED / p.name).is_file():
+            for ext in ("html", "md", "ipynb"):
+                out["%s/%s.%s" % (FOLDER, p.stem, ext)] = ("not-executed", "tutorial not run, make tutorials")
+    return out
+
+
 def read(p, rel, diag):
     errors = diag.errors
     stem = p.stem

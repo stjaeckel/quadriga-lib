@@ -44,9 +44,12 @@ def build_site(root, diag, release=False):
         return {}, {}
     # Generated Markdown; the hand-made static files are only checked as link targets
     generated = [p for p in site if p.endswith((".md", ".txt")) and (p in docs or p.startswith("tutorials"))]
-    checks.check_site(site, diag, generated)
+    # Links to tutorials left out because they have not been run warn; release builds stopped above already
+    skipped = {} if release else tutorials.left_out(root)
+    checks.check_site(site, diag, generated, skipped)
     # docs/README.md is not copied to the site; its links are checked against the site all the same
-    md_checks.check_markdown(dict(site, **{"README.md": docs["README.md"]}), "website", diag, ["README.md"])
+    md_checks.check_markdown(dict(site, **{"README.md": docs["README.md"]}), "website", diag, ["README.md"],
+                             skipped)
     if release:
         gaps = len(set(diag.gaps))
         if gaps or markers:

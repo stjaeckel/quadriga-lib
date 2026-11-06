@@ -75,8 +75,9 @@ def _target(path, url):
     return posixpath.normpath(posixpath.join(posixpath.dirname(path), file_part)), frag
 
 
-def check_site(mapping, diag, markdown):
-    """All checks of the built site; markdown lists the generated Markdown files to check inside."""
+def check_site(mapping, diag, markdown, left_out=None):
+    """All checks of the built site; markdown lists the generated Markdown files to check inside. left_out:
+    {site path: (warning kind, note)} of files left out of this build on purpose; links to them are warnings."""
     pages = {}
     for path in sorted(p for p in mapping if p.endswith(".html")):
         parser = _Page()
@@ -105,13 +106,16 @@ def check_site(mapping, diag, markdown):
                 continue  # external, mailto:, download/ and releases/ are not fetched
             target, frag = _target(path, url)
             where = ("website/" + path, line)
-            if target.startswith("../") or target not in mapping:
+            if target in (left_out or {}):
+                kind, note = left_out[target]
+                diag.warning(*where, "link target left out: %s (%s)" % (url, note), kind)
+            elif target.startswith("../") or target not in mapping:
                 diag.error(*where, "link target missing: %s" % url)
             elif frag and target.endswith(".html") and frag not in {i for i, _ in pages[target].ids}:
                 diag.error(*where, "anchor missing: %s (no id '%s' in %s)" % (url, frag, target))
             elif frag and target in generated and frag not in md_checks.collect_ids(mapping, target, md_ids):
                 diag.error(*where, "anchor missing: %s (no <a id> '%s' in %s)" % (url, frag, target))
-    md_checks.check_markdown(mapping, "website", diag, markdown)
+    md_checks.check_markdown(mapping, "website", diag, markdown, left_out)
     sizes(mapping, diag)
 
 
