@@ -31,7 +31,8 @@ Write a QuaDRiGa scenario configuration file
 
 ## Usage:
 ```
-quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, write_defaults )
+quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, \
+    write_defaults )
 ```
 
 ## Inputs:

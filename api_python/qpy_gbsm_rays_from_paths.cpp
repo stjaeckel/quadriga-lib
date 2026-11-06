@@ -26,8 +26,8 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 
 ## Usage:
 ```
-rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, path_length, \
-    M, method, path_type, tap, gr_eps )
+rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, \
+    path_length, M, method, path_type, tap, gr_eps )
 ```
 
 ## Inputs:

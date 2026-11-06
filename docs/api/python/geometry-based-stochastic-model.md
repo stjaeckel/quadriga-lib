@@ -244,7 +244,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#conf_file_write) · [MA
 
 ### Usage:
 ```python
-quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, write_defaults )
+quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, \
+    write_defaults )
 ```
 
 ### Inputs:
@@ -308,8 +309,8 @@ the same. Block 13, the XPR per cluster, is in column `13·N·M + n`; block 14, 
 
 ### Usage:
 ```python
-rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, center_freq, \
-    dual_mobility, horizontal )
+rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, \
+    center_freq, dual_mobility, horizontal )
 ```
 
 ### Inputs:
@@ -362,8 +363,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_init_phases) · [M
 
 ### Usage:
 ```python
-phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, dual_mobility, \
-    remove_bias, horizontal )
+phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, \
+    dual_mobility, remove_bias, horizontal )
 ```
 
 ### Inputs:
@@ -409,8 +410,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_rays_from_paths) �
 
 ### Usage:
 ```python
-rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, path_length, \
-    M, method, path_type, tap, gr_eps )
+rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, \
+    path_length, M, method, path_type, tap, gr_eps )
 ```
 
 ### Inputs:
@@ -467,8 +468,9 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, output, \
-    i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, use_absolute_delays, stack )
+chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, \
+    output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
+    use_absolute_delays, stack )
 ```
 
 ### Inputs:
@@ -609,12 +611,12 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [MATLA
 ### Usage:
 ```python
 # complex=True (default)
-lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, center_freq, \
-    tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
+lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
+    center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
 
 # complex=False
-lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., \
-    complex=False )
+lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
+    lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., complex=False )
 ```
 
 ### Inputs:
@@ -868,8 +870,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_clusters) · [MATLA
 
 ### Usage:
 ```python
-delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( scenpar, tx_pos, rx_pos, lsp, rnd, \
-    method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
+delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( scenpar, tx_pos, rx_pos, \
+    lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
 ```
 
 ### Inputs:
@@ -1046,8 +1048,9 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 
 ### Usage:
 ```python
-rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, power, \
-    aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, pol_variability, random_phase )
+rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, \
+    delay, power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, \
+    pol_variability, random_phase )
 ```
 
 ### Inputs:

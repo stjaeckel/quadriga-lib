@@ -107,8 +107,9 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [Python](../
 
 ### Usage:
 ```matlab
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,  radius_min, ...
-    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, coeff_im, i_snap );
+quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
+     radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, ...
+    coeff_im, i_snap );
 ```
 
 ### Inputs:

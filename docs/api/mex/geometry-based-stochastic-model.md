@@ -470,8 +470,9 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 
 ### Usage:
 ```matlab
-[ chan, par ] = quadriga_lib.gbsm_single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, ...
-    output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, use_absolute_delays );
+[ chan, par ] = quadriga_lib.gbsm_single_link_channel( tx_array, rx_array, rays, link_gain_dB, ...
+    mobility, output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, ...
+    use_absolute_delays );
 ```
 
 ### Inputs:
@@ -622,8 +623,9 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [Pytho
 
 ### Usage:
 ```matlab
-[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ...
-    quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads );
+[ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, ...
+    lsp_sigma ] = quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma, ...
+    cholesky, clip_spreads );
 ```
 
 ### Inputs:
@@ -886,8 +888,9 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_clusters) · [Pytho
 
 ### Usage:
 ```matlab
-[ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, rx_pos, ...
-    lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, o2i, n_cluster );
+[ delay, power, aod, eod, aoa, eoa, n_active ] = quadriga_lib.ssf_clusters( scenpar, tx_pos, ...
+    rx_pos, lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im, ...
+    o2i, n_cluster );
 ```
 
 ### Inputs:
@@ -1063,9 +1066,9 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 
 ### Usage:
 ```matlab
-rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, power, ...
-    aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps_re, gr_eps_im, ...
-    pol_variability, random_phase );
+rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, ...
+    power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps_re, ...
+    gr_eps_im, pol_variability, random_phase );
 ```
 
 ### Inputs:

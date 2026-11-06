@@ -28,7 +28,8 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
 
 # Unpacked outputs
-fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
+fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, \
+    sub_mesh_index, aabb, use_kernel, gpu_id )
 ```
 
 ## Inputs:
