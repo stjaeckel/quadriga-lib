@@ -660,17 +660,19 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                 if (drift && taps)
                 {
                     const arma::uvec kk = gr ? arma::uvec{0, 1, 2, 3, 5, 6, 7} : arma::uvec{0, 1, 2, 4, 5, 6};
-                    const arma::mat F = r->fbs_pos.cols(kk), L = r->lbs_pos.cols(kk);
-                    CHECK(arma::approx_equal(par<arma::mat>(c, "fbs_pos"), F, "absdiff", 0.0));
-                    CHECK(arma::approx_equal(par<arma::mat>(c, "lbs_pos"), L, "absdiff", 0.0));
+                    // float32 copies of the kept scatterers
+                    const arma::fmat F = arma::conv_to<arma::fmat>::from(r->fbs_pos.cols(kk));
+                    const arma::fmat L = arma::conv_to<arma::fmat>::from(r->lbs_pos.cols(kk));
+                    CHECK(arma::approx_equal(par<arma::fmat>(c, "fbs_pos"), F, "absdiff", 0.0f));
+                    CHECK(arma::approx_equal(par<arma::fmat>(c, "lbs_pos"), L, "absdiff", 0.0f));
                 }
                 if (drift && taps && gr)
                 {
-                    const arma::mat G = par<arma::mat>(c, "gr_pos");
+                    const arma::mat G = arma::conv_to<arma::mat>::from(par<arma::fmat>(c, "gr_pos"));
                     REQUIRE(arma::size(G) == arma::size(3, 3));
-                    for (arma::uword t = 0; t < 3; ++t)
-                        CHECK(arma::approx_equal(G.col(t), specular_point(r->tx_pos, a.R.row(t).t()), "absdiff",
-                                                 1e-12));
+                    for (arma::uword t = 0; t < 3; ++t) // float32 rounding: relative 2^-24
+                        CHECK(arma::approx_equal(G.col(t), specular_point(r->tx_pos, a.R.row(t).t()), "both", 1e-12,
+                                                 std::ldexp(1.0, -24)));
                 }
                 CHECK(par<arma::vec>(c, "link_gain_dB").n_elem == 3);
                 for (const char *x : {"b_med", "b_eff", "limit", "ratio"})

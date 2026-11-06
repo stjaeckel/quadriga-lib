@@ -2473,8 +2473,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 | --- | --- | --- |
 | `tap` | `[n_tap, 1]` or `[n_path, 1]` | Tap index per output tap or per path (a code, not shifted); uint64 |
 | `n_ray_tap` | `[n_tap, 1]` | Number of kept rays per tap; uint64; `'taps'` only |
-| `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `'drift'` with `'taps'` only |
-| `gr_pos` | `[3, n_snap]` | GR point per snapshot; `'drift'` with `'taps'` and a GR ray only |
+| `fbs_pos`, `lbs_pos` | `[3, n_kept]` | Scatterers of the kept rays at the ray-data positions; `'drift'` with `'taps'` only; single, the precision of path data in HDF5 files |
+| `gr_pos` | `[3, n_snap]` | GR point per snapshot; `'drift'` with `'taps'` and a GR ray only; single |
 | `link_gain_dB` | `[n_snap, 1]` | Link gain per snapshot |
 | `b_med`, `b_eff` | `[2, 1]` | Validity scales of [ssf_scatterers](#ssf_scatterers) at `i_freq`, Tx and Rx; without scatterers from a solved copy (`d_min` = 2 m) |
 | `limit` | `[2, 1]` | Validity limit per end, $\sqrt{\lambda b_{\mathrm{eff}} / 8}$ (`'phase'`) or $0.2 b_{\mathrm{med}}$ (`'drift'`); Inf where b is NaN |

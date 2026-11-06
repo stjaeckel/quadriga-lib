@@ -74,6 +74,12 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(par["tap"][:2], [0, 3])
         npt.assert_array_equal(par["ratio"], [0.0, 0.0])
         self.assertEqual(par["fbs_pos"].shape, (3, self.n_path))
+        kept = np.any(self.rays["power"] > 0, 1) | (self.rays["path_type"] < 2)
+        for k in ["fbs_pos", "lbs_pos"]:  # float32 copies
+            self.assertEqual(par[k].dtype, np.float32)
+            npt.assert_array_equal(par[k], self.rays[k][:, kept].astype(np.float32))
+        self.assertEqual(par["gr_pos"].dtype, np.float32)
+        self.assertEqual(par["gr_pos"].shape, (3, 1))
 
     def test_keywords(self):
         chan, par = gbsm.single_link_channel(tx_array=self.tx, rx_array=self.rx, rays=self.rays,

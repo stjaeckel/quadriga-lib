@@ -113,6 +113,7 @@ def typed_values():
         'big_endian': (np.arange(3.0).astype('>f8'), np.arange(3.0), np.float64),
         'big_endian_i4': (np.arange(4, dtype='>i4').reshape(2, 2), np.arange(4).reshape(2, 2), np.int32),
         'f32': (np.arange(3, dtype=np.float32), np.arange(3.0), np.float32),
+        'f32_2d': (np.arange(6, dtype=np.float32).reshape(3, 2), np.arange(6.0).reshape(3, 2), np.float32),
         'u32': (np.arange(3, dtype=np.uint32), np.arange(3), np.uint32),
         'i32': (np.arange(3, dtype=np.int32), np.arange(3), np.int32),
         'u64': (np.arange(3, dtype=np.uint64), np.arange(3), np.uint64),

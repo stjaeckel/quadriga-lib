@@ -498,8 +498,8 @@ Behaviour:
 |---|---|---|---|
 | `tap` | `arma::uvec` `[n_tap]` or `[n_path]` | tap index per output tap (`taps`) or per path (`rays`) | always |
 | `n_ray_tap` | `arma::uvec` `[n_tap]` | number of kept rays per tap | `taps` |
-| `fbs_pos`, `lbs_pos` | `arma::mat` `[3, n_kept]` | scatterers of the n_kept kept rays in ray order (LOS and GR at the ray-data positions) | `drift` and `taps` |
-| `gr_pos` | `arma::mat` `[3, n_snap]` | GR point per snapshot | `drift`, `taps`, GR ray kept |
+| `fbs_pos`, `lbs_pos` | `arma::fmat` `[3, n_kept]` | scatterers of the n_kept kept rays in ray order (LOS and GR at the ray-data positions); float32, the precision of path data in HDF5 files | `drift` and `taps` |
+| `gr_pos` | `arma::fmat` `[3, n_snap]` | GR point per snapshot | `drift`, `taps`, GR ray kept |
 | `link_gain_dB` | `arma::vec` `[n_snap]` | link gain per snapshot | always |
 | `b_med` | `arma::vec` `[2]` | `rays.b_med(i_freq)` (Tx, Rx); without scatterers from the solved copy of `b_eff`; NaN without NLOS power | always |
 | `b_eff` | `arma::vec` `[2]` | `rays.b_eff(i_freq)` (Tx, Rx); without scatterers from a solved copy (default d_min); a GR ray with an end below z = 0, which `phase` accepts and the solver rejects, is solved as an NLOS ray in that copy (b uses no GR scatterer; code review round 2) | always |
