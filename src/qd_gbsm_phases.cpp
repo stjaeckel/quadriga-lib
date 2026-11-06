@@ -353,12 +353,13 @@ SECTION!*/
 
 /*!MD
 # gbsm_init_phases
-Draw the random phases of one random set of a BS site and scenario
+Draw the SOS phases of one random set of a BS site and scenario
 
-- Draws the phases of one random set (set table in [[gbsm_draw]]) for [[gbsm_draw]]; store `phase` or the seed to
-  evaluate the same fields again along tracks or on maps
-- The phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed `"lsf"`
-  phases within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
+- Draws the SOS phases of one random set (set table in [[gbsm_draw]]): the random phases of the sinusoids of its
+  [sum-of-sinusoids (SOS)](cpp_api.html#sec-sum-of-sinusoids-random-number-generator) generators, as [[sos_init_phases]]; [[gbsm_draw]]
+  evaluates them at the links. Store `phase` or the seed to evaluate the same fields again along tracks or on maps
+- The SOS phases are a fixed function of `seed`, `set_type` and `set_id`, equal on all platforms (bias-removed
+  `"lsf"` sets within about 2e-14 rad); the sets are independent; each scenario of a site needs its own seed
 - `"lsf"` bias removal (`remove_bias`, at least 3 rows in `rx_pos`): [[sos_remove_bias]] sets the sample mean of
   columns 0 to 8 over the positions to 0 (with `tx_pos` in dual mobility; 2D mode: one floor), removing variance
 - `NumClusters = 1`: all sets but `"lsf"` are empty
@@ -383,7 +384,7 @@ void quadriga_lib::gbsm_init_phases(
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the decorrelation distances, `NumClusters` and `NumSubPaths` are used
 - **`set_type`** — `"lsf"`, `"cluster"` or `"ray"`
-- **`seed`** *(optional)* — Seed of the site and scenario, >= -1; -1 = system random device, new phases on each call
+- **`seed`** *(optional)* — Seed of the site and scenario, >= -1; -1 = system random device, new SOS phases on each call
 - **`set_id`** *(optional)* — `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`
 - **`preset`** *(optional)* — Sum-of-sinusoids preset, see [[sos_preset]]; sets `n_coeff`
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Bias-removal positions in [m] as in [[gbsm_draw]]; `"lsf"` only, else throws
@@ -392,11 +393,12 @@ void quadriga_lib::gbsm_init_phases(
 - **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D (TR), `false` 3D (legacy); as in [[gbsm_draw]]
 
 ## Output:
-- **`phase`** — Phases in [rad], in [-pi, pi); slice 0 = Rx side, slice 1 = Tx side; `[n_coeff, n_gen, 2]`
+- **`phase`** — SOS phases in [rad], in [-pi, pi), row = sinusoid, column = generator; slice 0 = Rx side, slice 1 =
+  Tx side; `[n_coeff, n_gen, 2]`
 
 ## See also:
-- [[gbsm_draw]] (evaluates the phases at the links)
-- [[sos_remove_bias]] (the bias removal of one generator)
+- [[gbsm_draw]] (evaluates the SOS phases at the links)
+- [[sos_init_phases]], [[sos_val]] (SOS phases and evaluation of one generator), [[sos_remove_bias]] (its bias removal)
 MD!*/
 
 void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double> &scenpar,
@@ -502,7 +504,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
 # gbsm_draw
 Spatially correlated normalized random values of one random set at a set of links
 
-- Evaluates the phases of [[gbsm_init_phases]] at the links, one column per generator. The value of a link depends
+- Evaluates the SOS phases of [[gbsm_init_phases]] at the links as [[sos_val]], one column per generator. The value of a link depends
   neither on the other links of the call nor on the other columns; in single mobility it does not depend on `tx_pos`
 - Dual mobility: the Tx is a second device on the same maps; its side of each generator uses the mirror generator
   (e.g. departure and arrival quantities exchange), and every column keeps its distribution
@@ -547,7 +549,7 @@ void quadriga_lib::gbsm_draw(
 ## Inputs:
 - **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, cluster DS and ASA
 - **`set_type`** — Set type of [[gbsm_init_phases]]
-- **`phase`** — Phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
+- **`phase`** — SOS phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
 - **`set_id`** *(optional)* — Set of [[gbsm_init_phases]]; ignored for `"lsf"`
@@ -564,7 +566,7 @@ void quadriga_lib::gbsm_draw(
 - **`rnd`** — Random values; `[n_link, n_gen]`
 
 ## See also:
-- [[gbsm_init_phases]] (the phases)
+- [[gbsm_init_phases]] (the SOS phases)
 - [[lsp_generate]] (the large-scale parameters from the `"lsf"` set)
 - [[path_loss]] (column 10 of the `"lsf"` set as `rnd_he`)
 - [[ssf_clusters]] (the clusters from the `"cluster"` sets)

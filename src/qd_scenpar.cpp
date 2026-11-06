@@ -720,7 +720,7 @@ through; an invalid value of a key that the function does not use throws as well
    `LOS_state_lambda`). The caller chooses the `los_probability` model and the `o2i_loss` models and weights (TR 38.901
    Tables 7.4.2-1, 7.4.3-2); the conf files state `LOS_state_lambda` in the NLOS files and `IO_state_lambda` in the
    O2I files (0 in the others). The states assign each link to a scenario; steps 3 to 7 run per scenario
-3. Per BS site and scenario, once: [[gbsm_init_phases]] for the random sets `"lsf"`, `"cluster"` (`set_id` -1 and one
+3. Per BS site and scenario, once: [[gbsm_init_phases]], the SOS phases of the random sets `"lsf"`, `"cluster"` (`set_id` -1 and one
    per frequency) and `"ray"` (-1 for the method `"quadriga"`, one per frequency for the TR methods)
 4. [[gbsm_draw]] of each set at the links; [[path_loss]] (`PL`, `sf_sigma`; column 10 of the `"lsf"` set as
    `rnd_he`); [[lsp_generate]] with `sf_sigma` (`lsp` and the optional outputs the later steps take, incl. `lsp_mu`,
@@ -732,7 +732,7 @@ through; an invalid value of a key that the function does not use throws as well
    [[ssf_paths]] and the QRT route ([[qrt_paths_from_scatterers]], [[qrt_file_append]]; back with [[qrt_file_read]]
    and [[gbsm_rays_from_paths]]). Other path sources fill a [[gbsm_rays]] object directly
 
-For moved positions, evaluate [[gbsm_draw]] (`"lsf"`), [[path_loss]] and [[lsp_generate]] again with the same phases:
+For moved positions, evaluate [[gbsm_draw]] (`"lsf"`), [[path_loss]] and [[lsp_generate]] again with the same SOS phases:
 they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) from slice 1 of `lsp`.<br><br>
 
 **Terms.** TR 38.901 names where they exist; QuaDRiGa names are marked:
@@ -756,7 +756,8 @@ they give the link gain (see Terms) and `kf_ratio` = KF(position) / KF(drop) fro
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
 | link gain | `-PL - O2I + 10·lg(SF)` in dB of a link at a position (`link_gain_dB`), with SF the linear shadow fading, slice 2 of `lsp` |
 | random set | the spatially correlated random values of one `set_type` and `set_id` (table in [[gbsm_draw]]) |
-| generator | one spatially correlated random field; one column of a random set |
+| generator | one spatially correlated random field, a [sum-of-sinusoids (SOS)](cpp_api.html#sec-sum-of-sinusoids-random-number-generator) generator; one column of a random set |
+| SOS phases | the random phases of the sinusoids of the generators of a random set (`phase`); evaluated at positions, they give its random values. "Phase" alone is the phase of a coefficient or ray |
 | block | the generators of one random quantity in a set |
 
 **Codes.** Path type: 0 LOS, 1 GR, 2 NLOS. Tap index: 3·slot + i, with i the sub-cluster (0, 1, 2) of a split cluster
