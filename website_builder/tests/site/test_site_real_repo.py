@@ -73,7 +73,13 @@ def test_old_anchors_exist(site):
 
 def test_tutorials_without_warnings(site):
     _, out, files = site
-    assert [ln for ln in out.splitlines() if ln.startswith("tutorials/") and ": warning:" in ln] == []
-    for nb in sorted((REPO / "tutorials").glob("*.ipynb")):
+    warnings = [ln for ln in out.splitlines() if ln.startswith("tutorials/") and ": warning:" in ln]
+    notebooks = sorted((REPO / "tutorials").glob("*.ipynb"))
+    if notebooks and not (REPO / "tutorials/executed").is_dir():  # tutorials not run in this checkout
+        assert warnings == ["tutorials/executed: warning: missing: the tutorials have not been run (make tutorials); "
+                            "the tutorials page lists none [not-executed]"]
+        return
+    assert warnings == []
+    for nb in notebooks:
         for ext in (".html", ".md", ".ipynb"):
             assert "tutorials/" + nb.stem + ext in files

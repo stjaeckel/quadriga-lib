@@ -26,7 +26,7 @@ def build_site(root, diag, release=False):
             web[pid] = prose.read_page(path, diag, root)
         else:
             diag.error("%s/%s.md" % (config.WEBSITE_CONTENT, pid), None, "content file missing")
-    tuts = tutorials.read_all(root, diag)
+    tuts = tutorials.read_all(root, diag, release)
     files = assets.static_files()
     files.update(assets.skill(root, diag))
     for t in tuts:

@@ -1,19 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
-"""Tutorial notebooks: metadata checks, outputs, headings, pages and twins."""
+"""Tutorial notebooks: executed copies, metadata checks, outputs, headings, pages and twins."""
 
 import json
+import shutil
 
-NB = "tutorials/mini_demo.ipynb"
+NB = "tutorials/mini_demo.ipynb"            # the notebook (cleared); messages name it
+RUN = "tutorials/executed/mini_demo.ipynb"  # its executed copy, which the builder reads
 
 
 def edit(root, change, name=NB):
-    path = root / NB
+    """Change the executed copy; with another name, rename the notebook and its copy."""
+    path = root / RUN
     nb = json.loads(path.read_text(encoding="utf-8"))
     change(nb)
     path.unlink()
-    (root / name).write_text(json.dumps(nb), encoding="utf-8")
+    (root / "tutorials/executed" / name.split("/")[-1]).write_text(json.dumps(nb), encoding="utf-8")
+    if name != NB:
+        (root / NB).rename(root / name)
 
 
 def site(root, rel):
@@ -110,7 +115,7 @@ def test_pages_twins_and_index(mini_repo, run_site):
     assert "```python\nimport quadriga_lib\nprint(quadriga_lib.version())\n```\n\n```text\n9.9.9\n```" in twin
     assert "![A black square](mini_demo/fig-4-1.svg)" in twin
     assert "the [FAQ](../faq.md#cite)" in twin
-    assert (mini_repo / "website" / NB).read_bytes() == (mini_repo / NB).read_bytes()
+    assert (mini_repo / "website" / NB).read_bytes() == (mini_repo / RUN).read_bytes()  # the executed copy
     page = site(mini_repo, "tutorials/mini_demo.html")
     assert '<a class="dl" href="mini_demo.ipynb">Download notebook <small>.ipynb</small></a>' in page
     index = site(mini_repo, "tutorials.html")
@@ -123,6 +128,39 @@ def test_pages_twins_and_index(mini_repo, run_site):
 
 def test_no_tutorials(mini_repo, run_site):
     (mini_repo / NB).unlink()
-    assert run_site(mini_repo)[0] == 0
-    assert "No tutorials yet." in site(mini_repo, "tutorials.html") and "No tutorials yet." in site(mini_repo, "tutorials.md")
-    assert "note-box" not in site(mini_repo, "tutorials.html")
+    code, out = run_site(mini_repo)
+    assert code == 0 and "not-executed" not in out
+    assert "tut-card" not in site(mini_repo, "tutorials.html") and "note-box" not in site(mini_repo, "tutorials.html")
+    assert "tutorials/mini_demo" not in site(mini_repo, "tutorials.md")
+    assert not (mini_repo / "website/tutorials/mini_demo.html").exists()
+
+
+def test_not_executed(mini_repo, run_site):
+    shutil.rmtree(mini_repo / "tutorials/executed")
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert ("tutorials/executed: warning: missing: the tutorials have not been run (make tutorials); the tutorials "
+            "page lists none [not-executed]") in out
+    index = site(mini_repo, "tutorials.html")
+    assert "<h1>Tutorials</h1>" in index and "tut-card" not in index
+    assert not (mini_repo / "website/tutorials/mini_demo.html").exists()
+    code, out = run_site(mini_repo, "--release")
+    assert code == 1 and "tutorials/executed: error: missing: the tutorials have not been run" in out
+
+
+def test_executed_copy_missing(mini_repo, run_site):
+    (mini_repo / RUN).unlink()
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert ("tutorials/mini_demo.ipynb: warning: no executed copy tutorials/executed/mini_demo.ipynb "
+            "(make tutorials); left out [not-executed]") in out
+    assert "tut-card" not in site(mini_repo, "tutorials.html")
+    code, out = run_site(mini_repo, "--release")
+    assert code == 1 and "tutorials/mini_demo.ipynb: error: no executed copy" in out
+
+
+def test_executed_copy_without_notebook_is_ignored(mini_repo, run_site):
+    (mini_repo / NB).unlink()  # a deleted tutorial whose executed copy is still there
+    code, out = run_site(mini_repo)
+    assert code == 0 and "mini_demo" not in out
+    assert not (mini_repo / "website/tutorials/mini_demo.html").exists()

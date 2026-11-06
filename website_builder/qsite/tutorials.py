@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
-"""Tutorial notebooks: reading and checking them (never running or rewriting), their outputs and figures,
-and the Markdown twins of the tutorial pages and of the tutorial index."""
+"""Tutorial notebooks: reading and checking their executed copies (never running or rewriting anything), their
+outputs and figures, and the Markdown twins of the tutorial pages and of the tutorial index."""
 
 import base64
 import dataclasses
@@ -19,6 +19,7 @@ META_KEYS = {"title": (str, True), "summary": (str, True), "level": (str, True),
              "order": (int, True), "dummy": (bool, False)}
 LEVELS = ("beginner", "intermediate", "advanced")
 FOLDER = "tutorials"
+EXECUTED = "tutorials/executed"  # written by the tutorial build (tutorials/GNUmakefile), not by this builder
 
 
 @dataclass
@@ -59,12 +60,33 @@ def _text(value):
     return "".join(value) if isinstance(value, list) else (value or "")
 
 
-def read_all(root, diag):
-    """All notebooks of tutorials/ in index order (order, then title); a notebook with errors is left out."""
+def read_all(root, diag, release=False):
+    """The tutorials in index order (order, then title): one per notebook tutorials/<stem>.ipynb, read from its
+    executed copy tutorials/executed/<stem>.ipynb; diagnostics name the notebook. A notebook with errors is left
+    out. Missing executed copies leave their tutorials out with the warning not-executed (an error with
+    release); without tutorials/executed/ the index lists no tutorial."""
     folder = root / FOLDER
+    sources = sorted(folder.glob("*.ipynb")) if folder.is_dir() else []
+    if not sources:
+        return []
+    if release:
+        report = diag.error
+    else:
+        def report(path, line, message):
+            diag.warning(path, line, message, "not-executed")
+    executed = root / EXECUTED
+    if not executed.is_dir():
+        report(EXECUTED, None, "missing: the tutorials have not been run (make tutorials); the tutorials page "
+               "lists none")
+        return []
     out = []
-    for p in sorted(folder.glob("*.ipynb")) if folder.is_dir() else []:
-        t = read(p, "%s/%s" % (FOLDER, p.name), diag)
+    for p in sources:
+        rel = "%s/%s" % (FOLDER, p.name)
+        run = executed / p.name
+        if not run.is_file():
+            report(rel, None, "no executed copy %s/%s (make tutorials); left out" % (EXECUTED, p.name))
+            continue
+        t = read(run, rel, diag)
         if t:
             out.append(t)
     return sorted(out, key=lambda t: (t.order, t.title))
@@ -199,5 +221,5 @@ def index_twin(page, tutorials):
     text = render_md.prose_twin(page, loc).rstrip("\n").split("\n")
     items = ["- [%s](%s/%s.md) · %s · %s · %s" % (t.title, FOLDER, t.stem, t.language, t.level,
                                                     " ".join(render_md.twin_lines([t.summary], loc)))
-             for t in tutorials] or ["No tutorials yet."]
-    return "\n".join(text + [""] + items) + "\n"
+             for t in tutorials]
+    return "\n".join(text + ([""] + items if items else [])) + "\n"
