@@ -507,8 +507,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
 Spatially correlated normalized random values of one random set at a set of links
 
 - Evaluates the SOS phases of [[gbsm_init_phases]] at the links as [[sos_val]], one column per generator. The value of a
-  link depends neither on the other links of the call nor on the other columns; with `dual_mobility = false` not on
-  `tx_pos`
+  link depends neither on the other links nor on the other columns; with `dual_mobility = false` not on `tx_pos`
 - `dual_mobility = true`: the Tx is a second device on the same fields; its side of each generator uses the mirror
   generator (e.g. departure and arrival quantities exchange), and every column keeps its distribution
 - 2D mode (`horizontal = true`, TR): the values are correlated in the x-y plane; links with equal `floor_id` share one
@@ -553,15 +552,16 @@ void quadriga_lib::gbsm_draw(
 ```
 
 ## Inputs:
-- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, cluster DS and ASA
+- **`scenpar`** — Scenario parameters; decorrelation distances, `NumClusters`, `NumSubPaths`, `PerClusterDS*` and
+  `PerClusterAS_A`
 - **`set_type`** — Set type of [[gbsm_init_phases]]
 - **`phase`** — SOS phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
 - **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
 - **`set_id`** *(optional)* — Set of [[gbsm_init_phases]]; ignored for `"lsf"`
 - **`preset`** *(optional)* — Preset of [[gbsm_init_phases]]; another preset with the same `n_coeff` is not detected
-- **`floor_id`** *(optional)* — Floor index of the UT per link, 0-based (`n_fl - 1` for the UT heights of TR 38.901
-  Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
+- **`floor_id`** *(optional)* — Floor number of the UT per link, ground floor 0 (`n_fl - 1` for the UT heights of
+  TR 38.901 Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
 - **`center_frequency`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
   uses their mean c_DS ([[ssf_rays]]): pass the same list as to [[ssf_rays]] (another list gives other `"quadriga"`
   rays); ignored and not checked for all other sets; `[n_freq]`

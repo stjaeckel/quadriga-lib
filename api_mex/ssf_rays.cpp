@@ -148,8 +148,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_freq' cannot be 0 (1-based index).");
     i_freq -= 1; // 1-based (MATLAB) -> 0-based (C++)
 
-    const arma::mat *p_gr_eps_re = gr_eps_re.empty() ? nullptr : &gr_eps_re;
-    const arma::mat *p_gr_eps_im = gr_eps_im.empty() ? nullptr : &gr_eps_im;
+    // An omitted input or [] (0 x 0) selects the default, an empty input of another shape (zero links) counts as given
+    auto given = [&](int i)
+    { return nrhs > i && (mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0); };
+    const arma::mat *p_gr_eps_re = given(18) ? &gr_eps_re : nullptr;
+    const arma::mat *p_gr_eps_im = given(19) ? &gr_eps_im : nullptr;
 
     // Output struct array in MATLAB memory, sizes from a completed copy of 'scenpar'; with an invalid 'scenpar' the
     // library call throws its message before any output is needed

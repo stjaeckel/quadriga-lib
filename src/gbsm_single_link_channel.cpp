@@ -34,7 +34,7 @@ Channel coefficients of one link at one frequency over one segment
 - `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
   per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
   element pair is the mean of the rays' delays weighted by `rays.power` at `i_freq` (equal weights where they sum to
-  0), `[n_rx, n_tx, n_tap]`; reduce it to `[1, 1, n_tap]` where needed
+  0)
 - `"taps"` is exact at the phase center for the TR methods (the rays of a tap share one delay); for `"quadriga"` only
   at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `"rays"` for
   wide bands. `"rays"`: one path per kept ray in ray order, exact at any bandwidth, the form of the QRT route; the
