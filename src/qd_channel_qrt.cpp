@@ -1064,7 +1064,8 @@ void quadriga_lib::qrt_file_read(
 - **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
 - **`coord`** — Interaction coordinates; `[3, sum(no_int)]`
 - **`interact_type`** — Interaction type codes, concatenated per path and segmented by `no_int`; `[sum(no_int)]`.
-  Empty for v4 legacy files.
+  Empty for v4 legacy files. GBSM paths of [[qrt_paths_from_scatterers]] carry 129 (GR) and 193 (NLOS); LOS and GR
+  paths are not marked as GBSM.
 
 ## Example:
 ```
@@ -1927,9 +1928,20 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
 # qrt_paths_from_scatterers
 Path objects of one CIR from spherical path data, for qrt_file_append
 
-- The path gain and the inverse free-space loss of the polyline length are folded into the stored Jones matrices
-- LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
-- Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
+- Converts the paths of one Tx-Rx pair (e.g. of [[ssf_paths]] with `drift` mobility) into [[path]] objects for
+  [[qrt_file_append]]; one call per CIR, the objects of all CIRs of one origin appended together
+- Interactions: LOS none; GR one reflection at `lbs_pos` (code 129, `nREF` = 1); NLOS two point scatterers at
+  `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
+  and `length` exist on the returned objects only ([[qrt_file_read_raw]] returns 0): files store the codes
+- The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
+  [[qrt_file_read]] (`downlink = true`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
+  within float32 accuracy, the polyline as `path_length` and `path_type` as `no_int`
+- `tx_pos` must be the `orig_pos` of [[qrt_file_append]] and `rx_pos` the CIR position of [[qrt_file_init]] (which
+  takes GHz): `qrt_file_read` recomputes the lengths from the stored positions; not checked
+- Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
+  0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
+- Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
+- A path of length 0 (LOS with `tx_pos` = `rx_pos`) throws: `qrt_file_read` would return an infinite gain
 
 ## Declaration:
 ```
@@ -1949,18 +1961,18 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`center_frequency`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
 - **`tx_pos`** — Tx (origin) position in [m]; `[3]`
 - **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
-- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
-- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`M`** — Polarization transfer matrices, row order of [[get_channels_spherical]]; `[8, n_path, n_freq]`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
-- **`i_cir`** *(optional)* — CIR index, stored in `path::iC`, < 2^32
+- **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
 
 ## Returns:
-- Path objects in input order; `[n_path]`
+- Path objects in input order, EM layout with `n_freq` frequencies; `[n_path]`
 
 ## See also:
 - [[qrt_file_append]] (writes the paths)
-- [[ssf_paths]] (path data of the geometry-based stochastic model)
+- [[gbsm_rays_from_paths]] (ray data from the paths read back)
 MD!*/
 
 std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const arma::vec &center_frequency,
@@ -1973,8 +1985,94 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
                                                                         const arma::uvec &path_type,
                                                                         arma::uword i_cir)
 {
-    // STUB: no computation yet; returns n_path empty path objects
-    (void)center_frequency, (void)tx_pos, (void)rx_pos, (void)lbs_pos, (void)path_gain, (void)M, (void)path_type;
-    (void)i_cir;
-    return std::vector<quadriga_lib::path>(fbs_pos.n_cols);
+    const arma::uword n_freq = center_frequency.n_elem, n_path = fbs_pos.n_cols;
+    if (n_freq == 0 || n_freq > 127)
+        throw std::invalid_argument("Input 'center_frequency' must have 1 to 127 elements.");
+    if (!center_frequency.is_finite() || arma::any(center_frequency <= 0.0))
+        throw std::invalid_argument("Input 'center_frequency' must be finite and > 0.");
+    auto check_pos = [](const arma::vec &x, const std::string &name)
+    {
+        if (x.n_elem != 3)
+            throw std::invalid_argument("Input '" + name + "' must have 3 elements.");
+        if (!x.is_finite())
+            throw std::invalid_argument("Input '" + name + "' must be finite.");
+    };
+    check_pos(tx_pos, "tx_pos"), check_pos(rx_pos, "rx_pos");
+    if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || lbs_pos.n_cols != n_path)
+        throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have size [3, n_path].");
+    if (!fbs_pos.is_finite() || !lbs_pos.is_finite())
+        throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must be finite.");
+    if (path_gain.n_rows != n_path || path_gain.n_cols != n_freq)
+        throw std::invalid_argument("Input 'path_gain' must have size [n_path, n_freq].");
+    if (!path_gain.is_finite() || arma::any(arma::vectorise(path_gain) < 0.0))
+        throw std::invalid_argument("Input 'path_gain' must be finite and >= 0.");
+    if (M.n_rows != 8 || M.n_cols != n_path || M.n_slices != n_freq)
+        throw std::invalid_argument("Input 'M' must have size [8, n_path, n_freq].");
+    if (!M.is_finite())
+        throw std::invalid_argument("Input 'M' must be finite.");
+    if (path_type.n_elem != n_path)
+        throw std::invalid_argument("Input 'path_type' must have n_path elements.");
+    if (arma::any(path_type > 2))
+        throw std::invalid_argument("Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS).");
+    if (i_cir > 4294967295ULL)
+        throw std::invalid_argument("Input 'i_cir' must be < 2^32.");
+
+    // Polyline lengths in double: LOS the direct line, GR via its point in lbs_pos, NLOS T -> FBS -> LBS -> R
+    auto dist = [](const double *a, const double *b)
+    {
+        const double x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
+        return std::sqrt(x * x + y * y + z * z);
+    };
+    const double *T = tx_pos.memptr(), *R = rx_pos.memptr();
+    arma::vec L(n_path);
+    for (arma::uword p = 0; p < n_path; ++p)
+    {
+        const double *F = fbs_pos.colptr(p), *B = lbs_pos.colptr(p);
+        L(p) = (path_type(p) == 0)   ? dist(T, R)
+               : (path_type(p) == 1) ? dist(T, B) + dist(B, R)
+                                     : dist(T, F) + dist(F, B) + dist(B, R);
+        if (L(p) == 0.0) // qrt_file_read would apply the free-space loss of a zero length
+            throw std::invalid_argument("Inputs 'tx_pos' and 'rx_pos' must differ for a path of zero length.");
+    }
+
+    // Amplitude of the inverse free-space loss at 1 m that qrt_file_read applies, per frequency
+    arma::vec a_1m(n_freq);
+    for (arma::uword f = 0; f < n_freq; ++f)
+        a_1m(f) = std::pow(10.0, -0.05 * qd_gain_at_1m(center_frequency(f), false));
+
+    const float Tf[3] = {(float)T[0], (float)T[1], (float)T[2]}, Rf[3] = {(float)R[0], (float)R[1], (float)R[2]};
+    std::vector<quadriga_lib::path> out(n_path);
+    for (arma::uword p = 0; p < n_path; ++p)
+    {
+        quadriga_lib::path &q = out[p];
+        const arma::uword type = path_type(p);
+        q.init(type == 0 ? 0 : type == 1 ? 1 : 2, n_freq);
+        q.iC = (unsigned)i_cir;
+        if (type == 1) // GR: one front reflection at its point
+        {
+            for (int i = 0; i < 3; ++i)
+                q.coord(0)[i] = (float)lbs_pos(i, p);
+            q.set_interaction_type_codes({129});
+            q.nREF = 1;
+        }
+        else if (type == 2) // NLOS: two point scatterers
+        {
+            for (int i = 0; i < 3; ++i)
+                q.coord(0)[i] = (float)fbs_pos(i, p), q.coord(1)[i] = (float)lbs_pos(i, p);
+            q.set_interaction_type_codes({193, 193});
+            q.nSCT = 2;
+        }
+        q.calc_length(Rf, Tf);
+
+        // Stored Jones matrix: M·sqrt(path_gain)·L·a_1m, so that qrt_file_read returns sqrt(path_gain)·M
+        for (arma::uword f = 0; f < n_freq; ++f)
+        {
+            const double s = std::sqrt(path_gain(p, f)) * L(p) * a_1m(f);
+            const double *m = M.slice_colptr(f, p);
+            float *J = q.xpr_coeff(f);
+            for (int e = 0; e < 8; ++e)
+                J[e] = (float)(m[e] * s);
+        }
+    }
+    return out;
 }
