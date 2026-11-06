@@ -26,8 +26,7 @@ class test_case(unittest.TestCase):
 
     def setUp(self):
         # Distinct values; asD_ds is the (DS, ASD) entry, esA_ds the (DS, ESA) entry of lsp_xcorr
-        self.scenpar = {"DS_mu": -7.5, "NumClusters": 12.0, "asD_ds": 0.25, "esA_ds": -0.5,
-                        "SubpathMethod": "Laplacian"}
+        self.scenpar = {"DS_mu": -7.5, "NumClusters": 12.0, "asD_ds": 0.25, "esA_ds": -0.5}
 
     def test_basic_call(self):
         out = quadriga_lib.gbsm.scenpar_validate(self.scenpar)
@@ -35,14 +34,14 @@ class test_case(unittest.TestCase):
         self.assertEqual(len(out), 3)
         scenpar_out, lsp_xcorr, lsp_xcorr_chk = out
 
-        # 172 entries, float values, 'SubpathMethod' (str) at position 106, the newest keys at the end
+        # 171 float entries in the canonical order, the newest keys at the end
         self.assertIsInstance(scenpar_out, dict)
-        self.assertEqual(len(scenpar_out), 172)
+        self.assertEqual(len(scenpar_out), 171)
         keys = list(scenpar_out)
-        self.assertEqual(keys[105:108], ["absTOA_lambda", "SubpathMethod", "LOS_scatter_radius"])
+        self.assertEqual(keys[105:107], ["absTOA_lambda", "LOS_scatter_radius"])
         self.assertEqual(keys[-6:], ["LOS_state_lambda", "IO_state_lambda", "O2I_d2D_in_max", "DS_VS", "DS_VS_a", "DS_VS_b"])
         for key, value in scenpar_out.items():
-            self.assertIsInstance(value, str if key == "SubpathMethod" else float, key)
+            self.assertIsInstance(value, float, key)
 
         # Given values are kept, missing keys have their default
         for key, value in self.scenpar.items():
@@ -70,8 +69,8 @@ class test_case(unittest.TestCase):
             self.assertEqual(out[0], ref[0])
             npt.assert_array_equal(out[1], ref[1])
             self.assertEqual(out[2], ref[2])
-        self.assertEqual(len(ref[0]), 172)
-        self.assertEqual(ref[0]["SubpathMethod"], "legacy")
+        self.assertEqual(len(ref[0]), 171)
+        self.assertNotIn("SubpathMethod", ref[0])
         self.assertEqual(ref[0]["NumClusters"], 6.0)
         npt.assert_array_equal(ref[1], np.eye(8))
         self.assertTrue(ref[2])
@@ -105,16 +104,16 @@ class test_case(unittest.TestCase):
 
     def test_validate(self):
         # Default is validate = True
-        bad = {"DS_mu": np.nan, "SubpathMethod": "foo"}
+        bad = {"DS_mu": np.nan, "SubpathMethod": "legacy"}
         with self.assertRaises(ValueError):
             quadriga_lib.gbsm.scenpar_validate(bad)
         with self.assertRaises(ValueError):
             quadriga_lib.gbsm.scenpar_validate(bad, True)
 
-        # validate = False accepts NaN and any SubpathMethod; NaN in a correlation gives lsp_xcorr_chk = False
+        # validate = False accepts NaN; NaN in a correlation gives lsp_xcorr_chk = False
         scenpar_out, _, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate(bad, False)
         self.assertTrue(np.isnan(scenpar_out["DS_mu"]))
-        self.assertEqual(scenpar_out["SubpathMethod"], "foo")
+        self.assertNotIn("SubpathMethod", scenpar_out)
         self.assertTrue(lsp_xcorr_chk)
         _, _, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate({"asD_ds": np.nan}, False)
         self.assertFalse(lsp_xcorr_chk)
@@ -152,9 +151,11 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.gbsm.scenpar_validate({"SNS_mu": 2.0})
         self.assertIn("SNS_mu", str(ctx.exception))
-        with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.gbsm.scenpar_validate({"SubpathMethod": "foo"})
-        self.assertIn("SubpathMethod", str(ctx.exception))
+        for validate in [True, False]:  # SubpathMethod: only 'legacy' is accepted
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.gbsm.scenpar_validate({"SubpathMethod": "foo"}, validate)
+            self.assertIn("Value 'foo' of 'SubpathMethod' is not supported; only 'legacy' is accepted.",
+                          str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.gbsm.scenpar_validate({"DS_VS": 4.0})
         self.assertIn("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.", str(ctx.exception))

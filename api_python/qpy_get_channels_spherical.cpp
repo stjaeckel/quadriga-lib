@@ -67,7 +67,8 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_t
 
 coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
 
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
+coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., \
+    angles=True )
 
 coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
 ```

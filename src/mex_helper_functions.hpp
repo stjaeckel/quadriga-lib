@@ -104,6 +104,46 @@ inline dtype qd_mex_cast(stype v, bool &bad)
     return ok ? (dtype)v : dtype(0);
 }
 
+// Helper: calls f with a typed pointer to the data of a real numeric or logical array (all integer classes, single,
+// double, logical); any other class raises "Input 'x' has an unsupported data type." (var_name empty: "Unsupported data
+// type."). The class is checked before the data pointer is read: Octave raises an internal error for mxGetData of
+// classes without numeric data (e.g. function handles).
+template <typename F>
+inline void qd_mex_visit_data(const mxArray *input, const std::string &var_name, F &&f)
+{
+    const bool numeric = mxIsNumeric(input) || mxIsLogical(input);
+    const void *d = numeric ? mxGetData(input) : nullptr;
+    switch (numeric ? mxGetClassID(input) : mxUNKNOWN_CLASS)
+    {
+    case mxDOUBLE_CLASS:
+        return f((const double *)d);
+    case mxSINGLE_CLASS:
+        return f((const float *)d);
+    case mxINT8_CLASS:
+        return f((const signed char *)d);
+    case mxUINT8_CLASS:
+        return f((const unsigned char *)d);
+    case mxINT16_CLASS:
+        return f((const short *)d);
+    case mxUINT16_CLASS:
+        return f((const unsigned short *)d);
+    case mxINT32_CLASS:
+        return f((const int *)d);
+    case mxUINT32_CLASS:
+        return f((const unsigned *)d);
+    case mxINT64_CLASS:
+        return f((const long long *)d);
+    case mxUINT64_CLASS:
+        return f((const unsigned long long *)d);
+    case mxLOGICAL_CLASS:
+        return f((const mxLogical *)d);
+    default:
+        break;
+    }
+    const std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
+    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+}
+
 // Helper: error for integer input that does not fit dtype, e.g. "Input 'x' must be an integer from 0 to 4294967295."
 template <typename dtype>
 inline void qd_mex_integer_error(const std::string &var_name, bool scalar)
@@ -165,30 +205,10 @@ inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_nam
 
     qd_mex_check_input(input, var_name); // Rejects complex and sparse input
 
-    // Assign the MATLAB data to the correct pointer; integer classes are read without a detour through double
-    if (mxIsDouble(input))
-        return qd_mex_cast<dtype>(*(const double *)mxGetData(input), bad);
-    else if (mxIsSingle(input))
-        return qd_mex_cast<dtype>(*(const float *)mxGetData(input), bad);
-    else if (mxIsClass(input, "uint32"))
-        return qd_mex_cast<dtype>(*(const unsigned *)mxGetData(input), bad);
-    else if (mxIsClass(input, "int32"))
-        return qd_mex_cast<dtype>(*(const int *)mxGetData(input), bad);
-    else if (mxIsClass(input, "uint64"))
-        return qd_mex_cast<dtype>(*(const unsigned long long *)mxGetData(input), bad);
-    else if (mxIsClass(input, "int64"))
-        return qd_mex_cast<dtype>(*(const long long *)mxGetData(input), bad);
-    else if (mxIsClass(input, "logical"))
-        return qd_mex_cast<dtype>(*(const bool *)mxGetData(input), bad);
-    else if (var_name.empty())
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
-    else
-    {
-        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_message.c_str());
-    }
-
-    return default_value;
+    // Integer classes are read without a detour through double
+    dtype value = default_value;
+    qd_mex_visit_data(input, var_name, [&](auto *p) { value = qd_mex_cast<dtype>(*p, bad); });
+    return value;
 }
 
 // Read a scalar input from MATLAB and convert it to a desired c++ output type
@@ -232,17 +252,19 @@ inline long long qd_mex_get_seed(const mxArray *input, const std::string &var_na
 }
 
 // Read a string input from MATLAB and convert it to a std::string
-// - Returns default_value (e.g. "") for empty input
-inline std::string qd_mex_get_string(const mxArray *input, std::string default_value = "")
+// - Returns default_value (e.g. "") for empty input; errors name 'var_name' if given
+inline std::string qd_mex_get_string(const mxArray *input, std::string default_value = "",
+                                     const std::string &var_name = "")
 {
-    if (input == nullptr)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a string (character array)");
-
-    if (mxGetNumberOfElements(input) == 0)
+    if (input != nullptr && mxGetNumberOfElements(input) == 0)
         return default_value;
 
-    if (!mxIsClass(input, "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a string (character array)");
+    if (input == nullptr || !mxIsClass(input, "char"))
+    {
+        const std::string msg = var_name.empty() ? "Input must be a string (character array)"
+                                                 : "Input '" + var_name + "' must be a string (character array).";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
 
     auto chr = mxArrayToString(input);
     std::string data = std::string(chr);
@@ -274,7 +296,7 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
 
     if (n_data == 0)
-        return arma::Mat<dtype>();
+        return arma::Mat<dtype>(d1, d2 * d3 * d4);
 
     return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2 * d3 * d4, create_copy, !create_copy);
 }
@@ -286,7 +308,7 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool crea
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
 
     if (n_data == 0)
-        return arma::Cube<dtype>();
+        return arma::Cube<dtype>(d1, d2, d3 * d4);
 
     return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
 }
@@ -436,23 +458,7 @@ inline void qd_mex_copy_convert(const mxArray *input, dtype *ptr, size_t n_data,
             ptr[m] = qd_mex_cast<dtype>(src[m], b);
         bad = b;
     };
-    if (qd_mex_type_matches<double>(input))
-        copy((const double *)mxGetData(input));
-    else if (qd_mex_type_matches<float>(input))
-        copy((const float *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned>(input))
-        copy((const unsigned *)mxGetData(input));
-    else if (qd_mex_type_matches<int>(input))
-        copy((const int *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned long long>(input))
-        copy((const unsigned long long *)mxGetData(input));
-    else if (qd_mex_type_matches<long long>(input))
-        copy((const long long *)mxGetData(input));
-    else
-    {
-        std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
+    qd_mex_visit_data(input, var_name, copy);
     if (bad)
         qd_mex_integer_error<dtype>(var_name, false);
 }
@@ -479,7 +485,7 @@ inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string va
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
     if (n_data == 0)
-        return arma::Mat<dtype>();
+        return arma::Mat<dtype>(d1, d2 * d3 * d4);
     arma::Mat<dtype> output(d1, d2 * d3 * d4, arma::fill::none);
     qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
     return output;
@@ -490,7 +496,7 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
     if (n_data == 0)
-        return arma::Cube<dtype>();
+        return arma::Cube<dtype>(d1, d2, d3 * d4);
     arma::Cube<dtype> output(d1, d2, d3 * d4, arma::fill::none);
     qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
     return output;
@@ -523,23 +529,7 @@ inline std::vector<arma::Cube<dtype>> qd_mex_typecast_CubeVec(const mxArray *inp
         bad = b;
     };
 
-    if (qd_mex_type_matches<double>(input))
-        copy((const double *)mxGetData(input));
-    else if (qd_mex_type_matches<float>(input))
-        copy((const float *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned>(input))
-        copy((const unsigned *)mxGetData(input));
-    else if (qd_mex_type_matches<int>(input))
-        copy((const int *)mxGetData(input));
-    else if (qd_mex_type_matches<unsigned long long>(input))
-        copy((const unsigned long long *)mxGetData(input));
-    else if (qd_mex_type_matches<long long>(input))
-        copy((const long long *)mxGetData(input));
-    else
-    {
-        std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
-    }
+    qd_mex_visit_data(input, var_name, copy);
     if (bad)
         qd_mex_integer_error<dtype>(var_name, false);
 
@@ -1022,558 +1012,85 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
     return output;
 }
 
-// Creates a std::vector of armadillo types from mxArray
-// - e.g. MATLAB --> std::vector<arma::Col<dtype>>
-// - vec_dim = Dimension used for std::vector, 0-based
-// - Data on other dimensions are vectorized and casted to <dtype>; integer dtypes need integer values in range
+// Creates a std::vector of armadillo objects from mxArray, one per index of dimension vec_dim (0-based); the data of
+// the other three dimensions, in their order, fill the object made by make(n1, n2, n3)
+// - Casts to <dtype>; reads all real classes (qd_mex_visit_data); integer dtypes need integer values in range
 // - Rejects complex and sparse input, and input with more than 4 dimensions; var_name is used in error messages
+template <typename dtype, typename obj, typename F>
+std::vector<obj> qd_mex_matlab2vector(const mxArray *input, size_t vec_dim, const std::string &var_name, F &&make)
+{
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
+    std::vector<obj> output;
+    if (n_data == 0) // Return empty std::vector
+        return output;
+    if (vec_dim > 3)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
+
+    // Element (i, n, o) with i the index over the dimensions before vec_dim and o over those after it
+    const size_t d[4] = {d1, d2, d3, d4}, dn = d[vec_dim];
+    size_t r[3], inner = 1, outer = 1;
+    for (size_t k = 0, j = 0; k < 4; ++k)
+        if (k < vec_dim)
+            r[j++] = d[k], inner *= d[k];
+        else if (k > vec_dim)
+            r[j++] = d[k], outer *= d[k];
+
+    bool bad = false; // Set when a value does not fit an integer dtype (NaN, Inf, fraction, out of range)
+    qd_mex_visit_data(input, var_name, [&](auto *src)
+                      {
+        output.reserve(dn);
+        for (size_t n = 0; n < dn; ++n)
+        {
+            obj tmp = make(r[0], r[1], r[2]);
+            dtype *ptr = tmp.memptr();
+            for (size_t o = 0; o < outer; ++o)
+                for (size_t i = 0; i < inner; ++i)
+                    ptr[o * inner + i] = qd_mex_cast<dtype>(src[(o * dn + n) * inner + i], bad);
+            output.push_back(std::move(tmp));
+        } });
+    if (bad)
+        qd_mex_integer_error<dtype>(var_name, false);
+    return output;
+}
+
+// MATLAB --> std::vector<arma::Col<dtype>>, see qd_mex_matlab2vector
 template <typename dtype>
 std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, size_t vec_dim, const std::string &var_name = "")
 {
-    // Rejects complex and sparse input, and input with more than 4 dimensions
-    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
-
-    if (n_data == 0) // Return empty std::vector
-        return std::vector<arma::Col<dtype>>();
-
-    // Generate pointers for the 6 supported MATLAB data types
-    double *ptr_d = nullptr;
-    float *ptr_f = nullptr;
-    unsigned *ptr_ui = nullptr;
-    int *ptr_i = nullptr;
-    unsigned long long *ptr_ull = nullptr;
-    long long *ptr_ll = nullptr;
-
-    // Assign the MATLAB data to the correct pointer
-    unsigned T = 0; // Type ID of input type
-    if (mxIsDouble(input))
-        T = 1, ptr_d = (double *)mxGetData(input);
-    else if (mxIsSingle(input))
-        T = 2, ptr_f = (float *)mxGetData(input);
-    else if (mxIsClass(input, "uint32"))
-        T = 3, ptr_ui = (unsigned *)mxGetData(input);
-    else if (mxIsClass(input, "int32"))
-        T = 4, ptr_i = (int *)mxGetData(input);
-    else if (mxIsClass(input, "uint64"))
-        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
-    else if (mxIsClass(input, "int64"))
-        T = 6, ptr_ll = (long long *)mxGetData(input);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
-
-    // Convert data to armadillo output; "bad" is set when a value does not fit an integer dtype
-    bool bad = false;
-    auto output = std::vector<arma::Col<dtype>>();
-    if (vec_dim == 0)
-        for (size_t n = 0; n < d1; ++n)
-        {
-            auto tmp = arma::Col<dtype>(d2 * d3 * d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_d[m * d1 + n], bad);
-            else if (T == 2)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_f[m * d1 + n], bad);
-            else if (T == 3)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ui[m * d1 + n], bad);
-            else if (T == 4)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_i[m * d1 + n], bad);
-            else if (T == 5)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ull[m * d1 + n], bad);
-            else if (T == 6)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ll[m * d1 + n], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 1)
-        for (size_t n = 0; n < d2; ++n)
-        {
-            auto tmp = arma::Col<dtype>(d1 * d3 * d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_d[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 2)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_f[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 3)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ui[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 4)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_i[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 5)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ull[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 6)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ll[m34 * d2 * d1 + n * d1 + m1], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 2)
-        for (size_t n = 0; n < d3; ++n)
-        {
-            auto tmp = arma::Col<dtype>(d1 * d2 * d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_d[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 2)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_f[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 3)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ui[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 4)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 5)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ull[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 6)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ll[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 3)
-        for (size_t n = 0; n < d4; ++n)
-        {
-            auto tmp = arma::Col<dtype>(d1 * d2 * d3, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_d[n * d3 * d2 * d1 + m], bad);
-            else if (T == 2)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_f[n * d3 * d2 * d1 + m], bad);
-            else if (T == 3)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ui[n * d3 * d2 * d1 + m], bad);
-            else if (T == 4)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_i[n * d3 * d2 * d1 + m], bad);
-            else if (T == 5)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ull[n * d3 * d2 * d1 + m], bad);
-            else if (T == 6)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ll[n * d3 * d2 * d1 + m], bad);
-            output.push_back(tmp);
-        }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
-
-    if (bad)
-        qd_mex_integer_error<dtype>(var_name, false);
-
-    return output;
+    return qd_mex_matlab2vector<dtype, arma::Col<dtype>>(input, vec_dim, var_name, [](size_t a, size_t b, size_t c)
+                                                         { return arma::Col<dtype>(a * b * c, arma::fill::none); });
 }
 
-// Creates a std::vector of armadillo types from mxArray
-// - e.g. MATLAB --> std::vector<arma::Mat<dtype>>
-// - Same conversion and input checks as qd_mex_matlab2vector_Col
+// MATLAB --> std::vector<arma::Mat<dtype>> with n2 * n3 columns, see qd_mex_matlab2vector
 template <typename dtype>
 std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, size_t vec_dim, const std::string &var_name = "")
 {
-    // Rejects complex and sparse input, and input with more than 4 dimensions
-    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
-
-    if (n_data == 0) // Return empty std::vector
-        return std::vector<arma::Mat<dtype>>();
-
-    // Generate pointers for the 6 supported MATLAB data types
-    double *ptr_d = nullptr;
-    float *ptr_f = nullptr;
-    unsigned *ptr_ui = nullptr;
-    int *ptr_i = nullptr;
-    unsigned long long *ptr_ull = nullptr;
-    long long *ptr_ll = nullptr;
-
-    // Assign the MATLAB data to the correct pointer
-    unsigned T = 0; // Type ID of input type
-    if (mxIsDouble(input))
-        T = 1, ptr_d = (double *)mxGetData(input);
-    else if (mxIsSingle(input))
-        T = 2, ptr_f = (float *)mxGetData(input);
-    else if (mxIsClass(input, "uint32"))
-        T = 3, ptr_ui = (unsigned *)mxGetData(input);
-    else if (mxIsClass(input, "int32"))
-        T = 4, ptr_i = (int *)mxGetData(input);
-    else if (mxIsClass(input, "uint64"))
-        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
-    else if (mxIsClass(input, "int64"))
-        T = 6, ptr_ll = (long long *)mxGetData(input);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
-
-    // Convert data to armadillo output; "bad" is set when a value does not fit an integer dtype
-    bool bad = false;
-    auto output = std::vector<arma::Mat<dtype>>();
-    if (vec_dim == 0)
-        for (size_t n = 0; n < d1; ++n)
-        {
-            auto tmp = arma::Mat<dtype>(d2, d3 * d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_d[m * d1 + n], bad);
-            else if (T == 2)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_f[m * d1 + n], bad);
-            else if (T == 3)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ui[m * d1 + n], bad);
-            else if (T == 4)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_i[m * d1 + n], bad);
-            else if (T == 5)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ull[m * d1 + n], bad);
-            else if (T == 6)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ll[m * d1 + n], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 1)
-        for (size_t n = 0; n < d2; ++n)
-        {
-            auto tmp = arma::Mat<dtype>(d1, d3 * d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_d[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 2)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_f[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 3)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ui[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 4)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_i[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 5)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ull[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 6)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ll[m34 * d2 * d1 + n * d1 + m1], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 2)
-        for (size_t n = 0; n < d3; ++n)
-        {
-            auto tmp = arma::Mat<dtype>(d1, d2 * d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_d[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 2)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_f[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 3)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ui[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 4)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 5)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ull[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 6)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ll[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 3)
-        for (size_t n = 0; n < d4; ++n)
-        {
-            auto tmp = arma::Mat<dtype>(d1, d2 * d3, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_d[n * d3 * d2 * d1 + m], bad);
-            else if (T == 2)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_f[n * d3 * d2 * d1 + m], bad);
-            else if (T == 3)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ui[n * d3 * d2 * d1 + m], bad);
-            else if (T == 4)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_i[n * d3 * d2 * d1 + m], bad);
-            else if (T == 5)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ull[n * d3 * d2 * d1 + m], bad);
-            else if (T == 6)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ll[n * d3 * d2 * d1 + m], bad);
-            output.push_back(tmp);
-        }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
-
-    if (bad)
-        qd_mex_integer_error<dtype>(var_name, false);
-
-    return output;
+    return qd_mex_matlab2vector<dtype, arma::Mat<dtype>>(input, vec_dim, var_name, [](size_t a, size_t b, size_t c)
+                                                         { return arma::Mat<dtype>(a, b * c, arma::fill::none); });
 }
 
-// Creates a std::vector of armadillo types from mxArray
-// - e.g. MATLAB --> std::vector<arma::Cube<dtype>>
-// - Same conversion and input checks as qd_mex_matlab2vector_Col
+// MATLAB --> std::vector<arma::Cube<dtype>>, see qd_mex_matlab2vector
 template <typename dtype>
 std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, size_t vec_dim, const std::string &var_name = "")
 {
-    // Rejects complex and sparse input, and input with more than 4 dimensions
-    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
-
-    if (n_data == 0) // Return empty std::vector
-        return std::vector<arma::Cube<dtype>>();
-
-    // Generate pointers for the 6 supported MATLAB data types
-    double *ptr_d = nullptr;
-    float *ptr_f = nullptr;
-    unsigned *ptr_ui = nullptr;
-    int *ptr_i = nullptr;
-    unsigned long long *ptr_ull = nullptr;
-    long long *ptr_ll = nullptr;
-
-    // Assign the MATLAB data to the correct pointer
-    unsigned T = 0; // Type ID of input type
-    if (mxIsDouble(input))
-        T = 1, ptr_d = (double *)mxGetData(input);
-    else if (mxIsSingle(input))
-        T = 2, ptr_f = (float *)mxGetData(input);
-    else if (mxIsClass(input, "uint32"))
-        T = 3, ptr_ui = (unsigned *)mxGetData(input);
-    else if (mxIsClass(input, "int32"))
-        T = 4, ptr_i = (int *)mxGetData(input);
-    else if (mxIsClass(input, "uint64"))
-        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
-    else if (mxIsClass(input, "int64"))
-        T = 6, ptr_ll = (long long *)mxGetData(input);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
-
-    // Convert data to armadillo output; "bad" is set when a value does not fit an integer dtype
-    bool bad = false;
-    auto output = std::vector<arma::Cube<dtype>>();
-    if (vec_dim == 0)
-        for (size_t n = 0; n < d1; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d2, d3, d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_d[m * d1 + n], bad);
-            else if (T == 2)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_f[m * d1 + n], bad);
-            else if (T == 3)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ui[m * d1 + n], bad);
-            else if (T == 4)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_i[m * d1 + n], bad);
-            else if (T == 5)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ull[m * d1 + n], bad);
-            else if (T == 6)
-                for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ll[m * d1 + n], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 1)
-        for (size_t n = 0; n < d2; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d1, d3, d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_d[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 2)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_f[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 3)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ui[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 4)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_i[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 5)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ull[m34 * d2 * d1 + n * d1 + m1], bad);
-            else if (T == 6)
-                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                    for (size_t m1 = 0; m1 < d1; ++m1)
-                        ptr[m34 * d1 + m1] = qd_mex_cast<dtype>(ptr_ll[m34 * d2 * d1 + n * d1 + m1], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 2)
-        for (size_t n = 0; n < d3; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d1, d2, d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_d[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 2)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_f[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 3)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ui[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 4)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 5)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ull[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            else if (T == 6)
-                for (size_t m4 = 0; m4 < d4; ++m4)
-                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                        ptr[m4 * d2 * d1 + m12] = qd_mex_cast<dtype>(ptr_ll[m4 * d3 * d2 * d1 + n * d2 * d1 + m12], bad);
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 3)
-        for (size_t n = 0; n < d4; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d1, d2, d3, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            if (T == 1)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_d[n * d3 * d2 * d1 + m], bad);
-            else if (T == 2)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_f[n * d3 * d2 * d1 + m], bad);
-            else if (T == 3)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ui[n * d3 * d2 * d1 + m], bad);
-            else if (T == 4)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_i[n * d3 * d2 * d1 + m], bad);
-            else if (T == 5)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ull[n * d3 * d2 * d1 + m], bad);
-            else if (T == 6)
-                for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                    ptr[m] = qd_mex_cast<dtype>(ptr_ll[n * d3 * d2 * d1 + m], bad);
-            output.push_back(tmp);
-        }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Armadillo object dimensions must be 0,1,2 or 3");
-
-    if (bad)
-        qd_mex_integer_error<dtype>(var_name, false);
-
-    return output;
+    return qd_mex_matlab2vector<dtype, arma::Cube<dtype>>(input, vec_dim, var_name, [](size_t a, size_t b, size_t c)
+                                                          { return arma::Cube<dtype>(a, b, c, arma::fill::none); });
 }
 
-// Converts input to a std::vector<bool>
+// Converts input to a std::vector<bool> (non-zero = true); reads all real classes (qd_mex_visit_data); rejects complex
+// and sparse input; any number of dimensions
 inline std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input, const std::string &var_name = "")
 {
-    std::vector<bool> output;
-
-    qd_mex_check_input(input, var_name, (size_t)-1); // Rejects complex and sparse input; any number of dimensions
-
+    qd_mex_check_input(input, var_name, (size_t)-1);
     const size_t n_data = (size_t)mxGetNumberOfElements(input);
+    std::vector<bool> output;
     if (n_data == 0) // Return empty
         return output;
-
     output.reserve(n_data);
-
-    // Shortcut for logical arrays
-    if (mxIsLogical(input))
-    {
-        const mxLogical *data = mxGetLogicals(input);
+    qd_mex_visit_data(input, var_name, [&](auto *src)
+                      {
         for (size_t m = 0; m < n_data; ++m)
-            output.push_back(data[m] != 0);
-        return output;
-    }
-
-    // Generate pointers for the supported MATLAB data types
-    double *ptr_d = nullptr;
-    float *ptr_f = nullptr;
-    unsigned *ptr_ui = nullptr;
-    int *ptr_i = nullptr;
-    unsigned long long *ptr_ull = nullptr;
-    long long *ptr_ll = nullptr;
-
-    // Assign the MATLAB data to the correct pointer
-    unsigned T = 0; // Type ID of input type
-    if (mxIsDouble(input))
-        T = 1, ptr_d = (double *)mxGetData(input);
-    else if (mxIsSingle(input))
-        T = 2, ptr_f = (float *)mxGetData(input);
-    else if (mxIsClass(input, "uint32"))
-        T = 3, ptr_ui = (unsigned *)mxGetData(input);
-    else if (mxIsClass(input, "int32"))
-        T = 4, ptr_i = (int *)mxGetData(input);
-    else if (mxIsClass(input, "uint64"))
-        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
-    else if (mxIsClass(input, "int64"))
-        T = 6, ptr_ll = (long long *)mxGetData(input);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported data type.");
-
-    // Convert types
-    if (T == 1)
-        for (size_t m = 0; m < n_data; ++m)
-            output.push_back(ptr_d[m] != 0.0);
-    else if (T == 2)
-        for (size_t m = 0; m < n_data; ++m)
-            output.push_back(ptr_f[m] != 0.0f);
-    else if (T == 3)
-        for (size_t m = 0; m < n_data; ++m)
-            output.push_back(ptr_ui[m] != 0U);
-    else if (T == 4)
-        for (size_t m = 0; m < n_data; ++m)
-            output.push_back(ptr_i[m] != 0);
-    else if (T == 5)
-        for (size_t m = 0; m < n_data; ++m)
-            output.push_back(ptr_ull[m] != 0ULL);
-    else if (T == 6)
-        for (size_t m = 0; m < n_data; ++m)
-            output.push_back(ptr_ll[m] != 0LL);
-
+            output.push_back(src[m] != 0); });
     return output;
 }
 

@@ -33,11 +33,12 @@ v, h = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, complex=
 
 # Projected distance / local angles (single-frequency only)
 vr, vi, hr, hi, dist = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, dist=True )
-vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \
-    elevation, orientation=ori, local_angles=True )
+vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, \
+    azimuth, elevation, orientation=ori, local_angles=True )
 
 # Element selection, orientation, element positions
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, orientation, element_pos )
+vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
+    orientation, element_pos )
 
 # Multi-frequency interpolation — output gains a frequency axis
 vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, frequency=freqs )

@@ -391,8 +391,8 @@ speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.16
     sensitivity=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]), \
-    angular_resolution=5.0)
+speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, \
+    10000.0]), angular_resolution=5.0)
 ```
 
 ### Inputs:
@@ -464,11 +464,12 @@ v, h = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, complex=
 
 # Projected distance / local angles (single-frequency only)
 vr, vi, hr, hi, dist = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, dist=True )
-vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \
-    elevation, orientation=ori, local_angles=True )
+vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, \
+    azimuth, elevation, orientation=ori, local_angles=True )
 
 # Element selection, orientation, element positions
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, orientation, element_pos )
+vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
+    orientation, element_pos )
 
 # Multi-frequency interpolation — output gains a frequency axis
 vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, frequency=freqs )

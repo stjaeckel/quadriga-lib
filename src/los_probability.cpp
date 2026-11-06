@@ -128,7 +128,7 @@ void quadriga_lib::los_probability(
     double r_clutter = NAN,
     double h_clutter = NAN,
     const arma::vec *rnd_g = nullptr,
-    const arma::vec *fc = nullptr,
+    const arma::vec *center_frequency = nullptr,
     arma::mat *los_soft = nullptr);
 ```
 
@@ -136,7 +136,7 @@ void quadriga_lib::los_probability(
 - **`model`** — Model name: `38.901_RMa`, `38.901_UMi`, `38.901_UMa`, `38.901_InH_Mixed`, `38.901_InH_Open`,
   `38.901_InF_SL`, `38.901_InF_DL`, `38.901_InF_SH`, `38.901_InF_DH`, `38.901_InF_HH`, `38.901_SMa`,
   `38.811_DenseUrban`, `38.811_Urban`, `38.811_Suburban`, `38.811_Rural`, `QuaDRiGa_Industrial`, `LOS`, `NLOS`
-- **`d2d_out`** — 2D outdoor distance in [m], finite and >= 0: `d2D - d2D-in` for O2I UTs, clamped at 0 by the
+- **`d2d_out`** — 2D outdoor distance in [m], finite and >= 0: `d2D - d2d_in` for O2I UTs, clamped at 0 by the
   caller; the 2D distance in indoor scenarios; `[n_link]`
 - **`h_bs`** — BS height in [m], finite; `[n_link]` or `[1]` for all links
 - **`h_ut`** — UT height in [m], finite; `[n_link]` or `[1]` for all links
@@ -147,7 +147,8 @@ void quadriga_lib::los_probability(
 - **`h_clutter`** *(optional)* — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0; NaN =
   default. The other models ignore the clutter arguments, which are validated for every model
 - **`rnd_g`** *(optional)* — Normal(0,1) value per link, G of eq. (7.6-18); required with `los_soft`; `[n_link]`
-- **`fc`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; required with `los_soft`; `[n_freq]`
+- **`center_frequency`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; required with `los_soft`;
+  `[n_freq]`
 
 ## Outputs:
 - **`p_los`** — LOS probability in [0, 1]; `[n_link]`
@@ -168,7 +169,7 @@ void quadriga_lib::los_probability(const std::string &model,
                                    double r_clutter,
                                    double h_clutter,
                                    const arma::vec *rnd_g,
-                                   const arma::vec *fc,
+                                   const arma::vec *center_frequency,
                                    arma::mat *los_soft)
 {
     // Model name
@@ -204,13 +205,13 @@ void quadriga_lib::los_probability(const std::string &model,
     // Soft LOS inputs
     if (los_soft != nullptr)
     {
-        if (rnd_g == nullptr || fc == nullptr)
-            throw std::invalid_argument("Output 'los_soft' requires 'rnd_g' and 'fc'.");
+        if (rnd_g == nullptr || center_frequency == nullptr)
+            throw std::invalid_argument("Output 'los_soft' requires 'rnd_g' and 'center_frequency'.");
         if (rnd_g->n_elem != n_link)
             throw std::invalid_argument("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'.");
         if (!rnd_g->is_finite())
             throw std::invalid_argument("Input 'rnd_g' must be finite.");
-        qd_gbsm_check_fc(*fc);
+        qd_gbsm_check_fc(*center_frequency);
     }
 
     // Model parameters with their defaults
@@ -335,7 +336,7 @@ void quadriga_lib::los_probability(const std::string &model,
     // Soft LOS state, TR 38.901 eq. (7.6-18)
     if (los_soft != nullptr)
     {
-        const arma::uword n_freq = fc->n_elem;
+        const arma::uword n_freq = center_frequency->n_elem;
         arma::vec G(n_link, arma::fill::none); // G + F(p) per link
         for (arma::uword l = 0; l < n_link; ++l)
             G[l] = rnd_g->at(l) + qd_los_probit(p_los[l]);
@@ -344,7 +345,7 @@ void quadriga_lib::los_probability(const std::string &model,
             los_soft->set_size(n_link, n_freq);
         for (arma::uword k = 0; k < n_freq && n_link > 0; ++k)
         {
-            const double kk = std::sqrt(20.0 * fc->at(k) / 299792458.0); // sqrt(20 / lambda)
+            const double kk = std::sqrt(20.0 * center_frequency->at(k) / 299792458.0); // sqrt(20 / lambda)
             double *ps = los_soft->colptr(k);
             for (arma::uword l = 0; l < n_link; ++l)
                 ps[l] = 0.5 + std::atan(kk * G[l]) / arma::datum::pi;

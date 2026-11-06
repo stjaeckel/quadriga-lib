@@ -57,7 +57,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(sf, np.full((3, 2), 3.0))  # SF_sigma of scenpar
 
     def test_keyword_arguments(self):
-        pl, sf = quadriga_lib.gbsm.path_loss(plpar=self.plpar, scenpar=self.scenpar, fc=self.fc, tx_pos=self.tx_pos,
+        pl, sf = quadriga_lib.gbsm.path_loss(plpar=self.plpar, scenpar=self.scenpar, center_freq=self.fc, tx_pos=self.tx_pos,
                                              rx_pos=self.rx_pos, d2d_in=None, rnd_he=None)
         npt.assert_array_equal(pl, self.pl)
         npt.assert_array_equal(sf, self.sf)

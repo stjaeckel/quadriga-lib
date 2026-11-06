@@ -12,11 +12,10 @@ SECTION!*/
 # scenpar_validate
 Validate scenario parameters and complete them with default values
 
-- Checks scenario parameters that did not come from a conf file and adds every missing key with its default value, so
-  that `scenpar_out` has all 172 keys: the 138 numeric keys of QuaDRiGa, `SubpathMethod` and 33 keys for TR 38.901
-  v19.5.0, which have no effect at their default of 0. `None` or an empty dict gives the complete default set
-- A name that is not one of the keys is an error, also with `validate = False`; this includes the QuaDRiGa key
-  `GR_epsilon`, which is not supported
+- Checks scenario parameters, e.g. ones built in code, and adds every missing key with its default value, so that
+  `scenpar_out` has all 171 keys: the 138 numeric keys of QuaDRiGa and 33 keys for TR 38.901 v19.5.0, which have no
+  effect at their default of 0. `None` or an empty dict gives the complete default set
+- A name that is not one of the keys is an error, also with `validate = False`
 - Value checks with `validate = True`; `NaN` is an error for every key:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
@@ -33,8 +32,7 @@ Validate scenario parameters and complete them with default values
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
-  - `SubpathMethod` must be `legacy`, `Laplacian` or `mmMAGIC`
-- With `validate = False` no value is checked: `NaN` and any `SubpathMethod` are accepted
+- `LOS_scatter_radius`, `NF_*` and `SNS_*` are checked but not used by any function of this version
 
 ## Usage:
 ```
@@ -42,20 +40,18 @@ scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scen
 ```
 
 ## Inputs:
-- **`scenpar_in`** — Scenario parameters; dict with any subset of the 172 keys returned by
-  [[conf_file_read]]; numeric values are real scalars (int, float, bool or a numpy value with one
-  element); `SubpathMethod` is a str; `None` or `{}` returns the default set; default: None
-- **`validate`** — `False`: only complete with defaults, no value checks; bool or `numpy.bool_`;
-  default: True; `None` selects the default
+- **`scenpar_in`** — Scenario parameters; dict with any subset of the keys returned by
+  [[conf_file_read]]; real scalars (int, float, bool or a numpy value with one element); `None` or
+  `{}` returns the default set; default: None
+- **`validate`** — `False`: only complete with defaults, no value checks (`NaN` is accepted); default: True
 
 ## Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing keys have their
-  default; dict with 172 entries in the QuaDRiGa order: the 138 numeric keys of QuaDRiGa with
-  `SubpathMethod` (str) at position 106 (0-based), then the 33 new keys; all other values are float
+  default; dict with all keys as floats in the canonical order, QuaDRiGa's keys first
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `(8, 8)`
-- **`lsp_xcorr_chk`** — `True` if `lsp_xcorr` is positive definite; `False` also if it contains
-  `NaN`; bool
+- **`lsp_xcorr_chk`** — `True` if `lsp_xcorr` is positive definite; `False` also if it contains `NaN`; `False` is no
+  error here, but [[lsp_generate]] raises `ValueError` for such parameters; bool
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
@@ -65,9 +61,8 @@ MD!*/
 py::tuple scenpar_validate(py::handle scenpar_in,
                            py::handle validate)
 {
-    // Read inputs: dict of real scalars and the str entry 'SubpathMethod'
-    std::string subpath_method;
-    auto scenpar = qd_python_dict2scenpar(scenpar_in, subpath_method, "scenpar_in");
+    // Read inputs: dict of real scalars
+    auto scenpar = qd_python_dict2scenpar(scenpar_in, "scenpar_in");
     const bool validate_b = qd_python_flag(validate, true, "validate");
 
     // Output allocation
@@ -77,11 +72,11 @@ py::tuple scenpar_validate(py::handle scenpar_in,
     auto lsp_xcorr_py = qd_python_init_output((arma::uword)8, (arma::uword)8, &lsp_xcorr);
 
     // Call library function; completes 'scenpar' in place (a copy, the input dict is not changed)
-    const bool lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, subpath_method, &lsp_xcorr, &key_order,
+    const bool lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, &lsp_xcorr, &key_order,
                                                               validate_b);
 
-    // Scenario parameters: numeric keys in canonical order, 'SubpathMethod' at its QuaDRiGa position
-    auto scenpar_out_py = qd_python_scenpar2dict(scenpar, subpath_method, key_order);
+    // Scenario parameters: numeric keys in canonical order
+    auto scenpar_out_py = qd_python_scenpar2dict(scenpar, key_order);
 
     return py::make_tuple(scenpar_out_py, lsp_xcorr_py, lsp_xcorr_chk);
 }

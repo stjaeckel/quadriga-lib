@@ -29,7 +29,7 @@ assertEqual( size(aod), [4, N + 1] );
 assertEqual( size(eoa), [4, N + 1] );
 assertEqual( size(n_active), [4, 1] );
 assertTrue( isa(delay, 'double') && isa(power, 'double') && isa(eod, 'double') && isa(aoa, 'double') );
-assertTrue( isa(n_active, 'uint64') );
+assertTrue( isa(n_active, 'uint32') );
 assertEqual( delay(:, 1), zeros(4, 1) );
 assertElementsAlmostEqual( aod(:, 1), aod_l, 'absolute', 1e-14 );
 assertElementsAlmostEqual( eod(:, 1), eod_l, 'absolute', 1e-14 );
@@ -38,7 +38,7 @@ assertElementsAlmostEqual( eoa(:, 1), -eod_l, 'absolute', 1e-14 );
 K = lsp(:, 1, 2);
 assertElementsAlmostEqual( power(:, 1), K ./ (K + 1), 'absolute', 1e-14 );     % LOS slot
 assertTrue( all( sum(power, 2) <= 1 + 1e-12 ) );                              % -25 dB removal, no renormalisation
-assertEqual( n_active, uint64( sum( power(:, 2:end) > 0, 2 ) ) );
+assertEqual( n_active, uint32( sum( power(:, 2:end) > 0, 2 ) ) );
 assertTrue( all( abs( aod(:) ) <= pi & abs( eod(:) ) <= pi / 2 ) );
 
 % NLOS scenario: zero LOS power, the NLOS powers sum to 1
@@ -54,12 +54,12 @@ assertEqual( p2, power );
 [ dq, pq, ~, ~, ~, ~, nq ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga' );
 assertEqual( size(dq), [4, N + 1] );
 assertElementsAlmostEqual( sum(pq, 2), ones(4, 1), 'absolute', 1e-12 );      % no removal in 'quadriga'
-assertEqual( nq, uint64( N * ones(4, 1) ) );
+assertEqual( nq, uint32( N * ones(4, 1) ) );
 assertTrue( max(abs(dq(:) - delay(:))) > 1e-9 );
 
 % '38.901_MF' with two frequencies and anchor LSPs: delays and angles per frequency
 [ lsp2, ~, rnd_f1 ] = draw( sp, [ 6e9, 30e9 ], tx_pos, rx_pos, 11 );
-rnd_f2 = quadriga_lib.ssf_draw( sp, quadriga_lib.ssf_init_phases( sp, 11, 2 ), tx_pos, rx_pos, 2 );
+rnd_f2 = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 11, 2 ), tx_pos, rx_pos, 2 );
 lsp_a = draw( sp, 2e9, tx_pos, rx_pos, 11 );
 [ dm, pm, am ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp2, rnd, '38.901_MF', cat( 3, rnd_f1, rnd_f2 ), lsp_a );
 assertEqual( size(dm), [4, N + 1, 2] );
@@ -111,6 +111,11 @@ assertEqual( eo([1, 3, 4], :), ea([1, 3, 4], :) );
 assertTrue( max(abs(eo(2, 2:end) - ea(2, 2:end))) > 1e-3 );
 eo2 = ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, int32([ 0, 2, 0, 0 ]) );                % numeric, row
 assertEqual( eo2, eo );
+for cls = { 'uint8', 'int8', 'int16', 'single' }                              % any real class
+    assertEqual( ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, cast( [ 0; 1; 0; 0 ], cls{1} ) ), eo );
+end
+assert_throws( @() ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, { 0; 1; 0; 0 } ), ...
+    'Input ''o2i'' has an unsupported data type.' );
 assertEqual( ssf_eoa( sn, tx_pos, rx_pos, lsp_n, rnd_n, rnd_fn, [] ), ea );
 
 %% Optional inputs: n_cluster (counts, no index shift)
@@ -121,7 +126,7 @@ assertEqual( pc(2, 8:end), zeros(1, 6) );                                     % 
 assertEqual( dc(2, 8:end), zeros(1, 6) );
 assertElementsAlmostEqual( ac(2, 8:end), repmat( aod_l(2), 1, 6 ), 'absolute', 1e-14 );
 assertEqual( pc(3, 11:end), zeros(1, 3) );
-assertEqual( nac, uint64(nc) );
+assertEqual( nac, uint32(nc) );
 assertEqual( quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], [], ...
     uint32(nc') ), dc );
 assertEqual( quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], [], ...
@@ -140,7 +145,7 @@ s1.NumClusters_min = 1;
 [ d1, p1, ~, ~, ~, ~, n1 ] = quadriga_lib.ssf_clusters( s1, tx_pos, rx_pos, lsp, zeros(4, 0) );
 assertEqual( size(d1), [4, 1] );
 assertEqual( p1, ones(4, 1) );
-assertEqual( n1, uint64( zeros(4, 1) ) );
+assertEqual( n1, uint32( zeros(4, 1) ) );
 
 %% Type handling
 [ ds, ps ] = quadriga_lib.ssf_clusters( sp, single(tx_pos), single(rx_pos), lsp, rnd, '38.901', rnd_f );
@@ -152,7 +157,7 @@ assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp ), 'Wrong 
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [], 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out8( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga' ), 'Wrong number of output arguments.' );
-msg_nc = 'Entries in ''n_cluster'' must be non-negative integers below 2^53.';
+msg_nc = 'Entries in ''n_cluster'' must be integers from 0 to 4294967295.';
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
     [], [ 12; 6.5; 9; 12 ] ), msg_nc );
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], [], [], [], ...
@@ -167,18 +172,89 @@ assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp2, rnd, '38
     'Method ''38.901'' supports one frequency only' );                                              % C++
 assert_throws( @() quadriga_lib.ssf_clusters( sg, tx_pos, rx_pos, lsp, rnd, 'quadriga' ), ...
     'Inputs ''gr_eps_re'' and ''gr_eps_im'' are required when ''GR_enabled'' is set.' );              % C++
-assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, zeros(0, 3), lsp(1:0, :, :), rnd(1:0, :), ...
-    'quadriga' ), 'rx_pos' );                                                                       % zero links
+[ d0, p0, ~, ~, ~, ~, n0 ] = quadriga_lib.ssf_clusters( sp, tx_pos, zeros(0, 3), lsp(1:0, :, :), rnd(1:0, :), ...
+    'quadriga' );                                                                                   % zero links
+assertEqual( size(d0), [ 0, size(delay, 2) ] );
+assertEqual( size(p0), [ 0, size(delay, 2) ] );
+assertTrue( isempty(n0) && isa(n0, 'uint32') );
+
+%% Links: an empty optional input of any shape selects the default (scenario without absolute TOA)
+l3 = 1 : 3;
+c_ref = cell(2, 7);
+c_emp = cell(2, 7);
+[ c_ref{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), '38.901', ...
+    rnd_f(l3, :) );
+[ c_emp{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), '38.901', ...
+    rnd_f(l3, :), [], [], zeros(0, 1) );
+[ c_ref{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), 'quadriga' );
+[ c_emp{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), 'quadriga', ...
+    zeros(0, 1), zeros(0, 1, 8), zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), false(0, 1), zeros(0, 1) );
+assertEqual( size( c_emp{1, 1} ), [ 3, N + 1 ] );
+assertEqual( c_emp, c_ref );
+
+%% Zero links: all methods, LOS with ground reflection and NLOS; empty inputs of the right shape count as given
+fc = [ 6e9; 30e9 ];
+r0 = zeros(0, 3);
+for s = { sg, sn }
+    sc = s{1};
+    G = double( sc.GR_enabled > 0 );
+    N0 = sc.NumClusters - 1;
+    phase = quadriga_lib.gbsm_init_phases( sc, 'lsf', 13 );
+    [ l0, at0, gre0, gim0, eo0, mu0, sig0 ] = quadriga_lib.lsp_generate( sc, fc, tx_pos, r0, ...
+        quadriga_lib.gbsm_draw( sc, 'lsf', phase, tx_pos, r0 ) );
+    rn0 = quadriga_lib.gbsm_draw( sc, 'cluster', quadriga_lib.gbsm_init_phases( sc, 'cluster', 13 ), tx_pos, r0 );
+    rf0 = zeros(0, N0, 2);
+    rr0 = zeros(0, 14 * N0 * sc.NumSubPaths + N0, 2);
+    for k = 1 : 2
+        rf0(:, :, k) = quadriga_lib.gbsm_draw( sc, 'cluster', quadriga_lib.gbsm_init_phases( sc, 'cluster', 13, k ), ...
+            tx_pos, r0, k );
+        rr0(:, :, k) = quadriga_lib.gbsm_draw( sc, 'ray', quadriga_lib.gbsm_init_phases( sc, 'ray', 13, k ), ...
+            tx_pos, r0, k );
+    end
+    rq0 = quadriga_lib.gbsm_draw( sc, 'ray', quadriga_lib.gbsm_init_phases( sc, 'ray', 13 ), tx_pos, r0, 0, [], ...
+        [], fc );
+    assertEqual( [ size(l0), size(at0), size(gre0), size(eo0), size(rf0), size(rq0) ], ...
+        [ 0, 2, 8, 0, 1, 0, 2, 0, 2, 0, N0, 2, 0, size(rq0, 2) ] );
+    la0 = quadriga_lib.lsp_generate( sc, 2e9, tx_pos, r0, quadriga_lib.gbsm_draw( sc, 'lsf', phase, tx_pos, r0 ) );
+    clu = cell(3, 7);
+    [ clu{1, :} ] = quadriga_lib.ssf_clusters( sc, tx_pos, r0, l0(:, 1, :), rn0, '38.901', rf0(:, :, 1), [], ...
+        eo0(:, 1), at0, gre0(:, 1), gim0(:, 1), false(0, 1), zeros(0, 1) );
+    [ clu{2, :} ] = quadriga_lib.ssf_clusters( sc, tx_pos, r0, l0, rn0, '38.901_MF', rf0, la0, [], at0, gre0, gim0 );
+    [ clu{3, :} ] = quadriga_lib.ssf_clusters( sc, tx_pos, r0, l0, rn0, 'quadriga', [], [], eo0, at0, gre0, gim0 );
+    n_slot = N0 + 1 + G;
+    for m = 1 : 3
+        n_fd = 1 + (m == 2);                                                  % '38.901_MF': delays per frequency
+        for o = [ 1, 3, 4, 5, 6 ]
+            assertEqual( size( clu{m, o}, 1 ), 0 );
+            assertEqual( [ size( clu{m, o}, 2 ), size( clu{m, o}, 3 ) ], [ n_slot, n_fd ] );
+        end
+        assertEqual( [ size( clu{m, 2}, 1 ), size( clu{m, 2}, 2 ), size( clu{m, 2}, 3 ) ], [ 0, n_slot, 1 + (m > 1) ] );
+        assertTrue( isa( clu{m, 7}, 'uint32' ) && isempty( clu{m, 7} ) );
+    end
+    % The rays of the zero-link clusters: a 1 x 0 struct array with all fields
+    rays = cell(1, 3);
+    rays{1} = quadriga_lib.ssf_rays( sc, tx_pos, r0, fc(1), l0(:, 1, :), mu0(:, 1, :), sig0(:, 1, :), clu{1, 1:6}, ...
+        rr0(:, :, 1), '38.901', [], [], [], gre0(:, 1), gim0(:, 1) );
+    rays{2} = quadriga_lib.ssf_rays( sc, tx_pos, r0, fc, l0, mu0, sig0, clu{2, 1:6}, rr0, '38.901_MF', 2, [], [], ...
+        gre0, gim0 );
+    rays{3} = quadriga_lib.ssf_rays( sc, tx_pos, r0, fc, l0, mu0, sig0, clu{3, 1:6}, rq0, 'quadriga', [], [], [], ...
+        gre0, gim0 );
+    for m = 1 : 3
+        assertTrue( isstruct( rays{m} ) );
+        assertEqual( size( rays{m} ), [1, 0] );
+        assertEqual( numel( fieldnames( rays{m} ) ), 18 );
+    end
+end
 
 end
 
 % LSPs and the random values of one scenario at the links
 function [ lsp, rnd, rnd_f, abs_toa, eod_offset_deg ] = draw( sp, fc, tx_pos, rx_pos, seed )
-phase = quadriga_lib.lsf_init_phases( sp, seed, [], [], [], false );
+phase = quadriga_lib.gbsm_init_phases( sp, 'lsf', seed, [], [], [], [], [], false );
 [ lsp, abs_toa, ~, ~, eod_offset_deg ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
-    quadriga_lib.lsf_draw( sp, phase, tx_pos, rx_pos ) );
-rnd = quadriga_lib.ssf_draw( sp, quadriga_lib.ssf_init_phases( sp, seed ), tx_pos, rx_pos );
-rnd_f = quadriga_lib.ssf_draw( sp, quadriga_lib.ssf_init_phases( sp, seed, 1 ), tx_pos, rx_pos, 1 );
+    quadriga_lib.gbsm_draw( sp, 'lsf', phase, tx_pos, rx_pos ) );
+rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', seed ), tx_pos, rx_pos );
+rnd_f = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', seed, 1 ), tx_pos, rx_pos, 1 );
 end
 
 % EoA of the '38.901' method with an O2I flag

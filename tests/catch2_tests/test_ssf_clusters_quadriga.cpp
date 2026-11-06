@@ -305,7 +305,7 @@ TEST_CASE("ssf_clusters - quadriga matches the algorithm at one and several freq
             fix_t f = make_fix(N, 4, F, 301 + 10 * (unsigned)F + (unsigned)gr, true);
             f.use_eod = f.use_toa = true, f.use_eps = gr, f.use_ncl = c[2] == 1;
             if (c[2] == 1)
-                f.ncl = arma::uvec{N, N - 1, 6, 9};
+                f.ncl = arma::u32_vec{(unsigned)N, (unsigned)N - 1, 6, 9};
             for (arma::uword l = 0; l < 4 && F == 2; ++l)
                 f.lsp(l, 1, 0) = f.lsp(l, 0, 0), f.lsp(l, 1, 3) = f.lsp(l, 0, 3);
             const out_t o = run(sp, f, "quadriga");
@@ -694,11 +694,11 @@ TEST_CASE("ssf_clusters - quadriga is swap-reciprocal with dual-mobility fields"
             f.use_eps = f.use_toa = true;
             f.tx.col(2).fill(h), f.rx.col(2).fill(1.5);
             arma::cube ph;
-            quadriga_lib::ssf_init_phases(sp, ph, 23, -1);
-            quadriga_lib::ssf_draw(sp, ph, f.tx, f.rx, f.rnd, -1, nullptr, true);
+            quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23);
+            quadriga_lib::gbsm_draw(sp, "cluster", ph, f.tx, f.rx, f.rnd, -1, "Comb256", nullptr, nullptr, true);
             fix_t s = f;
             s.tx = f.rx, s.rx = f.tx;
-            quadriga_lib::ssf_draw(sp, ph, s.tx, s.rx, s.rnd, -1, nullptr, true);
+            quadriga_lib::gbsm_draw(sp, "cluster", ph, s.tx, s.rx, s.rnd, -1, "Comb256", nullptr, nullptr, true);
             s.lsp.slice(3) = f.lsp.slice(4), s.lsp.slice(4) = f.lsp.slice(3);
             s.lsp.slice(5) = f.lsp.slice(6), s.lsp.slice(6) = f.lsp.slice(5);
             const out_t a = run(sp, f, "quadriga"), b = run(sp, s, "quadriga");

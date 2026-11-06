@@ -75,14 +75,18 @@ assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b, [], [1, -1, -1
 assert_throws( @() quadriga_lib.sos_val( freq, phase, complex(pos, pos + 1) ), 'Complex datatypes are not supported.' );
 assert_throws( @() quadriga_lib.sos_val( freq, complex(phase, 1), pos ), 'Complex datatypes are not supported.' );
 assert_throws( @() quadriga_lib.sos_val( freq, phase, complex(single(pos), 1) ), 'Complex datatypes are not supported.' );
-% Integer classes other than (u)int32 and (u)int64, and logical arrays, are rejected
-assert_throws( @() quadriga_lib.sos_val( freq, phase, uint8(pos) ), 'Unsupported data type.' );
-assert_throws( @() quadriga_lib.sos_val( freq, phase, pos > 0 ), 'Unsupported data type.' );
+% All real classes are read: 8- and 16-bit integers and logical arrays as their double values
+assertEqual( quadriga_lib.sos_val( freq, phase, uint8(pos) ), quadriga_lib.sos_val( freq, phase, double(uint8(pos)) ) );
+assertEqual( quadriga_lib.sos_val( freq, phase, pos > 0 ), quadriga_lib.sos_val( freq, phase, double(pos > 0) ) );
+assert_cpp_error( @() quadriga_lib.sos_val( freq, phase, @sin ), 'Unsupported data type.' );  % no data pointer
+assert_cpp_error( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], @sin ), ...
+    'Input ''use_kernel'' has an unsupported data type.' );
 vi = quadriga_lib.sos_val( freq, phase, int32(pos), [], [], [], [], [], [], 1 );
 assertEqual( vi, quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1 ) );
-% Scalars: complex, uint8 and non-integer values for integer arguments are rejected
+% Scalars: complex and non-integer values for integer arguments are rejected, uint8 is read
 assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, pos_b, phase, [], [], complex(1, 1) ), 'Complex datatypes are not supported.' );
-assert_throws( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], uint8(1) ), 'unsupported data type' );
+assertEqual( quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], uint8(1) ), ...
+    quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1 ) );
 assert_cpp_error( @() quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1.7 ), ...
     'Input ''use_kernel'' must be an integer from -2147483648 to 2147483647.' );
 vk = quadriga_lib.sos_val( freq, phase, pos, [], [], [], [], [], [], 1.0 );    % use_kernel = 1

@@ -63,7 +63,7 @@ namespace
 
     const char *LIB_CONFIG_DIR = "data/config";
 
-    // The 171 numeric keys, typed from QuaDRiGa's set_scenario_table.m (without 'SubpathMethod' and
+    // The 171 numeric keys, typed from QuaDRiGa's set_scenario_table.m (without its string key and
     // 'GR_epsilon') and the 33 keys for TR 38.901 v19.5.0
     const std::vector<std::string> KEYS = {
         "NumClusters", "NumSubPaths", "DS_mu", "DS_sigma", "DS_lambda", "DS_omega", "DS_gamma", "DS_epsilon",
@@ -122,7 +122,7 @@ namespace
     struct conf_data
     {
         std::unordered_map<std::string, double> scenpar;
-        std::string subpath_method = "legacy", pl_model;
+        std::string pl_model;
         std::unordered_map<std::string, std::vector<double>> plpar;
         std::vector<std::string> pl_order, short_names, ignored_keys;
     };
@@ -130,14 +130,14 @@ namespace
     conf_data read_back(const std::string &fn)
     {
         conf_data d;
-        quadriga_lib::conf_file_read(fn, d.scenpar, &d.subpath_method, &d.pl_model, &d.plpar, nullptr, nullptr,
+        quadriga_lib::conf_file_read(fn, d.scenpar, &d.pl_model, &d.plpar, nullptr, nullptr,
                                      &d.pl_order, &d.short_names, &d.ignored_keys, true);
         return d;
     }
 
     void write_data(const std::string &fn, const conf_data &d, bool write_defaults)
     {
-        quadriga_lib::conf_file_write(fn, d.scenpar, d.subpath_method, d.pl_model, &d.plpar, &d.pl_order,
+        quadriga_lib::conf_file_write(fn, d.scenpar, d.pl_model, &d.plpar, &d.pl_order,
                                       &d.short_names, "", nullptr, nullptr, write_defaults);
     }
 
@@ -153,8 +153,6 @@ namespace
             if (it == b.scenpar.end() || !bits_equal(kv.second, it->second))
                 d += " " + kv.first + ";";
         }
-        if (a.subpath_method != b.subpath_method)
-            d += " SubpathMethod;";
         if (a.pl_model != b.pl_model)
             d += " PL_model;";
         if (a.pl_order != b.pl_order)
@@ -256,7 +254,7 @@ namespace
     std::string round_trip(const std::unordered_map<std::string, double> &scenpar, const std::string &fn,
                            bool write_defaults, std::string *text = nullptr)
     {
-        quadriga_lib::conf_file_write(fn, scenpar, "legacy", "", nullptr, nullptr, nullptr, "", nullptr, nullptr,
+        quadriga_lib::conf_file_write(fn, scenpar, "", nullptr, nullptr, nullptr, "", nullptr, nullptr,
                                       write_defaults);
         if (!file_exists(fn))
             return " <file not written>";
@@ -422,7 +420,6 @@ TEST_CASE("conf_file_write - layout of a written file")
         "% ==================================================================================================\n"
         "\n"
         "NumClusters =          21           % number of clusters\n"
-        "SubpathMethod =        mmMAGIC      % subpath mapping method (legacy, Laplacian or mmMAGIC)\n"
         "\n"
         "r_DS =                 2.3          % delay scaling factor\n"
         "LNS_ksi =              0            % per cluster shadowing STD [dB]\n"
@@ -508,7 +505,7 @@ TEST_CASE("conf_file_write - layout of a written file")
         "PL_An =                39.08        % TX-RX 3D dist.-dep. of NLOS-PL [dB/log10(m)]\n"
         "PL_Exn =               1 2.5\n";
 
-    quadriga_lib::conf_file_write(f.fn, scenpar, "mmMAGIC", "nlos", &plpar, &pl_order, &short_names,
+    quadriga_lib::conf_file_write(f.fn, scenpar, "nlos", &plpar, &pl_order, &short_names,
                                   "Test reference", &ref_sec, &valid_range, false);
     REQUIRE(file_exists(f.fn));
     const std::string text = slurp(f.fn);
@@ -556,7 +553,7 @@ TEST_CASE("conf_file_write - numbers are written with the fewest digits that rea
     for (const auto &c : cases)
         scenpar[c.key] = c.value;
 
-    quadriga_lib::conf_file_write(f.fn, scenpar, "legacy", "", &plpar);
+    quadriga_lib::conf_file_write(f.fn, scenpar, "", &plpar);
     REQUIRE(file_exists(f.fn));
     const std::string text = slurp(f.fn);
     const conf_data back = read_back(f.fn);
@@ -642,13 +639,13 @@ TEST_CASE("conf_file_write - without write_defaults exactly the keys that differ
         }
     }
 
-    SECTION("SubpathMethod is written only if it is not legacy")
+    SECTION("SubpathMethod is never written")
     {
-        quadriga_lib::conf_file_write(f.fn, {}, "legacy");
+        quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 21.0}});
         CHECK(n_lines(slurp(f.fn), "SubpathMethod") == 0);
-        quadriga_lib::conf_file_write(f.fn, {}, "Laplacian");
-        CHECK(value_text(slurp(f.fn), "SubpathMethod") == "Laplacian");
-        CHECK(read_back(f.fn).subpath_method == "Laplacian");
+        quadriga_lib::conf_file_write(f.fn, {{"NumClusters", 21.0}}, "", nullptr, nullptr, nullptr, "", nullptr, nullptr,
+                                      true);
+        CHECK(n_lines(slurp(f.fn), "SubpathMethod") == 0);
     }
 }
 
@@ -665,14 +662,13 @@ TEST_CASE("conf_file_write - with write_defaults every key is written once")
         QD_DIAG("\n# diag: conf_file_write write_defaults = true, %zu given keys: %d assignments, %d lines\n",
                 scenpar.size(), n_assignments(text), (int)lines_of(text).size());
         CHECK(d.empty());
-        CHECK(n_assignments(text) == 172); // 171 numeric keys and SubpathMethod
+        CHECK(n_assignments(text) == 171); // the numeric keys, no SubpathMethod
         for (const auto &k : KEYS)
         {
             INFO("key " << k);
             CHECK(n_lines(text, k) == 1);
         }
-        CHECK(n_lines(text, "SubpathMethod") == 1);
-        CHECK(value_text(text, "SubpathMethod") == "legacy");
+        CHECK(n_lines(text, "SubpathMethod") == 0);
     }
 
     // All sections except the path loss (no PL input) are present, in the decided order
@@ -738,7 +734,7 @@ TEST_CASE("conf_file_write - path-loss comments and formulas depend on the model
     for (const auto &c : cases)
     {
         INFO("model '" << c.model << "'");
-        quadriga_lib::conf_file_write(f.fn, {}, "legacy", c.model, &plpar);
+        quadriga_lib::conf_file_write(f.fn, {}, c.model, &plpar);
         REQUIRE(file_exists(f.fn));
         const std::string text = slurp(f.fn);
         QD_DIAG("%s,%s,%s,%s,%d%d%d%d\n", c.model, comment_text(text, "PL_A").c_str(),
@@ -777,14 +773,14 @@ TEST_CASE("conf_file_write - path-loss keys are written in the given order, else
     const std::unordered_map<std::string, std::vector<double>> plpar = {{"Bn", {1.0}}, {"A", {2.0}}, {"hE", {3.0}}};
     const std::vector<std::string> order = {"hE", "A", "Bn"};
 
-    quadriga_lib::conf_file_write(f.fn, {}, "legacy", "logdist", &plpar, &order);
+    quadriga_lib::conf_file_write(f.fn, {}, "logdist", &plpar, &order);
     CHECK(read_back(f.fn).pl_order == order);
 
-    quadriga_lib::conf_file_write(f.fn, {}, "legacy", "logdist", &plpar);
+    quadriga_lib::conf_file_write(f.fn, {}, "logdist", &plpar);
     CHECK(read_back(f.fn).pl_order == std::vector<std::string>({"A", "Bn", "hE"})); // byte-wise: A < B < h
 
     // Model only: the section has the model line and no other key
-    quadriga_lib::conf_file_write(f.fn, {}, "legacy", "constant");
+    quadriga_lib::conf_file_write(f.fn, {}, "constant");
     REQUIRE(file_exists(f.fn));
     const conf_data d = read_back(f.fn);
     CHECK(d.pl_model == "constant");
@@ -837,7 +833,7 @@ TEST_CASE("conf_file_write - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "Laplacian", "logdist", &pl, &order, &names, "ref",
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "logdist", &pl, &order, &names, "ref",
                                                     &refs, &vr, true));
         CHECK(file_exists(f.fn));
         CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp));
@@ -876,16 +872,17 @@ TEST_CASE("conf_file_write - input validation")
                                                            {"NumClusters_min", 1000.0}, {"NF_k1", 1000.0}}));
     }
 
-    SECTION("subpath_method")
+    SECTION("SubpathMethod is not an argument: the third argument is pl_model")
     {
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "bla"); });
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, ""); });
+        quadriga_lib::conf_file_write(f.fn, sp, "legacy");
+        CHECK(value_text(slurp(f.fn), "PL_model") == "legacy");
+        CHECK(n_lines(slurp(f.fn), "SubpathMethod") == 0);
     }
 
     SECTION("pl_model")
     {
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "two words"); });
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "a-b"); });
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "two words"); });
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "a-b"); });
     }
 
     SECTION("plpar")
@@ -894,43 +891,43 @@ TEST_CASE("conf_file_write - input validation")
         const plmap model = {{"model", {1.0}}}, space = {{"A B", {1.0}}}, empty_name = {{"", {1.0}}},
                     no_value = {{"A", {}}}, nan = {{"A", {1.0, QNAN}}};
         for (const plmap *p : {&model, &space, &empty_name, &no_value, &nan})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "logdist", p); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", p); });
     }
 
     SECTION("pl_order")
     {
         const std::vector<std::string> missing = {"A"}, extra = {"A", "B", "C"}, twice = {"A", "A"};
         for (const auto *o : {&missing, &extra, &twice})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "logdist", &pl, o); });
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "logdist", nullptr, &order); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", &pl, o); });
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "logdist", nullptr, &order); });
     }
 
     SECTION("short_names")
     {
         const std::vector<std::string> space = {"A b"}, empty = {""}, twice = {"Ab", "Cd", "Ab"}; // must be distinct
         for (const auto *s : {&space, &empty, &twice})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, s); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, s); });
         const std::vector<std::string> case_differs = {"Ab", "AB"};
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, &case_differs));
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, &case_differs));
     }
 
     SECTION("ref and ref_sec")
     {
-        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "a\nb"); });
+        rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "a\nb"); });
         const std::vector<std::string> cr = {"a\rb"}, eleven(11, "x");
         for (const auto *r : {&cr, &eleven})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "", r); });
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", r); });
         const std::vector<std::string> ten(10, "x");
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "", &ten));
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", &ten));
     }
 
     SECTION("valid_range")
     {
         const arma::mat r32(3, 2, arma::fill::ones), r24(2, 4, arma::fill::ones), r42(4, 2, arma::fill::ones), r0;
         for (const auto *r : {&r32, &r24})
-            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "", nullptr, r); });
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "", nullptr, &r0));
-        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "legacy", "", nullptr, nullptr, nullptr, "", nullptr, &r42));
+            rejects([&]() { quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", nullptr, r); });
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", nullptr, &r0));
+        CHECK_NOTHROW(quadriga_lib::conf_file_write(f.fn, sp, "", nullptr, nullptr, nullptr, "", nullptr, &r42));
     }
 }
 
@@ -1112,7 +1109,7 @@ TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
         INFO("write_defaults " << wd);
 
         // Size of the text without a limit
-        quadriga_lib::conf_file_write(fn, sp, "legacy", "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
+        quadriga_lib::conf_file_write(fn, sp, "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
         const size_t n_bytes = slurp(fn).size();
         REQUIRE(n_bytes > 2048);
 
@@ -1127,7 +1124,7 @@ TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
             setrlimit(RLIMIT_FSIZE, &limit);
             try
             {
-                quadriga_lib::conf_file_write(fn, sp, "legacy", "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
+                quadriga_lib::conf_file_write(fn, sp, "", &pl, nullptr, nullptr, "", nullptr, nullptr, wd);
             }
             catch (const std::runtime_error &)
             {
@@ -1152,7 +1149,7 @@ TEST_CASE("conf_file_write - a failed write leaves an existing file unchanged")
     if (std::filesystem::exists("/dev/full") && geteuid() != 0)
     {
         CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp), std::runtime_error);
-        CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp, "legacy", "", nullptr, nullptr, nullptr, "",
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write("/dev/full", sp, "", nullptr, nullptr, nullptr, "",
                                                       nullptr, nullptr, true),
                         std::runtime_error);
     }

@@ -50,7 +50,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(loss[0], tw + 0.5 * 7.5 + 4.4 * 0.1, atol=1e-12, rtol=0)
 
     def test_keyword_arguments(self):
-        ok = quadriga_lib.gbsm.o2i_loss(fc=self.fc, rnd=self.rnd, models=self.models, weights=self.weights,
+        ok = quadriga_lib.gbsm.o2i_loss(center_freq=self.fc, rnd=self.rnd, models=self.models, weights=self.weights,
                                         d2d_in_max=25.0)
         op = quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, self.models, self.weights, 25.0)
         for a, b, c in zip(ok, op, self.out):

@@ -38,13 +38,16 @@ Compute the baseband frequency response of a MIMO channel
 ## Usage:
 ```
 # Single-freq, bandwidth + evenly spaced carriers
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, carriers=128 )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, \
+    carriers=128 )
 
 # Single-freq, absolute frequencies
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, freq_out=freq_out )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, \
+    freq_out=freq_out )
 
 # Multi-freq, split real / imaginary parts
-hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, freq_in=freq_in, freq_out=freq_out )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, \
+    freq_in=freq_in, freq_out=freq_out )
 ```
 
 ## Inputs:

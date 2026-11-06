@@ -35,20 +35,26 @@ ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3dB, bfr);
 ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, pol, [], spacing);
 
 % Uniform linear array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, [], [], [], [], pattern);
+ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, [], [], ...
+    [], [], pattern);
 
 % 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
+    Ng, dgv, dgh);
 
 % 3GPP-NR array with custom element beamwidth
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, bfr, M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, bfr, M, N, pol, tilt, ...
+    spacing, Mg, Ng, dgv, dgh);
 
 % 3GPP-NR array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
+    Ng, dgv, dgh, pattern);
 
 % Multi-beam M×N array (one combined beam / one beam per direction)
-ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
-ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
+ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, ...
+    spacing);
+ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, ...
+    dir, spacing);
 
 % Separate outputs (2 to 11 outputs)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...

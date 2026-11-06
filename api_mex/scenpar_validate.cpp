@@ -14,12 +14,10 @@ SECTION!*/
 # SCENPAR_VALIDATE
 Validate scenario parameters and complete them with default values
 
-- Checks scenario parameters that did not come from a conf file and adds every missing field with
-  its default value, so that `scenpar_out` has all 172 fields: the 138 numeric fields of QuaDRiGa,
-  `SubpathMethod` and 33 fields for TR 38.901 v19.5.0, which have no effect at their default of 0.
-  An empty input (`[]` or a struct without fields) gives the complete default set
-- A name that is not one of the fields is an error, also with `validate = false`; this includes the
-  QuaDRiGa field `GR_epsilon`, which is not supported
+- Checks scenario parameters, e.g. ones built in code, and adds every missing field with its default value, so that
+  `scenpar_out` has all 171 fields: the 138 numeric fields of QuaDRiGa and 33 fields for TR 38.901 v19.5.0, which have
+  no effect at their default of 0. An empty input (`[]` or a struct without fields) gives the complete default set
+- A name that is not one of the fields is an error, also with `validate = false`
 - Value checks with `validate = true`; `NaN` is an error for every field:
   - Integer from 1 to 1000: `NumClusters`, `NumSubPaths`
   - Finite and > 0: `r_DS`
@@ -36,8 +34,7 @@ Validate scenario parameters and complete them with default values
   - `NumClusters_min` must not exceed `NumClusters`
   - `NF_alpha` and `NF_beta` must be both 0 or both > 0
   - `DS_VS_a` and `DS_VS_b` must not both be 0 if `DS_VS` is > 0
-  - `SubpathMethod` must be `legacy`, `Laplacian` or `mmMAGIC`
-- With `validate = false` no value is checked: `NaN` and any `SubpathMethod` are accepted
+- `LOS_scatter_radius`, `NF_*` and `SNS_*` are checked but not used by any function of this version
 
 ## Usage:
 ```
@@ -45,19 +42,17 @@ Validate scenario parameters and complete them with default values
 ```
 
 ## Inputs:
-- **`scenpar_in`** *(optional)* — Scenario parameters; struct with any subset of the 172 fields;
-  numeric fields are real scalars of class double, single, int32, uint32, int64, uint64 or
-  logical; if omitted or empty, the default set is returned
-- **`validate`** — `false`: only complete with defaults, no value checks; default: true
+- **`scenpar_in`** — Scenario parameters; struct with any subset of the fields; numeric fields are real
+  scalars of any numeric class or logical; default: `[]` (the complete default set)
+- **`validate`** — `false`: only complete with defaults, no value checks (`NaN` is accepted); default: true
 
 ## Outputs:
 - **`scenpar_out`** — Complete scenario parameters; given values are kept, missing fields have their
-  default; struct with 172 fields in the QuaDRiGa field order: the 138 numeric keys of QuaDRiGa with
-  `SubpathMethod` (string) as field 107, then the 33 new keys; all numeric fields are double scalars
+  default; struct with all fields as double scalars in the canonical order, QuaDRiGa's fields first
 - **`lsp_xcorr`** — LSP cross-correlation matrix; order of rows and columns: DS, KF, SF, ASD, ASA,
   ESD, ESA, XPR; `[8, 8]`
-- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains
-  `NaN`; logical
+- **`lsp_xcorr_chk`** — `true` if `lsp_xcorr` is positive definite; `false` also if it contains `NaN`; `false` is no
+  error here, but [[lsp_generate]] raises an error for such parameters; logical
 
 ## See also:
 - [[conf_file_read]] (read the parameters from a conf file)
@@ -72,11 +67,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs: 1x1 struct of real numeric scalars and the string field 'SubpathMethod'
-    std::string subpath_method = "legacy";
+    // Read inputs: 1x1 struct of real numeric scalars
     std::unordered_map<std::string, double> scenpar;
     if (nrhs > 0)
-        scenpar = qd_mex_struct2scenpar(prhs[0], subpath_method, "scenpar_in");
+        scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar_in");
     const bool validate = (nrhs < 2) ? true : qd_mex_get_scalar<bool>(prhs[1], "validate", true);
 
     // Output allocation
@@ -91,10 +85,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_lsp_xcorr = lsp_xcorr.empty() ? nullptr : &lsp_xcorr;
 
     // Call library function
-    CALL_QD(lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, subpath_method, p_lsp_xcorr, &key_order, validate));
+    CALL_QD(lsp_xcorr_chk = quadriga_lib::scenpar_validate(scenpar, p_lsp_xcorr, &key_order, validate));
 
-    // Scenario parameters: numeric keys in canonical order, 'SubpathMethod' at its QuaDRiGa position
-    plhs[0] = qd_mex_scenpar2struct(scenpar, subpath_method, key_order);
+    // Scenario parameters: numeric keys in canonical order
+    plhs[0] = qd_mex_scenpar2struct(scenpar, key_order);
 
     if (nlhs > 2)
         plhs[2] = mxCreateLogicalScalar(lsp_xcorr_chk);

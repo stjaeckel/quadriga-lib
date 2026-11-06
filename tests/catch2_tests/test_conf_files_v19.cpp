@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -62,7 +63,7 @@ namespace
                    std::string *pl_model = nullptr)
     {
         spmap sp;
-        quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp, nullptr, pl_model, pl);
+        quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp, pl_model, pl);
         return sp;
     }
 
@@ -181,13 +182,13 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
     {
         INFO("file " << name);
         spmap sp;
-        std::string subpath_method, pl_model;
+        std::string pl_model;
         std::unordered_map<std::string, std::vector<double>> pl;
         std::vector<std::string> short_names, ignored;
         bool ok = false;
         REQUIRE_NOTHROW(ok = quadriga_lib::conf_file_read("data/config/3GPP_38.901_v19_" + name + ".conf", sp,
-                                                          &subpath_method, &pl_model, &pl, nullptr, nullptr, nullptr,
-                                                          &short_names, &ignored));
+                                                          &pl_model, &pl, nullptr, nullptr, nullptr, &short_names,
+                                                          &ignored));
         int n_changed = 0;
         for (const auto &e : sp)
             n_changed += (e.second != def[e.first]) ? 1 : 0;
@@ -197,14 +198,22 @@ TEST_CASE("conf files v19 - all 23 files are read without ignored keys and pass 
         CHECK(ok); // positive definite
         CHECK(ignored.empty());
         CHECK(short_names.empty());
-        CHECK(subpath_method == "legacy");
         CHECK(!pl_model.empty());
+
+        // The files carry no SubpathMethod line (conf_file_read accepts 'SubpathMethod = legacy' and ignores it)
+        std::ifstream file("data/config/3GPP_38.901_v19_" + name + ".conf");
+        std::string line;
+        int n_subpath = 0;
+        while (std::getline(file, line))
+            n_subpath += (line.find("SubpathMethod") != std::string::npos) ? 1 : 0;
+        CHECK(n_subpath == 0);
         CHECK(!pl.empty());
 
         // Common to all v19 files
         CHECK(sp["PerClusterES_D_scale"] == 0.375); // eq. (7.6-7)
         CHECK(sp["PerClusterES_D"] > 0.0);
-        CHECK(sp["PerClusterDS_fc_min"] == 0.0); // the TR has no clamp for the cluster DS
+        // Table 7.5-6 note 6: the cluster DS of UMa LOS and NLOS uses fc = 6 GHz below 6 GHz; no clamp elsewhere
+        CHECK(sp["PerClusterDS_fc_min"] == ((name == "UMa_LOS" || name == "UMa_NLOS") ? 6.0 : 0.0));
         CHECK(sp["PolVar_sigma"] == 3.0);        // clause 7.6.16
         CHECK(sp["NumSubPaths"] == 20.0);
 

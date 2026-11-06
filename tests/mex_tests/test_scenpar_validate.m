@@ -7,24 +7,24 @@ function test_scenpar_validate
 [ scenpar, lsp_xcorr, lsp_xcorr_chk ] = quadriga_lib.scenpar_validate();
 names = fieldnames( scenpar );
 assertEqual( size(scenpar), [1, 1] );
-assertEqual( numel(names), 172 );
+assertEqual( numel(names), 171 );
 assertEqual( names{1}, 'NumClusters' );
-assertEqual( names{107}, 'SubpathMethod' );
-assertEqual( names{108}, 'LOS_scatter_radius' );
-assertEqual( names{139}, 'xpr_esa' );
-assertEqual( names{140}, 'LSP_fc_min' );
-assertEqual( names{166}, 'PolVar_sigma' );
-assertEqual( names{167}, 'LOS_state_lambda' );
-assertEqual( names{168}, 'IO_state_lambda' );
-assertEqual( names{169}, 'O2I_d2D_in_max' );
-assertEqual( names{170}, 'DS_VS' );
-assertEqual( names{171}, 'DS_VS_a' );
-assertEqual( names{172}, 'DS_VS_b' );
+assertEqual( names{106}, 'absTOA_lambda' );
+assertEqual( names{107}, 'LOS_scatter_radius' );
+assertEqual( names{138}, 'xpr_esa' );
+assertEqual( names{139}, 'LSP_fc_min' );
+assertEqual( names{165}, 'PolVar_sigma' );
+assertEqual( names{166}, 'LOS_state_lambda' );
+assertEqual( names{167}, 'IO_state_lambda' );
+assertEqual( names{168}, 'O2I_d2D_in_max' );
+assertEqual( names{169}, 'DS_VS' );
+assertEqual( names{170}, 'DS_VS_a' );
+assertEqual( names{171}, 'DS_VS_b' );
+assertTrue( ~isfield( scenpar, 'SubpathMethod' ) );
 assertEqual( scenpar.NumClusters, 6 );
 assertEqual( scenpar.DS_mu, -6 );
 assertEqual( scenpar.ES_D_mu_min, -Inf );
 assertEqual( scenpar.XPR_sigma, 10 );
-assertEqual( scenpar.SubpathMethod, 'legacy' );
 assertEqual( scenpar.PolVar_sigma, 0 );
 assertEqual( lsp_xcorr, eye(8) );
 assertTrue( islogical(lsp_xcorr_chk) && isequal(size(lsp_xcorr_chk), [1, 1]) );
@@ -38,11 +38,11 @@ assertEqual( quadriga_lib.scenpar_validate( [], [] ), scenpar );
 assertEqual( quadriga_lib.scenpar_validate( [], true ), scenpar );
 
 %% A partial struct: given values are kept, the rest is completed, the field order is canonical
-in = struct( 'xpr_esa', 0.25, 'SubpathMethod', 'Laplacian', 'DS_mu', -7.5, 'ds_kf', -0.4, 'NumClusters', 12 );
+in = struct( 'xpr_esa', 0.25, 'SubpathMethod', 'legacy', 'DS_mu', -7.5, 'ds_kf', -0.4, 'NumClusters', 12 );
 [ out, X, chk ] = quadriga_lib.scenpar_validate( in );
 assertEqual( fieldnames(out), names );
 assertEqual( out.xpr_esa, 0.25 );
-assertEqual( out.SubpathMethod, 'Laplacian' );
+assertTrue( ~isfield( out, 'SubpathMethod' ) );                             % 'legacy' is accepted and ignored
 assertEqual( out.DS_mu, -7.5 );
 assertEqual( out.ds_kf, -0.4 );
 assertEqual( out.NumClusters, 12 );
@@ -58,19 +58,20 @@ assertEqual( out2, out );
 assertEqual( X2, X );
 
 % A struct with the fields of QuaDRiGa (no new keys) is completed with the 33 new fields
-legacy = rmfield( out, names(140:172) );
-assertEqual( numel(fieldnames(legacy)), 139 );
+legacy = rmfield( out, names(139:171) );
+assertEqual( numel(fieldnames(legacy)), 138 );
 assertEqual( quadriga_lib.scenpar_validate( legacy ), out );
 
 %% Optional input 'validate'
-bad = struct( 'r_DS', -1, 'SubpathMethod', 'bla', 'ds_kf', 0.9, 'ds_sf', 0.9, 'sf_kf', -0.9 );
+bad = struct( 'r_DS', -1, 'ds_kf', 0.9, 'ds_sf', 0.9, 'sf_kf', -0.9 );
 assert_throws( @() quadriga_lib.scenpar_validate( bad ), 'r_DS' );          % thrown by C++
 assert_throws( @() quadriga_lib.scenpar_validate( bad, [] ), 'r_DS' );
 [ out3, ~, chk3 ] = quadriga_lib.scenpar_validate( bad, false );
 assertEqual( out3.r_DS, -1 );
-assertEqual( out3.SubpathMethod, 'bla' );
 assertEqual( chk3, false );                                                 % not positive definite, no error
-assert_throws( @() quadriga_lib.scenpar_validate( struct('SubpathMethod', 'bla') ), 'SubpathMethod' );
+msg_sub = 'Value ''bla'' of ''SubpathMethod'' is not supported; only ''legacy'' is accepted.';
+assert_throws( @() quadriga_lib.scenpar_validate( struct('SubpathMethod', 'bla') ), msg_sub );
+assert_throws( @() quadriga_lib.scenpar_validate( struct('SubpathMethod', 'bla'), false ), msg_sub );
 
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.scenpar_validate( in );
@@ -113,7 +114,9 @@ vs = quadriga_lib.scenpar_validate( struct('DS_VS', 4), false );
 assertEqual( vs.DS_VS, 4 );
 
 % Errors of the shared helpers carry the identifier of the library
-assert_identifier( @() quadriga_lib.scenpar_validate( struct('NumClusters', int8(7)) ), 'quadriga_lib:CPPerror' );
+assert_identifier( @() quadriga_lib.scenpar_validate( struct('NumClusters', 7 + 1i) ), 'quadriga_lib:CPPerror' );
+vi = quadriga_lib.scenpar_validate( struct('NumClusters', int8(7)) );            % all real classes are read
+assertEqual( vi.NumClusters, 7 );
 
 end
 
