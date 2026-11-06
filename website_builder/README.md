@@ -190,7 +190,7 @@ The gap markers and the gap list are described in the docs-builder README ("Gap 
 
 ## Tests
 
-The tests of both builders are in `website_builder/tests/`: `tests/docs/` tests the docs builder and imports nothing of the website builder, `tests/site/` tests the website builder. Both use the fixture repository `tests/fixtures/mini_repo/` (version `9.9.9`, a few small doc blocks per language, content files and one small notebook). Tests marked `repo` read the real repository; `tests/fixtures/old_anchors.json` holds the ids of the old website that must keep working. Run them in the active environment:
+The tests of both builders are in `website_builder/tests/`: `tests/docs/` tests the docs builder and imports nothing of the website builder, `tests/site/` tests the website builder. Both use the fixture repository `tests/fixtures/mini_repo/` (version `9.9.9`, a few small doc blocks per language, content files and one small notebook). Tests marked `repo` read the real repository. Run them in the active environment:
 
 ```bash
 python3 -m pytest website_builder/tests
