@@ -679,7 +679,7 @@ TEST_CASE("Scalar closed face - a lossy box on a rigid wall reflects no more tha
         bf::Acc A;
         arma::mat o, d;
         diag_ray_at(thd, o, d);
-        bf::walk(P, mesh, mi, tr, f, thd, eps, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 400, A);
+        bf::walk(P, mesh, mi, tr, f, thd, eps, nullptr, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, A);
         return A;
     };
 
@@ -864,7 +864,7 @@ TEST_CASE("One solver - a sheet and a stack are one sum and no mirror is clamped
                 DiagSheet W = diag_cm_stack(eH, U, {{eS, U, thk}}, U, U, std::cos(th), f, true, false);
                 const double Rte = std::abs(cpx(E.xpr, 0, 0)), Rtm = std::abs(cpx(E.xpr, 0, 3));
                 cf::Acc A;
-                cf::walk(P, meshX, mX, 1, f, kt, 0.0, 1, &S0, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 400, A);
+                cf::walk(P, meshX, mX, 1, f, kt, 0.0, 1, &S0, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, A);
                 const double Xte = std::norm(A.R[0]), Xtm = std::norm(A.R[1]);
                 QD_DIAG("%g-%gj,%.1f,%.0f,%.6f,%.6f,%.3e,%.3e,%.6f,%.6f,%+.4f,%+.4f\n", s.first, s.second, thk * 1e3, thd, Rte, Rtm, std::abs(Rte - std::abs(W.R_te)),
                         std::abs(Rtm - std::abs(W.R_tm)), Xte, Xtm, dBp(Rte * Rte) - dBp(Xte), dBp(Rtm * Rtm) - dBp(Xtm));
@@ -2845,7 +2845,8 @@ TEST_CASE("Bare tf - a bare face with tf is a transformer where it is open and a
         L.a = a, L.ei = ei, L.thk = thk, L.tf = tf, L.m = m, L.fRef = fRef;
         return L;
     };
-    auto ports = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double thd, bool follow, int maxdepth = 400)
+    // maxdepth 200: the stack limit of bf::walk (1 MB on Windows), deep enough for the lossless check below
+    auto ports = [&](const ub::Pal &P, const arma::mat &mesh, const arma::uvec &mi, int tr, double thd, bool follow, int maxdepth = 200)
     {
         bf::Acc A;
         arma::mat o, d;

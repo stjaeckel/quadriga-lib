@@ -4981,9 +4981,9 @@ TEST_CASE("Closed face - tf at a closed face is a pad and the two ports of a she
                         diag_ray_at(thd, o, d);
                         const double kt = k0 * std::sin(thd * QPI / 180.0);
                         cf::Acc As, A0, A1;
-                        cf::walk(P, mesh_s, ms, tr, f, kt, 0.0, 2, nullptr, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 400, As);
-                        cf::walk(P, mesh_b, mb, tr, f, kt, 0.0, 2, nullptr, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 400, A0);
-                        cf::walk(P, mesh_b, mb, tr, f, kt, 1.5, 2, nullptr, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 400, A1);
+                        cf::walk(P, mesh_s, ms, tr, f, kt, 0.0, 2, nullptr, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, As);
+                        cf::walk(P, mesh_b, mb, tr, f, kt, 0.0, 2, nullptr, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, A0);
+                        cf::walk(P, mesh_b, mb, tr, f, kt, 1.5, 2, nullptr, true, o, d, 1.0, 1.0, 0.0, 0.0, 0, 200, A1);
                         for (int ch = 0; ch < ((tr > 2) ? 1 : 2); ++ch)
                         {
                             const double Ts = std::norm(As.T[ch]), Rs = std::norm(As.R[ch]), T0 = std::norm(A0.T[ch]), R0 = std::norm(A0.R[ch]), T1 = std::norm(A1.T[ch]), R1 = std::norm(A1.R[ch]);
