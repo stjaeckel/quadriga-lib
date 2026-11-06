@@ -1,15 +1,15 @@
 # Tutorial series: random fields and the sum-of-sinusoids method
 
-Project plan for the first tutorial series of quadriga-lib. It describes what the series covers, the steps to get there and the decisions taken on the way, and is updated as the work goes on.
+Project plan for the tutorial series on random fields and the sum-of-sinusoids method. It describes what the series covers, the steps to get there and the decisions taken on the way, and is updated as the work goes on. How tutorials are written, built and published in general is described in [tutorials/README.md](../tutorials/README.md); this plan holds only what is specific to this series.
 
 ## 0. Status
 
-- Current step: scope and content of part 1 (section 3, step 4); sketch and decisions in section 7. The part 1 draft is in `tutorials/sos_01_random_fields.ipynb` (cleared, references checked); the tutorial build (`tutorials/GNUmakefile`) and the website integration are done; next: the setup text on the tutorial index. The research is done; its findings are in section 5. The decisions of the kick-off are in section 4.
-- No tutorial notebook is written yet.
+- Part 1 is drafted (`tutorials/sos_01_random_fields.ipynb`), reviewed, and its references are checked against the full texts. The research behind the series is in section 5, the decisions in sections 4 and 6.
+- Next: the setup section of the tutorial index (input in section 5.6), then part 2.
 
 ## 1. Goal
 
-A series of three Jupyter tutorials on random fields and the sum-of-sinusoids (SOS) method, published through the tutorial pipeline of the website builder (`tutorials/<stem>.ipynb`, see `website_builder/README.md`, section "Tutorials"). They are the first real tutorials, so they also serve as the prototype of the pipeline: the kinks found while writing them are fixed in the builder or recorded in section 6.
+A series of three Jupyter tutorials on random fields and the sum-of-sinusoids (SOS) method, published on the website as `tutorials/sos_<nn>_<topic>.ipynb`. They were the first tutorials; the general rules learned while writing them are in `tutorials/README.md`.
 
 ## 2. The three parts
 
@@ -62,15 +62,14 @@ Notebook stem `sos_03_spatial_consistency`. Not now: needs the finished GBSM imp
 
 ## 4. Kick-off decisions
 
-- Versions: every tutorial must run before a release, so the tutorials on the website always work with the latest version. Each tutorial states the minimum required version; part 1 needs v0.13 (the next release). The set-up installs the latest version with pip.
-- Set-up: not on the notebook pages. The set-up instructions go into `website_builder/content/tutorials.md` (content-page format), are kept up to date there and apply to all tutorials. A tutorial family may add its own instructions (e.g. a later Sionna series with Sionna set-up). They cover Linux and Windows, with a venv + pip path (maybe with Ubuntu system packages) and a conda path. The packages follow what `tutorials/pipeline_demo.ipynb` and the builder README need: `quadriga-lib`, `numpy`, `matplotlib`, `jupyter`.
-- Language: Python first, to set up the pipeline. A MATLAB version follows in a separate session once this works.
+- Versions: part 1 needs v0.13, the next release.
+- Language: Python first. A MATLAB version follows as a separate project.
 - Audience: part 1 is generic; the audience of the library are wireless engineers, but the SOS method is useful outside wireless too.
 - Theory: brief, enough for a university-level engineer to follow, no walls of formulas, standard references. The focus is the software and how it helps; the theory is the groundwork.
-- Comparison with other methods: one simple example of a few lines, using common Python libraries the reader may already have, so the code teaches. No walls of code.
-- Dual mobility: placement open until after the research (topic 5).
-- Runtime: each notebook runs in under a minute. The 1024-sinusoid fits may be dropped; they are examples, and research runs have more time.
-- Names: stems as in section 2, may change later. `tutorials/pipeline_demo.ipynb` is removed once part 1 exists.
+- Comparison with other methods: one simple example of a few lines, using common Python libraries the reader may already have.
+- Dual mobility: placement open (section 5.5).
+- Fits with 1024 sinusoids may be left out of the notebooks to keep the run time short; they are examples, and research runs have more time.
+- Names: `sos_01_random_fields`, `sos_02_custom_acf`, `sos_03_spatial_consistency`; they may change.
 
 ## 5. Research findings
 
@@ -98,7 +97,7 @@ Six research topics, done in November 2026 (section 3, step 2). The references o
 - Invalid targets: the step "1 up to 10 m, 0 beyond" is invalid in every dimension. (measured: points at 0, 6 and 12 m give the correlation matrix [[1,1,0],[1,1,1],[0,1,1]], with determinant −1 and smallest eigenvalue −0.414.) The triangle (1 − d/a) for d < a is valid in 1-D [RW06, eq. 4.21] but not in 2-D (measured: a negative eigenvalue of its covariance matrix on a 2-D grid). Isotropic correlations cannot be lower than −0.403 in 2-D or −0.217 in 3-D [SH09, Sec. 2].
 - "Correlation length" has at least four conventions: the distance where the ACF falls to 1/e, stated in [JRBT18, Sec. II] and used by quadriga-lib [QL-API], which is the correlation distance d_cor of the exponential ACF of 3GPP [3GPP-901-19, clause 7.4.4, eq. 7.4-5] (3GPP cites ITU-R P.1816 for it and does not state 1/e in words); the distance where the ACF falls to 1/2 [WTN05]; Gudmundson describes the exponential decay by the correlation at a reference distance instead, e.g. 0.82 at 100 m [Gud91, eqs. 2-3, Fig. 1]; the length parameter ℓ of a kernel [RW06, Sec. 4.2.1]; the integral scale [GST]; and the scale of fluctuation 2∫ρ [Van10], [WW07]. (measured) For the same ℓ, the 1/e distances of the common models differ by up to 41 %.
 - Smoothness: the exponential ACF gives a continuous but not differentiable field, the Gaussian ACF an infinitely differentiable one; the Matérn family lies between, with a field that is k times mean-square differentiable if and only if ν > k [RW06, Sec. 4.2.1]. A covariance matrix with a Gaussian ACF is nearly singular, so a Cholesky comparison needs a small diagonal term [RW06, App. A.2]. (measured: Cholesky fails without it for 400 points along a 100 m line with a Gaussian ACF.)
-- Ergodicity: the mean of one realisation over a finite domain scatters around the ensemble mean, with a variance given by Vanmarcke's variance function [Van10], [WW07, eq. 4]. (measured: for an exponential ACF the standard deviation of the mean over a track of 10 decorrelation distances is 0.42 σ, over 100 decorrelation distances 0.14 σ.) This leads to the ensemble bias of part 3.
+- Ergodicity: the mean of one realization over a finite domain scatters around the ensemble mean, with a variance given by Vanmarcke's variance function [Van10], [WW07, eq. 4]. (measured: for an exponential ACF the standard deviation of the mean over a track of 10 decorrelation distances is 0.42 σ, over 100 decorrelation distances 0.14 σ.) This leads to the ensemble bias of part 3.
 - Finite N: the values of a sum of N cosines with amplitude sqrt(2/N) are bounded by sqrt(2N) (derived), and the excess kurtosis is −1.5/N (derived from the kurtosis 1.5 of one cosine with random phase; measured −0.37 at N = 4, −0.09 at N = 16 and −0.0064 at N = 256). With frequencies drawn at random (plain Monte Carlo), the ACF of the generator does not decay to zero: its rms at large distances is about sqrt(1/(2N)), 0.044 at N = 256 (measured). The fitted presets of quadriga-lib are not yet checked for this.
 - Further reading for the tutorial: [RW06, ch. 4] (free PDF); [Pae11] for wireless readers; [SD91] for readers from other fields.
 
@@ -134,7 +133,7 @@ Six research topics, done in November 2026 (section 3, step 2). The references o
 - Three use SOS in time with custom ACFs: a human-gesture sensing model with a damped-sinusoid ACF and N = 50, citing the fitting method [Chu24]; an underwater acoustic channel emulator [DM23] (abstract); a correlated fading model with linear complexity [WLK23] (abstract).
 - Six use it for spatially consistent large-scale parameters: shadow fading in a digital twin for reinforcement-learning training [Tao25a] (abstract) and for generated user trajectories [Tao25b]; spatially correlated LSPs for THz multi-hop routing [Nav25] (abstract); shadow-fading decorrelation for moving LEO satellites [MN23] (abstract); a satellite-cellular channel model [ALLSTAR] (citation context only); D2D and satellite extensions by the authors [JRB19], [JRT22].
 - The rest cite it in passing or as the reference for the QuaDRiGa simulator, mostly in machine-learning and receiver papers that use QuaDRiGa data sets [Uts22], [RU21].
-- For the series: present SOS as a generic generator in 1-D to 3-D, in space and in time [Chu24], [DM23]; new phases with fixed frequencies give a new realisation with the same ACF, and only the frequencies need memory [JRBT18]. Possible further tutorials: spatially consistent data sets for machine learning [Mor25], [Tao25a]; fitting a measured ACF in time [Chu24].
+- For the series: present SOS as a generic generator in 1-D to 3-D, in space and in time [Chu24], [DM23]; new phases with fixed frequencies give a new realization with the same ACF, and only the frequencies need memory [JRBT18]. Possible further tutorials: spatially consistent data sets for machine learning [Mor25], [Tao25a]; fitting a measured ACF in time [Chu24].
 
 ### 5.5 Random fields beyond radio, and dual mobility
 
@@ -149,7 +148,7 @@ Six research topics, done in November 2026 (section 3, step 2). The references o
 - Known weak spots reported there: the low frequencies of power-law spectra in phase screens [Cha19], [AOT]; too few features for large domains, called "variance starvation" in the random-feature literature [WBT20]; non-Gaussian values when amplitudes are fixed, which is the same trade-off as the equal amplitudes here. Fixed-amplitude initial conditions in cosmology are a published example of using this deliberately [AP16] (abstract).
 - Dual mobility in wireless is modelled in four ways:
   - per-link updates driven by the change of link geometry [36.885, Annex A.1.4], [37.885, clause 6.2]; (derived from the code of [ns3-pl]) in ns-3 two nodes moving in parallel never change their shadowing;
-  - a product joint correlation function ρ(Δtx)·ρ(Δrx), realised with a 4-D SOS over the horizontal positions of both ends [WTN06, Sec. II-IV];
+  - a product joint correlation function ρ(Δtx)·ρ(Δrx), realized with a 4-D SOS over the horizontal positions of both ends [WTN06, Sec. II-IV];
   - a line integral through one shared loss field [AP09, Sec. VI-A];
   - the sum of two per-end fields [JRBT18, eq. 19].
 - The sum of two per-end fields has the joint correlation (ρ_tx + ρ_rx)/2 (derived from [JRBT18, eq. 19]), not the product ρ_tx·ρ_rx that [JRBT18, eq. 18] quotes from [WTN05]. (measured with `sos.val` in the two-map mode: preset Exp256 at 20 m, 4000 independent generator pairs; moving one end 1000 m away leaves a correlation of 0.50.) The code follows eq. 19; the difference lies in the approximation of eq. 19, which [Pes20] also criticises. A tutorial on dual mobility must state this.
@@ -157,7 +156,10 @@ Six research topics, done in November 2026 (section 3, step 2). The references o
 - Outside wireless (sonar and underwater communication [QS13], ocean acoustics with moving surfaces [SP08], origin-destination flows [LP08]), quantities that depend on both ends are derived from one shared field or from separate per-end effects. No explicit 6-D random field was found.
 - Placement proposed: at most one sentence in part 1; its own notebook after part 2, or a long section of part 3. It needs the ACF vocabulary of part 2 and raises its own modelling questions: sum or product, one map or two, reciprocity.
 
-### 5.6 Environment set-up
+### 5.6 Input for the setup section of the tutorial index
+
+Research for the readers' setup on the tutorial index (`website_builder/content/tutorials.md`, section "Setup"); the facts are dated and have to be checked again when that text is written.
+
 
 - quadriga-lib 0.12.2 on PyPI has wheels for CPython 3.10 to 3.14 on Linux (x86_64 and aarch64, manylinux with glibc 2.28 or newer) and Windows x86_64; there are no macOS, Windows-ARM or Python 3.15 wheels [PyPI-ql]. It is not on conda-forge [CF-search].
 - Python 3.15 was released on 2026-10-09 [PyVer]. The Python install manager for Windows installs the latest stable Python by default [PyWin, Sec. 4.1], and the newest conda-forge `python` is 3.15.2 [CF-py]. For 3.15, pip finds no quadriga-lib wheel and tries to build from the source package (measured with `pip download`), which needs a C++ tool chain. The set-up must name the Python version (3.14 now); v0.13 should add cp315 wheels.
@@ -165,7 +167,6 @@ Six research topics, done in November 2026 (section 3, step 2). The references o
 - Windows: the default PowerShell execution policy on client PCs blocks the activation script `Activate.ps1` [MS-EP]; the fix given by the Python docs is `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` [PyVenv]. cmd.exe (`activate.bat`) or calling `.venv\Scripts\python.exe` directly need no change [PyVenv].
 - conda: Miniforge uses only the conda-forge channel [MF]; the Anaconda `defaults` channel requires a paid licence for for-profit organisations with more than 200 employees [AnaToS, Sec. 1]. Since quadriga-lib is only on PyPI, conda installs Python, numpy, matplotlib and Jupyter, and pip installs quadriga-lib last, as the conda documentation advises for mixing [conda-pip].
 - The `jupyter` package installs JupyterLab, Notebook 7, ipykernel and nbconvert [PyPI-jup], so it covers JupyterLab, Notebook, VS Code [VSC] and the refresh command of the builder README.
-- Checked environment (2026-11-05, Linux, conda): Python 3.14.8, quadriga-lib 0.12.5 built from `main`, numpy 2.5.4, matplotlib 3.10.9, scipy 1.18.1, jupyter 1.1.1 (JupyterLab 4.6.4, Notebook 7.6.3, ipykernel 7.4.0, nbconvert 7.17.2). It has everything part 1 needs: `tutorials/pipeline_demo.ipynb` runs with the refresh command of the builder README (`jupyter nbconvert --to notebook --execute`) without errors or warning text in the stored outputs, and the part 1 calls work (`sos.randn` with `preset="Exp256"` and a seed, repeatable; `sos.rand`; `sos.randi`; `sos.preset`, `sos.init_phases`, `sos.map` with output `[ny, nx, nz, n_gen]`; numpy Cholesky on 400 points; together 0.17 s CPU time). scipy is not needed for part 1.
 - Layout: scikit-learn's short per-OS blocks (create, activate, install, check) are the clearest model among the projects compared [SKL], [NumPy], [Astropy], [QuTiP], [Sionna-inst], [MNE]. venv + pip is the main path, conda the alternative. A check cell prints `sys.executable` (to catch a wrong kernel) and reads the version with `importlib.metadata`, since `quadriga_lib.version()` can end in `_AVX2` [QL-API], and suggests `%pip install --upgrade quadriga-lib` [IPy-magic] if the version is older than required.
 
 ### 5.7 Consequences for the plan
@@ -173,14 +174,14 @@ Six research topics, done in November 2026 (section 3, step 2). The references o
 - Part 1:
   - One table of the two method families (5.1) and the three design choices, so the properties of SOS follow from its choices, with its costs named.
   - Comparison example: Cholesky on 400 random 2-D points against `sos.randn` with the `Exp256` preset at the same points (exact against scalable).
-  - The ACF with the 1/e convention and a short conversion note (5.2); one Wiener-Khinchin formula ("the frequencies are samples of the spectrum"); field = ensemble, and the seed picks the realisation.
+  - The ACF with the 1/e convention and a short conversion note (5.2); one Wiener-Khinchin formula ("the frequencies are samples of the spectrum"); field = ensemble, and the seed picks the realization.
   - A level-cut map with `sos.rand`, which shows a LOS state map or a two-phase microstructure [RT95].
   - Candidates: a histogram at small N against N = 256 (5.2); the scatter of the track mean over many seeds (ergodicity, 5.2).
   - Leave out: SPDE, Karhunen-Loève, sequential simulation, measure theory, Hankel transforms.
 - Part 2: the step and triangle ACFs as invalid targets (5.2); ACF error against N, which also answers the ripple argument of [ns3-sgf]: inside the fitted range the error of the 256-sinusoid presets is 0.016 to 0.028 rms, beyond it the ACF keeps a residual of rms 1/sqrt(2N), 0.044 for 256 sinusoids (measured; a random rotation of the frequency set per drop is proposed in https://github.com/stjaeckel/quadriga-lib/issues/22); the slope at the origin and non-Gaussian values at small N; a travelling sea surface from custom frequencies with `sos.val`, with time as the third coordinate and the deep-water dispersion relation (measured: 256 components agree with a direct numpy evaluation within 4.5e-7; 10^6 points take about 0.4 s CPU time).
 - Part 3: the four methods of 5.3, one representative tool each; a closed trajectory, where a per-link update does not return to its start value and SOS does; the ensemble bias (5.2); validation with the calibration metrics of [3GPP-901, clause 7.8.3]; which parts of clause 7.6.3 quadriga-lib implements, in the vocabulary of the TR.
 - Dual mobility: placement open (5.5). The sum is filed as a defect: https://github.com/stjaeckel/quadriga-lib/issues/21 (with the measured link-pair correlations of [AP09, Table I] and the error analysis of [Pes20, Fig. 4], which the sum alone explains). The dual-mobility material waits for its fix.
-- Release v0.13: cp315 wheels (5.6).
+- Release v0.13: wheels for Python 3.15 (5.6).
 
 ### 5.8 References
 
@@ -322,28 +323,17 @@ Set-up sources
 - [Ubu] Ubuntu package data: `/usr/lib/python3.14/EXTERNALLY-MANAGED` and the venv module of Ubuntu 26.04; package versions from https://packages.ubuntu.com (noble).
 - [VSC] Microsoft, "Jupyter Notebooks in VS Code". https://code.visualstudio.com/docs/datascience/jupyter-notebooks
 
-## 6. Pipeline findings
-
-Problems of the tutorial pipeline found while writing the tutorials, and how they were solved.
-
-- Outputs (decision 7.3, item 6): tutorial build done (`tutorials/GNUmakefile`, `tutorials/qnb/`, root shortcuts, `.gitignore`), tested on 2026-11-06: clearing a clean notebook changes nothing; run then clear gives back the committed file; two runs give byte-identical copies; a second `make` runs nothing and a touched notebook reruns alone; a failing notebook stops `make` (exit 2) with its traceback and leaves no copy while the others complete (`-j 3 -k`); the root `make clean` leaves `tutorials/` alone and `make tidy` runs the tutorial clean. The kernel prints a warning about unencrypted TCP; it concerns the local connection on 127.0.0.1. IPC sockets instead of TCP were tried and dropped: parallel kernels shared fixed socket file names in the working folder and connected to each other. `tutorials/pipeline_demo.ipynb` is deleted. Website builder done on 2026-11-06: it publishes one tutorial per notebook `tutorials/<stem>.ipynb` from its executed copy; without `tutorials/executed/` the index lists none (warning `not-executed`, an error with `--release`), a notebook without a copy is left out the same way, and an executed copy without its notebook is ignored; "No tutorials yet." is gone, so the index then shows only its common part. `content/tutorials.md` has a `## Setup` section (placeholder in gap markers), described in the website README ("The tutorial index page"). Links in notebook Markdown are site paths from the site root (`tutorials.html#setup`), as on content pages; the notebook's two relative links were changed accordingly.
-- Setup page: `website_builder/content/tutorials.md` has no setup section yet; the notebook links to it for the setup (decision 4, "Set-up"). Content: section 5.6 (Python 3.14, venv + pip on Linux and Windows, conda via Miniforge, a check snippet with the interpreter path). Open, needed before part 1 is published.
-- Reproducible refresh: `jupyter nbconvert --to notebook --execute --inplace` (the refresh command of the builder README, now replaced by `qnb.run`, which records no timestamps) writes execution timestamps into the metadata of every cell, so every refresh changes the committed file even when all outputs are equal. With `--ExecutePreprocessor.record_timing=False` two runs give byte-identical files, outputs included (checked with the demo notebook, nbconvert 7.17.2). `jupyter nbconvert --clear-output --inplace` removes outputs and execution counts but not those timestamps; after a run without timing it gives back the cleared file exactly. The notebook metadata also records the Python version of the kernel (`language_info.version`), which changes with the environment. 
-
-- Version check of a source build: a quadriga-lib built and installed from the source tree has no pip metadata, so `importlib.metadata.version("quadriga-lib")` raises `PackageNotFoundError`, although the module imports and `quadriga_lib.version()` returns `0.12.5_AVX2`. The check cell of section 5.6 must therefore fall back to `quadriga_lib.version()` and strip the `_AVX2` suffix. Open: write the check cell.
-- `jupyter nbconvert --execute` prints a warning of the kernel ("Kernel is running over TCP without encryption") to the console. It does not reach the stored outputs, so the rule "no warning text in the stored outputs" is not affected.
-
-## 7. Part 1: scope and content (sketch)
+## 6. Part 1: scope and content (sketch)
 
 First sketch, for discussion; nothing is written yet. Notebook `tutorials/sos_01_random_fields.ipynb`, Python. Metadata: title "Random fields and the sum-of-sinusoids method", level `beginner`, `order` 1, `duration_min` about 25. The notebook runs in well under a minute (all calls together took 0.17 s CPU time in the environment check, section 5.6). Each section below is one `##` heading; code cells are short (a handful of lines), use numpy and matplotlib only, and every figure gets an alt text.
 
-### 7.1 Sections
+### 6.1 Sections
 
-1. Requirements. One Markdown line: quadriga-lib v0.13 or newer, set-up as on the tutorial index (`website_builder/content/tutorials.md`). Possibly a short version check (see 7.3).
-2. What a random field is. A random function of position; one realisation against the ensemble; stationarity and isotropy in one sentence each [KB13, Sec. 1], [RW06, Sec. 4.1]. One sentence per field where they occur: shadow fading and the large-scale parameters of channel models, soil and aquifer properties [GST22], ocean surfaces [Tes04], turbulence phase screens [Cha19], material microstructures [RT95]. No code.
+1. Requirements. One Markdown line: quadriga-lib v0.13 or newer, set-up as on the tutorial index (`website_builder/content/tutorials.md`). Possibly a short version check (see 6.3).
+2. What a random field is. A random function of position; one realization against the ensemble; stationarity and isotropy in one sentence each [KB13, Sec. 1], [RW06, Sec. 4.1]. One sentence per field where they occur: shadow fading and the large-scale parameters of channel models, soil and aquifer properties [GST22], ocean surfaces [Tes04], turbulence phase screens [Cha19], material microstructures [RT95]. No code.
 3. The autocorrelation function. Definition in words and one formula; the decorrelation distance with the 1/e convention and a note on the other conventions (5.2); smooth (Gauss) against rough (Exp) fields; one Wiener-Khinchin sentence: the ACF and the power spectrum are a Fourier pair [RW06, Sec. 4.2.1, eq. 4.6]. Code: the target ACFs of the `Exp`, `Gauss` and `Comb` presets from `sos.preset`. Figure 1: three ACF curves over the distance.
 4. How random fields are generated. The table of the two families (matrix methods, sums of waves) and the three design choices of the spectral family (5.1), with the place of the SOS method in it. No code.
-5. The sum-of-sinusoids method. `s(x) = sqrt(2/N) · sum_n cos(2π f_n·x + φ_n)`: the frequencies are samples of the spectrum and set the ACF, the phases select the realisation, the central limit theorem makes the values nearly Gaussian [Ric44], [JRBT18]. Strengths and costs in two short lists, including the residual of 1/sqrt(2N) beyond the fitted range (issue #22). No code, or one cell that prints the size of a preset (`freq.shape`).
+5. The sum-of-sinusoids method. `s(x) = sqrt(2/N) · sum_n cos(2π f_n·x + φ_n)`: the frequencies are samples of the spectrum and set the ACF, the phases select the realization, the central limit theorem makes the values nearly Gaussian [Ric44], [JRBT18]. Strengths and costs in two short lists, including the residual of 1/sqrt(2N) beyond the fitted range (issue #22). No code, or one cell that prints the size of a preset (`freq.shape`).
 6. A first field. `sos.randn` along a 100 m track for one decorrelation distance, `Exp256` against `Gauss256`: rough against smooth. Then `sos.map` on a 2-D grid, the two presets side by side, as in Fig. 1 of [JRBT18]. Figures 2 (two track curves) and 3 (two maps).
 7. Choosing a preset. The table of presets (`Exp`, `Gauss`, `Comb`; 128 to 1024 sinusoids), the accuracy of each step (3 to 4 dB per doubling, from the API documentation) and the cost (time ∝ N); `Comb256` as the default and why. No figure, or the approximation error against N from `sos.calc_mse` (one short loop).
 8. Checking the correlation. The ACF estimated from generated values (`sos.acf_estimate`) against the target, 1-D, as Fig. 4 (upper) of [JRBT18]; optionally the 2-D target (`sos.acf_2d`) against the ACF of the generator (`sos.acf_approx`), as Fig. 2 of [JRBT18]. Figure 4 (and 5).
@@ -352,16 +342,15 @@ First sketch, for discussion; nothing is written yet. Notebook `tutorials/sos_01
 11. Comparison with a matrix method. Cholesky of an exponential covariance matrix on 400 random 2-D points against `sos.randn` with `Exp256` at the same points (5.1, 5.7): both give correlated values; Cholesky is exact but needs the n × n matrix and a new factorisation for new points, the SOS generator evaluates any new point. Figure 8: the two point sets side by side.
 12. Summary and further reading. [RW06, ch. 4]; [Pae11] for wireless readers, [SD91] for others; what part 2 covers.
 
-### 7.2 Left out of part 1
+### 6.2 Left out of part 1
 
 SPDE, Karhunen-Loève, sequential simulation, measure theory, Hankel transforms (5.7); dual mobility (issue #21, at most one sentence); bias removal (part 3); custom ACFs and the fitting figures of [JRBT18] (part 2).
 
-### 7.3 Decisions on the sketch
+### 6.3 Decisions on the sketch
 
 1. Order: result first and interleaved. A map right after the introduction (one cell of about four lines with `sos.map`) shows what the notebook builds; each concept then comes with a small cell, including the sum-of-sinusoids formula evaluated by hand in numpy and compared with `sos.val`.
-2. Version: the first code cell prints `quadriga_lib.version()` only, which also stamps the published page with the version that made the outputs; one Markdown line under it names v0.13 as the minimum and points to the set-up on the tutorial index (wrong kernel as the most common cause). The full check (interpreter, upgrade hint) goes on the set-up page. Stored outputs show no local paths, since they are published.
-3. Demos: the scatter of the track mean over many seeds goes into section 9 (one realisation is not the ensemble; leads to the bias of part 3). The histogram at small N goes into the hand-written sum-of-sinusoids cell (a subset of the preset frequencies with `sos.val`).
-4. Preset accuracy: a table only, in correlation units (rms error inside the fitted range, the floor 1/sqrt(2N) beyond it); the curve of the error against N goes to part 2.
-5. The 2-D ACF figure (target from `sos.acf_2d` against the generator from `sos.acf_approx`) is included, one figure with two panels: it shows the isotropy that separable grid filters lack (5.3).
-6. Notebook outputs: not in git, made by the tutorial build. Tutorials are committed cleared (no outputs, no execution counts). `tutorials/GNUmakefile` holds everything needed: `make -C tutorials` (or `make tutorials` from the root) runs every notebook that is newer than its executed copy into `tutorials/executed/` (ignored by git), four notebooks at a time by default (`JOBS=…` in `tutorials/GNUmakefile`, set through `MAKEFLAGS`, honored by GNU make 4.4.1); `make -C tutorials clean` deletes `executed/` and clears the notebooks in place. The root `make clean` keeps the executed copies; the root `make tidy` runs the tutorial clean. The helpers are in `tutorials/qnb/` (shipped with the source package): `qnb.run` runs one notebook with nbclient (no nbconvert; no execution timestamps; temporary file renamed on success; a failing cell stops with its error and leaves no copy), `qnb.clear` clears notebooks with the standard library only (keeps cell ids and the tutorial metadata, reduces `language_info` to its name, writes the JSON as Jupyter does). The recipes call `python -m qnb.<tool>`, so a later nmake makefile for Windows can use the same helpers. The website builder will read only the executed copies and render the pages itself (pandoc MathML, site templates, Markdown twins, link checks); it does not run or convert anything inside `tutorials/`. If the copies are missing (a normal build), the tutorials page is left empty with a warning; with `--release` that is an error. Figures: PNG, maps with 32 colour levels. Reasons: outputs are reproducible build products (a few hundred kB per notebook and refresh in git otherwise), and `make website` stays under a second. Measured sizes, for the record (as stored in git, matplotlib 3.10.9): line plot 19 kB as PNG, 5 kB as SVG; map figure with two 400 × 400 panels 200 kB as PNG at 100 dpi, 93 kB with 32 colour levels, 38 kB as JPEG at quality 85 (not taken: the builder takes only SVG, PNG and text); SVG output changes at every run (date, random ids), PNG is byte-identical. Run time of `sos_01`: 5.3 s with nbclient, of which about 1.9 s kernel start (nbconvert adds 0.6 s); three notebooks with `-j 3` took 5.4 s; four notebooks took 5.5 s with the default `JOBS=4` and 11.2 s with `JOBS=1`. Executing inside `make website` (with a cache), keeping outputs in git, and converting to HTML with nbconvert in the tutorial build were considered and dropped.
-7. Tutorial test: dropped from this project. A test that runs the notebooks is a separate project.
+2. Demos: the scatter of the track mean over many seeds goes into section 9 (one realization is not the ensemble; leads to the bias of part 3). The histogram at small N goes into the hand-written sum-of-sinusoids cell (a subset of the preset frequencies with `sos.val`).
+3. Preset accuracy: a table only, in correlation units (rms error inside the fitted range, the floor 1/sqrt(2N) beyond it); the curve of the error against N goes to part 2.
+4. The 2-D ACF figure (target from `sos.acf_2d` against the generator from `sos.acf_approx`) is included, one figure with two panels: it shows the isotropy that separable grid filters lack (5.3).
+
+The version cell, the handling of outputs and the figure format follow `tutorials/README.md`.

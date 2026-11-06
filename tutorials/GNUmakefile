@@ -1,6 +1,7 @@
 # Tutorial notebooks: run them into executed copies (see README.md)
 #
 #   make          run every notebook that is newer than its executed copy, JOBS notebooks at a time
+#   make executed/<stem>.ipynb   run one notebook
 #   make clean    delete the executed copies and clear the notebooks in place
 #
 # PYTHON must be the Python of the environment with quadriga-lib and jupyter, e.g. the active conda environment.
@@ -8,7 +9,7 @@
 
 PYTHON ?= python3
 JOBS   ?= 4
-MAKEFLAGS += --jobs=$(JOBS)
+MAKEFLAGS += --jobs=$(JOBS) --keep-going  # a failing notebook does not stop the others
 
 NOTEBOOKS := $(wildcard *.ipynb)
 EXECUTED  := $(addprefix executed/,$(NOTEBOOKS))
