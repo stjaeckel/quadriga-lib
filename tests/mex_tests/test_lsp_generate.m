@@ -98,7 +98,12 @@ assertEqual( quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd_b ), lsp );
 [ lsp_b, toa_b ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd_b );
 assertEqual( lsp_b, lsp );
 assertEqual( toa_b, abs_toa );
-assert_throws( @() out3( sp, fc, tx_pos, rx_pos, rnd_b ), 'Column 9 of ''rnd'' must be in the range from 0 to 1.' );
+assert_throws( @() out3( sp, fc, tx_pos, rx_pos, rnd_b ), 'Column 10 of ''rnd'' must be in the range from 0 to 1.' );
+rnd_b(:, 10) = -0.5;
+assert_throws( @() out3( sp, fc, tx_pos, rx_pos, rnd_b ), 'Column 10 of ''rnd'' must be in the range from 0 to 1.' );
+rnd_b(:, 10) = 0.5;
+rnd_b(2, 3) = NaN;
+assert_throws( @() out3( sp, fc, tx_pos, rx_pos, rnd_b ), 'Input ''rnd'' must be finite.' );                % C++
 
 %% Type handling and orientation
 lsp_t = quadriga_lib.lsp_generate( sp, single(fc'), single(tx_pos), single(rx_pos), single(rnd), [], int32(1), uint32(1) );
@@ -117,7 +122,7 @@ assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, -sf_i
     'Input ''sf_sigma'' must be finite and >= 0.' );                                                % C++
 assert_throws( @() quadriga_lib.lsp_generate( struct( 'ds_kf', 0.9, 'ds_sf', 0.9, 'sf_kf', -0.9 ), fc, tx_pos, ...
     rx_pos, rnd ), 'LSP cross-correlation matrix in ''scenpar'' is not positive definite.' );       % C++
-assert_throws( @() quadriga_lib.lsp_generate( sp, [], tx_pos, rx_pos, rnd ), 'Input ''fc'' cannot be empty.' );
+assert_throws( @() quadriga_lib.lsp_generate( sp, [], tx_pos, rx_pos, rnd ), 'Input ''center_frequency'' cannot be empty.' );
 
 end
 

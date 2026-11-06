@@ -9,9 +9,21 @@
 //
 // Helpers and their users:
 //   qd_gbsm_check_links   common validation of tx_pos / rx_pos     qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp,
-//                                                                  ssf_clusters.cpp
+//                                                                  ssf_clusters.cpp, ssf_rays.cpp
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
-//                                                                  o2i_loss.cpp
+//                                                                  o2i_loss.cpp, ssf_rays.cpp, qd_gbsm_phases.cpp
+//   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
+//                                                                  gbsm_init_phases
+//   qd_gbsm_n_gen         number of generators of a random set     qd_gbsm_phases.cpp, MEX and Python wrappers of
+//                                                                  gbsm_init_phases
+//   qd_gbsm_ray_layout    ray and generator counts of a scenario   qd_gbsm_n_gen, qd_gbsm_phases.cpp, ssf_rays.cpp,
+//                                                                  MEX and Python wrappers of ssf_rays
+//   qd_gbsm_cds           cluster delay spread c_DS at a frequency qd_gbsm_phases.cpp, ssf_rays.cpp
+//   qd_gbsm_fresnel       reflection coefficients of the ground    ssf_rays.cpp, ssf_paths.cpp
+//   qd_gbsm_dist          distance of two points                   qd_gbsm_rays.cpp, ssf_paths.cpp,
+//                                                                  gbsm_rays_from_paths.cpp
+//   qd_gbsm_direction     angles towards the next distinct point   ssf_paths.cpp, gbsm_rays_from_paths.cpp
+//   qd_gbsm_specular_point  ground reflection point on z = 0       qd_gbsm_rays.cpp, ssf_paths.cpp
 //   qd_gbsm_lsp_stats     LSP mean and std per link and frequency  lsp_generate.cpp, path_loss.cpp
 //   qd_gbsm_chol8         Cholesky factorization of an 8x8 matrix  lsp_generate.cpp, qd_scenpar.cpp
 //
@@ -23,9 +35,13 @@
 #ifndef quadriga_gbsm_helpers_H
 #define quadriga_gbsm_helpers_H
 
+#include "quadriga_lib_helper_functions.hpp"
+
 #include <armadillo>
 #include <algorithm>
 #include <cmath>
+#include <complex>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -49,18 +65,110 @@ static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat 
 }
 
 // Validation of the carrier frequencies in [Hz]: not empty, finite and > 0; throws std::invalid_argument
-static inline void qd_gbsm_check_fc(const arma::vec &fc)
+static inline void qd_gbsm_check_fc(const arma::vec &center_frequency)
 {
-    if (fc.n_elem == 0)
-        throw std::invalid_argument("Input 'fc' cannot be empty.");
-    for (arma::uword k = 0; k < fc.n_elem; ++k)
-        if (!(std::isfinite(fc[k]) && fc[k] > 0.0))
-            throw std::invalid_argument("Input 'fc' must be finite and > 0.");
+    if (center_frequency.n_elem == 0)
+        throw std::invalid_argument("Input 'center_frequency' cannot be empty.");
+    for (arma::uword k = 0; k < center_frequency.n_elem; ++k)
+        if (!(std::isfinite(center_frequency[k]) && center_frequency[k] > 0.0))
+            throw std::invalid_argument("Input 'center_frequency' must be finite and > 0.");
+}
+
+// Number of sinusoids of a preset of sos_preset; 0 for a name that is not a preset, so that the caller throws its
+// own message in its order of checks
+static inline arma::uword qd_gbsm_n_coeff(const std::string &preset)
+{
+    int type = 0;
+    arma::uword n_coeff = 0;
+    return qd_sos_preset_lookup(preset, type, n_coeff) ? n_coeff : 0;
+}
+
+// Counts of the ray level of a completed scenpar (output of scenpar_validate; a missing key throws
+// std::out_of_range): N = NumClusters - 1 NLOS clusters, M = NumSubPaths rays per cluster, G = 1 if GR_enabled > 0
+// else 0, n_ray = 1 + G + N·M rays per link (LOS, GR, then ray m of cluster n at 1 + G + n·M + m) and
+// n_gen = 14·N·M + N generators of a "ray" set
+static inline void qd_gbsm_ray_layout(const std::unordered_map<std::string, double> &sp, arma::uword &N,
+                                      arma::uword &M, arma::uword &G, arma::uword &n_ray, arma::uword &n_gen)
+{
+    N = (arma::uword)sp.at("NumClusters") - 1;
+    M = (arma::uword)sp.at("NumSubPaths");
+    G = (sp.at("GR_enabled") > 0.0) ? 1 : 0;
+    n_ray = 1 + G + N * M;
+    n_gen = 14 * N * M + N;
+}
+
+// Number of generators n_gen of a random set of a completed scenpar: "lsf" 11; "cluster" 9·N for set_id -1 and N
+// for set_id >= 0; "ray" 14·N·M + N for any set_id; 0 for an unknown set type, so that the caller throws its own
+// message in its order of checks
+static inline arma::uword qd_gbsm_n_gen(const std::unordered_map<std::string, double> &sp,
+                                        const std::string &set_type, arma::sword set_id)
+{
+    if (set_type == "lsf")
+        return 11;
+    arma::uword N, M, G, n_ray, n_gen;
+    qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
+    if (set_type == "cluster")
+        return (set_id < 0) ? 9 * N : N;
+    return (set_type == "ray") ? n_gen : 0;
+}
+
+// Cluster delay spread c_DS in [s] of a completed scenpar at the frequency 'fc' in [Hz] (TR 38.901 Table 7.5-6):
+// 3.91 ns if PerClusterDS = 0 (no value in the TR), else
+// max(PerClusterDS_min, PerClusterDS + PerClusterDS_gamma·lg(max(fc / 1e9, PerClusterDS_fc_min))) ns
+static inline double qd_gbsm_cds(const std::unordered_map<std::string, double> &sp, double fc)
+{
+    const double ds = sp.at("PerClusterDS");
+    if (ds == 0.0)
+        return 3.91e-9;
+    const double f_ghz = std::max(fc / 1.0e9, sp.at("PerClusterDS_fc_min"));
+    return 1.0e-9 * std::max(sp.at("PerClusterDS_min"), ds + sp.at("PerClusterDS_gamma") * std::log10(f_ghz));
+}
+
+// Reflection coefficients R_par and R_per of the ground at z = 0 (TR 38.901 eqs. (7.6-38), (7.6-39)) for the
+// permittivity eps = eps_re - j·eps_im (eq. (7.6-40)), Tx and Rx heights h_t, h_r >= 0 and the 2D distance d2D in
+// [m]: cos(theta) = -(h_t + h_r)/d_GR' and sin²(theta) = (d2D/d_GR')² with d_GR' = max(d_GR, 1e-5),
+// d_GR = sqrt(d2D² + (h_t + h_r)²); a zero denominator (grazing incidence with eps = 1) gives that coefficient 0
+static inline void qd_gbsm_fresnel(double eps_re, double eps_im, double h_t, double h_r, double d2D,
+                                   std::complex<double> &R_par, std::complex<double> &R_per)
+{
+    const double d_gr = std::max(std::sqrt(d2D * d2D + (h_t + h_r) * (h_t + h_r)), 1e-5);
+    const double ct = -(h_t + h_r) / d_gr, s2 = (d2D / d_gr) * (d2D / d_gr);
+    const std::complex<double> eps(eps_re, -eps_im);
+    const std::complex<double> q = std::sqrt(eps - s2), a = eps * ct, d_par = a - q, d_per = ct - q;
+    R_par = (d_par == 0.0) ? std::complex<double>(0.0) : (a + q) / d_par;
+    R_per = (d_per == 0.0) ? std::complex<double>(0.0) : (ct + q) / d_per;
+}
+
+// Distance of the points a and b in [m], [3] each
+static inline double qd_gbsm_dist(const double *a, const double *b)
+{
+    return qd_calc_length(a[0], a[1], a[2], b[0], b[1], b[2]);
+}
+
+// Azimuth and elevation in [rad] from O towards the first of the points P that differs from O; 0 if none differs
+static inline void qd_gbsm_direction(const double *O, std::initializer_list<const double *> P, double &az, double &el)
+{
+    az = 0.0, el = 0.0;
+    for (const double *x : P)
+        if (x[0] != O[0] || x[1] != O[1] || x[2] != O[2])
+        {
+            const double dx = x[0] - O[0], dy = x[1] - O[1], dz = x[2] - O[2];
+            az = std::atan2(dy, dx), el = std::atan2(dz, std::sqrt(dx * dx + dy * dy));
+            return;
+        }
+}
+
+// Specular point G on z = 0 of the ground reflection between T and R (z >= 0): G = T + h_t / (h_t + h_r)·(R' - T)
+// with R' = (R_x, R_y, -R_z); both ends on the ground: the midpoint
+static inline void qd_gbsm_specular_point(const double *T, const double *R, double *G)
+{
+    const double h = T[2] + R[2], s = (h > 0.0) ? T[2] / h : 0.5;
+    G[0] = T[0] + s * (R[0] - T[0]), G[1] = T[1] + s * (R[1] - T[1]), G[2] = 0.0;
 }
 
 // LSP mean and std per link and frequency of a completed scenpar
 // - Per link and frequency, with P the key prefix of the LSP (DS, KF, SF, AS_D, AS_A, ES_D, ES_A, XPR):
-//     d = max(d2D, 1e-4), h = max(hBS, 1e-4), a = atan(h / d), f' = max(fc / 1e9, LSP_fc_min)
+//     d = max(d2D, 1e-4), h = max(hBS, 1e-4), a = atan(h / d), f' = max(center_frequency / 1e9, LSP_fc_min)
 //     mu    = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)
 //     s     = max(0, P_sigma + P_delta·lg(P_omega + f'))
 //     sigma = max(0, s + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))
@@ -73,21 +181,22 @@ static inline void qd_gbsm_check_fc(const arma::vec &fc)
 //   acts for them; the default sf_sigma of path_loss is always >= 0, as lsp_generate requires
 // - The keys that do not exist for SF (SF_mu, SF_gamma, SF_epsilon, SF_zeta, SF_alpha) count as 0, so the SF mean
 //   is 0. A frequency term with P_gamma = 0 (P_delta = 0) contributes 0 to mu (s)
-// - The constructor reads the coefficients and evaluates the frequency terms at 'fc' for the LSPs in 'lsps'
-//   (bit i = LSP i; the others are not evaluated and must not be queried). It throws std::invalid_argument for
+// - The constructor reads the coefficients and evaluates the frequency terms at 'center_frequency' for the LSPs in
+//   'lsps' (bit i = LSP i; the others are not evaluated and must not be queried). It throws std::invalid_argument for
 //   such an LSP if a multiplying coefficient is not finite (P_sigma, P_gamma, P_delta, P_epsilon, P_zeta,
 //   P_alpha, P_kappa, P_tau, P_beta; ES_D_mu_A to ES_D_mu_D for ESD; P_omega of an active frequency term), since
 //   Inf·0 gives NaN, or if a frequency term is active (P_gamma or P_delta not 0) but P_omega + f' is not > 0, which
 //   would give a NaN mean and hide the NaN of the std in the limit at 0. P_mu and ES_D_mu_min are not checked
 //   (an infinite value gives no NaN)
-// - 'sp' must hold all keys (output of scenpar_validate), a missing key throws std::out_of_range; 'fc' in [Hz],
-//   finite and > 0 (not validated here)
+// - 'sp' must hold all keys (output of scenpar_validate), a missing key throws std::out_of_range;
+//   'center_frequency' in [Hz], finite and > 0 (not validated here)
 // - set_link() takes the geometry of one link, get() returns the values of one LSP and frequency for it
 class qd_gbsm_lsp_stats
 {
 public:
-    qd_gbsm_lsp_stats(const std::unordered_map<std::string, double> &sp, const arma::vec &fc, unsigned lsps = 0xFFu)
-        : gamma_f(8 * fc.n_elem, 0.0), s_f(8 * fc.n_elem, 0.0)
+    qd_gbsm_lsp_stats(const std::unordered_map<std::string, double> &sp, const arma::vec &center_frequency,
+                      unsigned lsps = 0xFFu)
+        : gamma_f(8 * center_frequency.n_elem, 0.0), s_f(8 * center_frequency.n_elem, 0.0)
     {
         const char *prefix[8] = {"DS", "KF", "SF", "AS_D", "AS_A", "ES_D", "ES_A", "XPR"};
         auto key = [&](int i, const char *suffix)
@@ -122,9 +231,9 @@ public:
             const bool active = p_gamma != 0.0 || p_delta != 0.0;
             if (active)
                 finite(i, "_omega");
-            for (arma::uword k = 0; k < fc.n_elem; ++k)
+            for (arma::uword k = 0; k < center_frequency.n_elem; ++k)
             {
-                const double arg = p_omega + std::max(fc[k] / 1.0e9, fc_min);
+                const double arg = p_omega + std::max(center_frequency[k] / 1.0e9, fc_min);
                 if (active && !(arg > 0.0))
                     throw std::invalid_argument("Scenario parameter '" + std::string(prefix[i]) +
                                                 "_omega' plus the frequency in GHz must be > 0 where " +

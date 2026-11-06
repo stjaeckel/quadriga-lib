@@ -124,7 +124,8 @@ Also in: [C++](../cpp/channel-statistics.md#calc_cross_polarization_ratio) · [P
 
 ### Usage:
 ```matlab
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los, window_size );
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, ...
+    include_los, window_size );
 ```
 
 ### Inputs:

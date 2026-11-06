@@ -8,6 +8,8 @@
 #include "quadriga_lib.hpp"
 #include "python_arma_adapter.hpp"
 
+#include <iterator>
+
 namespace py = pybind11;
 
 static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
@@ -713,22 +715,6 @@ static bool qd_python_flag(const py::handle &value, bool default_value, const st
     throw py::type_error("Input '" + name + "' must be a bool or None.");
 }
 
-// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> uvec
-// - Every entry must be an integer in [0, 2^53) (larger integers are not exact in a double); otherwise
-//   std::invalid_argument naming the input 'name'
-static arma::uvec qd_python_uint_entries(const arma::vec &input, const std::string &name)
-{
-    arma::uvec out(input.n_elem);
-    for (arma::uword i = 0; i < input.n_elem; ++i)
-    {
-        const double v = input[i];
-        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
-            throw std::invalid_argument("Entries in '" + name + "' must be non-negative integers below 2^53.");
-        out[i] = (arma::uword)v;
-    }
-    return out;
-}
-
 // Python path -> std::string; returns false if 'value' is not a path
 // - str and bytes as they are; an object with '__fspath__' is converted with os.fspath first
 static bool qd_python_try_path(const py::handle &value, std::string &path)
@@ -768,17 +754,16 @@ static py::array_t<double, py::array::c_style | py::array::forcecast> qd_python_
     return py::array_t<double, py::array::c_style | py::array::forcecast>::ensure(arr);
 }
 
-// Dict of QuaDRiGa scenario parameters -> map of the numeric values and the str 'SubpathMethod'
-// - Every entry except 'SubpathMethod' must be a real scalar (one element); 'SubpathMethod' must be a str
+// Dict of QuaDRiGa scenario parameters -> map of the numeric values
+// - Every entry except 'SubpathMethod' must be a real scalar (one element)
+// - 'SubpathMethod' (an entry of QuaDRiGa's structs) must be the str 'legacy'; it is accepted and ignored
 // - Key names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
-// - None or an empty dict gives an empty map; 'subpath_method' is "legacy" if not in the dict
+// - None or an empty dict gives an empty map
 // - 'var_name' is used in the error messages
 static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::handle &obj,
-                                                                      std::string &subpath_method,
                                                                       const std::string &var_name = "scenpar")
 {
     std::unordered_map<std::string, double> scenpar;
-    subpath_method = "legacy";
     if (obj.is_none())
         return scenpar;
     if (!py::isinstance<py::dict>(obj))
@@ -793,7 +778,9 @@ static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::
         {
             if (!py::isinstance<py::str>(item.second))
                 throw std::invalid_argument("Entry 'SubpathMethod' of '" + var_name + "' must be a str.");
-            subpath_method = py::cast<std::string>(item.second);
+            const std::string value = py::cast<std::string>(item.second);
+            if (value != "legacy")
+                throw std::invalid_argument("Value '" + value + "' of 'SubpathMethod' is not supported; only 'legacy' is accepted.");
         }
         else
         {
@@ -807,22 +794,14 @@ static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::
     return scenpar;
 }
 
-// Map of QuaDRiGa scenario parameters -> dict of float values
-// - Keys in the order of 'key_order', with the str entry 'SubpathMethod' inserted before 'LOS_scatter_radius'
-//   (its QuaDRiGa position); every name in 'key_order' must be in 'scenpar'
+// Map of QuaDRiGa scenario parameters -> dict of float values, keys in the order of 'key_order'
+// - Every name in 'key_order' must be in 'scenpar'
 static py::dict qd_python_scenpar2dict(const std::unordered_map<std::string, double> &scenpar,
-                                       const std::string &subpath_method,
                                        const std::vector<std::string> &key_order)
 {
     py::dict output;
     for (const auto &key : key_order)
-    {
-        if (key == "LOS_scatter_radius")
-            output["SubpathMethod"] = subpath_method;
         output[py::str(key)] = scenpar.at(key);
-    }
-    if (!output.contains("SubpathMethod"))
-        output["SubpathMethod"] = subpath_method;
     return output;
 }
 
@@ -886,6 +865,126 @@ static py::dict qd_python_plpar2dict(const std::string &pl_model,
         output[py::str(key)] = qd_python_copy2numpy(&values);
     }
     return output;
+}
+
+// -------------------------------- gbsm_rays dict --------------------------------
+
+// Keys of the gbsm_rays dict in their order; the first qd_python_gbsm_rays_n_required are required as input, the
+// others optional (missing or None = empty), also any key appended later
+static const char *const qd_python_gbsm_rays_keys[] = {
+    "method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa",
+    "eoa", "M", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
+static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap"
+
+// Labels, codes or counts (non-negative integers, no index shift) -> u32_vec; None gives an empty vector
+// - A uint32 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float (exact
+//   below 2^53) and every entry must be an integer from 0 to 2^32 - 1, else std::invalid_argument naming 'name'
+static arma::u32_vec qd_python_u32_entries(const py::handle &obj, const std::string &name)
+{
+    if (py::isinstance<py::array_t<unsigned>>(obj))
+        return qd_python_numpy2arma_Col<unsigned>(obj, true);
+    const arma::vec in = qd_python_numpy2arma_Col<double>(obj, true);
+    arma::u32_vec out(in.n_elem);
+    for (arma::uword i = 0; i < in.n_elem; ++i)
+    {
+        if (!(in[i] >= 0.0 && in[i] < 4294967296.0 && in[i] == std::floor(in[i])))
+            throw std::invalid_argument("Entries in '" + name + "' must be integers from 0 to 4294967295.");
+        out[i] = (unsigned)in[i];
+    }
+    return out;
+}
+
+// Dict -> gbsm_rays, aliasing the numpy memory where dtype and layout allow (read-only)
+// - 'gr_eps' (complex, a real array = imaginary part 0) is copied into 'gr_eps_re' and 'gr_eps_im'
+// - Missing optional keys mean empty; a missing other key or an unknown key throws, naming 'var_name'
+// - Validation is left to is_valid()
+static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const std::string &var_name = "rays")
+{
+    const auto *K = qd_python_gbsm_rays_keys, *K_end = K + std::size(qd_python_gbsm_rays_keys);
+    for (auto item : d)
+    {
+        const std::string key = py::cast<std::string>(py::str(item.first));
+        if (std::find_if(K, K_end, [&](const char *k) { return key == k; }) == K_end)
+            throw std::invalid_argument("Entry '" + key + "' of '" + var_name + "' is unknown.");
+    }
+    for (size_t k = 0; k < qd_python_gbsm_rays_n_required; ++k)
+        if (!d.contains(K[k]))
+            throw std::invalid_argument("Entry '" + std::string(K[k]) + "' of '" + var_name + "' is missing.");
+    auto get = [&](const char *k) -> py::object
+    { return d.contains(k) ? py::object(d[k]) : py::object(py::none()); };
+
+    quadriga_lib::gbsm_rays r;
+    const py::object method = get("method");
+    if (!py::isinstance<py::str>(method))
+        throw std::invalid_argument("Entry 'method' of '" + var_name + "' must be a str.");
+    r.method = py::cast<std::string>(method);
+    r.tx_pos = qd_python_numpy2arma_Col<double>(get("tx_pos"), true);
+    r.rx_pos = qd_python_numpy2arma_Col<double>(get("rx_pos"), true);
+    r.center_frequency = qd_python_numpy2arma_Col<double>(get("center_frequency"), true);
+    r.delay = qd_python_numpy2arma_Col<double>(get("delay"), true);
+    r.power = qd_python_numpy2arma_Mat<double>(get("power"), true);
+    r.aod = qd_python_numpy2arma_Col<double>(get("aod"), true);
+    r.eod = qd_python_numpy2arma_Col<double>(get("eod"), true);
+    r.aoa = qd_python_numpy2arma_Col<double>(get("aoa"), true);
+    r.eoa = qd_python_numpy2arma_Col<double>(get("eoa"), true);
+    r.M = qd_python_numpy2arma_Cube<double>(get("M"), true);
+    r.path_type = qd_python_u32_entries(get("path_type"), var_name + ".path_type");
+    r.tap = qd_python_u32_entries(get("tap"), var_name + ".tap");
+    r.fbs_pos = qd_python_numpy2arma_Mat<double>(get("fbs_pos"), true);
+    r.lbs_pos = qd_python_numpy2arma_Mat<double>(get("lbs_pos"), true);
+    r.fallback = qd_python_u32_entries(get("fallback"), var_name + ".fallback");
+    const py::object gr_eps = get("gr_eps");
+    if (!gr_eps.is_none())
+    {
+        arma::cube re, im;
+        qd_python_copy2arma(py::cast<py::array_t<std::complex<double>>>(gr_eps), re, im);
+        r.gr_eps_re = arma::vectorise(re), r.gr_eps_im = arma::vectorise(im);
+    }
+    return r;
+}
+
+// Creates a list of n_link gbsm_rays dicts with all keys and aliases the attributes of 'rays' (resized to n_link)
+// whose size is known, as qd_mex_init_gbsm_rays; with 'has_gr', 'gr_eps_re' and 'gr_eps_im' are allocated in C++
+// - The other keys are empty arrays ('gr_eps' complex, 'fallback' uint32); the caller sets 'method' and, with
+//   'has_gr', 'gr_eps' after the call
+static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
+                                         bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
+{
+    py::list out;
+    rays.clear();
+    rays.resize(n_link);
+    const arma::uword n3 = 3, n8 = 8;
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        auto &r = rays[l];
+        py::dict d;
+        d["method"] = "";
+        d["tx_pos"] = qd_python_init_output(n3, &r.tx_pos);
+        d["rx_pos"] = qd_python_init_output(n3, &r.rx_pos);
+        d["center_frequency"] = qd_python_init_output(n_freq, &r.center_frequency);
+        d["delay"] = qd_python_init_output(n_ray, &r.delay);
+        d["power"] = qd_python_init_output(n_ray, n_freq, &r.power);
+        d["aod"] = qd_python_init_output(n_ray, &r.aod);
+        d["eod"] = qd_python_init_output(n_ray, &r.eod);
+        d["aoa"] = qd_python_init_output(n_ray, &r.aoa);
+        d["eoa"] = qd_python_init_output(n_ray, &r.eoa);
+        d["M"] = qd_python_init_output(n8, n_ray, n_freq, &r.M);
+        d["path_type"] = qd_python_init_output(n_ray, &r.path_type);
+        d["tap"] = qd_python_init_output(n_ray, &r.tap);
+        d["gr_eps"] = py::array_t<std::complex<double>>(0);
+        if (has_gr)
+            r.gr_eps_re.set_size(n_freq), r.gr_eps_im.set_size(n_freq);
+        if (has_scatterers)
+        {
+            d["fbs_pos"] = qd_python_init_output(n3, n_ray, &r.fbs_pos);
+            d["lbs_pos"] = qd_python_init_output(n3, n_ray, &r.lbs_pos);
+        }
+        else
+            d["fbs_pos"] = py::array_t<double>(0), d["lbs_pos"] = py::array_t<double>(0);
+        d["fallback"] = py::array_t<unsigned>(0);
+        out.append(d);
+    }
+    return out;
 }
 
 #endif

@@ -93,11 +93,11 @@ SECTION!*/
 # lsp_generate
 Large-scale parameters of a set of links from normalized random values
 
-- Generates the 8 LSPs of TR 38.901 clause 7.5 step 4 per link and frequency from the random values of [[lsf_draw]],
-  and on request the absolute TOA offset, the ground permittivity and the EoD offset
+- Generates the 8 LSPs of TR 38.901 clause 7.5 step 4 per link and frequency from the random values of
+  [[gbsm_draw]] (`"lsf"`), and on request the absolute TOA offset, the ground permittivity and the EoD offset
 - Mean `mu` and standard deviation `sigma` in the log domain (lg for DS and the angular spreads, dB for KF, SF and
   XPR), with the key prefix `P` (`DS`, `KF`, `SF`, `AS_D`, `AS_A`, `ES_D`, `ES_A`, `XPR`), `d = max(d2D, 1e-4)`,
-  `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(fc/1e9, LSP_fc_min)` in GHz:
+  `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(center_frequency/1e9, LSP_fc_min)` in GHz:
   - `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`
   - `sigma = max(0, max(0, P_sigma + P_delta·lg(P_omega + f')) + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`
   - SF has the mean 0. DS adds `lg(DS_VS_a·DS_VS + DS_VS_b)` if `DS_VS > 0` (V/S of the InF hall, TR 38.901 Table
@@ -113,8 +113,8 @@ Large-scale parameters of a set of links from normalized random values
 - The InF and InH NLOS files set `absTOA_Lmax`, and the InF files `DS_VS`, for the hall or office of their
   calibration scenario; for another hall set these keys in `scenpar`
 - Ground permittivity: QuaDRiGa's fits for dry, medium and wet ground, interpolated linearly over column 9 of `rnd`
-  (0 dry, 0.5 medium, 1 wet) with `fc` not limited by `LSP_fc_min`; they are not the materials of TR 38.901 Table
-  7.6.8-1
+  (0 dry, 0.5 medium, 1 wet) with `center_frequency` not limited by `LSP_fc_min`; they are not the materials of TR
+  38.901 Table 7.6.8-1
 - EoD offset, the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12: `EoD_offset_e +
   EoD_offset_e_gamma·lg f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) +
   EoD_offset_c + EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if `EoD_offset_b > 0`, plus
@@ -124,7 +124,7 @@ Large-scale parameters of a set of links from normalized random values
 ```
 void quadriga_lib::lsp_generate(
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &fc,
+    const arma::vec &center_frequency,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &rnd,
@@ -142,11 +142,11 @@ void quadriga_lib::lsp_generate(
 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_frequency`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`rnd`** — Random values from [[lsf_draw]], finite; column 9 in [0, 1] when the ground permittivity is requested;
-  column 10 is not used; `[n_link, 11]`
+- **`rnd`** — Random values from [[gbsm_draw]] (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
+  is requested; column 10 is not used; `[n_link, 11]`
 - **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite and >= 0; replaces
   the value from `scenpar`, also in `lsp_sigma`; `[n_link, n_freq]`
 - **`cholesky`** *(optional)* — `true`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS, ASD,
@@ -161,17 +161,19 @@ void quadriga_lib::lsp_generate(
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary
   part >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
-- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; `[n_link, n_freq, 8]`
-- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; `[n_link, n_freq, 8]`
+- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
+- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; required by [[ssf_rays]];
+  `[n_link, n_freq, 8]`
 
 ## See also:
-- [[lsf_draw]] (the random values `rnd`)
+- [[gbsm_draw]] (the random values `rnd`)
 - [[path_loss]] (the SF standard deviation `sf_sigma`)
 - [[ssf_clusters]] (the clusters from the LSPs)
+- [[ssf_rays]] (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 MD!*/
 
 void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &scenpar,
-                                const arma::vec &fc,
+                                const arma::vec &center_frequency,
                                 const arma::mat &tx_pos,
                                 const arma::mat &rx_pos,
                                 const arma::mat &rnd,
@@ -188,8 +190,8 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
 {
     // Validation, before any output is touched
     qd_gbsm_check_links(&tx_pos, &rx_pos);
-    qd_gbsm_check_fc(fc);
-    const arma::uword n_link = rx_pos.n_rows, n_freq = fc.n_elem;
+    qd_gbsm_check_fc(center_frequency);
+    const arma::uword n_link = rx_pos.n_rows, n_freq = center_frequency.n_elem;
 
     if (rnd.n_rows != n_link || rnd.n_cols != 11)
         throw std::invalid_argument("Input 'rnd' must have size [n_link, 11].");
@@ -205,7 +207,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
 
     std::unordered_map<std::string, double> sp = scenpar;
     arma::mat R;
-    if (!quadriga_lib::scenpar_validate(sp, "legacy", &R, nullptr, true))
+    if (!quadriga_lib::scenpar_validate(sp, &R, nullptr, true))
         throw std::invalid_argument("LSP cross-correlation matrix in 'scenpar' is not positive definite.");
 
     // Root Q of R in our LSP order: x = Q·s
@@ -241,7 +243,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
     }
 
     // Mean and std per link, frequency and LSP; checks the coefficients and the frequency terms
-    qd_gbsm_lsp_stats stats(sp, fc);
+    qd_gbsm_lsp_stats stats(sp, center_frequency);
 
     // Coefficients of the requested EoD offset and absolute TOA: an infinite value can give Inf·0 = NaN
     auto finite = [&](const char *key)
@@ -316,7 +318,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                                    : 0.0;
             for (arma::uword k = 0; k < n_freq; ++k)
             {
-                const double lf = std::log10(std::max(fc(k) / 1.0e9, fc_min));
+                const double lf = std::log10(std::max(center_frequency(k) / 1.0e9, fc_min));
                 double e = e0 + e_g * lf;
                 if (b > 0.0)
                     e += std::pow(10.0, (a0 + a_g * lf) * std::log10(std::max(b, d)) + c0 + c_g * lf + c_h * h_ut);
@@ -348,7 +350,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
             gr_eps_im->set_size(n_link, n_freq);
         for (arma::uword k = 0; k < n_freq; ++k)
         {
-            const double f = fc(k) / 1.0e9;
+            const double f = center_frequency(k) / 1.0e9;
             const double dry_re = 3.0, dry_im = 0.003 * std::pow(f, 1.34);
             const double med_re = 30.4 * std::pow(f, -0.47), med_im = 0.18 * std::pow(f, 1.05);
             const double wet_re = 31.3 * std::pow(f, -0.48), wet_im = 0.63 * std::pow(f, 0.77);

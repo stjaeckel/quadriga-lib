@@ -370,33 +370,16 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
     return chan;
 }
 
-// Entries of a real vector that hold non-negative integers (counts or labels, no index shift) -> uvec
-// - Every entry must be an integer in [0, 2^53) (larger integers are not exact in a double); otherwise a MATLAB
-//   error naming the input 'var_name'
-inline arma::uvec qd_mex_uint_entries(const arma::vec &input, const std::string &var_name)
-{
-    arma::uvec out(input.n_elem);
-    for (arma::uword i = 0; i < input.n_elem; ++i)
-    {
-        const double v = input[i];
-        if (!(v >= 0.0 && v < 9007199254740992.0 && v == std::floor(v)))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s",
-                              ("Entries in '" + var_name + "' must be non-negative integers below 2^53.").c_str());
-        out[i] = (arma::uword)v;
-    }
-    return out;
-}
-
-// 1x1 struct of QuaDRiGa scenario parameters -> map of the numeric values and the string 'SubpathMethod'
-// - Every field except 'SubpathMethod' must be a real numeric or logical scalar; 'SubpathMethod' must be a string
+// 1x1 struct of QuaDRiGa scenario parameters -> map of the numeric values
+// - Every field except 'SubpathMethod' must be a real numeric or logical scalar
+// - 'SubpathMethod' (a field of QuaDRiGa's structs) must be the string 'legacy'; it is accepted and ignored
 // - Field names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
-// - Empty input ([] or a struct without fields) gives an empty map; 'subpath_method' is "legacy" if not in the struct
+// - Empty input ([] or a struct without fields) gives an empty map
 // - 'var_name' is used in the error message for a wrong input type
-inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArray *input, std::string &subpath_method,
+inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArray *input,
                                                                      const std::string &var_name = "scenpar")
 {
     std::unordered_map<std::string, double> scenpar;
-    subpath_method = "legacy";
     if (mxIsEmpty(input))
         return scenpar;
 
@@ -412,7 +395,9 @@ inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArr
         {
             if (data == nullptr || !mxIsChar(data))
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Field 'SubpathMethod' must be a string.");
-            subpath_method = qd_mex_get_string(data);
+            const std::string value = qd_mex_get_string(data);
+            if (value != "legacy")
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Value '" + value + "' of 'SubpathMethod' is not supported; only 'legacy' is accepted.").c_str());
         }
         else
         {
@@ -425,19 +410,14 @@ inline std::unordered_map<std::string, double> qd_mex_struct2scenpar(const mxArr
     return scenpar;
 }
 
-// Map of QuaDRiGa scenario parameters -> 1x1 struct of double scalars
-// - Fields in the order of 'key_order', with the string field 'SubpathMethod' inserted before 'LOS_scatter_radius'
-//   (its QuaDRiGa position); every name in 'key_order' must be in 'scenpar'
+// Map of QuaDRiGa scenario parameters -> 1x1 struct of double scalars, fields in the order of 'key_order'
+// - Every name in 'key_order' must be in 'scenpar'
 inline mxArray *qd_mex_scenpar2struct(const std::unordered_map<std::string, double> &scenpar,
-                                      const std::string &subpath_method,
                                       const std::vector<std::string> &key_order)
 {
-    std::vector<std::string> fields = key_order;
-    fields.insert(std::find(fields.begin(), fields.end(), "LOS_scatter_radius"), "SubpathMethod");
-    mxArray *output = qd_mex_make_struct(fields);
+    mxArray *output = qd_mex_make_struct(key_order);
     for (const auto &key : key_order)
         qd_mex_set_field(output, key, qd_mex_copy2matlab(&scenpar.at(key)));
-    qd_mex_set_field(output, "SubpathMethod", mxCreateString(subpath_method.c_str()));
     return output;
 }
 
@@ -600,6 +580,111 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
 #undef CASE_ARMA
 
     return output;
+}
+
+// -------------------------------- gbsm_rays struct --------------------------------
+
+// Field names of the gbsm_rays struct in their order; the first qd_mex_gbsm_rays_n_required are required as input,
+// the others optional (missing = empty), also any field appended later
+inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
+    "method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa",
+    "eoa", "M", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
+inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
+
+// Element i of a gbsm_rays struct array -> gbsm_rays
+// - Borrows the MATLAB memory (read-only) unless 'copy'; integer fields accept any real class (cast and checked)
+// - Missing optional fields mean empty; a missing other field or an unknown field throws, naming 'var_name'
+// - Empty arrays keep their dimensions (e.g. 'power' [0, n_freq] for n_ray = 0); validation is left to is_valid()
+inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::uword i = 0, bool copy = false,
+                                                       const std::string &var_name = "rays")
+{
+    if (!mxIsStruct(s) || (size_t)i >= mxGetNumberOfElements(s))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + var_name + "' must be a struct.").c_str());
+    const auto &F = qd_mex_gbsm_rays_fields;
+    for (int f = 0; f < mxGetNumberOfFields(s); ++f)
+        if (std::find(F.begin(), F.end(), std::string(mxGetFieldNameByNumber(s, f))) == F.end())
+        {
+            const std::string msg = "Unknown field '" + std::string(mxGetFieldNameByNumber(s, f)) + "' in '" + var_name + "'.";
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+        }
+    for (size_t k = 0; k < qd_mex_gbsm_rays_n_required; ++k)
+        if (mxGetFieldNumber(s, F[k].c_str()) < 0)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + F[k] + "' is missing in '" + var_name + "'.").c_str());
+
+    // Field data or nullptr (missing or unset)
+    auto get = [&](const std::string &f) -> const mxArray *
+    { return mxGetField(s, (mwIndex)i, f.c_str()); };
+
+    quadriga_lib::gbsm_rays r;
+    const mxArray *a = get("method");
+    if (a != nullptr && !mxIsEmpty(a))
+    {
+        if (!mxIsChar(a))
+        {
+            const std::string msg = "Field 'method' of '" + var_name + "' must be a string.";
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+        }
+        r.method = qd_mex_get_string(a);
+    }
+    else
+        r.method.clear();
+    auto col = [&](const std::string &f, auto &x)
+    {
+        using T = typename std::decay_t<decltype(x)>::elem_type;
+        if ((a = get(f)) != nullptr && !mxIsEmpty(a))
+            x = qd_mex_get_Col<T>(a, copy, var_name + "." + f);
+    };
+    auto mat = [&](const std::string &f, arma::mat &x)
+    {
+        if ((a = get(f)) != nullptr)
+            x = qd_mex_get_Mat<double>(a, copy, var_name + "." + f);
+    };
+    col("tx_pos", r.tx_pos), col("rx_pos", r.rx_pos), col("center_frequency", r.center_frequency);
+    col("delay", r.delay), col("aod", r.aod), col("eod", r.eod), col("aoa", r.aoa), col("eoa", r.eoa);
+    col("path_type", r.path_type), col("tap", r.tap), col("gr_eps_re", r.gr_eps_re), col("gr_eps_im", r.gr_eps_im);
+    col("fallback", r.fallback);
+    mat("power", r.power), mat("fbs_pos", r.fbs_pos), mat("lbs_pos", r.lbs_pos);
+    if ((a = get("M")) != nullptr)
+        r.M = qd_mex_get_Cube<double>(a, copy, var_name + ".M");
+    return r;
+}
+
+// Creates the 1 x n_link gbsm_rays struct array with all fields and aliases the attributes of 'rays' (resized to
+// n_link) whose size is known: positions [3, 1], 'center_frequency', 'delay', 'power', angles, 'M', 'path_type',
+// 'tap', 'gr_eps_re' and 'gr_eps_im' if 'has_gr', 'fbs_pos' and 'lbs_pos' [3, n_ray] if 'has_scatterers'
+// - The other fields are empty ('fallback' uint32); 'method' is left unset for the caller to fill after the call
+inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
+                                      bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
+{
+    mxArray *s = qd_mex_make_struct(qd_mex_gbsm_rays_fields, n_link);
+    rays.clear();
+    rays.resize(n_link);
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        auto &r = rays[l];
+        auto set = [&](const char *f, mxArray *a)
+        { mxSetField(s, (mwIndex)l, f, a); };
+        auto empty = []()
+        { return mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL); };
+        set("tx_pos", qd_mex_init_output(&r.tx_pos, 3));
+        set("rx_pos", qd_mex_init_output(&r.rx_pos, 3));
+        set("center_frequency", qd_mex_init_output(&r.center_frequency, n_freq));
+        set("delay", qd_mex_init_output(&r.delay, n_ray));
+        set("power", qd_mex_init_output(&r.power, n_ray, n_freq));
+        set("aod", qd_mex_init_output(&r.aod, n_ray));
+        set("eod", qd_mex_init_output(&r.eod, n_ray));
+        set("aoa", qd_mex_init_output(&r.aoa, n_ray));
+        set("eoa", qd_mex_init_output(&r.eoa, n_ray));
+        set("M", qd_mex_init_output(&r.M, 8, n_ray, n_freq));
+        set("path_type", qd_mex_init_output(&r.path_type, n_ray));
+        set("tap", qd_mex_init_output(&r.tap, n_ray));
+        set("gr_eps_re", has_gr ? qd_mex_init_output(&r.gr_eps_re, n_freq) : empty());
+        set("gr_eps_im", has_gr ? qd_mex_init_output(&r.gr_eps_im, n_freq) : empty());
+        set("fbs_pos", has_scatterers ? qd_mex_init_output(&r.fbs_pos, 3, n_ray) : empty());
+        set("lbs_pos", has_scatterers ? qd_mex_init_output(&r.lbs_pos, 3, n_ray) : empty());
+        set("fallback", mxCreateNumericMatrix(0, 0, mxUINT32_CLASS, mxREAL));
+    }
+    return s;
 }
 
 #endif

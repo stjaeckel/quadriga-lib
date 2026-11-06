@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Oracles and helpers of the phase-set tests (test_gbsm_phases.cpp, test_ssf_phases.cpp), independent of the
-// functions under test:
+// Oracles and helpers of the phase-set tests (test_gbsm_phases_*.cpp), independent of the functions under test:
 //  - qd_ref_sos: the sum of sinusoids sqrt(2/N) · sum_n cos( 2·pi · F(n,:)·x + phi(n) + off(n) ), typed here
 //  - qd_unif: the Uniform map 0.5·erfc(-v/sqrt(2))
 //  - qd_preset / qd_acf_at: frequencies and ACF table of sos_preset, the ACF interpolated linearly by sos_acfi

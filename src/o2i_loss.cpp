@@ -22,22 +22,22 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 - Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier frequency; the
   caller adds `loss` to the path loss of the UT
 - Models of TR 38.901 v19.5.0: `low`, `high`, `low_A` (Table 7.4.3-2 with the materials of Table 7.4.3-1),
-  `legacy_6GHz` (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz; the O2I conf files of UMa and UMi have
-  its `SF_sigma = 7`), `car` and `car_metal` (clause 7.4.3.2, metallized windows)
+  `legacy_6GHz` (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz), `car` and `car_metal` (clause 7.4.3.2,
+  metallized windows)
 - Model of UT `u`: the smallest `j` with `rnd(u, 0) < w_0 + ... + w_j`, else the last model with a weight > 0; a model
   with weight 0 is never chosen
 - Indoor distance: the minimum of columns 1 and 2 of `rnd` times `d2d_in_max` (`low`, `high`, `low_A`, clause
   7.4.3.1), column 1 times `d2d_in_max` (`legacy_6GHz`), 0 for the car models
 - Draw `rnd` with [[sos_rand]] and [[sos_randn]] at the correlation distances of TR 38.901 clause 7.6.3.3: 50 m
   for column 0, 25 m for columns 1 and 2, 10 m for column 3
-- TR applicability (Table 7.4.3-2): RMa `low` only, InF `high` only, UMa and UMi `low` and `high`, SMa all three.
-  SMa has 90 % residential and 10 % commercial buildings (Table 7.2-5) with different maximum indoor distances: call
-  `o2i_loss` once per building type
+- TR applicability (Table 7.4.3-2): RMa `low` only, InF `high` only, UMa and UMi `low` and `high`, SMa `low`,
+  `high` and `low_A`. SMa has 90 % residential and 10 % commercial buildings (Table 7.2-5) with different maximum
+  indoor distances: call `o2i_loss` once per building type
 
 ## Declaration:
 ```
 void quadriga_lib::o2i_loss(
-    const arma::vec &fc,
+    const arma::vec &center_frequency,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
     const arma::vec &weights,
@@ -48,7 +48,7 @@ void quadriga_lib::o2i_loss(
 ```
 
 ## Inputs:
-- **`fc`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_frequency`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column
   3 Normal(0,1), finite (deviation `sigma_P`, car loss); `[n_ut, 4]`, `n_ut = 0` allowed
 - **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; `[n_model]`
@@ -66,7 +66,7 @@ void quadriga_lib::o2i_loss(
 - [[path_loss]] (basic path loss, legacy outdoor distance from `d2d_in`)
 MD!*/
 
-void quadriga_lib::o2i_loss(const arma::vec &fc,
+void quadriga_lib::o2i_loss(const arma::vec &center_frequency,
                             const arma::mat &rnd,
                             const std::vector<std::string> &models,
                             const arma::vec &weights,
@@ -76,12 +76,12 @@ void quadriga_lib::o2i_loss(const arma::vec &fc,
                             arma::uvec *model_index)
 {
     // Carrier frequencies
-    qd_gbsm_check_fc(fc);
+    qd_gbsm_check_fc(center_frequency);
 
     // Random values
     if (rnd.n_cols != 4)
         throw std::invalid_argument("Input 'rnd' must have 4 columns.");
-    const arma::uword n_ut = rnd.n_rows, n_freq = fc.n_elem;
+    const arma::uword n_ut = rnd.n_rows, n_freq = center_frequency.n_elem;
     const double *pr = rnd.memptr(); // column c of UT u at pr[c · n_ut + u]
     for (arma::uword u = 0; u < 3 * n_ut; ++u)
         if (!(pr[u] >= 0.0 && pr[u] <= 1.0))
@@ -139,7 +139,7 @@ void quadriga_lib::o2i_loss(const arma::vec &fc,
     arma::mat pl_tw(3, n_freq, arma::fill::none);
     for (arma::uword k = 0; k < n_freq; ++k)
     {
-        const double f = fc[k] * 1.0e-9;
+        const double f = center_frequency[k] * 1.0e-9;
         const double L_glass = 2.0 + 0.2 * f, L_irr = 25.4 + 0.11 * f, L_concrete = 5.0 + 4.0 * f,
                      L_plywood = 1.03 + 0.17 * f;
         pl_tw(0, k) = tw(0.3, L_glass, 0.7, L_concrete);

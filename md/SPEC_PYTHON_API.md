@@ -384,7 +384,7 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
 ### Flags
 - A flag is taken as `py::handle` and read with `qd_python_flag(handle, default_value, "name")` (`python_quadriga_adapter.hpp`): `None` selects the default, a Python `bool` or `numpy.bool_` gives its value, any other type (float, int, str, array) raises `TypeError` with `Input '<name>' must be a bool or None.`. A plain `bool` parameter is not used: pybind11 would turn `None` into `False` (silently not the default) and accept other types.
 - The default stays in the pybind11 declaration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
-- The `## Inputs:` line states the default; one bullet of the description states the rule once for all flags of the function ("take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`").
+- The `## Inputs:` line states the default; one bullet of the description states the rule once for all flags of the function ("take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`"). Where the section description states this rule for all functions of the section (as the `gbsm` submodule does in its conventions), the blocks only state the defaults.
 - Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError`.
 - The `gbsm` submodule follows this rule for all its flags; older wrappers with plain `bool` flags predate it.
 

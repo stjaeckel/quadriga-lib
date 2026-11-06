@@ -62,7 +62,7 @@ namespace
         arma::cube lsp, anchor, rnd_freq;
         arma::vec toa;
         std::vector<bool> o2i;
-        arma::uvec ncl;
+        arma::u32_vec ncl;
         bool use_rf = true, use_anchor = true, use_eod = false, use_toa = false, use_eps = false, use_o2i = false,
              use_ncl = false;
     };
@@ -112,14 +112,14 @@ namespace
         for (arma::uword l = 0; l < n_link; ++l)
             f.toa(l) = U(10e-9, 300e-9), f.o2i.push_back(l % 2 == 0);
         f.ncl.set_size(n_link);
-        f.ncl.fill(N);
+        f.ncl.fill((unsigned)N);
         return f;
     }
 
     struct out_t
     {
         arma::cube delay, power, aod, eod, aoa, eoa;
-        arma::uvec n_active;
+        arma::u32_vec n_active;
     };
 
     out_t run(const spmap &sp, const fix_t &f, const std::string &method = "38.901")
@@ -240,14 +240,14 @@ namespace
         lib_t r;
         arma::cube ph;
         arma::mat rnd_l;
-        quadriga_lib::lsf_init_phases(sp, ph, seed);
-        quadriga_lib::lsf_draw(sp, ph, tx, rx, rnd_l);
+        quadriga_lib::gbsm_init_phases(sp, "lsf", ph, seed);
+        quadriga_lib::gbsm_draw(sp, "lsf", ph, tx, rx, rnd_l);
         quadriga_lib::lsp_generate(sp, arma::vec{fc}, tx, rx, rnd_l, r.lsp, nullptr, &r.toa, nullptr, nullptr, &r.eod);
-        quadriga_lib::ssf_init_phases(sp, ph, seed, -1);
-        quadriga_lib::ssf_draw(sp, ph, tx, rx, r.rnd, -1);
-        quadriga_lib::ssf_init_phases(sp, ph, seed, 0);
+        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd);
+        quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed, 0);
         r.rnd_freq.set_size(rx.n_rows, (arma::uword)sp.at("NumClusters") - 1, 1);
-        quadriga_lib::ssf_draw(sp, ph, tx, rx, r.rnd_freq.slice(0), 0);
+        quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd_freq.slice(0), 0);
         return r;
     }
 

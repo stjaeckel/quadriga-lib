@@ -49,8 +49,8 @@ speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.16
     sensitivity=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]), \
-    angular_resolution=5.0)
+speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, \
+    10000.0]), angular_resolution=5.0)
 ```
 
 ## Inputs:

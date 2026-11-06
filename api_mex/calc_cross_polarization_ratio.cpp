@@ -40,7 +40,8 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 
 ## Usage:
 ```
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los, window_size );
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, ...
+    include_los, window_size );
 ```
 
 ## Inputs:

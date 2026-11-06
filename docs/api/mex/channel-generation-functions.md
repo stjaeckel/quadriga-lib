@@ -57,7 +57,7 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
   empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`; default: [] (auto-generate)
 - **`n_subpath`** — Sub-paths per cluster for Laplacian angular spread mapping; default: 20
 - **`doppler_effect`** — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); 0 disables; default: 50
-- **`seed`** — RNG seed for repeatability; `-1` uses the system random device; default: -1
+- **`seed`** — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device; default: -1
 - **`KF_linear`** — Overrides model KF (linear scale); default:  A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; 
   applied to first tap only; breakpoint ignored when `KF_linear >= 0`
 - **`XPR_NLOS_linear`** — Overrides NLOS cross-polarization ratio (linear scale); NAN or `[]` restores the default; must otherwise
@@ -344,9 +344,9 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 
 ### Usage:
 ```matlab
-[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, rx_array, ...
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    center_freq, use_absolute_delays, add_fake_los_path, use_avx2 );
+[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
+    rx_array, fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, ...
+    rx_orientation, center_freq, use_absolute_delays, add_fake_los_path, use_avx2 );
 ```
 
 ### Inputs:

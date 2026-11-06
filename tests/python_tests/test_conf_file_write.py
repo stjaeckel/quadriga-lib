@@ -29,7 +29,7 @@ config_dir = os.path.join(current_dir, "../../data/config")
 
 def scenpar_bits(scenpar):
     # Numeric values as raw 64-bit patterns, so that -0.0 and 0.0 differ
-    return np.array([v for k, v in scenpar.items() if k != "SubpathMethod"], dtype=np.float64).view(np.uint64)
+    return np.array(list(scenpar.values()), dtype=np.float64).view(np.uint64)
 
 
 class test_case(unittest.TestCase):
@@ -38,9 +38,9 @@ class test_case(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.fn = os.path.join(self.tmp.name, "conf_file_write_test.conf")
 
-        # Distinct values: one that needs 17 digits, -0, Inf, a correlation, a non-default SubpathMethod
+        # Distinct values: one that needs 17 digits, -0, Inf, a correlation
         self.scenpar = {"DS_mu": 0.1 + 0.2, "NumClusters": 12.0, "asD_ds": 0.25, "DS_gamma": -0.0,
-                        "absTOA_mu": np.inf, "SubpathMethod": "mmMAGIC"}
+                        "absTOA_mu": np.inf}
         # PL keys not in sorted order, one with three values
         self.plpar = {"model": "logdist", "B": np.array([1.0, 2.5, -3.0]), "A": np.array([4.0])}
         self.short_names = ["Ta", "Tb"]
@@ -100,7 +100,6 @@ class test_case(unittest.TestCase):
 
             # scenpar: same keys in the same order, same values bit for bit
             self.assertEqual(list(out[0]), list(scenpar), fn)
-            self.assertEqual(out[0]["SubpathMethod"], scenpar["SubpathMethod"], fn)
             npt.assert_array_equal(scenpar_bits(out[0]), scenpar_bits(scenpar), fn)
             self.assertEqual(out[0], scenpar, fn)
 
@@ -149,12 +148,15 @@ class test_case(unittest.TestCase):
         self.assertIn("% See: Test reference", texts[2])
         self.assertIn("% See: Test reference; Sec0", texts[3])
         self.assertIn("Valid frequency range", texts[4])
-        self.assertIn("SubpathMethod =        legacy", texts[5])
+        self.assertNotIn("SubpathMethod", texts[5])
 
-        # write_defaults = True writes all 171 numeric keys and SubpathMethod, the values do not change
+        # write_defaults = True writes all 171 numeric keys, the values do not change
         quadriga_lib.gbsm.conf_file_write(self.fn, self.scenpar, write_defaults=True)
         default_set = quadriga_lib.gbsm.scenpar_validate(self.scenpar)[0]
         self.assertEqual(quadriga_lib.gbsm.conf_file_read(self.fn)[0], default_set)
+
+        # A key SubpathMethod = 'legacy' is accepted and never written
+        self.assertEqual(self.write_text({"SubpathMethod": "legacy"}), ref)
 
         # A single str is one short name
         self.assertEqual(self.write_text({}, short_names="Ta"), self.write_text({}, short_names=["Ta"]))
@@ -269,6 +271,8 @@ class test_case(unittest.TestCase):
         check(ValueError, "Input 'scenpar' must be a dict or None", [("DS_mu", 1.0)])
         check(ValueError, "Keys of 'scenpar' must be str", {1: 1.0})
         check(ValueError, "Entry 'SubpathMethod' of 'scenpar' must be a str", {"SubpathMethod": None})
+        check(ValueError, "Value 'mmMAGIC' of 'SubpathMethod' is not supported; only 'legacy' is accepted.",
+              {"SubpathMethod": "mmMAGIC"})
         for value in ["1.5", 1 + 2j, None, [1.0, 2.0]]:
             check(ValueError, "Entry 'DS_mu' of 'scenpar' must be a real scalar", {"DS_mu": value})
         check(ValueError, "Input 'plpar' must be a dict or None", {}, [1.0])

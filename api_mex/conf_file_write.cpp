@@ -25,16 +25,13 @@ Write a QuaDRiGa scenario configuration file
   decorrelation distance, 6 ground reflection, 7 absolute TOA, 8 path-loss model, 9 EoD offset, 10
   optional modelling components; 1 to 8 are those of QuaDRiGa, so its 8 section references can be
   passed unchanged
-- Numbers have up to 15 significant digits, or 16 or 17 where 15 do not read back to the same
-  double, independent of the locale; `Inf`, `-Inf` and `-0` are kept
-- `write_defaults = false`: only fields whose value differs from the default (bit for bit) and
-  `SubpathMethod` if it is not `legacy`; a section without a written field is left out
+- Numbers are written independent of the locale; `Inf`, `-Inf` and `-0` are kept
+- `write_defaults = false`: only fields whose value differs from the default (bit for bit); a
+  section without a written field is left out
 - All inputs are validated before the file is opened: the checks of [[scenpar_validate]]; `model`,
   the other fields of `plpar` and the short names are names, the short names distinct; every `plpar`
   field has at least one value and no `NaN`; `fn`, `ref` and `ref_sec` have no line break
-- The text is written to a temporary file in the same directory, which must be writable, and renamed
-  to `fn`: a failed call creates no file and leaves an existing file unchanged; an existing file
-  keeps its permissions, a symbolic link `fn` is written through
+- A failed call creates no file and leaves an existing file unchanged; the directory must be writable
 
 ## Usage:
 ```
@@ -44,23 +41,21 @@ quadriga_lib.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, val
 
 ## Inputs:
 - **`fn`** — Path of the conf file to write; string
-- **`scenpar`** — Scenario parameters; struct with any subset of the 172 fields returned by
-  [[conf_file_read]]; numeric fields are real scalars of class double, single, int32, uint32,
-  int64, uint64 or logical; `SubpathMethod` is a string; missing fields have their default; `[]`
-  writes the default set
-- **`plpar`** *(optional)* — Path-loss parameters; struct with the field `model` (string) and one
-  real vector (row or column) of class double, single, int32, uint32, int64 or uint64 per further
-  field, named without the prefix `PL_`, as returned by [[conf_file_read]]; a matrix is an error;
-  written in struct order; if omitted or `[]`, no path-loss section
-- **`short_names`** *(optional)* — Short names of the scenario; cell array of strings or one string;
-  each one name of the characters `A-Z`, `a-z`, `0-9`, `_`; distinct
+- **`scenpar`** — Scenario parameters; struct with any subset of the fields returned by
+  [[conf_file_read]]; real scalars of any numeric class or logical; missing fields have their default; `[]` writes
+  the default set
+- **`plpar`** — Path-loss parameters; struct with the field `model` (string) and one real vector (row or
+  column) of any numeric class per further field, named without the prefix `PL_`, as returned by
+  [[conf_file_read]]; a matrix is an error; written in struct order; default: no path-loss section
+- **`short_names`** — Short names of the scenario; cell array of strings or one string; each one name
+  of the characters `A-Z`, `a-z`, `0-9`, `_`; distinct; default: none
 - **`ref`** — Literature reference; written in the header and before each non-empty entry of
   `ref_sec`; string; default: no reference
-- **`ref_sec`** *(optional)* — Reference per section, numbered as listed above; cell array of up to
-  10 strings; an empty or missing entry writes no reference
-- **`valid_range`** *(optional)* — Validity range, written as comment; rows: frequency in GHz,
-  distance, BS height, MT height in m; columns: lower and upper end, one value is written if both
-  are equal; a row with `NaN` is not written; `[4, 2]`
+- **`ref_sec`** — Reference per section, numbered as listed above; cell array of up to 10 strings;
+  an empty or missing entry writes no reference; default: none
+- **`valid_range`** — Validity range, written as comment; rows: frequency in GHz, distance, BS
+  height, UT height in m; columns: lower and upper end, one value is written if both are equal; a
+  row with `NaN` is not written; `[4, 2]`; default: none
 - **`write_defaults`** — `true`: write all fields; `false`: write only fields that differ from their
   default; default: false
 
@@ -82,8 +77,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
 
-    std::string subpath_method = "legacy";
-    const auto scenpar = qd_mex_struct2scenpar(prhs[1], subpath_method, "scenpar");
+    const auto scenpar = qd_mex_struct2scenpar(prhs[1], "scenpar");
 
     std::string pl_model;
     std::vector<std::string> pl_order;
@@ -112,6 +106,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool write_defaults = (nrhs < 8) ? false : qd_mex_get_scalar<bool>(prhs[7], "write_defaults", false);
 
     // Call library function
-    CALL_QD(quadriga_lib::conf_file_write(fn, scenpar, subpath_method, pl_model, &plpar, &pl_order, &short_names,
+    CALL_QD(quadriga_lib::conf_file_write(fn, scenpar, pl_model, &plpar, &pl_order, &short_names,
                                           ref, &ref_sec, &valid_range, write_defaults));
 }

@@ -107,8 +107,9 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [Python](../
 
 ### Usage:
 ```matlab
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,  radius_min, ...
-    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, coeff_im, i_snap );
+quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
+     radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, ...
+    coeff_im, i_snap );
 ```
 
 ### Inputs:
@@ -537,7 +538,8 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [Python](../python/
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(no_int)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files.
+  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
 - [arrayant_generate](array-antenna-functions.md#arrayant_generate) (for generating antenna arrays)

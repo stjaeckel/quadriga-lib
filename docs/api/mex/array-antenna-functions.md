@@ -39,17 +39,20 @@ Also in: [C++](../cpp/array-antenna-class.md#.calc_beamwidth_deg) · [Python](..
 ### Usage:
 ```matlab
 % Input as struct (struct mode)
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant );
 
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
 
 % Separate inputs (split mode)
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = ...
-    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, ...
+    e_phi_im, azimuth_grid, elevation_grid );
 
-[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = ...
-    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
-    i_element, threshold_dB );
+[ beamwidth_az, beamwidth_el, az_point_ang, ...
+    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, ...
+    e_phi_im, azimuth_grid, elevation_grid, i_element, threshold_dB );
 ```
 
 ### Inputs (struct mode):
@@ -147,9 +150,9 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_n
     coupling_im, center_freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 
 % Separate inputs (split-mode, single-freq only); propagation_speed is the 16th input
-arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, elevation_grid_new, ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
-    coupling_im, center_freq, name, propagation_speed );
+arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, ...
+    elevation_grid_new, e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
+    element_pos, coupling_re, coupling_im, center_freq, name, propagation_speed );
 ```
 
 ### Inputs:
@@ -305,20 +308,26 @@ ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3dB, bfr);
 ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, pol, [], spacing);
 
 % Uniform linear array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, [], [], [], [], pattern);
+ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, [], [], ...
+    [], [], pattern);
 
 % 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
+    Ng, dgv, dgh);
 
 % 3GPP-NR array with custom element beamwidth
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, bfr, M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, bfr, M, N, pol, tilt, ...
+    spacing, Mg, Ng, dgv, dgh);
 
 % 3GPP-NR array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], M, N, pol, tilt, spacing, Mg, ...
+    Ng, dgv, dgh, pattern);
 
 % Multi-beam M×N array (one combined beam / one beam per direction)
-ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
-ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, spacing);
+ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr, M, N, pol, dir, ...
+    spacing);
+ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, ...
+    dir, spacing);
 
 % Separate outputs (2 to 11 outputs)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...

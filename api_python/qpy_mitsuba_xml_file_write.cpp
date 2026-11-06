@@ -27,7 +27,8 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 
 ## Usage:
 ```
-quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf, map_to_itu )
+quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
+    mtl_names, bsdf, map_to_itu )
 ```
 
 ## Input Arguments:

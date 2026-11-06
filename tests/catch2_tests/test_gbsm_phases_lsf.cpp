@@ -4,21 +4,23 @@
 
 // Diagnostic output: off by default. QD_DIAG_GBSM=1 prints the tables of this file, QD_DIAG=1 those of all areas
 // (see qd_test_diag.hpp); the assertions run either way. Example:
-//   QD_DIAG_GBSM=1 ./build_linux/test_bin "lsf_*"
+//   QD_DIAG_GBSM=1 ./build_linux/test_bin "gbsm_*"
 
-// Verification suite for the phase sets of the large-scale model: quadriga_lib::lsf_init_phases and
-// quadriga_lib::lsf_draw (test cases "lsf_init_phases - ..." and "lsf_draw - ...").
+// Verification suite for the "lsf" set of quadriga_lib::gbsm_init_phases and quadriga_lib::gbsm_draw (test cases
+// "gbsm_init_phases - lsf: ..." and "gbsm_draw - lsf: ...") and for the input validation of gbsm_init_phases
+// ("gbsm_init_phases - input validation", all set types). The golden values of the previous version are in
+// test_gbsm_phases_golden.cpp.
 //
-// lsf_init_phases pins down: the size of the phase cube per preset, the raw phases (slice 0 equals sos_init_phases
-// with the same seed), the mirror relation of slice 1 (ASD <-> ASA, ESD <-> ESA, all others themselves), the seed,
-// the bias removal (zero sample mean of every Normal field over the drop positions in single and dual mobility, 2D
-// and 3D, Uniform generators 9 and 10 untouched, no correction below 3 positions), the replacement of a
-// decorrelation distance of 0 by 0.1 m, and the input validation.
-// lsf_draw pins down: the values of the 11 generators in single mobility (each generator with its own decorrelation
-// distance, 2D and 3D mode, three presets), the Uniform map of columns 9 and 10, the two-device formulas of dual
-// mobility (self-mirrored generators on one map, the pairs ASD/ASA and ESD/ESA on two maps without further mixing),
-// also with floor IDs, unit variance and the pair correlation in dual mobility, the swap reciprocity, the floor phase
-// offsets, the statistics (marginals, ACF, zero correlation of different floors at equal positions), the
+// gbsm_init_phases ("lsf") pins down: the size of the phase cube per preset, the raw phases (slice 0 equals
+// sos_init_phases with the same seed), the mirror relation of slice 1 (ASD <-> ASA, ESD <-> ESA, all others
+// themselves), the seed, the bias removal (zero sample mean of every Normal field over the drop positions in single and
+// dual mobility, 2D and 3D, Uniform generators 9 and 10 untouched, no correction below 3 positions), the replacement of
+// a decorrelation distance of 0 by 0.1 m, and the input validation.
+// gbsm_draw ("lsf") pins down: the values of the 11 generators in single mobility (each generator with its own
+// decorrelation distance, 2D and 3D mode, three presets), the Uniform map of columns 9 and 10, the two-device formulas
+// of dual mobility (self-mirrored generators on one map, the pairs ASD/ASA and ESD/ESA on two maps without further
+// mixing), also with floor IDs, unit variance and the pair correlation in dual mobility, the swap reciprocity, the
+// floor phase offsets, the statistics (marginals, ACF, zero correlation of different floors at equal positions), the
 // independence of z in 2D mode, of tx_pos in single mobility and of the other links, sizes, empty input, pre-sized
 // outputs and the input validation.
 // Oracles, independent of the functions:
@@ -29,14 +31,14 @@
 //    generators, (qd_ref_sos(F_g, P0_g, R) + qd_ref_sos(F_m, P0_m, T)) / sqrt(2) for the pairs, A_g the ACF table of
 //    sos_preset interpolated linearly by sos_acfi, D the Tx-Rx distance (horizontal in 2D mode)
 //  - statistics: Normal(0,1), Uniform(0,1), the ACF table of sos_preset
-// Tolerances of lsf_draw values: lsf_draw evaluates the sinusoids with the AVX2 kernel where available (sine and
-// cosine in single precision, accumulation in double, deviation below 4e-7·sqrt(2·n_coeff) = 9e-6 for 256
-// sinusoids). Normal columns 2e-5 for 256 sinusoids, scaled with sqrt(n_coeff/256) for other presets, Uniform
+// Tolerances of gbsm_draw ("lsf") values: gbsm_draw ("lsf") evaluates the sinusoids with the AVX2 kernel where
+// available (sine and cosine in single precision, accumulation in double, deviation below 4e-7·sqrt(2·n_coeff) = 9e-6
+// for 256 sinusoids). Normal columns 2e-5 for 256 sinusoids, scaled with sqrt(n_coeff/256) for other presets, Uniform
 // columns 1e-5 (the slope of the Uniform map is at most 0.4). The bias removal is closed-form: 1e-12.
-// Conventions: positions are rows {x, y, z} in meters; most cases use distinct decorrelation distances (DS 11,
-// KF 12, SF 13, ASD 14, ASA 15, ESD 16, ESA 17, XPR 18, absTOA 19, SC 20 m; generator 10 uses SF_lambda) so that a
-// mix-up of generators changes the result; the phase cubes of the lsf_draw cases are raw phases of sos_init_phases
-// with the Tx side mirrored (ASD <-> ASA, ESD <-> ESA).
+// Conventions: positions are rows {x, y, z} in meters; most cases use distinct decorrelation distances (DS 11, KF 12,
+// SF 13, ASD 14, ASA 15, ESD 16, ESA 17, XPR 18, absTOA 19, SC 20 m; generator 10 uses SF_lambda) so that a mix-up of
+// generators changes the result; the phase cubes of the gbsm_draw ("lsf") cases are raw phases of sos_init_phases with
+// the Tx side mirrored (ASD <-> ASA, ESD <-> ESA).
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_exception.hpp>
@@ -140,7 +142,7 @@ namespace
     }
 }
 
-TEST_CASE("lsf_init_phases - output size follows the preset")
+TEST_CASE("gbsm_init_phases - lsf: output size follows the preset")
 {
     const auto sp = scen_distinct();
     const char *presets[3] = {"Comb256", "Exp128", "Gauss1024"};
@@ -149,7 +151,7 @@ TEST_CASE("lsf_init_phases - output size follows the preset")
     {
         INFO("preset " << presets[i]);
         arma::cube phase;
-        quadriga_lib::lsf_init_phases(sp, phase, 3, nullptr, nullptr, false, true, presets[i]);
+        quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 3, -1, presets[i]);
         CHECK(phase.n_rows == n_coeff[i]);
         CHECK(phase.n_cols == 11);
         CHECK(phase.n_slices == 2);
@@ -159,28 +161,28 @@ TEST_CASE("lsf_init_phases - output size follows the preset")
     arma::cube ref, pre(256, 11, 2);
     pre.fill(99.0);
     const double *mem = pre.memptr();
-    quadriga_lib::lsf_init_phases(sp, ref, 3);
-    quadriga_lib::lsf_init_phases(sp, pre, 3);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", ref, 3);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", pre, 3);
     CHECK(pre.memptr() == mem);
     CHECK(arma::all(arma::vectorise(pre == ref)));
 }
 
-TEST_CASE("lsf_init_phases - slice 0 equals sos_init_phases with the same seed")
+TEST_CASE("gbsm_init_phases - lsf: slice 0 equals sos_init_phases with the same seed")
 {
     const auto sp = scen_distinct();
     arma::cube phase;
-    quadriga_lib::lsf_init_phases(sp, phase, 42);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 42);
     REQUIRE(phase.n_rows == 256);
     REQUIRE(phase.n_cols == 11);
     REQUIRE(phase.n_slices == 2);
     CHECK(arma::all(arma::vectorise(phase.slice(0) == raw_phases(256, 42))));
 
-    quadriga_lib::lsf_init_phases(sp, phase, 42, nullptr, nullptr, false, true, "Exp128");
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 42, -1, "Exp128");
     REQUIRE(phase.n_rows == 128);
     CHECK(arma::all(arma::vectorise(phase.slice(0) == raw_phases(128, 42))));
 }
 
-TEST_CASE("lsf_init_phases - slice 1 is the mirror of slice 0")
+TEST_CASE("gbsm_init_phases - lsf: slice 1 is the mirror of slice 0")
 {
     const auto sp = scen_distinct();
     const arma::mat rx = drop(50, 100.0, 11);
@@ -189,45 +191,45 @@ TEST_CASE("lsf_init_phases - slice 1 is the mirror of slice 0")
     const arma::mat tx1 = {{5.0, -7.0, 25.0}};
 
     arma::cube phase;
-    quadriga_lib::lsf_init_phases(sp, phase, 5);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5);
     CHECK(is_mirror(phase)); // no bias removal (no positions)
 
-    quadriga_lib::lsf_init_phases(sp, phase, 5, &tx1, &rx); // single mobility, bias removal
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5, -1, "Comb256", &tx1, &rx); // single mobility, bias removal
     CHECK(is_mirror(phase));
     CHECK(arma::any(arma::vectorise(phase.slice(0) != raw_phases(256, 5)))); // the correction did act
 
-    quadriga_lib::lsf_init_phases(sp, phase, 5, &tx, &rx, true); // dual mobility, bias removal
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5, -1, "Comb256", &tx, &rx, true); // dual mobility, bias removal
     CHECK(is_mirror(phase));
 
-    quadriga_lib::lsf_init_phases(sp, phase, 5, &tx, &rx, true, false); // dual mobility, no bias removal
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 5, -1, "Comb256", &tx, &rx, true, false); // dual mobility, no bias removal
     CHECK(is_mirror(phase));
 }
 
-TEST_CASE("lsf_init_phases - the same seed gives the same phases")
+TEST_CASE("gbsm_init_phases - lsf: the same seed gives the same phases")
 {
     const auto sp = scen_distinct();
     const arma::mat rx = drop(30, 100.0, 21);
     arma::cube a, b, c;
-    quadriga_lib::lsf_init_phases(sp, a, 7, nullptr, &rx);
-    quadriga_lib::lsf_init_phases(sp, b, 7, nullptr, &rx);
-    quadriga_lib::lsf_init_phases(sp, c, 8, nullptr, &rx);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", a, 7, -1, "Comb256", nullptr, &rx);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", b, 7, -1, "Comb256", nullptr, &rx);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", c, 8, -1, "Comb256", nullptr, &rx);
     CHECK(arma::all(arma::vectorise(a == b))); // determinism: repeated call, identical result
     CHECK(arma::any(arma::vectorise(a != c)));
 }
 
-TEST_CASE("lsf_init_phases - bias removal zeroes the drop mean in single mobility")
+TEST_CASE("gbsm_init_phases - lsf: bias removal zeroes the drop mean in single mobility")
 {
     const auto sp = scen_distinct();
     const arma::mat rx = drop(200, 100.0, 31);
     const arma::mat tx = {{50.0, 50.0, 25.0}};
 
     arma::cube phase, phase_raw;
-    quadriga_lib::lsf_init_phases(sp, phase, 9, &tx, &rx);
-    quadriga_lib::lsf_init_phases(sp, phase_raw, 9, &tx, &rx, false, false);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 9, -1, "Comb256", &tx, &rx);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase_raw, 9, -1, "Comb256", &tx, &rx, false, false);
     REQUIRE(phase.n_rows == 256);
 
     // Closed-form correction: the mean is zero up to the rounding of 200 O(1) values, 1e-12
-    QD_DIAG("\n# diag: lsf_init_phases single mobility, mean of ref_sos over 200 positions (2D)\n");
+    QD_DIAG("\n# diag: gbsm_init_phases lsf single mobility, mean of ref_sos over 200 positions (2D)\n");
     QD_DIAG("g,lambda,mean_raw,mean_corrected\n");
     for (arma::uword g = 0; g < 9; ++g)
     {
@@ -246,17 +248,17 @@ TEST_CASE("lsf_init_phases - bias removal zeroes the drop mean in single mobilit
     }
 }
 
-TEST_CASE("lsf_init_phases - bias removal in 3D mode uses the z coordinate")
+TEST_CASE("gbsm_init_phases - lsf: bias removal in 3D mode uses the z coordinate")
 {
     const auto sp = scen_distinct();
     const arma::mat rx = drop(200, 100.0, 41);
     const arma::mat tx = {{50.0, 50.0, 25.0}};
 
     arma::cube phase;
-    quadriga_lib::lsf_init_phases(sp, phase, 10, &tx, &rx, false, true, "Comb256", false);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 10, -1, "Comb256", &tx, &rx, false, true, false);
 
     double max_2d = 0.0;
-    QD_DIAG("\n# diag: lsf_init_phases 3D mode, mean of ref_sos with and without z\n");
+    QD_DIAG("\n# diag: gbsm_init_phases lsf 3D mode, mean of ref_sos with and without z\n");
     QD_DIAG("g,mean_3d,mean_2d\n");
     for (arma::uword g = 0; g < 9; ++g)
     {
@@ -271,7 +273,7 @@ TEST_CASE("lsf_init_phases - bias removal in 3D mode uses the z coordinate")
     CHECK(max_2d > 1e-6);
 }
 
-TEST_CASE("lsf_init_phases - bias removal with dual mobility uses the Rx and Tx positions together")
+TEST_CASE("gbsm_init_phases - lsf: bias removal with dual mobility uses the Rx and Tx positions together")
 {
     const auto sp = scen_distinct();
     const arma::mat rx = drop(100, 100.0, 51);
@@ -279,13 +281,13 @@ TEST_CASE("lsf_init_phases - bias removal with dual mobility uses the Rx and Tx 
     tx.col(0) += 30.0, tx.col(1) -= 20.0, tx.col(2) += 5.0; // equal separation for every link
 
     arma::cube phase, phase_sw;
-    quadriga_lib::lsf_init_phases(sp, phase, 12, &tx, &rx, true);
-    quadriga_lib::lsf_init_phases(sp, phase_sw, 12, &rx, &tx, true); // swapped roles
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 12, -1, "Comb256", &tx, &rx, true);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase_sw, 12, -1, "Comb256", &rx, &tx, true); // swapped roles
     REQUIRE(phase.n_rows == 256);
 
     // Mean over the union [R; T] of the field of every Normal generator (2D: z = 0), closed form: 1e-12
     const arma::mat U = arma::join_cols(rx, tx);
-    QD_DIAG("\n# diag: lsf_init_phases dual mobility, mean of ref_sos over the 200 Rx and Tx positions\n");
+    QD_DIAG("\n# diag: gbsm_init_phases lsf dual mobility, mean of ref_sos over the 200 Rx and Tx positions\n");
     QD_DIAG("g,mean_union,mean_rx_only\n");
     for (arma::uword g = 0; g < 9; ++g)
     {
@@ -303,11 +305,11 @@ TEST_CASE("lsf_init_phases - bias removal with dual mobility uses the Rx and Tx 
     QD_DIAG("# diag: max phase difference after swapping Tx and Rx: %.3e\n", max_dphi);
     CHECK(max_dphi < 1e-12);
 
-    // Supporting check through lsf_draw: with equal Tx-Rx distance for all links the normalisation
+    // Supporting check through gbsm_draw ("lsf"): with equal Tx-Rx distance for all links the normalisation
     // 1/sqrt(2 + 2·A(D)) is common, so the link mean of the self-mirrored Normal columns is 0.
-    // Tolerance 2e-5: lsf_draw evaluates with the AVX2 kernel (single-precision sin/cos where available).
+    // Tolerance 2e-5: gbsm_draw ("lsf") evaluates with the AVX2 kernel (single-precision sin/cos where available).
     arma::mat rnd;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", nullptr, nullptr, true);
     REQUIRE(rnd.n_rows == 100);
     REQUIRE(rnd.n_cols == 11);
     const arma::uword cols[5] = {0, 1, 2, 7, 8};
@@ -318,7 +320,7 @@ TEST_CASE("lsf_init_phases - bias removal with dual mobility uses the Rx and Tx 
     }
 }
 
-TEST_CASE("lsf_init_phases - no bias removal for fewer than 3 positions, without positions or when switched off")
+TEST_CASE("gbsm_init_phases - lsf: no bias removal for fewer than 3 positions, without positions or when switched off")
 {
     const auto sp = scen_distinct();
     const arma::mat raw = raw_phases(256, 13);
@@ -333,17 +335,17 @@ TEST_CASE("lsf_init_phases - no bias removal for fewer than 3 positions, without
     const arma::mat tx = {{0.0, 0.0, 25.0}};
     arma::cube phase;
 
-    quadriga_lib::lsf_init_phases(sp, phase, 13, &tx, &rx2);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13, -1, "Comb256", &tx, &rx2);
     CHECK(equals_raw(phase));
-    quadriga_lib::lsf_init_phases(sp, phase, 13);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13);
     CHECK(equals_raw(phase));
-    quadriga_lib::lsf_init_phases(sp, phase, 13, &tx, &rx200, false, false);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13, -1, "Comb256", &tx, &rx200, false, false);
     CHECK(equals_raw(phase));
-    CHECK_NOTHROW(quadriga_lib::lsf_init_phases(sp, phase, 13, &tx, &rx0));
+    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 13, -1, "Comb256", &tx, &rx0));
     CHECK(equals_raw(phase));
 }
 
-TEST_CASE("lsf_init_phases - a decorrelation distance of 0 is used as 0.1 m")
+TEST_CASE("gbsm_init_phases - lsf: a decorrelation distance of 0 is used as 0.1 m")
 {
     auto sp = scen_distinct();
     sp["DS_lambda"] = 0.0;
@@ -351,15 +353,15 @@ TEST_CASE("lsf_init_phases - a decorrelation distance of 0 is used as 0.1 m")
     // 1e-12 tolerance of the closed-form correction
     const arma::mat rx = drop(200, 10.0, 71);
     arma::cube phase;
-    quadriga_lib::lsf_init_phases(sp, phase, 14, nullptr, &rx);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 14, -1, "Comb256", nullptr, &rx);
 
     const arma::mat F = qd_preset("Comb256", 0.1).F;
     double m = mean_ref(F, phase.slice(0).colptr(0), rx, false);
-    QD_DIAG("\n# diag: lsf_init_phases DS_lambda = 0, mean with the 0.1 m table: %.3e\n", m);
+    QD_DIAG("\n# diag: gbsm_init_phases lsf DS_lambda = 0, mean with the 0.1 m table: %.3e\n", m);
     CHECK(std::abs(m) < 1e-12);
 }
 
-TEST_CASE("lsf_init_phases - input validation")
+TEST_CASE("gbsm_init_phases - input validation")
 {
     const auto sp = scen_distinct();
     const arma::mat rx = drop(5, 100.0, 81);
@@ -368,77 +370,109 @@ TEST_CASE("lsf_init_phases - input validation")
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::lsf_init_phases(sp, phase, 1, &tx, &rx));
-        CHECK_NOTHROW(quadriga_lib::lsf_init_phases(sp, phase));
-        CHECK_NOTHROW(quadriga_lib::lsf_init_phases({}, phase, 1)); // empty scenpar: all defaults
-        CHECK_NOTHROW(quadriga_lib::lsf_init_phases(sp, phase, 1, nullptr, &rx, true, false)); // dual mobility without tx_pos, no bias removal
+        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", &tx, &rx));
+        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase));
+        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases({}, "lsf", phase, 1)); // empty scenpar: all defaults
+        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", nullptr, &rx, true, false)); // dual mobility without tx_pos, no bias removal
     }
     SECTION("seed")
     {
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(sp, phase, -2, &tx, &rx), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, -2, -1, "Comb256", &tx, &rx), std::invalid_argument,
                              Message("Input 'seed' must be >= -1."));
     }
     SECTION("preset")
     {
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(sp, phase, 1, &tx, &rx, false, true, "Comb999"), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb999", &tx, &rx), std::invalid_argument,
                              Message("Input 'preset' is not a known preset."));
     }
     SECTION("scenpar value")
     {
         auto bad = sp;
         bad["DS_lambda"] = -1.0;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(bad, phase, 1), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(bad, "lsf", phase, 1), std::invalid_argument,
                              Message("Value of 'DS_lambda' must be finite and >= 0."));
         bad = sp;
         bad["SC_lambda"] = INFINITY;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(bad, phase, 1), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(bad, "lsf", phase, 1), std::invalid_argument,
                              Message("Value of 'SC_lambda' must be finite and >= 0."));
     }
     SECTION("scenpar unknown key")
     {
         auto bad = sp;
         bad["DS_lambdaX"] = 1.0;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(bad, phase, 1), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(bad, "lsf", phase, 1), std::invalid_argument,
                              Message("Unknown key 'DS_lambdaX' in 'scenpar'."));
     }
     SECTION("rx_pos")
     {
         arma::mat bad(5, 2, arma::fill::zeros);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(sp, phase, 1, &tx, &bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", &tx, &bad), std::invalid_argument,
                              Message("Input 'rx_pos' must have 3 columns."));
         bad = rx;
         bad(2, 1) = NAN;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(sp, phase, 1, &tx, &bad), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", &tx, &bad), std::invalid_argument,
                              Message("Input 'rx_pos' must be finite."));
     }
     SECTION("tx_pos")
     {
         arma::mat bad(1, 2, arma::fill::zeros);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(sp, phase, 1, &bad, &rx), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", &bad, &rx), std::invalid_argument,
                              Message("Input 'tx_pos' must have 3 columns."));
         bad.zeros(2, 3);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(sp, phase, 1, &bad, &rx), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", &bad, &rx), std::invalid_argument,
                              Message("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."));
     }
     SECTION("dual mobility without tx_pos")
     {
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_init_phases(sp, phase, 1, nullptr, &rx, true), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", nullptr, &rx, true), std::invalid_argument,
                              Message("Input 'tx_pos' is required for the bias removal with dual mobility."));
+    }
+    SECTION("set_type, checked first; the output is untouched on error")
+    {
+        arma::cube keep(2, 2, 2, arma::fill::ones);
+        for (const char *t : {"LSF", "", "clusters", "rays"})
+        {
+            INFO("set_type " << t);
+            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, keep, -2, -5, "Comb999", &tx, &rx), std::invalid_argument,
+                                 Message("Input 'set_type' must be 'lsf', 'cluster' or 'ray'."));
+        }
+        CHECK(keep.n_rows == 2);
+        CHECK(arma::all(arma::vectorise(keep) == 1.0));
+    }
+    SECTION("set_id is ignored for lsf")
+    {
+        arma::cube a, b;
+        quadriga_lib::gbsm_init_phases(sp, "lsf", a, 7, -1);
+        CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", b, 7, -5));
+        CHECK(arma::approx_equal(a, b, "absdiff", 0.0));
+    }
+    SECTION("positions with another set type")
+    {
+        for (const char *t : {"cluster", "ray"})
+        {
+            INFO("set_type " << t);
+            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, phase, 1, -1, "Comb256", &tx, &rx), std::invalid_argument,
+                                 Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
+            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, phase, 1, -1, "Comb256", nullptr, &rx), std::invalid_argument,
+                                 Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
+            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, t, phase, 1, -1, "Comb256", &tx), std::invalid_argument,
+                                 Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
+        }
     }
 }
 
-TEST_CASE("lsf_draw - single mobility values equal the sum of sinusoids of each generator")
+TEST_CASE("gbsm_draw - lsf: single mobility values equal the sum of sinusoids of each generator")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 21);
     const arma::mat rx = rx7(), tx = {{10.0, 20.0, 25.0}};
 
     arma::mat rnd, rnd2;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd);
     REQUIRE(rnd.n_rows == 7);
     REQUIRE(rnd.n_cols == 11);
 
-    QD_DIAG("\n# diag: lsf_draw single mobility (2D) against ref_sos, max abs difference per generator\n");
+    QD_DIAG("\n# diag: gbsm_draw lsf single mobility (2D) against ref_sos, max abs difference per generator\n");
     QD_DIAG("g,lambda,max_diff\n");
     for (arma::uword g = 0; g < 11; ++g)
     {
@@ -457,18 +491,18 @@ TEST_CASE("lsf_draw - single mobility values equal the sum of sinusoids of each 
     }
 
     // Determinism: a repeated call gives identical results
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd2);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd2);
     CHECK(qd_equal(rnd, rnd2));
 }
 
-TEST_CASE("lsf_draw - 3D mode uses the z coordinate")
+TEST_CASE("gbsm_draw - lsf: 3D mode uses the z coordinate")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 22);
     const arma::mat rx = rx7(), tx = {{10.0, 20.0, 25.0}};
 
     arma::mat rnd;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, false, "Comb256", false);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", nullptr, nullptr, false, false);
     REQUIRE(rnd.n_rows == 7);
     REQUIRE(rnd.n_cols == 11);
     for (arma::uword g = 0; g < 11; ++g)
@@ -485,7 +519,7 @@ TEST_CASE("lsf_draw - 3D mode uses the z coordinate")
     }
 }
 
-TEST_CASE("lsf_draw - other presets")
+TEST_CASE("gbsm_draw - lsf: other presets")
 {
     const auto sp = scen_distinct();
     const arma::mat rx = rx7(), tx = {{10.0, 20.0, 25.0}};
@@ -496,7 +530,7 @@ TEST_CASE("lsf_draw - other presets")
     {
         const arma::cube phase = make_phase(n_coeff[i], 23);
         arma::mat rnd;
-        quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, false, presets[i]);
+        quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, presets[i]);
         REQUIRE(rnd.n_rows == 7);
         const arma::mat F = qd_preset(presets[i], lambda_g[0]).F;
         for (arma::uword l = 0; l < 7; ++l)
@@ -507,56 +541,56 @@ TEST_CASE("lsf_draw - other presets")
     }
 }
 
-TEST_CASE("lsf_draw - 2D mode values do not depend on z")
+TEST_CASE("gbsm_draw - lsf: 2D mode values do not depend on z")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 24);
     arma::mat rx = rx7(), tx = rx7() + 15.0;
 
     arma::mat a, b, c, d;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, a);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, c, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, a);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, c, -1, "Comb256", nullptr, nullptr, true);
     rx.col(2) += 17.0, tx.col(2) -= 3.0;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, b);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, d, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, b);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, d, -1, "Comb256", nullptr, nullptr, true);
     CHECK(qd_equal(a, b));
     CHECK(qd_equal(c, d)); // dual mobility as well
 }
 
-TEST_CASE("lsf_draw - single mobility ignores tx_pos")
+TEST_CASE("gbsm_draw - lsf: single mobility ignores tx_pos")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 25);
     const arma::mat rx = rx7(), tx1 = {{10.0, 20.0, 25.0}}, tx2 = rx7() * 0.5 - 30.0;
     arma::mat a, b;
-    quadriga_lib::lsf_draw(sp, phase, tx1, rx, a);
-    quadriga_lib::lsf_draw(sp, phase, tx2, rx, b);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx1, rx, a);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx2, rx, b);
     CHECK(qd_equal(a, b));
 }
 
-TEST_CASE("lsf_draw - a link does not depend on the other links")
+TEST_CASE("gbsm_draw - lsf: a link does not depend on the other links")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 26);
     const arma::mat rx = rx7(), tx = rx7() * 0.5 - 30.0;
-    const arma::uvec fl = {0, 3, 3, 259, 0, 1, 259};
+    const arma::u32_vec fl = {0, 3, 3, 259, 0, 1, 259};
 
     for (int dual = 0; dual < 2; ++dual)
     {
         arma::mat all, one;
-        quadriga_lib::lsf_draw(sp, phase, tx, rx, all, &fl, dual == 1);
+        quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, all, -1, "Comb256", &fl, nullptr, dual == 1);
         for (arma::uword l = 0; l < 7; ++l)
         {
             const arma::mat r = rx.row(l), t = tx.row(l);
-            const arma::uvec f = {fl(l)};
-            quadriga_lib::lsf_draw(sp, phase, t, r, one, &f, dual == 1);
+            const arma::u32_vec f = {fl(l)};
+            quadriga_lib::gbsm_draw(sp, "lsf", phase, t, r, one, -1, "Comb256", &f, nullptr, dual == 1);
             INFO("dual " << dual << ", link " << l);
             CHECK(qd_equal(one, all.row(l)));
         }
     }
 }
 
-TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
+TEST_CASE("gbsm_draw - lsf: dual mobility values follow the two-device formulas")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 27);
@@ -565,7 +599,7 @@ TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
     const arma::mat tx = {{12.0, -15.0, 25.0}, {-40.0, 10.0, 30.0}, {100.0, 100.0, 1.5}, {-25.0, 3.0, 12.0}, {150.0, -80.0, 10.0}, {30.0, 80.0, 1.5}};
 
     arma::mat rnd;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", nullptr, nullptr, true);
     REQUIRE(rnd.n_rows == 6);
     REQUIRE(rnd.n_cols == 11);
 
@@ -581,7 +615,7 @@ TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
         return g >= 9 ? qd_unif(x) : x;
     };
 
-    QD_DIAG("\n# diag: lsf_draw dual mobility against the two-device formulas\n");
+    QD_DIAG("\n# diag: gbsm_draw lsf dual mobility against the two-device formulas\n");
     QD_DIAG("link,g,value,oracle,diff\n");
     for (arma::uword l = 0; l < 6; ++l)
         for (arma::uword g = 0; g < 11; ++g)
@@ -594,7 +628,7 @@ TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
 
     // One Tx row is used for every link
     const arma::mat tx1 = tx.row(4), tx_b = arma::repmat(tx1, 6, 1);
-    quadriga_lib::lsf_draw(sp, phase, tx1, rx, rnd, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx1, rx, rnd, -1, "Comb256", nullptr, nullptr, true);
     REQUIRE(rnd.n_rows == 6);
     for (arma::uword l = 0; l < 6; ++l)
         for (arma::uword g = 0; g < 11; ++g)
@@ -604,9 +638,9 @@ TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
         }
 
     // Floors 3 (k = 3, b = 0) and 259 (k = 3, b = 1) mixed with floor 0: the offsets go to both sides
-    const arma::uvec fl = {3, 259, 0, 259, 3, 0};
+    const arma::u32_vec fl = {3, 259, 0, 259, 3, 0};
     const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, &fl, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", &fl, nullptr, true);
     REQUIRE(rnd.n_rows == 6);
     for (arma::uword l = 0; l < 6; ++l)
         for (arma::uword g = 0; g < 11; ++g)
@@ -617,7 +651,7 @@ TEST_CASE("lsf_draw - dual mobility values follow the two-device formulas")
         }
 }
 
-TEST_CASE("lsf_draw - dual mobility keeps unit variance and correlates the pairs by the ACF at the Tx-Rx distance")
+TEST_CASE("gbsm_draw - lsf: dual mobility keeps unit variance and correlates the pairs by the ACF at the Tx-Rx distance")
 {
     auto sp = scen_distinct();
     sp["AS_D_lambda"] = 10.0, sp["AS_A_lambda"] = 15.0, sp["ES_D_lambda"] = 10.0, sp["ES_A_lambda"] = 20.0;
@@ -627,7 +661,7 @@ TEST_CASE("lsf_draw - dual mobility keeps unit variance and correlates the pairs
 
     // Variance: 5 standard errors of the sample variance, sqrt(2/n) = 0.014 -> 0.07
     // Correlation: 5 standard errors (<= 0.01) + approximation error of the SOS ACF (0.03) -> 0.08
-    QD_DIAG("\n# diag: lsf_draw dual mobility, 10^4 links, Tx = Rx + (D, 0, 0)\n");
+    QD_DIAG("\n# diag: gbsm_draw lsf dual mobility, 10^4 links, Tx = Rx + (D, 0, 0)\n");
     QD_DIAG("D,var3,var4,var5,var6,corr34,ref34,corr56,ref56\n");
     const double Ds[3] = {5.0, 10.0, 20.0};
     for (double D : Ds)
@@ -635,7 +669,7 @@ TEST_CASE("lsf_draw - dual mobility keeps unit variance and correlates the pairs
         arma::mat tx = rx;
         tx.col(0) += D;
         arma::mat rnd;
-        quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, true);
+        quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", nullptr, nullptr, true);
         REQUIRE(rnd.n_rows == rx.n_rows);
         double v[4] = {arma::var(rnd.col(3)), arma::var(rnd.col(4)), arma::var(rnd.col(5)), arma::var(rnd.col(6))};
         double c34 = qd_corr(rnd.col(3), rnd.col(4)), c56 = qd_corr(rnd.col(5), rnd.col(6));
@@ -651,27 +685,27 @@ TEST_CASE("lsf_draw - dual mobility keeps unit variance and correlates the pairs
 
     // D = 0: both pair members are the same sum
     arma::mat rnd;
-    quadriga_lib::lsf_draw(sp, phase, rx, rx, rnd, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, rx, rx, rnd, -1, "Comb256", nullptr, nullptr, true);
     CHECK(arma::all(rnd.col(3) == rnd.col(4)));
     CHECK(arma::all(rnd.col(5) == rnd.col(6)));
 }
 
-TEST_CASE("lsf_draw - swapping Tx and Rx swaps ASD with ASA and ESD with ESA")
+TEST_CASE("gbsm_draw - lsf: swapping Tx and Rx swaps ASD with ASA and ESD with ESA")
 {
     const auto sp = scen_distinct(); // unequal distances of ASD/ASA and ESD/ESA
     arma::mat A = rx7(), B = rx7() * 0.7 + 20.0;
     B.col(2).fill(25.0);
 
     arma::cube ph_bias, ph_raw;
-    quadriga_lib::lsf_init_phases(sp, ph_bias, 29, &B, &A, true); // computed once from the original positions
-    quadriga_lib::lsf_init_phases(sp, ph_raw, 29, &B, &A, true, false);
+    quadriga_lib::gbsm_init_phases(sp, "lsf", ph_bias, 29, -1, "Comb256", &B, &A, true); // computed once from the original positions
+    quadriga_lib::gbsm_init_phases(sp, "lsf", ph_raw, 29, -1, "Comb256", &B, &A, true, false);
 
     const arma::cube *phases[2] = {&ph_raw, &ph_bias};
     for (int i = 0; i < 2; ++i)
     {
         arma::mat ab, ba;
-        quadriga_lib::lsf_draw(sp, *phases[i], B, A, ab, nullptr, true); // tx = B, rx = A
-        quadriga_lib::lsf_draw(sp, *phases[i], A, B, ba, nullptr, true); // tx = A, rx = B
+        quadriga_lib::gbsm_draw(sp, "lsf", *phases[i], B, A, ab, -1, "Comb256", nullptr, nullptr, true); // tx = B, rx = A
+        quadriga_lib::gbsm_draw(sp, "lsf", *phases[i], A, B, ba, -1, "Comb256", nullptr, nullptr, true); // tx = A, rx = B
         REQUIRE(ab.n_cols == 11);
         REQUIRE(ba.n_cols == 11);
         INFO("bias removal " << i);
@@ -685,24 +719,24 @@ TEST_CASE("lsf_draw - swapping Tx and Rx swaps ASD with ASA and ESD with ESA")
     }
 }
 
-TEST_CASE("lsf_draw - floor 0 equals no floor ID and equal IDs share one field")
+TEST_CASE("gbsm_draw - lsf: floor 0 equals no floor ID and equal IDs share one field")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 30);
     const arma::mat rx = rx7(), tx = {{10.0, 20.0, 25.0}};
 
     arma::mat a, b;
-    const arma::uvec fl0(7, arma::fill::zeros);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, a);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, b, &fl0);
+    const arma::u32_vec fl0(7, arma::fill::zeros);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, a);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, b, -1, "Comb256", &fl0);
     CHECK(qd_equal(a, b));
 
     // Floors 3 (k = 3, b = 0) and 259 (k = 3, b = 1) mixed with floor 0 in one call
-    const arma::uvec fl = {3, 259, 3, 0, 259, 3, 259};
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, b, &fl);
+    const arma::u32_vec fl = {3, 259, 3, 0, 259, 3, 259};
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, b, -1, "Comb256", &fl);
     REQUIRE(b.n_rows == 7);
     const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259), off0(256, arma::fill::zeros);
-    QD_DIAG("\n# diag: lsf_draw floors against ref_sos with typed offsets\n");
+    QD_DIAG("\n# diag: gbsm_draw lsf floors against ref_sos with typed offsets\n");
     QD_DIAG("link,floor,g,value,oracle,diff\n");
     for (arma::uword l = 0; l < 7; ++l)
         for (arma::uword g = 0; g < 11; ++g)
@@ -718,7 +752,7 @@ TEST_CASE("lsf_draw - floor 0 equals no floor ID and equal IDs share one field")
         }
 }
 
-TEST_CASE("lsf_draw - fields of different floors are uncorrelated at equal positions")
+TEST_CASE("gbsm_draw - lsf: fields of different floors are uncorrelated at equal positions")
 {
     const auto sp = scen_equal(10.0);
     const arma::cube phase = make_phase(256, 31);
@@ -727,13 +761,13 @@ TEST_CASE("lsf_draw - fields of different floors are uncorrelated at equal posit
     const arma::uword floors[5] = {0, 1, 5, 255, 256};
 
     arma::mat rx(5 * n, 3);
-    arma::uvec fl(5 * n);
+    arma::u32_vec fl(5 * n);
     for (arma::uword f = 0; f < 5; ++f)
         rx.rows(f * n, f * n + n - 1) = g0, fl.subvec(f * n, f * n + n - 1).fill(floors[f]);
     const arma::mat tx = {{0.0, 0.0, 25.0}};
 
     arma::mat rnd;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, &fl);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", &fl);
     REQUIRE(rnd.n_rows == 5 * n);
 
     // Pairs (index into 'floors') and bounds: within a block of N = 256 floor IDs the correlation at zero
@@ -741,7 +775,7 @@ TEST_CASE("lsf_draw - fields of different floors are uncorrelated at equal posit
     // a random correlation with standard deviation 1/sqrt(2N) = 0.044, bound 0.25
     const int pairs[4][2] = {{0, 1}, {1, 2}, {0, 3}, {0, 4}};
     const double bound[4] = {0.05, 0.05, 0.05, 0.25};
-    QD_DIAG("\n# diag: lsf_draw correlation between floors at equal positions\n");
+    QD_DIAG("\n# diag: gbsm_draw lsf correlation between floors at equal positions\n");
     QD_DIAG("floor_a,floor_b,g,corr\n");
     for (int p = 0; p < 4; ++p)
         for (arma::uword g = 0; g < 9; ++g)
@@ -754,18 +788,18 @@ TEST_CASE("lsf_draw - fields of different floors are uncorrelated at equal posit
         }
 }
 
-TEST_CASE("lsf_draw - marginal distributions")
+TEST_CASE("gbsm_draw - lsf: marginal distributions")
 {
     const auto sp = scen_equal(10.0);
     const arma::cube phase = make_phase(256, 32);
     const arma::mat rx = qd_grid(100, 100, 50.0, 1.5), tx = {{0.0, 0.0, 25.0}};
     arma::mat rnd;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd);
     REQUIRE(rnd.n_cols == 11);
 
     // 5 standard errors with n = 10^4: mean 0.05, std 0.05 (0.01 each); Uniform mean 0.015 (0.003),
     // fraction below 0.1 within 0.015 (0.003)
-    QD_DIAG("\n# diag: lsf_draw marginal statistics, 10^4 links\n");
+    QD_DIAG("\n# diag: gbsm_draw lsf marginal statistics, 10^4 links\n");
     QD_DIAG("g,mean,std,frac_below_0.1\n");
     for (arma::uword g = 0; g < 11; ++g)
     {
@@ -788,7 +822,7 @@ TEST_CASE("lsf_draw - marginal distributions")
     }
 }
 
-TEST_CASE("lsf_draw - the correlation follows the preset ACF")
+TEST_CASE("gbsm_draw - lsf: the correlation follows the preset ACF")
 {
     // Tolerance 0.1 >= 5 standard errors (0.05) + directional error of the SOS approximation (up to 0.045):
     // the sample correlation converges to the ACF of the sinusoids along the offset direction, not to the table
@@ -800,20 +834,20 @@ TEST_CASE("lsf_draw - the correlation follows the preset ACF")
     const double offsets[3] = {5.0, 10.0, 20.0};
     const double az[4] = {0.0, 0.25 * pi, 0.5 * pi, 0.75 * pi};
 
-    QD_DIAG("\n# diag: lsf_draw sample correlation against the preset ACF (column 0 shown, all Normal columns checked)\n");
+    QD_DIAG("\n# diag: gbsm_draw lsf sample correlation against the preset ACF (column 0 shown, all Normal columns checked)\n");
     QD_DIAG("preset,offset,azimuth_deg,corr_g0,acf\n");
     for (int p = 0; p < 2; ++p)
     {
         const arma::cube phase = make_phase(256, 33 + p);
         const qd_preset_tab t = qd_preset(presets[p], 10.0);
         arma::mat a;
-        quadriga_lib::lsf_draw(sp, phase, tx, base, a, nullptr, false, presets[p]);
+        quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, base, a, -1, presets[p]);
         for (double d : offsets)
             for (double phi : az)
             {
                 arma::mat moved = base, b;
                 moved.col(0) += d * std::cos(phi), moved.col(1) += d * std::sin(phi);
-                quadriga_lib::lsf_draw(sp, phase, tx, moved, b, nullptr, false, presets[p]);
+                quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, moved, b, -1, presets[p]);
                 double ref = qd_acf_at(t, d);
                 QD_DIAG("%s,%.0f,%.0f,%.4f,%.4f\n", presets[p], d, phi * 180.0 / pi, qd_corr(a.col(0), b.col(0)), ref);
                 for (arma::uword g = 0; g < 9; ++g)
@@ -825,116 +859,119 @@ TEST_CASE("lsf_draw - the correlation follows the preset ACF")
     }
 }
 
-TEST_CASE("lsf_draw - sizes, empty input and pre-sized output")
+TEST_CASE("gbsm_draw - lsf: sizes, empty input and pre-sized output")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 35);
     const arma::mat rx0(0, 3), tx1 = {{0.0, 0.0, 25.0}}, tx0(0, 3);
     arma::mat rnd(4, 4, arma::fill::ones);
 
-    CHECK_NOTHROW(quadriga_lib::lsf_draw(sp, phase, tx1, rx0, rnd));
+    CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx1, rx0, rnd));
     CHECK(rnd.n_rows == 0);
     CHECK(rnd.n_cols == 11);
     rnd.ones(4, 4);
-    CHECK_NOTHROW(quadriga_lib::lsf_draw(sp, phase, tx0, rx0, rnd, nullptr, true));
+    CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx0, rx0, rnd, -1, "Comb256", nullptr, nullptr, true));
     CHECK(rnd.n_rows == 0);
     CHECK(rnd.n_cols == 11);
 
     // Pre-sized output with stale content: written in place (same memory) and completely, single and dual mobility
     const arma::mat rx = rx7(), tx = rx7() + 5.0;
-    const arma::uvec fl = {0, 3, 3, 259, 0, 1, 259};
+    const arma::u32_vec fl = {0, 3, 3, 259, 0, 1, 259};
     arma::mat ref, ref1;
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, ref1, &fl);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, ref, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, ref1, -1, "Comb256", &fl);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, ref, -1, "Comb256", nullptr, nullptr, true);
     arma::mat pre(7, 11);
     pre.fill(99.0);
     const double *mem = pre.memptr();
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, pre, &fl);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, pre, -1, "Comb256", &fl);
     CHECK(pre.memptr() == mem);
     CHECK(qd_equal(pre, ref1));
     pre.fill(99.0);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, pre, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, pre, -1, "Comb256", nullptr, nullptr, true);
     CHECK(pre.memptr() == mem);
     CHECK(qd_equal(pre, ref));
 
     // Wrong size: resized
     arma::mat wrong(3, 3, arma::fill::ones);
-    quadriga_lib::lsf_draw(sp, phase, tx, rx, wrong, nullptr, true);
+    quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, wrong, -1, "Comb256", nullptr, nullptr, true);
     CHECK(qd_equal(wrong, ref));
 }
 
-TEST_CASE("lsf_draw - input validation")
+TEST_CASE("gbsm_draw - lsf: input validation")
 {
     const auto sp = scen_distinct();
     const arma::cube phase = make_phase(256, 36);
     const arma::mat rx = rx7().rows(0, 2), tx = {{0.0, 0.0, 25.0}};
-    const arma::uvec fl = {0, 1, 2};
+    const arma::u32_vec fl = {0, 1, 2};
     arma::mat rnd;
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd));
-        CHECK_NOTHROW(quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, &fl, true));
-        CHECK_NOTHROW(quadriga_lib::lsf_draw({}, phase, tx, rx, rnd)); // empty scenpar: all defaults
+        CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd));
+        CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", &fl, nullptr, true));
+        CHECK_NOTHROW(quadriga_lib::gbsm_draw({}, "lsf", phase, tx, rx, rnd)); // empty scenpar: all defaults
     }
     SECTION("phase")
     {
         const std::string msg = "Input 'phase' must have size [256, 11, 2] for preset 'Comb256'.";
         arma::cube bad(128, 11, 2, arma::fill::zeros);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, bad, tx, rx, rnd), std::invalid_argument, Message(msg));
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", bad, tx, rx, rnd), std::invalid_argument, Message(msg));
         bad.zeros(256, 10, 2);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, bad, tx, rx, rnd), std::invalid_argument, Message(msg));
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", bad, tx, rx, rnd), std::invalid_argument, Message(msg));
         bad.zeros(256, 11, 1);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, bad, tx, rx, rnd), std::invalid_argument, Message(msg));
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", bad, tx, rx, rnd), std::invalid_argument, Message(msg));
         bad = phase;
         bad(5, 3, 1) = NAN;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, bad, tx, rx, rnd), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", bad, tx, rx, rnd), std::invalid_argument,
                              Message("Input 'phase' must be finite."));
     }
     SECTION("preset")
     {
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, false, "Comb999"), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb999"), std::invalid_argument,
                              Message("Input 'preset' is not a known preset."));
     }
     SECTION("rx_pos")
     {
         arma::mat bad(3, 2, arma::fill::zeros);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, bad, rnd), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, bad, rnd), std::invalid_argument,
                              Message("Input 'rx_pos' must have 3 columns."));
     }
     SECTION("tx_pos")
     {
         arma::mat bad = tx;
         bad(0, 1) = INFINITY;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, bad, rx, rnd), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, bad, rx, rnd), std::invalid_argument,
                              Message("Input 'tx_pos' must be finite."));
         bad.zeros(2, 3);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, bad, rx, rnd), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, bad, rx, rnd), std::invalid_argument,
                              Message("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."));
     }
     SECTION("floor_id")
     {
-        const arma::uvec bad = {0, 1};
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, &bad), std::invalid_argument,
+        const arma::u32_vec bad = {0, 1};
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", &bad), std::invalid_argument,
                              Message("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'."));
 
         // 3D mode: the height separates the floors, floor IDs are rejected (also all zero); the output is untouched
         const std::string msg = "Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.";
-        const arma::uvec fl0 = {0, 0, 0};
+        const arma::u32_vec fl0 = {0, 0, 0};
         arma::mat keep(2, 2, arma::fill::ones);
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, rx, keep, &fl, false, "Comb256", false),
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, keep, -1, "Comb256", &fl, nullptr,
+                                                     false, false),
                              std::invalid_argument, Message(msg));
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(sp, phase, tx, rx, keep, &fl0, true, "Comb256", false),
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, keep, -1, "Comb256", &fl0, nullptr,
+                                                     true, false),
                              std::invalid_argument, Message(msg));
         CHECK(keep.n_rows == 2);
         CHECK(arma::all(arma::vectorise(keep) == 1.0));
-        CHECK_NOTHROW(quadriga_lib::lsf_draw(sp, phase, tx, rx, rnd, nullptr, false, "Comb256", false));
+        CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, rx, rnd, -1, "Comb256", nullptr, nullptr, false,
+                                              false));
     }
     SECTION("scenpar")
     {
         auto bad = sp;
         bad["XPR_lambda"] = -1.0;
-        CHECK_THROWS_MATCHES(quadriga_lib::lsf_draw(bad, phase, tx, rx, rnd), std::invalid_argument,
+        CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(bad, "lsf", phase, tx, rx, rnd), std::invalid_argument,
                              Message("Value of 'XPR_lambda' must be finite and >= 0."));
     }
 }

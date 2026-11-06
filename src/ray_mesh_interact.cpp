@@ -3416,7 +3416,7 @@ void quadriga_lib::ray_state_update(
    |  205 | 0xCD |  221 |   237   | refl, sheet, resolve, inside, ok | reflection off an isolated sheet, ray inside a medium       |
    |  199 | 0xC7 |  215 |   231   | refl, sheet, glued, resolve, ok | reflection off a glued sheet from the host side              |
    |  207 | 0xCF |  223 |   239   | refl, sheet, glued, resolve, inside, ok | reflection off a glued sheet from the solid side    |
-   |  192+| 0xC0+|    — |    —    | refl, scatter, resolve clear    | reserved: scattering not implemented                         |
+   |  193 | 0xC1 |    — |    —    | refl, scatter, ok               | point scatterer of a GBSM path ([[qrt_paths_from_scatterers]]); ray-traced scattering is not implemented |
 
    A stack of two different sheets is crossed as one event with the codes of a sheet; a singular stack kills the ray.
 

@@ -12,7 +12,7 @@ if exist( fn, 'file' ); delete( fn ); end
 if exist( fn2, 'file' ); delete( fn2 ); end
 if exist( fn_nl, 'file' ); delete( fn_nl ); end
 
-s = struct( 'DS_mu', -7.25, 'NumClusters', int32(12), 'SubpathMethod', 'mmMAGIC', 'ds_kf', single(-0.5), ...
+s = struct( 'DS_mu', -7.25, 'NumClusters', int32(12), 'SubpathMethod', 'legacy', 'ds_kf', single(-0.5), ...
     'LNS_ksi', 0, 'PolVar_sigma', 3, 'DS_omega', 0.1 + 0.2, 'GR_enabled', true );
 pl = struct( 'model', 'nlos', 'A1', 22, 'B', [28; 1.5] );
 vr = [ 0.5, 100; 10, 10; NaN, 25; 1.5, 22.5 ];
@@ -24,7 +24,7 @@ quadriga_lib.conf_file_write( fn, s, pl, {'Ab', 'Cd'}, 'Test ref', {'T1', '', 'T
 % scenpar: every given value lands in its field, exactly; the rest has the default
 assertEqual( sp.DS_mu, -7.25 );
 assertEqual( sp.NumClusters, 12 );
-assertEqual( sp.SubpathMethod, 'mmMAGIC' );
+assertTrue( ~isfield( sp, 'SubpathMethod' ) );               % accepted and ignored, never written
 assertEqual( sp.ds_kf, -0.5 );
 assertEqual( sp.LNS_ksi, 0 );                 % zero with a non-zero default is kept
 assertEqual( sp.PolVar_sigma, 3 );
@@ -52,6 +52,7 @@ assertTrue( isempty( strfind( t, 'BS antenna height' ) ) );            % row wit
 assertTrue( ~isempty( strfind( t, '% See: Test ref; T1' ) ) );         % entry 1: LSP section
 assertTrue( ~isempty( strfind( t, '% See: Test ref; T3' ) ) );         % entry 3: correlations
 assertTrue( isempty( strfind( t, 'NumSubPaths' ) ) );                  % default, not written
+assertTrue( isempty( strfind( t, 'SubpathMethod' ) ) );
 
 %% Optional inputs: omitted, empty, explicit
 quadriga_lib.conf_file_write( fn, s );
@@ -66,7 +67,8 @@ quadriga_lib.conf_file_write( fn, s, [], [], [], [], [], true );      % write_de
 t2 = fileread( fn );
 assertEqual( numel( strfind( t2, 'NumSubPaths =' ) ), 1 );
 assertEqual( numel( strfind( t2, 'PolVar_sigma =' ) ), 1 );
-assertEqual( numel( regexp( t2, '^[A-Za-z]\w* += ', 'match', 'lineanchors' ) ), 172 );   % 171 keys and SubpathMethod
+assertEqual( numel( regexp( t2, '^[A-Za-z]\w* += ', 'match', 'lineanchors' ) ), 171 );   % the 171 keys
+assertTrue( isempty( strfind( t2, 'SubpathMethod' ) ) );
 
 quadriga_lib.conf_file_write( fn, [] );                                  % empty scenpar: default set
 assertEqual( fileread( fn ), sprintf( '%% Config file for scenario "test_conf_file_write_mex"\n' ) );
@@ -99,6 +101,11 @@ assertEqual( sp4.NumClusters, 7 );
 assertEqual( sp4.SC_lambda, 50 );
 assertEqual( pl4.A, [20, 30] );
 assertEqual( numel( strfind( fileread( fn ), 'NumSubPaths =' ) ), 1 );   % write_defaults = 1
+quadriga_lib.conf_file_write( fn, struct( 'NumClusters', uint8(9), 'GR_enabled', true ), ...
+    struct( 'model', 'logdist', 'A', int16([20, 30]) ) );                     % 8- and 16-bit classes
+[ sp5, pl5 ] = quadriga_lib.conf_file_read( fn );
+assertEqual( [ sp5.NumClusters, sp5.GR_enabled ], [ 9, 1 ] );
+assertEqual( pl5.A, [20, 30] );
 
 %% Path-loss fields: row and column vectors are accepted and written in their element order
 quadriga_lib.conf_file_write( fn, s, struct( 'A', [1, 2, 3], 'B', [4; 5; 6] ) );
@@ -126,8 +133,6 @@ assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', [1, 2; 3, 4
     'Field ''A'' must be a real numeric vector.' );                    % a matrix is not a vector
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, struct( 'A', ones(1, 1, 2) ) ), ...
     'Field ''A'' must be a real numeric vector.' );
-assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'NumClusters', uint8(7) ) ), ...
-    'unsupported data type' );                                         % 8- and 16-bit classes
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], 5 ), ...
     'Input ''short_names'' must be a cell array of strings.' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {}, '', 'T1' ), ...
@@ -136,7 +141,8 @@ assert_throws( @() quadriga_lib.conf_file_write( fn, s, [], {}, '', 'T1' ), ...
 %% Errors from C++; a failed call leaves no file
 delete( fn );
 assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'GR_epsilon', 1 ) ), 'Unknown key ''GR_epsilon''' );
-assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'SubpathMethod', 'bla' ) ), 'SubpathMethod' );
+assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'SubpathMethod', 'bla' ) ), ...
+    'Value ''bla'' of ''SubpathMethod'' is not supported; only ''legacy'' is accepted.' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'NumClusters', 0 ) ), 'NumClusters' );
 assert_throws( @() quadriga_lib.conf_file_write( fn, struct( 'DS_VS', 4 ) ), ...
     'Values of ''DS_VS_a'' and ''DS_VS_b'' must not both be 0 if ''DS_VS'' is > 0.' );
