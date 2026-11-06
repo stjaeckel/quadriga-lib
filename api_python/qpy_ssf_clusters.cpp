@@ -119,7 +119,7 @@ py::tuple ssf_clusters(py::handle scenpar,
     const auto eod_offset_deg_a = qd_python_numpy2arma_Mat<double>(eod_offset_deg, true);
     const auto abs_toa_a = qd_python_numpy2arma_Col<double>(abs_toa, true);
     const auto o2i_in = qd_python_numpy2arma_Col<double>(o2i, true);
-    const auto n_cluster_in = qd_python_numpy2arma_Col<double>(n_cluster, true);
+    const arma::u32_vec n_cluster_a = qd_python_u32_entries(n_cluster, "n_cluster");
 
     // Complex permittivity -> real and imaginary part; a real array is cast to complex (imaginary part 0)
     arma::mat gr_eps_re, gr_eps_im;
@@ -138,8 +138,6 @@ py::tuple ssf_clusters(py::handle scenpar,
     std::vector<bool> o2i_a(o2i_in.n_elem);
     for (arma::uword i = 0; i < o2i_in.n_elem; ++i)
         o2i_a[i] = o2i_in[i] != 0.0;
-
-    const arma::u32_vec n_cluster_a = qd_python_uint_entries(n_cluster_in, "n_cluster");
 
     // Wrap optional pointers; None selects the default
     const arma::cube *p_rnd_freq = rnd_freq.is_none() ? nullptr : &rnd_freq_a;

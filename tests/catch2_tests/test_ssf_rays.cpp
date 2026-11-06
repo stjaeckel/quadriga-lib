@@ -291,15 +291,31 @@ TEST_CASE("ssf_rays - 38.901 splits the two strongest clusters into the sub-clus
             }
         }
     }
+    SECTION("UMa NLOS at 100 GHz: c_DS limited to PerClusterDS_min = 0.25 ns")
+    {
+        rays_in_t in = make_rays_in(scen("UMa_NLOS"), 2, "38.901", 36);
+        in.fc = arma::vec{100e9};
+        const auto rays = call(in);
+        for (arma::uword l = 0; l < 2; ++l)
+        {
+            arma::vec P = arma::vec(in.N);
+            for (arma::uword n = 0; n < in.N; ++n)
+                P(n) = in.cl.power(l, 1 + in.G + n, 0);
+            const arma::uvec o = arma::sort_index(P, "descend");
+            check(rays[l], in, l, {o(0), o(1)}, 0.25e-9);
+        }
+    }
 }
 
 TEST_CASE("ssf_rays - coupling gives each quantity a permutation of the offsets within each group")
 {
     // Cluster elevations 0.1 rad, so that no zenith fold occurs and the offsets follow from the angles. Per group and
     // quantity: each recovered offset is one of the group's offsets (1e-9), each offset is used once, and the k-th
-    // smallest value of the rank block gets the k-th smallest offset (exact)
+    // smallest value of the rank block gets the k-th smallest offset (exact); link 2 has equal values in the rank
+    // blocks, where the lower position comes first
     rays_in_t in = make_rays_in(scen("UMi_NLOS"), 3, "38.901", 41);
     in.cl.eod.fill(0.1), in.cl.eoa.fill(0.1);
+    in.rnd(arma::span(2), arma::span(0, 4 * in.N * in.M - 1), arma::span(0)).fill(0.5);
     const auto rays = call(in);
     spmap sp = in.sp;
     quadriga_lib::scenpar_validate(sp);
@@ -336,7 +352,7 @@ TEST_CASE("ssf_rays - coupling gives each quantity a permutation of the offsets 
                         x(j) = in.rnd(l, q * in.N * in.M + n * in.M + m, 0);
                     }
                     CHECK(std::all_of(used.begin(), used.end(), [](arma::uword u) { return u == 1; }));
-                    const arma::uvec order = arma::sort_index(x);
+                    const arma::uvec order = arma::stable_sort_index(x);
                     for (arma::uword k = 0; k < size[gi]; ++k)
                         CHECK(idx[order(k)] == k);
                 }
@@ -359,13 +375,17 @@ TEST_CASE("ssf_rays - ray offsets for M other than 20")
         {-2.179417, -1.549424, -1.180902, -0.919431, -0.716619, -0.550909, -0.410804, -0.289439, -0.182387,
          -0.086626, 0.0},
         {-2.288001, -1.678661, -1.322221, -1.069322, -0.873159, -0.712881, -0.577369, -0.459983, -0.356441,
-         -0.263819, -0.180033, -0.103542, -0.033177}};
-    const arma::uword Ms[7] = {1, 2, 3, 4, 6, 21, 26};
-    for (int t = 0; t < 7; ++t)
+         -0.263819, -0.180033, -0.103542, -0.033177},
+        {-1.620801, -1.206300, -0.911998, -0.683543, -0.497386, -0.203084, 0.025148, 0.489648, 0.647457, 0.833614,
+         1.356372, 1.770873},
+        {-2.091088, -1.470590, -1.108015, -0.850581, -0.650745, -0.487909, -0.349868, -0.230475, -0.125138, -0.030834,
+         0.056442, 0.150747, 0.375477, 0.513517, 0.676353, 0.876190, 1.133624, 1.496199, 2.116696}};
+    const arma::uword Ms[9] = {1, 2, 3, 4, 6, 21, 26, 12, 19};
+    for (int t = 0; t < 9; ++t)
     {
         const arma::uword M = Ms[t];
         std::vector<double> asc = quoted[t];
-        for (size_t j = asc.size(); M > 6 && j-- > 0;) // the positive half of the symmetric sets
+        for (size_t j = asc.size(); M > 20 && j-- > 0;) // the positive half of the symmetric sets
             if (asc[j] < 0.0)
                 asc.push_back(-asc[j]);
         REQUIRE(asc.size() == M);
@@ -571,6 +591,17 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
     REQUIRE(other.size() == 3);
     for (arma::uword l = 0; l < 3; ++l)
         CHECK(same(other[l], ref[l]));
+
+    // Entries of a call with ground reflection reused without it: the permittivity is cleared
+    const rays_in_t no_gr = make_rays_in(scen("UMa_LOS"), 3, "38.901", 102);
+    const auto ref_no_gr = call(no_gr);
+    call(no_gr, other);
+    for (arma::uword l = 0; l < 3; ++l)
+    {
+        CHECK(other[l].gr_eps_re.empty());
+        CHECK(other[l].gr_eps_im.empty());
+        CHECK(same(other[l], ref_no_gr[l]));
+    }
 }
 
 TEST_CASE("ssf_rays - random_phase false gives zero initial phases")

@@ -65,12 +65,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
-    const std::string set_type = qd_mex_get_string(prhs[1]);
+    const std::string set_type = qd_mex_get_string(prhs[1], "", "set_type");
     const arma::sword seed = (nrhs < 3) ? -1 : qd_mex_get_seed(prhs[2]);
     const double set_id_in = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "set_id", 0.0);
-    const std::string preset = (nrhs < 5) ? std::string("Comb256") : qd_mex_get_string(prhs[4], "Comb256");
-    const arma::mat tx_pos = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5]);
-    const arma::mat rx_pos = (nrhs < 7) ? arma::mat() : qd_mex_get_Mat<double>(prhs[6]);
+    const std::string preset = (nrhs < 5) ? std::string("Comb256") : qd_mex_get_string(prhs[4], "Comb256", "preset");
+    const arma::mat tx_pos = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5], false, "tx_pos");
+    const arma::mat rx_pos = (nrhs < 7) ? arma::mat() : qd_mex_get_Mat<double>(prhs[6], false, "rx_pos");
     const bool dual_mobility = (nrhs < 8) ? false : qd_mex_get_scalar<bool>(prhs[7], "dual_mobility", false);
     const bool remove_bias = (nrhs < 9) ? true : qd_mex_get_scalar<bool>(prhs[8], "remove_bias", true);
     const bool horizontal = (nrhs < 10) ? true : qd_mex_get_scalar<bool>(prhs[9], "horizontal", true);

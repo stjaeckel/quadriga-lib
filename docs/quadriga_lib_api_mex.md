@@ -2530,13 +2530,13 @@ Also in: [C++](quadriga_lib_api_cpp.md#los_probability) · [Python](quadriga_lib
   at 0 by the caller; the 2D distance in indoor scenarios; `[n_link]`
 - **`h_bs`** — BS height in [m], finite; `[n_link]` or `[1]` for all links
 - **`h_ut`** — UT height in [m], finite; `[n_link]` or `[1]` for all links
-- **`d_clutter`** — Clutter size in [m] of the InF and SMa models, > 0; NaN or empty = TR default
-  (InF-SL and InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m); default: NaN
+- **`d_clutter`** — Clutter size in [m] of the InF and SMa models, > 0, scalar; NaN or empty = TR
+  default (InF-SL and InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m); default: NaN
 - **`r_clutter`** — Clutter density of the InF models (default 0.2 for SL and SH, 0.6 for DL and
-  DH), vegetation density of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1); NaN or empty =
-  default; default: NaN
-- **`h_clutter`** — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0; NaN or
-  empty = default. The other models ignore the clutter arguments, which are validated for every
+  DH), vegetation density of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1), scalar; NaN or
+  empty = default; default: NaN
+- **`h_clutter`** — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0, scalar;
+  NaN or empty = default. The other models ignore the clutter arguments, which are validated for every
   model; default: NaN
 - **`rnd_g`** *(optional)* — Normal(0,1) value per link, G of eq. (7.6-18); `[n_link]`
 - **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0 (messages name it
@@ -2605,8 +2605,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [Python](quadriga_lib_ap
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [gbsm_draw](#gbsm_draw) (`'lsf'`), finite; column 10 in [0, 1] when 3 or more
-  outputs are requested (the error message counts the columns from 0); column 11 is not used;
-  `[n_link, 11]`
+  outputs are requested; column 11 is not used; `[n_link, 11]`
 - **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite
   and >= 0; replaces the value from `scenpar`, also in `lsp_sigma`; omitted or empty = the scenario
   value; `[n_link, n_freq]`
@@ -3099,8 +3098,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#.solve_scatterers) · [Python](quadriga_l
   has zero excess delay) and lengthens them by a few ns
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular point
   on z = 0, which requires both ends at z >= 0
-- `rays_out` is a copy of `rays_in` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and
-  `fallback`; `rays_in` is not changed, also when it already holds scatterers
+- `rays_out` is a copy of `rays` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and
+  `fallback`; `rays` is not changed, also when it already holds scatterers
 - `b_med`, the scale of `drift`: the lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS
   rays with power > 0, fallback rays included; NaN without NLOS power. `b_eff`, the scale of `phase`:
   `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0`, with `b` the end-to-scatterer distance (NLOS), d3D
@@ -3109,11 +3108,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#.solve_scatterers) · [Python](quadriga_l
 
 ### Usage:
 ```matlab
-[ rays_out, b_med, b_eff ] = quadriga_lib.ssf_scatterers( rays_in, d_min );
+[ rays_out, b_med, b_eff ] = quadriga_lib.ssf_scatterers( rays, d_min );
 ```
 
 ### Inputs:
-- **`rays_in`** — Ray struct of one link, see [ssf_rays](#ssf_rays); `[1, 1]` struct
+- **`rays`** — Ray struct of one link, see [ssf_rays](#ssf_rays); `[1, 1]` struct
 - **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0; default: 2
 
 ### Outputs:

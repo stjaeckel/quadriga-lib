@@ -94,13 +94,13 @@ assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos
     'Wrong number of input arguments.' );
 assert_throws( @() out2( scenpar, 'lsf', phase, tx_pos, rx_pos ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; -1; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
+    'Entries in ''floor_id'' must be integers from 0 to 4294967295.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; 1.5; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
+    'Entries in ''floor_id'' must be integers from 0 to 4294967295.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; NaN; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
+    'Entries in ''floor_id'' must be integers from 0 to 4294967295.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], [], [ 0; 2^32; 0; 0; 0 ] ), ...
-    'Entries in ''floor_id'' must be non-negative integers below 2^32.' );
+    'Entries in ''floor_id'' must be integers from 0 to 4294967295.' );
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase(:, 1:10, :), tx_pos, rx_pos ), ...
     'Input ''phase'' must have size [256, 11, 2] for preset ''Comb256''.' );                        % C++
 assert_throws( @() quadriga_lib.gbsm_draw( scenpar, 'lsf', phase, tx_pos, rx_pos, [], 'Comb1024', [], [], [] ), ...
@@ -209,13 +209,24 @@ assert_throws( @() out2( sp, 'cluster', phase, tx_pos, rx_pos ), 'Wrong number o
 msg_set = 'Input ''set_id'' must be 0 (shared set) or a frequency index >= 1.';
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, -1 ), msg_set );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0.5 ), msg_set );
-msg_fl = 'Entries in ''floor_id'' must be non-negative integers below 2^32.';
+msg_fl = 'Entries in ''floor_id'' must be integers from 0 to 4294967295.';
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0, [], [ 0; -1; 0; 0; 0 ] ), msg_fl );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0, [], [ 0; 1.5; 0; 0; 0 ] ), msg_fl );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase_f, tx_pos, rx_pos ), ...
     'Input ''phase'' must have size [256, 108, 2] for preset ''Comb256'' and this set.' );      % C++
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 1 ), '[256, 12, 2]' );     % C++
-assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, zeros(0, 3) ), 'rx_pos' );        % zero links
+r0 = quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, zeros(0, 3) );                         % zero links
+assertEqual( size(r0), [ 0, size(phase, 2) ] );
+assert_throws( @() quadriga_lib.gbsm_draw( sp, 5, phase, tx_pos, rx_pos ), ...
+    'Input ''set_type'' must be a string (character array).' );
+assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', {1}, tx_pos, rx_pos ), ...
+    'Input ''phase'' has an unsupported data type.' );
+assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, {1}, rx_pos ), ...
+    'Input ''tx_pos'' has an unsupported data type.' );
+assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, {1} ), ...
+    'Input ''rx_pos'' has an unsupported data type.' );
+assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0, 7 ), ...
+    'Input ''preset'' must be a string (character array).' );
 assert_throws( @() quadriga_lib.gbsm_draw( sp, 'cluster', phase, tx_pos, rx_pos, 0, [], fl, [], [], false ), 'floor_id' );
 
 %% Set types, set index and center_freq

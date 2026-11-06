@@ -25,8 +25,8 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
   has zero excess delay) and lengthens them by a few ns
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular point
   on z = 0, which requires both ends at z >= 0
-- `rays_out` is a copy of `rays_in` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and
-  `fallback`; `rays_in` is not changed, also when it already holds scatterers
+- `rays_out` is a copy of `rays` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and
+  `fallback`; `rays` is not changed, also when it already holds scatterers
 - `b_med`, the scale of `drift`: the lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS
   rays with power > 0, fallback rays included; NaN without NLOS power. `b_eff`, the scale of `phase`:
   `sqrt(sum P / sum(P / b²))` over the rays with power `P > 0`, with `b` the end-to-scatterer distance (NLOS), d3D
@@ -35,11 +35,11 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 ## Usage:
 ```
-[ rays_out, b_med, b_eff ] = quadriga_lib.ssf_scatterers( rays_in, d_min );
+[ rays_out, b_med, b_eff ] = quadriga_lib.ssf_scatterers( rays, d_min );
 ```
 
 ## Inputs:
-- **`rays_in`** — Ray struct of one link, see [[ssf_rays]]; `[1, 1]` struct
+- **`rays`** — Ray struct of one link, see [[ssf_rays]]; `[1, 1]` struct
 - **`d_min`** *(optional)* — Minimum distance of the scatterers to both ends in [m], finite and > 0; default: 2
 
 ## Outputs:
@@ -59,10 +59,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
     if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'rays_in' must be a 1x1 struct.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'rays' must be a 1x1 struct.");
 
     // The input is borrowed (read-only); the solver writes into the three new fields of the output
-    auto rays = qd_mex_struct2gbsm_rays(prhs[0], 0, false, "rays_in");
+    auto rays = qd_mex_struct2gbsm_rays(prhs[0]);
     const double d_min = (nrhs < 2) ? 2.0 : qd_mex_get_scalar<double>(prhs[1], "d_min", 2.0);
     const arma::uword n_ray = rays.n_ray(), n_freq = rays.n_freq();
 

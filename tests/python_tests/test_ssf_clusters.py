@@ -175,7 +175,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=nc.astype(float))[0], dc)
         with self.assertRaises(ValueError) as ctx:
             f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 6.5, 9, 12])
-        self.assertIn("Entries in 'n_cluster' must be non-negative integers below 2^32.", str(ctx.exception))
+        self.assertIn("Entries in 'n_cluster' must be integers from 0 to 4294967295.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 3, 9, 12])
         self.assertIn("Entries of 'n_cluster' must be in [6, 12].", str(ctx.exception))

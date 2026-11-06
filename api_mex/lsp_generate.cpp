@@ -60,8 +60,7 @@ Large-scale parameters of a set of links from normalized random values
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [[gbsm_draw]] (`'lsf'`), finite; column 10 in [0, 1] when 3 or more
-  outputs are requested (the error message counts the columns from 0); column 11 is not used;
-  `[n_link, 11]`
+  outputs are requested; column 11 is not used; `[n_link, 11]`
 - **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite
   and >= 0; replaces the value from `scenpar`, also in `lsp_sigma`; omitted or empty = the scenario
   value; `[n_link, n_freq]`
@@ -97,7 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
-    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[1]);
+    const arma::vec center_freq = qd_mex_get_Col<double>(prhs[1], false, "center_freq");
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[3]);
     const arma::mat rnd = qd_mex_get_Mat<double>(prhs[4]);
@@ -134,6 +133,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_eod_offset_deg = (nlhs > 4) ? &eod_offset_deg : nullptr;
     arma::cube *p_lsp_mu = (nlhs > 5) ? &lsp_mu : nullptr;
     arma::cube *p_lsp_sigma = (nlhs > 6) ? &lsp_sigma : nullptr;
+
+    // Column 10 of 'rnd' (C++ column 9) is checked here, so that the message counts the columns from 1
+    if (nlhs > 2 && rnd.n_rows == n_link && rnd.n_cols == 11 && rnd.is_finite() &&
+        (arma::any(rnd.col(9) < 0.0) || arma::any(rnd.col(9) > 1.0)))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Column 10 of 'rnd' must be in the range from 0 to 1.");
 
     // Call library function
     CALL_QD(quadriga_lib::lsp_generate(scenpar, center_freq, tx_pos, rx_pos, rnd, lsp, p_sf_sigma, p_abs_toa, p_gr_eps_re,

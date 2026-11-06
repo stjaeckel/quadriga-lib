@@ -575,7 +575,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
             throw std::invalid_argument("Number of elements in 'n_cluster' does not match number of rows in 'rx_pos'.");
         const double n_min = sp.at("NumClusters_min");
         const arma::uword N_lo = std::min(n_min > 2.0 ? (arma::uword)n_min - 1 : (arma::uword)1, N);
-        if (arma::any(*n_cluster < N_lo) || arma::any(*n_cluster > N))
+        if (arma::any(*n_cluster < (unsigned)N_lo) || arma::any(*n_cluster > (unsigned)N))
             throw std::invalid_argument("Entries of 'n_cluster' must be in [" + std::to_string(N_lo) + ", " +
                                         std::to_string(N) + "].");
     }

@@ -252,17 +252,19 @@ inline long long qd_mex_get_seed(const mxArray *input, const std::string &var_na
 }
 
 // Read a string input from MATLAB and convert it to a std::string
-// - Returns default_value (e.g. "") for empty input
-inline std::string qd_mex_get_string(const mxArray *input, std::string default_value = "")
+// - Returns default_value (e.g. "") for empty input; errors name 'var_name' if given
+inline std::string qd_mex_get_string(const mxArray *input, std::string default_value = "",
+                                     const std::string &var_name = "")
 {
-    if (input == nullptr)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a string (character array)");
-
-    if (mxGetNumberOfElements(input) == 0)
+    if (input != nullptr && mxGetNumberOfElements(input) == 0)
         return default_value;
 
-    if (!mxIsClass(input, "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a string (character array)");
+    if (input == nullptr || !mxIsClass(input, "char"))
+    {
+        const std::string msg = var_name.empty() ? "Input must be a string (character array)"
+                                                 : "Input '" + var_name + "' must be a string (character array).";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
 
     auto chr = mxArrayToString(input);
     std::string data = std::string(chr);
@@ -294,7 +296,7 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
 
     if (n_data == 0)
-        return arma::Mat<dtype>();
+        return arma::Mat<dtype>(d1, d2 * d3 * d4);
 
     return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2 * d3 * d4, create_copy, !create_copy);
 }
@@ -306,7 +308,7 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool crea
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name); // Rejects complex, sparse and 5-D input
 
     if (n_data == 0)
-        return arma::Cube<dtype>();
+        return arma::Cube<dtype>(d1, d2, d3 * d4);
 
     return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
 }
@@ -483,7 +485,7 @@ inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string va
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
     if (n_data == 0)
-        return arma::Mat<dtype>();
+        return arma::Mat<dtype>(d1, d2 * d3 * d4);
     arma::Mat<dtype> output(d1, d2 * d3 * d4, arma::fill::none);
     qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
     return output;
@@ -494,7 +496,7 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
 {
     auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
     if (n_data == 0)
-        return arma::Cube<dtype>();
+        return arma::Cube<dtype>(d1, d2, d3 * d4);
     arma::Cube<dtype> output(d1, d2, d3 * d4, arma::fill::none);
     qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
     return output;

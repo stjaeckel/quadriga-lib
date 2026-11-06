@@ -314,9 +314,14 @@ TEST_CASE("gbsm_rays::solve_scatterers - a ray with power 0 at frequency 0 and >
     rays_t r = make_rays(11, false, false, 4, 2, "38.901_MF");
     r.power(1, 0) = 0.0;
     REQUIRE(r.power(1, 1) > 0.0);
+    r.power(0, 1) = 0.0; // and the reverse: > 0 at frequency 0, 0 at the last
+    REQUIRE(r.power(0, 0) > 0.0);
     r.solve_scatterers();
-    CHECK(len3(r.fbs_pos.col(1) - 0.5 * (r.tx_pos + r.rx_pos)) > 1.0);
-    check_solved(r, 1);
+    for (arma::uword i : {0, 1})
+    {
+        CHECK(len3(r.fbs_pos.col(i) - 0.5 * (r.tx_pos + r.rx_pos)) > 1.0);
+        check_solved(r, i);
+    }
 }
 
 TEST_CASE("gbsm_rays::solve_scatterers - input validation")

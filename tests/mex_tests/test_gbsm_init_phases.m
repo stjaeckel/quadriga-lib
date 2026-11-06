@@ -98,6 +98,14 @@ assert_throws( @() quadriga_lib.gbsm_init_phases( struct( 'Foo', 1 ), 'lsf', 7 )
 assert_throws( @() quadriga_lib.gbsm_init_phases( struct( 'DS_lambda', -1 ), 'lsf', 7 ), 'DS_lambda' );     % C++
 assert_throws( @() quadriga_lib.gbsm_init_phases( 5, 'lsf', 7 ), 'Input ''scenpar'' must be a 1x1 struct.' );
 assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', -2 ), 'Input ''seed''' );
+assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 5 ), ...
+    'Input ''set_type'' must be a string (character array).' );
+assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], 1 ), ...
+    'Input ''preset'' must be a string (character array).' );
+assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], {1} ), ...
+    'Input ''tx_pos'' has an unsupported data type.' );
+assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], {1} ), ...
+    'Input ''rx_pos'' has an unsupported data type.' );
 
 % ---- Set type 'cluster' ----
 %% Setup: UMi LOS file, N = 12 NLOS clusters

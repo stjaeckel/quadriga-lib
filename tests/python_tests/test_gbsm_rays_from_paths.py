@@ -124,7 +124,7 @@ class test_case(unittest.TestCase):
         self.assertIn("The interaction point of the GR path must be on the ground", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.rays_from_paths(*self.args, tap=[-1, 0, 1])
-        self.assertIn("Entries in 'tap' must be non-negative integers", str(ctx.exception))
+        self.assertIn("Entries in 'tap' must be integers from 0 to 4294967295.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.rays_from_paths(self.fc * 0, *self.args[1:])
         self.assertIn("Input 'center_frequency' must be finite and > 0.", str(ctx.exception))

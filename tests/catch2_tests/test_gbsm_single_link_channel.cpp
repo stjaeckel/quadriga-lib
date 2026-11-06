@@ -419,6 +419,7 @@ TEST_CASE("gbsm_single_link_channel - the phase speed-up equals per-snapshot pla
     // Orientation changes: snapshot 1 Rx only, 2 Tx only, 4 both
     a.Ro = arma::mat{{0.0, 0.0, 1.0}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, -2.5}};
     a.lg = {-70.0, -71.0, -71.0, -72.0, -72.0};
+    a.kf = {1.0, 1.0, 2.0, 2.0, 2.0}; // snapshot 2: the K ratio changes alone
     const std::vector<snap_t> e = ref(a);
     check_rays(a.run(), a, e);
     a.out = "taps";
@@ -538,7 +539,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
     // Positions of the snapshots: none at the ray-data positions
     args_t a{&omni, &omni, &s};
     a.T = arma::mat{{3.3, -4.0, 25.0}, {3.2, -4.4, 25.0}};
-    a.R = arma::mat{{120.5, 45.0, 1.5}, {120.1, 45.0, 1.5}, {119.0, 45.0, 1.5}};
+    a.R = arma::mat{{120.5, 45.0, 1.5}, {120.1, 45.0, 1.5}, {119.0, 45.0, 2.5}}; // snapshot 2 also moves in z
     a.T = arma::join_cols(a.T, a.T.row(1));
     a.lg = {-80.0, -81.0, -82.0};
     const double d_tx = len3(arma::vec(a.T.row(1).t()) - s.tx_pos), d_rx = len3(arma::vec(a.R.row(2).t()) - s.rx_pos);

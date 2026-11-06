@@ -119,10 +119,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat gr_eps_re = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10]);
     const arma::mat gr_eps_im = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11]);
     const std::vector<bool> o2i = (nrhs < 13) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[12], "o2i");
-    const arma::vec n_cluster_in = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13], false, "n_cluster");
-
-    // Cluster numbers are counts (no index shift)
-    const arma::u32_vec n_cluster = qd_mex_uint_entries(n_cluster_in, "n_cluster");
+    const arma::u32_vec n_cluster =
+        (nrhs < 14) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[13], false, "n_cluster");
 
     // Wrap optional pointers; empty arrays select the default
     const arma::cube *p_rnd_freq = rnd_freq.empty() ? nullptr : &rnd_freq;

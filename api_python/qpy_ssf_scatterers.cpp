@@ -83,8 +83,11 @@ py::tuple ssf_scatterers(const py::dict &rays, double d_min)
             rays_out[k] = fallback_py;
         else if (rays.contains(k) && !py::object(rays[k]).is_none())
             rays_out[k] = rays[k];
-        else
-            rays_out[k] = py::array_t<std::complex<double>>(0); // 'gr_eps', the only other optional key
+        else if (key == "gr_eps") // the only other optional key
+            rays_out[k] = py::array_t<std::complex<double>>(0);
+        else // a key given as None, valid for n_ray = 0: empty with the dtype of the key
+            rays_out[k] = (key == "path_type" || key == "tap") ? py::array(py::array_t<unsigned>(0))
+                                                               : py::array(py::array_t<double>(0));
     }
     return py::make_tuple(rays_out, b_med_py, b_eff_py);
 }
