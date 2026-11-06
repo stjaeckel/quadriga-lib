@@ -5,7 +5,8 @@ Project plan for the tutorial series on random fields and the sum-of-sinusoids m
 ## 0. Status
 
 - Part 1 is drafted (`tutorials/sos_01_random_fields.ipynb`), reviewed, and its references are checked against the full texts. The research behind the series is in section 5, the decisions in sections 4 and 6.
-- Next: the setup section of the tutorial index (input in section 5.6), then part 2.
+- Part 2 is drafted (`tutorials/sos_02_custom_acf.ipynb`), reviewed, and its references are checked against the full texts; scope, decisions and findings are in section 7. Its statements on the residual beyond the fitted range and on 1-D fits describe the library as it is; they are to be revisited when https://github.com/stjaeckel/quadriga-lib/issues/22 and https://github.com/stjaeckel/quadriga-lib/issues/24 are resolved.
+- Next: the setup section of the tutorial index (input in section 5.6).
 
 ## 1. Goal
 
@@ -26,13 +27,13 @@ Notebook stem `sos_01_random_fields`. Possible now; all functions exist. Python 
 - Repeatable simulations with phases or seeds.
 - Plots: two example processes side by side (Gauss and Exp preset), like Fig. 1 of the publication; desired and approximated ACF, at least in 1-D, in 2-D if a few lines of plot code do it (like Fig. 2).
 
-### Part 2: Custom random fields (advanced; title to be found)
+### Part 2: Custom correlation functions (advanced)
 
-Notebook stem `sos_02_custom_acf`; working title "Designing your own correlation function".
+Notebook stem `sos_02_custom_acf`; title "Custom correlation functions and the limits of the sum-of-sinusoids method". The content as written is in section 7.
 
 - Approximating a custom ACF with the quadriga-lib tools (`sos.generate`, `sos.calc_mse`, `sos.acf_approx`, `sos.acf_estimate`).
 - Using custom frequencies instead of the presets. The model has no weights: all sinusoids have the amplitude sqrt(2/N), and the only free parameters are the frequency vectors. The low-level calls (`sos.val`, `sos.map`, `sos.remove_bias`) take custom frequencies already; `sos.randn`, `sos.rand`, `sos.randi` and the GBSM functions take only a preset name.
-- An extreme example: fully correlated from 0 to 10 m and uncorrelated beyond. This step is not a valid ACF in any dimension, not even in 1-D: points at 0, 6 and 12 m would need equal values at 0 and 6 m and at 6 and 12 m, but uncorrelated values at 0 and 12 m (the correlation matrix has determinant −1). Its spectrum has negative parts (Bochner's theorem), so it cannot be met exactly. An SOS generator always has a valid ACF, so the fit gives a valid approximation. The tutorial says this up front and uses it to show the limits. The triangle (1 − d/a) for d < a is the textbook example of an ACF that is valid in 1-D but not in 2-D.
+- An extreme example: fully correlated from 0 to 10 m and uncorrelated beyond. This step is not a valid ACF in any dimension, not even in 1-D: points at 0, 6 and 12 m would need equal values at 0 and 6 m and at 6 and 12 m, but uncorrelated values at 0 and 12 m (the correlation matrix has determinant −1). Its spectrum has negative parts (Bochner's theorem), so it cannot be met exactly. An SOS generator always has a valid ACF, so the fit gives a valid approximation. The tutorial says this up front and uses it to show the limits. The triangle (1 − d/a) for d < a is valid in 1-D but not in 2-D, but only mildly: its 2-D spectrum dips to about −2 % of its peak, and fits follow it (section 7). The damped cosine exp(−d/a)·cos(2πd/b) shows the dependence on the dimension clearly.
 - How well it is approximated with different numbers of sinusoids, and how the resulting field looks. The fitting figures of the publication (Fig. 3 to 6) belong here.
 - Limitations of the method.
 
@@ -218,13 +219,14 @@ Books and papers
 - [PKL96] M. Pätzold, U. Killat, F. Laue, "A deterministic digital simulation model for Suzuki processes with application to a shadowed Rayleigh land mobile radio channel", IEEE Trans. Veh. Technol. 45(2), 318-331, 1996. https://doi.org/10.1109/25.492906 (bibliographic)
 - [QS13] P. Qarabaqi, M. Stojanovic, "Statistical characterization and computationally efficient modeling of a class of underwater acoustic communication channels", IEEE J. Oceanic Eng. 38(4), 701-717, 2013. (bibliographic)
 - [Ric44] S. O. Rice, "Mathematical analysis of random noise", Bell Syst. Tech. J. 23(3), 282-332, 1944. https://doi.org/10.1002/j.1538-7305.1944.tb00874.x
+- [Ric45] S. O. Rice, "Mathematical analysis of random noise" (Parts III and IV), Bell Syst. Tech. J. 24(1), 46-156, 1945. https://doi.org/10.1002/j.1538-7305.1945.tb00453.x (read from a scan: Sec. 3.3, expected number of zeros, eq. 3.3-11, p. 54; infinite for the exponential ACF, p. 55)
 - [RR07] A. Rahimi, B. Recht, "Random features for large-scale kernel machines", NIPS 20, 2007. https://papers.nips.cc/paper/2007/hash/013a006f03dbc5392effeb8f18fda755-Abstract.html
 - [RT95] A. P. Roberts, M. Teubner, "Transport properties of heterogeneous materials derived from Gaussian random fields: bounds and simulation", Phys. Rev. E 51(5), 4141-4154, 1995. https://doi.org/10.1103/PhysRevE.51.4141
 - [RW06] C. E. Rasmussen, C. K. I. Williams, Gaussian Processes for Machine Learning, MIT Press, 2006. http://gaussianprocess.org/gpml/chapters/ (chapters 2, 4 and appendix A)
 - [SD91] M. Shinozuka, G. Deodatis, "Simulation of stochastic processes by spectral representation", Appl. Mech. Rev. 44(4), 191-204, 1991. https://doi.org/10.1115/1.3119501 (abstract)
 - [SD96] M. Shinozuka, G. Deodatis, "Simulation of multi-dimensional Gaussian stochastic fields by spectral representation", Appl. Mech. Rev. 49(1), 29-53, 1996. https://doi.org/10.1115/1.3101883 (abstract)
 - [SDH87] M. Shinozuka, G. Deodatis, T. Harada, "Digital simulation of seismic ground motion", Technical Report NCEER-87-0017, 1987. https://nehrpsearch.nist.gov/static/files/NSF/PB88155197.pdf
-- [SH09] P. Schneider, J. Hartlap, "Constrained correlation functions", Astronomy & Astrophysics 504(3), 705-717, 2009. https://doi.org/10.1051/0004-6361/200912424
+- [SH09] P. Schneider, J. Hartlap, "Constrained correlation functions", Astronomy & Astrophysics 504(3), 705-717, 2009. https://doi.org/10.1051/0004-6361/200912424 (read: arXiv:0905.0577v1; bounds in Sec. 2, eqs. 5-6)
 - [SN26] C. Safta, H. N. Najm, "Numerical considerations for the construction of Karhunen-Loève expansions", arXiv:2603.19108, 2026. https://arxiv.org/abs/2603.19108
 - [SP08] M. Siderius, M. B. Porter, "Modeling broadband ocean acoustic transmissions with time-varying sea surfaces", J. Acoust. Soc. Am. 124, 137-150, 2008. https://doi.org/10.1121/1.2920959 (bibliographic)
 - [Tes04] J. Tessendorf, "Simulating ocean water", SIGGRAPH course notes, 1999-2004. https://jtessen.people.clemson.edu/reports/papers_files/coursenotes2004.pdf
@@ -354,3 +356,38 @@ SPDE, Karhunen-Loève, sequential simulation, measure theory, Hankel transforms 
 4. The 2-D ACF figure (target from `sos.acf_2d` against the generator from `sos.acf_approx`) is included, one figure with two panels: it shows the isotropy that separable grid filters lack (5.3).
 
 The version cell, the handling of outputs and the figure format follow `tutorials/README.md`.
+
+## 7. Part 2: scope, decisions and findings
+
+Notebook `tutorials/sos_02_custom_acf.ipynb`, Python. Metadata: title "Custom correlation functions and the limits of the sum-of-sinusoids method", level `advanced`, `order` 11, `duration_min` 35. The notebook runs in about 30 s (all fits included). Numbers below are printed by the notebook unless marked otherwise; "(measured)" marks checks run for the plan with a local build of quadriga-lib (main branch).
+
+### 7.1 Sections
+
+1. A field with two length scales: 0.6·exp(−d/5 m) + 0.4·exp(−d/50 m), fitted in 3-D with 256 sinusoids on 201 geometrically spaced sample points up to 250 m, `freq_min` 0.001 1/m, `freq_max` 1 1/m, 20 test directions; a map.
+2. The frequencies are the free parameters: equal amplitudes, so the density of the frequencies takes the place of the spectrum; a histogram of |f|; what `sos.generate` does [JRBT18, Sec. III] and what is the library's (regular directions on the half circle or half sphere, fit along the sinusoid's own direction); its arguments.
+3. Judging a fit: the same target with the default settings loses the short scale (ACF 0.99 at 1 m against 0.88; largest error of the direction-mean ACF 0.23 against 0.014) while the scores of `sos.calc_mse` differ by at most 1.8 dB; the ACF along 200 directions; the error map from `sos.acf_approx` minus `sos.acf_2d`; `acf_tail` and `freq_min`; `sos.acf_estimate` over 20 realizations.
+4. Using your own frequencies: `sos.init_phases`, `sos.val`, `sos.map`; division of the frequencies scales the distances [JRBT18, Sec. III]; scaling one column makes the field anisotropic.
+5. Targets that are not ACFs: Bochner [RW06, Sec. 4.2.1, Thm. 4.1]; the step with the three-point matrix (determinant −1); fits with 16, 64 and 256 sinusoids reach the same rms error (0.186, 0.157, 0.153); the damped cosine exp(−d/20 m)·cos(2πd/10 m), the form of [Chu24, Sec. III-B, eq. 2], fitted in 1-D (rms 0.020 with 32 sinusoids) and in 2-D and 3-D, where the fits stop at the bounds −0.402 and −0.217 [SH09, Sec. 2, eqs. 5-6]; the 2-D fit puts 80 % of its frequencies on a ring at 0.104 to 0.106 1/m (ACF J0); the triangle in one sentence (2-D fit rms 0.026).
+6. How many sinusoids: own 3-D fits of the exponential ACF with 8 to 256 sinusoids and the presets `Exp128` to `Exp1024`; error inside the fitted range and between 5 and 30 d0 against 1/sqrt(2N); 3 dB per doubling [JRBT18, Sec. V, Fig. 3]; a fit with 300 test directions reaches the preset (0.028 against 0.028 at 256); a fit without `freq_min` keeps a mean of +0.015 beyond the range; the residual belongs to the table; its average over all rotations, (1/N)·Σ sin(2π|f|d)/(2π|f|d), has an rms of 0.0053 for `Exp256` and decays with distance; 1-D fits leave the tail uncontrolled (damped cosine, 32 sinusoids: rms 0.209 between 50 and 1000 m against 0.125).
+7. The slope at the origin: the `Exp` presets near d = 0; zero crossings per 100 m from 2·sqrt(mean f_x²) [Ric45, Sec. 3.3, eq. 3.3-11] and counted on a 10 km track (Exp128 7.5 to Exp1024 11.1, Comb256 4.6; scatter between seeds ±0.2 to ±0.3).
+8. Few sinusoids: tail probabilities against N (no value below −3 with 4 sinusoids, about half of the Normal share with 8, about 90 % with 32).
+9. A traveling sea surface: wave vectors drawn from the Phillips spectrum [Tes04, eqs. 40, 41] with equal amplitudes (Tessendorf uses an FFT lattice with Gaussian amplitudes, eqs. 36, 42), deep-water dispersion [Tes04, eq. 31], time as the third coordinate of `sos.map`; the principle of random Fourier features [RR07, Sec. 3]; two frames 2 s apart.
+10. Limits of the method, summary, references.
+
+### 7.2 Decisions
+
+- Main example: the two-scale ACF, which teaches the spacing of the sample points and the frequency limits; the damped cosine serves as the example of a target that is valid in 1-D only.
+- The triangle gets one sentence: its 2-D spectrum is only about 2 % negative, and a 2-D fit with 256 sinusoids follows it (rms 0.026), so it does not show the dependence on the dimension.
+- The residual 1/sqrt(2N) is presented for a fixed table of frequencies, with the average over rotations as what a random rotation per realization would give; no recipe for rotating tables and no issue link (https://github.com/stjaeckel/quadriga-lib/issues/22 is open; to be revisited when it is resolved).
+- The ripple argument of [ns3-sgf] is answered with the numbers only; ns-3 is not named.
+- The sea surface has its own section before the limits; keeping only the waves that move with the wind is a choice of the notebook and is said so.
+- Error against N: own fits and presets in correlation units (rms), with one line in dB from `sos.calc_mse`.
+- Left out: dual mobility (https://github.com/stjaeckel/quadriga-lib/issues/21), `sos.remove_bias` and the ensemble bias (part 3), fits with 1024 sinusoids, a second histogram of the values, conditioning on measured values.
+
+### 7.3 Findings
+
+- Fit settings: each sample point counts equally in the error of `sos.generate`, so the spacing of the sample points weights the fit; the default upper limit 15/max(dist) limits fine scales when the range is long. For the two-scale target, either change alone does not help (measured: largest error 0.17 to 0.31); both together reduce it from 0.20 to 0.018 (measured, 2-D). Raising `freq_max` alone for exp(−d/5 m) fitted to 250 m moves the ACF at 5 m from 0.638 to 0.486 (target 0.368; measured, 2-D).
+- Cost of `sos.generate` (measured): 2-D and 3-D fits take up to about 1 s for 256 sinusoids on 200 sample points with the default limits and 20 to 30 test directions, about 2 s with 300; the two-scale fit with `freq_max` 1 1/m over 250 m takes about 5 s; 1-D fits run up to 1000 passes and take several seconds.
+- 1-D fits do not decay to 1/sqrt(2N) beyond the fitted range: the fit stacks sinusoids closer together than it can resolve over the range; `freq_min` turns the plateau of near-zero frequencies into an oscillation of about the same size (measured: exponential ACF, 256 sinusoids, rms beyond the range 0.133, with `freq_min` 0.247). A tail term in the cost of the fit reduces it to 0.018 at an in-range error of 0.0053 instead of 0.0049 (measured in a numpy prototype). Filed as https://github.com/stjaeckel/quadriga-lib/issues/24; the 1-D statements of part 2 are to be revisited when it is resolved.
+- Frequencies drawn from a spectrum (sea surface) give the target ACF only on average over draws; one draw has an error of about 1/sqrt(2N) at all distances, more than a fit inside its range.
+- Reference check of part 2: the zero-crossing formula is in Parts III and IV of Rice [Ric45], not in [Ric44]; Chuang et al. model the residual fluctuations of the multipath parameters with the damped cosine, not the channel of moving hands and arms; GPML gives the triangle only as the 1-D member of eq. 4.21; Tessendorf's crests can be sharpened ([Tes04, Sec. 4.6]). The notebook follows these readings.
