@@ -85,11 +85,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 a = mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL);
             else if (mxIsChar(in))
                 a = mxCreateString(qd_mex_get_string(in).c_str());
-            else
+            else // An empty cell or struct (non-empty ones are rejected when read) is copied as an empty double
             {
                 a = mxIsLogical(in) ? mxCreateLogicalArray(mxGetNumberOfDimensions(in), mxGetDimensions(in))
                                     : mxCreateNumericArray(mxGetNumberOfDimensions(in), mxGetDimensions(in),
-                                                           mxGetClassID(in), mxREAL);
+                                                           mxIsNumeric(in) ? mxGetClassID(in) : mxDOUBLE_CLASS, mxREAL);
                 if (mxGetNumberOfElements(in) > 0)
                     std::memcpy(mxGetData(a), mxGetData(in), mxGetNumberOfElements(in) * mxGetElementSize(in));
             }

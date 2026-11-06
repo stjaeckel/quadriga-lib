@@ -67,15 +67,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec tx_pos = qd_mex_get_Col<double>(prhs[1], false, "tx_pos");
     const arma::vec rx_pos = qd_mex_get_Col<double>(prhs[2], false, "rx_pos");
     // Empty arrays keep their dimensions, so that a link without paths ([3, 0], [0, n_freq], [8, 0, n_freq]) passes
-    auto dim = [](const mxArray *a, mwSize d) -> arma::uword
-    { return d < mxGetNumberOfDimensions(a) ? (arma::uword)mxGetDimensions(a)[d] : 1; };
     auto mat = [&](const mxArray *a, const char *name)
-    { return mxIsEmpty(a) ? arma::mat(dim(a, 0), dim(a, 1)) : qd_mex_get_Mat<double>(a, false, name); };
+    { return mxIsEmpty(a) ? arma::mat(qd_mex_dim(a, 0), qd_mex_dim(a, 1)) : qd_mex_get_Mat<double>(a, false, name); };
     const arma::mat fbs_pos = mat(prhs[3], "fbs_pos"), lbs_pos = mat(prhs[4], "lbs_pos");
     const arma::mat path_gain = mat(prhs[5], "path_gain");
     const arma::vec path_length = qd_mex_get_Col<double>(prhs[6], false, "path_length");
-    const arma::cube M = mxIsEmpty(prhs[7]) ? arma::cube(dim(prhs[7], 0), dim(prhs[7], 1), dim(prhs[7], 2))
-                                            : qd_mex_get_Cube<double>(prhs[7], false, "M");
+    const mxArray *m = prhs[7];
+    const arma::cube M = mxIsEmpty(m) ? arma::cube(qd_mex_dim(m, 0), qd_mex_dim(m, 1), qd_mex_dim(m, 2))
+                                      : qd_mex_get_Cube<double>(m, false, "M");
     const std::string method = (nrhs < 9) ? std::string("quadriga") : qd_mex_get_string(prhs[8], "quadriga");
     const arma::uvec path_type = (nrhs < 10) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[9], false, "path_type");
     const arma::uvec tap = (nrhs < 11) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[10], false, "tap");

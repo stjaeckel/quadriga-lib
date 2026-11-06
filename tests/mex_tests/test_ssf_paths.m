@@ -92,18 +92,24 @@ for cls = { 'uint8', 'int8', 'uint16', 'int16' }                              % 
     assertEqual( quadriga_lib.ssf_paths( s, -90 ), pg );
 end
 
-%% No path: empty outputs keep their shapes
+%% No path: empty outputs keep their shapes (two frequencies, so that M is [8, 0, n_freq])
 s = rays;
 for f = { 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', 'path_type', 'tap', 'fallback' }
     s.(f{1}) = s.(f{1})( [], : );
 end
-s.M = zeros( 8, 0 );
+s.center_frequency = [ fc; 2 * fc ];
+s.power = zeros( 0, 2 );
+s.M = zeros( 8, 0, 2 );
+s.gr_eps_re = [ gre; gre ];
+s.gr_eps_im = [ gim; gim ];
 s.fbs_pos = zeros( 3, 0 );
 s.lbs_pos = zeros( 3, 0 );
-[ g0, l0, M0, a0, ~, ~, ~, f0, ~, p0, r0 ] = quadriga_lib.ssf_paths( s, -90, 'drift' );
-assertEqual( { size(g0), size(l0), size(M0), size(a0), size(f0), size(p0), size(r0) }, ...
-    { [0, 1], [0, 1], [8, 0], [0, 1], [3, 0], [0, 1], [0, 1] } );
-assertTrue( isa(p0, 'uint64') && isa(r0, 'uint64') );
+for mob = { 'phase', 'drift' }
+    [ g0, l0, M0, a0, ~, ~, ~, f0, ~, p0, r0 ] = quadriga_lib.ssf_paths( s, [ -90; -90 ], mob{1} );
+    assertEqual( { size(g0), size(l0), size(M0), size(a0), size(f0), size(p0), size(r0) }, ...
+        { [0, 2], [0, 1], [8, 0, 2], [0, 1], [3, 0], [0, 1], [0, 1] } );
+    assertTrue( isa(p0, 'uint64') && isa(r0, 'uint64') );
+end
 
 %% Errors
 assert_throws( @() quadriga_lib.ssf_paths( rays ), 'Wrong number of input arguments.' );

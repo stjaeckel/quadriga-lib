@@ -577,14 +577,32 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
         a.r = &u, a.mob = "phase";
         check(a.run(), bm, be, false);
     }
-    SECTION("phase without scatterers, GR ray and the Tx below z = 0: no solved copy, b NaN, limits Inf")
+    SECTION("phase without scatterers, Tx or Rx below z = 0, with and without GR ray: b from a solved copy")
     {
-        rays_t u = make_rays(59, true, true, 6, 1, "38.901");
-        u.tx_pos(2) = -1.0; // hand-made object: valid, but without a specular point
-        REQUIRE(u.is_valid().empty());
-        a.r = &u, a.mob = "phase";
-        const double b_nan[2] = {nan_v, nan_v};
-        check(a.run(), b_nan, b_nan, false);
+        for (int e = 0; e < 2; ++e)
+            for (bool gr : {true, false})
+            {
+                INFO("end " << e << " below z = 0, GR ray " << gr);
+                rays_t u = make_rays(59, true, gr, 6, 1, "38.901");
+                arma::vec &P0 = (e == 0) ? u.tx_pos : u.rx_pos;
+                const double dz = -1.0 - P0(2);
+                P0(2) = -1.0; // hand-made object: valid, but the GR ray has no specular point
+                REQUIRE(u.is_valid().empty());
+
+                // Oracle: the NLOS scatterers do not depend on the GR ray, whose scatterers b does not use (b of the
+                // GR ray is its image-method length); the solver rejects the GR ray, so it is solved as an NLOS ray
+                rays_t v = u;
+                v.path_type.replace(1, 2);
+                v.solve_scatterers();
+                v.path_type = u.path_type;
+                ref_b(v, 0, bm, be);
+                REQUIRE((std::isfinite(bm[e]) && std::isfinite(be[e])));
+
+                args_t b = a; // snapshot positions moved with the end, so that the displacements stay
+                b.r = &u, b.mob = "phase";
+                (e == 0 ? b.T : b.R).col(2) += dz;
+                check(b.run(), bm, be, false);
+            }
     }
     SECTION("LOS-only link, d3D = 100 m: limits 1.0347 m at 3.5 GHz and 0.3658 m at 28 GHz")
     {
