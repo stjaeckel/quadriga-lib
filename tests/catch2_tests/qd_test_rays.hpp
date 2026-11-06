@@ -12,6 +12,7 @@
 //  - geometry: unit_vec, ang_dist, polyline, specular_point, fresnel (TR eqs. (7.6-38) to (7.6-40))
 //  - make_rays: a hand-made gbsm_rays object of one link (Tx (3, -4, 25), Rx (120, 45, 1.5)), so that the consumers
 //    of ray data need no ssf_rays; with_scatterers builds the NLOS rays from hand-made scatterers
+//  - ref_rays_tr, ref_cds: the expected rays of ssf_rays for the TR methods, typed from TR 38.901 clause 7.5
 // Units: positions in [m], angles in [rad], delays in [s], frequencies in [Hz].
 
 #ifndef QD_TEST_RAYS_HPP
@@ -282,6 +283,109 @@ namespace
                 for (arma::uword e = 0; e < 8; ++e)
                     r.M(e, i, k) = U(-1.0, 1.0);
             }
+        }
+        return r;
+    }
+
+    // Expected ray data of one link of ssf_rays with the TR methods, typed from TR 38.901 clause 7.5 steps 7 to 11
+    // (antenna-free part): additive angle model (eqs. (7.5-13), (7.5-18), (7.5-20), zenith wrap of step 7 for ZOA and
+    // ZOD), polarisation of eqs. (7.5-21), (7.5-28) without clause 7.6.16, LOS eq. (7.5-29), ground reflection eqs.
+    // (7.6-38) to (7.6-40)
+    // - Inputs as ssf_rays takes them; frequency k (index into fc, lsp_mu, lsp_sigma, the power slices and the slices
+    //   of rnd), geometry slice g = k for 38.901_MF (mf), else 0
+    // - Split (Table 7.5-5, M = 20 only): the clusters with power > 0 at k that have fewer than two clusters of higher
+    //   power or of equal power and lower index; ray positions 0-9, 10-15, 16-19 with delay + 0, 1.28, 2.56 c_DS
+    // - Coupling: in each group of positions, the ray whose rank-block value is the k-th smallest gets the k-th
+    //   smallest offset of the group (rank blocks 0 AOD, 1 AOA, 2 ZOD, 3 ZOA; equal values: lower position first)
+    // - c_DS of Table 7.5-6 (3.91 ns where the table has no value), c_ZSD = PerClusterES_D_scale·10^mu_lgZSD
+    //   (eq. (7.5-20)) or PerClusterES_D; initial phases 2·pi·Phi(x) - pi of a Normal value x, or 0
+    // - ang[q] in rank-block order: AOD, AOA, EOD, EOA; J holds 4 entries per ray: tt, tp, pt, pp (rows Rx, columns Tx)
+    struct ref_rays_t
+    {
+        std::vector<double> delay, power, ang[4];
+        std::vector<std::complex<double>> J;
+        std::vector<arma::uword> path_type, tap;
+    };
+    double ref_cds(const spmap &sp, double fc) // c_DS in [s], Table 7.5-6 with the keys of a completed scenpar
+    {
+        const double ds = sp.at("PerClusterDS"), f = std::max(fc / 1e9, sp.at("PerClusterDS_fc_min"));
+        return ds == 0.0 ? 3.91e-9
+                         : 1e-9 * std::max(sp.at("PerClusterDS_min"), ds + sp.at("PerClusterDS_gamma") * std::log10(f));
+    }
+    ref_rays_t ref_rays_tr(const spmap &scenpar, const fix_t &f, const out_t &cl, const lsp_stats_t &st,
+                           const arma::cube &rnd, const arma::vec &fc, arma::uword l, arma::uword k, bool mf,
+                           bool random_phase = true)
+    {
+        spmap sp = scenpar;
+        quadriga_lib::scenpar_validate(sp);
+        const arma::uword N = (arma::uword)sp.at("NumClusters") - 1, M = (arma::uword)sp.at("NumSubPaths");
+        const arma::uword G = sp.at("GR_enabled") > 0.0 ? 1 : 0, g = mf ? k : 0, NM = N * M, n_ray = 1 + G + NM;
+        const double c_ds = ref_cds(sp, fc(k)), d2r = pi / 180.0;
+        const double c[4] = {sp.at("PerClusterAS_D"), sp.at("PerClusterAS_A"),
+                             sp.at("PerClusterES_D_scale") > 0.0
+                                 ? sp.at("PerClusterES_D_scale") * std::pow(10.0, st.mu(l, k, 5))
+                                 : sp.at("PerClusterES_D"),
+                             sp.at("PerClusterES_A")};
+        const arma::cube *cang[4] = {&cl.aod, &cl.aoa, &cl.eod, &cl.eoa};
+        const offsets_t off = tr_offsets(M);
+
+        ref_rays_t r;
+        r.delay.assign(n_ray, 0.0), r.power.assign(n_ray, 0.0), r.J.assign(4 * n_ray, 0.0);
+        r.path_type.assign(n_ray, 2), r.tap.assign(n_ray, 0);
+        for (auto &a : r.ang)
+            a.assign(n_ray, 0.0);
+        for (arma::uword s = 0; s < 1 + G; ++s) // LOS and GR rays: the slot values
+        {
+            r.delay[s] = cl.delay(l, s, g), r.power[s] = cl.power(l, s, k), r.path_type[s] = s, r.tap[s] = 3 * s;
+            for (int q = 0; q < 4; ++q)
+                r.ang[q][s] = (*cang[q])(l, s, g);
+        }
+        r.J[0] = 1.0, r.J[3] = -1.0;
+        if (G)
+        {
+            const arma::uword t = (f.tx.n_rows == 1) ? 0 : l;
+            const double dx = f.rx(l, 0) - f.tx(t, 0), dy = f.rx(l, 1) - f.tx(t, 1);
+            std::complex<double> R_par, R_perp;
+            fresnel(f.eps_re(l, k), f.eps_im(l, k), f.tx(t, 2), f.rx(l, 2), std::sqrt(dx * dx + dy * dy), R_par,
+                    R_perp);
+            const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
+            r.J[4] = R > 0.0 ? R_par / R : 0.0, r.J[7] = R > 0.0 ? -R_perp / R : 0.0;
+        }
+
+        const double dsub[3] = {0.0, 1.28, 2.56};
+        for (arma::uword n = 0; n < N; ++n)
+        {
+            const arma::uword s = 1 + G + n;
+            const double P = cl.power(l, s, k);
+            arma::uword above = 0;
+            for (arma::uword o = 0; o < N; ++o)
+                above += (cl.power(l, 1 + G + o, k) > P || (cl.power(l, 1 + G + o, k) == P && o < n)) ? 1 : 0;
+            const bool split = M == 20 && P > 0.0 && above < 2;
+            const arma::uword n_grp = split ? 3 : 1, first[3] = {0, 10, 16}, size[3] = {split ? 10 : M, 6, 4};
+            for (arma::uword i = 0; i < n_grp; ++i)
+                for (arma::uword m = first[i]; m < first[i] + size[i]; ++m)
+                {
+                    const arma::uword ray = 1 + G + n * M + m;
+                    auto x = [&](arma::uword b, arma::uword pos) { return rnd(l, b * NM + n * M + pos, k); };
+                    r.delay[ray] = cl.delay(l, s, g) + dsub[i] * c_ds;
+                    r.power[ray] = P / (double)M, r.tap[ray] = 3 * s + i;
+                    for (arma::uword q = 0; q < 4; ++q)
+                    {
+                        arma::uword rank = 0;
+                        for (arma::uword o = first[i]; o < first[i] + size[i]; ++o)
+                            rank += (x(q, o) < x(q, m) || (x(q, o) == x(q, m) && o < m)) ? 1 : 0;
+                        const double off_deg = c[q] * (split ? off.groups[i][rank] : off.asc[rank]);
+                        const double centre_deg = (*cang[q])(l, s, g) / d2r;
+                        r.ang[q][ray] = q < 2 ? wrap_rad((centre_deg + off_deg) * d2r)
+                                              : zen2elev(90.0 - centre_deg + off_deg);
+                    }
+                    auto phase = [&](arma::uword b)
+                    { return random_phase ? 2.0 * pi * 0.5 * std::erfc(-x(b, m) / std::sqrt(2.0)) - pi : 0.0; };
+                    const double X = st.mu(l, k, 7) + st.sigma(l, k, 7) * x(4, m), ik = std::pow(10.0, -X / 10.0);
+                    r.J[4 * ray] = std::polar(1.0, phase(5)), r.J[4 * ray + 1] = std::polar(std::sqrt(ik), phase(6));
+                    r.J[4 * ray + 2] = std::polar(std::sqrt(ik), phase(7));
+                    r.J[4 * ray + 3] = std::polar(1.0, phase(8));
+                }
         }
         return r;
     }
