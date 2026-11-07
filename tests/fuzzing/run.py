@@ -17,8 +17,10 @@ The corpus of each target is kept in <out>/corpus/<target> and grows from run to
 import argparse
 import datetime
 import os
+import random
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -30,6 +32,14 @@ SOURCE_DIR = Path(__file__).resolve().parents[2]
 
 # Order of the findings in the report: memory errors first, resource problems last
 KIND_ORDER = ["memory", "undefined-behavior", "uncaught exception", "deadly signal", "timeout", "out-of-memory", "memory-leak"]
+
+# UBSan check types for the suppressions of known undefined behaviour; UBSan has no type that covers all checks
+UB_CHECKS = ["alignment", "bool", "bounds", "enum", "float-cast-overflow", "function", "integer-divide-by-zero",
+             "nonnull-attribute", "null", "object-size", "pointer-overflow", "returns-nonnull-attribute", "shift-base",
+             "shift-exponent", "signed-integer-overflow", "vla-bound", "vptr"]
+
+# Sanitizer settings of a single run of an input; the reproduce line of the report uses the same
+REPRO_ENV = "OMP_NUM_THREADS=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1"
 
 
 def parse_time(text):
@@ -51,17 +61,25 @@ def find_symbolizer():
     return str(found[-1]) if found else None
 
 
-def fuzz_env(args, tmp):
+def fuzz_env(tmp, suppressions):
+    """The environment of all target runs. The triage depends on these settings, so values from the calling shell
+    (e.g. a log_path in ASAN_OPTIONS or OMP_NUM_THREADS) are replaced."""
     env = os.environ.copy()
-    env.setdefault("OMP_NUM_THREADS", "1")  # One thread per fuzzing process; parallel work comes from the processes
-    env.setdefault("OMP_WAIT_POLICY", "passive")
-    env.setdefault("ASAN_OPTIONS", "detect_leaks=1")
-    env.setdefault("UBSAN_OPTIONS", "print_stacktrace=1")
+    env["OMP_NUM_THREADS"] = "1"  # One thread per fuzzing process; parallel work comes from the processes
+    env["OMP_WAIT_POLICY"] = "passive"
+    env["ASAN_OPTIONS"] = "detect_leaks=1"
+    env["UBSAN_OPTIONS"] = f"halt_on_error=1:print_stacktrace=1:suppressions={suppressions}"
+    env.pop("LSAN_OPTIONS", None)
     env["QD_FUZZ_TMP"] = str(tmp)
     sym = find_symbolizer()
     if sym:
         env.setdefault("ASAN_SYMBOLIZER_PATH", sym)
     return env
+
+
+def repro_env():
+    sym = find_symbolizer()
+    return REPRO_ENV + (f" ASAN_SYMBOLIZER_PATH={sym}" if sym and not shutil.which("llvm-symbolizer") else "")
 
 
 def limits(args):
@@ -172,10 +190,12 @@ def last_stats(log):
     try:
         for line in Path(log).read_text(errors="replace").splitlines():
             # The exec/s field of fork mode is that of the last job only; runs over time is the average
-            m = re.match(r"#(\d+):\s+cov: (\d+) ft: (\d+) corp: (\d+) exec/s:? \d+ .*time: (\d+)s", line)
+            m = re.match(r"#(\d+):\s+cov: (\d+) ft: (\d+) corp: (\d+) exec/s:? \d+ oom/timeout/crash: (\d+)/(\d+)/(\d+) "
+                         r"time: (\d+)s job: (\d+)", line)
             if m:
-                runs, seconds = int(m.group(1)), max(int(m.group(5)), 1)
-                stats = {"runs": runs, "cov": int(m.group(2)), "exec_s": runs // seconds}
+                runs, seconds = int(m.group(1)), max(int(m.group(8)), 1)
+                stats = {"runs": runs, "cov": int(m.group(2)), "exec_s": runs // seconds, "jobs": int(m.group(9)),
+                         "failed_jobs": int(m.group(5)) + int(m.group(6)) + int(m.group(7)), "elapsed": int(m.group(8))}
     except OSError:
         pass
     return stats
@@ -188,6 +208,13 @@ def schedule(targets, jobs, total_time):
         return [list(zip(targets, workers))], total_time
     batches = [targets[i:i + jobs] for i in range(0, len(targets), jobs)]
     return [[(t, 1) for t in b] for b in batches], max(total_time // len(batches), 60)
+
+
+def stop_group(p, sig):
+    try:
+        os.killpg(p.pid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
 
 
 def run_batch(batch, seconds, args, env, run_dir, corpus_root, info):
@@ -205,20 +232,26 @@ def run_batch(batch, seconds, args, env, run_dir, corpus_root, info):
                       "seed_error": seeds.returncode != 0}
         cmd = [str(target), f"-fork={workers}", "-ignore_crashes=1", "-ignore_timeouts=1", "-ignore_ooms=1",
                f"-max_total_time={seconds}", *limits(args), f"-artifact_prefix={artifacts}/", str(corpus)]
-        procs.append((name, subprocess.Popen(cmd, env=env, stdout=log, stderr=subprocess.STDOUT, cwd=run_dir), log))
+        # Own process group, so that the fork-mode workers end with their parent
+        procs.append((name, subprocess.Popen(cmd, env=env, stdout=log, stderr=subprocess.STDOUT, cwd=run_dir,
+                                             start_new_session=True), log))
     deadline = time.time() + seconds + 300
     try:
         for name, p, log in procs:
             try:
                 info[name]["returncode"] = p.wait(timeout=max(deadline - time.time(), 1))
             except subprocess.TimeoutExpired:
-                p.kill()
+                stop_group(p, signal.SIGKILL)
                 info[name]["returncode"] = "killed after the time limit"
     except KeyboardInterrupt:
         for name, p, log in procs:
-            p.terminate()
+            stop_group(p, signal.SIGINT)  # libFuzzer ends its workers and exits on SIGINT
         for name, p, log in procs:
-            p.wait()
+            try:
+                p.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                stop_group(p, signal.SIGKILL)
+                p.wait()
         info["interrupted"] = True
     for name, p, log in procs:
         log.close()
@@ -233,9 +266,12 @@ def run_batch(batch, seconds, args, env, run_dir, corpus_root, info):
 
 
 def select_artifacts(artifacts, limit):
-    """At most limit inputs, the smallest of each kind (crash, leak, timeout, oom) in turn."""
+    """At most limit inputs, taken from each kind (crash, leak, timeout, oom) in turn and at random within a kind.
+    Random, not smallest first: the smallest inputs of an API target all decode to the same first cases."""
     by_kind = {}
-    for f in sorted(artifacts.glob("*"), key=lambda f: (f.stat().st_size, f.name)):
+    files = sorted(artifacts.glob("*"))
+    random.Random(0).shuffle(files)
+    for f in files:
         by_kind.setdefault(f.name.split("-")[0], []).append(f)
     chosen, queues = [], list(by_kind.values())
     while len(chosen) < limit and any(queues):
@@ -270,6 +306,18 @@ def minimize(fd, folder, args, env):
     (folder / "output.txt").write_text("\n".join(lines[:300]) + ("\n[... output cut ...]\n" if len(lines) > 300 else "\n"))
 
 
+def parallel(fn, items, jobs):
+    """fn over items in threads; on Ctrl-C or SIGTERM the queued items are dropped."""
+    pool = ThreadPoolExecutor(max_workers=max(jobs, 1))
+    try:
+        return list(pool.map(fn, items))
+    except KeyboardInterrupt:
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    finally:
+        pool.shutdown(wait=False)
+
+
 def triage(targets, args, env, run_dir, known, info):
     jobs = []
     for target in targets:
@@ -278,8 +326,7 @@ def triage(targets, args, env, run_dir, known, info):
             chosen, skipped = select_artifacts(artifacts, args.max_replays)
             jobs += [(target, f) for f in chosen]
             info.setdefault(target.name, {})["not_replayed"] = skipped
-    with ThreadPoolExecutor(max_workers=max(args.jobs, 1)) as pool:
-        results = list(pool.map(lambda j: replay(j[0], j[1], args, env), jobs))
+    results = parallel(lambda j: replay(j[0], j[1], args, env), jobs, args.jobs)
 
     groups, flaky = {}, {}
     for (target, f), result in zip(jobs, results):
@@ -302,8 +349,7 @@ def triage(targets, args, env, run_dir, known, info):
     for i, fd in enumerate(findings, 1):
         fd["id"] = f"F{i}"
         (run_dir / "findings" / fd["id"]).mkdir(parents=True)
-    with ThreadPoolExecutor(max_workers=max(args.jobs, 1)) as pool:
-        list(pool.map(lambda fd: minimize(fd, run_dir / "findings" / fd["id"], args, env), findings))
+    parallel(lambda fd: minimize(fd, run_dir / "findings" / fd["id"], args, env), findings, args.jobs)
     return findings, known_hits, flaky
 
 
@@ -316,6 +362,14 @@ def read_known(path):
                 signature, _, note = line.partition("|")
                 known[signature.strip()] = note.strip()
     return known
+
+
+def write_suppressions(path, known):
+    """UBSan suppressions for the known undefined behaviour, by function, so that fuzzing goes on past it.
+    Returns the suppressed functions. Memory errors cannot be suppressed."""
+    functions = sorted({m.group(1) for sig in known if (m := re.match(r"undefined-behavior in (\S+) \(", sig))})
+    path.write_text("".join(f"{check}:*{fn}*\n" for fn in functions for check in UB_CHECKS))
+    return functions
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -350,7 +404,7 @@ def git_commit():
         return "unknown"
 
 
-def write_report(path, args, targets, info, findings, known_hits, flaky, started, load_before):
+def write_report(path, args, targets, info, findings, known_hits, flaky, started, load_before, stage="done"):
     finished = datetime.datetime.now()
     load_after = os.getloadavg()[0]
     new_per = {t.name: 0 for t in targets}
@@ -368,27 +422,40 @@ def write_report(path, args, targets, info, findings, known_hits, flaky, started
           f"- Limits per input: {args.input_timeout} s, {args.rss_limit_mb} MB",
           f"- Result: {len(findings)} new finding(s), {len(known_hits)} known, "
           f"{sum(len(v) for v in flaky.values())} input(s) that did not fail again", ""]
+    if info.get("suppressed"):
+        L += [f"- Known undefined behaviour skipped while fuzzing: {', '.join(info['suppressed'])}", ""]
     if info.get("interrupted"):
         L += ["**The run was interrupted; the fuzzing time is shorter than planned.**", ""]
+    if stage == "fuzzed":
+        L += ["**The triage did not run or did not finish: the failing inputs are not replayed or grouped yet.**", ""]
+        L += [f"- {t.name}: {sum(1 for _ in (path.parent / 'artifacts' / t.name).glob('*'))} failing input(s) in `artifacts/{t.name}/`"
+              for t in targets if (path.parent / "artifacts" / t.name).is_dir()] + [""]
 
     L += ["## Targets", "", "| Target | Time | Processes | Runs | Runs/s | Coverage | Corpus (start / end) | New | Known | Did not fail again |",
           "| :----- | ---: | --------: | ---: | -----: | -------: | -------------------: | --: | ----: | -----------------: |"]
     for t in targets:
         i = info.get(t.name, {})
-        L.append(f"| {t.name} | {duration(i.get('seconds', 0))} | {i.get('workers', '-')} | {i.get('runs', '-')} | {i.get('exec_s', '-')} | "
+        L.append(f"| {t.name} | {duration(i.get('elapsed', i.get('seconds', 0)))} | {i.get('workers', '-')} | {i.get('runs', '-')} | {i.get('exec_s', '-')} | "
                  f"{i.get('cov', '-')} | {i.get('corpus_before', '-')} / {i.get('corpus_after', '-')} | {new_per[t.name]} | "
                  f"{known_per[t.name]} | {len(flaky.get(t.name, []))} |")
     L += ["", "Coverage counts the instrumented code locations (edges) reached; it compares runs of the same target, not targets.", ""]
 
     problems = [f"- {t.name}: writing the seeds failed (see logs/{t.name}.log)" for t in targets if info.get(t.name, {}).get("seed_error")]
     problems += [f"- {t.name}: the fuzzer did not finish normally (exit code {info[t.name].get('returncode')}, see logs/{t.name}.log)"
-                 for t in targets if t.name in info and not info[t.name].get("finished")]
+                 for t in targets if t.name in info and not info[t.name].get("finished") and not info.get("interrupted")]
+    problems += [f"- {t.name}: no input was run (see logs/{t.name}.log)"
+                 for t in targets if t.name in info and not info[t.name].get("runs")]
+    problems += [f"- {t.name}: {info[t.name]['failed_jobs']} failing inputs in {info[t.name]['jobs']} fuzzing jobs; each failure ends a job, "
+                 "so the fuzzer hardly gets past them. Fixing the defect, or listing it in known.txt if it is undefined behaviour, lets it go further"
+                 for t in targets if info.get(t.name, {}).get("jobs", 0) >= 20
+                 and info[t.name]["failed_jobs"] > 0.5 * info[t.name]["jobs"]]
     if problems:
         L += ["## Problems of the run", ""] + problems + [""]
 
-    L += ["## New findings", ""]
-    if not findings:
-        L += ["None.", ""]
+    if stage == "done":
+        L += ["## New findings", ""]
+        if not findings:
+            L += ["None.", ""]
     for fd in findings:
         signature, kind, message, frames, _ = fd["result"]
         inputs = ", ".join(f"{t} {n}" for t, n in fd["counts"].items())
@@ -397,9 +464,9 @@ def write_report(path, args, targets, info, findings, known_hits, flaky, started
         L += [f"### {fd['id']}: {fd['signature']}", "",
               f"- Signature (for known.txt): `{fd['signature']}`",
               f"- Message: `{message}`",
-              f"- Inputs that hit it: {inputs}",
+              f"- Replayed inputs that hit it: {inputs}",
               f"- Input: `findings/{fd['id']}/input` ({size_note}); full output: `findings/{fd['id']}/output.txt`",
-              f"- Reproduce: `OMP_NUM_THREADS=1 {fd['target']} {' '.join(limits(args))} {fd['input']}`", ""]
+              f"- Reproduce: `{repro_env()} {fd['target']} {' '.join(limits(args))} {fd['input']}`", ""]
         shown = [f for f in frames if relative(f[1])][:8] or frames[:8]
         if shown:
             L += ["Stack (frames in the source tree):", "", "```text"]
@@ -413,7 +480,7 @@ def write_report(path, args, targets, info, findings, known_hits, flaky, started
         L += [""]
     skipped = [f"- {t.name}: {info[t.name]['not_replayed']}" for t in targets if info.get(t.name, {}).get("not_replayed")]
     if skipped:
-        L += ["## Inputs not replayed", "", f"At most {args.max_replays} failing inputs per target are replayed, the smallest of each kind first; "
+        L += ["## Inputs not replayed", "", f"At most {args.max_replays} failing inputs per target are replayed, chosen at random with every kind of failure in turn; "
               "the others are kept in `artifacts/`. Many failing inputs usually mean one defect that is easy to hit.", ""] + skipped + [""]
     if flaky:
         L += ["## Inputs that did not fail again", "",
@@ -426,6 +493,19 @@ def write_report(path, args, targets, info, findings, known_hits, flaky, started
 # ---------------------------------------------------------------------------------------------------------------------
 
 
+def say(text):
+    """Progress message; a closed output (e.g. a pipe into a killed "tail") must not end the run before the report."""
+    try:
+        print(text, flush=True)
+    except OSError:
+        pass
+
+
+def on_sigterm(*_):
+    """SIGTERM (e.g. from "timeout") ends the run like Ctrl-C: the fuzzers stop and a report is written."""
+    raise KeyboardInterrupt
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--build-dir", required=True, type=Path, help="build folder of the fuzz targets (ENABLE_FUZZING=ON)")
@@ -436,7 +516,7 @@ def main():
     ap.add_argument("--input-timeout", type=int, default=10, help="seconds per input before it counts as a hang (default 10)")
     ap.add_argument("--rss-limit-mb", type=int, default=2048, help="memory per input before it counts as out-of-memory (default 2048)")
     ap.add_argument("--minimize-time", type=int, default=60, help="seconds to minimize each new finding (default 60)")
-    ap.add_argument("--max-replays", type=int, default=50, help="failing inputs replayed per target (default 50)")
+    ap.add_argument("--max-replays", type=int, default=500, help="failing inputs replayed per target (default 500)")
     ap.add_argument("--known", type=Path, default=Path(__file__).with_name("known.txt"), help="list of known findings")
     args = ap.parse_args()
 
@@ -450,6 +530,15 @@ def main():
         sys.exit(f"No fuzz targets (fz_*) in {args.build_dir}; build with ENABLE_FUZZING=ON first")
     targets = [t.resolve() for t in targets]
 
+    # libFuzzer passes the corpus and artifact folders to its workers unquoted, and stack traces are parsed by spaces
+    shm = Path("/dev/shm")
+    tmp_base = shm if shm.is_dir() and os.access(shm, os.W_OK) else Path(tempfile.gettempdir())
+    for what, path in [("build folder", args.build_dir.resolve()), ("output folder", args.out.resolve()),
+                       ("source folder", SOURCE_DIR), ("temp folder", tmp_base)]:
+        if re.search(r"\s", str(path)):
+            sys.exit(f"The {what} must not contain spaces: {path}")
+    signal.signal(signal.SIGTERM, on_sigterm)
+
     started = datetime.datetime.now()
     run_dir = args.out.resolve() / "runs" / f"{started:%Y-%m-%d_%H%M%S}"
     (run_dir / "logs").mkdir(parents=True)
@@ -458,26 +547,33 @@ def main():
         latest.unlink()
     latest.symlink_to(run_dir.relative_to(args.out.resolve()))
 
-    shm = Path("/dev/shm")
-    tmp = Path(tempfile.mkdtemp(prefix="qd_fuzz_", dir=shm if shm.is_dir() and os.access(shm, os.W_OK) else None))
-    env = fuzz_env(args, tmp)
+    tmp = Path(tempfile.mkdtemp(prefix="qd_fuzz_", dir=tmp_base))
+    known = read_known(args.known)
+    info = {"suppressed": write_suppressions(run_dir / "ubsan_suppressions.txt", known)}
+    env = fuzz_env(tmp, run_dir / "ubsan_suppressions.txt")
     load_before = os.getloadavg()[0]
     batches, seconds = schedule(targets, args.jobs, args.time)
-    print(f"Fuzzing {len(targets)} target(s) in {len(batches)} batch(es) of {seconds} s; output in {run_dir}", flush=True)
+    say(f"Fuzzing {len(targets)} target(s) in {len(batches)} batch(es) of {seconds} s; output in {run_dir}")
 
-    info = {}
+    report = run_dir / "report.md"
     try:
         for batch in batches:
             if info.get("interrupted"):
                 break
             run_batch(batch, seconds, args, env, run_dir, args.out.resolve() / "corpus", info)
-        print("Replaying and minimizing the failing inputs ...", flush=True)
-        findings, known_hits, flaky = triage(targets, args, env, run_dir, read_known(args.known), info)
+        write_report(report, args, targets, info, [], [], {}, started, load_before, stage="fuzzed")
+        say("Replaying and minimizing the failing inputs ...")
+        findings, known_hits, flaky = triage(targets, args, env, run_dir, known, info)
+    except KeyboardInterrupt:
+        if not report.exists():
+            write_report(report, args, targets, info, [], [], {}, started, load_before, stage="fuzzed")
+        say(f"Interrupted; report without triage: {report}")
+        sys.exit(130)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    write_report(run_dir / "report.md", args, targets, info, findings, known_hits, flaky, started, load_before)
-    print(f"{len(findings)} new finding(s), {len(known_hits)} known. Report: {run_dir / 'report.md'}")
+    write_report(report, args, targets, info, findings, known_hits, flaky, started, load_before)
+    say(f"{len(findings)} new finding(s), {len(known_hits)} known. Report: {report}")
 
 
 if __name__ == "__main__":
