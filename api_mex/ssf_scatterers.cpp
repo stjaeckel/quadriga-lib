@@ -21,8 +21,8 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
   angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the ray's
   own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With `d_min` = 2 m
-  this applies to up to about 23 % of the rays (Indoor LOS, RMa NLOS; most in the TR methods without absolute TOA)
-  and lengthens them by a few ns
+  this applies to up to about 23 % of the rays (most in the TR methods without absolute TOA) and lengthens them by up to
+  25 ns (median below 5 ns), the DS of a link by up to 3 ns; `b_med` can then equal `d_min`
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular point
   on z = 0, which requires both ends at z >= 0
 - `rays_out` is a copy of `rays` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and
