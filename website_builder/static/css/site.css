@@ -340,9 +340,9 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .params > .pnote > dt { display: none; }
 .params > .pnote > dd { grid-column: 1 / -1; }
 /* from 600 px one grid per list, shared by its rows: the name column is as wide as the longest name
-   (at least 120 px, at most 35 % for long groups) */
+   (at least 120 px); a group of names stacks one per line, since the column takes the longest single name */
 @media (min-width: 600px) {
-  .params { display: grid; grid-template-columns: fit-content(35%) minmax(0, 1fr); column-gap: var(--s4); }
+  .params { display: grid; grid-template-columns: minmax(120px, min-content) minmax(0, 1fr); column-gap: var(--s4); }
   .params > div { grid-column: 1 / -1; grid-template-columns: subgrid; }
   .params dt { min-width: 120px; }
 }
