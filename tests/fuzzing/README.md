@@ -36,9 +36,11 @@ make test-fuzz FUZZ_TIME=8h FUZZ_JOBS=16 FUZZ_DIR=$HOME/quadriga-fuzz
 | `FUZZ_CC`, `FUZZ_CXX` | `clang`, `clang++` | Compiler, e.g. `clang-21`, `clang++-21`                                       |
 | `FUZZ_ARGS`      | empty                 | Further options of `run.py`, e.g. `FUZZ_ARGS='--targets fz_qdant fz_obj'`       |
 
-The options of `run.py` (`python3 tests/fuzzing/run.py --help`) beyond those set by the variables are `--targets` (run only these targets), `--input-timeout` (seconds one input may take before it counts as a hang, default 10), `--rss-limit-mb` (memory one input may use before it counts as out-of-memory, default 2048), `--minimize-time` (seconds spent shrinking each new finding, default 60), `--max-replays` (failing inputs replayed per target, default 50; a defect that is easy to hit can leave thousands) and `--known` (the list of known findings, default `known.txt` in this folder).
+The options of `run.py` (`python3 tests/fuzzing/run.py --help`) beyond those set by the variables are `--targets` (run only these targets), `--input-timeout` (seconds one input may take before it counts as a hang, default 10), `--rss-limit-mb` (memory one input may use before it counts as out-of-memory, default 2048), `--minimize-time` (seconds spent shrinking each new finding, default 60), `--max-replays` (failing inputs replayed per target, default 500; a defect that is easy to hit can leave thousands) and `--known` (the list of known findings, default `known.txt` in this folder).
 
-Each fuzzing process runs one thread (`OMP_NUM_THREADS=1`); the parallel work comes from the processes. When there are at least as many processes as targets, all targets run for the whole time and the processes are shared out among them. Otherwise the targets run in batches and the time is split between the batches, with at least one minute per batch, so a short run of many targets on few processes can take longer than `FUZZ_TIME`. After the fuzzing time the runner replays and shrinks the failing inputs, which takes up to a few minutes per new finding. Ctrl-C during the fuzzing ends it early and the report is still written; Ctrl-C during the replay at the end stops without a report.
+Each fuzzing process runs one thread (`OMP_NUM_THREADS=1`); the parallel work comes from the processes. When there are at least as many processes as targets, all targets run for the whole time and the processes are shared out among them. Otherwise the targets run in batches and the time is split between the batches, with at least one minute per batch, so a short run of many targets on few processes can take longer than `FUZZ_TIME`. After the fuzzing time the runner replays and shrinks the failing inputs, which takes up to a few minutes per new finding. Ctrl-C or SIGTERM (for example from `timeout`) during the fuzzing ends it early, and the triage and the report follow as usual. Before the triage the runner writes a preliminary report, marked as such, so that a run stopped during the triage still leaves one.
+
+The runner sets the sanitizer and OpenMP settings of the targets itself (`ASAN_OPTIONS`, `UBSAN_OPTIONS`, `OMP_NUM_THREADS`), because the triage depends on them; values set in the calling shell do not apply. The build, output and temp folders must not contain spaces, since libFuzzer passes them on to its workers unquoted; the runner refuses such paths.
 
 ## The output folder
 
@@ -61,10 +63,10 @@ The corpus is what makes long fuzzing pay off: each run starts from the inputs t
 
 - **Header:** the commit (with a note if tracked files had uncommitted changes), start and end, the number of processes, the load before and after, the limits per input and the counts of new and known findings.
 - **Targets:** per target the fuzzing time, the processes, the inputs run, the runs per second, the coverage (code edges reached; it compares runs of one target, not targets with each other), the corpus size at the start and at the end, and the number of failing inputs that were new, known or did not fail again.
-- **Problems of the run:** a target whose seeds could not be written or whose fuzzer did not end normally. Its log tells why.
+- **Problems of the run:** a target whose seeds could not be written, whose fuzzer did not end normally or ran no input, or one where most fuzzing jobs ended at a failing input. Each failure ends a job, so such a target hardly explores past the failure; fixing the defect, or listing it in `known.txt` when it is undefined behaviour, lets it go further.
 - **New findings:** one section per cause. Many failing inputs usually share one cause; they are grouped by their signature, which is the kind of failure, the first library function in the stack trace and its file (for example `heap-buffer-overflow in quadriga_lib::qdant_read (src/qd_arrayant_qdant.cpp)`). Each section gives the message of the sanitizer or of libFuzzer, how many inputs hit it, the smallest input after minimizing, the command that reproduces it, the stack frames in the source tree, the input as text if it is printable, and a command that recreates the input file, ready to paste into an issue.
 - **Known findings:** causes listed in `known.txt`, counted only.
-- **Inputs not replayed:** per target the failing inputs beyond `--max-replays`, which stay in `artifacts/` unexamined.
+- **Inputs not replayed:** per target the failing inputs beyond `--max-replays`, which stay in `artifacts/` unexamined. The counts of inputs per finding are those of the replayed inputs.
 - **Inputs that did not fail again:** inputs that failed while fuzzing but passed when run alone, most often a timeout under heavy load.
 
 The kinds of failure:
@@ -84,19 +86,21 @@ A clean `std::exception` is the correct answer to invalid input and never shows 
 
 ## Reproducing a finding
 
-A target runs a single input when it is given a file, and prints the same sanitizer report. The "Reproduce" line of the report names the right target and sets the limits and the single thread of the run:
+A target runs a single input when it is given a file, and prints the same sanitizer report. The "Reproduce" line of the report names the right target and sets the limits, the single thread and the sanitizer options of the run:
 
 ```bash
-OMP_NUM_THREADS=1 build_linux_fuzz/fz_<target> -timeout=10 -rss_limit_mb=2048 -malloc_limit_mb=2048 <FUZZ_DIR>/latest/findings/F1/input
+OMP_NUM_THREADS=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 build_linux_fuzz/fz_<target> -timeout=10 -rss_limit_mb=2048 -malloc_limit_mb=2048 <FUZZ_DIR>/latest/findings/F1/input
 ```
 
-The binary also runs under a debugger. The input of a file target is the file the reader gets, so it reproduces through the public reader function with any build of the library, for example in a small test run with `make test-asan`. The input of an API target is decoded into arguments by `fz::input`; to call the function outside the fuzz build, the arguments are read off the target's source, with a debugger or a print in a copy of the target, and written into the test by hand.
+Without `halt_on_error=1`, undefined behaviour is printed and the input runs on, so libFuzzer does not count it as a failure. Where `llvm-symbolizer` is installed only with a version suffix, as on Debian and Ubuntu, the line also sets `ASAN_SYMBOLIZER_PATH`; without it the stack traces have no function names. The binary also runs under a debugger. The input of a file target is the file the reader gets, so it reproduces through the public reader function with any build of the library, for example in a small test run with `make test-asan`. The input of an API target is decoded into arguments by `fz::input`; to call the function outside the fuzz build, the arguments are read off the target's source, with a debugger or a print in a copy of the target, and written into the test by hand.
 
 When a finding is fixed, its regression test goes into the normal test suite: a Catch2 test that writes the bytes of the input, or the few lines of it that matter, into a file (or passes the decoded arguments) and checks that the library now throws a clean error or gives the right result. The fuzz inputs themselves are not kept in the repository.
 
 ## Known findings
 
 `known.txt` lists causes that are known and not fixed yet, one per line as `<signature> | <note>`, with the signature copied from the report. Inputs with a listed signature are counted under "Known findings" instead of coming back as new in every run. A line is added when a finding is filed and stays open, and removed with the fix, so that a regression shows up as new again. The signature names the function and the file but not the line, so it stays valid while the code around it changes.
+
+Known undefined behaviour is also skipped while fuzzing: the runner turns its entries into an UndefinedBehaviorSanitizer suppressions file (`ubsan_suppressions.txt` in the run folder) for the named functions, and the report header lists them. Without that, a target whose inputs mostly hit one known case would end almost every fuzzing job there and never get further. Such inputs then no longer fail, so they do not appear under "Known findings". Memory errors, hangs and out-of-memory cases cannot be skipped this way; a target that keeps hitting one of them explores little until the defect is fixed.
 
 ## What is fuzzed
 
@@ -178,7 +182,7 @@ The targets follow a few rules, each for a reason:
 A short run checks a new target: `make test-fuzz FUZZ_TIME=2m FUZZ_ARGS='--targets fz_<name>'`. A finding whose signature names a file in `targets/` (no library function was on the stack) is usually a mistake in the target. A target file kept outside the repository, for example to try it before adding it, can be built by hand from the repository root against the library of an existing fuzz build, with the compiler of that build; when Armadillo is not installed on the system, the fuzz build has unpacked it, and `-I build_linux_fuzz/armadillo-<version>/include` is added:
 
 ```bash
-clang++ -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all -fopenmp \
+clang++ -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=fuzzer,address,undefined -fopenmp \
     -I tests/fuzzing -I include -D QD_SOURCE_DIR='"'$PWD'"' <folder>/fz_new.cpp build_linux_fuzz/libquadriga.a -o <folder>/fz_new
 python3 tests/fuzzing/run.py --build-dir <folder> --out <output folder> --time 2m
 ```
@@ -187,11 +191,11 @@ Without Clang's OpenMP library, `-fopenmp` is left out.
 
 ## How it works
 
-**Build.** `ENABLE_FUZZING=ON` compiles the whole library with libFuzzer's coverage instrumentation, AddressSanitizer and UndefinedBehaviorSanitizer at `-O1 -g`, with `-fno-sanitize-recover=all`, so that any undefined behaviour stops the input; MATLAB, Octave, Python and CUDA are off. Each target links libFuzzer, which provides `main`. AVX2 follows the `avx2` switch of the GNUmakefile; functions with an AVX2 kernel choose it at run time, so the CPU of the fuzzing machine decides which kernel is fuzzed.
+**Build.** `ENABLE_FUZZING=ON` compiles the whole library with libFuzzer's coverage instrumentation, AddressSanitizer and UndefinedBehaviorSanitizer at `-O1 -g`; MATLAB, Octave, Python and CUDA are off. UndefinedBehaviorSanitizer stays recoverable in the build, and the runner makes it stop the input at run time (`halt_on_error=1`), which is what allows known cases to be skipped with a suppressions file. Each target links libFuzzer, which provides `main`. AVX2 follows the `avx2` switch of the GNUmakefile; functions with an AVX2 kernel choose it at run time, so the CPU of the fuzzing machine decides which kernel is fuzzed.
 
 **Fuzzing.** libFuzzer runs the target in its own process, many thousand inputs per second for most targets, and keeps the inputs that reach new code. The runner starts libFuzzer in fork mode with one or more worker processes per target: a worker that fails saves its input and is replaced, so one defect does not stop a long run. The input files of the targets go to a folder per process; the runner puts these folders on the RAM disk (`/dev/shm`) where available and removes them at the end, while a target run by hand leaves its folder `qd_fuzz_<pid>` in the system temp folder.
 
-**Triage.** After the fuzzing time, the saved inputs are run alone, up to `--max-replays` per target and the smallest of each kind first. An input that passes is listed under "did not fail again". The output of the others gives the kind of failure and the stack trace, from which the signature is formed. For each signature that is not in `known.txt`, the smallest input is shrunk with libFuzzer's `-minimize_crash` for up to `--minimize-time` seconds and kept if it still fails with the same signature.
+**Triage.** After the fuzzing time, the saved inputs are run alone, up to `--max-replays` per target, taken from each kind of failure in turn and at random within a kind. Random rather than smallest first, because the smallest inputs of an API target all decode to the same first cases and would hide the other causes. An input that passes is listed under "did not fail again". The output of the others gives the kind of failure and the stack trace, from which the signature is formed. For each signature that is not in `known.txt`, the smallest input is shrunk with libFuzzer's `-minimize_crash` for up to `--minimize-time` seconds and kept if it still fails with the same signature.
 
 libFuzzer was chosen over AFL++ because it runs the inputs inside the target's process instead of starting the program for each one, which is many times faster for these readers, and because it ships with Clang. AFL++ can build the same targets, since both use the `LLVMFuzzerTestOneInput` interface.
 

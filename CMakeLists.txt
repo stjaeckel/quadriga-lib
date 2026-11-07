@@ -59,11 +59,12 @@ if(MSVC)
     endif()
 else()
     set(OPT_FLAGS -O3)
-    if(ENABLE_FUZZING) # The whole library gets the coverage instrumentation; every sanitizer report stops the input
+    if(ENABLE_FUZZING) # The whole library gets the coverage instrumentation. UBSan stays recoverable, so that the fuzz
+        # runner can stop at undefined behaviour (halt_on_error=1) and skip known cases with a suppressions file
         if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             message(FATAL_ERROR "ENABLE_FUZZING needs Clang (libFuzzer), e.g. -D CMAKE_CXX_COMPILER=clang++")
         endif()
-        set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all)
+        set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=fuzzer-no-link,address,undefined)
         add_link_options(-fsanitize=address,undefined)
     elseif(ENABLE_SANITIZERS) # -O1 -g instead of -O3 keeps the stack traces in the reports readable
         set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize-recover=address)
