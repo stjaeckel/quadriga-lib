@@ -14,8 +14,6 @@ release/
 dist/
 wheelhouse/
 tests/test*
-tests/afl/afl_out/*
-tests/afl/bin/*
 __pycache__/
 deploy.py
 include/quadriga_lib_config.hpp

@@ -149,7 +149,7 @@ Example without MATLAB, with the system compiler:
 make gcc_version= matlab=OFF
 ```
 
-The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENABLE_PYTHON`, `ENABLE_AVX2`, `ENABLE_CUDA`, `ENABLE_SHARED_LIB`, `ENABLE_TESTS`) if you prefer to call CMake directly. `ENABLE_SANITIZERS` (CMake only, default `OFF`) builds with AddressSanitizer and UndefinedBehaviorSanitizer for testing; it turns MATLAB, Octave and CUDA off.
+The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENABLE_PYTHON`, `ENABLE_AVX2`, `ENABLE_CUDA`, `ENABLE_SHARED_LIB`, `ENABLE_TESTS`) if you prefer to call CMake directly. `ENABLE_SANITIZERS` (CMake only, default `OFF`) builds with AddressSanitizer and UndefinedBehaviorSanitizer for testing; it turns MATLAB, Octave and CUDA off. `ENABLE_FUZZING` (CMake only, default `OFF`, Clang) builds the fuzz targets of [tests/fuzzing](tests/fuzzing/README.md) instead of the interfaces.
 
 ### Make targets
 
@@ -161,6 +161,7 @@ The same switches exist as CMake options (`ENABLE_MATLAB`, `ENABLE_OCTAVE`, `ENA
 | `make test`           | Builds and runs the C++ tests, then the Octave, MATLAB and Python tests that are enabled |
 | `make python_test`    | Runs only the Python tests                                          |
 | `make test-asan`      | Builds the C++ tests with AddressSanitizer and UndefinedBehaviorSanitizer in `build_linux_asan` and runs them |
+| `make test-fuzz`      | Builds the fuzz targets with Clang in `build_linux_fuzz` and fuzzes the library for `FUZZ_TIME` (default 10 minutes); see [tests/fuzzing/README.md](tests/fuzzing/README.md) |
 | `make docs`           | Writes the documentation as Markdown files into `docs/` from the source comments |
 | `make docs-check`     | Checks that `docs/` matches the source comments; writes nothing     |
 | `make website`        | Builds the website into `website/`                                  |
@@ -179,6 +180,7 @@ Without MATLAB, run the tests with `make test matlab=OFF`.
 | C++ (Catch2)    | `tests/catch2_tests/`             | `build_linux/test_bin` (one case: `build_linux/test_bin "<test name>"`) |
 | MATLAB / Octave | `tests/mex_tests/`                | `octave --eval "cd tests; quadriga_lib_mex_tests;"`           |
 | Python (pytest) | `tests/python_tests/`             | `PYTHONPATH=lib python3 -m pytest tests/python_tests -x`      |
+| Fuzzing         | `tests/fuzzing/`                  | `make test-fuzz FUZZ_TIME=8h`; see [its README](tests/fuzzing/README.md) |
 
 ### Windows
 

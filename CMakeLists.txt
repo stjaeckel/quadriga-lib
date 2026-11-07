@@ -29,6 +29,7 @@ option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_CUDA "Enable CUDA GPU Acceleration" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
 option(ENABLE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer for testing (GCC or Clang)" OFF)
+option(ENABLE_FUZZING "Build the fuzz targets in tests/fuzzing with libFuzzer and the sanitizers (Clang only)" OFF)
 
 set(CATCH2_PATH "" CACHE PATH "Location of the Catch2 library. If left empty, Catch2 is built from sources.")
 set(_CATCH2_PATH ${CATCH2_PATH}) # For internal use
@@ -52,12 +53,19 @@ if(MSVC)
     add_compile_options(/EHsc /Zc:__cplusplus /nologo /MP)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     set(MEX_CXXFLAGS "/std:c++17 /nologo $<$<CONFIG:Debug>:/MTd> $<$<CONFIG:Release>:/MT>")
-    if(ENABLE_SANITIZERS)
-        message(STATUS "Sanitizers need GCC or Clang. ENABLE_SANITIZERS ignored!")
+    if(ENABLE_SANITIZERS OR ENABLE_FUZZING)
+        message(STATUS "Sanitizers and fuzzing need GCC or Clang. ENABLE_SANITIZERS and ENABLE_FUZZING ignored!")
+        set(ENABLE_FUZZING OFF)
     endif()
 else()
     set(OPT_FLAGS -O3)
-    if(ENABLE_SANITIZERS) # -O1 -g instead of -O3 keeps the stack traces in the reports readable
+    if(ENABLE_FUZZING) # The whole library gets the coverage instrumentation; every sanitizer report stops the input
+        if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            message(FATAL_ERROR "ENABLE_FUZZING needs Clang (libFuzzer), e.g. -D CMAKE_CXX_COMPILER=clang++")
+        endif()
+        set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all)
+        add_link_options(-fsanitize=address,undefined)
+    elseif(ENABLE_SANITIZERS) # -O1 -g instead of -O3 keeps the stack traces in the reports readable
         set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize-recover=address)
         add_link_options(-fsanitize=address,undefined)
     endif()
@@ -157,6 +165,16 @@ if(ENABLE_SANITIZERS AND NOT MSVC AND (BUILD_MATLAB OR BUILD_OCTAVE OR BUILD_CUD
     message(STATUS "Sanitizers enabled: MATLAB, Octave and CUDA disabled!")
     set(BUILD_MATLAB OFF)
     set(BUILD_OCTAVE OFF)
+    set(BUILD_CUDA OFF)
+endif()
+
+# The fuzz build is for the fuzz targets only; the Python module would need the sanitizer runtime preloaded
+if(ENABLE_FUZZING AND NOT MSVC AND (BUILD_MATLAB OR BUILD_OCTAVE OR BUILD_CUDA OR BUILD_PYTHON OR BUILD_MEX_DOC))
+    message(STATUS "Fuzzing enabled: MATLAB, Octave, Python and CUDA disabled!")
+    set(BUILD_MATLAB OFF)
+    set(BUILD_OCTAVE OFF)
+    set(BUILD_MEX_DOC OFF)
+    set(BUILD_PYTHON OFF)
     set(BUILD_CUDA OFF)
 endif()
 
@@ -613,6 +631,23 @@ if (ENABLE_TESTS)
 
     # Catch2 and the library headers are parsed once and reused by every test file
     target_precompile_headers(test_bin PRIVATE <catch2/catch_test_macros.hpp> <quadriga_lib.hpp>)
+endif()
+
+# --- Fuzz targets: tests/fuzzing/README.md ---
+if (ENABLE_FUZZING AND NOT MSVC)
+    file(GLOB FUZZ_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzzing/targets/fz_*.cpp)
+    set(FUZZ_TARGET_NAMES "")
+    foreach(FUZZ_SRC ${FUZZ_SOURCES})
+        get_filename_component(FUZZ_NAME ${FUZZ_SRC} NAME_WE)
+        add_executable(${FUZZ_NAME} ${FUZZ_SRC})
+        target_include_directories(${FUZZ_NAME} PRIVATE ${QUADRIGA_CORE_INCLUDES} ${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzzing)
+        target_compile_definitions(${FUZZ_NAME} PRIVATE QD_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+        target_link_libraries(${FUZZ_NAME} PRIVATE ${QUADRIGA_LINK_TARGET})
+        target_link_options(${FUZZ_NAME} PRIVATE -fsanitize=fuzzer)
+        list(APPEND FUZZ_TARGET_NAMES ${FUZZ_NAME})
+    endforeach()
+    add_custom_target(fuzz_targets DEPENDS ${FUZZ_TARGET_NAMES})
+    message(STATUS "Fuzz targets: ${FUZZ_TARGET_NAMES}")
 endif()
 
 # --- Install options ---
