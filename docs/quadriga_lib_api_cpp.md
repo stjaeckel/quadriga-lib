@@ -3377,11 +3377,12 @@ KF(drop) from slice 1 of `lsp`. Ray data can also come from path data, with [gbs
 i, with i the sub-cluster (0, 1, 2) of a split cluster and 0 otherwise: LOS 0, GR 3 if enabled, NLOS cluster `n` (from
 0) 3·(1 + G + n) + i with G = 1 if GR is enabled (without GR the first cluster has 3).
 
-**Model properties.** UTs closer than the decorrelation distance `SC_lambda` get correlated clusters and rays, so
-separately dropped UTs a few wavelengths apart have unrealistically correlated fading: drop once and move the UTs with
-[ssf_paths](#ssf_paths) or [gbsm_single_link_channel](#gbsm_single_link_channel). Across bands, `"quadriga"` uses one ray set, so the fading is
-correlated; the TR methods draw coupling, XPR and phases per frequency, so it is independent, also with
-`"38.901_MF"`, which keeps the delays and angles.
+**Model properties.** UTs closer than `SC_lambda` get correlated clusters and rays (TR 38.901 clause 7.6.3.1). In the
+TR methods, the tap fading of separately dropped UTs then stays correlated over metres instead of a few wavelengths
+(tap-power correlation 0.5 at about 0.3·`SC_lambda`, 0.1 at 0.8·`SC_lambda`): for closer UTs, drop once and move them
+with [ssf_paths](#ssf_paths) or [gbsm_single_link_channel](#gbsm_single_link_channel), or use `"quadriga"`. Across bands, `"quadriga"` uses one ray set,
+so the fading is correlated; the TR methods draw coupling, XPR and phases per frequency, so it is independent, also
+with `"38.901_MF"`, which keeps the delays and angles.
 
 **Conventions.** `N = NumClusters - 1` is the number of NLOS clusters: `NumClusters` counts the LOS slot, as in
 QuaDRiGa. Positions are in m; in the batch functions one row (x, y, z) per link: `rx_pos` is `[n_link, 3]`, `tx_pos` is
