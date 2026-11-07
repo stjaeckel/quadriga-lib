@@ -20,6 +20,15 @@ gcc_version = 12
 CMAKE_BUILD_DIR = build_linux
 ASAN_BUILD_DIR = build_linux_asan
 
+# Fuzzing (tests/fuzzing/README.md): build folder; output folder with the corpus kept between runs and the reports
+# (not removed by "make clean"); run time; parallel processes
+FUZZ_BUILD_DIR = build_linux_fuzz
+FUZZ_DIR = build_linux_fuzz_out
+FUZZ_TIME = 10m
+FUZZ_JOBS = $(shell nproc --all)
+FUZZ_CC = clang
+FUZZ_CXX = clang++
+
 # Build tool: Ninja if installed, else Make (override with USE_NINJA=0/1). Switching tools needs "make clean".
 USE_NINJA ?= $(if $(shell command -v ninja),1,0)
 ifeq ($(USE_NINJA),1)
@@ -129,6 +138,27 @@ test-asan:
 		UBSAN_OPTIONS=$${UBSAN_OPTIONS:-print_stacktrace=1:halt_on_error=1} \
 		time $(ASAN_BUILD_DIR)/test_bin $(TEST_ARGS)
 .PHONY: test-asan
+
+# Fuzz targets of tests/fuzzing with libFuzzer, in their own build folder; tests/fuzzing/README.md. FUZZ_ARGS is
+# passed to run.py (e.g. FUZZ_ARGS='--targets fz_qdant fz_obj').
+test-fuzz:
+	cmake -B $(FUZZ_BUILD_DIR) $(CMAKE_GENERATOR_ARG) \
+		-D CMAKE_C_COMPILER=$(FUZZ_CC) \
+		-D CMAKE_CXX_COMPILER=$(FUZZ_CXX) \
+		-D ENABLE_FUZZING=ON \
+		-D ENABLE_TESTS=OFF \
+		-D ENABLE_MATLAB=OFF \
+		-D ENABLE_OCTAVE=OFF \
+		-D ENABLE_MEX_DOC=OFF \
+		-D ENABLE_PYTHON=OFF \
+		-D ARMA_EXT=$(arma_internal) \
+		-D ENABLE_AVX2=$(avx2) \
+		-D ENABLE_CUDA=OFF \
+		-D ENABLE_STATIC_LIB=ON \
+		-D ENABLE_SHARED_LIB=OFF
+	cmake --build $(FUZZ_BUILD_DIR) --target fuzz_targets --parallel $(shell nproc) $(BUILD_TOOL_ARGS)
+	python3 tests/fuzzing/run.py --build-dir $(FUZZ_BUILD_DIR) --out $(FUZZ_DIR) --time $(FUZZ_TIME) --jobs $(FUZZ_JOBS) $(FUZZ_ARGS)
+.PHONY: test-fuzz
 
 # Documentation: docs_builder/README.md and website_builder/README.md
 docs:
@@ -249,6 +279,7 @@ release:
 clean:
 	- rm -rf $(CMAKE_BUILD_DIR)
 	- rm -rf $(ASAN_BUILD_DIR)
+	- rm -rf $(FUZZ_BUILD_DIR)
 	- rm +quadriga_lib/*.mex
 	- rm +quadriga_lib/*.mexa64
 	- rm release/*.deb

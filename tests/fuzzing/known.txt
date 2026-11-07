@@ -1,0 +1,2 @@
+# Known findings that are not fixed yet; see README.md, section "Known findings".
+# One line per cause: <signature as in the report> | <note>

@@ -87,20 +87,19 @@ Read this before the hunt, so known items are not reported as new:
 3. Build the MEX for Octave and MATLAB and the Python module. The MEX for MATLAB needs a compiler whose libstdc++ is not newer than MATLAB's (`GNUmakefile` sets `gcc_version`). Run `tests/quadriga_lib_mex_tests.m` (Octave and MATLAB) and `pytest tests/python_tests`, and record the results.
 4. Write the build commands and results into the "Baseline" section of the findings file.
 
-## Phase 2: fuzzing the file readers (the manager)
+## Phase 2: fuzzing (the manager)
 
-Write one harness per reader (qdant, OBJ, MTL / material import, HDF5, QRT, conf files, PNG if a reader exists) in the working folder, with seeds from `tests/data` and `data/`. The harness catches the library's exceptions. A clean exception is correct behaviour. A crash, a sanitizer report, a hang that repeats outside the fuzzer, or input that is accepted but gives a wrong result is a finding.
+The fuzz targets for the file readers and for API functions, and the runner that fuzzes them and writes a report, are in `tests/fuzzing`; [tests/fuzzing/README.md](../tests/fuzzing/README.md) describes how they work and how to read the report. Run them from the worktree, with the build folder in the working folder and an output folder that is the same in every scan, so that the corpus grows from scan to scan (the maintainer's local agent notes name it; otherwise ask in phase 0):
 
-Facts and traps for AFL++ (checked with AFL++ 4.33c and clang 21, 2026-10-15):
+```
+make test-fuzz FUZZ_BUILD_DIR=<working folder>/build_fuzz FUZZ_DIR=<fuzz output folder> FUZZ_TIME=<share of the time budget> FUZZ_JOBS=<free cores>
+```
 
-- Use `afl-clang-fast++`. `afl-g++-fast` fails with a GCC plugin version error.
-- AFL's clang has no OpenMP. Build the fuzzing library without OpenMP in its own build directory (`CC=afl-clang-fast CXX=afl-clang-fast++`, ASan on, `ENABLE_AVX2=OFF`, no MEX or Python). CMake falls back to single-threaded by itself. If the whole library does not compile with clang, link the harness against only the reader sources it needs.
-- If the system sends core dumps to a crash handler (for example apport on Ubuntu), AFL reports crashes as hangs. Do not change `core_pattern`. Instead, call `prctl(PR_SET_DUMPABLE, 0)` first in every harness's `main`, and run `afl-fuzz` with `AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1 AFL_NO_UI=1`.
-- Build harnesses with ASan and with `AFL_LLVM_LAF_ALL=1` or a CMPLOG binary (`-c`). Without these, a three-byte magic compare was not found in 160,000 executions.
-- `tests/afl/Makefile` hard-codes old paths; do not use it. `tests/afl/src/afl_qdant_read.cpp` and `tests/afl/qdant_samples/` serve as a template and seeds.
-- Bound every instance: `afl-fuzz -V <seconds>` for the run time, `-t <ms>` for the per-input timeout, `-m none` together with the memory-capped scope and `hard_rss_limit_mb` from the resource limits. Run one instance per free core within the local thread limits.
+- Bound the run as in "Resource limits": `timeout` with the fuzzing time plus one hour for the triage, inside a memory-capped scope of about 3 GB per process. The runner limits each input to 10 s and 2 GB itself.
+- Each section under "New findings" in `report.md` is a candidate finding: the inputs are grouped by cause, the input is minimized, and the section has the command that reproduces it and a command that recreates the input file for an issue. Known findings (`tests/fuzzing/known.txt`) are only counted. A target listed under "Problems of the run" is a finding about the fuzzing setup.
+- A reader or API function in scope that has no target gets one in the working folder, built by hand as the README shows; it is proposed for `tests/fuzzing` in phase 5 with the findings.
 
-Record executions and coverage per reader in the findings file.
+Record the targets table of the report (time, runs, coverage, corpus size) in the Baseline section of the findings file.
 
 ## Phase 3: the area hunt (sub-agents)
 
@@ -143,7 +142,7 @@ The findings file is `<working folder>/findings.md`. Top of the file:
 
 1. Title, date, the scanned commit, the areas in scope and the exclusions from phase 0, and the marks used: **[R]** reproduced by a program or script run in this scan; **[M]** measured (timings, counts); **[C]** read from the code, not reproduced.
 2. **Summary table:** ID, title (one line), area, kind (1 to 4), severity, mark, relation to GitHub (new / #N / regression of #N), status. Sorted by severity, then area.
-3. **Baseline:** build commands for every configuration, suite results, sanitizer results, MEX and Python test results, fuzzing time and executions per reader, and the load during each.
+3. **Baseline:** build commands for every configuration, suite results, sanitizer results, MEX and Python test results, fuzzing time, runs and coverage per target, and the load during each.
 4. **Coverage:** one row per in-scope source file: reviewed by reading (yes / partly / no), probed (yes / no), run under the sanitizers (yes / no), and the IDs that refer to it.
 
 Then one section per finding:
