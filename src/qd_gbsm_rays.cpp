@@ -242,10 +242,10 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 - NLOS rays with power > 0 at some frequency: FBS on the departure ray and LBS on the arrival ray at equal
   distances from their end, so that the polyline Tx, FBS, LBS, Rx has the length d3D + c·delay (d3D the Tx-Rx
   distance) and the angles are exact
-- Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the
-  ray's own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With
-  `d_min` = 2 m this applies to up to about 23 % of the rays (Indoor LOS, RMa NLOS; most in the TR methods without
-  absolute TOA) and lengthens them by a few ns
+- Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the ray's
+  own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With `d_min` = 2 m
+  this applies to up to about 23 % of the rays (most in the TR methods without absolute TOA) and lengthens them by up to
+  25 ns (median below 5 ns), the DS of a link by up to 3 ns; `b_med` can then equal `d_min`
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular
   point on z = 0, which requires both ends at z >= 0
 - Writes `fbs_pos`, `lbs_pos` and `fallback` of all rays and overwrites given scatterers; nothing else changes;

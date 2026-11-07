@@ -2069,7 +2069,7 @@ or be filled directly (fields in [ssf_rays](#ssf_rays)); continue with step 6.
 | tap | rays summed in one output tap: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`'quadriga'`) |
 | snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
 | segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |
-| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting); `auto`: `phase` for the TR methods, `drift` for `'quadriga'` |
+| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting; validity in [ssf_paths](#ssf_paths)); `auto`: `phase` for the TR methods, `drift` for `'quadriga'` |
 | scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
 | coefficient power | power of a ray without link gain and oxygen loss (field `power` of the ray struct): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [ssf_clusters](#ssf_clusters) sets it; for data from paths the path gain |
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
@@ -2083,11 +2083,14 @@ or be filled directly (fields in [ssf_rays](#ssf_rays)); continue with step 6.
 with s the slot and i the sub-cluster (0, 1, 2) of a split cluster, else 0 (LOS 0, GR 3, the first NLOS cluster 3
 without and 6 with GR). Both are labels, not indices: the wrappers do not shift them.
 
-**Model properties.** UTs closer than the decorrelation distance `SC_lambda` get correlated clusters and rays, so
-separately dropped UTs a few wavelengths apart have unrealistically correlated fading: drop once and move the UTs with
-[ssf_paths](#ssf_paths) or [gbsm_single_link_channel](#gbsm_single_link_channel). Across bands, `'quadriga'` uses one ray set, so the fading is
-correlated; the TR methods draw coupling, XPR and phases per frequency, so it is independent, also with
-`'38.901_MF'`, which keeps the delays and angles.
+**Model properties.** UTs closer than `SC_lambda` get correlated clusters and rays (TR 38.901 clause 7.6.3.1). In the TR
+methods, the tap fading of separately dropped UTs then stays correlated over metres instead of a few wavelengths
+(tap-power correlation 0.5 at about 0.3·`SC_lambda`, 0.1 at 0.8·`SC_lambda`); `'quadriga'` avoids this. In all methods,
+the cluster delays and angles of separately dropped UTs change faster than for a moved UT, so their single-frequency
+channel and Doppler are wrong at small distances: for close UTs, drop once and move them with [ssf_paths](#ssf_paths) or
+[gbsm_single_link_channel](#gbsm_single_link_channel). Across bands, `'quadriga'` uses one ray set, so the fading is correlated; the TR methods
+draw coupling, XPR and phases per frequency, so it is independent, also with `'38.901_MF'`, which keeps the delays and
+angles.
 
 **Conventions.** `N = NumClusters - 1` is the number of NLOS clusters: `NumClusters` counts the LOS slot, as in
 QuaDRiGa. Positions are in m; in the batch functions one row (x, y, z) per link: `rx_pos` is `[n_link, 3]`, `tx_pos` is
@@ -2841,7 +2844,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [Python](quadriga_lib_ap
     method of the TR is required
   - `'quadriga'`: S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple
     Frequencies", 2019, with the LOS direction added to the cluster offsets; for tracks, several frequencies and
-    device-to-device links
+    device-to-device links; delays and angles depend on the frequency list, so keep it fixed to reproduce a seed
 
 | Property | `'38.901'` | `'38.901_MF'` | `'quadriga'` |
 | --- | --- | --- | --- |
@@ -2945,9 +2948,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [Python](quadriga_lib_api_p
   with `oxygen` times the absorption of TR 38.901 clause 7.6.1 (Table 7.6.1-1 at each frequency) over each path's own
   length, without the delay offset τ_Δ of eq. (7.6-1) and at the carrier only (no in-band variation of eq. (7.6-2))
 - Validity per moving end, with `b_eff` and `b_med` of [ssf_scatterers](#ssf_scatterers): `'phase'` up to about `sqrt(λ · b_eff / 8)`,
-  typically 0.1 to 1 m; `'drift'` up to about `0.2 · b_med`, typically 1.5 to 12 m, new segment from `0.5 · b_med`; in
-  `'drift'` each path length changes by at most the displacement. [gbsm_single_link_channel](#gbsm_single_link_channel) reports the
-  displacement relative to the limit
+  typically 0.1 to 1 m at the carrier, about 0.15 to 0.35 m at the edges of a 400 MHz band; `'drift'` up to about
+  `0.2 · b_med`, typically 1.5 to 12 m, new segment from `0.5 · b_med`; in `'drift'` each path length changes by at most
+  the displacement. [gbsm_single_link_channel](#gbsm_single_link_channel) reports the displacement relative to the limit
 - An error is raised for invalid input; in `'drift'` also without scatterers, and for a GR ray at moved ends without
   permittivity in `rays` or with an end below z = 0
 
@@ -3097,8 +3100,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#.solve_scatterers) · [Python](quadriga_l
   angles are exact
 - Where no such pair exists with both distances at least `d_min`, both scatterers are placed at `d_min` along the ray's
   own directions and `fallback` is 1: the polyline is longer than the ray, `delay` keeps its value. With `d_min` = 2 m
-  this applies to up to about 23 % of the rays (Indoor LOS, RMa NLOS; most in the TR methods without absolute TOA)
-  and lengthens them by a few ns
+  this applies to up to about 23 % of the rays (most in the TR methods without absolute TOA) and lengthens them by up to
+  25 ns (median below 5 ns), the DS of a link by up to 3 ns; `b_med` can then equal `d_min`
 - LOS ray and NLOS rays with zero power at all frequencies: the midpoint of the direct line; GR ray: the specular point
   on z = 0, which requires both ends at z >= 0
 - `rays_out` is a copy of `rays` (all fields; unchanged fields keep their class) with new `fbs_pos`, `lbs_pos` and

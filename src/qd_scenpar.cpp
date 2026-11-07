@@ -760,7 +760,7 @@ KF(drop) from slice 1 of `lsp`. Ray data can also come from path data, with [[gb
 | tap | rays summed in one output tap: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`"quadriga"`) |
 | snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
 | segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |
-| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting); `auto`: `phase` for the TR methods, `drift` for `"quadriga"` |
+| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting; validity in [[ssf_paths]]); `auto`: `phase` for the TR methods, `drift` for `"quadriga"` |
 | scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
 | coefficient power | power of a ray without link gain and oxygen loss (`gbsm_rays.power`): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [[ssf_clusters]] sets it; for data from paths the path gain |
 | path gain | linear power gain of a path incl. link gain and oxygen loss |

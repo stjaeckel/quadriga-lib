@@ -22,7 +22,7 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
     method of the TR is required
   - `"quadriga"`: S. Jaeckel et al., "A Spatially Consistent Geometric D2D Small-Scale Fading Model for Multiple
     Frequencies", 2019, with the LOS direction added to the cluster offsets; for tracks, several frequencies and
-    device-to-device links
+    device-to-device links; delays and angles depend on the frequency list, so keep it fixed to reproduce a seed
 
 | Property | `"38.901"` | `"38.901_MF"` | `"quadriga"` |
 | --- | --- | --- | --- |

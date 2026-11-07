@@ -37,9 +37,9 @@ Antenna-free paths of one link at one position
   with `oxygen` times the absorption of TR 38.901 clause 7.6.1 (Table 7.6.1-1 at each frequency) over each path's own
   length, without the delay offset τ_Δ of eq. (7.6-1) and at the carrier only (no in-band variation of eq. (7.6-2))
 - Validity per moving end, with `b_eff` and `b_med` of [[ssf_scatterers]]: `"phase"` up to about `sqrt(λ · b_eff / 8)`,
-  typically 0.1 to 1 m; `"drift"` up to about `0.2 · b_med`, typically 1.5 to 12 m, new segment from `0.5 · b_med`; in
-  `"drift"` each path length changes by at most the displacement. [[gbsm.single_link_channel]] reports the
-  displacement relative to the limit
+  typically 0.1 to 1 m at the carrier, about 0.15 to 0.35 m at the edges of a 400 MHz band; `"drift"` up to about
+  `0.2 · b_med`, typically 1.5 to 12 m, new segment from `0.5 · b_med`; in `"drift"` each path length changes by at most
+  the displacement. [[gbsm.single_link_channel]] reports the displacement relative to the limit
 - Raises `ValueError` for invalid input; in `"drift"` also without scatterers, and for a GR ray at moved ends without
   permittivity in `rays` or with an end below z = 0
 

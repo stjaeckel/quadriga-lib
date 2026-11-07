@@ -77,7 +77,7 @@ or be filled directly (fields in [[ssf_rays]]); continue with step 6.<br><br>
 | tap | rays summed in one output tap: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`'quadriga'`) |
 | snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
 | segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |
-| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting); `auto`: `phase` for the TR methods, `drift` for `'quadriga'` |
+| mobility | how the paths follow moved ends within a segment: `phase` (phase rotation per ray, delays and angles fixed) or `drift` (scatterers fixed, geometry recomputed; QuaDRiGa drifting; validity in [[ssf_paths]]); `auto`: `phase` for the TR methods, `drift` for `'quadriga'` |
 | scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
 | coefficient power | power of a ray without link gain and oxygen loss (field `power` of the ray struct): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [[ssf_clusters]] sets it; for data from paths the path gain |
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
@@ -91,11 +91,14 @@ or be filled directly (fields in [[ssf_rays]]); continue with step 6.<br><br>
 with s the slot and i the sub-cluster (0, 1, 2) of a split cluster, else 0 (LOS 0, GR 3, the first NLOS cluster 3
 without and 6 with GR). Both are labels, not indices: the wrappers do not shift them.<br><br>
 
-**Model properties.** UTs closer than the decorrelation distance `SC_lambda` get correlated clusters and rays, so
-separately dropped UTs a few wavelengths apart have unrealistically correlated fading: drop once and move the UTs with
-[[ssf_paths]] or [[gbsm_single_link_channel]]. Across bands, `'quadriga'` uses one ray set, so the fading is
-correlated; the TR methods draw coupling, XPR and phases per frequency, so it is independent, also with
-`'38.901_MF'`, which keeps the delays and angles.<br><br>
+**Model properties.** UTs closer than `SC_lambda` get correlated clusters and rays (TR 38.901 clause 7.6.3.1). In the TR
+methods, the tap fading of separately dropped UTs then stays correlated over metres instead of a few wavelengths
+(tap-power correlation 0.5 at about 0.3·`SC_lambda`, 0.1 at 0.8·`SC_lambda`); `'quadriga'` avoids this. In all methods,
+the cluster delays and angles of separately dropped UTs change faster than for a moved UT, so their single-frequency
+channel and Doppler are wrong at small distances: for close UTs, drop once and move them with [[ssf_paths]] or
+[[gbsm_single_link_channel]]. Across bands, `'quadriga'` uses one ray set, so the fading is correlated; the TR methods
+draw coupling, XPR and phases per frequency, so it is independent, also with `'38.901_MF'`, which keeps the delays and
+angles.<br><br>
 
 **Conventions.** `N = NumClusters - 1` is the number of NLOS clusters: `NumClusters` counts the LOS slot, as in
 QuaDRiGa. Positions are in m; in the batch functions one row (x, y, z) per link: `rx_pos` is `[n_link, 3]`, `tx_pos` is
