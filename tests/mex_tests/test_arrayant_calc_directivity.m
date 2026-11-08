@@ -104,5 +104,18 @@ catch ME
     end
 end
 
+% Error: the struct field center_freq is a scalar
+try
+    ant_cf = ant;
+    ant_cf.center_freq = [3.5e9, 28e9];
+    [~] = quadriga_lib.arrayant_calc_directivity( ant_cf );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Input ''center_freq'' must be a scalar.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
 end
 

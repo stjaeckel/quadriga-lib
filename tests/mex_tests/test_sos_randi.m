@@ -80,12 +80,12 @@ assert_throws( @() quadriga_lib.sos_randi( dd, pos, 0.5 ), 'imax' );
 assert_throws( @() quadriga_lib.sos_randi( dd, pos, 6, [], [], [], NaN ), 'Input ''seed''' );
 assert_throws( @() quadriga_lib.sos_randi( dd, pos, 6, [], [], [], -2 ), 'seed' );                 % thrown by C++
 
-%% Non-integer scalars are rejected, a vector for a scalar uses its first element
+%% Non-integer scalars and vectors for a scalar are rejected
 assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, 6.9, [], [], [], 7 ), 'Input ''imax'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, 6, [], [], [], 7.9 ), ...
     'Input ''seed'' must be an integer from -1 to 9223372036854775807.' );
 assertEqual( quadriga_lib.sos_randi( dd, pos, 6.0, [], [], [], 7.0 ), val );
-assertEqual( quadriga_lib.sos_randi( dd, pos, [6, 2], [], [], [], 7 ), val );
+assert_cpp_error( @() quadriga_lib.sos_randi( dd, pos, [6, 2], [], [], [], 7 ), 'Input ''imax'' must be a scalar.' );
 
 end
 

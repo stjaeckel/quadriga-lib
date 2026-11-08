@@ -171,6 +171,8 @@ msg_set = 'Input ''set_id'' must be 0 (shared set) or a frequency index >= 1.';
 assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', 42, -1 ), msg_set );
 assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', 42, 1.5 ), msg_set );
 assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', 42, NaN ), msg_set );
+assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', 42, [1, 2] ), 'Input ''set_id'' must be a scalar.' );
+assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', [42, 43] ), 'Input ''seed'' must be a scalar.' );
 assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', -2 ), 'seed' );
 assert_throws( @() quadriga_lib.gbsm_init_phases( sp, 'cluster', 42, 0, 'Unknown' ), 'preset' );                   % C++
 assert_throws( @() quadriga_lib.gbsm_init_phases( struct( 'NumClusters', 0 ), 'cluster', 42 ), 'NumClusters' );     % C++

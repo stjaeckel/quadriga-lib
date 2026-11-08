@@ -207,6 +207,11 @@ assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [],
 a = quadriga_lib.arrayant_generate('3GPP', [], [], [], [], [], 2.0);
 assertEqual( size(a.e_theta_re, 3), 2 );
 
+%% Scalar inputs take one element; position 10 is a scalar tilt for 3GPP and a direction matrix for multibeam
+assert_cpp_error( @() quadriga_lib.arrayant_generate('omni', [], [3.5e9, 28e9]), 'Input ''freq'' must be a scalar.' );
+assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', 10, [], [], [], [], [2, 1]), 'Input ''M'' must be a scalar.' );
+assert_cpp_error( @() quadriga_lib.arrayant_generate('3GPP', 10, [], [], [], [], 1, 1, 1, [5, 10]), 'Input ''tilt_dir'' must be a scalar.' );
+
 % Multibeam: the default element beamwidth is the documented 120 deg (0 or [] select it)
 for type = {'multibeam', 'multibeam_sep'}
     a0 = quadriga_lib.arrayant_generate(type{1});

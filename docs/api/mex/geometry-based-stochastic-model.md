@@ -578,7 +578,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#los_probability) · [Py
 - **`p_los`** — LOS probability in [0, 1]; `[n_link, 1]`
 - **`los_soft`** — Soft LOS state in [0, 1]; `> 0.5` exactly when `rnd_g > -F(p_los)` of eq.
   (7.6-18), which has the probability `p_los`; `[n_link, n_freq]`; `[]` if `rnd_g` or `center_freq`
-  is omitted or empty
+  is omitted or empty; `zeros(0, n_freq)` for no link and `center_freq` given
 
 ### See also:
 - [o2i_loss](#o2i_loss) (indoor distance for `d2d_out`)

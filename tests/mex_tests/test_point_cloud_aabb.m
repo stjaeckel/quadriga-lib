@@ -108,6 +108,16 @@ catch ME
     end
 end
 
+try % Vector for the scalar vec_size
+    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, [8, 1] );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Input ''vec_size'' must be a scalar.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
 end
 
 
