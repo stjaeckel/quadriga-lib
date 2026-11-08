@@ -705,8 +705,8 @@ void quadriga_lib::path_to_tube(
 ```
 
 ### Inputs:
-- **`path_coord`** — Ordered 3D path coordinates; `[3, n_coord]`
-- **`radius`** *(optional)* — Tube cross-section radius
+- **`path_coord`** — Ordered 3D path coordinates, finite; `[3, n_coord]`
+- **`radius`** *(optional)* — Tube cross-section radius, finite and > 0
 - **`n_edges`** *(optional)* — Number of vertices per circular cross-section; must be ≥ 3
 
 ### Outputs:

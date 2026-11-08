@@ -43,8 +43,8 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 - **`center_freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
   recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
    entry's `center_freq` unchanged.
-- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; sorted; defaults to input grid
-- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; sorted; defaults to input grid
+- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
+- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; defaults to input grid
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
   5th input in struct mode, 16th input with separate inputs; default: 299792458
 - **`e_theta_re`** ... **`elevation_grid`** — Required inputs for split mode

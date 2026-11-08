@@ -103,6 +103,7 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [Python](../
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
 - Paths below `gain_min` are excluded; `max_no_paths` limits the total number of exported paths
+- Paths with non-finite coordinates are skipped
 - The function takes raw channel data fields directly; no MATLAB channel struct is needed
 
 ### Usage:

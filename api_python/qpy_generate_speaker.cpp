@@ -84,8 +84,8 @@ speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 5
   - `e_theta_im` — e-theta field component, imaginary part; `(n_elevation, n_azimuth, n_elements, n_freq)`
   - `e_phi_re` — e-phi field component, real part; `(n_elevation, n_azimuth, n_elements, n_freq)`
   - `e_phi_im` — e-phi field component, imaginary part; `(n_elevation, n_azimuth, n_elements, n_freq)`
-  - `azimuth_grid` — Azimuth angles in rad, -π to π, sorted; `(n_azimuth,)`
-  - `elevation_grid` — Elevation angles in rad, -π/2 to π/2, sorted; `(n_elevation,)`
+  - `azimuth_grid` — Azimuth angles in rad, -π to π, strictly increasing; `(n_azimuth,)`
+  - `elevation_grid` — Elevation angles in rad, -π/2 to π/2, strictly increasing; `(n_elevation,)`
   - `element_pos` — Element (x,y,z) positions in meters; `(3, n_elements)`
   - `coupling_re` — Coupling matrix, real part;
     `(n_elements, n_ports)` or `(n_elements, n_ports, n_freq)` if it varies across frequencies

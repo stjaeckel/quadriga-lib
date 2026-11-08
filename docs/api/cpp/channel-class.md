@@ -133,6 +133,7 @@ Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Pytho
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
 - Paths below `gain_min` are excluded; `max_no_paths` limits total count
+- Paths with non-finite coordinates are skipped
 
 ### Declaration:
 ```cpp

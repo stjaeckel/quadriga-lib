@@ -30,19 +30,19 @@ Class for storing and manipulating array antenna models
 - `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity)
 
 ## Attributes:<br>
-| Attribute                         | Size                                   | Description                                       |
-| --------------------------------- | -------------------------------------- | ------------------------------------------------- |
-| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part               |
-| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part          |
-| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part               |
-| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part          |
-| `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], sorted       |
-| `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], sorted |
-| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords       |
-| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                        |
-| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                   |
-| `dtype center_frequency`          | scalar                                 | Center frequency                                  |
-| `std::string name`                | string                                 | Name of the array antenna object                  |
+| Attribute                         | Size                                   | Description                                                    |
+| --------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
+| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part                            |
+| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part                       |
+| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part                            |
+| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part                       |
+| `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], strictly increasing       |
+| `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], strictly increasing |
+| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords                    |
+| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                                     |
+| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                                |
+| `dtype center_frequency`          | scalar                                 | Center frequency                                               |
+| `std::string name`                | string                                 | Name of the array antenna object                               |
 
 ## Simple member functions:<br>
 | Function         | Description                                       |
@@ -511,8 +511,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
 ```
 
 ## Inputs:
-- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
-- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
+- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
 - **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ## Returns:
@@ -2211,22 +2211,20 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
     if (elevation_grid.n_elem != n_elevation)
         return std::string("Number of elements in 'elevation_grid' does not match number of rows in pattern data.");
 
-    bool error_code = false;
-    for (const dtype *val = azimuth_grid.begin(); val < azimuth_grid.end(); ++val)
-        error_code = *val < dtype(-3.1415930) || *val > dtype(3.1415930) ? true : error_code;
-    if (error_code)
+    const dtype *p_az = azimuth_grid.memptr(), *p_el = elevation_grid.memptr();
+    const dtype az_max = dtype(3.1415930), el_max = dtype(1.5707965);
+
+    if (!qd_in_range(p_az, n_azimuth, -az_max, az_max))
         return std::string("Values of 'azimuth_grid' must be between -pi and pi (equivalent to -180 to 180 degree).");
 
-    for (const dtype *val = elevation_grid.begin(); val < elevation_grid.end(); ++val)
-        error_code = *val < dtype(-1.5707965) || *val > dtype(1.5707965) ? true : error_code;
-    if (error_code)
+    if (!qd_in_range(p_el, n_elevation, -el_max, el_max))
         return std::string("Values of 'elevation_grid' must be between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
 
-    if (!azimuth_grid.is_sorted())
-        return std::string("Values of 'azimuth_grid' must be sorted in ascending order.");
+    if (!qd_in_range(p_az, n_azimuth, -az_max, az_max, true, true))
+        return std::string("Values of 'azimuth_grid' must be sorted in strictly ascending order.");
 
-    if (!elevation_grid.is_sorted())
-        return std::string("Values of 'elevation_grid' must be sorted in ascending order.");
+    if (!qd_in_range(p_el, n_elevation, -el_max, el_max, true, true))
+        return std::string("Values of 'elevation_grid' must be sorted in strictly ascending order.");
 
     if (!element_pos.empty() && (element_pos.n_rows != 3 || element_pos.n_cols != n_elements))
         return std::string("Size of 'element_pos' must be either empty or match [3, n_elements]");

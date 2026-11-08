@@ -2,6 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
+#include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
@@ -288,4 +289,104 @@ TEST_CASE("Arrayant copy_element - Read-only object and empty destination")
     CHECK_THROWS_AS(a.copy_element(0, idx_max), std::invalid_argument);
     CHECK_THROWS_AS(a.copy_element(0, arma::uvec{1, idx_max}), std::invalid_argument);
     CHECK(a.n_elements() == 3);
+}
+
+// The grids must be finite, in range and strictly increasing. A NaN or two equal neighbours must be rejected by the
+// full check, by validate() and by interpolate, which otherwise returns zero or NaN patterns without an error.
+// The same holds for the output grids of combine_pattern and arrayant_combine_pattern_multi.
+TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values", "", float, double)
+{
+    using T = TestType;
+    const T nan = std::numeric_limits<T>::quiet_NaN();
+
+    // 3 elevation x 4 azimuth points, one element
+    quadriga_lib::arrayant<T> a;
+    a.e_theta_re.ones(3, 4, 1), a.e_theta_im.zeros(3, 4, 1), a.e_phi_re.zeros(3, 4, 1), a.e_phi_im.zeros(3, 4, 1);
+    a.azimuth_grid = {T(-3.0), T(-1.0), T(1.0), T(3.0)};
+    a.elevation_grid = {T(-1.0), T(0.0), T(1.0)};
+    a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
+    REQUIRE(a.is_valid(false).empty());
+
+    arma::Mat<T> az = {T(0.1)}, el = {T(0.2)}, vr, vi, hr, hi;
+
+    // Rejected by all three entry points; interpolate runs on a copy that was never validated
+    auto rejected = [&](const quadriga_lib::arrayant<T> &b)
+    {
+        quadriga_lib::arrayant<T> c = b, d = b;
+        CHECK(!c.is_valid(false).empty());
+        CHECK(!c.validate().empty());
+        CHECK_THROWS_AS(d.interpolate(&az, &el, &vr, &vi, &hr, &hi), std::invalid_argument);
+    };
+
+    SECTION("Controls: valid grids pass")
+    {
+        quadriga_lib::arrayant<T> b = a;
+        CHECK(b.validate().empty());
+        b.interpolate(&az, &el, &vr, &vi, &hr, &hi);
+        CHECK(std::abs(vr(0) - T(1.0)) < T(1e-5));
+
+        // A single grid point in both directions
+        quadriga_lib::arrayant<T> s;
+        s.e_theta_re.ones(1, 1, 1), s.e_theta_im.zeros(1, 1, 1), s.e_phi_re.zeros(1, 1, 1), s.e_phi_im.zeros(1, 1, 1);
+        s.azimuth_grid = {T(0.0)}, s.elevation_grid = {T(0.0)};
+        CHECK(s.validate().empty());
+    }
+
+    SECTION("NaN in azimuth_grid")
+    {
+        for (arma::uword i : {0, 2, 3})
+        {
+            quadriga_lib::arrayant<T> b = a;
+            b.azimuth_grid(i) = nan;
+            rejected(b);
+        }
+    }
+
+    SECTION("NaN in elevation_grid")
+    {
+        for (arma::uword i : {0, 1, 2})
+        {
+            quadriga_lib::arrayant<T> b = a;
+            b.elevation_grid(i) = nan;
+            rejected(b);
+        }
+    }
+
+    SECTION("Repeated and constant grid values")
+    {
+        quadriga_lib::arrayant<T> b = a;
+        b.elevation_grid(2) = b.elevation_grid(1);
+        rejected(b);
+
+        b = a;
+        b.azimuth_grid(1) = b.azimuth_grid(0);
+        rejected(b);
+
+        b = a;
+        b.azimuth_grid.zeros();
+        rejected(b);
+    }
+
+    SECTION("Unsorted grid")
+    {
+        quadriga_lib::arrayant<T> b = a;
+        std::swap(b.azimuth_grid(1), b.azimuth_grid(2));
+        rejected(b);
+    }
+
+    SECTION("Output grids of combine_pattern")
+    {
+        const std::vector<quadriga_lib::arrayant<T>> v = {a};
+        arma::Col<T> az_ok = {T(-1.0), T(0.0), T(1.0)}, el_ok = {T(0.0)};
+        CHECK_NOTHROW(a.combine_pattern(&az_ok, &el_ok));
+
+        arma::Col<T> az_nan = {T(-1.0), nan, T(1.0)}, el_nan = {nan};
+        CHECK_THROWS_AS(a.combine_pattern(&az_nan, &el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(a.combine_pattern(&az_ok, &el_nan), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, &az_nan, &el_ok), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_combine_pattern_multi(v, &az_ok, &el_nan), std::invalid_argument);
+
+        arma::Col<T> az_rep = {T(-1.0), T(-1.0), T(1.0)};
+        CHECK_THROWS_AS(a.combine_pattern(&az_rep, &el_ok), std::invalid_argument);
+    }
 }

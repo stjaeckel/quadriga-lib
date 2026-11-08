@@ -22,8 +22,8 @@ namespace quadriga_lib
         arma::Cube<dtype> e_theta_im;                // E-theta (vertical) field, imaginary part; [n_elevation, n_azimuth, n_elements]
         arma::Cube<dtype> e_phi_re;                  // E-phi (horizontal) field, real part; [n_elevation, n_azimuth, n_elements]
         arma::Cube<dtype> e_phi_im;                  // E-phi (horizontal) field, imaginary part; [n_elevation, n_azimuth, n_elements]
-        arma::Col<dtype> azimuth_grid;               // Azimuth angles in rad, in [-pi, pi], sorted; [n_azimuth]
-        arma::Col<dtype> elevation_grid;             // Elevation angles in rad, in [-pi/2, pi/2], sorted; [n_elevation]
+        arma::Col<dtype> azimuth_grid;               // Azimuth angles in rad, in [-pi, pi], strictly increasing; [n_azimuth]
+        arma::Col<dtype> elevation_grid;             // Elevation angles in rad, in [-pi/2, pi/2], strictly increasing; [n_elevation]
         arma::Mat<dtype> element_pos;                // Element positions in local Cartesian coords; [3, n_elements] or empty
         arma::Mat<dtype> coupling_re;                // Coupling matrix, real part; [n_elements, n_ports]
         arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part; [n_elements, n_ports]
@@ -54,8 +54,8 @@ namespace quadriga_lib
 
         // Combine element patterns, positions, and coupling weights into effective radiation patterns
         // Returns new arrayant with n_ports elements (= number of columns in coupling_re/im), each holding the combined effective pattern for that port
-        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,         // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
-                                        const arma::Col<dtype> *elevation_grid_new = nullptr,       // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,         // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
+                                        const arma::Col<dtype> *elevation_grid_new = nullptr,       // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
                                         dtype propagation_speed = dtype(299792458.0)) const;        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
 
         // Creates a copy of the array antenna object
@@ -124,8 +124,8 @@ namespace quadriga_lib
     // Combine element patterns, positions, and coupling weights into effective radiation patterns
     template <typename dtype>
     std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(const std::vector<arrayant<dtype>> &arrayant_vec,     // Non-empty vector of valid arrayant objects
-                                                                const arma::Col<dtype> *azimuth_grid_new = nullptr,   // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
-                                                                const arma::Col<dtype> *elevation_grid_new = nullptr, // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+                                                                const arma::Col<dtype> *azimuth_grid_new = nullptr,   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
+                                                                const arma::Col<dtype> *elevation_grid_new = nullptr, // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
                                                                 const arma::Col<dtype> *freq_grid_new = nullptr,      // Output frequency grid in Hz; defaults to input grid
                                                                 dtype propagation_speed = dtype(299792458.0));        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
     // Concatenate two multi-frequency arrayant vectors into a single multi-element model

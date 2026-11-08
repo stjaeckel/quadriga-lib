@@ -53,8 +53,8 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 - **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
+- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
+- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
 - **`element_pos`** — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
 - **`coupling_re`** — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
 - **`coupling_im`** — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros

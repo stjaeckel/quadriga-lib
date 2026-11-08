@@ -131,9 +131,9 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 - **`freq`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
   recomputed at each value; if `None`, each input entry's `center_freq` is used; a scalar `<= 0`
   is treated as not given; default: `None`
-- **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; sorted; `(n_azimuth_out,)`;
+- **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; strictly increasing; `(n_azimuth_out,)`;
   if `None`, the input grid is used; default: `None`
-- **`elevation_grid`** — Alternative output elevation grid in rad; -pi/2 to pi/2; sorted;
+- **`elevation_grid`** — Alternative output elevation grid in rad; -pi/2 to pi/2; strictly increasing;
   `(n_elevation_out,)`; if `None`, the input grid is used; default: `None`
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for
   acoustics; default: `299792458.0`
@@ -333,19 +333,19 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 
 ### Outputs:
 - **`ant`** — Dict with fields:
-   | Field            | Description                                     | Size                                   |
-   | ---------------- | ----------------------------------------------- | -------------------------------------- |
-   | `e_theta_re`     | e-theta field component, real part              | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_theta_im`     | e-theta field component, imaginary part         | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_re`       | e-phi field component, real part                | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_im`       | e-phi field component, imaginary part           | `[n_elevation, n_azimuth, n_elements]` |
-   | `azimuth_grid`   | Azimuth angles in rad, -π to π, sorted          | `[n_azimuth]`                          |
-   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, sorted    | `[n_elevation]`                        |
-   | `element_pos`    | Element (x,y,z) positions in meters             | `[3, n_elements]`                      |
-   | `coupling_re`    | Coupling matrix, real part                      | `[n_elements, n_ports]`                |
-   | `coupling_im`    | Coupling matrix, imaginary part                 | `[n_elements, n_ports]`                |
-   | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`    | scalar                                 |
-   | `name`           | Name of the array antenna object                | string                                 |
+   | Field            | Description                                               | Size                                   |
+   | ---------------- | --------------------------------------------------------- | -------------------------------------- |
+   | `e_theta_re`     | e-theta field component, real part                        | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_theta_im`     | e-theta field component, imaginary part                   | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_re`       | e-phi field component, real part                          | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_im`       | e-phi field component, imaginary part                     | `[n_elevation, n_azimuth, n_elements]` |
+   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `[n_azimuth]`                          |
+   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[n_elevation]`                        |
+   | `element_pos`    | Element (x,y,z) positions in meters                       | `[3, n_elements]`                      |
+   | `coupling_re`    | Coupling matrix, real part                                | `[n_elements, n_ports]`                |
+   | `coupling_im`    | Coupling matrix, imaginary part                           | `[n_elements, n_ports]`                |
+   | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`              | scalar                                 |
+   | `name`           | Name of the array antenna object                          | string                                 |
 
 ---
 <a id="generate_speaker"></a>
@@ -426,8 +426,8 @@ speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 5
   - `e_theta_im` — e-theta field component, imaginary part; `(n_elevation, n_azimuth, n_elements, n_freq)`
   - `e_phi_re` — e-phi field component, real part; `(n_elevation, n_azimuth, n_elements, n_freq)`
   - `e_phi_im` — e-phi field component, imaginary part; `(n_elevation, n_azimuth, n_elements, n_freq)`
-  - `azimuth_grid` — Azimuth angles in rad, -π to π, sorted; `(n_azimuth,)`
-  - `elevation_grid` — Elevation angles in rad, -π/2 to π/2, sorted; `(n_elevation,)`
+  - `azimuth_grid` — Azimuth angles in rad, -π to π, strictly increasing; `(n_azimuth,)`
+  - `elevation_grid` — Elevation angles in rad, -π/2 to π/2, strictly increasing; `(n_elevation,)`
   - `element_pos` — Element (x,y,z) positions in meters; `(3, n_elements)`
   - `coupling_re` — Coupling matrix, real part;
     `(n_elements, n_ports)` or `(n_elements, n_ports, n_freq)` if it varies across frequencies
