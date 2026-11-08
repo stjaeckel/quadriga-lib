@@ -219,6 +219,43 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
     CHECK(arma::all(mtl_ind_re == mtl_ind_sub.elem(I)));
 }
 
+// Splits a 4-face mesh (two faces near x = 0, two near x = 10) along x, with an extra 10th column of value 'extra'
+// (or without it), and checks that only the first 9 columns are used and copied
+template <typename dtype>
+static void check_mesh_split_extra_column(bool add_column, dtype extra)
+{
+    arma::Mat<dtype> mesh = {{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0},
+                             {0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0},
+                             {10.0, 0.0, 0.0, 11.0, 0.0, 0.0, 10.0, 1.0, 0.0},
+                             {10.0, 0.0, 1.0, 11.0, 0.0, 1.0, 10.0, 1.0, 1.0}};
+    const arma::Mat<dtype> faces = mesh;
+    if (add_column)
+        mesh.insert_cols(9, arma::Col<dtype>(4, arma::fill::value(extra)));
+
+    arma::Mat<dtype> A, B;
+    arma::Col<int> split_ind;
+    int axis = quadriga_lib::triangle_mesh_split<dtype>(&mesh, &A, &B, 1, &split_ind);
+
+    REQUIRE(axis == 1);
+    REQUIRE(A.n_rows == 2);
+    REQUIRE(A.n_cols == 9);
+    REQUIRE(B.n_rows == 2);
+    REQUIRE(B.n_cols == 9);
+    CHECK(arma::approx_equal(A, faces.rows(0, 1), "absdiff", (dtype)0));
+    CHECK(arma::approx_equal(B, faces.rows(2, 3), "absdiff", (dtype)0));
+    CHECK(arma::all(split_ind == arma::Col<int>({1, 1, 2, 2})));
+}
+
+TEST_CASE("Quadriga tools - Mesh split ignores columns after the 9th")
+{
+    check_mesh_split_extra_column<double>(false, 0.0);
+    check_mesh_split_extra_column<double>(true, 0.0);   // extra column does not move any face
+    check_mesh_split_extra_column<double>(true, 100.0); // extra column would move all faces to B
+    check_mesh_split_extra_column<float>(false, 0.0f);
+    check_mesh_split_extra_column<float>(true, 0.0f);
+    check_mesh_split_extra_column<float>(true, 100.0f);
+}
+
 TEST_CASE("Quadriga tools - Point Cloud Segmentation")
 {
     // Generate set of points

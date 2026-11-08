@@ -29,7 +29,7 @@ int triangle_mesh_split(
 ```
 
 ## Inputs:
-- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
+- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; further columns are ignored and not copied to the outputs; `[n_mesh, 9]`
 - **`axis`** *(optional)* — Split axis: 0 = longest extent, 1 = x, 2 = y, 3 = z
 
 ## Outputs:
@@ -62,7 +62,7 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh,
     arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(mesh);
 
     arma::uword n_face = mesh->n_rows;
-    arma::uword n_mesh = mesh->n_elem;
+    arma::uword n_mesh = 9 * n_face; // First 9 columns (column-major), further columns are ignored
     const dtype *p_mesh = mesh->memptr();
 
     // Find longest axis
