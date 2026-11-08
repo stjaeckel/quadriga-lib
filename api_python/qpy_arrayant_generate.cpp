@@ -91,19 +91,19 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 
 ## Outputs:
 - **`ant`** — Dict with fields:<br><br>
-   | Field            | Description                                     | Size                                   |
-   | ---------------- | ----------------------------------------------- | -------------------------------------- |
-   | `e_theta_re`     | e-theta field component, real part              | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_theta_im`     | e-theta field component, imaginary part         | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_re`       | e-phi field component, real part                | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_im`       | e-phi field component, imaginary part           | `[n_elevation, n_azimuth, n_elements]` |
-   | `azimuth_grid`   | Azimuth angles in rad, -π to π, sorted          | `[n_azimuth]`                          |
-   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, sorted    | `[n_elevation]`                        |
-   | `element_pos`    | Element (x,y,z) positions in meters             | `[3, n_elements]`                      |
-   | `coupling_re`    | Coupling matrix, real part                      | `[n_elements, n_ports]`                |
-   | `coupling_im`    | Coupling matrix, imaginary part                 | `[n_elements, n_ports]`                |
-   | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`    | scalar                                 |
-   | `name`           | Name of the array antenna object                | string                                 |
+   | Field            | Description                                               | Size                                   |
+   | ---------------- | --------------------------------------------------------- | -------------------------------------- |
+   | `e_theta_re`     | e-theta field component, real part                        | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_theta_im`     | e-theta field component, imaginary part                   | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_re`       | e-phi field component, real part                          | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_im`       | e-phi field component, imaginary part                     | `[n_elevation, n_azimuth, n_elements]` |
+   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `[n_azimuth]`                          |
+   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[n_elevation]`                        |
+   | `element_pos`    | Element (x,y,z) positions in meters                       | `[3, n_elements]`                      |
+   | `coupling_re`    | Coupling matrix, real part                                | `[n_elements, n_ports]`                |
+   | `coupling_im`    | Coupling matrix, imaginary part                           | `[n_elements, n_ports]`                |
+   | `center_freq`    | Center frequency in Hz; inputs accept `(1,)`              | scalar                                 |
+   | `name`           | Name of the array antenna object                          | string                                 |
 MD!*/
 
 py::dict arrayant_generate(const std::string &type,

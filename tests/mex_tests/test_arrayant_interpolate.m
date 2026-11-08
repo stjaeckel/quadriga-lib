@@ -298,6 +298,34 @@ catch ME
     end
 end
 
+% A NaN in a grid is out of range
+ant.elevation_grid = el_grid;
+ant.azimuth_grid = az_grid;
+ant.azimuth_grid(4) = NaN;
+try
+    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Values of ''azimuth_grid'' must be between -pi and pi (equivalent to -180 to 180 degree).';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Grids must be strictly increasing: two equal neighbours are rejected
+ant.azimuth_grid = az_grid;
+ant.elevation_grid = el_grid;
+ant.elevation_grid(3) = ant.elevation_grid(2);
+try
+    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Values of ''elevation_grid'' must be sorted in strictly ascending order.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
 ant.elevation_grid = el_grid;
 try
     [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el, [], 1 );

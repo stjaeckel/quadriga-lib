@@ -106,6 +106,7 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g. for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
 - Paths below `gain_min` are excluded; `max_no_paths` caps the total number of exported paths
+- Paths with non-finite coordinates are skipped
 - Takes raw channel data fields directly; no channel dict is required
 - The per-snapshot fields `no_interact`, `interact_coord` and `coeff` each accept either a `list`
   (one entry per snapshot, ragged) or a single padded `ndarray` (MATLAB-style nD layout)

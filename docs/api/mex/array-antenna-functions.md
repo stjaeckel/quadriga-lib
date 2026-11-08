@@ -66,8 +66,8 @@ Also in: [C++](../cpp/array-antenna-class.md#.calc_beamwidth_deg) · [Python](..
 - **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
+- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
+- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
 - **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
 - **`threshold_dB`** — Threshold in dB; default: 3 (equivalent to FWHM)
 
@@ -161,8 +161,8 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 - **`center_freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
   recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
    entry's `center_freq` unchanged.
-- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; sorted; defaults to input grid
-- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; sorted; defaults to input grid
+- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
+- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; defaults to input grid
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
   5th input in struct mode, 16th input with separate inputs; default: 299792458
 - **`e_theta_re`** ... **`elevation_grid`** — Required inputs for split mode
@@ -392,19 +392,19 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 
 ### Outputs:
 - **`ant`** — Struct with fields:
-   | Field            | Description                                     | Size                                   |
-   | ---------------- | ----------------------------------------------- | -------------------------------------- |
-   | `e_theta_re`     | e-theta field component, real part              | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_theta_im`     | e-theta field component, imaginary part         | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_re`       | e-phi field component, real part                | `[n_elevation, n_azimuth, n_elements]` |
-   | `e_phi_im`       | e-phi field component, imaginary part           | `[n_elevation, n_azimuth, n_elements]` |
-   | `azimuth_grid`   | Azimuth angles in rad, -π to π, sorted          | `[n_azimuth]`                          |
-   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, sorted    | `[n_elevation]`                        |
-   | `element_pos`    | Element (x,y,z) positions in meters             | `[3, n_elements]`                      |
-   | `coupling_re`    | Coupling matrix, real part                      | `[n_elements, n_ports]`                |
-   | `coupling_im`    | Coupling matrix, imaginary part                 | `[n_elements, n_ports]`                |
-   | `center_freq`    | Center frequency in Hz                          | scalar                                 |
-   | `name`           | Name of the array antenna object                | string                                 |
+   | Field            | Description                                               | Size                                   |
+   | ---------------- | --------------------------------------------------------- | -------------------------------------- |
+   | `e_theta_re`     | e-theta field component, real part                        | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_theta_im`     | e-theta field component, imaginary part                   | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_re`       | e-phi field component, real part                          | `[n_elevation, n_azimuth, n_elements]` |
+   | `e_phi_im`       | e-phi field component, imaginary part                     | `[n_elevation, n_azimuth, n_elements]` |
+   | `azimuth_grid`   | Azimuth angles in rad, -π to π, strictly increasing       | `[n_azimuth]`                          |
+   | `elevation_grid` | Elevation angles in rad, -π/2 to π/2, strictly increasing | `[n_elevation]`                        |
+   | `element_pos`    | Element (x,y,z) positions in meters                       | `[3, n_elements]`                      |
+   | `coupling_re`    | Coupling matrix, real part                                | `[n_elements, n_ports]`                |
+   | `coupling_im`    | Coupling matrix, imaginary part                           | `[n_elements, n_ports]`                |
+   | `center_freq`    | Center frequency in Hz                                    | scalar                                 |
+   | `name`           | Name of the array antenna object                          | string                                 |
 
    If `ant` is used as an input to other functions, fields `e_theta_re`, `e_theta_im`, `e_phi_re`, 
    `e_phi_im`, `azimuth_grid`, `elevation_grid` are mandatory; remaining fields are optional (defaults: 
@@ -463,8 +463,8 @@ Also in: [C++](../cpp/array-antenna-class.md#.interpolate) · [Python](../python
 - **`e_theta_im`** — e-theta imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_re`** — e-phi real part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_im`** — e-phi imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth sample grid in rad, sorted, in [-π, π]; `[n_azimuth]`
-- **`elevation_grid`** — Elevation sample grid in rad, sorted, in [-π/2, π/2]; `[n_elevation]`
+- **`azimuth_grid`** — Azimuth sample grid in rad, strictly increasing, in [-π, π]; `[n_azimuth]`
+- **`elevation_grid`** — Elevation sample grid in rad, strictly increasing, in [-π/2, π/2]; `[n_elevation]`
 
 ### Outputs:
 - **`V_re`** — Real part of the interpolated e-theta (vertical) field component;
@@ -582,8 +582,8 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 - **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
+- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
+- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
 - **`element_pos`** — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
 - **`coupling_re`** — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
 - **`coupling_im`** — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros

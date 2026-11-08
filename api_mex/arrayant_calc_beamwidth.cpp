@@ -54,8 +54,8 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 - **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
+- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
+- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
 - **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
 - **`threshold_dB`** — Threshold in dB; default: 3 (equivalent to FWHM)
 

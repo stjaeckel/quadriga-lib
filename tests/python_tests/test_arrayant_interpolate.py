@@ -592,6 +592,28 @@ class TestErrorHandling(unittest.TestCase):
         with self.assertRaises(ValueError):
             arrayant.interpolate(ant, [[0]], [[0]], element=[5], frequency=[1000])
 
+    def test_nan_or_repeated_grid_raises(self):
+        """Grids must be finite and strictly increasing; otherwise patterns would be zero or NaN."""
+        def ant():
+            return {"e_theta_re": np.ones((5, 10, 1)),
+                    "e_theta_im": np.zeros((5, 10, 1)),
+                    "e_phi_re": np.zeros((5, 10, 1)),
+                    "e_phi_im": np.zeros((5, 10, 1)),
+                    "azimuth_grid": np.linspace(-np.pi, np.pi, 10),
+                    "elevation_grid": np.linspace(-np.pi / 2, np.pi / 2, 5)}
+
+        a = ant()
+        a["azimuth_grid"][3] = np.nan
+        with self.assertRaises(ValueError) as ctx:
+            arrayant.interpolate(a, [[0.1]], [[0.2]])
+        self.assertIn("'azimuth_grid' must be between -pi and pi", str(ctx.exception))
+
+        a = ant()
+        a["elevation_grid"][2] = a["elevation_grid"][1]
+        with self.assertRaises(ValueError) as ctx:
+            arrayant.interpolate(a, [[0.1]], [[0.2]])
+        self.assertIn("'elevation_grid' must be sorted in strictly ascending order", str(ctx.exception))
+
 
 # ======================================================================================
 # Edge cases

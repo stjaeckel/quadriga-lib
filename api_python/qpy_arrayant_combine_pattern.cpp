@@ -41,9 +41,9 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 - **`freq`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
   recomputed at each value; if `None`, each input entry's `center_freq` is used; a scalar `<= 0`
   is treated as not given; default: `None`
-- **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; sorted; `(n_azimuth_out,)`;
+- **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; strictly increasing; `(n_azimuth_out,)`;
   if `None`, the input grid is used; default: `None`
-- **`elevation_grid`** — Alternative output elevation grid in rad; -pi/2 to pi/2; sorted;
+- **`elevation_grid`** — Alternative output elevation grid in rad; -pi/2 to pi/2; strictly increasing;
   `(n_elevation_out,)`; if `None`, the input grid is used; default: `None`
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for
   acoustics; default: `299792458.0`

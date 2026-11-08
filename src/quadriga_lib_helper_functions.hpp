@@ -150,7 +150,8 @@ static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientat
     }
 }
 
-// Check if elements of a vector are in a specific range
+// Check if elements of a vector are in a specific range; NaN is out of range
+// With check_sorted, the values must also be strictly increasing
 template <typename dtype>
 static bool qd_in_range(const dtype *data, size_t n_elem, dtype min, dtype max, bool inclusive = true, bool check_sorted = false)
 {
@@ -158,7 +159,7 @@ static bool qd_in_range(const dtype *data, size_t n_elem, dtype min, dtype max, 
     {
         for (size_t i = 0; i < n_elem; ++i)
         {
-            if (data[i] < min || data[i] > max)
+            if (!(data[i] >= min && data[i] <= max))
                 return false;
             if (check_sorted && i != 0 && data[i] <= data[i - 1])
                 return false;
@@ -168,7 +169,7 @@ static bool qd_in_range(const dtype *data, size_t n_elem, dtype min, dtype max, 
     {
         for (size_t i = 0; i < n_elem; ++i)
         {
-            if (data[i] <= min || data[i] >= max)
+            if (!(data[i] > min && data[i] < max))
                 return false;
             if (check_sorted && i != 0 && data[i] <= data[i - 1])
                 return false;

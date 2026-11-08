@@ -58,8 +58,8 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
 - **`e_theta_im`** — e-theta imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_re`** — e-phi real part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_im`** — e-phi imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth sample grid in rad, sorted, in [-π, π]; `[n_azimuth]`
-- **`elevation_grid`** — Elevation sample grid in rad, sorted, in [-π/2, π/2]; `[n_elevation]`
+- **`azimuth_grid`** — Azimuth sample grid in rad, strictly increasing, in [-π, π]; `[n_azimuth]`
+- **`elevation_grid`** — Elevation sample grid in rad, strictly increasing, in [-π/2, π/2]; `[n_elevation]`
 
 ## Outputs:
 - **`V_re`** — Real part of the interpolated e-theta (vertical) field component;
