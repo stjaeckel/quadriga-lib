@@ -699,3 +699,53 @@ TEST_CASE("Get Channels IRS - A segment without paths gives empty outputs")
         }
     }
 }
+
+TEST_CASE("combine_irs_coord - outputs that alias inputs")
+{
+    arma::u32_vec n1 = {1, 0}, n2 = {1}, no_interact;
+    arma::mat c1 = arma::vec({1.0, 2.0, 3.0}), c2 = arma::vec({4.0, 5.0, 6.0}), coord;
+    CHECK_NOTHROW(quadriga_lib::combine_irs_coord(0.0, 0.0, 0.0, &n1, &c1, &n2, &c2, &no_interact, &coord));
+
+    arma::u32_vec m1 = n1, m2 = n2;
+    arma::mat d1 = c1, d2 = c2;
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord(0.0, 0.0, 0.0, &m1, &c1, &n2, &c2, &m1, &coord), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord(0.0, 0.0, 0.0, &n1, &c1, &m2, &c2, &m2, &coord), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord(0.0, 0.0, 0.0, &n1, &d1, &n2, &c2, &no_interact, &d1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord(0.0, 0.0, 0.0, &n1, &c1, &n2, &d2, &no_interact, &d2), std::invalid_argument);
+    CHECK(arma::all(m1 == n1));
+    CHECK(arma::approx_equal(d1, c1, "absdiff", 0.0));
+
+    arma::mat view(d2.memptr(), 3, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord(0.0, 0.0, 0.0, &n1, &c1, &n2, &d2, &no_interact, &view), std::invalid_argument);
+}
+
+TEST_CASE("Get Channels IRS - outputs that alias inputs")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto irs = ant;
+    irs.coupling_re = arma::mat({1.0});
+    irs.coupling_im = arma::mat({0.0});
+    arma::mat fb = arma::mat({5.0, 0.0, 1.0}).t(), M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    arma::vec g = {1.0}, l = {12.0};
+    arma::cube cr, ci, dl, ad, ed, aa, ea;
+    auto call = [&](arma::cube *c_re, arma::cube *c_im, arma::cube *a1, arma::cube *a2, const arma::mat *M_1)
+    {
+        quadriga_lib::get_channels_irs<double>(&ant, &ant, &irs, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 5, 5, 0, 0, 0, 0,
+                                               &fb, &fb, &g, &l, M_1, &fb, &fb, &g, &l, &M,
+                                               c_re, c_im, &dl, 0, -140.0, 1e9, false, a1, &ed, &aa, a2);
+    };
+    CHECK_NOTHROW(call(&cr, &ci, &ad, &ea, &M));
+
+    SECTION("Two outputs are the same object")
+    {
+        CHECK_THROWS_AS(call(&cr, &cr, &ad, &ea, &M), std::invalid_argument);
+        CHECK_THROWS_AS(call(&cr, &ci, &ad, &ad, &M), std::invalid_argument);
+    }
+    SECTION("Output shares memory with an input")
+    {
+        arma::cube M_cube(8, 1, 1);
+        arma::mat M_on_ea(M_cube.memptr(), 8, 1, false, true);
+        M_on_ea = M;
+        CHECK_THROWS_AS(call(&cr, &ci, &ad, &M_cube, &M_on_ea), std::invalid_argument);
+    }
+}

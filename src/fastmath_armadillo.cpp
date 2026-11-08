@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_math.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include "fastmath_vectorized_generic.h"
 
 #if BUILD_WITH_AVX2
@@ -47,6 +48,8 @@ void quadriga_lib::fast_sincos(const arma::Col<dtype> &x, arma::fvec *s, arma::f
     if (s == nullptr && c == nullptr)
         return;
 
+    qd_check_alias_list({s, c}, {"s", "c"}, &x);
+
     if (s != nullptr && s->n_elem != n_val)
         s->set_size(n_val);
     if (c != nullptr && c->n_elem != n_val)
@@ -58,15 +61,6 @@ void quadriga_lib::fast_sincos(const arma::Col<dtype> &x, arma::fvec *s, arma::f
     const dtype * Xa = x.memptr();
     float * Sa = (s == nullptr) ? nullptr : s->memptr();
     float * Ca = (c == nullptr) ? nullptr : c->memptr();
-
-    const void *Xa_v = static_cast<const void *>(Xa);
-    const void *Sa_v = static_cast<const void *>(Sa);
-    const void *Ca_v = static_cast<const void *>(Ca);
-
-    if ((Sa && Xa_v == Sa_v) || // x and s are the same buffer
-        (Ca && Xa_v == Ca_v) || // x and c are the same buffer
-        (Sa && Ca && Sa == Ca)) // s and c are the same buffer (same type, direct compare ok)
-        throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
 
     // --- Compute sin/cos into Sa/Ca ---
 #if BUILD_WITH_AVX2
@@ -125,6 +119,7 @@ template <typename dtype>
 void quadriga_lib::fast_asin(const arma::Col<dtype> &x, arma::fvec &s)
 {
     const arma::uword n_val = x.n_elem;
+    qd_check_alias(&s, "s", &x);
 
     if (s.n_elem != n_val)
         s.set_size(n_val);
@@ -134,9 +129,6 @@ void quadriga_lib::fast_asin(const arma::Col<dtype> &x, arma::fvec &s)
 
     const dtype * Xa = x.memptr();
     float * Sa = s.memptr();
-
-    if (static_cast<const void *>(Xa) == static_cast<const void *>(Sa))
-        throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
 
 #if BUILD_WITH_AVX2
     if (runtime_AVX2_Check())
@@ -179,6 +171,7 @@ template <typename dtype>
 void quadriga_lib::fast_acos(const arma::Col<dtype> &x, arma::fvec &c)
 {
     const arma::uword n_val = x.n_elem;
+    qd_check_alias(&c, "c", &x);
 
     if (c.n_elem != n_val)
         c.set_size(n_val);
@@ -188,9 +181,6 @@ void quadriga_lib::fast_acos(const arma::Col<dtype> &x, arma::fvec &c)
 
     const dtype * Xa = x.memptr();
     float * Ca = c.memptr();
-
-    if (static_cast<const void *>(Xa) == static_cast<const void *>(Ca))
-        throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
 
 #if BUILD_WITH_AVX2
     if (runtime_AVX2_Check())
@@ -239,6 +229,7 @@ void quadriga_lib::fast_atan2(const arma::Col<dtype> &y, const arma::Col<dtype> 
 
     if (x.n_elem != n_val)
         throw std::invalid_argument("Input vectors 'y' and 'x' must have the same length.");
+    qd_check_alias(&a, "a", &y, &x);
 
     if (a.n_elem != n_val)
         a.set_size(n_val);
@@ -315,6 +306,7 @@ void quadriga_lib::fast_slerp(const arma::Col<dtype> &Ar, const arma::Col<dtype>
 
     if (Ai.n_elem != n_val || Br.n_elem != n_val || Bi.n_elem != n_val || w.n_elem != n_val)
         throw std::invalid_argument("All input vectors must have the same length.");
+    qd_check_alias_list({&Xr, &Xi}, {"Xr", "Xi"}, &Ar, &Ai, &Br, &Bi, &w);
 
     if (Xr.n_elem != n_val)
         Xr.set_size(n_val);
@@ -430,6 +422,9 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
     const int kernel = (use_kernel == 1 || !avx2_ok) ? 1 : 2;
 #endif
 
+    qd_check_alias_list<arma::Col<dtype>>({&x, &y, &z, sAZ, cAZ, sEL, cEL}, {"x", "y", "z", "sAZ", "cAZ", "sEL", "cEL"},
+                                          &az, &el, len);
+
     // Resize required outputs
     if (x.n_elem != n_val)
         x.set_size(n_val);
@@ -541,6 +536,8 @@ void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtyp
 #if BUILD_WITH_AVX2
     const int kernel = (use_kernel == 1 || !avx2_ok) ? 1 : 2;
 #endif
+
+    qd_check_alias_list<arma::Col<dtype>>({&az, &el, len}, {"az", "el", "len"}, &x, &y, &z);
 
     // Resize outputs
     if (az.n_elem != n_val)

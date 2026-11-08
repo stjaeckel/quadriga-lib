@@ -238,6 +238,9 @@ void quadriga_lib::arrayant<dtype>::calc_beamwidth_deg(arma::uword i_element, dt
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
+    qd_check_alias_list<dtype>({beamwidth_az, beamwidth_el, az_point_ang, el_point_ang},
+                               {"beamwidth_az", "beamwidth_el", "az_point_ang", "el_point_ang"});
+
     const bool need_az = (beamwidth_az != nullptr) || (az_point_ang != nullptr);
     const bool need_el = (beamwidth_el != nullptr) || (el_point_ang != nullptr);
     if (!need_az && !need_el)
@@ -1237,6 +1240,10 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> *azimuth,
     if (V_re == nullptr || V_im == nullptr || H_re == nullptr || H_im == nullptr)
         throw std::invalid_argument("Outputs 'V_re', 'V_im', 'H_re', 'H_im' cannot be NULL");
 
+    qd_check_alias_list({V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma},
+                        {"V_re", "V_im", "H_re", "H_im", "dist", "azimuth_loc", "elevation_loc", "gamma"},
+                        azimuth, elevation, orientation, element_pos_i);
+
     arma::uword n_out = azimuth->n_rows;
     arma::uword n_ang = azimuth->n_cols;
 
@@ -1408,6 +1415,8 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *output)
 {
+    qd_check_alias(output, "output", this); // nullptr modifies this object
+
     // Check if arrayant object is valid
     std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
@@ -1709,6 +1718,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
                                                    unsigned usage, unsigned element,
                                                    quadriga_lib::arrayant<dtype> *output)
 {
+    qd_check_alias(output, "output", this); // nullptr modifies this object
+
     // Check if arrayant object is valid
     std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)

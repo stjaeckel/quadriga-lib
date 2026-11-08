@@ -171,3 +171,32 @@ TEMPLATE_TEST_CASE("fast_geo2cart / fast_cart2geo - Invalid use_kernel", "[fast_
                         std::invalid_argument);
     }
 }
+
+TEMPLATE_TEST_CASE("fast_geo2cart / fast_cart2geo - Outputs that alias inputs", "[fast_geo2cart]", float, double)
+{
+    using dtype = TestType;
+    arma::Col<dtype> a = arma::linspace<arma::Col<dtype>>(-1.0, 1.0, 9), b = a, c = a, len(9, arma::fill::ones);
+    arma::Col<dtype> o1, o2, o3, o4, o5;
+
+    for (int k : geo_kernels())
+    {
+        CHECK_NOTHROW(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, &o4, nullptr, nullptr, &o5, &len, k));
+        CHECK_NOTHROW(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o3, k));
+
+        // An output is an input
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, a, o2, o3, nullptr, nullptr, nullptr, nullptr, nullptr, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, nullptr, nullptr, nullptr, &len, &len, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, c, nullptr, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &a, k), std::invalid_argument);
+
+        // Two outputs are the same object
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o1, o3, nullptr, nullptr, nullptr, nullptr, nullptr, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, o3, &o4, nullptr, &o4, nullptr, nullptr, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, o1, o2, &o1, k), std::invalid_argument);
+
+        // An output uses the memory of an input
+        arma::Col<dtype> b_view(b.memptr(), 9, false, true);
+        CHECK_THROWS_AS(quadriga_lib::fast_geo2cart<dtype>(a, b, o1, o2, b_view, nullptr, nullptr, nullptr, nullptr, nullptr, k), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::fast_cart2geo<dtype>(a, b, c, b_view, o2, nullptr, k), std::invalid_argument);
+    }
+}

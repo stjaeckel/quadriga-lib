@@ -312,7 +312,7 @@ arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype>
 - `yi`: Input y-axis sampling points (for 2D only), vector of length `ny`
 - `xo`: Output x-axis sampling points, vector of length `mx`
 - `yo`: Output y-axis sampling points (for 2D only), vector of length `my`
-- `output`: Interpolated data cube (modified in-place for one variant)
+- `output`: Interpolated data cube (output argument of the first variant)
 
 ### Input / Output size details:
 - 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`

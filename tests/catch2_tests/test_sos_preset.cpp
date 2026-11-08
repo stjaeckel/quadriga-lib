@@ -358,7 +358,7 @@ TEST_CASE("sos_preset - the stored tables have the recorded checksums")
 TEST_CASE("sos_preset - outputs that share memory with each other throw")
 {
     // The three outputs are written one after the other; an output on the memory of another one (or the same
-    // object) overwrote it. Such calls now throw before anything is written.
+    // object) would overwrite it. Such calls throw before anything is written.
     arma::mat freq;
     arma::vec acf, dist;
     quadriga_lib::sos_preset<double>("Exp128", freq, &acf, &dist);
@@ -378,21 +378,21 @@ TEST_CASE("sos_preset - outputs that share memory with each other throw")
 
     arma::mat f1;
     arma::vec same(200, arma::fill::value(7.0));
-    CHECK(message(f1, &same, &same) == "Output 'dist' cannot share memory with 'acf'.");
+    CHECK(message(f1, &same, &same) == "Outputs 'acf' and 'dist' cannot be the same object or share memory.");
     CHECK(arma::all(same == 7.0));
     CHECK(f1.n_elem == 0); // nothing written
 
     // 'acf' on part of the memory of 'freq'
     arma::mat f2(128, 3, arma::fill::value(5.0));
     arma::vec a2(f2.memptr() + 100, 200, false, true), d2;
-    CHECK(message(f2, &a2, &d2) == "Output 'acf' cannot share memory with 'freq'.");
+    CHECK(message(f2, &a2, &d2) == "Outputs 'freq' and 'acf' cannot be the same object or share memory.");
     CHECK(arma::all(arma::vectorise(f2) == 5.0));
 
     // 'dist' overlaps the end of 'acf'
     arma::vec block(300, arma::fill::value(3.0));
     arma::vec a3(block.memptr(), 200, false, true), d3(block.memptr() + 150, 150, false, true);
     arma::mat f3;
-    CHECK(message(f3, &a3, &d3) == "Output 'dist' cannot share memory with 'acf'.");
+    CHECK(message(f3, &a3, &d3) == "Outputs 'acf' and 'dist' cannot be the same object or share memory.");
     CHECK(arma::all(block == 3.0));
 
     // Separate outputs next to each other in one block are accepted

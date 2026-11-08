@@ -478,30 +478,17 @@ TEST_CASE("sos_randn, sos_rand, sos_randi - on two maps the value of a generator
     CHECK(arma::abs(r1.col(0) - r2.col(0)).max() > 0.05);
 }
 
-TEST_CASE("sos_randn, sos_rand, sos_randi - the output may be the same object as a position matrix")
+TEST_CASE("sos_randn, sos_rand, sos_randi - outputs that alias inputs")
 {
-    // 3 generators and 3 position columns: the output has the size of the input and is not reallocated,
-    // 5 generators: it is resized. Both must give the values of a call with a separate output.
-    arma::mat pos = rnd(50, 3, -60.0, 60.0, 50), pos_b = rnd(50, 3, -60.0, 60.0, 51);
-    for (arma::uword n_gen : {3, 5})
-    {
-        arma::vec dd(n_gen), db(n_gen);
-        for (arma::uword g = 0; g < n_gen; ++g)
-            dd(g) = 5.0 + 3.0 * (double)g, db(g) = (g == 1) ? 30.0 : dd(g); // Generator 1 on two maps
-        arma::mat ref_n, ref_u, ref_i;
-        quadriga_lib::sos_randn(dd, pos, ref_n, &pos_b, &db, "Comb128", 3);
-        quadriga_lib::sos_rand(dd, pos, ref_u, &pos_b, &db, "Comb128", 3);
-        quadriga_lib::sos_randi(dd, pos, 9, ref_i, &pos_b, &db, "Comb128", 3);
-        REQUIRE(ref_n.n_cols == n_gen);
-        CHECK(arma::abs(ref_n).max() > 0.5);
+    arma::mat pos = rnd(5, 3, -60.0, 60.0, 50), pos_b = rnd(5, 3, -60.0, 60.0, 51), val;
+    arma::vec dd = {5.0, 8.0, 11.0}, db = {5.0, 30.0, 11.0};
+    CHECK_NOTHROW(quadriga_lib::sos_randn(dd, pos, val, &pos_b, &db, "Comb128", 3));
 
-        INFO("n_gen " << n_gen);
-        arma::mat a = pos, b = pos_b, c = pos;
-        quadriga_lib::sos_randn(dd, a, a, &pos_b, &db, "Comb128", 3); // val is 'pos'
-        CHECK(arma::approx_equal(a, ref_n, "absdiff", 0.0));
-        quadriga_lib::sos_rand(dd, pos, b, &b, &db, "Comb128", 3); // val is 'pos_b'
-        CHECK(arma::approx_equal(b, ref_u, "absdiff", 0.0));
-        quadriga_lib::sos_randi(dd, c, 9, c, &pos_b, &db, "Comb128", 3);
-        CHECK(arma::approx_equal(c, ref_i, "absdiff", 0.0));
-    }
+    arma::mat a = pos, b = pos_b;
+    arma::vec d = dd;
+    CHECK_THROWS_AS(quadriga_lib::sos_randn(dd, a, a, &pos_b, &db, "Comb128", 3), std::invalid_argument);   // val is 'pos'
+    CHECK_THROWS_AS(quadriga_lib::sos_rand(dd, pos, b, &b, &db, "Comb128", 3), std::invalid_argument);      // val is 'pos_b'
+    CHECK_THROWS_AS(quadriga_lib::sos_randi(d, pos, 9, d, &pos_b, &db, "Comb128", 3), std::invalid_argument); // val is 'dist_decorr'
+    arma::mat v(a.memptr() + 3, 5, 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_randi(dd, a, 9, v, &pos_b, &db, "Comb128", 3), std::invalid_argument); // val on part of the memory of 'pos'
 }

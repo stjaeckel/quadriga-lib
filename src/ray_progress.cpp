@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 // This is supposed to run on 64-bit only
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
@@ -339,6 +340,12 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    const arma::u32_vec *sbs_ind_in,
                                                    const std::vector<bool> *subdiv_flag_in)
 {
+    // The in/out arguments must be distinct and must not share memory with an input
+    qd_check_alias_list({&orig, &dest, &acc_dist, trivec, tridir}, {"orig", "dest", "acc_dist", "trivec", "tridir"},
+                        &mesh, &center_frequency, aabb);
+    qd_check_alias_list({&mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer},
+                        {"mtl_ind_prev", "mtl_ind_current", "mtl_ind_buffer"});
+
     // Mesh validation
     const arma::uword n_mesh = mesh.n_rows;
     if (n_mesh == 0)

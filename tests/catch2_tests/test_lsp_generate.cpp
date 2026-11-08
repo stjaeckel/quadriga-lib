@@ -1111,6 +1111,24 @@ TEST_CASE("lsp_generate - input validation")
         arma::mat sf(3, 2, arma::fill::value(4.0));
         CHECK_NOTHROW(run_all(sp, fc, tx, rx, rnd, &sf, false, false));
     }
+    SECTION("outputs that alias inputs")
+    {
+        arma::mat r = rx, t = tx, u = rnd;
+        arma::vec f = fc, toa;
+        arma::mat *no_mat = nullptr;
+        arma::vec *no_vec = nullptr;
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, r, rnd, lsp, no_mat, no_vec, no_mat, no_mat, &r), std::invalid_argument); // eod_offset_deg is 'rx_pos'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, t, rx, rnd, lsp, no_mat, no_vec, no_mat, no_mat, &t), std::invalid_argument); // eod_offset_deg is 'tx_pos'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, u, lsp, no_mat, no_vec, &u, &im), std::invalid_argument);            // gr_eps_re is 'rnd'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, f, tx, rx, rnd, lsp, no_mat, &f, &re, &im), std::invalid_argument);              // abs_toa is 'center_frequency'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, no_mat, &toa, &re, &re), std::invalid_argument);           // gr_eps_im is 'gr_eps_re'
+        arma::cube on_rnd(u.memptr(), 3, 1, 8, false, true);
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, u, on_rnd), std::invalid_argument);
+        CHECK(arma::approx_equal(r, rx, "absdiff", 0.0));
+        CHECK(arma::approx_equal(u, rnd, "absdiff", 0.0));
+        CHECK(arma::approx_equal(f, fc, "absdiff", 0.0));
+        CHECK_NOTHROW(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, no_mat, &toa, &re, &im));
+    }
     SECTION("rx_pos")
     {
         arma::mat bad(3, 2, arma::fill::zeros);

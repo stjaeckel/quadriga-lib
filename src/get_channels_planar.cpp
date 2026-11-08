@@ -128,6 +128,13 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         throw std::invalid_argument(error_message.c_str());
     }
 
+    qd_check_alias(rx_Doppler, "rx_Doppler", aod, eod, aoa, eoa, path_gain, path_length, M);
+    qd_check_alias_list({coeff_re, coeff_im, delay}, {"coeff_re", "coeff_im", "delay"},
+                        aod, eod, aoa, eoa, path_gain, path_length, M);
+    qd_check_alias_outputs(coeff_re, "coeff_re", rx_Doppler, "rx_Doppler");
+    qd_check_alias_outputs(coeff_im, "coeff_im", rx_Doppler, "rx_Doppler");
+    qd_check_alias_outputs(delay, "delay", rx_Doppler, "rx_Doppler");
+
     // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot does not depend on the
     // path data, except that its delays use the antenna response in the direction of path 0: a dummy NLOS path in the
     // LOS direction (1 m longer, never detected as LOS) gives the delays of a LOS path; its own slot is dropped.

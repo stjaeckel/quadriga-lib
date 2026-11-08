@@ -24,7 +24,6 @@ Target ACF on a 2-D grid
 - The result is the reference for [[sos_acf_approx]]
 - Equally spaced means that every sample point lies within 1e-4 of the step from its place on the regular
   axis; for long single-precision tables the rounding of the sample points themselves is allowed for
-- `dist_2d` may be the same object as `acf` or `dist`
 
 ## Declaration:
 ```
@@ -55,6 +54,9 @@ void quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
                               arma::Col<dtype> *dist_2d)
 {
     qd_sos_check_acf(acf, dist);
+    qd_check_alias(&acf_2d, "acf_2d", &acf, &dist);
+    qd_check_alias(dist_2d, "dist_2d", &acf, &dist);
+    qd_check_alias_outputs(&acf_2d, "acf_2d", dist_2d, "dist_2d");
     if (!qd_sos_equally_spaced(dist))
         throw std::invalid_argument("Input 'dist' must be equally spaced.");
 
@@ -63,7 +65,6 @@ void quadriga_lib::sos_acf_2d(const arma::Col<dtype> &acf,
     const double step = (double)dist.at(n_acf - 1) / (double)(n_acf - 1);
     const long long half = 2 * (long long)n_acf - 2, i_max = (long long)n_acf - 1;
 
-    // The table is copied before the outputs are resized, so that 'dist_2d' may be the same object as an input
     const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf);
     const double *pa = acf_d.memptr();
 

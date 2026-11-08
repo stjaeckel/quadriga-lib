@@ -213,6 +213,9 @@ void quadriga_lib::los_probability(const std::string &model,
             throw std::invalid_argument("Input 'rnd_g' must be finite.");
         qd_gbsm_check_fc(*center_frequency);
     }
+    qd_check_alias(&p_los, "p_los", &d2d_out, &h_bs, &h_ut, rnd_g, center_frequency);
+    qd_check_alias(los_soft, "los_soft", &d2d_out, &h_bs, &h_ut, rnd_g, center_frequency);
+    qd_check_alias_outputs(&p_los, "p_los", los_soft, "los_soft");
 
     // Model parameters with their defaults
     double kinv0 = 0.0, hc = 0.0;    // InF: -ln(1 - r)/d_clutter, clutter height

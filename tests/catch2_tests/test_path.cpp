@@ -315,16 +315,36 @@ TEST_CASE("path - xpr_update complex multiply matches hand calc")
     CHECK(std::abs(r[1] - 1.0f) < 1e-5f);
 }
 
-TEST_CASE("path - xpr_update self-aliasing is safe")
+TEST_CASE("path - xpr_update with an update that overlaps the coefficients")
 {
-    path p(0, 1, false);
-    float *m = p.xpr_coeff(0);
-    set_jones(m, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    // Passing the state as its own update squares VV: (1+i)^2 = 2i.
-    p.xpr_update(p.xpr_coeff(0), 1.0f);
-    const float *r = p.xpr_coeff(0);
-    CHECK(std::abs(r[0] - 0.0f) < 1e-5f);
-    CHECK(std::abs(r[1] - 2.0f) < 1e-5f);
+    path p(1, 2, false);
+    const float u[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+    CHECK_NOTHROW(p.xpr_update(u, 1.0f, 1));
+
+    // The update is the slot that is written
+    CHECK_THROWS_AS(p.xpr_update(p.xpr_coeff(0), 1.0f), std::invalid_argument);
+    CHECK_THROWS_AS(p.xpr_update(p.xpr_coeff(1), 1.0f, 1), std::invalid_argument);
+
+    // The update starts inside the slot
+    CHECK_THROWS_AS(p.xpr_update(p.xpr_coeff(0) + 3, 1.0f), std::invalid_argument);
+
+    // The update is another slot of the same path
+    CHECK_NOTHROW(p.xpr_update(p.xpr_coeff(1), 1.0f, 0));
+
+    // Scalar mode: 2 values per slot
+    path s(0, 1, true);
+    CHECK_THROWS_AS(s.xpr_update(s.xpr_coeff(0) + 1, 1.0f), std::invalid_argument);
+}
+
+TEST_CASE("path - duplicate and extend into the source path")
+{
+    path p(2, 1, false);
+    path q;
+    CHECK_NOTHROW(p.duplicate(q));
+    CHECK_NOTHROW(p.extend(q, 1.0f, 2.0f, 3.0f));
+    CHECK_THROWS_AS(p.duplicate(p), std::invalid_argument);
+    CHECK_THROWS_AS(p.extend(p, 1.0f, 2.0f, 3.0f), std::invalid_argument);
+    CHECK(p.n_seg() == 2);
 }
 
 TEST_CASE("path - xpr_update scalar mode")

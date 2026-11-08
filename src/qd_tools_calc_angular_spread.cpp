@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -182,6 +183,17 @@ void quadriga_lib::calc_angular_spreads_sphere(const std::vector<arma::Col<dtype
     // quantize: 0 (off) or a finite step >= 1e-3 deg, so that the bin count stays below 360 000 + 2
     if (!(quantize == (dtype)0 || (std::isfinite(quantize) && quantize >= (dtype)1e-3)))
         throw std::invalid_argument("Input 'quantize' must be 0 (off) or a finite value >= 1e-3 deg.");
+
+    qd_check_alias(phi_out, "phi", &az, &el, &powers);
+    qd_check_alias(theta_out, "theta", &az, &el, &powers);
+    qd_check_alias_outputs(phi_out, "phi", theta_out, "theta");
+    qd_check_alias_outputs(azimuth_spread, "azimuth_spread", elevation_spread, "elevation_spread");
+    qd_check_alias_outputs(azimuth_spread, "azimuth_spread", orientation, "orientation");
+    qd_check_alias_outputs(elevation_spread, "elevation_spread", orientation, "orientation");
+    for (arma::uword n = 0; n < N; n++)
+        qd_check_alias(azimuth_spread, "azimuth_spread", &az[n], &el[n], &powers[n]),
+            qd_check_alias(elevation_spread, "elevation_spread", &az[n], &el[n], &powers[n]),
+            qd_check_alias(orientation, "orientation", &az[n], &el[n], &powers[n]);
 
     dtype quantize_rad = quantize * (dtype)(3.14159265358979323846 / 180.0);
     dtype pi_val = (dtype)3.14159265358979323846;

@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_generic_functions.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
@@ -96,6 +97,10 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
 
     if (bandwidth < 0.0)
         throw std::invalid_argument("Bandwidth cannot be negative");
+
+    qd_check_alias(hmat_re, "hmat_re", coeff_re, coeff_im, delay);
+    qd_check_alias(hmat_im, "hmat_im", coeff_re, coeff_im, delay);
+    qd_check_alias_outputs(hmat_re, "hmat_re", hmat_im, "hmat_im");
 
     // Set output size
     if (hmat_re != nullptr)
@@ -291,6 +296,10 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
             throw std::invalid_argument("delay must be [n_rx, n_tx, n_path] or [1, 1, n_path] per snapshot.");
     }
 
+    qd_check_alias(hmat_re, "hmat_re", coeff_re, coeff_im, delay);
+    qd_check_alias(hmat_im, "hmat_im", coeff_re, coeff_im, delay);
+    qd_check_alias_outputs(hmat_re, "hmat_re", hmat_im, "hmat_im");
+
     // Resize outputs (only if needed, preserves externally borrowed memory)
     if (hmat_re != nullptr && hmat_re->size() != n_snap_o)
         hmat_re->resize(n_snap_o);
@@ -453,6 +462,13 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 
     if (!planar_wave && !(delay0.n_rows == n_rx && delay0.n_cols == n_tx && delay0.n_slices == n_path))
         throw std::invalid_argument("Input 'delay[0]' must have shape [n_rx, n_tx, n_path] or [1, 1, n_path].");
+
+    for (size_t f = 0; f < n_freq_in; ++f)
+    {
+        qd_check_alias(hmat_re, "hmat_re", &coeff_re[f], &coeff_im[f], &delay[f]);
+        qd_check_alias(hmat_im, "hmat_im", &coeff_re[f], &coeff_im[f], &delay[f]);
+    }
+    qd_check_alias_outputs(hmat_re, "hmat_re", hmat_im, "hmat_im");
 
     // --- Set output size ---
 

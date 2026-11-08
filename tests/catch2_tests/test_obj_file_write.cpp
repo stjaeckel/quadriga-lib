@@ -1158,3 +1158,21 @@ TEST_CASE("Test OBJ File Write - A used material named '(null)' is rejected")
     std::remove("null_name.obj");
     std::remove("null_name.mtl");
 }
+
+TEST_CASE("obj_file_write - outputs that alias inputs")
+{
+    arma::mat mesh = quadriga_lib::cube<double>(), vlo;
+    arma::umat fio;
+    arma::uvec obj_ind(mesh.n_rows, arma::fill::zeros);
+    std::vector<std::string> obj_names = {"cube"};
+    CHECK_NOTHROW(quadriga_lib::obj_file_write<double>("", &mesh, &obj_ind, nullptr, &obj_names, nullptr, &vlo, &fio));
+
+    arma::mat m = mesh;
+    arma::umat oi(obj_ind.memptr(), obj_ind.n_elem, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", &m, &obj_ind, nullptr, &obj_names, nullptr, &m, &fio), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", &mesh, &obj_ind, nullptr, &obj_names, nullptr, &vlo, &oi), std::invalid_argument);
+    CHECK(arma::approx_equal(m, mesh, "absdiff", 0.0));
+
+    arma::umat fi = fio;
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, &vlo, &fi, &vlo, &fi), std::invalid_argument);
+}

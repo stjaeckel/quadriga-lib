@@ -1078,3 +1078,31 @@ TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with abs
     }
     CHECK(err < 1e-5);
 }
+
+TEST_CASE("baseband_freq_response_multi - Outputs that alias inputs")
+{
+    arma::vec freq_in = {1.0e9, 1.1e9};
+    arma::vec freq_out = {1.0e9, 1.05e9};
+    std::vector<arma::cube> cre(2), cim(2), dl(2);
+    for (int f = 0; f < 2; ++f)
+    {
+        cre[f] = arma::cube(2, 2, 2, arma::fill::randn);
+        cim[f] = arma::cube(2, 2, 2, arma::fill::randn);
+        dl[f] = arma::cube(2, 2, 2, arma::fill::randu) * 1.0e-7;
+    }
+    arma::cube Hr, Hi;
+    arma::Cube<std::complex<double>> *no_cplx = nullptr;
+    CHECK_NOTHROW(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi, no_cplx));
+
+    // An output is an element of an input
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &cre[1], &Hi, no_cplx), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &cim[0], no_cplx), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &dl[0], &Hi, no_cplx), std::invalid_argument);
+
+    // Both outputs are the same object
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hr, no_cplx), std::invalid_argument);
+
+    // An output uses the memory of an input
+    arma::cube cim_view(cim[1].memptr(), 2, 2, 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &cim_view, &Hi, no_cplx), std::invalid_argument);
+}

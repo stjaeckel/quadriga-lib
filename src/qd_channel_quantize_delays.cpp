@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <cmath>
 #include <cstring>
@@ -182,8 +183,6 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
   speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every
   acoustic array. In those cases use absolute delays (`use_absolute_delays = true`)
 - Run time and memory depend on the number of paths and taps, not on the absolute delay values
-- Outputs may alias inputs, also across arguments (e.g. `delay_quant == coeff_re`); all inputs are read before the
-  outputs are written. The three outputs must be different objects.
 
 ## Declaration:
 ```
@@ -258,8 +257,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
         throw std::invalid_argument("Output 'coeff_im_quant' must not be NULL.");
     if (delay_quant == nullptr)
         throw std::invalid_argument("Output 'delay_quant' must not be NULL.");
-    if (coeff_re_quant == coeff_im_quant || coeff_re_quant == delay_quant || coeff_im_quant == delay_quant)
-        throw std::invalid_argument("Outputs 'coeff_re_quant', 'coeff_im_quant' and 'delay_quant' must be different objects.");
+    qd_check_alias_list({coeff_re_quant, coeff_im_quant, delay_quant},
+                        {"coeff_re_quant", "coeff_im_quant", "delay_quant"}, coeff_re, coeff_im, delay);
 
     arma::uword n_snap = (arma::uword)coeff_re->size();
     if (n_snap == 0)
@@ -555,8 +554,7 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
     // Output delays are shared [1,1,n_taps] only when input was shared AND fix_taps is 1 or 2
     bool output_shared = shared_delays && (fix_taps == 1 || fix_taps == 2);
 
-    // The outputs are built in local vectors and moved to the output arguments at the end, after the last read of
-    // the inputs, so any output may alias any input
+    // The outputs are built in local vectors and moved to the output arguments at the end
     std::vector<arma::Cube<dtype>> out_re(n_snap), out_im(n_snap), out_dl(n_snap);
     std::vector<int> tap2pos; // Lookup tap index - grid[0] -> position in grid, reused for all grids
 

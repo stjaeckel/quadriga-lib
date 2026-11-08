@@ -146,6 +146,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         throw std::invalid_argument(error_message.c_str());
     }
 
+    qd_check_alias_list({coeff_re, coeff_im, delay, aod, eod, aoa, eoa},
+                        {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
+                        fbs_pos, lbs_pos, path_gain, path_length, M);
+
     // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot (delays and angles from
     // the TX-RX geometry) does not depend on the path data, so a dummy NLOS path (1 m longer than the LOS path, never
     // detected as LOS) fills the input; its own slot is dropped.

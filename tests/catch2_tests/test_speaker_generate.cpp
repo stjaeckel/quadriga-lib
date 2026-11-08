@@ -1811,3 +1811,20 @@ TEST_CASE("Speaker - rotate_pattern_multi: documentation example 2-way speaker")
     std::string err = quadriga_lib::arrayant_is_valid_multi(speaker, false);
     CHECK(err.empty());
 }
+
+TEST_CASE("Speaker - set_element_pos_multi: positions that are an entry's own element_pos throw")
+{
+    arma::vec freqs = {1000.0, 2000.0};
+    auto drv = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+    auto spk = quadriga_lib::arrayant_concat_multi(drv, drv); // 2 entries with 2 elements
+    quadriga_lib::arrayant_set_element_pos_multi(spk, arma::mat({{0.0, 1.0}, {0.0, 0.0}, {0.0, 0.0}}));
+    arma::uvec swap = {1, 0};
+
+    arma::mat pos = spk[0].element_pos;
+    CHECK_NOTHROW(quadriga_lib::arrayant_set_element_pos_multi(spk, pos, swap));
+    CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, spk[0].element_pos, swap), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, spk[1].element_pos), std::invalid_argument);
+    arma::mat pos_on_entry(spk[1].element_pos.memptr(), 3, 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, pos_on_entry, swap), std::invalid_argument);
+}

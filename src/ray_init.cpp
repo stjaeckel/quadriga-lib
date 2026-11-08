@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -122,6 +123,11 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
                                    const arma::fmat *rx_points,
                                    bool scalar_mode)
 {
+    qd_check_alias_list({orig, dest, trivec, tridir, acc_dist}, {"orig", "dest", "trivec", "tridir", "acc_dist"},
+                        mesh, aabb, rx_points);
+    qd_check_alias_list({mtl_ind_prev, mtl_ind_current, mtl_ind_buffer},
+                        {"mtl_ind_prev", "mtl_ind_current", "mtl_ind_buffer"});
+
     // Validate mesh
     bool has_mesh = mesh && mesh->n_rows != 0;
     if (has_mesh && mesh->n_cols != 9)

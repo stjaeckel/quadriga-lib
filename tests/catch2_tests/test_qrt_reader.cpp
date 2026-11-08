@@ -510,3 +510,47 @@ TEST_CASE("QRT Reader - normalize_M must be 0 or 1")
         CHECK(M.n_cols > 0);
     }
 }
+
+TEST_CASE("QRT Reader - outputs that alias other outputs or the cache")
+{
+    std::string fn = "tests/data/test_v5.qrt";
+    std::ifstream f(fn, std::ios::binary);
+    auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);
+
+    // Reads tx_pos, rx_pos, fbs_pos, lbs_pos, aoa, and coord
+    auto read = [&](arma::fvec *tx, arma::fvec *rx, arma::fmat *fbs, arma::fmat *lbs, arma::fvec *aoa, arma::fmat *coord,
+                    arma::fvec *fc = nullptr)
+    {
+        quadriga_lib::qrt_file_read<float>(fn, 0, 0, true, fc, tx, nullptr, rx, nullptr, fbs, lbs, nullptr, nullptr, nullptr,
+                                           nullptr, nullptr, aoa, nullptr, nullptr, 1, nullptr, coord, nullptr, &f, &cache);
+    };
+    arma::fvec tx, rx, aoa(4), fc;
+    arma::fmat fbs, lbs, coord;
+    CHECK_NOTHROW(read(&tx, &rx, &fbs, &lbs, &aoa, &coord, &fc));
+
+    // Two outputs are the same object
+    CHECK_THROWS_AS(read(&tx, &tx, &fbs, &lbs, &aoa, &coord), std::invalid_argument);
+    CHECK_THROWS_AS(read(&tx, &rx, &fbs, &fbs, &aoa, &coord), std::invalid_argument);
+    CHECK_THROWS_AS(read(&tx, &rx, &fbs, &lbs, &aoa, &fbs), std::invalid_argument);
+
+    // An output uses the memory of another output
+    aoa.set_size(4);
+    arma::fvec aoa_view(aoa.memptr(), 4, false, false);
+    CHECK_THROWS_AS(read(&aoa_view, &rx, &fbs, &lbs, &aoa, &coord), std::invalid_argument);
+
+    // An output is part of the cache
+    CHECK_THROWS_AS(read(&tx, &rx, &fbs, &lbs, &aoa, &coord, &cache.freq), std::invalid_argument);
+    CHECK_THROWS_AS(read(&tx, &rx, &cache.cir_pos, &lbs, &aoa, &coord), std::invalid_argument);
+
+    // qrt_file_parse: two outputs are the same object
+    arma::uword n1 = 0, n2 = 0;
+    arma::fmat p1, p2;
+    CHECK_NOTHROW(quadriga_lib::qrt_file_parse(fn, &n1, &n2));
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_parse(fn, &n1, &n1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                 nullptr, &p1, nullptr, &p1),
+                    std::invalid_argument);
+    std::vector<std::string> names;
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, nullptr, nullptr, &names, &names),
+                    std::invalid_argument);
+}

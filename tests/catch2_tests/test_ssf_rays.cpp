@@ -879,3 +879,30 @@ TEST_CASE("ssf_rays - input validation")
         CHECK(arma::all(rays[0].delay == 7.0));
     }
 }
+
+TEST_CASE("ssf_rays - outputs that alias inputs")
+{
+    // A member of an entry of 'rays' that is an input, or that lies on the memory of one, is written while the
+    // inputs are still read
+    rays_in_t in = make_rays_in(scen("UMa_LOS", true), 2, "38.901", 191);
+    std::vector<quadriga_lib::gbsm_rays> rays;
+    CHECK_NOTHROW(call(in, rays));
+    REQUIRE(rays.size() == 2);
+
+    // 'center_frequency' is the member of the first entry
+    const arma::vec fc = rays[0].center_frequency;
+    CHECK_THROWS_AS(quadriga_lib::ssf_rays(in.sp, in.f.tx, in.f.rx, rays[0].center_frequency, in.f.lsp, in.st.mu,
+                                           in.st.sigma, in.cl.delay, in.cl.power, in.cl.aod, in.cl.eod, in.cl.aoa,
+                                           in.cl.eoa, in.rnd, rays, in.method, 0, "additive", "38.901", &in.f.eps_re,
+                                           &in.f.eps_im),
+                    std::invalid_argument);
+    CHECK(arma::approx_equal(rays[0].center_frequency, fc, "absdiff", 0.0));
+
+    // A member on the memory of 'rx_pos'
+    const arma::mat rx = in.f.rx;
+    quadriga_lib::gbsm_rays &r = rays[1];
+    r.delay.~Col(), ::new (&r.delay) arma::vec(in.f.rx.memptr(), 2, false, true);
+    CHECK_THROWS_AS(call(in, rays), std::invalid_argument);
+    CHECK(arma::approx_equal(in.f.rx, rx, "absdiff", 0.0));
+    r.delay.~Col(), ::new (&r.delay) arma::vec();
+}

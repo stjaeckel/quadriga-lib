@@ -286,3 +286,17 @@ TEST_CASE("fast_atan2 - NaN and infinite input, signed zeros")
         CHECK(ulp_dist((*a)(7), (float)-M_PI) <= 1);  // atan2(-0, -1) = -pi
     }
 }
+
+TEST_CASE("fast_atan2 - Outputs that alias inputs")
+{
+    arma::fvec y = arma::linspace<arma::fvec>(-1.0f, 1.0f, 9), x(9, arma::fill::ones), a;
+    CHECK_NOTHROW(quadriga_lib::fast_atan2(y, x, a));
+
+    // The output is an input
+    CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, y), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, x), std::invalid_argument);
+
+    // The output uses the memory of an input
+    arma::fvec x_view(x.memptr(), 9, false, true);
+    CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, x_view), std::invalid_argument);
+}

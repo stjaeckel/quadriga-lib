@@ -634,7 +634,7 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 
 - Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
 - `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
-- The update reads all old values before writing, so `coeff_update` may alias the slot; the return value uses the same gain definition as `calc_gain`
+- The return value uses the same gain definition as `calc_gain`
 - Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
 ```cpp
 float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
@@ -1073,8 +1073,6 @@ Also in: [MATLAB](../mex/channel-functions.md#quantize_delays) · [Python](../py
   speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every
   acoustic array. In those cases use absolute delays (`use_absolute_delays = true`)
 - Run time and memory depend on the number of paths and taps, not on the absolute delay values
-- Outputs may alias inputs, also across arguments (e.g. `delay_quant == coeff_re`); all inputs are read before the
-  outputs are written. The three outputs must be different objects.
 
 ### Declaration:
 ```cpp

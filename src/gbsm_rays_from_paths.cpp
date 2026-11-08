@@ -17,7 +17,7 @@ SECTION!*/
 # gbsm_rays_from_paths
 Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
-- Fills a [[gbsm_rays]] object in place (`fallback` cleared) from path data in the names and order of
+- Fills a [[gbsm_rays]] object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
   [[qrt_file_read]], read as `qrt_file_read<double>` with `downlink = true` and `normalize_M = 1` (an uplink read gives
   swapped ends and a conjugated `M`, which this function does not undo; `normalize_M = 0` leaves only the free-space
   gain in `power`)
@@ -158,6 +158,16 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
         if (type(p) == 1 && std::abs(lbs_pos(2, p)) > 1.0e-3)
             throw std::invalid_argument("The interaction point of the GR path must be on the ground (z = 0); "
                                         "shift local coordinates in x and y only.");
+
+    auto check = [&](const auto &m)
+    {
+        qd_check_alias(&m, "rays", &center_frequency, &tx_pos, &rx_pos, &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
+                       path_type, tap, gr_eps_re, gr_eps_im);
+    };
+    check(rays.tx_pos), check(rays.rx_pos), check(rays.center_frequency), check(rays.delay), check(rays.power);
+    check(rays.aod), check(rays.eod), check(rays.aoa), check(rays.eoa), check(rays.M), check(rays.path_type);
+    check(rays.tap), check(rays.gr_eps_re), check(rays.gr_eps_im), check(rays.fbs_pos), check(rays.lbs_pos);
+    check(rays.fallback);
 
     rays.delay.set_size(n_path), rays.aod.set_size(n_path), rays.eod.set_size(n_path);
     rays.aoa.set_size(n_path), rays.eoa.set_size(n_path);

@@ -1325,3 +1325,27 @@ TEST_CASE("Interp multi - Reversed query frequency order")
     CHECK(std::abs(V_fwd(0, 0, 1) - V_rev(0, 0, 1)) < 1e-12);
     CHECK(std::abs(V_fwd(0, 0, 2) - V_rev(0, 0, 0)) < 1e-12);
 }
+
+TEST_CASE("Interp multi - outputs that alias inputs")
+{
+    auto vec = build_simple_multi({1e9, 2e9});
+    arma::mat az = {0.1, 0.2, 0.3}, el(1, 3, arma::fill::zeros), pos(3, 1, arma::fill::zeros);
+    arma::vec freq = {1.5e9};
+    arma::cube ori(3, 1, 1, arma::fill::zeros), Vr, Vi, Hr, Hi;
+    CHECK_NOTHROW(quadriga_lib::arrayant_interpolate_multi(vec, &az, &el, &freq, &Vr, &Vi, &Hr, &Hi, {}, &ori, &pos));
+
+    SECTION("Output is an input")
+    {
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate_multi(vec, &az, &el, &freq, &ori, &Vi, &Hr, &Hi, {}, &ori), std::invalid_argument);
+    }
+    SECTION("Two outputs are the same object")
+    {
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate_multi(vec, &az, &el, &freq, &Vr, &Vi, &Vr, &Hi), std::invalid_argument);
+    }
+    SECTION("Output shares memory with an input")
+    {
+        arma::mat az_on_Vr(Vr.memptr(), 1, 3, false, true); // Vr is [1, 3, 1] from the baseline call
+        az_on_Vr = az;
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate_multi(vec, &az_on_Vr, &el, &freq, &Vr, &Vi, &Hr, &Hi), std::invalid_argument);
+    }
+}

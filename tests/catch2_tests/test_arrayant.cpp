@@ -390,3 +390,29 @@ TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values",
         CHECK_THROWS_AS(a.combine_pattern(&az_rep, &el_ok), std::invalid_argument);
     }
 }
+
+TEST_CASE("Arrayant remove_zeros - output that is the object itself")
+{
+    // Omni pattern with zero rear half, so remove_zeros would shrink the azimuth grid
+    auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    for (arma::uword j = 0; j < a.n_azimuth(); ++j)
+        if (std::abs(a.azimuth_grid(j)) > 2.0)
+            a.e_theta_re.slice(0).col(j).zeros();
+
+    quadriga_lib::arrayant<double> o;
+    auto b = a.copy();
+    CHECK_NOTHROW(b.remove_zeros(&o));
+    CHECK(o.n_azimuth() < a.n_azimuth());
+    CHECK_THROWS_AS(b.remove_zeros(&b), std::invalid_argument);
+    CHECK(b.n_azimuth() == a.n_azimuth());
+    CHECK(arma::approx_equal(b.e_theta_re, a.e_theta_re, "absdiff", 0.0));
+}
+
+TEST_CASE("Arrayant calc_beamwidth_deg - outputs that are the same variable")
+{
+    auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 60.0, 0.0, 10.0);
+    double bw_az = 0.0, bw_el = 0.0, p_az = 0.0, p_el = 0.0;
+    CHECK_NOTHROW(a.calc_beamwidth_deg(0, 3.0, &bw_az, &bw_el, &p_az, &p_el));
+    CHECK_THROWS_AS(a.calc_beamwidth_deg(0, 3.0, &bw_az, &bw_az), std::invalid_argument);
+    CHECK_THROWS_AS(a.calc_beamwidth_deg(0, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
+}

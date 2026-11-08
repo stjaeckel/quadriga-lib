@@ -571,31 +571,29 @@ TEST_CASE("Quadriga tools - Subdivision count too large")
     CHECK_THROWS_AS(quadriga_lib::plane<double>({1.0}, {}, {}, 1ULL << 32), std::invalid_argument);
 }
 
-TEST_CASE("Quadriga tools - Subdivide triangles in place")
+TEST_CASE("subdivide_triangles - outputs that alias inputs")
 {
-    arma::mat t = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {1, 2, 3, 4, 5, 7, -1, 0, 2}}, ref;
-    arma::uvec mtl = {3, 5}, mtl_ref;
-    quadriga_lib::subdivide_triangles(3, &t, &ref, &mtl, &mtl_ref);
-    REQUIRE(ref.n_rows == 18);
+    arma::mat t = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {1, 2, 3, 4, 5, 7, -1, 0, 2}}, out;
+    arma::uvec mtl = {3, 5}, mtl_out;
+    CHECK_NOTHROW(quadriga_lib::subdivide_triangles(3, &t, &out, &mtl, &mtl_out));
 
+    // An output that is its own input is rejected before anything is written
     arma::mat t2 = t;
     arma::uvec mtl2 = mtl;
-    arma::uword n = quadriga_lib::subdivide_triangles(3, &t2, &t2, &mtl2, &mtl2);
-    CHECK(n == 18);
-    CHECK(arma::approx_equal(t2, ref, "absdiff", 0.0));
-    CHECK(arma::all(mtl2 == mtl_ref));
-
-    // n_div = 1 keeps the size: the output is written into the input's memory
-    t2 = t, mtl2 = mtl;
-    const double *p = t2.memptr();
-    quadriga_lib::subdivide_triangles(1, &t2, &t2, &mtl2, &mtl2);
-    CHECK(t2.memptr() == p);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, &t2, &t2, &mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, &t, &out, &mtl2, &mtl2), std::invalid_argument);
     CHECK(arma::approx_equal(t2, t, "absdiff", 0.0));
+    CHECK(arma::all(mtl2 == mtl));
+
+    // n_div = 1 keeps the size, an output on the memory of the input is rejected as well
+    arma::mat view(t2.memptr(), t2.n_rows, t2.n_cols, false, true);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1, &t2, &view, &mtl, &mtl_out), std::invalid_argument);
 
     // An invalid material list leaves the output untouched
-    arma::mat out(1, 1, arma::fill::value(9.0));
+    out.set_size(1, 1);
+    out(0, 0) = 9.0;
     arma::uvec bad = {1, 2, 3};
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(2, &t, &out, &bad, &mtl2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(2, &t, &out, &bad, &mtl_out), std::invalid_argument);
     CHECK(out.n_elem == 1);
 }
 
@@ -610,4 +608,122 @@ TEST_CASE("Quadriga tools - Icosphere radius must be finite and positive")
     arma::fmat center_f;
     CHECK_THROWS_AS(quadriga_lib::icosphere<float>(1, 0.0f, &center_f), std::invalid_argument);
     CHECK(quadriga_lib::icosphere<double>(1, 1e-3, &center) == 20);
+}
+
+TEST_CASE("triangle_mesh_split - outputs that alias inputs")
+{
+    arma::mat mesh = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {10, 0, 0, 11, 0, 0, 10, 1, 0}}, A, B;
+    arma::Col<int> split_ind;
+    CHECK_NOTHROW(quadriga_lib::triangle_mesh_split(&mesh, &A, &B, 1, &split_ind));
+
+    arma::mat m = mesh;
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &m, &B, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &A, &m, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &A, &A, 1, &split_ind), std::invalid_argument);
+    CHECK(arma::approx_equal(m, mesh, "absdiff", 0.0));
+
+    arma::mat view(m.memptr(), 1, 9, false, true);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &view, &B, 1), std::invalid_argument);
+}
+
+TEST_CASE("point_cloud_split - outputs that alias inputs")
+{
+    arma::mat points = {{0, 0, 0}, {1, 0, 0}, {10, 0, 0}}, A, B;
+    arma::Col<int> split_ind;
+    CHECK_NOTHROW(quadriga_lib::point_cloud_split(&points, &A, &B, 1, &split_ind));
+
+    arma::mat p = points;
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &p, &B, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &A, &p, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &A, &A, 1, &split_ind), std::invalid_argument);
+    CHECK(arma::approx_equal(p, points, "absdiff", 0.0));
+
+    arma::mat view(p.memptr(), 2, 3, false, true);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &A, &view, 1), std::invalid_argument);
+}
+
+TEST_CASE("triangle_mesh_segmentation - outputs that alias inputs")
+{
+    arma::mat mesh = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {10, 0, 0, 11, 0, 0, 10, 1, 0}, {20, 0, 0, 21, 0, 0, 20, 1, 0}}, meshR;
+    arma::u32_vec sub_mesh_index, mesh_index;
+    arma::uvec mtl = {1, 2, 3}, mtl_out;
+    CHECK_NOTHROW(quadriga_lib::triangle_mesh_segmentation(&mesh, &meshR, &sub_mesh_index, 1, 2, &mtl, &mtl_out, &mesh_index));
+
+    arma::mat m = mesh;
+    arma::uvec mt = mtl;
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(&m, &m, &sub_mesh_index, 1, 2, &mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(&mesh, &meshR, &sub_mesh_index, 1, 2, &mt, &mt), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(&mesh, &meshR, &sub_mesh_index, 1, 2, &mtl, &mtl_out, &sub_mesh_index), std::invalid_argument);
+    CHECK(arma::approx_equal(m, mesh, "absdiff", 0.0));
+    CHECK(arma::all(mt == mtl));
+}
+
+TEST_CASE("point_cloud_segmentation - outputs that alias inputs")
+{
+    arma::mat points = {{0, 0, 0}, {10, 0, 0}, {20, 0, 0}}, pointsR;
+    arma::u32_vec sub_cloud_index, fwd, rev;
+    CHECK_NOTHROW(quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 1, 2, &fwd, &rev));
+
+    arma::mat p = points;
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(&p, &p, &sub_cloud_index, 1, 2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 1, 2, &sub_cloud_index), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 1, 2, &fwd, &fwd), std::invalid_argument);
+    CHECK(arma::approx_equal(p, points, "absdiff", 0.0));
+}
+
+TEST_CASE("coord2path - outputs that alias inputs")
+{
+    arma::u32_vec no_interact = {1, 1};
+    arma::mat coord = {{1.0, 2.0}, {1.0, 2.0}, {0.0, 1.0}}, c;
+    arma::vec path_length;
+    arma::mat fbs, lbs, angles;
+    std::vector<arma::mat> path_coord;
+    CHECK_NOTHROW(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &coord, &path_length, &fbs, &lbs, &angles, &path_coord));
+
+    c = coord;
+    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &path_length, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &path_length, (arma::mat *)nullptr, (arma::mat *)nullptr, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &path_length, &fbs, &fbs), std::invalid_argument);
+    CHECK(arma::approx_equal(c, coord, "absdiff", 0.0));
+
+    // The input is an element of the output vector
+    std::vector<arma::mat> pc(2);
+    pc[0] = coord;
+    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &pc[0], (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, &pc), std::invalid_argument);
+
+    arma::vec view(c.memptr(), 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &view), std::invalid_argument);
+}
+
+TEST_CASE("subdivide_rays - outputs that alias inputs")
+{
+    arma::mat orig = {{0.0, 0.0, 0.0}};
+    arma::mat trivec = {{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}};
+    arma::mat tridir = {{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}};
+    arma::mat dest = {{5.0, 5.0, 5.0}};
+    arma::mat origN, trivecN, tridirN, destN;
+    CHECK_NOTHROW(quadriga_lib::subdivide_rays(orig, trivec, tridir, &dest, &origN, &trivecN, &tridirN, &destN));
+
+    arma::mat o = orig, tv = trivec, td = tridir, d = dest;
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(o, trivec, tridir, &dest, &o), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, tv, tridir, &dest, &origN, &tv), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, td, &dest, &origN, &trivecN, &td), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, &d, &origN, &trivecN, &tridirN, &d), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, &dest, &origN, &trivecN, &trivecN), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, trivec, tridir, &dest, &origN, &trivecN, &tridirN, &origN), std::invalid_argument);
+    CHECK(arma::approx_equal(o, orig, "absdiff", 0.0));
+    CHECK(arma::approx_equal(d, dest, "absdiff", 0.0));
+
+    arma::mat view(tv.memptr(), 4, 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_rays(orig, tv, tridir, (arma::mat *)nullptr, &view), std::invalid_argument);
+}
+
+TEST_CASE("icosphere - outputs that alias inputs")
+{
+    arma::mat center, vert, direction;
+    arma::vec length;
+    CHECK_NOTHROW(quadriga_lib::icosphere<double>(1, 1.0, &center, &length, &vert, &direction));
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, &length, &center), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, &length, &vert, &vert), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, nullptr, nullptr, &center), std::invalid_argument);
 }

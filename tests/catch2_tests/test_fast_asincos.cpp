@@ -453,3 +453,20 @@ TEST_CASE("fast_acos - Stress test near x = 1 and x = -1")
 
     CHECK(max_abs_error(c2, ref2) < 3e-7);
 }
+
+TEST_CASE("fast_asin / fast_acos - Outputs that alias inputs")
+{
+    arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 9), y;
+    CHECK_NOTHROW(quadriga_lib::fast_asin(x, y));
+    CHECK_NOTHROW(quadriga_lib::fast_acos(x, y));
+
+    // The output is the input
+    CHECK_THROWS_AS(quadriga_lib::fast_asin(x, x), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::fast_acos(x, x), std::invalid_argument);
+
+    // The output uses part of the memory of the input (shifted by one element)
+    arma::fvec buf = arma::linspace<arma::fvec>(-1.0f, 1.0f, 10);
+    arma::fvec x_part(buf.memptr(), 9, false, true), y_part(buf.memptr() + 1, 9, false, true);
+    CHECK_THROWS_AS(quadriga_lib::fast_asin(x_part, y_part), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::fast_acos(x_part, y_part), std::invalid_argument);
+}

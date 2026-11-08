@@ -195,18 +195,6 @@ TEST_CASE("sos_acf_approx - input validation")
     }
 }
 
-TEST_CASE("sos_acf_approx - the axis output may be the same object as dist")
-{
-    arma::mat freq = {{0.03, 0.05, -0.02}, {-0.07, 0.01, 0.04}};
-    arma::vec dist = {0.0, 2.0, 4.0, 6.0}, ref_axis, d = dist;
-    arma::cube ref, ro;
-    quadriga_lib::sos_acf_approx(freq, dist, ref, &ref_axis);
-    quadriga_lib::sos_acf_approx(freq, d, ro, &d);
-    REQUIRE(d.n_elem == 13);
-    CHECK(arma::approx_equal(d, ref_axis, "absdiff", 0.0));
-    CHECK(arma::approx_equal(ro, ref, "absdiff", 0.0));
-}
-
 TEST_CASE("sos_acf_approx - the planes are point-symmetric to the last bit")
 {
     // R(-dx) = R(dx). The half of each plane beyond the center column is the mirror image of the other
@@ -238,10 +226,10 @@ TEST_CASE("sos_acf_approx - the planes are point-symmetric to the last bit")
     }
 }
 
-TEST_CASE("sos_acf_approx - an output that shares memory with an input throws")
+TEST_CASE("sos_acf_approx - outputs that alias inputs")
 {
-    // 'acf_approx' on foreign memory (hand-built) that overlaps 'freq' or 'dist' was written while the inputs
-    // were still read; the call now throws before anything is written. 'dist_2d' may still be 'dist'.
+    // 'acf_approx' on foreign memory (hand-built) that overlaps 'freq' or 'dist' would be written while the
+    // inputs are still read; the call throws before anything is written. The same holds for 'dist_2d'.
     const arma::vec dist = {0.0, 2.0, 4.0, 6.0}; // grid of 13 points
     const arma::mat freq = arma::mat({0.05, 0.11, -0.07, 0.2}).t();
     arma::cube ref;
@@ -270,7 +258,7 @@ TEST_CASE("sos_acf_approx - an output that shares memory with an input throws")
     {
         msg = e.what();
     }
-    CHECK(msg == "Output 'acf_approx' cannot share memory with an input.");
+    CHECK(msg == "Output 'acf_approx' cannot be an input or share memory with one.");
     CHECK(arma::approx_equal(f, freq, "absdiff", 0.0));
 
     // Next to the inputs: accepted, same values
@@ -278,10 +266,12 @@ TEST_CASE("sos_acf_approx - an output that shares memory with an input throws")
     quadriga_lib::sos_acf_approx<double>(f, dist, out3);
     CHECK(arma::approx_equal(out3, ref, "absdiff", 0.0));
 
-    // 'dist_2d' the same object as 'dist' stays valid
+    // 'dist_2d' the same object as 'dist', or on the memory of 'acf_approx'
     arma::vec d2 = dist;
     arma::cube out4;
-    quadriga_lib::sos_acf_approx<double>(freq, d2, out4, &d2);
-    CHECK(arma::approx_equal(out4, ref, "absdiff", 0.0));
-    CHECK(d2.n_elem == 13);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(freq, d2, out4, &d2), std::invalid_argument);
+    CHECK(d2.n_elem == 4);
+    arma::cube out5(13, 1, 1);
+    arma::vec d5(out5.memptr(), 13, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(freq, dist, out5, &d5), std::invalid_argument);
 }

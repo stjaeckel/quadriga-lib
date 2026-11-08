@@ -307,10 +307,10 @@ TEST_CASE("sos_map - cubes that share one block of memory are filled in place")
     }
 }
 
-TEST_CASE("sos_map - a map cube that shares memory with 'freq' or 'phase' throws")
+TEST_CASE("sos_map - outputs that alias inputs")
 {
     // Cubes on foreign memory (hand-built) that overlap an input: the call throws before anything is written,
-    // with a message that names 'map', for the one-block path and for separate cubes
+    // with a message that names 'map', for the one-block path, for separate cubes and for the grid vectors
     std::mt19937_64 rng(77);
     std::uniform_real_distribution<double> u(-0.3, 0.3);
     arma::mat freq(10, 2), phase(10, 2);
@@ -331,7 +331,7 @@ TEST_CASE("sos_map - a map cube that shares memory with 'freq' or 'phase' throws
         }
         return "no error";
     };
-    const std::string expected = "Output 'map' cannot share memory with 'freq' or 'phase'.";
+    const std::string expected = "Output 'map' cannot be an input or share memory with one.";
 
     // One block: two cubes one after the other on the memory of 'freq' (20 values) and the following block
     arma::vec block(60, arma::fill::zeros);
@@ -367,6 +367,22 @@ TEST_CASE("sos_map - a map cube that shares memory with 'freq' or 'phase' throws
     map3.emplace_back(4, 5, 1, arma::fill::zeros);
     CHECK(message(map3) == expected);
     CHECK(arma::approx_equal(freq, freq0, "absdiff", 0.0));
+
+    // A cube on the memory of the grid vector 'x'
+    arma::vec xb(20, arma::fill::zeros);
+    xb.head(5) = x;
+    arma::vec xv(xb.memptr(), 5, false, true);
+    std::vector<arma::cube> map5;
+    map5.emplace_back(xb.memptr(), 4, 5, 1, false, true);
+    try
+    {
+        quadriga_lib::sos_map<double>(freq, phase.col(0), xv, map5, &y);
+        FAIL("no error");
+    }
+    catch (const std::invalid_argument &e)
+    {
+        CHECK(std::string(e.what()) == expected);
+    }
 
     // Memory next to the inputs is accepted and gives the values of a normal call
     std::vector<arma::cube> ref, map4;

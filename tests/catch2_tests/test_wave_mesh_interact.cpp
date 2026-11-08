@@ -2653,3 +2653,37 @@ TEST_CASE("Acoustic - embedded material counted once", "[wave]")
     CHECK(g6 > 0.0);
     CHECK(g6 / g12 == Approx(std::pow(10.0, 0.6)).epsilon(1e-3));
 }
+
+TEST_CASE("ray_mesh_interact - outputs that alias inputs", "[wave]")
+{
+    arma::mat cube = quadriga_lib::cube<double>();
+    arma::uvec mtl_ind(cube.n_rows, arma::fill::zeros);
+    std::unordered_map<std::string, std::vector<double>> air;
+    const arma::mat o0 = {{-1.5, 0.0, 0.0}}, d0 = {{0.0, 0.0, 1.5}};
+    arma::mat orig = o0, dest = d0, fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind, ray_indN;
+    quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &cube, &fbs, &sbs, nullptr, &fbs_ind, &sbs_ind);
+    arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}}, tridir = {{0.0, 0.7, 0.0, 0.7, 0.0, 0.7}};
+
+    arma::mat origN, destN, fbsN, xprmatN, trivecN;
+    arma::vec gainN;
+    CHECK_NOTHROW(quadriga_lib::ray_mesh_interact<double>(0, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, &trivec, &tridir,
+                                                  &origN, &destN, &fbsN, nullptr, &gainN, &xprmatN, &trivecN));
+
+    CHECK_THROWS_AS(quadriga_lib::ray_mesh_interact<double>(0, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, &trivec, &tridir,
+                                                    &orig), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_mesh_interact<double>(0, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, &trivec, &tridir,
+                                                    &origN, &destN, nullptr, nullptr, nullptr, nullptr, &trivec), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_mesh_interact<double>(0, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, &trivec, &tridir,
+                                                    &origN, &origN), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_mesh_interact<double>(0, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, &trivec, &tridir,
+                                                    &origN, &destN, nullptr, nullptr, nullptr, &xprmatN, nullptr, &xprmatN), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_mesh_interact<double>(0, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, nullptr, nullptr,
+                                                    &origN, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                    nullptr, nullptr, nullptr, nullptr, false, &fbs_ind), std::invalid_argument);
+    CHECK(arma::approx_equal(orig, o0, "absdiff", 0.0));
+
+    arma::vec view(dest.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::ray_mesh_interact<double>(0, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, nullptr, nullptr,
+                                                    &origN, nullptr, nullptr, nullptr, &view), std::invalid_argument);
+}

@@ -327,3 +327,22 @@ TEST_CASE("calc_rician_k_factor - Error: negative window_size")
         quadriga_lib::calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, &kf, (arma::Col<double> *)nullptr, -0.01),
         std::invalid_argument);
 }
+
+TEST_CASE("calc_rician_k_factor - outputs that alias inputs")
+{
+    std::vector<arma::vec> powers = {arma::vec({1.0, 0.5})}, path_length = {arma::vec({10.0, 20.0})};
+    arma::mat tx(3, 1, arma::fill::zeros), rx(3, 1, arma::fill::zeros);
+    rx(0) = 10.0;
+    arma::vec kf, pg;
+    CHECK_NOTHROW(quadriga_lib::calc_rician_k_factor(powers, path_length, tx, rx, &kf, &pg));
+
+    arma::vec t3 = {0.0, 0.0, 0.0}, r3 = {10.0, 0.0, 0.0};
+    CHECK_THROWS_AS(quadriga_lib::calc_rician_k_factor(powers, path_length, t3, rx, &t3, &pg), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_rician_k_factor(powers, path_length, tx, r3, &kf, &r3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_rician_k_factor(powers, path_length, tx, rx, &kf, &kf), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_rician_k_factor(powers, path_length, tx, rx, &path_length[0], &pg), std::invalid_argument);
+    CHECK(r3(0) == 10.0);
+
+    arma::vec view(r3.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::calc_rician_k_factor(powers, path_length, tx, r3, &view), std::invalid_argument);
+}

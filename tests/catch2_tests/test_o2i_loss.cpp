@@ -323,6 +323,19 @@ TEST_CASE("o2i_loss - input validation")
                     double d_max)
     { quadriga_lib::o2i_loss(f, r, m, ww, loss, d_max); };
 
+    SECTION("outputs that alias inputs")
+    {
+        arma::mat r = rnd5;
+        arma::vec f = fc, ww = w;
+        CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, r, models, w, r), std::invalid_argument);                // loss is 'rnd'
+        CHECK_THROWS_AS(quadriga_lib::o2i_loss(f, rnd5, models, w, loss, 25.0, &f), std::invalid_argument); // d2d_in is 'center_frequency'
+        CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, rnd5, models, ww, loss, 25.0, &ww), std::invalid_argument); // d2d_in is 'weights'
+        CHECK_NOTHROW(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss));
+        arma::vec on_loss(loss.memptr(), 5, false, true);
+        CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss, 25.0, &on_loss), std::invalid_argument); // d2d_in on the memory of 'loss'
+        CHECK(arma::approx_equal(r, rnd5, "absdiff", 0.0));
+    }
+
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(call(fc, rnd5, models, w, 25.0));

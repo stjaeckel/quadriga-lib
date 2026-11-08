@@ -981,3 +981,36 @@ TEST_CASE("ssf_clusters - input validation")
     CHECK(arma::all(arma::vectorise(o.delay) == 7.0));
     CHECK(arma::all(arma::vectorise(o.power) == 7.0));
 }
+
+TEST_CASE("ssf_clusters - outputs that alias inputs")
+{
+    // Each call gets its own copy of the inputs, since a call without the check changes them
+    const spmap sp = read_v19("UMa_LOS");
+    fix_t keep = make_fix(UMa_LOS.N, 2, 1, 181, true);
+    keep.use_ncl = true;
+    fix_t f = keep;
+    out_t o;
+    auto call = [&](arma::cube &delay, arma::cube &power, arma::cube &aod, arma::u32_vec &n_active)
+    {
+        quadriga_lib::ssf_clusters(sp, f.tx, f.rx, f.lsp, f.rnd, delay, power, aod, o.eod, o.aoa, o.eoa, "38.901",
+                                   &f.rnd_freq, &f.anchor, nullptr, nullptr, nullptr, nullptr, nullptr, &f.ncl, &n_active);
+    };
+    CHECK_NOTHROW(call(o.delay, o.power, o.aod, o.n_active));
+
+    CHECK_THROWS_AS(call(f.lsp, o.power, o.aod, o.n_active), std::invalid_argument); // delay is 'lsp'
+    CHECK(eq(f.lsp, keep.lsp));
+    f = keep;
+    CHECK_THROWS_AS(call(o.delay, f.rnd_freq, o.aod, o.n_active), std::invalid_argument); // power is 'rnd_freq'
+    CHECK(eq(f.rnd_freq, keep.rnd_freq));
+    f = keep;
+    CHECK_THROWS_AS(call(o.delay, o.power, f.anchor, o.n_active), std::invalid_argument); // aod is 'lsp_anchor'
+    CHECK(eq(f.anchor, keep.anchor));
+    f = keep;
+    CHECK_THROWS_AS(call(o.delay, o.power, o.aod, f.ncl), std::invalid_argument); // n_active is 'n_cluster'
+    CHECK(arma::all(f.ncl == keep.ncl));
+    f = keep;
+    CHECK_THROWS_AS(call(o.delay, o.delay, o.aod, o.n_active), std::invalid_argument); // power is 'delay'
+    arma::cube on_rnd(f.rnd.memptr(), 2, 3, 1, false, true);
+    CHECK_THROWS_AS(call(o.delay, o.power, on_rnd, o.n_active), std::invalid_argument); // aod on the memory of 'rnd'
+    CHECK(arma::approx_equal(f.rnd, keep.rnd, "absdiff", 0.0));
+}

@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -75,6 +76,13 @@ void quadriga_lib::calc_rician_k_factor(const std::vector<arma::Col<dtype>> &pow
         if (powers[i].n_elem != path_length[i].n_elem)
             throw std::invalid_argument("Each element of 'powers' and 'path_length' must have the same number of elements.");
     }
+
+    qd_check_alias(kf, "kf", &tx_pos, &rx_pos);
+    qd_check_alias(pg, "pg", &tx_pos, &rx_pos);
+    qd_check_alias_outputs(kf, "kf", pg, "pg");
+    for (arma::uword i = 0; i < n_cir; ++i)
+        qd_check_alias(kf, "kf", &powers[i], &path_length[i]),
+            qd_check_alias(pg, "pg", &powers[i], &path_length[i]);
 
     // Early return if no outputs are requested
     if (kf == nullptr && pg == nullptr)

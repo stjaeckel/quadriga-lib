@@ -225,6 +225,16 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     if (rx_array.empty())
         throw std::invalid_argument("get_channels_multifreq: RX array vector is empty.");
 
+    const std::vector<arma::Cube<dtype>> *outs[] = {&coeff_re, &coeff_im, &delay};
+    const char *names[] = {"coeff_re", "coeff_im", "delay"};
+    for (int i = 0; i < 3; ++i)
+    {
+        for (const auto &c : *outs[i])
+            qd_check_alias(&c, names[i], &fbs_pos, &lbs_pos, &path_gain, &path_length, &M, &freq_in, &freq_out);
+        for (int j = i + 1; j < 3; ++j)
+            qd_check_alias_outputs(outs[i], names[i], outs[j], names[j]);
+    }
+
     {
         std::string err = quadriga_lib::arrayant_is_valid_multi(tx_array, false);
         if (!err.empty())

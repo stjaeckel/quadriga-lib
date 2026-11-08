@@ -20,7 +20,6 @@ Target ACF at given distances
 - Distances beyond the last sample point return the last value of the table
 - The same rule is applied by [[sos_val]] and [[sos_remove_bias]] for two devices on the same map
 - An empty `d` returns an empty `val`
-- `val` may be the same object as `acf`, `dist` or `d`
 
 ## Declaration:
 ```
@@ -50,11 +49,11 @@ void quadriga_lib::sos_acfi(const arma::Col<dtype> &acf,
                             arma::Col<dtype> &val)
 {
     qd_sos_check_acf(acf, dist);
+    qd_check_alias(&val, "val", &acf, &dist, &d);
     for (arma::uword i = 0; i < d.n_elem; ++i)
         if (!(d.at(i) >= (dtype)0.0))
             throw std::invalid_argument("Input 'd' must be >= 0.");
 
-    // The table is copied before the output is resized, so that 'val' may be the same object as an input
     const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
 
     if (val.n_elem != d.n_elem)

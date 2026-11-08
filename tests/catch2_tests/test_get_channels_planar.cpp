@@ -387,3 +387,34 @@ TEST_CASE("Get Channels Planar - 0 paths without add_fake_los_path")
                                                               &one, &e, &e, &e, &e, &e, &M0, &cr, &ci, &dl, 1e9, true, false),
                     std::invalid_argument);
 }
+
+TEST_CASE("Get Channels Planar - outputs that alias inputs")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    arma::vec aod = {0.0}, eod = {0.0}, aoa = {arma::datum::pi}, eoa = {0.0}, gain = {1.0}, length = {20.0};
+    arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    arma::cube cr, ci, dl;
+    arma::vec doppler;
+    auto call = [&](arma::cube *c_re, arma::cube *d, arma::vec *dop, const arma::vec *g, bool fake_los)
+    {
+        quadriga_lib::get_channels_planar<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0,
+                                                  &aod, &eod, &aoa, &eoa, g, &length, &M, c_re, &ci, d,
+                                                  1e9, false, fake_los, dop);
+    };
+    CHECK_NOTHROW(call(&cr, &dl, &doppler, &gain, true));
+
+    SECTION("Output is an input")
+    {
+        CHECK_THROWS_AS(call(&cr, &dl, &gain, &gain, true), std::invalid_argument);
+        CHECK_THROWS_AS(call(&cr, &dl, &aod, &gain, false), std::invalid_argument);
+    }
+    SECTION("Two outputs are the same object")
+    {
+        CHECK_THROWS_AS(call(&cr, &cr, &doppler, &gain, false), std::invalid_argument);
+    }
+    SECTION("Output shares memory with an input")
+    {
+        arma::vec gain_on_cr(cr.memptr(), 1, false, true); // cr is [1, 1, 2] from the baseline call
+        CHECK_THROWS_AS(call(&cr, &dl, &doppler, &gain_on_cr, false), std::invalid_argument);
+    }
+}

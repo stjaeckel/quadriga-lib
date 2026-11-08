@@ -4,6 +4,7 @@
 
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <iomanip> // std::setprecision
 
@@ -591,6 +592,36 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     }
     else if (this->path_lbs_pos.size() != 0)
         throw std::invalid_argument("The channel object has 'path_lbs_pos', but no 'path_lbs_pos_add' is provided!");
+
+    // The fields of snapshot i_snap are written: an input must not be one of them or share memory with one
+    auto check_mat = [&](const arma::Mat<dtype> *out, const char *name)
+    {
+        qd_check_alias(out, name, interact_coord_add, path_gain_add, path_length_add, path_polarization_add,
+                       path_angles_add, path_fbs_pos_add, path_lbs_pos_add);
+    };
+    if (add_coefficients)
+    {
+        qd_check_alias(&this->coeff_re[i_snap], "coeff_re[i_snap]", coeff_re_add, coeff_im_add, delay_add);
+        qd_check_alias(&this->coeff_im[i_snap], "coeff_im[i_snap]", coeff_re_add, coeff_im_add, delay_add);
+        qd_check_alias(&this->delay[i_snap], "delay[i_snap]", coeff_re_add, coeff_im_add, delay_add);
+    }
+    if (add_interact_coord)
+    {
+        qd_check_alias(&this->no_interact[i_snap], "no_interact[i_snap]", no_interact_add);
+        check_mat(&this->interact_coord[i_snap], "interact_coord[i_snap]");
+    }
+    if (path_gain_add != nullptr)
+        check_mat(&this->path_gain[i_snap], "path_gain[i_snap]");
+    if (path_length_add != nullptr)
+        check_mat(&this->path_length[i_snap], "path_length[i_snap]");
+    if (path_polarization_add != nullptr)
+        check_mat(&this->path_polarization[i_snap], "path_polarization[i_snap]");
+    if (path_angles_add != nullptr)
+        check_mat(&this->path_angles[i_snap], "path_angles[i_snap]");
+    if (path_fbs_pos_add != nullptr)
+        check_mat(&this->path_fbs_pos[i_snap], "path_fbs_pos[i_snap]");
+    if (path_lbs_pos_add != nullptr)
+        check_mat(&this->path_lbs_pos[i_snap], "path_lbs_pos[i_snap]");
 
     // Add data to existing channel
     if (add_coefficients)

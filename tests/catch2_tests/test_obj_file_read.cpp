@@ -653,3 +653,21 @@ TEST_CASE("Test OBJ File Read - 'usemtl (null)' marks faces without material")
     CHECK(cn[csv(4) - 1] == "itu_glass");
     std::remove("nullmtl.obj");
 }
+
+TEST_CASE("obj_file_read - outputs that alias each other")
+{
+    const std::string fn = "tests/data/test_scene.obj";
+    arma::mat mesh, vert_list, bsdf;
+    arma::umat face_ind;
+    arma::uvec obj_ind, mtl_ind;
+    std::vector<std::string> obj_names, mtl_names;
+    CHECK_NOTHROW(quadriga_lib::obj_file_read<double>(fn, &mesh, &vert_list, &face_ind, &obj_ind, &obj_names, &mtl_ind, &mtl_names, &bsdf));
+
+    CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>(fn, &mesh, &mesh), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>(fn, &mesh, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &mesh), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>(fn, nullptr, nullptr, nullptr, &obj_ind, nullptr, &obj_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>(fn, nullptr, nullptr, &face_ind, &obj_ind, &obj_names, &mtl_ind, &obj_names), std::invalid_argument);
+
+    arma::uvec view(face_ind.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>(fn, nullptr, nullptr, &face_ind, &view), std::invalid_argument);
+}

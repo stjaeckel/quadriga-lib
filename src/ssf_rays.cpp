@@ -295,6 +295,15 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         if (arma::any(arma::vectorise(x) < 0.0) || arma::any(arma::vectorise(x) > 1.0))
             throw std::invalid_argument("Values of block 14 of 'rnd_ray' must be in [0, 1].");
     }
+    auto check = [&](const auto &m)
+    {
+        qd_check_alias(&m, "rays", &tx_pos, &rx_pos, &center_frequency, &lsp, &lsp_mu, &lsp_sigma, &delay, &power, &aod,
+                       &eod, &aoa, &eoa, &rnd_ray, gr_eps_re, gr_eps_im);
+    };
+    for (const gbsm_rays &r : rays)
+        check(r.tx_pos), check(r.rx_pos), check(r.center_frequency), check(r.delay), check(r.power), check(r.aod),
+            check(r.eod), check(r.aoa), check(r.eoa), check(r.M), check(r.path_type), check(r.tap),
+            check(r.gr_eps_re), check(r.gr_eps_im), check(r.fbs_pos), check(r.lbs_pos), check(r.fallback);
 
     if (rays.size() != n_link)
         rays.resize(n_link);

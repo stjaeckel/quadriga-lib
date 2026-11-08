@@ -1664,6 +1664,26 @@ TEST_CASE("ray_progress - input validation", "[wave]")
         CHECK_NOTHROW(C.step(S));
     }
 
+    SECTION("in/out arguments that are the same object or share memory with an input")
+    {
+        // A fresh launch per call: a call that runs updates the in/out arguments
+        Cfg C;
+        auto step = [&](arma::fmat &orig, arma::fmat &dest, arma::Col<short> &cur)
+        {
+            return quadriga_lib::ray_progress(S.mesh, S.mtl_ind, S.mtl_prop, C.freq, C.Ox, C.Oy, C.Oz, orig, dest, C.prev,
+                                              cur, C.buf, C.path_dir, C.acc_dist, C.paths);
+        };
+        C = one_ray();
+        CHECK_THROWS_AS(step(C.orig, C.orig, C.cur), std::invalid_argument);
+        C = one_ray();
+        CHECK_THROWS_AS(step(C.orig, C.dest, C.prev), std::invalid_argument);
+
+        // 'orig' uses the memory of the mesh
+        C = one_ray();
+        arma::fmat mesh_part(S.mesh.memptr(), 1, 3, false, true);
+        CHECK_THROWS_AS(step(mesh_part, C.dest, C.cur), std::invalid_argument);
+    }
+
     SECTION("mesh")
     {
         Cfg C = one_ray();

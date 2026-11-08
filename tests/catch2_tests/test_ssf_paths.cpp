@@ -876,3 +876,38 @@ TEST_CASE("Diagnostic - ssf_paths fallback share and b_med on a library drop")
         CHECK((qa.is_finite() && std::isfinite(mt) && std::isfinite(mr) && std::isfinite(res)));
     }
 }
+
+TEST_CASE("ssf_paths - outputs that alias inputs")
+{
+    // The outputs are resized and written while the members of 'rays' and the other inputs are still read; each
+    // call gets its own copy of the rays, since a call without the check changes them
+    const rays_t keep = make_rays(25, true, true, 4, 2, "38.901");
+    arma::vec lg = {-80.0, -90.0}, T = keep.tx_pos + arma::vec{1.0, 0.0, 0.0}, l, a, e;
+    arma::mat g;
+    arma::cube M;
+    const std::string ph = "phase";
+    CHECK_NOTHROW(quadriga_lib::ssf_paths(keep, lg, g, l, M, ph, &T, nullptr, nullptr, &a, &e));
+
+    rays_t x = keep;
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, x.M), std::invalid_argument); // M is 'rays.M'
+    CHECK(arma::approx_equal(x.M, keep.M, "absdiff", 0.0));
+    x = keep;
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, x.power, l, M), std::invalid_argument); // path_gain is 'rays.power'
+    CHECK(arma::approx_equal(x.power, keep.power, "absdiff", 0.0));
+    x = keep;
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, x.delay, M), std::invalid_argument); // path_length is 'rays.delay'
+    CHECK(arma::approx_equal(x.delay, keep.delay, "absdiff", 0.0));
+    x = keep;
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, nullptr, nullptr, nullptr, &x.rx_pos), std::invalid_argument); // aod is 'rays.rx_pos'
+    CHECK(arma::approx_equal(x.rx_pos, keep.rx_pos, "absdiff", 0.0));
+    x = keep;
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, &T, nullptr, nullptr, &a, &a), std::invalid_argument); // eod is 'aod'
+    arma::vec T2 = T, lg2 = lg;
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, &T2, nullptr, nullptr, &T2), std::invalid_argument); // aod is 'tx_pos'
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg2, g, l, M, ph, &T, nullptr, nullptr, &lg2), std::invalid_argument); // aod is 'link_gain_dB'
+    CHECK(arma::approx_equal(T2, T, "absdiff", 0.0));
+    x = keep;
+    arma::mat on_power(x.power.memptr(), 2, 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, on_power, l, M), std::invalid_argument); // path_gain on the memory of 'rays.power'
+    CHECK(arma::approx_equal(x.power, keep.power, "absdiff", 0.0));
+}

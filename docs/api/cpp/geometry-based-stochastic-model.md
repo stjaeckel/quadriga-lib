@@ -116,8 +116,7 @@ as a `[3]` vector, except [gbsm_single_link_channel](#gbsm_single_link_channel),
 `[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the conf-file keys): in
 rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR 38.901 except two
 deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm_init_phases](#gbsm_init_phases), [gbsm_draw](#gbsm_draw)) and
-`method = "quadriga"` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Outputs must not share memory with the
-inputs or with each other unless stated otherwise. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
+`method = "quadriga"` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
 linear power ratios, spreads and `_deg` offsets in degrees.
 
 ---
@@ -312,7 +311,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_draw) · [Pytho
 - 3D mode (legacy QuaDRiGa): the height separates the floors, so UTs on different floors are correlated by the ACF of
   their height difference. The per-link statistics are the same in both modes
 - The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
-- `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts any empty `phase`
+- An empty set (`NumClusters = 1`) accepts any empty `phase`
 
 Random sets, with `N = NumClusters - 1` and `M = NumSubPaths`; a set never changes size (new random quantities come in
 new sets), and a decorrelation distance of 0 is used as 0.1 m:
@@ -488,7 +487,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 
 Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths) · [Python](../python/geometry-based-stochastic-model.md#gbsm.rays_from_paths)
 
-- Fills a [gbsm_rays](#gbsm_rays) object in place (`fallback` cleared) from path data in the names and order of
+- Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
   [qrt_file_read](channel-functions.md#qrt_file_read), read as `qrt_file_read<double>` with `downlink = true` and `normalize_M = 1` (an uplink read gives
   swapped ends and a conjugated `M`, which this function does not undo; `normalize_M = 0` leaves only the free-space
   gain in `power`)

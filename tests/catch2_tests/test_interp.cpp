@@ -178,3 +178,18 @@ TEST_CASE("interp - non-finite grid values in 'xi' or 'yi' throw")
         CHECK(message([&]() { quadriga_lib::interp_2D<double>(d, xi, yi, xo, arma::vec{0.5}); }) == "Input 'yi' must be finite.");
     }
 }
+
+TEST_CASE("interp_2D - Outputs that alias inputs")
+{
+    arma::cube input(3, 4, 2, arma::fill::randu), output;
+    arma::vec xi = arma::linspace<arma::vec>(0.0, 3.0, 4), yi = arma::linspace<arma::vec>(0.0, 2.0, 3);
+    arma::vec xo = xi + 0.5, yo = yi + 0.5;
+    CHECK_NOTHROW(quadriga_lib::interp_2D(input, xi, yi, xo, yo, output));
+
+    // The output is the input
+    CHECK_THROWS_AS(quadriga_lib::interp_2D(input, xi, yi, xo, yo, input), std::invalid_argument);
+
+    // The output uses the memory of the input
+    arma::cube view(input.memptr(), 3, 4, 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::interp_2D(input, xi, yi, xo, yo, view), std::invalid_argument);
+}

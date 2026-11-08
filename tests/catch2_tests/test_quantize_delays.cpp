@@ -888,60 +888,23 @@ TEST_CASE("quantize_delays - Delay offset gives the same taps")
     CHECK(sec < 1.0);
 }
 
-TEST_CASE("quantize_delays - Outputs may alias the inputs")
+TEST_CASE("quantize_delays - Outputs that alias inputs")
 {
-    // Delay modes: 0 = random, 1 = on the tap grid (no interpolation), 2 = random with max_no_taps = 3 (fallback to
-    // the nearest tap), 3 = a path at delay 0 and interpolation for the others
-    arma::arma_rng::set_seed(5);
-    for (int mode = 0; mode < 4; ++mode)
-    for (int shared = 0; shared < 2; ++shared)
-        for (int fix_taps = 0; fix_taps < 4; ++fix_taps)
-        {
-            arma::uword max_no_taps = (mode == 2) ? 3 : 48;
-            std::vector<arma::Cube<double>> cre(2), cim(2), dl(2);
-            for (int s = 0; s < 2; ++s)
-            {
-                cre[s] = arma::cube(2, 3, 5, arma::fill::randn);
-                cim[s] = arma::cube(2, 3, 5, arma::fill::randn);
-                dl[s] = shared ? arma::cube(1, 1, 5, arma::fill::randu) * 100.0e-9
-                               : arma::cube(2, 3, 5, arma::fill::randu) * 100.0e-9;
-                if (mode == 1)
-                    dl[s] = arma::round(dl[s] / 5.0e-9) * 5.0e-9;
-                if (mode == 3)
-                    for (arma::uword p = 0; p < 5; ++p)
-                        dl[s].slice(p).fill(p == 0 ? 0.0 : 12.5e-9 + 4.2e-9 * (double)p);
-            }
-            std::vector<arma::Cube<double>> re0, im0, d0;
-            quadriga_lib::quantize_delays(&cre, &cim, &dl, &re0, &im0, &d0, 5.0e-9, max_no_taps, 1.0, fix_taps);
+    std::vector<arma::Cube<double>> cre(1), cim(1), dl(1), o1, o2, o3;
+    cre[0] = arma::cube(2, 3, 5, arma::fill::randn);
+    cim[0] = arma::cube(2, 3, 5, arma::fill::randn);
+    dl[0] = arma::cube(2, 3, 5, arma::fill::randu) * 100.0e-9;
+    CHECK_NOTHROW(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o2, &o3));
 
-            // In place: each output aliases its own input
-            auto a_re = cre, a_im = cim, a_dl = dl;
-            quadriga_lib::quantize_delays(&a_re, &a_im, &a_dl, &a_re, &a_im, &a_dl, 5.0e-9, max_no_taps, 1.0, fix_taps);
-            CHECK(qd_same(a_re, re0));
-            CHECK(qd_same(a_im, im0));
-            CHECK(qd_same(a_dl, d0));
+    // Each output is its own input
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre, &cim, &dl), std::invalid_argument);
 
-            // Across arguments: delay_quant aliases coeff_re, coeff_re_quant aliases delay
-            auto b_re = cre, b_im = cim, b_dl = dl;
-            std::vector<arma::Cube<double>> b_imq;
-            quadriga_lib::quantize_delays(&b_re, &b_im, &b_dl, &b_dl, &b_imq, &b_re, 5.0e-9, max_no_taps, 1.0, fix_taps);
-            CHECK(qd_same(b_dl, re0));
-            CHECK(qd_same(b_imq, im0));
-            CHECK(qd_same(b_re, d0));
+    // An output is another input
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o2, &cre), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &dl, &o2, &o3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &dl, &o3), std::invalid_argument);
 
-            // Rotated: coeff_re_quant aliases coeff_im, coeff_im_quant aliases delay, delay_quant aliases coeff_re
-            auto c_re = cre, c_im = cim, c_dl = dl;
-            quadriga_lib::quantize_delays(&c_re, &c_im, &c_dl, &c_im, &c_dl, &c_re, 5.0e-9, max_no_taps, 1.0, fix_taps);
-            CHECK(qd_same(c_im, re0));
-            CHECK(qd_same(c_dl, im0));
-            CHECK(qd_same(c_re, d0));
-        }
-
-    // Two outputs pointing to the same vector cannot both be returned: error
-    std::vector<arma::Cube<double>> cre(1), cim(1), dl(1), o1, o2;
-    cre[0] = arma::cube(1, 1, 2, arma::fill::ones);
-    cim[0] = arma::cube(1, 1, 2, arma::fill::zeros);
-    dl[0] = arma::cube(1, 1, 2, arma::fill::zeros);
+    // Two outputs are the same object
     CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o1, &o2), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o2, &o1), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o2, &o1, &o1), std::invalid_argument);

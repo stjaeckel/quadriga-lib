@@ -607,3 +607,24 @@ TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive pola
     CHECK(xpr(1, 4) == 0.0);
     CHECK(xpr(1, 5) == 0.0);
 }
+
+TEST_CASE("calc_cross_polarization_ratio - outputs that alias inputs")
+{
+    std::vector<arma::vec> powers = {arma::vec({1.0, 0.5})}, path_length = {arma::vec({10.0, 20.0})};
+    std::vector<arma::mat> M = {arma::mat(8, 2, arma::fill::ones)};
+    arma::mat tx(3, 1, arma::fill::zeros), rx(3, 1, arma::fill::zeros), xpr;
+    rx(0) = 10.0;
+    arma::vec pg;
+    CHECK_NOTHROW(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &xpr, &pg));
+
+    arma::vec t3 = {0.0, 0.0, 0.0}, r3 = {10.0, 0.0, 0.0};
+    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, t3, rx, &xpr, &t3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, r3, &xpr, &r3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &tx, &pg), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &xpr, &powers[0]), std::invalid_argument);
+    CHECK(t3(0) == 0.0);
+    CHECK(r3(0) == 10.0);
+
+    arma::vec view(xpr.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::calc_cross_polarization_ratio(powers, M, path_length, tx, rx, &xpr, &view), std::invalid_argument);
+}

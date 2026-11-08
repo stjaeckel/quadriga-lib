@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -74,6 +75,9 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
         throw std::invalid_argument("Output 'meshR' cannot be NULL.");
     if (sub_mesh_index == nullptr)
         throw std::invalid_argument("Output 'sub_mesh_index' cannot be NULL.");
+    qd_check_alias(meshR, "meshR", mesh);
+    qd_check_alias(mtl_ind_out, "mtl_ind_out", mtl_ind);
+    qd_check_alias_outputs(sub_mesh_index, "sub_mesh_index", mesh_index, "mesh_index");
 
     if (target_size == 0)
         throw std::invalid_argument("Input 'target_size' cannot be 0.");

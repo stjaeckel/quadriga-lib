@@ -320,3 +320,21 @@ TEST_CASE("fast_slerp - Nearly parallel inputs: accuracy and lane independence")
     CHECK(std::abs(std::hypot((double)Yr(7), (double)Yi(7)) - 1.0) < 1e-6);
     CHECK(std::abs(std::atan2((double)Yi(7), (double)Yr(7)) - 0.5) < 1e-6);
 }
+
+TEST_CASE("fast_slerp - Outputs that alias inputs")
+{
+    arma::fvec Ar(9, arma::fill::ones), Ai(9, arma::fill::zeros), Br(9, arma::fill::zeros), Bi(9, arma::fill::ones);
+    arma::fvec w = arma::linspace<arma::fvec>(0.0f, 1.0f, 9), Xr, Xi;
+    CHECK_NOTHROW(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi));
+
+    // An output is an input
+    CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Ar, Xi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, w), std::invalid_argument);
+
+    // Both outputs are the same object
+    CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xr), std::invalid_argument);
+
+    // An output uses the memory of an input
+    arma::fvec Bi_view(Bi.memptr(), 9, false, true);
+    CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Bi_view), std::invalid_argument);
+}

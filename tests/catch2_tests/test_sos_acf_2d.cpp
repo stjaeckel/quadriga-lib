@@ -178,19 +178,20 @@ TEST_CASE("sos_acf_2d - long tables in single precision count as equally spaced"
     CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, bad), std::invalid_argument);
 }
 
-TEST_CASE("sos_acf_2d - the axis output may be the same object as an input")
+TEST_CASE("sos_acf_2d - outputs that alias inputs")
 {
-    arma::vec acf = {1.0, 0.5, 0.25}, dist = {0.0, 1.5, 3.0}, ref_axis;
-    arma::mat ref, a, b;
-    quadriga_lib::sos_acf_2d(acf, dist, ref, &ref_axis);
-    REQUIRE(ref_axis.n_elem == 9);
+    arma::vec acf = {1.0, 0.5, 0.25}, dist = {0.0, 1.5, 3.0}, axis;
+    arma::mat a;
+    CHECK_NOTHROW(quadriga_lib::sos_acf_2d(acf, dist, a, &axis));
 
     arma::vec d = dist, c = acf;
-    quadriga_lib::sos_acf_2d(acf, d, a, &d); // dist_2d is 'dist'
-    quadriga_lib::sos_acf_2d(c, dist, b, &c); // dist_2d is 'acf'
-    CHECK(arma::approx_equal(a, ref, "absdiff", 0.0));
-    CHECK(arma::approx_equal(b, ref, "absdiff", 0.0));
-    CHECK(arma::approx_equal(d, ref_axis, "absdiff", 0.0));
-    CHECK(arma::approx_equal(c, ref_axis, "absdiff", 0.0));
-    CHECK(std::abs(ref_axis(8) - 6.0) < 1e-14);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, d, a, &d), std::invalid_argument); // dist_2d is 'dist'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(c, dist, a, &c), std::invalid_argument); // dist_2d is 'acf'
+
+    // acf_2d on the memory of 'acf', dist_2d on the memory of acf_2d
+    arma::mat m(c.memptr(), 3, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(c, dist, m, &axis), std::invalid_argument);
+    arma::mat g(9, 9);
+    arma::vec v(g.memptr(), 9, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_2d(acf, dist, g, &v), std::invalid_argument);
 }

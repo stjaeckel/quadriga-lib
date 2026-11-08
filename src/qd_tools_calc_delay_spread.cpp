@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <algorithm>
 #include <utility>
@@ -71,6 +72,7 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
             throw std::invalid_argument("Delays and powers must have the same number of elements for each CIR.");
         if (delays[i].n_elem == 0)
             throw std::invalid_argument("Delay and power vectors must not be empty.");
+        qd_check_alias(mean_delay, "mean_delay", &delays[i], &powers[i]);
     }
 
     if (threshold <= (dtype)0.0)

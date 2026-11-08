@@ -761,6 +761,11 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
                                   arma::fmat *orig_orientation,
                                   std::ifstream *file)
 {
+    qd_check_alias_list({no_cir, no_orig, no_dest, no_freq}, {"no_cir", "no_orig", "no_dest", "no_freq"});
+    qd_check_alias_list({orig_names, dest_names}, {"orig_names", "dest_names"});
+    qd_check_alias_list<arma::fmat>({freq, cir_pos, cir_orientation, orig_pos, orig_orientation},
+                                    {"freq", "cir_pos", "cir_orientation", "orig_pos", "orig_orientation"});
+
     // Determine which stream to use and whether we own it
     std::ifstream local_stream;
     bool own_stream = (file == nullptr);
@@ -1100,6 +1105,22 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 {
     if (normalize_M != 0 && normalize_M != 1)
         throw std::invalid_argument("'normalize_M' must be 0 or 1.");
+
+    // Outputs must be distinct and must not be part of the cache; 'coord' is a float matrix, like the outputs for
+    // dtype = float
+    const arma::Mat<dtype> *out[] = {center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos,
+                                     path_gain, path_length, aod, eod, aoa, eoa};
+    const char *const name[] = {"center_frequency", "tx_pos", "tx_orientation", "rx_pos", "rx_orientation", "fbs_pos",
+                                "lbs_pos", "path_gain", "path_length", "aod", "eod", "aoa", "eoa"};
+    auto check_cache = [cache](const auto *o, const char *n)
+    {
+        if (cache)
+            qd_check_alias(o, n, &cache->freq, &cache->cir_pos, &cache->cir_orientation, &cache->orig_pos_all, &cache->orig_orientation);
+    };
+    qd_check_alias_list(out, name);
+    for (size_t i = 0; i < 13; ++i)
+        qd_check_alias_outputs(out[i], name[i], coord, "coord"), check_cache(out[i], name[i]);
+    check_cache(coord, "coord");
 
     // Stream setup
     std::ifstream local_stream;

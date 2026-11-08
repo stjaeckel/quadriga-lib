@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "quadriga_arrayant.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Channel generation functions
@@ -138,6 +139,11 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     // Check if IRS array is valid
     if (irs_array == nullptr)
         throw std::invalid_argument("IRS array cannot be NULL");
+
+    qd_check_alias_list({coeff_re, coeff_im, delay, aod, eod, aoa, eoa},
+                        {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
+                        fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
+                        fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2);
 
     std::string error_message = irs_array->is_valid();
     if (error_message.length() != 0)

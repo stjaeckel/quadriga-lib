@@ -39,7 +39,6 @@ Approximation error of the ACF of a set of sinusoids
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
 - The test directions are evaluated in parallel; the result does not depend on the number of threads
 - Equally spaced has the meaning given in [[sos_acf_2d]]
-- `acf_tail` and `test_dir` may be the same objects as inputs
 
 ## Declaration:
 ```
@@ -90,6 +89,10 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
     if (freq.n_cols > 3)
         throw std::invalid_argument("Input 'freq' must have 1, 2 or 3 columns.");
     qd_sos_check_acf(acf, dist);
+    qd_check_alias(acf_tail, "acf_tail", &freq, &acf, &dist);
+    qd_check_alias(test_dir, "test_dir", &freq, &acf, &dist);
+    qd_check_alias_outputs(acf_tail, "acf_tail", test_dir, "test_dir");
+    qd_check_alias_outputs(mse_core, "mse_core", mse_all, "mse_all");
     if (!qd_sos_equally_spaced(dist))
         throw std::invalid_argument("Input 'dist' must be equally spaced.");
     if (n_dir == 0)

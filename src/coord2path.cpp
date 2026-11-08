@@ -71,6 +71,20 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
     if (interact_coord->n_cols != n_interact)
         throw std::invalid_argument("Number of columns of 'interact_coord' must match the sum of 'no_interact'.");
 
+    qd_check_alias(path_length, "path_length", interact_coord);
+    qd_check_alias(fbs_pos, "fbs_pos", interact_coord);
+    qd_check_alias(lbs_pos, "lbs_pos", interact_coord);
+    qd_check_alias(path_angles, "path_angles", interact_coord);
+    qd_check_alias_outputs(path_length, "path_length", fbs_pos, "fbs_pos");
+    qd_check_alias_outputs(path_length, "path_length", lbs_pos, "lbs_pos");
+    qd_check_alias_outputs(path_length, "path_length", path_angles, "path_angles");
+    qd_check_alias_outputs(fbs_pos, "fbs_pos", lbs_pos, "lbs_pos");
+    qd_check_alias_outputs(fbs_pos, "fbs_pos", path_angles, "path_angles");
+    qd_check_alias_outputs(lbs_pos, "lbs_pos", path_angles, "path_angles");
+    if (path_coord != nullptr)
+        for (const auto &m : *path_coord)
+            qd_check_alias(&m, "path_coord", interact_coord);
+
     constexpr double los_limit = 1.0e-4;
 
     // Set the output size

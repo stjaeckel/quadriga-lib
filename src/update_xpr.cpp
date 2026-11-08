@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -323,6 +324,9 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
                               bool apply_gain,
                               const arma::uvec *ray_index)
 {
+    qd_check_alias(update, "update", &xprmat);
+    qd_check_alias(gain, "gain", &xprmat, update);
+
     const bool have_state = !xprmat.is_empty();
     const bool have_update = (update != nullptr) && !update->is_empty();
 

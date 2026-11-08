@@ -259,6 +259,17 @@ TEST_CASE("conf_file_list - input validation")
         CHECK(scen == strvec{"M", "Ms", "N", "Ns"});
     }
 
+    SECTION("outputs that alias inputs")
+    {
+        strvec d = {a.name, b.name};
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list(d, d), std::invalid_argument);                   // scenarios is 'dirs'
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list(d, scen, &files, &d), std::invalid_argument);    // file_dirs is 'dirs'
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list(d, scen, &scen, &dirs), std::invalid_argument);  // file_names is 'scenarios'
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list(d, scen, &files, &files), std::invalid_argument); // file_dirs is 'file_names'
+        CHECK(d == strvec{a.name, b.name});
+        CHECK(scen == marker);
+    }
+
     SECTION("short name equals an earlier file name")
     {
         a.add("N.conf", "ShortName = M\n");

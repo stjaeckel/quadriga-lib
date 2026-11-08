@@ -120,6 +120,9 @@ void quadriga_lib::o2i_loss(const arma::vec &center_frequency,
 
     if (!std::isfinite(d2d_in_max) || d2d_in_max < 0.0)
         throw std::invalid_argument("Input 'd2d_in_max' must be finite and >= 0.");
+    qd_check_alias(&loss, "loss", &center_frequency, &rnd, &weights);
+    qd_check_alias(d2d_in, "d2d_in", &center_frequency, &rnd, &weights);
+    qd_check_alias_outputs(&loss, "loss", d2d_in, "d2d_in");
 
     // Cumulative weights and the fallback model (last non-zero weight)
     std::vector<double> c_cum(n_model);

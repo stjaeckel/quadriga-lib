@@ -1036,3 +1036,18 @@ TEST_CASE("Rotate Pattern - In place with a grid update keeps the coupling")
     CHECK(arma::approx_equal(out.coupling_re, a.coupling_re, "absdiff", 0.0));
     CHECK(out.name == "myant");
 }
+
+TEST_CASE("Rotate Pattern - Output that is the object itself")
+{
+    auto a = quadriga_lib::generate_arrayant_xpol<double>(10.0); // 2 elements
+    quadriga_lib::arrayant<double> o;
+    for (unsigned usage : {2u, 3u})
+        for (unsigned element : {1u, unsigned(-1)})
+        {
+            auto b = a.copy();
+            CHECK_NOTHROW(b.rotate_pattern(10.0, 20.0, 30.0, usage, element, &o));
+            CHECK_THROWS_AS(b.rotate_pattern(10.0, 20.0, 30.0, usage, element, &b), std::invalid_argument);
+            REQUIRE(b.n_elements() == a.n_elements());
+            CHECK(arma::approx_equal(b.e_theta_re, a.e_theta_re, "absdiff", 0.0));
+        }
+}

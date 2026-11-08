@@ -35,11 +35,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
   with `pos` and `phase_b` with `pos_b` and the frequencies `freq · freq_scale_b`; two offsets per generator.
-  The mean of the combined value is then zero as well. `phase_b` cannot share memory with `phase`: one
-  matrix cannot hold two corrections
-- The arguments that are written, `phase`, `phase_b`, `offset` and `mean_before`, cannot share memory with
-  another argument, not even in part, and `offset` and `mean_before` cannot be the same object. Such a call
-  throws and leaves all arguments unchanged
+  The mean of the combined value is then zero as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
   `c` the mean ACF between that position and all positions; on average over the positions the loss is at
@@ -83,7 +79,7 @@ void quadriga_lib::sos_remove_bias(
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
   number for different maps
 - **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; updated in-place; no memory shared with `phase`; `[n_coeff, n_gen]`
+  same map; updated in-place; `[n_coeff, n_gen]`
 - **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
@@ -151,17 +147,13 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
         qd_sos_check_acf_same_map(*acf, *dist);
     }
 
-    // 'phase' and 'phase_b' are updated and 'offset' and 'mean_before' written while the other arguments are
-    // still read: none of them can share memory with another argument, not even in part
-    const arma::Mat<dtype> *args[9] = {&freq, &phase, &pos, pos_b, phase_b, acf, dist, offset, mean_before};
-    const char *names[9] = {"freq", "phase", "pos", "pos_b", "phase_b", "acf", "dist", "offset", "mean_before"};
-    const bool written[9] = {false, true, false, false, true, false, false, true, true};
-    for (int i = 1; i < 9; ++i)
-        for (int j = 0; j < i; ++j)
-            if ((written[i] || written[j]) && args[i] != nullptr && args[j] != nullptr && qd_sos_share_memory(*args[i], *args[j]))
-                throw std::invalid_argument(std::string(i < 7 ? "Input '" : "Output '") + names[i] + "' cannot share memory with '" + names[j] + "'.");
-    if (offset != nullptr && offset == mean_before)
-        throw std::invalid_argument("Outputs 'offset' and 'mean_before' cannot be the same object.");
+    // 'phase' and 'phase_b' are updated in place, 'offset' and 'mean_before' are written
+    qd_check_alias(&phase, "phase", &freq, &pos, pos_b, acf, dist);
+    qd_check_alias(phase_b, "phase_b", &freq, &pos, pos_b, acf, dist);
+    qd_check_alias(offset, "offset", &freq, &phase, &pos, pos_b, phase_b, acf, dist);
+    qd_check_alias(mean_before, "mean_before", &freq, &phase, &pos, pos_b, phase_b, acf, dist);
+    qd_check_alias_outputs(&phase, "phase", phase_b, "phase_b");
+    qd_check_alias_outputs(offset, "offset", mean_before, "mean_before");
 
     const arma::uword n_gen = phase.n_cols, n_col = two_maps ? 2 : 1;
 

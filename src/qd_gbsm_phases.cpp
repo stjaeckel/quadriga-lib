@@ -439,6 +439,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
     const bool do_bias = lsf && remove_bias && n_link > 2;
     if (do_bias && dual_mobility && tx_pos == nullptr)
         throw std::invalid_argument("Input 'tx_pos' is required for the bias removal with dual mobility.");
+    qd_check_alias(&phase, "phase", tx_pos, rx_pos);
 
     // The decorrelation distances of the "ray" generators are not used here (no bias removal)
     const bool ray = set_type == "ray";
@@ -517,7 +518,7 @@ Spatially correlated normalized random values of one random set at a set of link
 - 3D mode (legacy QuaDRiGa): the height separates the floors, so UTs on different floors are correlated by the ACF of
   their height difference. The per-link statistics are the same in both modes
 - The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
-- `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts any empty `phase`
+- An empty set (`NumClusters = 1`) accepts any empty `phase`
 
 Random sets, with `N = NumClusters - 1` and `M = NumSubPaths`; a set never changes size (new random quantities come in
 new sets), and a decorrelation distance of 0 is used as 0.1 m:
@@ -623,6 +624,7 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
         throw std::invalid_argument("Input 'center_frequency' is required for the shared 'ray' set.");
     if (shared_ray)
         qd_gbsm_check_fc(*center_frequency);
+    qd_check_alias(&rnd, "rnd", &phase, &tx_pos, &rx_pos, center_frequency);
 
     if (n_link == 0 || n_gen == 0)
     {

@@ -1482,3 +1482,67 @@ TEST_CASE("ray_state_update - input validation", "[wave]")
         CHECK(C.xprmat.n_cols == 0);
     }
 }
+
+// One ray through ray_triangle_intersect and ray_mesh_interact, the arguments ray_state_update reads
+struct RsuAliasCase
+{
+    arma::mat cube = quadriga_lib::cube<double>();
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> air;
+    arma::mat orig = {{-1.5, 0.0, 0.0}}, dest = {{0.0, 0.0, 1.5}};
+    arma::mat fbs, sbs, fbsN, sbsN, xprmatN, normal_vecN, path_dirN;
+    arma::u32_vec no_interact, fbs_ind, sbs_ind;
+    arma::vec gainN, fbs_angleN, acc_geo = {0.5};
+    std::vector<uint8_t> out_typeN;
+    arma::Col<short> m1 = {0}, m2 = {0}, prev = {0}, cur = {0}, buf = {0};
+    RsuAliasCase()
+    {
+        mtl_ind.zeros(cube.n_rows);
+        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &cube, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_mesh_interact<double>(1, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, nullptr, nullptr,
+                                        nullptr, nullptr, &fbsN, &sbsN, &gainN, &xprmatN, nullptr, nullptr, &fbs_angleN, nullptr,
+                                        nullptr, &normal_vecN, &out_typeN, &path_dirN);
+    }
+    void run(arma::Col<short> *prev_out, arma::Col<short> *cur_out, arma::vec *acc_geoN, std::vector<uint8_t> *rtype,
+             arma::vec *gain, const arma::vec *fang)
+    {
+        quadriga_lib::ray_state_update<double>(1, 1.0e9, &orig, &dest, &fbsN, &sbsN, &no_interact, fang, &normal_vecN, &out_typeN,
+                                               &air, &m1, &m2, &prev, &cur, &buf, nullptr, &acc_geo, nullptr,
+                                               prev_out, cur_out, nullptr, gain, &xprmatN, &path_dirN, acc_geoN, nullptr, rtype);
+    }
+};
+
+TEST_CASE("ray_state_update - outputs that alias inputs", "[wave]")
+{
+    RsuAliasCase C;
+    arma::Col<short> prev_out, cur_out;
+    arma::vec acc_geoN;
+    std::vector<uint8_t> rtype;
+    CHECK_NOTHROW(C.run(&prev_out, &cur_out, &acc_geoN, &rtype, &C.gainN, &C.fbs_angleN));
+
+    CHECK_THROWS_AS(C.run(&C.prev, &cur_out, &acc_geoN, &rtype, &C.gainN, &C.fbs_angleN), std::invalid_argument);
+    CHECK_THROWS_AS(C.run(&prev_out, &prev_out, &acc_geoN, &rtype, &C.gainN, &C.fbs_angleN), std::invalid_argument);
+    CHECK_THROWS_AS(C.run(&prev_out, &cur_out, &C.acc_geo, &rtype, &C.gainN, &C.fbs_angleN), std::invalid_argument);
+    CHECK_THROWS_AS(C.run(&prev_out, &cur_out, &acc_geoN, &rtype, &C.gainN, &C.gainN), std::invalid_argument); // in/out gain is an input
+    CHECK_THROWS_AS(C.run(&prev_out, &cur_out, &C.gainN, &rtype, &C.gainN, &C.fbs_angleN), std::invalid_argument);
+    CHECK(C.acc_geo(0) == 0.5);
+
+    arma::vec view(C.fbs_angleN.memptr(), 1, false, true);
+    CHECK_THROWS_AS(C.run(&prev_out, &cur_out, &view, &rtype, &C.gainN, &C.fbs_angleN), std::invalid_argument);
+}
+
+TEST_CASE("ray_state_update - resolved_typeN may be out_typeN", "[wave]")
+{
+    RsuAliasCase A, B;
+    arma::Col<short> prev_a, cur_a, prev_b, cur_b;
+    arma::vec acc_a, acc_b;
+    std::vector<uint8_t> rtype;
+    A.run(&prev_a, &cur_a, &acc_a, &rtype, &A.gainN, &A.fbs_angleN);
+    REQUIRE_NOTHROW(B.run(&prev_b, &cur_b, &acc_b, &B.out_typeN, &B.gainN, &B.fbs_angleN));
+    CHECK(B.out_typeN == rtype);
+    CHECK(arma::all(prev_a == prev_b));
+    CHECK(arma::all(cur_a == cur_b));
+    CHECK(arma::approx_equal(acc_a, acc_b, "absdiff", 0.0));
+    CHECK(arma::approx_equal(A.gainN, B.gainN, "absdiff", 0.0));
+    CHECK(arma::approx_equal(A.xprmatN, B.xprmatN, "absdiff", 0.0));
+}

@@ -88,6 +88,7 @@
 // parts of the state machine (ray_state_update). Then the public functions, each after its API block.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <complex>
 #include <unordered_map>
@@ -2849,6 +2850,13 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     if (p_mtl_ind && mtl_ind->max() > MaterialSet.n_mtl)
         throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
+    qd_check_alias_list<arma::Mat<dtype>>({origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN,
+                                           thicknessN, edge_lengthN, normal_vecN, path_dirN},
+                                          {"origN", "destN", "fbsN", "sbsN", "gainN", "xprmatN", "trivecN", "tridirN",
+                                           "fbs_angleN", "thicknessN", "edge_lengthN", "normal_vecN", "path_dirN"},
+                                          orig, dest, mesh, trivec, tridir);
+    qd_check_alias(ray_indN, "ray_indN", fbs_ind, sbs_ind);
+
     // Output ray index. Without compaction the map is the identity and is not stored (at 1e8 rays it would
     // cost 400 MB), so the range check runs in parallel; with compaction the counter is a prefix sum.
     unsigned n_rayN_u = 0;
@@ -3357,7 +3365,7 @@ void quadriga_lib::ray_state_update(
 - **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
   It includes the relaunch offset the same way, projected onto the direction the wave has (exact for parallel faces).
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
-  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.<br><br>
+  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write. May be `out_typeN`, which is then updated in place.<br><br>
    | Bit  | Flag        | Meaning                                                                        |
    | :--: | :---------: | ------------------------------------------------------------------------------ |
    |   0  | ok          | OK flag (0 = a deferred medium is pending in the buffer word)                  |
@@ -3560,6 +3568,18 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (acc_dist_refracted && acc_dist_refracted->n_elem != n_ray)
         throw std::invalid_argument("Input 'acc_dist_refracted' must match the number of rays in 'orig'.");
     const dtype *p_acc_refract_in = acc_dist_refracted ? acc_dist_refracted->memptr() : nullptr;
+
+    // Written arguments (outputs and in/out) against the read-only inputs and against each other
+    qd_check_alias_list<arma::Mat<dtype>>(
+        {acc_dist_geometricN, acc_dist_refractedN, gainN, xprmatN, path_dirN, origN, destN, tridirN},
+        {"acc_dist_geometricN", "acc_dist_refractedN", "gainN", "xprmatN", "path_dirN", "origN", "destN", "tridirN"},
+        orig, dest, fbsN, sbsN, fbs_angleN, normal_vecN, path_dir_prev, acc_dist_geometric, acc_dist_refracted, tridir);
+    qd_check_alias_list({mtl_ind_prev_outN, mtl_ind_current_outN, mtl_ind_buffer_outN},
+                        {"mtl_ind_prev_outN", "mtl_ind_current_outN", "mtl_ind_buffer_outN"},
+                        mtl_ind_fbsN, mtl_ind_sbsN, mtl_ind_prev_in, mtl_ind_current_in, mtl_ind_buffer_in);
+    qd_check_alias(resolved_typeN, "resolved_typeN", verdict_inN); // may be out_typeN (in place)
+    qd_check_alias(verdict_outN, "verdict_outN", out_typeN, verdict_inN);
+    qd_check_alias_outputs(resolved_typeN, "resolved_typeN", verdict_outN, "verdict_outN");
 
     if (mtl_ind_prev_outN && mtl_ind_prev_outN->n_elem != n_rayN)
         mtl_ind_prev_outN->set_size(n_rayN);

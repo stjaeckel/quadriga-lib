@@ -315,3 +315,45 @@ TEST_CASE("Baseband Frequency Response - Carrier counts that are not a multiple 
         quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, B, nullptr, nullptr, nullptr);
     }
 }
+
+TEST_CASE("baseband_freq_response - Outputs that alias inputs")
+{
+    arma::cube cre(2, 2, 4, arma::fill::randn), cim(2, 2, 4, arma::fill::randn), dl(2, 2, 4, arma::fill::randu);
+    dl *= 1.0e-7;
+    arma::vec pilot = arma::linspace<arma::vec>(0.0, 1.0, 4);
+    arma::cube Hr, Hi;
+    CHECK_NOTHROW(quadriga_lib::baseband_freq_response<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &Hi));
+
+    // An output is an input
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(&cre, &cim, &dl, &pilot, 1.0e8, &cre, &Hi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &cim), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(&cre, &cim, &dl, &pilot, 1.0e8, &dl, &Hi), std::invalid_argument);
+
+    // Both outputs are the same object
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &Hr), std::invalid_argument);
+
+    // An output uses the memory of an input
+    arma::cube cre_view(cre.memptr(), 2, 2, 4, false, true);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &cre_view), std::invalid_argument);
+}
+
+TEST_CASE("baseband_freq_response_vec - Outputs that alias inputs")
+{
+    std::vector<arma::cube> cre(2), cim(2), dl(2), Hr, Hi;
+    for (int s = 0; s < 2; ++s)
+    {
+        cre[s] = arma::cube(2, 2, 4, arma::fill::randn);
+        cim[s] = arma::cube(2, 2, 4, arma::fill::randn);
+        dl[s] = arma::cube(2, 2, 4, arma::fill::randu) * 1.0e-7;
+    }
+    arma::vec pilot = arma::linspace<arma::vec>(0.0, 1.0, 4);
+    CHECK_NOTHROW(quadriga_lib::baseband_freq_response_vec<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &Hi));
+
+    // An output is an input
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(&cre, &cim, &dl, &pilot, 1.0e8, &cre, &Hi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &cim), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(&cre, &cim, &dl, &pilot, 1.0e8, &dl, &Hi), std::invalid_argument);
+
+    // Both outputs are the same object
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &Hr), std::invalid_argument);
+}

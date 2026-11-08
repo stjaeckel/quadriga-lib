@@ -1606,7 +1606,7 @@ void quadriga_lib::ray_state_update(
 - **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
   It includes the relaunch offset the same way, projected onto the direction the wave has (exact for parallel faces).
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
-  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.
+  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write. May be `out_typeN`, which is then updated in place.
    | Bit  | Flag        | Meaning                                                                        |
    | :--: | :---------: | ------------------------------------------------------------------------------ |
    |   0  | ok          | OK flag (0 = a deferred medium is pending in the buffer word)                  |
@@ -1787,7 +1787,6 @@ void quadriga_lib::ray_triangle_intersect(
 - **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
 - **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
 - **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
-- `fbs` and `sbs` may be the same objects as `orig` or `dest` (e.g. to advance rays in place)
 
 ### See also:
 - [obj_file_read](#obj_file_read) (load mesh from OBJ file)
@@ -1902,7 +1901,6 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#subdivide_triangles) 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
 - Material indices are duplicated from the parent triangle to all sub-triangles
-- `triangles_out` may be the same object as `triangles_in`, and `mtl_ind_out` the same as `mtl_ind` (in place)
 - Throws `std::invalid_argument` when `n_div` is so large that the number of output values exceeds 64 bits
 
 ### Declaration:
