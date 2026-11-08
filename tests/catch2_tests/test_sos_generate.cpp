@@ -445,21 +445,16 @@ TEST_CASE("sos_generate - with few test directions the result fits those directi
     }
 }
 
-TEST_CASE("sos_generate - an output may be the same object as an input")
+TEST_CASE("sos_generate - outputs that alias inputs")
 {
-    arma::vec dist = arma::regspace(0.0, 1.0, 40.0), acf = arma::exp(-dist / 10.0);
-    arma::mat ref, freq;
-    arma::vec ref_ase;
-    quadriga_lib::sos_generate(acf, dist, 12, ref, &ref_ase, (arma::mat *)nullptr, 3, true, 7, true, 0.0, 0.0, 5);
-    REQUIRE(ref.n_rows == 12);
-    CHECK(arma::abs(ref).max() > 1e-3);
+    arma::vec dist = arma::regspace(0.0, 1.0, 40.0), acf = arma::exp(-dist / 10.0), ase;
+    arma::mat freq, td;
+    CHECK_NOTHROW(quadriga_lib::sos_generate(acf, dist, 4, freq, &ase, &td, 3, true, 3, true, 0.0, 0.0, 5));
 
-    // ase is 'acf' (41 elements, resized to the number of passes); then ase is 'dist'
     arma::vec a = acf, d = dist;
-    quadriga_lib::sos_generate(a, dist, 12, freq, &a, (arma::mat *)nullptr, 3, true, 7, true, 0.0, 0.0, 5);
-    CHECK(arma::approx_equal(freq, ref, "absdiff", 0.0));
-    CHECK(arma::approx_equal(a, ref_ase, "absdiff", 0.0));
-    quadriga_lib::sos_generate(acf, d, 12, freq, &d, (arma::mat *)nullptr, 3, true, 7, true, 0.0, 0.0, 5);
-    CHECK(arma::approx_equal(freq, ref, "absdiff", 0.0));
-    CHECK(arma::approx_equal(d, ref_ase, "absdiff", 0.0));
+    CHECK_THROWS_AS(quadriga_lib::sos_generate(a, dist, 4, freq, &a, &td, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // ase is 'acf'
+    CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, d, 4, freq, &ase, &d, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // test_dir is 'dist'
+    arma::mat fd(d.memptr(), 4, 3, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, d, 4, fd, &ase, &td, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // freq on the memory of 'dist'
+    CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, freq, &ase, &freq, 3, true, 3, true, 0.0, 0.0, 5), std::invalid_argument); // test_dir is 'freq'
 }

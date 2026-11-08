@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include "quadriga_lib_generic_functions.hpp"
 
 #if BUILD_WITH_AVX2
@@ -62,7 +63,6 @@ void quadriga_lib::ray_triangle_intersect(
 - **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
 - **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
 - **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
-- `fbs` and `sbs` may be the same objects as `orig` or `dest` (e.g. to advance rays in place)
 
 ## See also:
 - [[obj_file_read]] (load mesh from OBJ file)
@@ -109,6 +109,16 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
         throw std::invalid_argument("Input 'mesh' must have at least 9 columns containing x,y,z coordinates of 3 vertices.");
 
     arma::uword n_mesh = mesh->n_rows;
+
+    qd_check_alias(fbs, "fbs", orig, dest, mesh, aabb);
+    qd_check_alias(sbs, "sbs", orig, dest, mesh, aabb);
+    qd_check_alias_outputs(fbs, "fbs", sbs, "sbs");
+    qd_check_alias(no_interact, "no_interact", sub_mesh_index);
+    qd_check_alias(fbs_ind, "fbs_ind", sub_mesh_index);
+    qd_check_alias(sbs_ind, "sbs_ind", sub_mesh_index);
+    qd_check_alias_outputs(no_interact, "no_interact", fbs_ind, "fbs_ind");
+    qd_check_alias_outputs(no_interact, "no_interact", sbs_ind, "sbs_ind");
+    qd_check_alias_outputs(fbs_ind, "fbs_ind", sbs_ind, "sbs_ind");
 
     // Determine which compute kernel to use
     // kernel: 1 = GENERIC, 2 = AVX2, 3 = CUDA
@@ -226,23 +236,6 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
                               smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                               ox, oy, oz, dx, dy, dz,
                               n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
-    }
-
-    // An output may be the same object as 'orig' or 'dest' (e.g. when rays are advanced in place). Both outputs
-    // need the original coordinates, and resizing an output would free the input's memory, so the coordinates
-    // are copied before the first output is written.
-    arma::Mat<dtype> od_copy;
-    if ((fbs != nullptr && (fbs == orig || fbs == dest)) || (sbs != nullptr && (sbs == orig || sbs == dest)))
-    {
-        od_copy.set_size(n_ray, 6);
-        std::memcpy(od_copy.colptr(0), ox, n_ray * sizeof(dtype));
-        std::memcpy(od_copy.colptr(1), oy, n_ray * sizeof(dtype));
-        std::memcpy(od_copy.colptr(2), oz, n_ray * sizeof(dtype));
-        std::memcpy(od_copy.colptr(3), dx, n_ray * sizeof(dtype));
-        std::memcpy(od_copy.colptr(4), dy, n_ray * sizeof(dtype));
-        std::memcpy(od_copy.colptr(5), dz, n_ray * sizeof(dtype));
-        ox = od_copy.colptr(0), oy = od_copy.colptr(1), oz = od_copy.colptr(2);
-        dx = od_copy.colptr(3), dy = od_copy.colptr(4), dz = od_copy.colptr(5);
     }
 
     // Compute FBS location in GCS

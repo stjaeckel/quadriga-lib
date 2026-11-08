@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include <cmath>
 #include <stdexcept>
 #include <limits>
@@ -117,6 +118,13 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
 
     if (window_size < (dtype)0)
         throw std::invalid_argument("Input 'window_size' must be non-negative.");
+
+    qd_check_alias(xpr, "xpr", &tx_pos, &rx_pos);
+    qd_check_alias(pg, "pg", &tx_pos, &rx_pos);
+    qd_check_alias_outputs(xpr, "xpr", pg, "pg");
+    for (arma::uword i = 0; i < n_cir; ++i)
+        qd_check_alias(xpr, "xpr", &powers[i], &M[i], &path_length[i]),
+            qd_check_alias(pg, "pg", &powers[i], &M[i], &path_length[i]);
 
     // --- Initialize outputs ---
     if (xpr != nullptr)

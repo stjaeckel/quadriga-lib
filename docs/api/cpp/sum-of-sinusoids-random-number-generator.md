@@ -174,7 +174,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acf_2d)
 - The result is the reference for [sos_acf_approx](#sos_acf_approx)
 - Equally spaced means that every sample point lies within 1e-4 of the step from its place on the regular
   axis; for long single-precision tables the rounding of the sample points themselves is allowed for
-- `dist_2d` may be the same object as `acf` or `dist`
 
 ### Declaration:
 ```cpp
@@ -216,8 +215,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acf_app
 - `R(-dx) = R(dx)`: each plane is point-symmetric about its center. One half is computed and the other
   half is its mirror image, so the symmetry is exact
 - Equally spaced has the meaning given in [sos_acf_2d](#sos_acf_2d)
-- `dist_2d` may be the same object as `dist`
-- `acf_approx` cannot share memory with `freq` or `dist`; such a call throws before anything is written
 
 ### Declaration:
 ```cpp
@@ -267,7 +264,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acf_est
 - The pairs are searched in parallel and added in a fixed order; the result does not depend on the number
   of threads. Run time and memory: `2·n_pos^2` pairs for one device, at most 36 MB for the pairs of a block
   of rows
-- The outputs may be the same objects as inputs
 
 ### Declaration:
 ```cpp
@@ -315,7 +311,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acfi) �
 - Distances beyond the last sample point return the last value of the table
 - The same rule is applied by [sos_val](#sos_val) and [sos_remove_bias](#sos_remove_bias) for two devices on the same map
 - An empty `d` returns an empty `val`
-- `val` may be the same object as `acf`, `dist` or `d`
 
 ### Declaration:
 ```cpp
@@ -366,7 +361,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_calc_ms
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
 - The test directions are evaluated in parallel; the result does not depend on the number of threads
 - Equally spaced has the meaning given in [sos_acf_2d](#sos_acf_2d)
-- `acf_tail` and `test_dir` may be the same objects as inputs
 
 ### Declaration:
 ```cpp
@@ -434,7 +428,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_generat
   all sample points. It must not have more than 100000 points (the default has 151), which limits
   `freq_max - freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
-- `ase` and `test_dir` may be the same objects as `acf` or `dist`
 - `test_dir` and the reported error use the same test directions as [sos_calc_mse](#sos_calc_mse) with the same `n_dir`
 - All computations are done in double precision for both instantiations
 - A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject decisions, so a
@@ -544,7 +537,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_map) ·
 - Cubes of the correct size keep their memory. If they lie one after the other in memory (one block of
   `n_gen` cubes, as the MATLAB and Python interfaces allocate it), the values are computed in place;
   otherwise they are computed in a matrix `[ny·nx·nz, n_gen]` and copied
-- A cube that shares memory with `freq` or `phase` is an error, before anything is written
 
 ### Declaration:
 ```cpp
@@ -595,8 +587,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_preset)
 - The tables are stored for `d = 10 m`. For another decorrelation distance the distances are multiplied by
   `d/10` and the frequencies by `10/d`
 - All tables are 3-dimensional and can be used with positions of 1, 2 or 3 columns
-- The outputs cannot be the same object or share memory with each other; such a call throws before anything
-  is written
 - How the tables were made: [sos_generate](#sos_generate) with the 200-sample ACF for 10 m, `n_dim = 3`,
   `uniform_smp = true`, `n_dir = 300`, `random_init = true`, `freq_min = 0.005`, `freq_max = 15 / 49.75`,
   and the seeds 39, 3, 2, 5 (Exp), 13, 32, 6, 21 (Gauss), 13, 25, 37, 47 (Comb) for 128, 256, 512 and 1024
@@ -659,7 +649,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_rand) �
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ### Declaration:
 ```cpp
@@ -724,7 +713,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_randi) 
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ### Declaration:
 ```cpp
@@ -789,7 +777,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_randn) 
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ### Declaration:
 ```cpp
@@ -847,11 +834,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_remove_
   mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
   with `pos` and `phase_b` with `pos_b` and the frequencies `freq · freq_scale_b`; two offsets per generator.
-  The mean of the combined value is then zero as well. `phase_b` cannot share memory with `phase`: one
-  matrix cannot hold two corrections
-- The arguments that are written, `phase`, `phase_b`, `offset` and `mean_before`, cannot share memory with
-  another argument, not even in part, and `offset` and `mean_before` cannot be the same object. Such a call
-  throws and leaves all arguments unchanged
+  The mean of the combined value is then zero as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
   `c` the mean ACF between that position and all positions; on average over the positions the loss is at
@@ -895,7 +878,7 @@ void quadriga_lib::sos_remove_bias(
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
   number for different maps
 - **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; updated in-place; no memory shared with `phase`; `[n_coeff, n_gen]`
+  same map; updated in-place; `[n_coeff, n_gen]`
 - **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
@@ -959,8 +942,6 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_val) ·
   rounded to single precision
 - Memory: for `dtype = double` the values are computed in `val`; two devices need one more array of the
   size of `val`, and `dtype = float` one array of that size in double precision
-- `val` cannot be the same object as an input, nor use the memory of one: it is resized and written while
-  the inputs are read. Such a call throws and leaves `val` unchanged
 
 ### Declaration:
 ```cpp

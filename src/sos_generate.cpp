@@ -46,7 +46,6 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
   all sample points. It must not have more than 100000 points (the default has 151), which limits
   `freq_max - freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
-- `ase` and `test_dir` may be the same objects as `acf` or `dist`
 - `test_dir` and the reported error use the same test directions as [[sos_calc_mse]] with the same `n_dir`
 - All computations are done in double precision for both instantiations
 - A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject decisions, so a
@@ -113,6 +112,12 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
                                 arma::sword seed)
 {
     qd_sos_check_acf(acf, dist);
+    qd_check_alias(&freq, "freq", &acf, &dist);
+    qd_check_alias(ase, "ase", &acf, &dist);
+    qd_check_alias(test_dir, "test_dir", &acf, &dist);
+    qd_check_alias_outputs(&freq, "freq", ase, "ase");
+    qd_check_alias_outputs(&freq, "freq", test_dir, "test_dir");
+    qd_check_alias_outputs(ase, "ase", test_dir, "test_dir");
     if (n_coeff == 0)
         throw std::invalid_argument("Input 'n_coeff' cannot be 0.");
     if (n_dim < 1 || n_dim > 3)

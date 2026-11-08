@@ -336,3 +336,22 @@ TEST_CASE("calc_angular_spreads_sphere - Defaults: wrapping off, bank angle off 
     CHECK(std::abs(es(0) - 0.190512) < 1.0e-6);
     CHECK(arma::all(arma::vectorise(orient) == 0.0)); // no rotation without wrapping
 }
+
+TEST_CASE("calc_angular_spreads_sphere - outputs that alias inputs")
+{
+    std::vector<arma::vec> az = {arma::vec({0.1, -0.1, 0.3})}, el = {arma::vec({0.0, 0.1, -0.1})}, pw = {arma::vec({1.0, 1.0, 0.5})};
+    arma::vec as, es;
+    arma::mat orient;
+    std::vector<arma::vec> phi, theta;
+    CHECK_NOTHROW(quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &as, &es, &orient, &phi, &theta, false));
+
+    auto az2 = az;
+    CHECK_THROWS_AS(quadriga_lib::calc_angular_spreads_sphere(az2, el, pw, &as, &es, &orient, &az2, &theta, false), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &as, &es, &orient, &phi, &phi, false), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &as, &as), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_angular_spreads_sphere(az2, el, pw, &az2[0]), std::invalid_argument);
+    CHECK(arma::approx_equal(az2[0], az[0], "absdiff", 0.0));
+
+    arma::vec view(orient.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &view, (arma::vec *)nullptr, &orient), std::invalid_argument);
+}

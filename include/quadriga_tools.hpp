@@ -379,7 +379,7 @@ namespace quadriga_lib
                           arma::Mat<dtype> *path_dirN = nullptr,                               // In/Out: Continuation direction, updated in place; [n_rayN]
                           arma::Col<dtype> *acc_dist_geometricN = nullptr,                     // Out: Accumulated geometric distance leaving this call, [n_rayN]
                           arma::Col<dtype> *acc_dist_refractedN = nullptr,                     // Out: Accumulated refracted distance leaving this call, [n_rayN]
-                          std::vector<uint8_t> *resolved_typeN = nullptr,                      // Out: Resolved ray type, [n_rayN]
+                          std::vector<uint8_t> *resolved_typeN = nullptr,                      // Out: Resolved ray type, may be out_typeN (in place), [n_rayN]
                           const arma::u32_vec *ray_indN = nullptr,                             // rayN -> ray map; NULL = identity (ray = rayN); [n_rayN]
                           double eps = 0.15,                                                   // Airy resolve threshold in [0, 1]; 0 = always resolve
                           arma::Mat<dtype> *origN = nullptr,                                   // In/Out: relaunch origin, corrected in place; [n_rayN, 3]

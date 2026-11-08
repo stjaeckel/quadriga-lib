@@ -3,24 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-
-// Helper functions
-namespace
-{
-    // Repeat sequence of values + Optional typecast
-    template <typename dtypeIn, typename dtypeOut>
-    inline void qd_repeat_sequence(const dtypeIn *sequence, size_t sequence_length, size_t repeat_value, size_t repeat_sequence, dtypeOut *output)
-    {
-        size_t pos = 0;                                  // Position in output
-        for (size_t rs = 0; rs < repeat_sequence; ++rs)  // Repeat sequence of values
-            for (size_t v = 0; v < sequence_length; ++v) // Iterate through all values of the sequence
-            {
-                dtypeOut val = (dtypeOut)sequence[v];        // Type conversion
-                for (size_t rv = 0; rv < repeat_value; ++rv) // Repeat each value
-                    output[pos++] = val;
-            }
-    }
-}
+#include "quadriga_lib_helper_functions.hpp"
 
 // Make sure size_t and arma::uword are synonyms
 static_assert(sizeof(size_t) == sizeof(arma::uword), "size_t and arma::uword have different sizes");
@@ -121,6 +104,13 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
         throw std::invalid_argument("Input 'lod' must be 1-7.");
 
     arma::uword n_ray = n_path * n_seg; // Total number of ellipsoid rays (n_path * n_seg)
+
+    qd_check_alias_outputs(&ray_x, "ray_x", &ray_y, "ray_y");
+    qd_check_alias_outputs(&ray_x, "ray_x", &ray_z, "ray_z");
+    qd_check_alias_outputs(&ray_x, "ray_x", &weight, "weight");
+    qd_check_alias_outputs(&ray_y, "ray_y", &ray_z, "ray_z");
+    qd_check_alias_outputs(&ray_y, "ray_y", &weight, "weight");
+    qd_check_alias_outputs(&ray_z, "ray_z", &weight, "weight");
 
     // Adjust output size
     if (ray_x.n_rows != n_pos || ray_x.n_cols != n_path || ray_x.n_slices != n_seg)

@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include <limits>
 
 /*!SECTION
@@ -16,7 +17,6 @@ Subdivide triangles into smaller triangles
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
 - Material indices are duplicated from the parent triangle to all sub-triangles
-- `triangles_out` may be the same object as `triangles_in`, and `mtl_ind_out` the same as `mtl_ind` (in place)
 - Throws `std::invalid_argument` when `n_div` is so large that the number of output values exceeds 64 bits
 
 ## Declaration:
@@ -61,6 +61,8 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
 
     if (triangles_out == nullptr)
         throw std::invalid_argument("Output 'triangles_out' cannot be NULL.");
+    qd_check_alias(triangles_out, "triangles_out", triangles_in);
+    qd_check_alias(mtl_ind_out, "mtl_ind_out", mtl_ind);
 
     arma::uword n_triangles_in = (arma::uword)triangles_in->n_rows;
 
@@ -75,15 +77,6 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
 
     if (process_mtl_ind && mtl_ind->n_elem != n_triangles_in)
         throw std::invalid_argument("Number of triangles in 'triangles_in' and length of 'mtl_ind' do not match.");
-
-    // An output may be the same object as its input (subdivision in place); the input is then read from a copy
-    arma::Mat<dtype> triangles_in_copy;
-    if (triangles_out == triangles_in)
-        triangles_in_copy = *triangles_in, triangles_in = &triangles_in_copy;
-
-    arma::uvec mtl_ind_copy;
-    if (process_mtl_ind && mtl_ind_out == mtl_ind)
-        mtl_ind_copy = *mtl_ind, mtl_ind = &mtl_ind_copy;
 
     if (triangles_out->n_cols != 9 || triangles_out->n_rows != n_triangles_out)
         triangles_out->set_size(n_triangles_out, 9);

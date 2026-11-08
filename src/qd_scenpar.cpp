@@ -790,8 +790,7 @@ as a `[3]` vector, except [[gbsm_single_link_channel]], which takes one row per 
 `[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the conf-file keys): in
 rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR 38.901 except two
 deliberate library choices: the SOS preset `Comb256` with bias removal ([[gbsm_init_phases]], [[gbsm_draw]]) and
-`method = "quadriga"` of [[gbsm_rays_from_paths]]; QuaDRiGa variants are options. Outputs must not share memory with the
-inputs or with each other unless stated otherwise. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
+`method = "quadriga"` of [[gbsm_rays_from_paths]]; QuaDRiGa variants are options. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
 linear power ratios, spreads and `_deg` offsets in degrees.
 SECTION_DESC!*/
 
@@ -871,6 +870,14 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
                                   std::vector<std::string> *ignored_keys,
                                   bool validate)
 {
+    qd_check_alias(pl_model, "pl_model", &fn);
+    qd_check_alias_outputs(key_order, "key_order", pl_order, "pl_order");
+    qd_check_alias_outputs(key_order, "key_order", short_names, "short_names");
+    qd_check_alias_outputs(key_order, "key_order", ignored_keys, "ignored_keys");
+    qd_check_alias_outputs(pl_order, "pl_order", short_names, "short_names");
+    qd_check_alias_outputs(pl_order, "pl_order", ignored_keys, "ignored_keys");
+    qd_check_alias_outputs(short_names, "short_names", ignored_keys, "ignored_keys");
+
     const std::vector<std::string> lines = qd_conf_read_lines(fn);
 
     // Parse into local variables
@@ -1119,6 +1126,13 @@ arma::uword quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
                                          std::vector<std::string> *file_dirs,
                                          bool parse_shortnames)
 {
+    qd_check_alias(&scenarios, "scenarios", &dirs);
+    qd_check_alias(file_names, "file_names", &dirs);
+    qd_check_alias(file_dirs, "file_dirs", &dirs);
+    qd_check_alias_outputs(&scenarios, "scenarios", file_names, "file_names");
+    qd_check_alias_outputs(&scenarios, "scenarios", file_dirs, "file_dirs");
+    qd_check_alias_outputs(file_names, "file_names", file_dirs, "file_dirs");
+
     std::vector<std::string> l_scenarios, l_file_names, l_file_dirs;
     std::unordered_set<std::string> file_set, short_set;
 

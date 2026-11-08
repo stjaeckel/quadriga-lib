@@ -199,7 +199,7 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 
 - Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
 - `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
-- The update reads all old values before writing, so `coeff_update` may alias the slot; the return value uses the same gain definition as `calc_gain`
+- The return value uses the same gain definition as `calc_gain`
 - Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
 ```
 float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
@@ -505,6 +505,10 @@ float *quadriga_lib::path::xpr_coeff(size_t freq)
 float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_update, size_t freq, float fGHz, float len)
 {
     float *oX = xpr_coeff(freq); // Bounds-checked; resolves to xprmat or into the data buffer
+    const size_t n_coeff = is_scalar() ? 2 : 8;
+    if (coeff_update && (std::uintptr_t)coeff_update < (std::uintptr_t)(oX + n_coeff) &&
+        (std::uintptr_t)oX < (std::uintptr_t)(coeff_update + n_coeff))
+        throw std::invalid_argument("Input 'coeff_update' cannot share memory with the coefficients of the path.");
     float amplitude_update = gain_update == 1.0f ? 1.0f : std::sqrt(std::abs(gain_update));
     float d = len > 0.0f ? len : len_acc;
 
@@ -575,6 +579,8 @@ float quadriga_lib::path::calc_gain(float fGHz, size_t freq, float len) const
 // Duplicate path, writing to "target", returns length
 float quadriga_lib::path::duplicate(path &target) const
 {
+    if (&target == this)
+        throw std::invalid_argument("Output 'target' cannot be the source path.");
     target = *this;
     return len_acc;
 }
@@ -582,6 +588,8 @@ float quadriga_lib::path::duplicate(path &target) const
 // Duplicate path and append a new segment
 float quadriga_lib::path::extend(path &target, float x, float y, float z, uint8_t type) const
 {
+    if (&target == this)
+        throw std::invalid_argument("Output 'target' cannot be the source path.");
     if (nSEG == 255)
         throw std::runtime_error("Cannot add segment: maximum of 255 segments reached.");
 

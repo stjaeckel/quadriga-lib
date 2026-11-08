@@ -1059,3 +1059,18 @@ TEST_CASE("conf_file_read - a short name stated twice in one file is an error")
         CHECK(r.short_names == std::vector<std::string>{"Ab", "AB", "Cd"});
     }
 }
+
+TEST_CASE("conf_file_read - outputs that alias inputs")
+{
+    tmp_file f(case_file(), "PL_model = nlos\nShortName = Ab\nFoo = bar\n");
+    std::unordered_map<std::string, double> sp;
+    std::string name = f.fn, pl;
+    std::vector<std::string> ko, po, sn, ik;
+    CHECK_NOTHROW(quadriga_lib::conf_file_read(name, sp, &pl, nullptr, nullptr, &ko, &po, &sn, &ik));
+
+    std::string fn = f.fn;
+    CHECK_THROWS_AS(quadriga_lib::conf_file_read(fn, sp, &fn), std::invalid_argument); // pl_model is 'fn'
+    CHECK(fn == f.fn);
+    CHECK_THROWS_AS(quadriga_lib::conf_file_read(name, sp, &pl, nullptr, nullptr, &ko, &po, &po, &ik), std::invalid_argument); // short_names is 'pl_order'
+    CHECK_THROWS_AS(quadriga_lib::conf_file_read(name, sp, &pl, nullptr, nullptr, &ik, &po, &sn, &ik), std::invalid_argument); // ignored_keys is 'key_order'
+}

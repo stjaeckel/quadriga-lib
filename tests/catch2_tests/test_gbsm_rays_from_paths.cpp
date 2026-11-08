@@ -23,6 +23,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -519,4 +520,30 @@ TEST_CASE("gbsm_rays_from_paths - input validation")
         CHECK(arma::approx_equal(out.delay, r.delay, "absdiff", 0.0));
         CHECK(out.method == r.method);
     }
+}
+
+TEST_CASE("gbsm_rays_from_paths - outputs that alias inputs")
+{
+    // An input that is a member of 'rays', or lies on the memory of one, is read while 'rays' is written
+    const quadriga_lib::gbsm_rays r = make_rays(47, true, true, 3, 2, "quadriga", true);
+    in_t in = in_of(r);
+    quadriga_lib::gbsm_rays o = r;
+    CHECK_NOTHROW(run(in, o));
+    auto call = [&](const arma::vec &cf, const arma::mat &pg, const arma::vec &pl, const arma::u32_vec &type)
+    { quadriga_lib::gbsm_rays_from_paths(cf, in.T, in.R, in.fbs, in.lbs, pg, pl, in.M, o, "quadriga", &type); };
+
+    CHECK_THROWS_AS(call(o.center_frequency, in.pg, in.pl, in.type), std::invalid_argument); // center_frequency is 'rays.center_frequency'
+    o = r;
+    CHECK_THROWS_AS(call(in.cf, o.power, in.pl, in.type), std::invalid_argument); // path_gain is 'rays.power'
+    o = r;
+    CHECK_THROWS_AS(call(in.cf, in.pg, o.delay, in.type), std::invalid_argument); // path_length is 'rays.delay'
+    CHECK(arma::approx_equal(o.delay, r.delay, "absdiff", 0.0));
+    o = r;
+    CHECK_THROWS_AS(call(in.cf, in.pg, in.pl, o.path_type), std::invalid_argument); // path_type is 'rays.path_type'
+    o = r;
+    const arma::vec pl = in.pl;
+    o.aod.~Col(), ::new (&o.aod) arma::vec(in.pl.memptr(), in.pl.n_elem, false, true);
+    CHECK_THROWS_AS(run(in, o), std::invalid_argument); // 'rays.aod' on the memory of 'path_length'
+    CHECK(arma::approx_equal(in.pl, pl, "absdiff", 0.0));
+    o.aod.~Col(), ::new (&o.aod) arma::vec();
 }

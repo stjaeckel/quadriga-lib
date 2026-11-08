@@ -1294,3 +1294,35 @@ TEST_CASE("Calc Diffraction Gain - verbose debug output with one position")
         CHECK(n_later > 0); // the scene has a segment with a second iteration
     }
 }
+
+TEST_CASE("calc_diffraction_gain - outputs that alias inputs")
+{
+    arma::mat cube = quadriga_lib::cube<double>();
+    arma::uvec mtl_ind(cube.n_rows, arma::fill::zeros);
+    std::unordered_map<std::string, std::vector<double>> air;
+    const arma::mat o0 = {{-10.0, 0.0, 0.5}}, d0 = {{10.0, 0.0, 0.5}};
+    arma::mat orig = o0, dest = d0, xprmat;
+    arma::vec gain;
+    CHECK_NOTHROW(quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, air, 1.0e9, 1, &gain, &xprmat));
+
+    // Writing xprmat into orig or dest would resize them before they are read
+    CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, air, 1.0e9, 1, &gain, &orig), std::invalid_argument);
+    CHECK(arma::approx_equal(orig, o0, "absdiff", 0.0));
+    CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain<double>(o0, dest, cube, mtl_ind, air, 1.0e9, 1, &gain, &dest), std::invalid_argument);
+    CHECK(arma::approx_equal(dest, d0, "absdiff", 0.0));
+
+    arma::mat o = o0;
+    arma::vec view(o.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain<double>(o, d0, cube, mtl_ind, air, 1.0e9, 1, &view), std::invalid_argument);
+    arma::vec gain_on_xpr(xprmat.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain<double>(o0, d0, cube, mtl_ind, air, 1.0e9, 1, &gain_on_xpr, &xprmat), std::invalid_argument);
+}
+
+TEST_CASE("generate_diffraction_paths - outputs that alias inputs")
+{
+    arma::mat orig = {{0.0, 0.0, 0.0}}, dest = {{10.0, 0.0, 0.0}};
+    arma::cube x, y, z, w;
+    CHECK_NOTHROW(quadriga_lib::generate_diffraction_paths<double>(orig, dest, 1.0e9, 1, x, y, z, w));
+    CHECK_THROWS_AS(quadriga_lib::generate_diffraction_paths<double>(orig, dest, 1.0e9, 1, x, x, z, w), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::generate_diffraction_paths<double>(orig, dest, 1.0e9, 1, x, y, z, z), std::invalid_argument);
+}

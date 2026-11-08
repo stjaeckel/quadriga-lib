@@ -140,3 +140,42 @@ TEST_CASE("Channel - Interaction count sum does not wrap at 32 bits")
     CHECK_THROWS_AS(c.add_paths(0, &cre, &cim, &dl, &no_interact_huge, &coord_6), std::invalid_argument);
     CHECK(c.n_path().at(0) == 2);
 }
+
+TEST_CASE("Channel - add_paths with inputs that are fields of the channel")
+{
+    quadriga_lib::channel<double> c;
+    c.rx_pos = arma::mat(3, 1, arma::fill::zeros);
+    c.tx_pos = arma::mat(3, 1, arma::fill::ones);
+    c.coeff_re.push_back(arma::cube(1, 1, 2, arma::fill::ones));
+    c.coeff_im.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
+    c.delay.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
+    c.path_gain.push_back(arma::vec(2, arma::fill::ones));
+    c.path_length.push_back(arma::vec(2, arma::fill::ones));
+    c.path_fbs_pos.push_back(arma::mat(3, 2, arma::fill::ones));
+    c.path_lbs_pos.push_back(arma::mat(3, 2, arma::fill::zeros));
+    REQUIRE(c.is_valid().empty());
+
+    const arma::cube cre(1, 1, 2, arma::fill::ones), cim(1, 1, 2, arma::fill::zeros), dl(1, 1, 2, arma::fill::zeros);
+    const arma::vec pg(2, arma::fill::ones), pl(2, arma::fill::ones);
+    const arma::mat fbs(3, 2, arma::fill::ones), lbs(3, 2, arma::fill::zeros);
+
+    auto d = c;
+    CHECK_NOTHROW(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &lbs));
+    CHECK(d.n_path().at(0) == 4);
+
+    // An input is the field it is appended to
+    d = c;
+    CHECK_THROWS_AS(d.add_paths(0, &d.coeff_re[0], &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &lbs), std::invalid_argument);
+
+    // An input is another field of the snapshot
+    d = c;
+    CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &d.path_fbs_pos[0]), std::invalid_argument);
+    d = c;
+    CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &d.path_length[0], &pl, nullptr, nullptr, &fbs, &lbs), std::invalid_argument);
+
+    // An input uses the memory of a field
+    d = c;
+    const arma::mat fbs_view(d.path_fbs_pos[0].memptr(), 3, 2, false, true);
+    CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &fbs_view), std::invalid_argument);
+    CHECK(d.n_path().at(0) == 2);
+}

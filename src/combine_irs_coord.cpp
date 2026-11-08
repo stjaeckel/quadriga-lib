@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -74,6 +75,8 @@ void quadriga_lib::combine_irs_coord(dtype Ix, dtype Iy, dtype Iz,
         throw std::invalid_argument("Output 'no_interact' cannot be NULL.");
     if (interact_coord == nullptr)
         throw std::invalid_argument("Output 'interact_coord' cannot be NULL.");
+    qd_check_alias(no_interact, "no_interact", no_interact_1, no_interact_2);
+    qd_check_alias(interact_coord, "interact_coord", interact_coord_1, interact_coord_2);
 
     arma::uword n_path_1 = no_interact_1->n_elem;
     arma::uword n_path_2 = no_interact_2->n_elem;

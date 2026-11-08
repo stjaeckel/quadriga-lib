@@ -376,3 +376,21 @@ TEST_CASE("ACDF - User bins must be finite and strictly ascending")
     CHECK_NOTHROW(quadriga_lib::acdf<double>(data, &one, &cdf));
     CHECK(cdf(0) == 1.0);
 }
+
+TEST_CASE("acdf - outputs that alias inputs")
+{
+    arma::mat data = {{1.0, 2.0}, {2.0, 3.0}, {3.0, 4.0}};
+    arma::vec bins, avg, mu, sig;
+    arma::mat cdf;
+    CHECK_NOTHROW(quadriga_lib::acdf(data, &bins, &cdf, &avg, &mu, &sig, 11));
+
+    arma::mat d = data;
+    CHECK_THROWS_AS(quadriga_lib::acdf(d, &bins, &d), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::acdf(data, &bins, &cdf, &avg, &mu, &mu), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::acdf(data, &bins, &cdf, &bins), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::acdf(data, &bins, &cdf, &avg, &avg), std::invalid_argument);
+    CHECK(arma::approx_equal(d, data, "absdiff", 0.0));
+
+    arma::vec view(d.memptr(), 3, false, true);
+    CHECK_THROWS_AS(quadriga_lib::acdf(d, &view), std::invalid_argument);
+}

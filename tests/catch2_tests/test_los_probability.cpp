@@ -745,3 +745,21 @@ TEST_CASE("los_probability - input validation")
             CHECK_THROWS_MATCHES(call_s(&g, f), std::invalid_argument, Message("Input 'center_frequency' must be finite and > 0."));
     }
 }
+
+TEST_CASE("los_probability - outputs that alias inputs")
+{
+    const arma::vec d = {20.0, 100.0, 400.0}, hB = {25.0}, hU = {1.5, 15.0, 22.5}, g = {0.3, -0.5, 1.1}, fc = {3.5e9};
+    arma::vec p, b = hB, u = hU, gg = g, f = fc;
+    arma::mat soft;
+    CHECK_NOTHROW(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, &g, &fc, &soft));
+
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, b, hU, b), std::invalid_argument);                              // p_los is 'h_bs'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, u, u), std::invalid_argument);                              // p_los is 'h_ut'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, gg, NAN, NAN, NAN, &gg, &fc, &soft), std::invalid_argument); // p_los is 'rnd_g'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, f, NAN, NAN, NAN, &g, &f, &soft), std::invalid_argument);   // p_los is 'center_frequency'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, &g, &fc, &p), std::invalid_argument);     // los_soft is 'p_los'
+    arma::mat on_u(u.memptr(), 3, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, u, p, NAN, NAN, NAN, &g, &fc, &on_u), std::invalid_argument);   // los_soft on the memory of 'h_ut'
+    CHECK(arma::approx_equal(b, hB, "absdiff", 0.0));
+    CHECK(arma::approx_equal(u, hU, "absdiff", 0.0));
+}

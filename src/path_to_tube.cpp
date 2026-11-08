@@ -75,6 +75,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         throw std::invalid_argument("Output 'vert' cannot be NULL.");
     if (faces == nullptr)
         throw std::invalid_argument("Output 'faces' cannot be NULL.");
+    qd_check_alias(vert, "vert", path_coord);
 
     if (path_coord->n_rows != 3ULL)
         throw std::invalid_argument("Input 'path_coord' must have 3 rows containing x,y,z coordinates.");

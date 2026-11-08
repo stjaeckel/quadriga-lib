@@ -288,40 +288,21 @@ TEST_CASE("sos_acf_estimate - input validation")
     }
 }
 
-TEST_CASE("sos_acf_estimate - an output may be the same object as an input")
+TEST_CASE("sos_acf_estimate - outputs that alias inputs")
 {
-    arma::mat freq = rnd(40, 3, -0.08, 0.08, 12);
-    arma::vec phase = rnd(40, 1, -pi, pi, 13), bins = {2.0, 5.0, 10.0, 15.0, 22.0, 30.0};
-    arma::vec dist = arma::regspace(0.0, 1.0, 30.0), acf = arma::exp(-dist / 8.0);
+    arma::mat freq = rnd(8, 3, -0.08, 0.08, 12);
+    arma::vec phase = rnd(8, 1, -pi, pi, 13), bins = {2.0, 5.0, 10.0};
+    arma::vec dist = arma::regspace(0.0, 1.0, 30.0), acf = arma::exp(-dist / 8.0), est, est_dist, est_dual;
+    CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, &est_dist, &est_dual, &acf, &dist, 1));
 
-    arma::vec ref, ref_dist, ref_dual;
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 80, ref, &ref_dist, &ref_dual, &acf, &dist, 1);
-    REQUIRE(ref.n_elem == 6);
-    REQUIRE(ref_dual.n_elem == 6);
-
-    // acf_est is 'acf' (31 elements, resized to 6 before the two-device part reads the table),
-    // dist_est is 'dist', acf_est_dual is 'bins'
-    arma::vec a = acf, d = dist, b = bins;
-    quadriga_lib::sos_acf_estimate(freq, phase, b, 80, a, &d, &b, &a, &d, 1);
-    REQUIRE(a.n_elem == 6);
-    REQUIRE(d.n_elem == 6);
-    REQUIRE(b.n_elem == 6);
-    CHECK(arma::approx_equal(a, ref, "absdiff", 0.0));
-    CHECK(arma::approx_equal(d, ref_dist, "absdiff", 0.0));
-    // The two-device estimate has NaN in sparse bins, so it is compared element by element
-    arma::uword n_finite = 0;
-    for (arma::uword i = 0; i < 6; ++i)
-    {
-        INFO("bin " << i);
-        CHECK(same_or_both_nan(b(i), ref_dual(i), 1e-300));
-        n_finite += std::isfinite(ref_dual(i)) ? 1 : 0;
-    }
-    CHECK(n_finite >= 3);
-
-    // acf_est is 'phase' (40 elements)
-    arma::vec p = phase;
-    quadriga_lib::sos_acf_estimate(freq, p, bins, 80, p, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1);
-    CHECK(arma::approx_equal(p, ref, "absdiff", 0.0));
+    arma::vec a = acf, d = dist, b = bins, p = phase;
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, a, &est_dist, &est_dual, &a, &dist, 1), std::invalid_argument); // acf_est is 'acf'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, &d, &est_dual, &acf, &d, 1), std::invalid_argument);   // dist_est is 'dist'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, b, 10, est, &est_dist, &b, &acf, &dist, 1), std::invalid_argument);   // acf_est_dual is 'bins'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, p, bins, 10, p, &est_dist, &est_dual, &acf, &dist, 1), std::invalid_argument); // acf_est is 'phase'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, &est, &est_dual, &acf, &dist, 1), std::invalid_argument); // dist_est is 'acf_est'
+    arma::vec f(freq.memptr(), 3, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, f, &est_dist, &est_dual, &acf, &dist, 1), std::invalid_argument); // acf_est on the memory of 'freq'
 }
 
 TEST_CASE("sos_acf_estimate - results do not depend on the number of threads")

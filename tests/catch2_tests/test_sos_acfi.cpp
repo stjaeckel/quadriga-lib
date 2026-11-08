@@ -112,28 +112,19 @@ TEST_CASE("sos_acfi - input validation")
     }
 }
 
-TEST_CASE("sos_acfi - the output may be the same object as an input")
+TEST_CASE("sos_acfi - outputs that alias inputs")
 {
-    // 40 table samples, 4000 distances: the output is resized when it is the table, and must then
-    // still be evaluated with the table as it was given
+    // The output is resized and written while the table and the distances are still read
     arma::vec dist = arma::regspace(0.0, 0.5, 19.5), acf = arma::exp(-dist / 4.0);
-    arma::vec d(4000);
-    for (arma::uword i = 0; i < d.n_elem; ++i)
-        d(i) = 0.006 * (double)i; // 0 to 24 m, beyond the table
-    arma::vec ref;
-    quadriga_lib::sos_acfi(acf, dist, d, ref);
-    REQUIRE(ref.n_elem == 4000);
-    CHECK(std::abs(ref(1000) - std::exp(-6.0 / 4.0)) < 1e-12); // 6 m is a sample point
-    CHECK(std::abs(ref(3999) - acf(39)) < 1e-14);
+    arma::vec d = arma::regspace(0.0, 0.6, 24.0), val;
+    CHECK_NOTHROW(quadriga_lib::sos_acfi(acf, dist, d, val));
 
     arma::vec a = acf, b = dist, c = d;
-    quadriga_lib::sos_acfi(a, dist, d, a); // val is 'acf'
-    quadriga_lib::sos_acfi(acf, b, d, b);  // val is 'dist'
-    quadriga_lib::sos_acfi(acf, dist, c, c); // val is 'd'
-    REQUIRE(a.n_elem == 4000);
-    REQUIRE(b.n_elem == 4000);
-    REQUIRE(c.n_elem == 4000);
-    CHECK(arma::approx_equal(a, ref, "absdiff", 0.0));
-    CHECK(arma::approx_equal(b, ref, "absdiff", 0.0));
-    CHECK(arma::approx_equal(c, ref, "absdiff", 0.0));
+    CHECK_THROWS_AS(quadriga_lib::sos_acfi(a, dist, d, a), std::invalid_argument);   // val is 'acf'
+    CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, b, d, b), std::invalid_argument);    // val is 'dist'
+    CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, dist, c, c), std::invalid_argument); // val is 'd'
+
+    // A vector on the memory of 'd'
+    arma::vec v(c.memptr(), c.n_elem, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_acfi(acf, dist, c, v), std::invalid_argument);
 }

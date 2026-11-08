@@ -202,6 +202,9 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         for (arma::uword l = 0; l < n_link; ++l)
             if (!((*rnd_he)(l) >= 0.0 && (*rnd_he)(l) <= 1.0))
                 throw std::invalid_argument("Input 'rnd_he' must be in the range from 0 to 1.");
+    qd_check_alias(&pl, "pl", &center_frequency, &tx_pos, &rx_pos, d2d_in, rnd_he);
+    qd_check_alias(sf_sigma, "sf_sigma", &center_frequency, &tx_pos, &rx_pos, d2d_in, rnd_he);
+    qd_check_alias_outputs(&pl, "pl", sf_sigma, "sf_sigma");
 
     // Model, index into 'names'; the empty name is "no model"
     enum model_t

@@ -294,7 +294,7 @@ namespace quadriga_lib
 
     // Ray data of one link from spherical path data (e.g. read with qrt_file_read)
     // - Delays from the path lengths, angles from the scatterer positions, power = path gain
-    // - Fills a pre-initialised object in place
+    // - Fills a pre-initialised object; members of the right size keep their memory
     void gbsm_rays_from_paths(const arma::vec &center_frequency,        // Frequencies in [Hz], [n_freq]
                               const arma::vec &tx_pos,                  // Tx position in [m], [3]
                               const arma::vec &rx_pos,                  // Rx position in [m], [3]

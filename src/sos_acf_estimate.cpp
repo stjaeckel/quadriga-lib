@@ -46,7 +46,6 @@ Monte-Carlo estimate of the ACF of one generator
 - The pairs are searched in parallel and added in a fixed order; the result does not depend on the number
   of threads. Run time and memory: `2·n_pos^2` pairs for one device, at most 36 MB for the pairs of a block
   of rows
-- The outputs may be the same objects as inputs
 
 ## Declaration:
 ```
@@ -121,6 +120,12 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
             throw std::invalid_argument("Inputs 'acf' and 'dist' are required for output 'acf_est_dual'.");
         qd_sos_check_acf_same_map(*acf, *dist);
     }
+    qd_check_alias(&acf_est, "acf_est", &freq, &phase, &bins, acf, dist);
+    qd_check_alias(dist_est, "dist_est", &freq, &phase, &bins, acf, dist);
+    qd_check_alias(acf_est_dual, "acf_est_dual", &freq, &phase, &bins, acf, dist);
+    qd_check_alias_outputs(&acf_est, "acf_est", dist_est, "dist_est");
+    qd_check_alias_outputs(&acf_est, "acf_est", acf_est_dual, "acf_est_dual");
+    qd_check_alias_outputs(dist_est, "dist_est", acf_est_dual, "acf_est_dual");
 
     const arma::uword n_bin = bins.n_elem;
 
@@ -177,7 +182,6 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
     };
 
     // The GENERIC kernel is used: this is an offline tool and its result should not depend on the CPU
-    // All inputs are copied before the first output is resized, so that an output may be the same object as an input
     const arma::mat freq_d = arma::conv_to<arma::mat>::from(freq), phase_d = arma::conv_to<arma::mat>::from(phase);
     arma::vec acf_d, dist_d;
     if (acf_est_dual != nullptr)

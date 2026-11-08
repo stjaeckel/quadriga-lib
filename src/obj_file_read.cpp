@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -528,6 +529,19 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
                                         const std::string &fn_csv, arma::uvec *csv_ind, std::vector<std::string> *csv_names,
                                         std::unordered_map<std::string, std::vector<dtype>> *csv_prop, bool csv_strict)
 {
+    qd_check_alias_outputs(mesh, "mesh", vert_list, "vert_list");
+    qd_check_alias_outputs(mesh, "mesh", bsdf, "bsdf");
+    qd_check_alias_outputs(vert_list, "vert_list", bsdf, "bsdf");
+    qd_check_alias_outputs(face_ind, "face_ind", obj_ind, "obj_ind");
+    qd_check_alias_outputs(face_ind, "face_ind", mtl_ind, "mtl_ind");
+    qd_check_alias_outputs(face_ind, "face_ind", csv_ind, "csv_ind");
+    qd_check_alias_outputs(obj_ind, "obj_ind", mtl_ind, "mtl_ind");
+    qd_check_alias_outputs(obj_ind, "obj_ind", csv_ind, "csv_ind");
+    qd_check_alias_outputs(mtl_ind, "mtl_ind", csv_ind, "csv_ind");
+    qd_check_alias_outputs(obj_names, "obj_names", mtl_names, "mtl_names");
+    qd_check_alias_outputs(obj_names, "obj_names", csv_names, "csv_names");
+    qd_check_alias_outputs(mtl_names, "mtl_names", csv_names, "csv_names");
+
     const bool want_csv_table = (csv_ind != nullptr || csv_names != nullptr || csv_prop != nullptr);
 
     // Material table (loaded on demand). Lives across the whole function for the lambdas below.

@@ -2095,3 +2095,31 @@ TEST_CASE("Get Channels Spherical - 0 paths without add_fake_los_path")
                                                                  &f0, &f0, &one, &e, &M0, &cr, &ci, &dl, 1e9, true, false),
                     std::invalid_argument);
 }
+
+TEST_CASE("Get Channels Spherical - outputs that alias inputs")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    arma::mat fbs = arma::mat({10.0, 5.0, 1.0}).t(), M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    arma::vec gain = {1.0}, length = {0.0};
+    arma::cube cr, ci, dl, aod, eod, aoa, eoa;
+    auto call = [&](arma::cube *c_re, arma::cube *c_im, arma::cube *d, arma::cube *a1, arma::cube *a2,
+                    const arma::mat *M_in)
+    {
+        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 1, 0, 0, 0, 20, 0, 1, 0, 0, 0,
+                                                     &fbs, &fbs, &gain, &length, M_in, c_re, c_im, d, 1e9, false, false,
+                                                     a1, &eod, &aoa, a2);
+    };
+    CHECK_NOTHROW(call(&cr, &ci, &dl, &aod, &eoa, &M));
+
+    SECTION("Two outputs are the same object")
+    {
+        CHECK_THROWS_AS(call(&cr, &cr, &dl, &aod, &eoa, &M), std::invalid_argument);
+        CHECK_THROWS_AS(call(&cr, &ci, &dl, &dl, &eoa, &M), std::invalid_argument);
+        CHECK_THROWS_AS(call(&cr, &ci, &dl, &aod, &aod, &M), std::invalid_argument);
+    }
+    SECTION("Output shares memory with an input")
+    {
+        arma::cube cr_on_M(M.memptr(), 1, 1, 8, false, true);
+        CHECK_THROWS_AS(call(&cr_on_M, &ci, &dl, &aod, &eoa, &M), std::invalid_argument);
+    }
+}

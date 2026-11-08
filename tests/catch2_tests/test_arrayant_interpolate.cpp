@@ -406,3 +406,29 @@ TEST_CASE("Arrayant interpolation - NaN and infinite angles give NaN")
     arrayant_interpolate_nonfinite_check<float>();
     arrayant_interpolate_nonfinite_check<double>();
 }
+
+TEST_CASE("Arrayant interpolation - outputs that alias inputs")
+{
+    auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0); // 2 elements, so n_out = 2
+    arma::mat az = {0.1, 0.2, 0.3}, el = {0.0, 0.1, -0.1}, pos(3, 2, arma::fill::zeros);
+    arma::cube ori(3, 1, 1, arma::fill::zeros);
+    arma::mat Vr, Vi, Hr, Hi, dist, az_loc, el_loc, gamma;
+    CHECK_NOTHROW(ant.interpolate(&az, &el, &Vr, &Vi, &Hr, &Hi, {}, &ori, &pos, &dist, &az_loc, &el_loc, &gamma));
+
+    SECTION("Output is an input")
+    {
+        CHECK_THROWS_AS(ant.interpolate(&az, &el, &az, &Vi, &Hr, &Hi), std::invalid_argument);
+        CHECK_THROWS_AS(ant.interpolate(&az, &el, &Vr, &Vi, &Hr, &Hi, {}, nullptr, nullptr, nullptr, nullptr, &el), std::invalid_argument);
+        CHECK_THROWS_AS(ant.interpolate(&az, &el, &Vr, &Vi, &Hr, &Hi, {}, &ori, &pos, &pos), std::invalid_argument);
+    }
+    SECTION("Two outputs are the same object")
+    {
+        CHECK_THROWS_AS(ant.interpolate(&az, &el, &Vr, &Vr, &Hr, &Hi), std::invalid_argument);
+        CHECK_THROWS_AS(ant.interpolate(&az, &el, &Vr, &Vi, &Hr, &Hi, {}, nullptr, nullptr, nullptr, &az_loc, nullptr, &az_loc), std::invalid_argument);
+    }
+    SECTION("Output shares memory with an input")
+    {
+        arma::mat V_on_az(az.memptr(), 1, 3, false, true);
+        CHECK_THROWS_AS(ant.interpolate(&az, &el, &V_on_az, &Vi, &Hr, &Hi, {0}), std::invalid_argument);
+    }
+}

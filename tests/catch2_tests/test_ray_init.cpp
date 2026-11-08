@@ -531,3 +531,25 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
                                              nullptr, nullptr, &bad, &box, nullptr, false));
     }
 }
+
+TEST_CASE("ray_init - Outputs that alias inputs")
+{
+    arma::fmat mesh = quadriga_lib::cube<float>({}, {}, {3.0f, 0.0f, 0.0f});
+    arma::fmat orig, dest, trivec, tridir, acc_dist;
+    arma::Col<short> prev, cur, buf;
+
+    auto call = [&](arma::fmat *o, arma::fmat *d, arma::fmat *tv, arma::fmat *td, arma::Col<short> *p, arma::Col<short> *c)
+    {
+        return quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 10.0f, o, d, tv, td, p, c, &buf, nullptr, &acc_dist,
+                                      nullptr, &mesh, nullptr, nullptr, nullptr, false);
+    };
+    CHECK_NOTHROW(call(&orig, &dest, &trivec, &tridir, &prev, &cur));
+
+    // Two outputs are the same object
+    CHECK_THROWS_AS(call(&orig, &orig, &trivec, &tridir, &prev, &cur), std::invalid_argument);
+    CHECK_THROWS_AS(call(&orig, &dest, &trivec, &trivec, &prev, &cur), std::invalid_argument);
+    CHECK_THROWS_AS(call(&orig, &dest, &trivec, &tridir, &prev, &prev), std::invalid_argument);
+
+    // An output is the mesh
+    CHECK_THROWS_AS(call(&orig, &mesh, &trivec, &tridir, &prev, &cur), std::invalid_argument);
+}

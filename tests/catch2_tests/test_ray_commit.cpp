@@ -943,6 +943,11 @@ TEST_CASE("ray_commit - input validation")
         CHECK_NOTHROW(C.commit(S, P, out));
     }
 
+    SECTION("paths_commit is the in-flight path storage")
+    {
+        CHECK_THROWS_AS(C.commit(S, P, C.paths), std::invalid_argument);
+    }
+
     SECTION("mesh")
     {
         Scene bad = S;

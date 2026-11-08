@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include <cmath>
 #include <limits>
 
@@ -66,6 +67,12 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<d
     // Set sizes
     if (center == nullptr)
         throw std::invalid_argument("Output 'center' cannot be NULL.");
+    qd_check_alias_outputs(center, "center", length, "length");
+    qd_check_alias_outputs(center, "center", vert, "vert");
+    qd_check_alias_outputs(center, "center", direction, "direction");
+    qd_check_alias_outputs(length, "length", vert, "vert");
+    qd_check_alias_outputs(length, "length", direction, "direction");
+    qd_check_alias_outputs(vert, "vert", direction, "direction");
 
     if (center->n_rows != n_faces || center->n_cols != 3)
         center->set_size(n_faces, 3);

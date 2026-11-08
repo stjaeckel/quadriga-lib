@@ -523,6 +523,9 @@ void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arra
     if (element_pos.n_rows != 3)
         throw std::invalid_argument("arrayant_set_element_pos_multi: element_pos must have 3 rows (x, y, z).");
 
+    for (const auto &ant : arrayant_vec)
+        qd_check_alias(&ant.element_pos, "arrayant_vec", &element_pos);
+
     arma::uword n_elements_ref = arrayant_vec[0].n_elements();
 
     // Determine which elements to update

@@ -273,43 +273,27 @@ TEST_CASE("Ray-Triangle Intersect - Double input far from the origin")
     }
 }
 
-TEST_CASE("Ray-Triangle Intersect - Outputs that alias the inputs")
+TEST_CASE("ray_triangle_intersect - outputs that alias inputs")
 {
-    // Planes z = 0 and z = -1; ray (0,0,1) -> (0,0,-2): FBS (0,0,0), SBS (0,0,-1)
+    // Planes z = 0 and z = -1; ray (0,0,1) -> (0,0,-2)
     arma::mat mesh = {{-1, -1, 0, 1, -1, 0, 0, 1, 0}, {-1, -1, -1, 1, -1, -1, 0, 1, -1}};
     const arma::mat o0 = {{0, 0, 1}}, d0 = {{0, 0, -2}};
+    arma::mat o = o0, d = d0, f, s;
+    arma::u32_vec ni, fi, si, smi = {0};
+    CHECK_NOTHROW(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &s, &ni, &fi, &si, &smi));
 
-    for (int kernel : rti_kernels())
-    {
-        INFO("use_kernel = " << kernel);
-        arma::mat fbs_ref, sbs_ref;
-        quadriga_lib::ray_triangle_intersect<double>(&o0, &d0, &mesh, &fbs_ref, &sbs_ref, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
-        CHECK(arma::approx_equal(fbs_ref, arma::mat({{0, 0, 0}}), "absdiff", 1e-6)); // AVX2 computes in float
-        CHECK(arma::approx_equal(sbs_ref, arma::mat({{0, 0, -1}}), "absdiff", 1e-6));
+    // Advancing rays in place is rejected, the inputs stay unchanged
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &o, &s), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &d), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &d, &o), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &f), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &s, &ni, &ni), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &s, &ni, &fi, &si, &si), std::invalid_argument);
+    CHECK(arma::approx_equal(o, o0, "absdiff", 0.0));
+    CHECK(arma::approx_equal(d, d0, "absdiff", 0.0));
 
-        // fbs = orig, sbs = orig, fbs = dest, sbs = dest, fbs = orig and sbs = dest
-        for (int c = 0; c < 5; ++c)
-        {
-            INFO("case " << c);
-            arma::mat o = o0, d = d0, f, s;
-            arma::mat *pf = (c == 0 || c == 4) ? &o : (c == 2 ? &d : &f);
-            arma::mat *ps = (c == 1) ? &o : ((c == 3 || c == 4) ? &d : &s);
-            quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, pf, ps, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
-            CHECK(arma::approx_equal(*pf, fbs_ref, "absdiff", 0.0));
-            CHECK(arma::approx_equal(*ps, sbs_ref, "absdiff", 0.0));
-        }
-
-        // orig and dest with 4 columns: writing fbs into orig or dest reallocates it ('dest' must have as many rows as
-        // 'orig', so the extra column replaces the extra row this test used before)
-        arma::mat o = {{0, 0, 1, 7}}, d = {{0, 0, -2, 5}}, s;
-        quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &o, &s, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
-        CHECK(arma::approx_equal(o, fbs_ref, "absdiff", 0.0));
-        CHECK(arma::approx_equal(s, sbs_ref, "absdiff", 0.0));
-        o = {{0, 0, 1, 7}}, d = {{0, 0, -2, 5}};
-        quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &d, &o, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
-        CHECK(arma::approx_equal(d, fbs_ref, "absdiff", 0.0));
-        CHECK(arma::approx_equal(o, sbs_ref, "absdiff", 0.0));
-    }
+    arma::mat view(mesh.memptr(), 1, 3, false, true);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &view), std::invalid_argument);
 }
 
 TEST_CASE("Ray-Triangle Intersect - Mesh with extra columns and row count of dest")

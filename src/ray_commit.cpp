@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include "bits.hpp"
 
 #include <algorithm>
@@ -139,6 +140,8 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
                                      float max_path_length, float min_gain_dB,
                                      uint8_t min_no_segments, bool ignore_direct_path)
 {
+    qd_check_alias(&paths_commit, "paths_commit", &paths);
+
     // Mesh validation
     const arma::uword n_mesh = mesh.n_rows;
     if (n_mesh == 0)

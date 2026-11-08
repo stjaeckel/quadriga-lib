@@ -664,3 +664,26 @@ TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
             CHECK(arma::all(off == off_ref));
         }
 }
+
+TEST_CASE("ray_point_intersect - outputs that alias inputs")
+{
+    arma::fmat points = {{5.0f, 0.0f, 0.0f}, {0.0f, 5.0f, 0.0f}}, orig, trivec, tridir;
+    quadriga_lib::icosphere<float>(1, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    std::vector<unsigned> hit_index;
+    arma::u32_vec hit_offset, hit_count, sci = {0};
+    std::vector<arma::u32_vec> hpp;
+    CHECK_NOTHROW(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_index, &hit_offset, &hit_count, &hpp, &sci));
+
+    arma::u32_vec s = sci;
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_index, &hit_offset, &hit_offset), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_index, &s, nullptr, nullptr, &s), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_index, nullptr, &s, nullptr, &s), std::invalid_argument);
+    CHECK(arma::all(s == sci));
+
+    // The sub-cloud index is an element of the output vector
+    std::vector<arma::u32_vec> h2(1, sci);
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_index, nullptr, nullptr, &h2, &h2[0]), std::invalid_argument);
+
+    arma::u32_vec view(hit_offset.memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(points, orig, trivec, tridir, &hit_index, &hit_offset, &view), std::invalid_argument);
+}

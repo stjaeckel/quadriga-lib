@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -74,6 +75,10 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
         throw std::invalid_argument("Output 'pointsR' cannot be NULL.");
     if (sub_cloud_index == nullptr)
         throw std::invalid_argument("Output 'sub_cloud_index' cannot be NULL.");
+    qd_check_alias(pointsR, "pointsR", points);
+    qd_check_alias_outputs(sub_cloud_index, "sub_cloud_index", forward_index, "forward_index");
+    qd_check_alias_outputs(sub_cloud_index, "sub_cloud_index", reverse_index, "reverse_index");
+    qd_check_alias_outputs(forward_index, "forward_index", reverse_index, "reverse_index");
 
     if (target_size == 0)
         throw std::invalid_argument("Input 'target_size' cannot be 0.");

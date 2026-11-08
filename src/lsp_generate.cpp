@@ -204,6 +204,22 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
         if (!sf_sigma->is_finite() || arma::any(arma::vectorise(*sf_sigma) < 0.0))
             throw std::invalid_argument("Input 'sf_sigma' must be finite and >= 0.");
     }
+    qd_check_alias(&lsp, "lsp", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(abs_toa, "abs_toa", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(gr_eps_re, "gr_eps_re", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(gr_eps_im, "gr_eps_im", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(eod_offset_deg, "eod_offset_deg", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(lsp_mu, "lsp_mu", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(lsp_sigma, "lsp_sigma", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias_outputs(&lsp, "lsp", lsp_mu, "lsp_mu");
+    qd_check_alias_outputs(&lsp, "lsp", lsp_sigma, "lsp_sigma");
+    qd_check_alias_outputs(lsp_mu, "lsp_mu", lsp_sigma, "lsp_sigma");
+    qd_check_alias_outputs(abs_toa, "abs_toa", gr_eps_re, "gr_eps_re");
+    qd_check_alias_outputs(abs_toa, "abs_toa", gr_eps_im, "gr_eps_im");
+    qd_check_alias_outputs(abs_toa, "abs_toa", eod_offset_deg, "eod_offset_deg");
+    qd_check_alias_outputs(gr_eps_re, "gr_eps_re", gr_eps_im, "gr_eps_im");
+    qd_check_alias_outputs(gr_eps_re, "gr_eps_re", eod_offset_deg, "eod_offset_deg");
+    qd_check_alias_outputs(gr_eps_im, "gr_eps_im", eod_offset_deg, "eod_offset_deg");
 
     std::unordered_map<std::string, double> sp = scenpar;
     arma::mat R;

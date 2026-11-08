@@ -51,6 +51,7 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
     }
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
+    qd_check_alias(&val, "val", &dist_decorr, &pos, pos_b, dist_decorr_b);
     int preset_type = -1;
     arma::uword preset_n_coeff = 0;
     if (!qd_sos_preset_lookup(preset, preset_type, preset_n_coeff))
@@ -188,7 +189,6 @@ Spatially correlated Normal distributed random numbers
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ## Declaration:
 ```
@@ -262,7 +262,6 @@ Spatially correlated Uniform distributed random numbers
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ## Declaration:
 ```
@@ -337,7 +336,6 @@ Spatially correlated integer random numbers
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ## Declaration:
 ```

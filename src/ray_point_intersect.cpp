@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include "quadriga_lib_generic_functions.hpp"
 
 #if BUILD_WITH_AVX2
@@ -114,6 +115,12 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
     if (tridir.n_rows != n_ray_t)
         throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
+    qd_check_alias(hit_offset, "hit_offset", sub_cloud_index);
+    qd_check_alias(hit_count, "hit_count", sub_cloud_index);
+    qd_check_alias_outputs(hit_offset, "hit_offset", hit_count, "hit_count");
+    if (hits_per_point != nullptr)
+        for (const auto &h : *hits_per_point)
+            qd_check_alias(&h, "hits_per_point", sub_cloud_index);
 
     // Determine which compute kernel to use
     // kernel: 1 = GENERIC, 2 = AVX2, 3 = CUDA

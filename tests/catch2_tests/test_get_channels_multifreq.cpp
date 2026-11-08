@@ -1406,3 +1406,37 @@ TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
                                                                  f0, f0, g0, e, M0, fin, arma::vec(), cr, ci, dl, true, false),
                     std::invalid_argument);
 }
+
+TEST_CASE("Multifreq - outputs that alias inputs")
+{
+    auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>(10.0));
+    arma::mat fbs = arma::mat({10.0, 5.0, 0.0}).t(), pg = {1.0};
+    arma::vec pl = {0.0}, fi = {1e9}, fo = {1e9, 2e9};
+    arma::cube M(8, 1, 1, arma::fill::zeros);
+    M(0, 0, 0) = 1.0, M(6, 0, 0) = -1.0;
+    std::vector<arma::cube> cr, ci, dl;
+    CHECK_NOTHROW(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                        fbs, fbs, pg, pl, M, fi, fo, cr, ci, dl));
+    REQUIRE(cr.size() == 2);
+
+    SECTION("Output is an input")
+    {
+        std::vector<arma::cube> c_in = {M};
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                              fbs, fbs, pg, pl, c_in[0], fi, fo, c_in, ci, dl),
+                        std::invalid_argument);
+    }
+    SECTION("Two outputs are the same object")
+    {
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                              fbs, fbs, pg, pl, M, fi, fo, cr, cr, dl),
+                        std::invalid_argument);
+    }
+    SECTION("Output shares memory with an input")
+    {
+        arma::mat pg_on_ci(ci[1].memptr(), 1, 1, false, true); // ci[1] is [1, 1, 1] from the baseline call
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                              fbs, fbs, pg_on_ci, pl, M, fi, fo, cr, ci, dl),
+                        std::invalid_argument);
+    }
+}

@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
+#include <utility>
 
 // Calculate length
 template <typename dtype>
@@ -628,27 +630,6 @@ static inline void qd_sos_check_acf_same_map(const arma::Col<dtype> &acf, const 
             throw std::invalid_argument("Input 'acf' must be > -1 for two devices on the same map.");
 }
 
-// True if two matrices share memory, i.e. the ranges [memptr, memptr + n_elem) of their elements overlap;
-// false if one of them is empty. Compared as integers, since the two pointers may belong to different blocks.
-template <typename dtype>
-static inline bool qd_sos_share_memory(const dtype *a, arma::uword n_a, const dtype *b, arma::uword n_b)
-{
-    if (n_a == 0 || n_b == 0)
-        return false;
-    const std::uintptr_t a0 = (std::uintptr_t)a, b0 = (std::uintptr_t)b;
-    return a0 < b0 + n_b * sizeof(dtype) && b0 < a0 + n_a * sizeof(dtype);
-}
-template <typename dtype>
-static inline bool qd_sos_share_memory(const arma::Mat<dtype> &a, const arma::Mat<dtype> &b)
-{
-    return qd_sos_share_memory(a.memptr(), a.n_elem, b.memptr(), b.n_elem);
-}
-template <typename dtype>
-static inline bool qd_sos_share_memory(const arma::Cube<dtype> &a, const arma::Mat<dtype> &b)
-{
-    return qd_sos_share_memory(a.memptr(), a.n_elem, b.memptr(), b.n_elem);
-}
-
 // Type and number of sinusoids of a preset of sos_preset (defined in sos_preset.cpp)
 // type: 0 = Exp, 1 = Gauss, 2 = Comb; returns false for a name that is not a preset
 bool qd_sos_preset_lookup(const std::string &name, int &type, arma::uword &n_coeff);
@@ -692,6 +673,96 @@ static inline void qd_sos_directions(size_t n, size_t n_dim, double *ux, double 
             az[i] = a;
         if (el != nullptr)
             el[i] = e;
+    }
+}
+
+// --- Outputs that are the same object as an input, or share memory with one ---
+// Outputs are resized and written while inputs are still read, so an output must not alias an input or another
+// output. These helpers detect this before anything is written.
+
+template <typename T, typename = void>
+struct qd_has_memptr : std::false_type
+{
+};
+template <typename T>
+struct qd_has_memptr<T, std::void_t<decltype(std::declval<const T &>().memptr()), decltype(std::declval<const T &>().n_elem)>>
+    : std::true_type
+{
+};
+template <typename T, typename = void>
+struct qd_has_data : std::false_type
+{
+};
+template <typename T>
+struct qd_has_data<T, std::void_t<decltype(std::declval<const T &>().data()), decltype(std::declval<const T &>().size())>>
+    : std::true_type
+{
+};
+
+// Byte range [first, first + n_bytes) of the elements of an Armadillo object (Mat, Col, Row, Cube) or a
+// std::vector; n_bytes = 0 for empty objects and for other types
+template <typename T>
+static inline void qd_mem_range(const T &x, std::uintptr_t &first, std::size_t &n_bytes)
+{
+    first = 0, n_bytes = 0;
+    if constexpr (qd_has_memptr<T>::value)
+        first = (std::uintptr_t)x.memptr(), n_bytes = (std::size_t)x.n_elem * sizeof(*x.memptr());
+    else if constexpr (qd_has_data<T>::value)
+        first = (std::uintptr_t)x.data(), n_bytes = (std::size_t)x.size() * sizeof(*x.data());
+}
+
+// True if 'a' and 'b' are the same object (compared only when one type converts to the other, e.g. Col and Mat)
+// or if their elements share memory; false if one of them is nullptr
+template <typename A, typename B>
+static inline bool qd_alias(const A *a, const B *b)
+{
+    if (a == nullptr || b == nullptr)
+        return false;
+    if constexpr (std::is_convertible<const A *, const B *>::value)
+    {
+        if (static_cast<const B *>(a) == b)
+            return true;
+    }
+    else if constexpr (std::is_convertible<const B *, const A *>::value)
+    {
+        if (static_cast<const A *>(b) == a)
+            return true;
+    }
+    std::uintptr_t a0, b0;
+    std::size_t na, nb;
+    qd_mem_range(*a, a0, na);
+    qd_mem_range(*b, b0, nb);
+    return na != 0 && nb != 0 && a0 < b0 + nb && b0 < a0 + na;
+}
+
+// Throws std::invalid_argument if output 'out' aliases one of the inputs; nullptr arguments are skipped
+template <typename O, typename... I>
+static inline void qd_check_alias(const O *out, const char *name, const I *...inputs)
+{
+    (void)out; // unused when there are no inputs
+    if ((qd_alias(out, inputs) || ...))
+        throw std::invalid_argument(std::string("Output '") + name + "' cannot be an input or share memory with one.");
+}
+
+// Throws std::invalid_argument if two outputs alias each other; nullptr arguments are skipped
+template <typename A, typename B>
+static inline void qd_check_alias_outputs(const A *a, const char *name_a, const B *b, const char *name_b)
+{
+    if (qd_alias(a, b))
+        throw std::invalid_argument(std::string("Outputs '") + name_a + "' and '" + name_b +
+                                    "' cannot be the same object or share memory.");
+}
+
+// Throws std::invalid_argument if one of the outputs out[0 .. N-1] aliases one of the inputs or another output;
+// nullptr arguments are skipped. Example: qd_check_alias_list<arma::mat>({x, y}, {"x", "y"}, in_a, in_b);
+template <typename T, std::size_t N, typename... I>
+static inline void qd_check_alias_list(const T *const (&out)[N], const char *const (&name)[N], const I *...inputs)
+{
+    for (std::size_t i = 0; i < N; ++i)
+    {
+        qd_check_alias(out[i], name[i], inputs...);
+        for (std::size_t j = i + 1; j < N; ++j)
+            qd_check_alias_outputs(out[i], name[i], out[j], name[j]);
     }
 }
 

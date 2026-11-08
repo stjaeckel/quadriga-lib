@@ -116,3 +116,23 @@ TEST_CASE("xpr_update - duplicate ray_index entries give the single-thread resul
 
     omp_set_num_threads(n_threads_before);
 }
+
+TEST_CASE("xpr_update - separate inputs that alias xprmat")
+{
+    arma::mat xprmat(8, 2, arma::fill::ones), update(8, 1, arma::fill::ones);
+    arma::vec gain;
+    arma::uvec ray_index = {1};
+    CHECK_NOTHROW(quadriga_lib::xpr_update(xprmat, &update, &gain, false, false, false, &ray_index));
+
+    arma::mat x = xprmat;
+    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &x, &gain, false, false, false, &ray_index), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &x), std::invalid_argument);
+    CHECK(arma::approx_equal(x, xprmat, "absdiff", 0.0));
+
+    // gain on the memory of xprmat or update
+    arma::vec g_on_x(x.memptr(), 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &update, &g_on_x), std::invalid_argument);
+    arma::mat u = x;
+    arma::vec g_on_u(u.memptr(), 2, false, true);
+    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &u, &g_on_u), std::invalid_argument);
+}

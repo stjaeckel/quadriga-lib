@@ -15,6 +15,7 @@ lang: en-US
 - Armadillo types are column-major. Shape notation `[a, b, c]` means `[rows, cols, slices]` for `arma::Cube`; `[rows, cols]` for `arma::Mat`; `[n]` for `arma::Col`/`arma::Row`.
 - Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
+- An output cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation.
 - Invalid inputs (shape/domain) cause a `std::invalid_argument`; I/O failures a `std::runtime_error`.
 - Index conventions: 0-based unless the field is explicitly called "1-based" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).
 - Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
@@ -2094,7 +2095,7 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 
 - Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
 - `coeff_update == nullptr` applies only the gain; `gain_update == 1.0` applies only the multiply; both defaults leave the matrix unchanged and just measure it
-- The update reads all old values before writing, so `coeff_update` may alias the slot; the return value uses the same gain definition as `calc_gain`
+- The return value uses the same gain definition as `calc_gain`
 - Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
 ```cpp
 float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
@@ -2533,8 +2534,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#quantize_delays) · [Python](quadriga_
   speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every
   acoustic array. In those cases use absolute delays (`use_absolute_delays = true`)
 - Run time and memory depend on the number of paths and taps, not on the absolute delay values
-- Outputs may alias inputs, also across arguments (e.g. `delay_quant == coeff_re`); all inputs are read before the
-  outputs are written. The three outputs must be different objects.
 
 ### Declaration:
 ```cpp
@@ -3394,8 +3393,7 @@ as a `[3]` vector, except [gbsm_single_link_channel](#gbsm_single_link_channel),
 `[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the conf-file keys): in
 rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR 38.901 except two
 deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm_init_phases](#gbsm_init_phases), [gbsm_draw](#gbsm_draw)) and
-`method = "quadriga"` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Outputs must not share memory with the
-inputs or with each other unless stated otherwise. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
+`method = "quadriga"` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
 linear power ratios, spreads and `_deg` offsets in degrees.
 
 ---
@@ -3590,7 +3588,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_draw) · [Python](quadriga_lib_ap
 - 3D mode (legacy QuaDRiGa): the height separates the floors, so UTs on different floors are correlated by the ACF of
   their height difference. The per-link statistics are the same in both modes
 - The values are within `4e-7 · sqrt(2·n_coeff)` of a double-precision evaluation
-- `rnd` may share memory with `tx_pos` or `rx_pos`; an empty set (`NumClusters = 1`) accepts any empty `phase`
+- An empty set (`NumClusters = 1`) accepts any empty `phase`
 
 Random sets, with `N = NumClusters - 1` and `M = NumSubPaths`; a set never changes size (new random quantities come in
 new sets), and a decorrelation distance of 0 is used as 0.1 m:
@@ -3766,7 +3764,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quadriga_lib_api_python.md#gbsm.rays_from_paths)
 
-- Fills a [gbsm_rays](#gbsm_rays) object in place (`fallback` cleared) from path data in the names and order of
+- Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
   [qrt_file_read](#qrt_file_read), read as `qrt_file_read<double>` with `downlink = true` and `normalize_M = 1` (an uplink read gives
   swapped ends and a conjugated `M`, which this function does not undo; `normalize_M = 0` leaves only the free-space
   gain in `power`)
@@ -4888,7 +4886,7 @@ arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype>
 - `yi`: Input y-axis sampling points (for 2D only), vector of length `ny`
 - `xo`: Output x-axis sampling points, vector of length `mx`
 - `yo`: Output y-axis sampling points (for 2D only), vector of length `my`
-- `output`: Interpolated data cube (modified in-place for one variant)
+- `output`: Interpolated data cube (output argument of the first variant)
 
 ### Input / Output size details:
 - 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`
@@ -6488,7 +6486,7 @@ void quadriga_lib::ray_state_update(
 - **`acc_dist_refractedN`** — Accumulated refracted (VBS) distance leaving this call, compact set; `[n_rayN]`. NULL skips the write.
   It includes the relaunch offset the same way, projected onto the direction the wave has (exact for parallel faces).
 - **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
-  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.
+  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write. May be `out_typeN`, which is then updated in place.
    | Bit  | Flag        | Meaning                                                                        |
    | :--: | :---------: | ------------------------------------------------------------------------------ |
    |   0  | ok          | OK flag (0 = a deferred medium is pending in the buffer word)                  |
@@ -6669,7 +6667,6 @@ void quadriga_lib::ray_triangle_intersect(
 - **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
 - **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
 - **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
-- `fbs` and `sbs` may be the same objects as `orig` or `dest` (e.g. to advance rays in place)
 
 ### See also:
 - [obj_file_read](#obj_file_read) (load mesh from OBJ file)
@@ -6784,7 +6781,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#subdivide_triangles) · Not in: Python
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
 - Material indices are duplicated from the parent triangle to all sub-triangles
-- `triangles_out` may be the same object as `triangles_in`, and `mtl_ind_out` the same as `mtl_ind` (in place)
 - Throws `std::invalid_argument` when `n_div` is so large that the number of output values exceeds 64 bits
 
 ### Declaration:
@@ -7222,7 +7218,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acf_2d) · [Python](quadriga_lib_a
 - The result is the reference for [sos_acf_approx](#sos_acf_approx)
 - Equally spaced means that every sample point lies within 1e-4 of the step from its place on the regular
   axis; for long single-precision tables the rounding of the sample points themselves is allowed for
-- `dist_2d` may be the same object as `acf` or `dist`
 
 ### Declaration:
 ```cpp
@@ -7264,8 +7259,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acf_approx) · [Python](quadriga_l
 - `R(-dx) = R(dx)`: each plane is point-symmetric about its center. One half is computed and the other
   half is its mirror image, so the symmetry is exact
 - Equally spaced has the meaning given in [sos_acf_2d](#sos_acf_2d)
-- `dist_2d` may be the same object as `dist`
-- `acf_approx` cannot share memory with `freq` or `dist`; such a call throws before anything is written
 
 ### Declaration:
 ```cpp
@@ -7315,7 +7308,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acf_estimate) · [Python](quadriga
 - The pairs are searched in parallel and added in a fixed order; the result does not depend on the number
   of threads. Run time and memory: `2·n_pos^2` pairs for one device, at most 36 MB for the pairs of a block
   of rows
-- The outputs may be the same objects as inputs
 
 ### Declaration:
 ```cpp
@@ -7363,7 +7355,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_acfi) · [Python](quadriga_lib_api
 - Distances beyond the last sample point return the last value of the table
 - The same rule is applied by [sos_val](#sos_val) and [sos_remove_bias](#sos_remove_bias) for two devices on the same map
 - An empty `d` returns an empty `val`
-- `val` may be the same object as `acf`, `dist` or `d`
 
 ### Declaration:
 ```cpp
@@ -7414,7 +7405,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_calc_mse) · [Python](quadriga_lib
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
 - The test directions are evaluated in parallel; the result does not depend on the number of threads
 - Equally spaced has the meaning given in [sos_acf_2d](#sos_acf_2d)
-- `acf_tail` and `test_dir` may be the same objects as inputs
 
 ### Declaration:
 ```cpp
@@ -7482,7 +7472,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_generate) · [Python](quadriga_lib
   all sample points. It must not have more than 100000 points (the default has 151), which limits
   `freq_max - freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
-- `ase` and `test_dir` may be the same objects as `acf` or `dist`
 - `test_dir` and the reported error use the same test directions as [sos_calc_mse](#sos_calc_mse) with the same `n_dir`
 - All computations are done in double precision for both instantiations
 - A seed >= 0 makes the result repeatable on one platform. The search takes accept/reject decisions, so a
@@ -7592,7 +7581,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_map) · [Python](quadriga_lib_api_
 - Cubes of the correct size keep their memory. If they lie one after the other in memory (one block of
   `n_gen` cubes, as the MATLAB and Python interfaces allocate it), the values are computed in place;
   otherwise they are computed in a matrix `[ny·nx·nz, n_gen]` and copied
-- A cube that shares memory with `freq` or `phase` is an error, before anything is written
 
 ### Declaration:
 ```cpp
@@ -7643,8 +7631,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_preset) · [Python](quadriga_lib_a
 - The tables are stored for `d = 10 m`. For another decorrelation distance the distances are multiplied by
   `d/10` and the frequencies by `10/d`
 - All tables are 3-dimensional and can be used with positions of 1, 2 or 3 columns
-- The outputs cannot be the same object or share memory with each other; such a call throws before anything
-  is written
 - How the tables were made: [sos_generate](#sos_generate) with the 200-sample ACF for 10 m, `n_dim = 3`,
   `uniform_smp = true`, `n_dir = 300`, `random_init = true`, `freq_min = 0.005`, `freq_max = 15 / 49.75`,
   and the seeds 39, 3, 2, 5 (Exp), 13, 32, 6, 21 (Gauss), 13, 25, 37, 47 (Comb) for 128, 256, 512 and 1024
@@ -7707,7 +7693,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_rand) · [Python](quadriga_lib_api
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ### Declaration:
 ```cpp
@@ -7772,7 +7757,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_randi) · [Python](quadriga_lib_ap
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ### Declaration:
 ```cpp
@@ -7837,7 +7821,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_randn) · [Python](quadriga_lib_ap
 - A seed selects the phases, not the field: calls with the same seed but other decorrelation distances
   or another preset return related fields, equal at the coordinate origin and correlated around it. Use
   different seeds, or several entries of `dist_decorr` in one call, for quantities that must be independent
-- `val` may be the same object as `pos` or `pos_b`
 
 ### Declaration:
 ```cpp
@@ -7895,11 +7878,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_remove_bias) · [Python](quadriga_
   mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
   with `pos` and `phase_b` with `pos_b` and the frequencies `freq · freq_scale_b`; two offsets per generator.
-  The mean of the combined value is then zero as well. `phase_b` cannot share memory with `phase`: one
-  matrix cannot hold two corrections
-- The arguments that are written, `phase`, `phase_b`, `offset` and `mean_before`, cannot share memory with
-  another argument, not even in part, and `offset` and `mean_before` cannot be the same object. Such a call
-  throws and leaves all arguments unchanged
+  The mean of the combined value is then zero as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
   `c` the mean ACF between that position and all positions; on average over the positions the loss is at
@@ -7943,7 +7922,7 @@ void quadriga_lib::sos_remove_bias(
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
   number for different maps
 - **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
-  same map; updated in-place; no memory shared with `phase`; `[n_coeff, n_gen]`
+  same map; updated in-place; `[n_coeff, n_gen]`
 - **`acf`** *(optional)* — Target ACF; required for two devices on the same map, must then be > -1;
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
@@ -8007,8 +7986,6 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_val) · [Python](quadriga_lib_api_
   rounded to single precision
 - Memory: for `dtype = double` the values are computed in `val`; two devices need one more array of the
   size of `val`, and `dtype = float` one array of that size in double precision
-- `val` cannot be the same object as an input, nor use the memory of one: it is resized and written while
-  the inputs are read. Such a call throws and leaves `val` unchanged
 
 ### Declaration:
 ```cpp

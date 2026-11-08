@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <fstream>
 #include <string>
@@ -408,6 +409,8 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         throw std::invalid_argument("Either 'mesh' or 'vert_list'+'face_ind' must be given.");
     if (!has_mesh && (!has_vl || !has_fi))
         throw std::invalid_argument("'vert_list' and 'face_ind' must be given together.");
+    qd_check_alias(vert_list_out, "vert_list_out", mesh, vert_list, bsdf);
+    qd_check_alias(face_ind_out, "face_ind_out", obj_ind, mtl_ind, face_ind, csv_ind);
 
     if (fn.empty() && vert_list_out == nullptr && face_ind_out == nullptr)
         return;

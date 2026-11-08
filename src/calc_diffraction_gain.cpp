@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 #include "qd_atmospheric_absorption.hpp"
 
 // Helper functions
@@ -172,6 +173,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     // Range and table validation happens inside ray_mesh_interact / ray_state_update.
     if (!mtl_ind.is_empty() && mtl_ind.max() > 16383)
         throw std::invalid_argument("Material indices must not exceed 16383.");
+
+    qd_check_alias(gain, "gain", &orig, &dest, &mesh);
+    qd_check_alias(xprmat, "xprmat", &orig, &dest, &mesh);
+    qd_check_alias_outputs(gain, "gain", xprmat, "xprmat");
 
     // Initialize XPRMAT output
     if (xprmat && (xprmat->n_rows != nXPR || xprmat->n_cols != n_pos))

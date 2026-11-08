@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_math.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -47,7 +48,7 @@ arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype>
 - `yi`: Input y-axis sampling points (for 2D only), vector of length `ny`
 - `xo`: Output x-axis sampling points, vector of length `mx`
 - `yo`: Output y-axis sampling points (for 2D only), vector of length `my`
-- `output`: Interpolated data cube (modified in-place for one variant)
+- `output`: Interpolated data cube (output argument of the first variant)
 
 ## Input / Output size details:
 - 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`
@@ -96,6 +97,7 @@ void quadriga_lib::interp_2D(const arma::Cube<dtype> &input,
         throw std::invalid_argument("Input 'xi' must be finite.");
     if (!yi.is_finite())
         throw std::invalid_argument("Input 'yi' must be finite.");
+    qd_check_alias(&output, "output", &input);
 
     if (output.n_rows != my || output.n_cols != mx || output.n_slices != ne)
         output.set_size(my, mx, ne);

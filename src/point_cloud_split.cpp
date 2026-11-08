@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <vector>
 
@@ -61,6 +62,9 @@ int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points,
         throw std::invalid_argument("Output 'pointsA' cannot be NULL.");
     if (pointsB == nullptr)
         throw std::invalid_argument("Output 'pointsB' cannot be NULL.");
+    qd_check_alias(pointsA, "pointsA", points);
+    qd_check_alias(pointsB, "pointsB", points);
+    qd_check_alias_outputs(pointsA, "pointsA", pointsB, "pointsB");
 
     // Calculate bounding box
     arma::Mat<dtype> aabb = quadriga_lib::point_cloud_aabb(points);

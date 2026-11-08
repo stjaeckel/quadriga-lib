@@ -139,6 +139,18 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         throw std::invalid_argument("Input 'kf_ratio' must have n_freq elements.");
     if (kf_ratio != nullptr && (!kf_ratio->is_finite() || arma::any(*kf_ratio < 0.0)))
         throw std::invalid_argument("Input 'kf_ratio' must be finite and >= 0.");
+    auto check = [&](const auto *out, const char *name)
+    {
+        qd_check_alias(out, name, &rays.tx_pos, &rays.rx_pos, &rays.center_frequency, &rays.delay, &rays.power, &rays.aod,
+                       &rays.eod, &rays.aoa, &rays.eoa, &rays.M, &rays.path_type, &rays.tap, &rays.gr_eps_re,
+                       &rays.gr_eps_im, &rays.fbs_pos, &rays.lbs_pos, &rays.fallback, &link_gain_dB, tx_pos, rx_pos, kf_ratio);
+    };
+    check(&M, "M"), check(path_type, "path_type"), check(ray_ind, "ray_ind");
+    const arma::mat *outputs[8] = {&path_gain, &path_length, aod, eod, aoa, eoa, fbs_pos, lbs_pos};
+    const char *names[8] = {"path_gain", "path_length", "aod", "eod", "aoa", "eoa", "fbs_pos", "lbs_pos"};
+    for (int i = 0; i < 8; ++i)
+        check(outputs[i], names[i]);
+    qd_check_alias_list(outputs, names);
 
     const bool drift = mobility == "drift" || (mobility == "auto" && rays.method == "quadriga");
     const double *T0 = rays.tx_pos.memptr(), *R0 = rays.rx_pos.memptr();
@@ -162,7 +174,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
             keep.push_back(i);
     const arma::uword n_path = (arma::uword)keep.size(), n_sc = drift ? n_path : 0;
 
-    // Outputs: resized only when the size differs, so that pre-sized outputs are written in place
+    // Outputs: resized only when the size differs, so that pre-sized outputs keep their memory
     if (path_gain.n_rows != n_path || path_gain.n_cols != n_freq)
         path_gain.set_size(n_path, n_freq);
     if (path_length.n_elem != n_path)

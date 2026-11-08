@@ -1087,6 +1087,18 @@ TEST_CASE("path_loss - input validation")
         {"tripple_slope", {{"A1", {22.0}}, {"B", {28.0}}, {"E1", {13.33}}}},
         {"nlos", {{"An", {39.08}}, {"Bn", {13.54}}, {"A1", {22.0}}, {"B", {28.0}}, {"E", {13.33}}}}};
 
+    SECTION("outputs that alias inputs")
+    {
+        arma::mat r = rx, t = tx, sf;
+        CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &sf));
+        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, tx, r, r), std::invalid_argument);        // pl is 'rx_pos'
+        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, t, rx, pl, &t), std::invalid_argument);   // sf_sigma is 'tx_pos'
+        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &pl), std::invalid_argument); // sf_sigma is 'pl'
+        arma::mat on_rx(r.memptr(), 3, 2, false, true);
+        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, tx, r, on_rx), std::invalid_argument);
+        CHECK(arma::approx_equal(r, rx, "absdiff", 0.0));
+    }
+
     SECTION("valid baseline")
     {
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl));

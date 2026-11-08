@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -57,6 +58,9 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh,
         throw std::invalid_argument("Output 'meshA' cannot be NULL.");
     if (meshB == nullptr)
         throw std::invalid_argument("Output 'meshB' cannot be NULL.");
+    qd_check_alias(meshA, "meshA", mesh);
+    qd_check_alias(meshB, "meshB", mesh);
+    qd_check_alias_outputs(meshA, "meshA", meshB, "meshB");
 
     // Calculate bounding box
     arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(mesh);

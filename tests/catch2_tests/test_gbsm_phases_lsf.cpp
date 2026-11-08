@@ -375,6 +375,13 @@ TEST_CASE("gbsm_init_phases - input validation")
         CHECK_NOTHROW(quadriga_lib::gbsm_init_phases({}, "lsf", phase, 1)); // empty scenpar: all defaults
         CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, 1, -1, "Comb256", nullptr, &rx, true, false)); // dual mobility without tx_pos, no bias removal
     }
+    SECTION("outputs that alias inputs")
+    {
+        arma::mat r = rx;
+        arma::cube on_rx(r.memptr(), 5, 3, 1, false, true);
+        CHECK_THROWS_AS(quadriga_lib::gbsm_init_phases(sp, "lsf", on_rx, 1, -1, "Comb256", &tx, &r), std::invalid_argument);
+        CHECK(arma::approx_equal(r, rx, "absdiff", 0.0));
+    }
     SECTION("seed")
     {
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "lsf", phase, -2, -1, "Comb256", &tx, &rx), std::invalid_argument,
@@ -924,6 +931,17 @@ TEST_CASE("gbsm_draw - lsf: input validation")
         bad(5, 3, 1) = NAN;
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "lsf", bad, tx, rx, rnd), std::invalid_argument,
                              Message("Input 'phase' must be finite."));
+    }
+    SECTION("outputs that alias inputs")
+    {
+        arma::mat r = rx, t = tx;
+        arma::cube ph = phase;
+        CHECK_THROWS_AS(quadriga_lib::gbsm_draw(sp, "lsf", phase, tx, r, r), std::invalid_argument); // rnd is 'rx_pos'
+        CHECK_THROWS_AS(quadriga_lib::gbsm_draw(sp, "lsf", phase, t, rx, t), std::invalid_argument); // rnd is 'tx_pos'
+        arma::mat on_phase(ph.memptr(), 3, 11, false, true);
+        CHECK_THROWS_AS(quadriga_lib::gbsm_draw(sp, "lsf", ph, tx, rx, on_phase), std::invalid_argument);
+        CHECK(arma::approx_equal(r, rx, "absdiff", 0.0));
+        CHECK(arma::approx_equal(ph, phase, "absdiff", 0.0));
     }
     SECTION("preset")
     {

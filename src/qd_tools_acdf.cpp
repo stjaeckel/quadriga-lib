@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -69,6 +70,18 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
     if (n_bins < 2)
         throw std::invalid_argument("Input 'n_bins' must be at least 2.");
+
+    qd_check_alias(bins, "bins", &data);
+    qd_check_alias(cdf_per_set, "cdf_per_set", &data, bins);
+    qd_check_alias(cdf_avg, "cdf_avg", &data, bins);
+    qd_check_alias(mu, "mu", &data, bins);
+    qd_check_alias(sig, "sig", &data, bins);
+    qd_check_alias_outputs(cdf_per_set, "cdf_per_set", cdf_avg, "cdf_avg");
+    qd_check_alias_outputs(cdf_per_set, "cdf_per_set", mu, "mu");
+    qd_check_alias_outputs(cdf_per_set, "cdf_per_set", sig, "sig");
+    qd_check_alias_outputs(cdf_avg, "cdf_avg", mu, "mu");
+    qd_check_alias_outputs(cdf_avg, "cdf_avg", sig, "sig");
+    qd_check_alias_outputs(mu, "mu", sig, "sig");
 
     arma::uword n_samples = data.n_rows;
     arma::uword n_sets = data.n_cols;

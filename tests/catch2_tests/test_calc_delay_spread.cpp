@@ -320,3 +320,16 @@ TEST_CASE("calc_delay_spread - Granularity and delays must be finite, bin count 
     std::vector<arma::vec> dn = {{0.0, nan}};
     CHECK_NOTHROW(quadriga_lib::calc_delay_spread<double>(dn, p, 100.0, 0.0));
 }
+
+TEST_CASE("calc_delay_spread - outputs that alias inputs")
+{
+    std::vector<arma::vec> delays = {arma::vec({0.0, 1.0e-6, 2.0e-6})}, powers = {arma::vec({1.0, 0.5, 0.25})};
+    arma::vec mean_delay;
+    CHECK_NOTHROW(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay));
+    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &delays[0]), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &powers[0]), std::invalid_argument);
+    CHECK(delays[0].n_elem == 3);
+
+    arma::vec view(powers[0].memptr(), 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &view), std::invalid_argument);
+}

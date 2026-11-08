@@ -105,3 +105,17 @@ TEST_CASE("path_to_tube - non-finite coordinates or radius throw")
     CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p4, &vert, &faces, nan, 4), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p4, &vert, &faces, inf, 4), std::invalid_argument);
 }
+
+TEST_CASE("path_to_tube - outputs that alias inputs")
+{
+    arma::mat path = {{0.0, 1.0, 2.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}}, vert;
+    arma::umat faces;
+    CHECK_NOTHROW(quadriga_lib::path_to_tube(&path, &vert, &faces, 0.1));
+
+    arma::mat p = path;
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube(&p, &p, &faces, 0.1), std::invalid_argument);
+    CHECK(arma::approx_equal(p, path, "absdiff", 0.0));
+
+    arma::mat view(p.memptr(), 3, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube(&p, &view, &faces, 0.1), std::invalid_argument);
+}

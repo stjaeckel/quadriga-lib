@@ -163,7 +163,9 @@ if (out != nullptr && (out->n_rows != n_ray || out->n_cols != 3))
 ```
   - Reason: the MEX and Python wrappers pre-allocate outputs in MATLAB / numpy memory and map Armadillo objects onto that memory. An unconditional `set_size`, `zeros(n, m)`, or assignment of a differently sized object would detach the output from that memory or throw. With the size check, a correctly pre-sized output is written zero-copy.
   - Consequence: every element of an output must be written by the function (it may hold arbitrary data on entry), and the output size must be derivable from the inputs and documented.
-- Do not read from an output before writing it, and do not assume that distinct arguments point to distinct objects unless the contract says so; if aliasing an input with an output is not supported, say so in the documentation.
+- Do not read from an output before writing it.
+- An output must not be the same object as an input or another output, nor share memory with one. Check this with `qd_check_alias`, `qd_check_alias_outputs` or `qd_check_alias_list` (`src/quadriga_lib_helper_functions.hpp`) after the null checks and before the first output is resized or written; such a call throws `std::invalid_argument`. The rule is stated once in the general C++ API documentation, not per function. A function that needs a different behaviour states it in its requirements and documentation.
+  - Reason: outputs are resized and written while inputs are still read. Supporting aliasing needs a copy of the input, which saves the caller no memory; a caller who wants the result in place uses a separate output and `swap()`.
 - In/out arguments (documented as "updated in-place") keep their size; validate it like an input.
 
 ## Numerics and types

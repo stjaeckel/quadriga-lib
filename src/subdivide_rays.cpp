@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -121,6 +122,7 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> &orig,
     arma::Mat<dtype> *out_list[4] = {origN, trivecN, tridirN, destN};
     const arma::uword out_cols[4] = {3, 9, tridir.n_cols, 3};
     const char *out_name[4] = {"origN", "trivecN", "tridirN", "destN"};
+    qd_check_alias_list<arma::Mat<dtype>>({origN, trivecN, tridirN, destN}, out_name, &orig, &trivec, &tridir, dest);
 
     // Number of ray slots in the output buffers, rays are in the columns for transposed output.
     // Buffers that can hold all new rays are reused as they are and must have the same size.

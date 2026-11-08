@@ -4,6 +4,7 @@
 
 #include "quadriga_arrayant.hpp"
 #include "qd_arrayant_interpolate.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -100,6 +101,9 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<quadriga_lib::ar
         throw std::invalid_argument("arrayant_interpolate_multi: Input 'frequency' cannot be NULL or empty.");
     if (V_re == nullptr || V_im == nullptr || H_re == nullptr || H_im == nullptr)
         throw std::invalid_argument("arrayant_interpolate_multi: Outputs 'V_re', 'V_im', 'H_re', 'H_im' cannot be NULL.");
+
+    qd_check_alias_list({V_re, V_im, H_re, H_im}, {"V_re", "V_im", "H_re", "H_im"},
+                        azimuth, elevation, frequency, orientation, element_pos_i);
 
     if (validate_input)
     {

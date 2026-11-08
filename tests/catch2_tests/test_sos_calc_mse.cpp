@@ -352,34 +352,21 @@ TEST_CASE("sos_calc_mse - a perfect fit returns +Inf")
     CHECK((std::isinf(mf) && mf > 0.0f));
 }
 
-TEST_CASE("sos_calc_mse - an output may be the same object as an input")
+TEST_CASE("sos_calc_mse - outputs that alias inputs")
 {
-    arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0);
-    arma::mat freq = rnd(12, 3, -0.15, 0.15, 60);
+    arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0), tail;
+    arma::mat freq = rnd(12, 3, -0.15, 0.15, 60), dir;
+    double core = 0.0, all = 0.0;
+    CHECK_NOTHROW(quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all, &tail, &dir, 7));
 
-    double core = 0.0, all = 0.0, core1 = 0.0, all1 = 0.0;
-    arma::vec tail;
-    arma::mat dir;
-    double ref = quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all, &tail, &dir, 7);
-
-    // acf_tail is 'acf' (6 elements, resized to 4), test_dir is 'freq'
-    arma::vec a = acf;
+    arma::vec a = acf, d = dist;
     arma::mat f = freq;
-    double mse = quadriga_lib::sos_calc_mse(f, a, dist, &core1, &all1, &a, &f, 7);
-    CHECK(mse == ref);
-    CHECK(core1 == core);
-    CHECK(all1 == all);
-    REQUIRE(a.n_elem == 4);
-    CHECK(arma::approx_equal(a, tail, "absdiff", 0.0));
-    REQUIRE(f.n_rows == 7);
-    CHECK(arma::approx_equal(f, dir, "absdiff", 0.0));
-
-    // acf_tail is 'dist'
-    arma::vec d = dist;
-    mse = quadriga_lib::sos_calc_mse(freq, acf, d, &core1, &all1, &d, (arma::mat *)nullptr, 7);
-    CHECK(mse == ref);
-    CHECK(core1 == core);
-    CHECK(arma::approx_equal(d, tail, "absdiff", 0.0));
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, a, dist, &core, &all, &a, &dir, 7), std::invalid_argument);  // acf_tail is 'acf'
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, d, &core, &all, &tail, &d, 7), std::invalid_argument);  // test_dir is 'dist'
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(f, acf, dist, &core, &all, &tail, &f, 7), std::invalid_argument);  // test_dir is 'freq'
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &core, &tail, &dir, 7), std::invalid_argument); // mse_all is 'mse_core'
+    arma::vec t(f.memptr(), 4, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(f, acf, dist, &core, &all, &t, &dir, 7), std::invalid_argument); // acf_tail on the memory of 'freq'
 }
 
 TEST_CASE("sos_calc_mse - results do not depend on the number of threads")

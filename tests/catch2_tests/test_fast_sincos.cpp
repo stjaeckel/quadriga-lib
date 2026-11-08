@@ -139,3 +139,21 @@ TEMPLATE_TEST_CASE("Fast Sine / Cosine - sweep over [-1e10, 1e10] and lane indep
             }
     }
 }
+
+TEST_CASE("fast_sincos - Outputs that alias inputs")
+{
+    arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 9), s, c;
+    CHECK_NOTHROW(quadriga_lib::fast_sincos(x, &s, &c));
+
+    // An output is the input
+    CHECK_THROWS_AS(quadriga_lib::fast_sincos(x, &x, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::fast_sincos(x, &s, &x), std::invalid_argument);
+
+    // Both outputs are the same object
+    CHECK_THROWS_AS(quadriga_lib::fast_sincos(x, &s, &s), std::invalid_argument);
+
+    // An output uses part of the memory of the input (shifted by one element)
+    arma::fvec buf = arma::linspace<arma::fvec>(-1.0f, 1.0f, 10);
+    arma::fvec x_part(buf.memptr(), 9, false, true), s_part(buf.memptr() + 1, 9, false, true);
+    CHECK_THROWS_AS(quadriga_lib::fast_sincos(x_part, &s_part), std::invalid_argument);
+}

@@ -579,6 +579,9 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
             throw std::invalid_argument("Entries of 'n_cluster' must be in [" + std::to_string(N_lo) + ", " +
                                         std::to_string(N) + "].");
     }
+    qd_check_alias_list({&delay, &power, &aod, &eod, &aoa, &eoa}, {"delay", "power", "aod", "eod", "aoa", "eoa"},
+                        &tx_pos, &rx_pos, &lsp, &rnd, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps_re, gr_eps_im);
+    qd_check_alias(n_active, "n_active", n_cluster);
 
     // Outputs
     const arma::uword n_slot = 1 + (G ? 1 : 0) + N, n_fd = m_mf ? F : 1;
