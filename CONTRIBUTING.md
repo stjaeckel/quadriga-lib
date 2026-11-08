@@ -12,6 +12,24 @@
 
 **Pull requests.** Small fixes are welcome. For anything larger, please open an issue first so the approach can be agreed before you write code. New or changed API functions follow `md/SPEC_CPP_API.md`, `md/SPEC_MATLAB_API.md` and `md/SPEC_PYTHON_API.md`. A change to the doc-block or content format, or to what the documentation builders do, updates `docs_builder/README.md` or `website_builder/README.md` in the same commit.
 
+## Commit messages
+
+```
+<area>: <imperative summary, at most 60 characters, no period>
+
+<body, wrapped at 72 columns>
+
+Fixes #N | Part of #N
+```
+
+**Area.** One lowercase prefix for the layer where the change originates. `cpp`: a change in the C++ core, including wrapper pass-through edits and regenerated `docs/`. `api`: the public interface changes (new function, renamed argument, changed default) in C++ and both wrappers. `mex`, `python`: a change in that wrapper only. `docs`: text only, no change in behaviour. Others: `tests`, `build`, `website`, `notes`. If two fit, prefer `api` over `cpp` and `cpp` over `mex` or `python`. Never combine prefixes.
+
+**Subject.** Imperative mood ("Fix", "Add", "Make"), saying what changes for a user of the library. Details go in the body.
+
+**Body.** What was wrong and why, with measured numbers where they exist; what the change does now; side effects (changed results, renamed API, layers touched, "docs/ is regenerated"); "Tests: <platforms and suites> pass". Plain physics and engineering terms, no internal tracking ids or planning documents.
+
+**Scope.** One logical change per commit. A part that could be reverted on its own goes in its own commit.
+
 ## For the maintainer and coding sessions
 
 This part describes how issues are filed, fixed and closed. It is written so that a coding session can follow it on its own. Everything in an issue is public: no private details, no local paths, no local branch names, no references to temporary `md/` documents. Refer to release tags (e.g. `v0.12.4`) or commits on `main`.
