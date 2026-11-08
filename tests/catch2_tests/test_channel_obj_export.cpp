@@ -3,7 +3,9 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <fstream>
 #include <iostream>
+#include <string>
 
 #include "quadriga_lib.hpp"
 
@@ -83,4 +85,38 @@ TEST_CASE("Channel - OBJ Export")
 
     std::remove("test_chan.obj");
     std::remove("test_chan.mtl");
+}
+TEST_CASE("Channel - OBJ Export skips paths with non-finite coordinates")
+{
+    quadriga_lib::channel<double> c;
+    c.tx_pos = arma::mat({0.0, 0.0, 1.0}).t();
+    c.rx_pos = arma::mat({20.0, 0.0, 1.0}).t();
+    c.center_frequency = 1.0e9;
+
+    // 2 paths: LOS and a single-bounce path with a NaN interaction point
+    c.no_interact.push_back(arma::u32_vec({0, 1}));
+    c.interact_coord.push_back(arma::mat({arma::datum::nan, 10.0, 1.0}).t());
+    c.coeff_re.push_back(arma::cube(1, 1, 2, arma::fill::value(1.0e-3)));
+    c.coeff_im.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
+    c.delay.push_back(arma::cube(1, 1, 2, arma::fill::value(1.0e-7)));
+
+    c.write_paths_to_obj_file("test_chan_nonfinite.obj", 0, 0.0, -100.0);
+
+    std::ifstream file("test_chan_nonfinite.obj");
+    REQUIRE(file.is_open());
+    std::string line;
+    int n_obj = 0, n_nan = 0;
+    while (std::getline(file, line))
+    {
+        if (line.rfind("o QuaDRiGa_path", 0) == 0)
+            ++n_obj;
+        if (line.rfind("#", 0) != 0 && line.find("nan") != std::string::npos) // the comment table also lists skipped paths
+            ++n_nan;
+    }
+    file.close();
+    std::remove("test_chan_nonfinite.obj");
+    std::remove("test_chan_nonfinite.mtl");
+
+    CHECK(n_obj == 1);
+    CHECK(n_nan == 0);
 }

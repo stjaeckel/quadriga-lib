@@ -56,8 +56,8 @@ void quadriga_lib::path_to_tube(
 ```
 
 ## Inputs:
-- **`path_coord`** — Ordered 3D path coordinates; `[3, n_coord]`
-- **`radius`** *(optional)* — Tube cross-section radius
+- **`path_coord`** — Ordered 3D path coordinates, finite; `[3, n_coord]`
+- **`radius`** *(optional)* — Tube cross-section radius, finite and > 0
 - **`n_edges`** *(optional)* — Number of vertices per circular cross-section; must be ≥ 3
 
 ## Outputs:
@@ -82,9 +82,12 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
     if (path_coord->n_cols < 2ULL)
         throw std::invalid_argument("Input 'path_coord' must have 2 or more columns.");
 
+    if (!path_coord->is_finite())
+        throw std::invalid_argument("Input 'path_coord' must contain only finite values.");
+
     double radius_d = (double)radius;
-    if (radius_d <= 0.0)
-        throw std::invalid_argument("Radius mut be larger than 0.");
+    if (!std::isfinite(radius_d) || radius_d <= 0.0)
+        throw std::invalid_argument("Radius must be finite and larger than 0.");
 
     if (n_edges < 3ULL)
         throw std::invalid_argument("Number of edges mut be >= 3.");
