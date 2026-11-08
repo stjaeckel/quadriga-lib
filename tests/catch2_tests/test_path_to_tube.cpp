@@ -80,3 +80,28 @@ TEST_CASE("path_to_tube - straight, nearly straight and reversed paths give fini
     quadriga_lib::path_to_tube<double>(&pm, &vert, &faces, radius, n_edges);
     CHECK(vert.is_finite());
 }
+
+TEST_CASE("path_to_tube - non-finite coordinates or radius throw")
+{
+    arma::mat vert;
+    arma::umat faces;
+    const double nan = arma::datum::nan, inf = arma::datum::inf;
+
+    // NaN point after 5 long segments (the merged path no longer fits into in-object storage)
+    arma::mat p1 = {{0.0, 1.0, 2.0, 3.0, 4.0, 5.0, nan, 6.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p1, &vert, &faces, 0.1, 4), std::invalid_argument);
+
+    // Short path, merged path stored inside the matrix object
+    arma::mat p2 = {{0.0, 1.0, 2.0, 3.0, 4.0, nan, 5.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p2, &vert, &faces, 0.1, 4), std::invalid_argument);
+
+    // Two neighbouring points at +inf in the same coordinate (inf - inf = NaN)
+    arma::fmat p3 = {{0.0f, 1.0f, (float)inf, (float)inf, 2.0f}, {0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 0.0f, 0.0f}};
+    arma::fmat vf;
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<float>(&p3, &vf, &faces, 0.1f, 4), std::invalid_argument);
+
+    // Non-finite radius
+    arma::mat p4 = {{0.0, 1.0, 2.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p4, &vert, &faces, nan, 4), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p4, &vert, &faces, inf, 4), std::invalid_argument);
+}

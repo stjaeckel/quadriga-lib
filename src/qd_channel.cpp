@@ -729,6 +729,7 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
 - Paths below `gain_min` are excluded; `max_no_paths` limits total count
+- Paths with non-finite coordinates are skipped
 
 ## Declaration:
 ```
@@ -926,6 +927,10 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
             x = std::round(x);
 
             color_index(i_path) = (p < gain_min) ? -1 : (int)x;
+
+            // Paths with non-finite coordinates cannot be drawn
+            if (!path_coord[i_path].is_finite())
+                color_index(i_path) = -1;
         }
 
         // Sort the path power in decreasing order and return the indices
