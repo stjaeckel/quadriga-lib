@@ -102,7 +102,8 @@ if (nlhs > 2)
 ```
 // ---------- Inputs: MATLAB -> C++ ----------
 
-// Scalar, casts to dtype; returns default_value for empty input "[]". Integer types need an integer value in range.
+// Scalar, casts to dtype; returns default_value for empty input "[]"; more than one element raises
+// "Input 'x' must be a scalar.". Integer types need an integer value in range.
 dtype qd_mex_get_scalar(const mxArray *input, std::string var_name, dtype default_value);
 dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = ""); // floating point only; NaN for "[]"
 

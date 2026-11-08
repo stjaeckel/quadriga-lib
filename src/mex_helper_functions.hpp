@@ -194,8 +194,9 @@ inline std::array<size_t, 5> qd_mex_get_dims(const mxArray *input, const std::st
     return {d1, d2, d3, d4, d1 * d2 * d3 * d4};
 }
 
-// Helper for qd_mex_get_scalar: reads the first element and casts it to <dtype>; sets "bad" when the value
-// does not fit an integer type (see qd_mex_fits); returns default_value for empty input
+// Helper for qd_mex_get_scalar: reads the one element and casts it to <dtype>; sets "bad" when the value
+// does not fit an integer type (see qd_mex_fits); returns default_value for empty input; more than one element
+// raises "Input 'x' must be a scalar."
 template <typename dtype>
 inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_name, dtype default_value, bool &bad)
 {
@@ -204,6 +205,11 @@ inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_nam
         return default_value;
 
     qd_mex_check_input(input, var_name); // Rejects complex and sparse input
+    if (mxGetNumberOfElements(input) != 1)
+    {
+        const std::string msg = var_name.empty() ? "Input must be a scalar." : "Input '" + var_name + "' must be a scalar.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
 
     // Integer classes are read without a detour through double
     dtype value = default_value;
@@ -212,7 +218,7 @@ inline dtype qd_mex_read_scalar(const mxArray *input, const std::string &var_nam
 }
 
 // Read a scalar input from MATLAB and convert it to a desired c++ output type
-// - Casts to <dtype>; returns default_value for empty input
+// - Casts to <dtype>; returns default_value for empty input; more than one element is an error
 // - Integer types (except bool) need an integer value in their range: NaN, Inf, fractional, negative (unsigned) or
 //   too large values raise an error
 // - Rejects complex and sparse input

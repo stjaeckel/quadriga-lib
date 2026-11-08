@@ -60,7 +60,7 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 - **`p_los`** — LOS probability in [0, 1]; `[n_link, 1]`
 - **`los_soft`** — Soft LOS state in [0, 1]; `> 0.5` exactly when `rnd_g > -F(p_los)` of eq.
   (7.6-18), which has the probability `p_los`; `[n_link, n_freq]`; `[]` if `rnd_g` or `center_freq`
-  is omitted or empty
+  is omitted or empty; `zeros(0, n_freq)` for no link and `center_freq` given
 
 ## See also:
 - [[o2i_loss]] (indoor distance for `d2d_out`)
@@ -81,11 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec h_bs = qd_mex_get_Col<double>(prhs[2]);
     const arma::vec h_ut = qd_mex_get_Col<double>(prhs[3]);
     auto clutter = [&](int k, const std::string &name) // omitted or [] = NaN (TR default), else a scalar
-    {
-        if (nrhs > k && mxGetNumberOfElements(prhs[k]) > 1)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Input '" + name + "' must be a scalar.").c_str());
-        return (nrhs <= k) ? NAN : qd_mex_get_scalar<double>(prhs[k], name, NAN);
-    };
+    { return (nrhs <= k) ? NAN : qd_mex_get_scalar<double>(prhs[k], name, NAN); };
     const double d_clutter = clutter(4, "d_clutter"), r_clutter = clutter(5, "r_clutter");
     const double h_clutter = clutter(6, "h_clutter");
     const arma::vec rnd_g = (nrhs < 8) ? arma::vec() : qd_mex_get_Col<double>(prhs[7]);
@@ -99,8 +95,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[0] = qd_mex_init_output(&p_los, d2d_out.n_elem);
     if (soft)
         plhs[1] = qd_mex_init_output(&los_soft, d2d_out.n_elem, center_freq.n_elem);
-    else if (nlhs > 1)
-        plhs[1] = mxCreateDoubleMatrix(0, 0, mxREAL);
+    else if (nlhs > 1) // [], or [0, n_freq] for no link: an empty 'rnd_g' is then a valid input
+        plhs[1] = mxCreateDoubleMatrix(0, d2d_out.is_empty() ? center_freq.n_elem : 0, mxREAL);
 
     // Wrap optional pointers
     const arma::vec *p_rnd_g = rnd_g.empty() ? nullptr : &rnd_g;

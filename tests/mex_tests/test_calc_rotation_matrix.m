@@ -89,6 +89,7 @@ assertElementsAlmostEqual( R, [c,0,-s,0,1,0,s,0,c]', 'absolute', 1e-5 );
 assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( sparse([0;0;1]) ), 'Sparse inputs are not supported.' );
 assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], sparse(true) ), 'Input ''invert_y_axis'' is sparse' );
 assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( zeros(3,1,1,1,2) ), 'Inputs with more than 4 dimensions are not supported.' );
+assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], [true, false] ), 'Input ''invert_y_axis'' must be a scalar.' );
 
 end
 

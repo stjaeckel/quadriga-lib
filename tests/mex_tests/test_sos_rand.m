@@ -65,6 +65,7 @@ assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], dd ), 'dist_decorr_b' ); 
 assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], 'Comb300' ), 'Input ''preset'' is not a known preset.' );  % thrown by C++
 assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], [], NaN ), 'Input ''seed''' );            % wrapper
 assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], [], -2 ), 'seed' );                        % thrown by C++
+assert_throws( @() quadriga_lib.sos_rand( dd, pos, [], [], [], [5, -7] ), 'Input ''seed'' must be a scalar.' );
 
 end
 

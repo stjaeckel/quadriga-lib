@@ -64,6 +64,9 @@ assertElementsAlmostEqual( s4(3:4, :), ref, 'absolute', 1e-8 );
 [ ~, s5 ] = quadriga_lib.los_probability( '38.901_UMi', d, 10, 1.5, NaN, NaN, NaN, rnd_g', fc' );  % row / column
 assertEqual( s5, s4 );
 assertEqual( quadriga_lib.los_probability( '38.901_UMi', d, 10, 1.5, [], [], [], rnd_g, fc ), p );
+[ p6, s6 ] = quadriga_lib.los_probability( '38.901_UMi', zeros(0, 1), 10, 1.5, [], [], [], zeros(0, 1), fc );
+assertEqual( size(p6), [0, 1] );
+assertEqual( size(s6), [0, 2] );                                               % no link: [0, n_freq]
 
 %% Outputs: none
 quadriga_lib.los_probability( '38.901_UMi', d, 10, 1.5 );
