@@ -29,7 +29,7 @@ lang: en-US
 | [export_obj_file](#export_obj_file) | Array antenna functions | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
 | [generate](#generate) | Array antenna functions | Generates predefined array antenna models |
 | [generate_speaker](#generate_speaker) | Array antenna functions | Generate a parametric frequency-dependent loudspeaker directivity model |
-| [interpolate](#interpolate) | Array antenna functions | Interpolate polarimetric array antenna field patterns (single- and multi-frequency) |
+| [interpolate](#interpolate) | Array antenna functions | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
 | [qdant_read](#qdant_read) | Array antenna functions | Reads array antenna data from QDANT files |
 | [qdant_write](#qdant_write) | Array antenna functions | Writes array antenna data to QDANT files |
 | [rotate_pattern](#rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns around the principal axes using Euler rotations |
@@ -532,86 +532,79 @@ speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 5
 ---
 <a id="interpolate"></a>
 ## interpolate
-Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
+Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
 
-Also in: [C++](quadriga_lib_api_cpp.md#.interpolate) · [MATLAB](quadriga_lib_api_mex.md#arrayant_interpolate)
+Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [MATLAB](quadriga_lib_api_mex.md#arrayant_interpolate)
 
-- Interpolates the complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles
-- NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised
-- Single-frequency input (3D pattern fields) returns 2D outputs `(n_out, n_ang)`; the optional `dist` and
-  `local_angles` outputs are available only on this path
-- Multi-frequency input (4D pattern fields) interpolates spatially and across frequency; for each
-  target frequency the two bracketing `center_freq` entries are blended via SLERP
-- Passing `frequency` adds a frequency dimension to the output `(n_out, n_ang, n_freq_out)`; for a
-  single-frequency antenna the spatial result is simply replicated across the requested frequencies
-- `azimuth` / `elevation` of shape `(1, n_ang)` apply the same angles to all elements (planar
-  wave); shape `(n_out, n_ang)` gives per-element angles (spherical wave)
+- Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
+  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
+- Single-frequency mode (3D pattern arrays and no `frequency`): outputs `(n_out, n_ang)`; `dist` and `local_angles`
+  add outputs. Multi-frequency mode (4D pattern arrays, or `frequency` given): for each target frequency, the two
+  entries whose center frequencies bracket it are interpolated and blended; frequencies outside the entries take the
+  nearest entry; outputs `(n_out, n_ang, n_freq)`; a 3D pattern is the same at every frequency
+- `azimuth` of shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
+- NaN or infinite angles give NaN in all outputs of that angle and output, without an error
+- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to a few 1e-5 of the peak
+  field value and about 1e-4 rad in the angles (more near the poles of the local frame); auto selects GENERIC in this
+  version, which may change in a later version
+- The flags `dist`, `local_angles`, `fast_access` and `complex` take a bool or `numpy.bool_`; `None` selects the
+  default, any other type raises `TypeError`
 
 ### Usage:
 ```python
-# Single-frequency, separate real / imaginary parts
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation )
+# Single-frequency mode
+V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
+    orientation, element_pos, use_kernel=0 )
 
-# Complex-valued output
-v, h = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, complex=True )
+# Single-frequency mode with the projected distance and the local angles
+V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( \
+    arrayant, azimuth, elevation, ..., dist=True, local_angles=True )
 
-# Projected distance / local angles (single-frequency only)
-vr, vi, hr, hi, dist = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, dist=True )
-vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, \
-    azimuth, elevation, orientation=ori, local_angles=True )
+# Multi-frequency mode
+V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., frequency=freqs )
 
-# Element selection, orientation, element positions
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
-    orientation, element_pos )
-
-# Multi-frequency interpolation — output gains a frequency axis
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, frequency=freqs )
+# Complex output
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=True )
 ```
 
 ### Inputs:
-- **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`;
-  4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
-- **`azimuth`** — Azimuth angles in rad, in [-pi, pi]; `(1, n_ang)` for shared angles (planar
-  wave) or `(n_out, n_ang)` for per-element angles (spherical wave)
-- **`elevation`** — Elevation angles in rad, in [-pi/2, pi/2]; same shape as `azimuth`
-- **`element`** — Element indices to interpolate; duplicates allowed; `(n_out,)` or a
-  list of int; `None` or empty uses all elements (`n_out = n_elements`); default: `None`
-- **`orientation`** — antenna orientation (bank, tilt, heading) in rad; shape `(3, 1)`,
-  `(3, n_out)`, `(3, 1, n_ang)`, or `(3, n_out, n_ang)`; `None` uses East-facing broadside;
-  default: `None`
-- **`element_pos`** — Alternative element (x,y,z) positions in m; `(3, n_out)`; `None` falls back
-  to `arrayant["element_pos"]` (or zeros); default: `None`
-- **`frequency`** — Target frequencies in Hz; `(n_freq_out,)` or scalar; adds a frequency axis to
-  the output; for 4D input it interpolates between entries, for 3D input it replicates the spatial
-  result; if omitted for 4D input the entries' `center_freq` values are used; default: `None`
-- **`complex`** — If `True`, return complex-valued arrays instead of separate real / imaginary
-  parts; default: `False`
-- **`dist`** — If `True`, also return the projected distances; single-frequency input only and
-  not allowed together with `frequency`; default: `False`
-- **`local_angles`** — If `True`, also return the antenna-local angles; single-frequency input
-  only and not allowed together with `frequency`; default: `False`
-- **`fast_access`** — If `True`, require the pattern arrays to be double and column-major
-  (Fortran-contiguous) so they can be read without a copy; raises if not. With `False`, such arrays are
-  read without a copy as well and all others are copied; default: `False`
+- **`arrayant`** — Dict containing the arrayant data; layout as documented in [generate](#generate); 4D pattern arrays contain
+  a frequency-dependent model
+- **`azimuth`** — Azimuth angles in GCS; `(1, n_ang)` (same angles for all outputs) or `(n_out, n_ang)` (one angle
+  per output)
+- **`elevation`** — Elevation angles in GCS; same shape as `azimuth`
+- **`element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
+- **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `(3, 1)`, `(3, n_out)`, `(3, 1, n_ang)` or
+  `(3, n_out, n_ang)`; default: `None` (no rotation)
+- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `(3, n_out)`; default: `None`
+  (the positions of the arrayant)
+- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `(n_freq,)`; default: `None` (the
+  `center_freq` of the entries)
+- **`dist`** — Also return the projected distance; single-frequency mode only; default: `False`
+- **`local_angles`** — Also return the local angles and the polarization rotation angle; single-frequency mode only;
+  default: `False`
+- **`fast_access`** — Require the pattern arrays to be float64 and Fortran-contiguous, so that they are read without
+  a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
+  default: `False`
+- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
+- **`complex`** — Return `V` and `H` as complex arrays instead of `V_re, V_im, H_re, H_im`; default: `False`
 
 ### Outputs:
-Returned as a tuple; its length depends on `complex`, `dist`, and `local_angles`.
-- **`vr`, `vi`, `hr`, `hi`** — Real / imaginary parts of the interpolated e-theta (V) and e-phi
-  (H) field components; `(n_out, n_ang)`, or `(n_out, n_ang, n_freq_out)` when `frequency` is
-  given; returned when `complex` is `False`
-- **`v`, `h`** — Complex-valued e-theta (V) and e-phi (H) components; same shape as above;
-  returned instead of `vr, vi, hr, hi` when `complex` is `True`
-- **`dist`** — Projected distances between elements on the wavefront plane, used for phase
-  computation; `(n_out, n_ang)`; returned only when `dist` is `True`
-- **`azimuth_loc`, `elevation_loc`, `gamma`** — Azimuth, elevation, and polarization rotation
-  angles in the local element frame, in rad; `(n_out, n_ang)` each; returned only when
+- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `(n_out, n_ang)`; multi-frequency mode:
+  `(n_out, n_ang, n_freq)`
+- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same shape as `V_re`
+- **`V`** / **`H`** — e-theta and e-phi field, complex; returned instead of the real parts when `complex` is `True`
+- **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
+  elements closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
+- **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`;
+  returned when `local_angles` is `True`
+- **`gamma`** — Polarization rotation angle from the global to the local frame; `(n_out, n_ang)`; returned when
   `local_angles` is `True`
 
 ### See also:
-- [qdant_read](#qdant_read) / [qdant_write](#qdant_write) (load / save arrayant data)
-- [generate](#generate) (arrayant struct layout)
-- [generate_speaker](#generate_speaker) (typical multi-frequency struct array source)
+- [generate](#generate) (arrayant dict layout)
+- [qdant_read](#qdant_read) (load arrayant data)
+- [generate_speaker](#generate_speaker) (typical source of multi-frequency arrayants)
 
 ---
 <a id="qdant_read"></a>
@@ -1627,6 +1620,8 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_chann
     angles=True )
 
 coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
+
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
 ```
 
 ### Inputs:
@@ -1652,6 +1647,9 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   separate `coeff_re` and `coeff_im`; default: `False`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
+- **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [interpolate](#interpolate);
+  `int`; default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`

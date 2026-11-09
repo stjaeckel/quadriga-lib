@@ -5,8 +5,16 @@
 #ifndef qd_arrayant_qdant_H
 #define qd_arrayant_qdant_H
 
+#include "quadriga_arrayant.hpp"
+
 #include <armadillo>
+#include <climits>
+#include <stdexcept>
 #include <string>
+
+#if BUILD_WITH_AVX2
+#include "quadriga_lib_avx2_functions.hpp"
+#endif
 
 // Returns empty string if there was no error or an error message otherwise
 template <typename dtype> // float or double
@@ -76,5 +84,51 @@ inline void qd_arrayant_coupling_block_diag(const arma::Mat<dtype> &coupling_re1
             coupling_im.submat(n_el1, n_ports1, r1, c1) = coupling_im2;
     }
 }
+
+// Resolves the kernel selector 'use_kernel' of the arrayant interpolation functions to the kernel that runs: 1
+// (GENERIC) for 0 (auto) and 1, 2 (AVX2) for 2. Throws std::invalid_argument for other values, and for 2 when the
+// AVX2 kernel is not available (BUILD_WITH_AVX2 and the CPU check) or when a pattern cube has more than INT_MAX
+// values (int32 gather offsets of the AVX2 kernel); n_pattern_values: number of values of the largest pattern cube
+static inline int qd_arrayant_interpolate_kernel(int use_kernel, unsigned long long n_pattern_values)
+{
+    if (use_kernel < 0 || use_kernel > 2)
+        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
+    if (use_kernel != 2)
+        return 1; // Auto selects GENERIC
+#if BUILD_WITH_AVX2
+    const bool avx2_available = runtime_AVX2_Check();
+#else
+    const bool avx2_available = false;
+#endif
+    if (!avx2_available)
+        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+    if (n_pattern_values > (unsigned long long)INT_MAX)
+        throw std::invalid_argument("AVX2 kernel requested, but the antenna pattern has more than INT_MAX samples.");
+    return 2;
+}
+
+// Interpolates the pattern of 'ant' (arrayant_interpolate without its argument handling), for library functions that
+// have validated the arrayant themselves (e.g. with is_valid) and own the outputs
+// - Preconditions, not checked: 'ant' is valid; no output aliases an input, a data member of 'ant' or another output
+// - Checks, before a kernel runs: i_element not empty and its entries < n_elements; the sizes of the angles, the
+//   orientation, the positions and the outputs; n_ang <= INT_MAX; kernel 1 or 2, for 2 as qd_arrayant_interpolate_kernel;
+//   throws std::invalid_argument on a violation. With n_ang = 0 it returns after the checks.
+// - All outputs are pre-sized by the caller and completely written; optional outputs may be nullptr
+template <typename dtype>
+void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant, // Valid array antenna with n_elements elements
+                                      const arma::Mat<dtype> &azimuth,          // Azimuth angles in GCS in rad; [1, n_ang] or [n_out, n_ang]
+                                      const arma::Mat<dtype> &elevation,        // Elevation angles in GCS in rad; same size as azimuth
+                                      const arma::uvec &i_element,              // Element indices, 0-based; [n_out], n_out >= 1
+                                      const arma::Cube<dtype> &orientation,     // Euler angles in rad; [3, 1 or n_out, 1 or n_ang]
+                                      const arma::Mat<dtype> &element_pos,      // Element positions in m; [3, n_out]
+                                      arma::Mat<dtype> &V_re,                   // Output: e-theta field, real part; [n_out, n_ang]
+                                      arma::Mat<dtype> &V_im,                   // Output: e-theta field, imaginary part; [n_out, n_ang]
+                                      arma::Mat<dtype> &H_re,                   // Output: e-phi field, real part; [n_out, n_ang]
+                                      arma::Mat<dtype> &H_im,                   // Output: e-phi field, imaginary part; [n_out, n_ang]
+                                      arma::Mat<dtype> *dist,                   // Optional output: projected distance in m; [n_out, n_ang] or nullptr
+                                      arma::Mat<dtype> *azimuth_loc,            // Optional output: local azimuth in rad; [n_out, n_ang] or nullptr
+                                      arma::Mat<dtype> *elevation_loc,          // Optional output: local elevation in rad; [n_out, n_ang] or nullptr
+                                      arma::Mat<dtype> *gamma,                  // Optional output: polarization rotation angle in rad; [n_out, n_ang] or nullptr
+                                      int kernel);                              // Kernel: 1 = GENERIC, 2 = AVX2
 
 #endif

@@ -103,4 +103,27 @@ void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz, // Freque
                  const size_t n_pos,                                   // Number of positions
                  double *val);                                         // Output: Values, Size [n_pos, n_gen], uninitialized
 
+// Interpolation of array antenna patterns (arrayant_interpolate), AVX2 kernel; computes in single precision for
+// float and double. Arguments and preconditions as qd_arrayant_interpolate_GENERIC, and the pattern of all elements
+// has at most INT_MAX samples (int32 gather offsets); checked by qd_arrayant_interpolate_dispatch, not by the kernel.
+template <typename dtype>
+void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_im,       // e-theta field, real / imaginary part, [n_elevation, n_azimuth, n_elements]
+                                  const dtype *e_phi_re, const dtype *e_phi_im,           // e-phi field, real / imaginary part, [n_elevation, n_azimuth, n_elements]
+                                  const size_t n_elevation, const size_t n_azimuth,       // Number of elevation and azimuth samples, both >= 1
+                                  const dtype *azimuth_grid,                              // Azimuth sample angles in rad, strictly increasing, [n_azimuth]
+                                  const dtype *elevation_grid,                            // Elevation sample angles in rad, strictly increasing, [n_elevation]
+                                  const dtype *azimuth, const dtype *elevation,           // Angles in GCS in rad, [n_angle_rows, n_ang]
+                                  const size_t n_angle_rows,                              // 1 (same angles for all outputs) or n_out
+                                  const size_t n_ang,                                     // Number of angles, 1 <= n_ang <= INT_MAX
+                                  const dtype *rotation,                                  // Rotation matrices, 9 values per orientation column and slice, [9, n_rotation_cols, n_rotation_slices]
+                                  const size_t n_rotation_cols,                           // 1 (same orientation for all outputs) or n_out
+                                  const size_t n_rotation_slices,                         // 1 (same orientation for all angles) or n_ang
+                                  const dtype *element_pos,                               // Element positions in m, [3, n_out]
+                                  const unsigned long long *i_element,                    // Element indices, 0-based, < n_elements, [n_out]
+                                  const size_t n_out,                                     // Number of outputs, >= 1
+                                  dtype *V_re, dtype *V_im, dtype *H_re, dtype *H_im,     // Output: e-theta and e-phi field, [n_out, n_ang], allocated
+                                  dtype *dist,                                            // Optional output: projected distance in m, [n_out, n_ang] or nullptr
+                                  dtype *azimuth_loc, dtype *elevation_loc,               // Optional output: local angles in rad, [n_out, n_ang] or nullptr
+                                  dtype *gamma);                                          // Optional output: polarization rotation angle in rad, [n_out, n_ang] or nullptr
+
 #endif

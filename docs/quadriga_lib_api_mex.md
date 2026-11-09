@@ -35,7 +35,7 @@ lang: en-US
 | [arrayant_copy_element](#arrayant_copy_element) | Array antenna functions | Create copies of array antenna elements |
 | [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
 | [arrayant_generate](#arrayant_generate) | Array antenna functions | Generates predefined array antenna models |
-| [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | Interpolate polarimetric array antenna field patterns (single- and multi-frequency) |
+| [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
 | [arrayant_qdant_read](#arrayant_qdant_read) | Array antenna functions | Reads array antenna data from QDANT files |
 | [arrayant_qdant_write](#arrayant_qdant_write) | Array antenna functions | Writes array antenna data to QDANT files |
 | [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns around the principal axes using Euler rotations |
@@ -518,77 +518,62 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 ---
 <a id="arrayant_interpolate"></a>
 ## arrayant_interpolate
-Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
+Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
 
-Also in: [C++](quadriga_lib_api_cpp.md#.interpolate) · [Python](quadriga_lib_api_python.md#interpolate)
+Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadriga_lib_api_python.md#interpolate)
 
-- Interpolates complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles.
-- NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised
-- Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs); returns up to 8 outputs 
-  including the optional `dist`, `azimuth_loc`, `elevation_loc`, and `gamma` as matrices of size `[n_out, n_ang]`
-- Multi-frequency mode is selected automatically when `arrayant` is a struct array with more than one 
-  element or when `freq` is non-empty; for each target frequency, the two bracketing `center_freq` 
-  entries are located and blended via SLERP.
-- Separate arrayant inputs are accepted in single-frequency mode only
+- Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
+  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
+- Single-frequency mode (a 1x1 struct and no `frequency`): up to 8 outputs. Multi-frequency mode (a struct array with
+  more than one entry, or `frequency` given): for each target frequency, the two entries whose center frequencies
+  bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
+- `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
+- NaN or infinite angles give NaN in all outputs of that angle and output, without an error
+- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to a few 1e-5 of the peak
+  field value and about 1e-4 rad in the angles (more near the poles of the local frame); auto selects GENERIC in this
+  version, which may change in a later version
 
 ### Usage:
 ```matlab
-% Single-frequency, struct input
-[V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
-    quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, element, orientation, element_pos );
+% Single-frequency mode
+[ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.arrayant_interpolate( ...
+    arrayant, azimuth, elevation, element, orientation, element_pos, [], use_kernel );
 
-% Single-frequency, separate arrayant inputs
-[V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
-    quadriga_lib.arrayant_interpolate( [], azimuth, elevation, element, orientation, element_pos, [], ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
-
-% Multi-frequency, struct array input
-[V_re, V_im, H_re, H_im] = quadriga_lib.arrayant_interpolate( arrayant_multi, azimuth, elevation, ...
-    element, orientation, element_pos, freq );
+% Multi-frequency mode
+[ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
+    element, orientation, element_pos, frequency, use_kernel );
 ```
 
 ### Inputs:
-- **`arrayant`** — Struct (single-frequency) or struct array (multi-frequency) containing the arrayant data; 
-  field layout as in [arrayant_generate](#arrayant_generate). Pass `[]` to provide the data via separate inputs (single-frequency only)
-- **`azimuth`** — Azimuth angles in rad, in [-π, π]; single or double precision; `[1, n_ang]` for planar-wave mode 
-  (same angles for all elements) or `[n_out, n_ang]` for per-element angles (spherical-wave mode)
-- **`elevation`** — Elevation angles in rad, in [-π/2, π/2]; single or double; shape must match `azimuth`
-- **`element`** — Element indices to interpolate; 1-based; duplicates allowed; defaults to `[1:n_elements]` 
-  when empty; `[1, n_out]`, `[n_out, 1]`, or `[]`; uint32 or double
-- **`orientation`** — Antenna orientation (bank, tilt, heading) in rad; East is the default broadside; 
-  `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]`, `[3, n_out, n_ang]`, or `[]`
-- **`element_pos`** — Override element positions in m; `[3, n_out]` or `[]`; falls back to `arrayant.element_pos` 
-  (or zeros) when empty
-- **`freq`** — Target frequencies in Hz; `[n_freq]`. When passing a struct array, `freq` may be omitted or `[]`, 
-  in which case the `center_freq` values of the struct array entries are used  as target frequencies (no 
-  interpolation between bands, one output slice per entry).
-
-### Inputs (separate arrayant data, required when arrayant is [], single-frequency only):
-- **`e_theta_re`** — e-theta real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_theta_im`** — e-theta imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_re`** — e-phi real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_im`** — e-phi imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth sample grid in rad, strictly increasing, in [-π, π]; `[n_azimuth]`
-- **`elevation_grid`** — Elevation sample grid in rad, strictly increasing, in [-π/2, π/2]; `[n_elevation]`
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate); a struct
+  array may contain a frequency-dependent model
+- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` (same angles for all outputs) or `[n_out, n_ang]` (one angle per
+  output)
+- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
+- **`element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
+- **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or
+  `[3, n_out, n_ang]`; default: no rotation
+- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
+  positions of the arrayant
+- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
+  of the entries
+- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
-- **`V_re`** — Real part of the interpolated e-theta (vertical) field component;
-  `[n_out, n_ang]` in single-freq mode, `[n_out, n_ang, n_freq]` in multi-freq mode
-- **`V_im`** — Imaginary part of the e-theta component; same size as `V_re`
-- **`H_re`** — Real part of the interpolated e-phi (horizontal) field component; same size as `V_re`
-- **`H_im`** — Imaginary part of the e-phi component; same size as `V_re`
-- **`dist`** *(single-frequency only)* — Effective distances between the antenna elements
-  projected onto the wavefront plane; used for phase computation; `[n_out, n_ang]`
-- **`azimuth_loc`** *(single-frequency only)* — Azimuth angles in the local (rotated) element
-  frame in rad; `[n_out, n_ang]`
-- **`elevation_loc`** *(single-frequency only)* — Elevation angles in the local element frame in
-  rad; `[n_out, n_ang]`
-- **`gamma`** *(single-frequency only)* — Polarization rotation angles in rad; `[n_out, n_ang]`
+- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`; multi-frequency mode:
+  `[n_out, n_ang, n_freq]`
+- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same size as `V_re`
+- **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
+  elements closer to the source; `[n_out, n_ang]`; single-frequency mode only
+- **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `[n_out, n_ang]`;
+  single-frequency mode only
+- **`gamma`** — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`; single-frequency
+  mode only
 
 ### See also:
-- [arrayant_qdant_read](#arrayant_qdant_read) / [arrayant_qdant_write](#arrayant_qdant_write) (load / save arrayant data)
 - [arrayant_generate](#arrayant_generate) (arrayant struct layout)
-- [generate_speaker](#generate_speaker) (typical multi-frequency struct array source)
+- [arrayant_qdant_read](#arrayant_qdant_read) (load arrayant data)
+- [generate_speaker](#generate_speaker) (typical source of multi-frequency struct arrays)
 
 ---
 <a id="arrayant_qdant_read"></a>
@@ -1752,7 +1737,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 ```matlab
 [ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
     rx_array, fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, ...
-    rx_orientation, center_freq, use_absolute_delays, add_fake_los_path, use_avx2 );
+    rx_orientation, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ### Inputs:
@@ -1772,8 +1757,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
-- **`use_avx2`** — If `true`, use AVX2 for antenna interpolation; reduces accuracy to single-precision interpolation, 
-  equivalent precision loss to the AVX2 kernel in arrayant_interpolate; default: `false`
+- **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision; error if unavailable); auto selects GENERIC in this version, see
+  [arrayant_interpolate](#arrayant_interpolate); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`

@@ -61,6 +61,31 @@ e3 = (sqrt(11.0 * 11.0 + 10.0 * 10.0) + sqrt(11.0 * 11.0 + 20.0 * 20.0 + 10.0 * 
 assertElementsAlmostEqual( delay(:,:,1), [d0,d1;d1,d0]/C, 'absolute', 1e-13 );
 assertElementsAlmostEqual( delay(:,:,2), [e0,e2;e1,e3]/C, 'absolute', 1e-13 );
 
+% Kernel selection (input 15): 0 = auto and 1 = GENERIC give the default result, 2 = AVX2 where available
+args = { ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1, 0 };
+[cr_1, ci_1] = quadriga_lib.get_channels_spherical( args{:}, 1 );
+assertEqual( cr_1, coeff_re );
+assertEqual( ci_1, coeff_im );
+assertEqual( quadriga_lib.get_channels_spherical( args{:}, 0 ), coeff_re );
+assertEqual( quadriga_lib.get_channels_spherical( args{:}, [] ), coeff_re );
+assertEqual( quadriga_lib.get_channels_spherical( args{:}, true ), coeff_re );   % Logical true = 1 (GENERIC)
+try
+    cr_2 = quadriga_lib.get_channels_spherical( args{:}, 2 );
+    assertElementsAlmostEqual( cr_2, coeff_re, 'absolute', 1e-5 );              % Single precision
+catch ME
+    if isempty(strfind(ME.message, 'AVX2 kernel requested but not available'))  %#ok<STREMP>
+        rethrow(ME);
+    end
+end
+try
+    quadriga_lib.get_channels_spherical( args{:}, 3 );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'Input ''use_kernel'' must be 0, 1 or 2.')) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "use_kernel", GOT: "', ME.message, '"']);
+    end
+end
+
 % Exception handling
 [~] = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
 

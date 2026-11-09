@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 
@@ -136,6 +137,11 @@ TEST_CASE("Combine multi - Non-positive freq_grid_new throws")
     REQUIRE_THROWS_AS(
         quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &neg_freq),
         std::invalid_argument);
+
+    // Infinite values are rejected with a message that names this function's argument
+    arma::vec inf_freq = {1000.0, arma::datum::inf};
+    CHECK_THROWS_WITH(quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &inf_freq),
+                      Catch::Matchers::ContainsSubstring("freq_grid_new"));
 }
 
 TEST_CASE("Combine multi - Unsorted freq_grid_new produces correct results")
@@ -742,7 +748,7 @@ TEST_CASE("Combine multi - Doubling frequency doubles the phase shift")
 
 TEST_CASE("Combine multi - Negated dist sign matches single-freq combine_pattern")
 {
-    // Critical regression test: ensure dist sign matches qd_arrayant_interpolate convention.
+    // Critical regression test: ensure dist sign matches the convention of arrayant_interpolate.
     // Use a position that produces a non-trivial phase, then compare to single-freq.
     const double C0 = 299792458.0;
     double f0 = 2.4e9;

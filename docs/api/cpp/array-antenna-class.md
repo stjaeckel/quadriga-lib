@@ -11,7 +11,6 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-array-
 | [.combine_pattern](#.combine_pattern) | Combine element patterns, positions, and coupling weights into effective radiation patterns |
 | [.copy_element](#.copy_element) | Copy a single antenna element to one or more destination slots |
 | [.export_obj_file](#.export_obj_file) | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
-| [.interpolate](#.interpolate) | Interpolate polarimetric antenna field patterns for given azimuth/elevation angles |
 | [.is_valid](#.is_valid) | Validate the integrity of an arrayant object |
 | [.qdant_write](#.qdant_write) | Write arrayant data to a QDANT (XML) file |
 | [.remove_zeros](#.remove_zeros) | Remove zero-valued entries from antenna pattern data, reducing its size |
@@ -46,15 +45,15 @@ Not in: MATLAB, Python
 | `std::string name`                | string                                 | Name of the array antenna object                               |
 
 ### Simple member functions:
-| Function         | Description                                       |
-| ---------------- | ------------------------------------------------- |
-| `.n_elevation()` | Number of elevation angles                        |
-| `.n_azimuth()`   | Number of azimuth angles                          |
-| `.n_elements()`  | Number of antenna elements                        |
-| `.n_ports()`     | Number of ports (columns of coupling matrix)      |
-| `.copy()`        | Returns a deep copy of the arrayant object        |
-| `.reset()`       | Clears all data, resetting size to zero           |
-| `.is_valid()`    | Returns `""` if valid, or an error message string |
+| Function         | Description                                                            |
+| ---------------- | ---------------------------------------------------------------------- |
+| `.n_elevation()` | Number of elevation angles                                             |
+| `.n_azimuth()`   | Number of azimuth angles                                               |
+| `.n_elements()`  | Number of antenna elements                                             |
+| `.n_ports()`     | Number of ports (columns of coupling matrix)                           |
+| `.copy()`        | Returns a deep copy; a copy of a valid arrayant is marked as validated |
+| `.reset()`       | Clears all data, resetting size to zero                                |
+| `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
 ### Complex member functions:
 | Function                  | Description                                                       |
@@ -65,7 +64,7 @@ Not in: MATLAB, Python
 | [.combine_pattern](#.combine_pattern)      | Compute effective patterns from elements, positions, and coupling |
 | [.copy_element](#.copy_element)         | Copy a single element to one or more destination slots            |
 | [.export_obj_file](#.export_obj_file)      | Export pattern geometry to Wavefront OBJ                          |
-| [.interpolate](#.interpolate)          | Interpolate field patterns at given azimuth/elevation angles      |
+| [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)  | Interpolate field patterns at given azimuth/elevation angles      |
 | [.qdant_write](#.qdant_write)          | Write arrayant to QDANT file                                      |
 | [.remove_zeros](#.remove_zeros)         | Remove zero-valued entries from pattern data                      |
 | [.rotate_pattern](#.rotate_pattern)       | Rotate pattern and/or polarization via Euler angles               |
@@ -194,7 +193,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
 - New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
 
 ### See also:
-- [.interpolate](#.interpolate) (used internally to compute effective radiation patterns)
+- [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate) (used internally to compute effective radiation patterns)
 - [.rotate_pattern](#.rotate_pattern) (useful for orienting array antenna patterns)
 
 ---
@@ -253,62 +252,6 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(
 - [colormap](site-specific-simulation-tools.md#colormap) (Used for setting the colormap)
 - [icosphere](site-specific-simulation-tools.md#icosphere) (Used internally to generate icosphere primitive)
 - [.write_paths_to_obj_file](channel-class.md#.write_paths_to_obj_file) (function of Channel class to export propagation paths to OBJ 3D visualization)
-
----
-<a id=".interpolate"></a>
-## .interpolate
-Interpolate polarimetric antenna field patterns for given azimuth/elevation angles
-
-Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_interpolate) · [Python](../python/array-antenna-functions.md#interpolate)
-
-- Outputs complex e-theta (V) and e-phi (H) field components at requested angles
-- `n_out` equals `n_elements` when `i_element` is omitted; equals `len(i_element)` otherwise
-- Azimuth input supports planar wave mode (`[1, n_ang]`) or per-element spherical wave mode (`[n_out, n_ang]`)
-- NaN or infinite angles give NaN in all outputs for that angle (and element); no exception is thrown
-- Output matrices are resized automatically if dimensions do not match; this invalidates existing data pointers
-
-### Declaration:
-```cpp
-void quadriga_lib::arrayant<dtype>::interpolate(
-    const arma::Mat<dtype> *azimuth,
-    const arma::Mat<dtype> *elevation,
-    arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
-    arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
-    arma::uvec i_element = {},
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos_i = nullptr,
-    arma::Mat<dtype> *dist = nullptr,
-    arma::Mat<dtype> *azimuth_loc = nullptr,
-    arma::Mat<dtype> *elevation_loc = nullptr,
-    arma::Mat<dtype> *gamma = nullptr) const;
-```
-
-### Inputs:
-- **`azimuth`** — Azimuth angles in rad, in [-pi, pi]; `[1, n_ang]` or `[n_out, n_ang]`
-- **`elevation`** — Elevation angles in rad, in [-pi/2, pi/2]; `[1, n_ang]` or `[n_out, n_ang]`
-- **`i_element`** *(optional)* — Element indices (0-based) to interpolate; duplicates allowed; defaults to all elements; `[n_out]` or `{}`
-- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) in rad; `nullptr`; `[3, 1]`; `[3, n_out]`; `[3, 1, n_ang]`, or `[3, n_out, n_ang]`
-- **`element_pos_i`** *(optional)* — Override element positions in m; `nullptr` uses `arrayant.element_pos`; `[3, n_out]`
-
-### Outputs:
-- **`V_re`** / **`V_im`** — Real/imaginary e-theta (vertical) field component; `[n_out, n_ang]`
-- **`H_re`** / **`H_im`** — Real/imaginary e-phi (horizontal) field component; `[n_out, n_ang]`
-- **`dist`** *(optional)* — Distance from the wavefront plane (normal to the incident ray direction) to each element; `nullptr` or `[n_out, n_ang]`
-- **`azimuth_loc`** *(optional)* — Azimuth angles in local (rotated) element frame in rad; `nullptr` or `[n_out, n_ang]`
-- **`elevation_loc`** *(optional)* — Elevation angles in local element frame in rad; `nullptr` or `[n_out, n_ang]`
-- **`gamma`** *(optional)* — Polarization rotation angles in rad; `nullptr` or `[n_out, n_ang]`
-
-### Example:
-```cpp
-auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
-arma::mat azimuth = {0.0, 0.5*pi, -0.5*pi, pi};
-arma::mat elevation(1, azimuth.n_elem);  // zeros
-arma::mat V_re, V_im, H_re, H_im;
-ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im);
-```
-
-### See also:
-- [arrayant_interpolate_multi](array-antenna-functions.md#arrayant_interpolate_multi) (multi-freq counterpart)
 
 ---
 <a id=".is_valid"></a>

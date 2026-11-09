@@ -848,6 +848,32 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertLessEqual(delay[0, 0, 0], delay[0, 0, 2])
 
     # -------------------------------------------------------------------------
+    # Kernel selection: use_kernel (after freq)
+    # -------------------------------------------------------------------------
+
+    def test_use_kernel(self):
+        ant = arrayant.generate('3gpp', M=1, N=2, pol=3, res=10.0)
+        rng = np.random.default_rng(0)
+        fbs_pos = np.asfortranarray(rng.uniform(-30, 30, (3, 5)))
+        args = (ant, xpol(), fbs_pos, fbs_pos, np.ones(5), np.zeros(5), make_M(5),
+                [0, 0, 10], [0.1, 0.2, 0.3], [40, 5, 1.5], [0, 0, 0], 3.5e9)
+        ref = arrayant.get_channels_spherical(*args)
+        for k in (0, 1):
+            res = arrayant.get_channels_spherical(*args, use_kernel=k)
+            for a, b in zip(res, ref):
+                npt.assert_array_equal(a, b)
+        try:
+            res = arrayant.get_channels_spherical(*args, use_kernel=2)
+            scale = np.abs(ref[0]).max()
+            npt.assert_allclose(res[0], ref[0], atol=1e-5 * scale, rtol=0)  # Single precision
+            npt.assert_allclose(res[2], ref[2], atol=1e-12, rtol=0)  # Delays do not depend on the kernel
+        except ValueError as e:
+            self.assertIn("AVX2 kernel requested but not available", str(e))
+        with self.assertRaises(ValueError) as ctx:
+            arrayant.get_channels_spherical(*args, use_kernel=3)
+        self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
+
+    # -------------------------------------------------------------------------
     # Error handling
     # -------------------------------------------------------------------------
 

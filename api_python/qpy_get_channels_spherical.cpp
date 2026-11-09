@@ -71,6 +71,8 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_chann
     angles=True )
 
 coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
+
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
 ```
 
 ## Inputs:
@@ -96,6 +98,9 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   separate `coeff_re` and `coeff_im`; default: `False`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
+- **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [[interpolate]];
+  `int`; default: 0
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
@@ -195,7 +200,8 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                  const bool add_fake_los_path,
                                  const bool angles,
                                  const bool complex,
-                                 const arma::uword freq)
+                                 const arma::uword freq,
+                                 const int use_kernel)
 {
     // References to every aliased Python array, held until the function returns (the GIL is released below)
     std::vector<py::object> keep_alive;
@@ -357,7 +363,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                                  angles ? &aod[j] : nullptr,
                                                                  angles ? &eod[j] : nullptr,
                                                                  angles ? &aoa[j] : nullptr,
-                                                                 angles ? &eoa[j] : nullptr);
+                                                                 angles ? &eoa[j] : nullptr, use_kernel);
                 }
                 catch (const std::exception &e)
                 {
@@ -466,7 +472,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                          &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
                                                          &coeff_re, &coeff_im, &delay,
                                                          center_frequency, use_absolute_delays, add_fake_los_path,
-                                                         p_aod, p_eod, p_aoa, p_eoa);
+                                                         p_aod, p_eod, p_aoa, p_eoa, use_kernel);
         }
 
         auto coeff_py = qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
@@ -489,7 +495,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                      &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
                                                      &coeff_re, &coeff_im, &delay,
                                                      center_frequency, use_absolute_delays, add_fake_los_path,
-                                                     p_aod, p_eod, p_aoa, p_eoa);
+                                                     p_aod, p_eod, p_aoa, p_eoa, use_kernel);
     }
 
     if (angles)
@@ -516,4 +522,5 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
 //       py::arg("add_fake_los_path") = false,
 //       py::arg("angles") = false,
 //       py::arg("complex") = false,
-//       py::arg("freq") = 0);
+//       py::arg("freq") = 0,
+//       py::arg("use_kernel") = 0);

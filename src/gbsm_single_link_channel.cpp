@@ -373,9 +373,9 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
             M = arma::mat(pM.slice_memptr(0), 8, n_kept);
             const arma::vec g = (n_kept > 0) ? arma::vec(pg.col(0)) : arma::vec();
             const double *To = c.tx_orientation.colptr(t), *Ro = c.rx_orientation.colptr(t);
-            get_channels_spherical(&tx_array, &rx_array, T(0), T(1), T(2), To[0], To[1], To[2], R(0), R(1), R(2),
-                                   Ro[0], Ro[1], Ro[2], &fbs, &lbs, &g, &pl, &M, &cr, &ci, &dl, fc,
-                                   use_absolute_delays);
+            get_channels_spherical<double>(&tx_array, &rx_array, T(0), T(1), T(2), To[0], To[1], To[2], R(0), R(1), R(2),
+                                           Ro[0], Ro[1], Ro[2], &fbs, &lbs, &g, &pl, &M, &cr, &ci, &dl, fc,
+                                           use_absolute_delays, false, nullptr, nullptr, nullptr, nullptr, 1);
             if (with_gr)
                 gr_pos.col(t) = fbs.col(i_gr(0));
         }

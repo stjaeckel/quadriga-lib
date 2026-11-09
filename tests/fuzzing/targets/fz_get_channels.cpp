@@ -75,11 +75,11 @@ static void run(fz::input &in)
     case 0:
     {
         paths<T> q(in, in.size(8));
-        const bool avx2 = in.ConsumeBool();
+        const int use_kernel = in.ConsumeIntegralInRange<int>(0, quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1);
         fz::clean([&] { quadriga_lib::get_channels_spherical(&tx, &rx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9],
                                                              p[10], p[11], &q.fbs, &q.lbs, &q.gain, &q.length, &q.M, opt(c_re, 0),
                                                              opt(c_im, 1), opt(dl, 2), fc, absolute, fake_los, opt(aod, 3),
-                                                             opt(eod, 4), opt(aoa, 5), opt(eoa, 6), avx2); });
+                                                             opt(eod, 4), opt(aoa, 5), opt(eoa, 6), use_kernel); });
         break;
     }
     case 1:

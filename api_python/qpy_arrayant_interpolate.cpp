@@ -10,198 +10,166 @@ SECTION!*/
 
 /*!MD
 # interpolate
-Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
+Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
 
-- Interpolates the complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles
-- NaN or infinite angles give NaN in all outputs for that angle (and element); no error is raised
-- Single-frequency input (3D pattern fields) returns 2D outputs `(n_out, n_ang)`; the optional `dist` and
-  `local_angles` outputs are available only on this path
-- Multi-frequency input (4D pattern fields) interpolates spatially and across frequency; for each
-  target frequency the two bracketing `center_freq` entries are blended via SLERP
-- Passing `frequency` adds a frequency dimension to the output `(n_out, n_ang, n_freq_out)`; for a
-  single-frequency antenna the spatial result is simply replicated across the requested frequencies
-- `azimuth` / `elevation` of shape `(1, n_ang)` apply the same angles to all elements (planar
-  wave); shape `(n_out, n_ang)` gives per-element angles (spherical wave)
+- Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
+  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
+- Single-frequency mode (3D pattern arrays and no `frequency`): outputs `(n_out, n_ang)`; `dist` and `local_angles`
+  add outputs. Multi-frequency mode (4D pattern arrays, or `frequency` given): for each target frequency, the two
+  entries whose center frequencies bracket it are interpolated and blended; frequencies outside the entries take the
+  nearest entry; outputs `(n_out, n_ang, n_freq)`; a 3D pattern is the same at every frequency
+- `azimuth` of shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
+- NaN or infinite angles give NaN in all outputs of that angle and output, without an error
+- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to a few 1e-5 of the peak
+  field value and about 1e-4 rad in the angles (more near the poles of the local frame); auto selects GENERIC in this
+  version, which may change in a later version
+- The flags `dist`, `local_angles`, `fast_access` and `complex` take a bool or `numpy.bool_`; `None` selects the
+  default, any other type raises `TypeError`
 
 ## Usage:
 ```
-# Single-frequency, separate real / imaginary parts
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation )
+# Single-frequency mode
+V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
+    orientation, element_pos, use_kernel=0 )
 
-# Complex-valued output
-v, h = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, complex=True )
+# Single-frequency mode with the projected distance and the local angles
+V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( \
+    arrayant, azimuth, elevation, ..., dist=True, local_angles=True )
 
-# Projected distance / local angles (single-frequency only)
-vr, vi, hr, hi, dist = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, dist=True )
-vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, \
-    azimuth, elevation, orientation=ori, local_angles=True )
+# Multi-frequency mode
+V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., frequency=freqs )
 
-# Element selection, orientation, element positions
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
-    orientation, element_pos )
-
-# Multi-frequency interpolation — output gains a frequency axis
-vr, vi, hr, hi = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, frequency=freqs )
+# Complex output
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=True )
 ```
 
 ## Inputs:
-- **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may
-  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`;
-  4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
-- **`azimuth`** — Azimuth angles in rad, in [-pi, pi]; `(1, n_ang)` for shared angles (planar
-  wave) or `(n_out, n_ang)` for per-element angles (spherical wave)
-- **`elevation`** — Elevation angles in rad, in [-pi/2, pi/2]; same shape as `azimuth`
-- **`element`** — Element indices to interpolate; duplicates allowed; `(n_out,)` or a
-  list of int; `None` or empty uses all elements (`n_out = n_elements`); default: `None`
-- **`orientation`** — antenna orientation (bank, tilt, heading) in rad; shape `(3, 1)`,
-  `(3, n_out)`, `(3, 1, n_ang)`, or `(3, n_out, n_ang)`; `None` uses East-facing broadside;
-  default: `None`
-- **`element_pos`** — Alternative element (x,y,z) positions in m; `(3, n_out)`; `None` falls back
-  to `arrayant["element_pos"]` (or zeros); default: `None`
-- **`frequency`** — Target frequencies in Hz; `(n_freq_out,)` or scalar; adds a frequency axis to
-  the output; for 4D input it interpolates between entries, for 3D input it replicates the spatial
-  result; if omitted for 4D input the entries' `center_freq` values are used; default: `None`
-- **`complex`** — If `True`, return complex-valued arrays instead of separate real / imaginary
-  parts; default: `False`
-- **`dist`** — If `True`, also return the projected distances; single-frequency input only and
-  not allowed together with `frequency`; default: `False`
-- **`local_angles`** — If `True`, also return the antenna-local angles; single-frequency input
-  only and not allowed together with `frequency`; default: `False`
-- **`fast_access`** — If `True`, require the pattern arrays to be double and column-major
-  (Fortran-contiguous) so they can be read without a copy; raises if not. With `False`, such arrays are
-  read without a copy as well and all others are copied; default: `False`
+- **`arrayant`** — Dict containing the arrayant data; layout as documented in [[generate]]; 4D pattern arrays contain
+  a frequency-dependent model
+- **`azimuth`** — Azimuth angles in GCS; `(1, n_ang)` (same angles for all outputs) or `(n_out, n_ang)` (one angle
+  per output)
+- **`elevation`** — Elevation angles in GCS; same shape as `azimuth`
+- **`element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
+- **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `(3, 1)`, `(3, n_out)`, `(3, 1, n_ang)` or
+  `(3, n_out, n_ang)`; default: `None` (no rotation)
+- **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `(3, n_out)`; default: `None`
+  (the positions of the arrayant)
+- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `(n_freq,)`; default: `None` (the
+  `center_freq` of the entries)
+- **`dist`** — Also return the projected distance; single-frequency mode only; default: `False`
+- **`local_angles`** — Also return the local angles and the polarization rotation angle; single-frequency mode only;
+  default: `False`
+- **`fast_access`** — Require the pattern arrays to be float64 and Fortran-contiguous, so that they are read without
+  a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
+  default: `False`
+- **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
+- **`complex`** — Return `V` and `H` as complex arrays instead of `V_re, V_im, H_re, H_im`; default: `False`
 
 ## Outputs:
-Returned as a tuple; its length depends on `complex`, `dist`, and `local_angles`.
-- **`vr`, `vi`, `hr`, `hi`** — Real / imaginary parts of the interpolated e-theta (V) and e-phi
-  (H) field components; `(n_out, n_ang)`, or `(n_out, n_ang, n_freq_out)` when `frequency` is
-  given; returned when `complex` is `False`
-- **`v`, `h`** — Complex-valued e-theta (V) and e-phi (H) components; same shape as above;
-  returned instead of `vr, vi, hr, hi` when `complex` is `True`
-- **`dist`** — Projected distances between elements on the wavefront plane, used for phase
-  computation; `(n_out, n_ang)`; returned only when `dist` is `True`
-- **`azimuth_loc`, `elevation_loc`, `gamma`** — Azimuth, elevation, and polarization rotation
-  angles in the local element frame, in rad; `(n_out, n_ang)` each; returned only when
+- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `(n_out, n_ang)`; multi-frequency mode:
+  `(n_out, n_ang, n_freq)`
+- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same shape as `V_re`
+- **`V`** / **`H`** — e-theta and e-phi field, complex; returned instead of the real parts when `complex` is `True`
+- **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
+  elements closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
+- **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`;
+  returned when `local_angles` is `True`
+- **`gamma`** — Polarization rotation angle from the global to the local frame; `(n_out, n_ang)`; returned when
   `local_angles` is `True`
 
 ## See also:
-- [[qdant_read]] / [[qdant_write]] (load / save arrayant data)
-- [[generate]] (arrayant struct layout)
-- [[generate_speaker]] (typical multi-frequency struct array source)
+- [[generate]] (arrayant dict layout)
+- [[qdant_read]] (load arrayant data)
+- [[generate_speaker]] (typical source of multi-frequency arrayants)
 MD!*/
 
 py::tuple arrayant_interpolate(const py::dict &arrayant,
-                               py::handle azimuth,
-                               py::handle elevation,
+                               const py::array_t<double> &azimuth,
+                               const py::array_t<double> &elevation,
                                py::handle element,
                                py::handle orientation,
                                py::handle element_pos,
                                py::handle frequency,
-                               bool complex,
-                               bool dist,
-                               bool local_angles,
-                               bool fast_access)
+                               py::handle dist,
+                               py::handle local_angles,
+                               py::handle fast_access,
+                               int use_kernel,
+                               py::handle complex)
 {
-    // Shared inputs
-    const auto az = qd_python_numpy2arma_Mat<double>(azimuth, true);
-    const auto el = qd_python_numpy2arma_Mat<double>(elevation, true);
-    const arma::uvec element_ind = qd_python_numpy2arma_Col<arma::uword>(element, true);
-    const auto ori = qd_python_numpy2arma_Cube<double>(orientation, true);
-    const auto elpos = qd_python_numpy2arma_Mat<double>(element_pos, true);
-    const arma::vec freq = qd_python_numpy2arma_Col<double>(frequency, true);
+    const bool want_dist = qd_python_flag(dist, false, "dist");
+    const bool want_local_angles = qd_python_flag(local_angles, false, "local_angles");
+    const bool strict = qd_python_flag(fast_access, false, "fast_access");
+    const bool want_complex = qd_python_flag(complex, false, "complex");
 
-    if (az.n_elem == 0)
-        throw std::invalid_argument("Azimuth angles cannot be empty.");
+    const auto azimuth_a = qd_python_numpy2arma_Mat(azimuth, true);
+    const auto elevation_a = qd_python_numpy2arma_Mat(elevation, true);
+    const auto element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
+    const auto orientation_a = qd_python_numpy2arma_Cube<double>(orientation, true);
+    const auto element_pos_a = qd_python_numpy2arma_Mat<double>(element_pos, true);
+    const auto frequency_a = qd_python_numpy2arma_Col<double>(frequency, true);
 
-    const arma::uword n_ang = az.n_cols;
+    const arma::uvec *p_element = element_a.is_empty() ? nullptr : &element_a;
+    const arma::cube *p_orientation = orientation_a.is_empty() ? nullptr : &orientation_a;
+    const arma::mat *p_element_pos = element_pos_a.is_empty() ? nullptr : &element_pos_a;
 
-    // Parse the (possibly frequency-dependent) antenna via the unified multi-freq reader
-    auto ant_vec = qd_python_dict2arrayant_multi(arrayant, true, fast_access, true);
+    const auto ant = qd_python_dict2arrayant_multi(arrayant, true, strict);
+    const arma::uword n_out = element_a.is_empty() ? ant[0].n_elements() : element_a.n_elem;
+    const arma::uword n_ang = azimuth_a.n_cols;
 
-    // The multi-frequency code path covers 4D input as well as any 3D/4D input with a frequency
-    const bool use_multi = (ant_vec.size() > 1) || (freq.n_elem > 0);
-
-    // Multi-frequency / frequency-replication path
-    if (use_multi)
+    if (ant.size() > 1 || !frequency_a.is_empty()) // Multi-frequency mode
     {
-        if (dist)
-            throw std::invalid_argument("Interpolate: 'dist' is not supported when 'frequency' is given or for multi-frequency arrayants.");
-        if (local_angles)
-            throw std::invalid_argument("Interpolate: 'local_angles' is not supported when 'frequency' is given or for multi-frequency arrayants.");
+        if (want_dist || want_local_angles)
+            throw std::invalid_argument("Outputs 'dist' and 'local_angles' are not available in the multi-frequency mode.");
 
-        // Target frequencies. If omitted for a 4D antenna, use the entries' center_freq values.
-        arma::vec freq_target = freq;
-        if (freq_target.n_elem == 0)
-        {
-            freq_target.set_size(ant_vec.size());
-            for (size_t i = 0; i < ant_vec.size(); ++i)
-                freq_target[i] = ant_vec[i].center_frequency;
-        }
-
-        const arma::uword n_out = (element_ind.n_elem == 0) ? ant_vec[0].n_elements()
-                                                            : element_ind.n_elem;
-        const arma::uword n_freq_out = freq_target.n_elem;
-
+        const arma::uword n_freq = frequency_a.is_empty() ? (arma::uword)ant.size() : frequency_a.n_elem;
         arma::cube V_re, V_im, H_re, H_im;
         py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py;
-        if (complex)
+        if (!want_complex)
         {
-            V_re.set_size(n_out, n_ang, n_freq_out);
-            V_im.set_size(n_out, n_ang, n_freq_out);
-            H_re.set_size(n_out, n_ang, n_freq_out);
-            H_im.set_size(n_out, n_ang, n_freq_out);
-        }
-        else
-        {
-            V_re_py = qd_python_init_output(n_out, n_ang, n_freq_out, &V_re);
-            V_im_py = qd_python_init_output(n_out, n_ang, n_freq_out, &V_im);
-            H_re_py = qd_python_init_output(n_out, n_ang, n_freq_out, &H_re);
-            H_im_py = qd_python_init_output(n_out, n_ang, n_freq_out, &H_im);
+            V_re_py = qd_python_init_output(n_out, n_ang, n_freq, &V_re);
+            V_im_py = qd_python_init_output(n_out, n_ang, n_freq, &V_im);
+            H_re_py = qd_python_init_output(n_out, n_ang, n_freq, &H_re);
+            H_im_py = qd_python_init_output(n_out, n_ang, n_freq, &H_im);
         }
 
-        quadriga_lib::arrayant_interpolate_multi<double>(ant_vec, &az, &el, &freq_target, &V_re, &V_im, &H_re, &H_im,
-                                                         element_ind, &ori, &elpos, false);
+        quadriga_lib::arrayant_interpolate_multi<double>(ant, azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
+                                                         frequency_a.is_empty() ? nullptr : &frequency_a,
+                                                         p_element, p_orientation, p_element_pos, use_kernel);
 
-        if (complex)
+        if (want_complex)
             return py::make_tuple(qd_python_copy2numpy<double, std::complex<double>>(&V_re, &V_im),
                                   qd_python_copy2numpy<double, std::complex<double>>(&H_re, &H_im));
-
         return py::make_tuple(V_re_py, V_im_py, H_re_py, H_im_py);
     }
 
-    // Single-frequency path (no frequency dimension)
-    const auto &ant = ant_vec[0];
-    const arma::uword n_out = (element_ind.n_elem == 0) ? ant.n_elements() : element_ind.n_elem;
-
-    arma::mat V_re, V_im, H_re, H_im, dist_proj, azimuth_loc, elevation_loc, gamma;
-    py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py, dist_proj_py, azimuth_loc_py, elevation_loc_py, gamma_py;
-
-    if (!complex) // when complex, interpolate() resizes the outputs itself
+    arma::mat V_re, V_im, H_re, H_im, dist_a, azimuth_loc, elevation_loc, gamma;
+    py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py, dist_py, azimuth_loc_py, elevation_loc_py, gamma_py;
+    if (!want_complex) // With complex output, the C++ function sizes the outputs, which are then merged
     {
         V_re_py = qd_python_init_output(n_out, n_ang, &V_re);
         V_im_py = qd_python_init_output(n_out, n_ang, &V_im);
         H_re_py = qd_python_init_output(n_out, n_ang, &H_re);
         H_im_py = qd_python_init_output(n_out, n_ang, &H_im);
     }
-    if (dist)
-        dist_proj_py = qd_python_init_output(n_out, n_ang, &dist_proj);
-    if (local_angles)
+    if (want_dist)
+        dist_py = qd_python_init_output(n_out, n_ang, &dist_a);
+    if (want_local_angles)
     {
         azimuth_loc_py = qd_python_init_output(n_out, n_ang, &azimuth_loc);
         elevation_loc_py = qd_python_init_output(n_out, n_ang, &elevation_loc);
         gamma_py = qd_python_init_output(n_out, n_ang, &gamma);
     }
 
-    if (local_angles) // Without 'dist', dist_proj is a scratch output
-        ant.interpolate(&az, &el, &V_re, &V_im, &H_re, &H_im, element_ind, &ori, &elpos, &dist_proj, &azimuth_loc, &elevation_loc, &gamma);
-    else if (dist)
-        ant.interpolate(&az, &el, &V_re, &V_im, &H_re, &H_im, element_ind, &ori, &elpos, &dist_proj);
-    else
-        ant.interpolate(&az, &el, &V_re, &V_im, &H_re, &H_im, element_ind, &ori, &elpos);
+    quadriga_lib::arrayant_interpolate<double>(ant[0], azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
+                                               p_element, p_orientation, p_element_pos,
+                                               want_dist ? &dist_a : nullptr,
+                                               want_local_angles ? &azimuth_loc : nullptr,
+                                               want_local_angles ? &elevation_loc : nullptr,
+                                               want_local_angles ? &gamma : nullptr, use_kernel);
 
-    // Assemble the output tuple in the documented order
+    // Output tuple in the documented order
     py::list out;
-    if (complex)
+    if (want_complex)
     {
         out.append(qd_python_copy2numpy<double, std::complex<double>>(&V_re, &V_im));
         out.append(qd_python_copy2numpy<double, std::complex<double>>(&H_re, &H_im));
@@ -213,9 +181,9 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
         out.append(H_re_py);
         out.append(H_im_py);
     }
-    if (dist)
-        out.append(dist_proj_py);
-    if (local_angles)
+    if (want_dist)
+        out.append(dist_py);
+    if (want_local_angles)
     {
         out.append(azimuth_loc_py);
         out.append(elevation_loc_py);
@@ -224,16 +192,17 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     return py::tuple(out);
 }
 
-// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
+// pybind11 declaration:
 // m.def("interpolate", &arrayant_interpolate,
 //       py::arg("arrayant"),
-//       py::arg("azimuth"),
-//       py::arg("elevation"),
+//       py::arg("azimuth").none(false),
+//       py::arg("elevation").none(false),
 //       py::arg("element") = py::none(),
 //       py::arg("orientation") = py::none(),
 //       py::arg("element_pos") = py::none(),
 //       py::arg("frequency") = py::none(),
-//       py::arg("complex") = false,
 //       py::arg("dist") = false,
 //       py::arg("local_angles") = false,
-//       py::arg("fast_access") = false);
+//       py::arg("fast_access") = false,
+//       py::arg("use_kernel") = 0,
+//       py::arg("complex") = false);

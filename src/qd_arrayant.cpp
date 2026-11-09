@@ -13,7 +13,6 @@
 #include "quadriga_tools.hpp"
 #include "quadriga_math.hpp"
 #include "qd_arrayant_functions.hpp"
-#include "qd_arrayant_interpolate.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
@@ -45,15 +44,15 @@ Class for storing and manipulating array antenna models
 | `std::string name`                | string                                 | Name of the array antenna object                               |
 
 ## Simple member functions:<br>
-| Function         | Description                                       |
-| ---------------- | ------------------------------------------------- |
-| `.n_elevation()` | Number of elevation angles                        |
-| `.n_azimuth()`   | Number of azimuth angles                          |
-| `.n_elements()`  | Number of antenna elements                        |
-| `.n_ports()`     | Number of ports (columns of coupling matrix)      |
-| `.copy()`        | Returns a deep copy of the arrayant object        |
-| `.reset()`       | Clears all data, resetting size to zero           |
-| `.is_valid()`    | Returns `""` if valid, or an error message string |
+| Function         | Description                                                            |
+| ---------------- | ---------------------------------------------------------------------- |
+| `.n_elevation()` | Number of elevation angles                                             |
+| `.n_azimuth()`   | Number of azimuth angles                                               |
+| `.n_elements()`  | Number of antenna elements                                             |
+| `.n_ports()`     | Number of ports (columns of coupling matrix)                           |
+| `.copy()`        | Returns a deep copy; a copy of a valid arrayant is marked as validated |
+| `.reset()`       | Clears all data, resetting size to zero                                |
+| `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
 ## Complex member functions:<br>
 | Function                  | Description                                                       |
@@ -64,7 +63,6 @@ Class for storing and manipulating array antenna models
 | .[[combine_pattern]]      | Compute effective patterns from elements, positions, and coupling |
 | .[[copy_element]]         | Copy a single element to one or more destination slots            |
 | .[[export_obj_file]]      | Export pattern geometry to Wavefront OBJ                          |
-| .[[interpolate]]          | Interpolate field patterns at given azimuth/elevation angles      |
 | .[[qdant_write]]          | Write arrayant to QDANT file                                      |
 | .[[remove_zeros]]         | Remove zero-valued entries from pattern data                      |
 | .[[rotate_pattern]]       | Rotate pattern and/or polarization via Euler angles               |
@@ -307,7 +305,8 @@ void quadriga_lib::arrayant<dtype>::calc_beamwidth_deg(arma::uword i_element, dt
     auto cut_power = [&](const arma::Mat<dtype> &az_q, const arma::Mat<dtype> &el_q, arma::Col<double> &P) -> arma::uword
     {
         arma::Mat<dtype> V_re, V_im, H_re, H_im;
-        this->interpolate(&az_q, &el_q, &V_re, &V_im, &H_re, &H_im, i_el_vec);
+        quadriga_lib::arrayant_interpolate<dtype>(*this, az_q, el_q, V_re, V_im, H_re, H_im, &i_el_vec,
+                                                  nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
         P.set_size(az_q.n_elem);
         double P_max = 0.0;
         arma::uword iM = 0;
@@ -522,7 +521,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
 - New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
 
 ## See also:
-- .[[interpolate]] (used internally to compute effective radiation patterns)
+- [[arrayant_interpolate]] (used internally to compute effective radiation patterns)
 - .[[rotate_pattern]] (useful for orienting array antenna patterns)
 MD!*/
 
@@ -572,16 +571,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
     const auto p_element_pos = this->element_pos.empty() ? &element_pos_empty : &this->element_pos;
 
     // Interpolate the pattern data
-    unsigned n32_out = unsigned(n_elements);
-    arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n32_out, n32_out);
-    arma::Cube<dtype> orientation(3, 1, 1);
+    const arma::uvec i_element = arma::regspace<arma::uvec>(0, n_elements - 1);
+    const arma::Cube<dtype> orientation(3, 1, 1, arma::fill::zeros);
     arma::Mat<dtype> V_re(n_elements, n_ang), V_im(n_elements, n_ang), H_re(n_elements, n_ang), H_im(n_elements, n_ang), dist(n_elements, n_ang);
-    arma::Mat<dtype> EMPTY;
 
-    qd_arrayant_interpolate(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
-                            azimuth_grid, elevation_grid, azimuth, elevation,
-                            i_element, orientation, *p_element_pos,
-                            V_re, V_im, H_re, H_im, &dist);
+    qd_arrayant_interpolate_dispatch<dtype>(*this, azimuth, elevation, i_element, orientation, *p_element_pos,
+                                            V_re, V_im, H_re, H_im, &dist, nullptr, nullptr, nullptr, 1);
 
     // Apply phase shift caused by element positions
     double lambda = (double)propagation_speed / (double)this->center_frequency;
@@ -672,6 +667,20 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
     ant.coupling_im = coupling_im;
     ant.center_frequency = center_frequency;
     ant.read_only = false;
+
+    // The copy holds the same data as a valid source, so it is marked as validated for the quick check of is_valid
+    if (is_valid().empty())
+    {
+        ant.check_ptr[0] = ant.e_theta_re.memptr();
+        ant.check_ptr[1] = ant.e_theta_im.memptr();
+        ant.check_ptr[2] = ant.e_phi_re.memptr();
+        ant.check_ptr[3] = ant.e_phi_im.memptr();
+        ant.check_ptr[4] = ant.azimuth_grid.memptr();
+        ant.check_ptr[5] = ant.elevation_grid.memptr();
+        ant.check_ptr[6] = ant.element_pos.memptr();
+        ant.check_ptr[7] = ant.coupling_re.memptr();
+        ant.check_ptr[8] = ant.coupling_im.memptr();
+    }
 
     return ant;
 }
@@ -956,7 +965,8 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
 
     // Interpolate antenna patterns (for all elements in the array)
     arma::Mat<dtype> V_re, V_im, H_re, H_im;
-    interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im, i_element);
+    quadriga_lib::arrayant_interpolate<dtype>(*this, azimuth, elevation, V_re, V_im, H_re, H_im, &i_element,
+                                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
     dtype *vr = V_re.memptr(), *vi = V_im.memptr(), *hr = H_re.memptr(), *hi = H_im.memptr();
 
     // Calculate maximum Power in the Pattern
@@ -1157,178 +1167,6 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
 
         outFile.close();
     }
-}
-
-/*!MD
-# .interpolate
-Interpolate polarimetric antenna field patterns for given azimuth/elevation angles
-
-- Outputs complex e-theta (V) and e-phi (H) field components at requested angles
-- `n_out` equals `n_elements` when `i_element` is omitted; equals `len(i_element)` otherwise
-- Azimuth input supports planar wave mode (`[1, n_ang]`) or per-element spherical wave mode (`[n_out, n_ang]`)
-- NaN or infinite angles give NaN in all outputs for that angle (and element); no exception is thrown
-- Output matrices are resized automatically if dimensions do not match; this invalidates existing data pointers
-
-## Declaration:
-```
-void quadriga_lib::arrayant<dtype>::interpolate(
-    const arma::Mat<dtype> *azimuth,
-    const arma::Mat<dtype> *elevation,
-    arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
-    arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
-    arma::uvec i_element = {},
-    const arma::Cube<dtype> *orientation = nullptr,
-    const arma::Mat<dtype> *element_pos_i = nullptr,
-    arma::Mat<dtype> *dist = nullptr,
-    arma::Mat<dtype> *azimuth_loc = nullptr,
-    arma::Mat<dtype> *elevation_loc = nullptr,
-    arma::Mat<dtype> *gamma = nullptr) const;
-```
-
-## Inputs:
-- **`azimuth`** — Azimuth angles in rad, in [-pi, pi]; `[1, n_ang]` or `[n_out, n_ang]`
-- **`elevation`** — Elevation angles in rad, in [-pi/2, pi/2]; `[1, n_ang]` or `[n_out, n_ang]`
-- **`i_element`** *(optional)* — Element indices (0-based) to interpolate; duplicates allowed; defaults to all elements; `[n_out]` or `{}`
-- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) in rad; `nullptr`; `[3, 1]`; `[3, n_out]`; `[3, 1, n_ang]`, or `[3, n_out, n_ang]`
-- **`element_pos_i`** *(optional)* — Override element positions in m; `nullptr` uses `arrayant.element_pos`; `[3, n_out]`
-
-## Outputs:
-- **`V_re`** / **`V_im`** — Real/imaginary e-theta (vertical) field component; `[n_out, n_ang]`
-- **`H_re`** / **`H_im`** — Real/imaginary e-phi (horizontal) field component; `[n_out, n_ang]`
-- **`dist`** *(optional)* — Distance from the wavefront plane (normal to the incident ray direction) to each element; `nullptr` or `[n_out, n_ang]`
-- **`azimuth_loc`** *(optional)* — Azimuth angles in local (rotated) element frame in rad; `nullptr` or `[n_out, n_ang]`
-- **`elevation_loc`** *(optional)* — Elevation angles in local element frame in rad; `nullptr` or `[n_out, n_ang]`
-- **`gamma`** *(optional)* — Polarization rotation angles in rad; `nullptr` or `[n_out, n_ang]`
-
-## Example:
-```
-auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
-arma::mat azimuth = {0.0, 0.5*pi, -0.5*pi, pi};
-arma::mat elevation(1, azimuth.n_elem);  // zeros
-arma::mat V_re, V_im, H_re, H_im;
-ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im);
-```
-
-## See also:
-- [[arrayant_interpolate_multi]] (multi-freq counterpart)
-MD!*/
-
-// ARRAYANT METHOD : Interpolation
-template <typename dtype>
-void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> *azimuth,
-                                                const arma::Mat<dtype> *elevation,
-                                                arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
-                                                arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
-                                                arma::uvec i_element,
-                                                const arma::Cube<dtype> *orientation,
-                                                const arma::Mat<dtype> *element_pos_i,
-                                                arma::Mat<dtype> *dist,
-                                                arma::Mat<dtype> *azimuth_loc, arma::Mat<dtype> *elevation_loc,
-                                                arma::Mat<dtype> *gamma) const
-{
-    // Check if arrayant object is valid
-    std::string error_message = is_valid();
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    if (azimuth == nullptr)
-        throw std::invalid_argument("Input 'azimuth' cannot be NULL");
-
-    if (elevation == nullptr)
-        throw std::invalid_argument("Input 'elevation' cannot be NULL");
-
-    if (V_re == nullptr || V_im == nullptr || H_re == nullptr || H_im == nullptr)
-        throw std::invalid_argument("Outputs 'V_re', 'V_im', 'H_re', 'H_im' cannot be NULL");
-
-    qd_check_alias_list({V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma},
-                        {"V_re", "V_im", "H_re", "H_im", "dist", "azimuth_loc", "elevation_loc", "gamma"},
-                        azimuth, elevation, orientation, element_pos_i);
-
-    arma::uword n_out = azimuth->n_rows;
-    arma::uword n_ang = azimuth->n_cols;
-
-    if (elevation->n_rows != n_out || elevation->n_cols != n_ang)
-        throw std::invalid_argument("Sizes of 'azimuth' and 'elevation' do not match.");
-
-    arma::uword n_elements = e_theta_re.n_slices;
-    if (i_element.n_elem == 0)
-        i_element = arma::regspace<arma::uvec>(0, n_elements - 1);
-    else if (arma::any(i_element >= n_elements))
-        throw std::invalid_argument("Element indices 'i_element' cannot exceed the array antenna size.");
-
-    if (n_out != 1 && n_out != i_element.n_elem)
-        throw std::invalid_argument("Number of requested outputs does not match the number of elements.");
-
-    // Process orientation
-    n_out = i_element.n_elem;
-    arma::Cube<dtype> orientation_empty = arma::Cube<dtype>(3, 1, 1);
-    const arma::Cube<dtype> *orientation_local = (orientation == nullptr || orientation->n_elem == 0) ? &orientation_empty : orientation;
-    if (orientation != nullptr)
-    {
-        arma::uword o1 = orientation_local->n_rows,
-                    o2 = orientation_local->n_cols,
-                    o3 = orientation_local->n_slices;
-
-        if (o1 != 3)
-            throw std::invalid_argument("Input 'orientation' must have 3 elements on the first dimension.");
-        else if (o2 != 1 && o2 != n_out)
-            throw std::invalid_argument("Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.");
-        else if (o3 != 1 && o3 != n_ang)
-            throw std::invalid_argument("Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.");
-    }
-
-    // Process alternative element positions
-    arma::Mat<dtype> element_pos_local(3, n_out);
-    if (element_pos_i != nullptr && element_pos_i->n_elem != 0)
-    {
-        if (element_pos_i->n_rows != 3 || element_pos_i->n_cols != n_out)
-            throw std::invalid_argument("Alternative element positions 'element_pos_i' must have 3 rows and 'n_out' columns.");
-
-        const dtype *ptrI = element_pos_i->memptr();
-        dtype *ptrO = element_pos_local.memptr();
-        std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
-    }
-    else if (element_pos.n_elem != 0)
-    {
-        const dtype *ptrI = element_pos.memptr();
-        dtype *ptrO = element_pos_local.memptr();
-        for (arma::uword i = 0; i < n_out; ++i)
-            std::memcpy(&ptrO[3 * i], &ptrI[3 * i_element[i]], 3 * sizeof(dtype));
-    }
-
-    // Resize output variables
-    if (V_re->n_rows != n_out || V_re->n_cols != n_ang)
-        V_re->set_size(n_out, n_ang);
-    if (V_im->n_rows != n_out || V_im->n_cols != n_ang)
-        V_im->set_size(n_out, n_ang);
-    if (H_re->n_rows != n_out || H_re->n_cols != n_ang)
-        H_re->set_size(n_out, n_ang);
-    if (H_im->n_rows != n_out || H_im->n_cols != n_ang)
-        H_im->set_size(n_out, n_ang);
-
-    if (dist != nullptr && (dist->n_rows != n_out || dist->n_cols != n_ang))
-        dist->set_size(n_out, n_ang);
-    if (azimuth_loc != nullptr && (azimuth_loc->n_rows != n_out || azimuth_loc->n_cols != n_ang))
-        azimuth_loc->set_size(n_out, n_ang);
-    if (elevation_loc != nullptr && (elevation_loc->n_rows != n_out || elevation_loc->n_cols != n_ang))
-        elevation_loc->set_size(n_out, n_ang);
-    if (gamma != nullptr && (gamma->n_rows != n_out || gamma->n_cols != n_ang))
-        gamma->set_size(n_out, n_ang);
-
-    // Convert element index format
-    arma::u32_vec i_element_int(n_out); // 1-based
-    {
-        unsigned *pi = i_element_int.memptr();
-        arma::uword *pu = i_element.memptr();
-        for (arma::uword i = 0; i < n_out; ++i)
-            pi[i] = (unsigned)pu[i] + 1;
-    }
-
-    // Call private library function
-    qd_arrayant_interpolate<dtype>(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
-                                   azimuth_grid, elevation_grid, *azimuth, *elevation,
-                                   i_element_int, *orientation_local, element_pos_local,
-                                   *V_re, *V_im, *H_re, *H_im, dist, azimuth_loc, elevation_loc, gamma);
 }
 
 /*!MD
@@ -1742,11 +1580,11 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     }
 
     // Set element indices
-    arma::Col<unsigned> i_element(1);
+    arma::uvec i_element(1);
     if (use_all_elements)
-        i_element = arma::regspace<arma::Col<unsigned>>(1, unsigned(e_theta_re.n_slices));
+        i_element = arma::regspace<arma::uvec>(0, e_theta_re.n_slices - 1);
     else
-        i_element.at(0) = element + 1;
+        i_element.at(0) = element;
 
     // Extract the element positions
     arma::Mat<dtype> element_pos_update;
@@ -1915,7 +1753,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
 
     arma::Mat<dtype> V_re(n_out, n_ang, arma::fill::none), V_im(n_out, n_ang, arma::fill::none);
     arma::Mat<dtype> H_re(n_out, n_ang, arma::fill::none), H_im(n_out, n_ang, arma::fill::none);
-    arma::Mat<dtype> azimuth_loc, elevation_loc, gamma, EMPTY;
+    arma::Mat<dtype> azimuth_loc, elevation_loc, gamma;
 
     // Create list of angles for pattern interpolation
     arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
@@ -1941,18 +1779,16 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     else if (usage == 2)
         gamma.set_size(n_out, n_ang);
 
-    qd_arrayant_interpolate<dtype>(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
-                                   azimuth_grid, elevation_grid, azimuth, elevation,
-                                   i_element, orientation, element_pos_interp,
-                                   V_re, V_im, H_re, H_im, nullptr, &azimuth_loc, &elevation_loc, &gamma);
+    const bool loc_angles = usage == 1 || usage == 4;
+    qd_arrayant_interpolate_dispatch<dtype>(*this, azimuth, elevation, i_element, orientation, element_pos_interp,
+                                            V_re, V_im, H_re, H_im, nullptr, loc_angles ? &azimuth_loc : nullptr,
+                                            loc_angles ? &elevation_loc : nullptr, usage == 2 ? &gamma : nullptr, 1);
     azimuth.reset(), elevation.reset();
 
     orientation.zeros();
-    if (usage == 1 || usage == 4) // Only return interpolated pattern (ignore polarization)
-        qd_arrayant_interpolate(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
-                                azimuth_grid, elevation_grid, azimuth_loc, elevation_loc,
-                                i_element, orientation, element_pos_interp,
-                                V_re, V_im, H_re, H_im);
+    if (loc_angles) // Only return interpolated pattern (ignore polarization)
+        qd_arrayant_interpolate_dispatch<dtype>(*this, azimuth_loc, elevation_loc, i_element, orientation, element_pos_interp,
+                                                V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr, nullptr, 1);
     azimuth_loc.reset(), elevation_loc.reset();
 
     // Adjust size of output, if needed; coupling, center frequency and name are kept. A single element written to
@@ -2071,8 +1907,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         dtype *R_ptr = R.memptr();
         for (auto i = 0ULL; i < i_element.n_elem; ++i)
         {
-            unsigned j = 3 * (i_element.at(i) - 1);
-            unsigned k = use_all_elements ? j : 0;
+            arma::uword j = 3 * i_element.at(i);
+            arma::uword k = use_all_elements ? j : 0;
             dtype a = R_ptr[0] * ptrI[j] + R_ptr[3] * ptrI[j + 1] + R_ptr[6] * ptrI[j + 2];
             dtype b = R_ptr[1] * ptrI[j] + R_ptr[4] * ptrI[j + 1] + R_ptr[7] * ptrI[j + 2];
             dtype c = R_ptr[2] * ptrI[j] + R_ptr[5] * ptrI[j + 1] + R_ptr[8] * ptrI[j + 2];

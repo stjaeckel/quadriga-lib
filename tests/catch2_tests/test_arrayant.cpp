@@ -101,7 +101,39 @@ TEST_CASE("Arrayant - Quick is_valid detects resized members with unchanged data
     REQUIRE(!a.is_valid(false).empty());
 
     REQUIRE(!a.is_valid().empty()); // stops here if the quick check misses the change
-    CHECK_THROWS_AS(a.interpolate(&az, &el, &vr, &vi, &hr, &hi), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate(a, az, el, vr, vi, hr, hi), std::invalid_argument);
+}
+
+// A copy of a valid arrayant passes the quick check of is_valid with its own data: its cache holds the data
+// pointers of the copy. The members of the pattern used here have more than 16 elements, so they live on the heap and
+// keep their data pointers when the copy is returned. A copy of an invalid arrayant gets no cache.
+TEST_CASE("Arrayant copy - A copy of a valid arrayant is marked as validated")
+{
+    // 6 elements on a 10 degree grid: grids of 19 and 37 values, positions [3, 6], coupling [6, 6]
+    auto a = quadriga_lib::generate_arrayant_3GPP<double>(1, 3, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0);
+    REQUIRE(a.validate().empty());
+    REQUIRE(a.element_pos.n_elem > 16);
+    REQUIRE(a.coupling_im.n_elem > 16);
+
+    const auto b = a.copy();
+    const arma::Cube<double> *pattern[4] = {&b.e_theta_re, &b.e_theta_im, &b.e_phi_re, &b.e_phi_im};
+    for (int i = 0; i < 4; ++i)
+        CHECK(b.check_ptr[i] == pattern[i]->memptr());
+    CHECK(b.check_ptr[4] == b.azimuth_grid.memptr());
+    CHECK(b.check_ptr[5] == b.elevation_grid.memptr());
+    CHECK(b.check_ptr[6] == b.element_pos.memptr());
+    CHECK(b.check_ptr[7] == b.coupling_re.memptr());
+    CHECK(b.check_ptr[8] == b.coupling_im.memptr());
+    CHECK(b.check_ptr[0] != a.check_ptr[0]); // Own data, not the cache of the source
+    CHECK(b.is_valid().empty());
+
+    // The copy of an invalid arrayant has an empty cache and fails the check
+    auto c = a.copy();
+    c.e_theta_im.set_size(19, 36, 6);
+    const auto d = c.copy();
+    for (int i = 0; i < 9; ++i)
+        CHECK(d.check_ptr[i] == nullptr);
+    CHECK(!d.is_valid().empty());
 }
 
 // Append must build the block-diagonal coupling [C1 0; 0 C2] (as arrayant_concat_multi), also when the number
@@ -309,20 +341,20 @@ TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values",
 
     arma::Mat<T> az = {T(0.1)}, el = {T(0.2)}, vr, vi, hr, hi;
 
-    // Rejected by all three entry points; interpolate runs on a copy that was never validated
+    // Rejected by all three entry points; arrayant_interpolate runs on a copy that was never validated
     auto rejected = [&](const quadriga_lib::arrayant<T> &b)
     {
         quadriga_lib::arrayant<T> c = b, d = b;
         CHECK(!c.is_valid(false).empty());
         CHECK(!c.validate().empty());
-        CHECK_THROWS_AS(d.interpolate(&az, &el, &vr, &vi, &hr, &hi), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate(d, az, el, vr, vi, hr, hi), std::invalid_argument);
     };
 
     SECTION("Controls: valid grids pass")
     {
         quadriga_lib::arrayant<T> b = a;
         CHECK(b.validate().empty());
-        b.interpolate(&az, &el, &vr, &vi, &hr, &hi);
+        quadriga_lib::arrayant_interpolate(b, az, el, vr, vi, hr, hi);
         CHECK(std::abs(vr(0) - T(1.0)) < T(1e-5));
 
         // A single grid point in both directions

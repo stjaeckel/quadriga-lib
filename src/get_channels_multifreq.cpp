@@ -9,9 +9,9 @@
 #include <vector>
 #include <limits>
 
-#include "quadriga_arrayant.hpp"
+#include "quadriga_lib.hpp"
 #include "quadriga_lib_helper_functions.hpp"
-#include "qd_arrayant_interpolate.hpp"
+#include "qd_arrayant_functions.hpp"
 #include "slerp.h"
 
 // Find bracketing indices and weight for frequency interpolation
@@ -511,32 +511,32 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     }
 
     // Prepare TX/RX element indices and interpolation positions (frequency-independent)
-    arma::Col<unsigned> i_tx_element(n_links);
+    arma::uvec i_tx_element(n_links);
     arma::Mat<dtype> tx_element_pos_interp(3, n_links);
     {
-        unsigned *pe = i_tx_element.memptr();
+        arma::uword *pe = i_tx_element.memptr();
         dtype *pp = tx_element_pos_interp.memptr();
         arma::Mat<dtype> tx_local(3, n_tx, arma::fill::zeros);
         if (!tx_array[0].element_pos.is_empty())
             std::memcpy(tx_local.memptr(), tx_array[0].element_pos.memptr(), 3 * n_tx * sizeof(dtype));
         dtype *ptl = tx_local.memptr();
-        for (unsigned t = 0; t < (unsigned)n_tx; ++t)
-            for (unsigned r = 0; r < (unsigned)n_rx; ++r)
-                *pe++ = t + 1, *pp++ = ptl[3 * t], *pp++ = ptl[3 * t + 1], *pp++ = ptl[3 * t + 2];
+        for (arma::uword t = 0; t < n_tx; ++t)
+            for (arma::uword r = 0; r < n_rx; ++r)
+                *pe++ = t, *pp++ = ptl[3 * t], *pp++ = ptl[3 * t + 1], *pp++ = ptl[3 * t + 2];
     }
 
-    arma::Col<unsigned> i_rx_element(n_links);
+    arma::uvec i_rx_element(n_links);
     arma::Mat<dtype> rx_element_pos_interp(3, n_links);
     {
-        unsigned *pe = i_rx_element.memptr();
+        arma::uword *pe = i_rx_element.memptr();
         dtype *pp = rx_element_pos_interp.memptr();
         arma::Mat<dtype> rx_local(3, n_rx, arma::fill::zeros);
         if (!rx_array[0].element_pos.is_empty())
             std::memcpy(rx_local.memptr(), rx_array[0].element_pos.memptr(), 3 * n_rx * sizeof(dtype));
         dtype *prl = rx_local.memptr();
-        for (unsigned t = 0; t < (unsigned)n_tx; ++t)
-            for (unsigned r = 0; r < (unsigned)n_rx; ++r)
-                *pe++ = r + 1, *pp++ = prl[3 * r], *pp++ = prl[3 * r + 1], *pp++ = prl[3 * r + 2];
+        for (arma::uword t = 0; t < n_tx; ++t)
+            for (arma::uword r = 0; r < n_rx; ++r)
+                *pe++ = r, *pp++ = prl[3 * r], *pp++ = prl[3 * r + 1], *pp++ = prl[3 * r + 2];
     }
 
     // Determine if element coupling is needed (check ALL entries across frequencies)
@@ -597,6 +597,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     }
 
     // Phase 2: Per-frequency processing (parallelized over output frequencies)
+    // The interpolation calls inside the parallel region do not throw for the validated arrays; should one, the error
+    // is passed on after the region
+    bool omp_failed = false;
+    std::string omp_error;
     const int n_freq_out_i = (int)n_freq_out;
 #pragma omp parallel for schedule(static) if (n_freq_out >= 8)
     for (int f_i = 0; f_i < n_freq_out_i; ++f_i)
@@ -785,10 +789,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             if (tx_exact)
             {
                 const auto &ta = tx_array[tx_lo];
-                qd_arrayant_interpolate(ta.e_theta_re, ta.e_theta_im, ta.e_phi_re, ta.e_phi_im,
-                                        ta.azimuth_grid, ta.elevation_grid, AOD_j, EOD_j,
-                                        i_tx_element, tx_orientation, tx_element_pos_interp,
-                                        Vt_re, Vt_im, Ht_re, Ht_im);
+                OMP_SAFE_CALL(omp_failed, omp_error,
+                              qd_arrayant_interpolate_dispatch<dtype>(ta, AOD_j, EOD_j, i_tx_element, tx_orientation, tx_element_pos_interp,
+                                                                      Vt_re, Vt_im, Ht_re, Ht_im, nullptr, nullptr, nullptr, nullptr, 1));
             }
             else
             {
@@ -798,16 +801,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 arma::Mat<dtype> Ht_re_hi(n_links, 1), Ht_im_hi(n_links, 1);
 
                 const auto &ta_lo = tx_array[tx_lo];
-                qd_arrayant_interpolate(ta_lo.e_theta_re, ta_lo.e_theta_im, ta_lo.e_phi_re, ta_lo.e_phi_im,
-                                        ta_lo.azimuth_grid, ta_lo.elevation_grid, AOD_j, EOD_j,
-                                        i_tx_element, tx_orientation, tx_element_pos_interp,
-                                        Vt_re_lo, Vt_im_lo, Ht_re_lo, Ht_im_lo);
+                OMP_SAFE_CALL(omp_failed, omp_error,
+                              qd_arrayant_interpolate_dispatch<dtype>(ta_lo, AOD_j, EOD_j, i_tx_element, tx_orientation, tx_element_pos_interp,
+                                                                      Vt_re_lo, Vt_im_lo, Ht_re_lo, Ht_im_lo, nullptr, nullptr, nullptr, nullptr, 1));
 
                 const auto &ta_hi = tx_array[tx_hi];
-                qd_arrayant_interpolate(ta_hi.e_theta_re, ta_hi.e_theta_im, ta_hi.e_phi_re, ta_hi.e_phi_im,
-                                        ta_hi.azimuth_grid, ta_hi.elevation_grid, AOD_j, EOD_j,
-                                        i_tx_element, tx_orientation, tx_element_pos_interp,
-                                        Vt_re_hi, Vt_im_hi, Ht_re_hi, Ht_im_hi);
+                OMP_SAFE_CALL(omp_failed, omp_error,
+                              qd_arrayant_interpolate_dispatch<dtype>(ta_hi, AOD_j, EOD_j, i_tx_element, tx_orientation, tx_element_pos_interp,
+                                                                      Vt_re_hi, Vt_im_hi, Ht_re_hi, Ht_im_hi, nullptr, nullptr, nullptr, nullptr, 1));
 
                 // SLERP blend between bracket entries
                 dtype *vtr = Vt_re.memptr(), *vti = Vt_im.memptr();
@@ -833,10 +834,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             if (rx_exact)
             {
                 const auto &ra = rx_array[rx_lo];
-                qd_arrayant_interpolate(ra.e_theta_re, ra.e_theta_im, ra.e_phi_re, ra.e_phi_im,
-                                        ra.azimuth_grid, ra.elevation_grid, AOA_j, EOA_j,
-                                        i_rx_element, rx_orientation, rx_element_pos_interp,
-                                        Vr_re, Vr_im, Hr_re, Hr_im);
+                OMP_SAFE_CALL(omp_failed, omp_error,
+                              qd_arrayant_interpolate_dispatch<dtype>(ra, AOA_j, EOA_j, i_rx_element, rx_orientation, rx_element_pos_interp,
+                                                                      Vr_re, Vr_im, Hr_re, Hr_im, nullptr, nullptr, nullptr, nullptr, 1));
             }
             else
             {
@@ -847,17 +847,15 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
                 const auto &ra_lo = rx_array[rx_lo];
 
-                qd_arrayant_interpolate(ra_lo.e_theta_re, ra_lo.e_theta_im, ra_lo.e_phi_re, ra_lo.e_phi_im,
-                                        ra_lo.azimuth_grid, ra_lo.elevation_grid, AOA_j, EOA_j,
-                                        i_rx_element, rx_orientation, rx_element_pos_interp,
-                                        Vr_re_lo, Vr_im_lo, Hr_re_lo, Hr_im_lo);
+                OMP_SAFE_CALL(omp_failed, omp_error,
+                              qd_arrayant_interpolate_dispatch<dtype>(ra_lo, AOA_j, EOA_j, i_rx_element, rx_orientation, rx_element_pos_interp,
+                                                                      Vr_re_lo, Vr_im_lo, Hr_re_lo, Hr_im_lo, nullptr, nullptr, nullptr, nullptr, 1));
 
                 const auto &ra_hi = rx_array[rx_hi];
 
-                qd_arrayant_interpolate(ra_hi.e_theta_re, ra_hi.e_theta_im, ra_hi.e_phi_re, ra_hi.e_phi_im,
-                                        ra_hi.azimuth_grid, ra_hi.elevation_grid, AOA_j, EOA_j,
-                                        i_rx_element, rx_orientation, rx_element_pos_interp,
-                                        Vr_re_hi, Vr_im_hi, Hr_re_hi, Hr_im_hi);
+                OMP_SAFE_CALL(omp_failed, omp_error,
+                              qd_arrayant_interpolate_dispatch<dtype>(ra_hi, AOA_j, EOA_j, i_rx_element, rx_orientation, rx_element_pos_interp,
+                                                                      Vr_re_hi, Vr_im_hi, Hr_re_hi, Hr_im_hi, nullptr, nullptr, nullptr, nullptr, 1));
 
                 dtype *vrr = Vr_re.memptr(), *vri = Vr_im.memptr();
                 dtype *hrr = Hr_re.memptr(), *hri = Hr_im.memptr();
@@ -993,6 +991,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         }
 
     } // End frequency loop (OMP parallel)
+
+    if (omp_failed)
+        throw std::runtime_error(omp_error);
 }
 
 // Explicit template instantiations

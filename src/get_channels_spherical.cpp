@@ -10,11 +10,10 @@
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_lib_helper_functions.hpp"
-#include "qd_arrayant_interpolate.hpp"
+#include "qd_arrayant_functions.hpp"
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
-#include "qd_arrayant_interpolate_avx2.hpp"
 #endif
 
 /*!SECTION
@@ -71,7 +70,7 @@ void quadriga_lib::get_channels_spherical(
     arma::Cube<dtype> *eod = nullptr,
     arma::Cube<dtype> *aoa = nullptr,
     arma::Cube<dtype> *eoa = nullptr,
-    bool use_avx2 = false);
+    int use_kernel = 0);
 ```
 
 ## Inputs:
@@ -92,7 +91,9 @@ void quadriga_lib::get_channels_spherical(
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot
-- **`use_avx2`** *(optional)* — If `true`, use AVX2 for antenna interpolation; faster, but less accurate; ignored when not supported
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto,
+  1 = GENERIC, 2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto
+  selects GENERIC in this version, see [[arrayant_interpolate]]
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -122,13 +123,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                                           arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
                                           dtype center_frequency, bool use_absolute_delays, bool add_fake_los_path,
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
-                                          bool use_avx2)
+                                          int use_kernel)
 {
-    // Suppress unused-parameter warning when AVX2 support is disabled at compile time
-#if !BUILD_WITH_AVX2
-    (void)use_avx2;
-#endif
-
     // Constants
     constexpr dtype los_limit = (dtype)1.0e-4;
     constexpr dtype zero = (dtype)0.0;
@@ -145,6 +141,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         error_message = "Mandatory inputs and outputs cannot be NULL";
         throw std::invalid_argument(error_message.c_str());
     }
+
+    // Kernel of the antenna interpolation and the coefficient computation, checked before any early return
+    const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array->e_theta_re.n_elem, rx_array->e_theta_re.n_elem));
 
     qd_check_alias_list({coeff_re, coeff_im, delay, aod, eod, aoa, eoa},
                         {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
@@ -169,7 +168,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                                                     center_frequency, use_absolute_delays, true,
                                                     aod == nullptr ? nullptr : &ad, eod == nullptr ? nullptr : &ed,
                                                     aoa == nullptr ? nullptr : &aa, eoa == nullptr ? nullptr : &ea,
-                                                    use_avx2);
+                                                    use_kernel);
 
         // Copy slot 0 to the outputs
         auto copy_slot = [](const arma::Cube<dtype> &src, arma::Cube<dtype> *dst)
@@ -419,20 +418,20 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     }
 
     // Calculate TX element indices and positions
-    arma::Col<unsigned> i_tx_element(n_links, arma::fill::none);
-    unsigned *p_element = i_tx_element.memptr();
+    arma::uvec i_tx_element(n_links, arma::fill::none);
+    arma::uword *p_element = i_tx_element.memptr();
     arma::Mat<dtype> tx_element_pos_interp(3, n_links, arma::fill::none);
     ptr = tx_element_pos_interp.memptr();
     if (tx_array->element_pos.n_elem != 0)
         std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     else
         tx_element_pos.zeros();
-    for (unsigned t = 0; t < (unsigned)n_tx; ++t)
-        for (unsigned r = 0; r < (unsigned)n_rx; ++r)
-            *p_element++ = t + 1, *ptr++ = p_tx[3 * t], *ptr++ = p_tx[3 * t + 1], *ptr++ = p_tx[3 * t + 2];
+    for (arma::uword t = 0; t < n_tx; ++t)
+        for (arma::uword r = 0; r < n_rx; ++r)
+            *p_element++ = t, *ptr++ = p_tx[3 * t], *ptr++ = p_tx[3 * t + 1], *ptr++ = p_tx[3 * t + 2];
 
     // Calculate RX element indices and positions
-    arma::Col<unsigned> i_rx_element(n_links, arma::fill::none);
+    arma::uvec i_rx_element(n_links, arma::fill::none);
     p_element = i_rx_element.memptr();
     arma::Mat<dtype> rx_element_pos_interp(3, n_links, arma::fill::none);
     ptr = rx_element_pos_interp.memptr();
@@ -440,9 +439,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
     else
         rx_element_pos.zeros();
-    for (unsigned t = 0; t < unsigned(n_tx); ++t)
-        for (unsigned r = 0; r < unsigned(n_rx); ++r)
-            *p_element++ = r + 1, *ptr++ = p_rx[3 * r], *ptr++ = p_rx[3 * r + 1], *ptr++ = p_rx[3 * r + 2];
+    for (arma::uword t = 0; t < n_tx; ++t)
+        for (arma::uword r = 0; r < n_rx; ++r)
+            *p_element++ = r, *ptr++ = p_rx[3 * r], *ptr++ = p_rx[3 * r + 1], *ptr++ = p_rx[3 * r + 2];
 
     // Determine if we need to apply antenna-element coupling
     bool apply_element_coupling = false;
@@ -519,42 +518,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     arma::Mat<dtype> Hr_re(n_links, n_out, arma::fill::none), Hr_im(n_links, n_out, arma::fill::none);
 
     // Interpolate antennas
-#if BUILD_WITH_AVX2
-    if (use_avx2 && runtime_AVX2_Check())
-    {
-        qd_arrayant_interpolate_avx2(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
-                                     tx_array->azimuth_grid, tx_array->elevation_grid, AOD_all, EOD_all,
-                                     i_tx_element, tx_orientation, tx_element_pos_interp,
-                                     Vt_re, Vt_im, Ht_re, Ht_im);
-
-        qd_arrayant_interpolate_avx2(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
-                                     rx_array->azimuth_grid, rx_array->elevation_grid, AOA_all, EOA_all,
-                                     i_rx_element, rx_orientation, rx_element_pos_interp,
-                                     Vr_re, Vr_im, Hr_re, Hr_im);
-    }
-    else
-    {
-        qd_arrayant_interpolate(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
-                                tx_array->azimuth_grid, tx_array->elevation_grid, AOD_all, EOD_all,
-                                i_tx_element, tx_orientation, tx_element_pos_interp,
-                                Vt_re, Vt_im, Ht_re, Ht_im);
-
-        qd_arrayant_interpolate(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
-                                rx_array->azimuth_grid, rx_array->elevation_grid, AOA_all, EOA_all,
-                                i_rx_element, rx_orientation, rx_element_pos_interp,
-                                Vr_re, Vr_im, Hr_re, Hr_im);
-    }
-#else
-    qd_arrayant_interpolate(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
-                            tx_array->azimuth_grid, tx_array->elevation_grid, AOD_all, EOD_all,
-                            i_tx_element, tx_orientation, tx_element_pos_interp,
-                            Vt_re, Vt_im, Ht_re, Ht_im);
-
-    qd_arrayant_interpolate(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
-                            rx_array->azimuth_grid, rx_array->elevation_grid, AOA_all, EOA_all,
-                            i_rx_element, rx_orientation, rx_element_pos_interp,
-                            Vr_re, Vr_im, Hr_re, Hr_im);
-#endif
+    qd_arrayant_interpolate_dispatch<dtype>(*tx_array, AOD_all, EOD_all, i_tx_element, tx_orientation, tx_element_pos_interp,
+                                            Vt_re, Vt_im, Ht_re, Ht_im, nullptr, nullptr, nullptr, nullptr, kernel);
+    qd_arrayant_interpolate_dispatch<dtype>(*rx_array, AOA_all, EOA_all, i_rx_element, rx_orientation, rx_element_pos_interp,
+                                            Vr_re, Vr_im, Hr_re, Hr_im, nullptr, nullptr, nullptr, nullptr, kernel);
 
     // Calculate the MIMO channel coefficients for each path
     const int n_out_i = (int)n_out;
@@ -575,7 +542,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
 
         // Compute MIMO coefficients (Jones product + phase rotation)
 #if BUILD_WITH_AVX2
-        if (use_avx2 && runtime_AVX2_Check())
+        if (kernel == 2)
             qd_coeff_combine_avx2(pVrr, pVri, pHrr, pHri, pVtr, pVti, pHtr, pHti,
                                   pM, &p_delays[o_slice], wave_number, wavelength, path_amplitude,
                                   &p_coeff_re[o_slice], &p_coeff_im[o_slice], n_links);
@@ -711,7 +678,7 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
                                                    float center_frequency, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
-                                                   bool use_avx2);
+                                                   int use_kernel);
 
 template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<double> *tx_array, const quadriga_lib::arrayant<double> *rx_array,
                                                    double Tx, double Ty, double Tz, double Tb, double Tt, double Th,
@@ -721,4 +688,4 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
                                                    double center_frequency, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
-                                                   bool use_avx2);
+                                                   int use_kernel);

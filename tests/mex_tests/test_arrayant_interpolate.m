@@ -1,383 +1,165 @@
 function test_arrayant_interpolate
+% MEX interface test for quadriga_lib.arrayant_interpolate.
+% Scope: argument and output handling, index conversion, single- and multi-frequency mode, kernels, error paths.
+% Physics validation lives in the Catch2 suites (test_arrayant_interpolate.cpp, test_arrayant_interpolate_multi.cpp).
 
-% Simple interpolation in az-direction
-ant = struct( 'e_theta_re', [-2,2], 'e_theta_im', [-1,1], ...
-    'e_phi_re', [3,1], 'e_phi_im', [6,2], ...
-    'azimuth_grid', [0,pi], 'elevation_grid', 0 );
+%% Setup: two elements with two azimuth samples (0 and pi) each
+% Element 1: e-theta in opposite phase (linear), e-phi in phase; element 2: e-theta with a 90 degree phase step
+ant = struct( 'e_theta_re', cat(3, [-2, 2], [1, 0]), 'e_theta_im', cat(3, [-1, 1], [0, 1]), ...
+    'e_phi_re', cat(3, [3, 1], [0, 0]), 'e_phi_im', cat(3, [6, 2], [0, 0]), ...
+    'azimuth_grid', [0, pi], 'elevation_grid', 0 );
+az = [0, 1, 2] * pi/4;
+el = [-0.5, 0, 0.5];
+c = cos([0, 1, 2] * pi/8);
+s = sin([0, 1, 2] * pi/8);
 
-[vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( ant, [0,1,2,3]*pi/4, [-0.5,0,0,0.5] );
-assertElementsAlmostEqual( vr, [-2, -1, 0, 1], 1e-14);
-assertElementsAlmostEqual( vi, [-1, -0.5, 0, 0.5], 1e-14);
-assertElementsAlmostEqual( hr, [3, 2.5, 2, 1.5], 1e-14);
-assertElementsAlmostEqual( hi, [6, 5, 4, 3], 1e-14);
-assertElementsAlmostEqual( ds, [0, 0, 0, 0], 1e-14);
-assertElementsAlmostEqual( az, [0,1,2,3]*pi/4, 1e-14);
-assertElementsAlmostEqual( el, [-0.5, 0, 0, 0.5], 1e-14);
+%% Basic call and values
+[ V_re, V_im, H_re, H_im, dist, az_loc, el_loc, gamma ] = quadriga_lib.arrayant_interpolate( ant, az, el );
+assertEqual( size(V_re), [2, 3] );
+assertTrue( isa(V_re, 'double') && isa(gamma, 'double') );
+assertElementsAlmostEqual( V_re, [ -2, -1, 0; c ], 'absolute', 1e-14 );
+assertElementsAlmostEqual( V_im, [ -1, -0.5, 0; s ], 'absolute', 1e-14 );
+assertElementsAlmostEqual( H_re, [ 3, 2.5, 2; 0, 0, 0 ], 'absolute', 1e-14 );
+assertElementsAlmostEqual( H_im, [ 6, 5, 4; 0, 0, 0 ], 'absolute', 1e-14 );
+assertElementsAlmostEqual( dist, zeros(2, 3), 'absolute', 1e-14 );
+assertElementsAlmostEqual( az_loc, [ az; az ], 'absolute', 1e-14 );
+assertElementsAlmostEqual( el_loc, [ el; el ], 'absolute', 1e-14 );
+assertElementsAlmostEqual( gamma, zeros(2, 3), 'absolute', 1e-14 );
 
-[vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( [], [0,1,2,3]*pi/4, [-0.5,0,0,0.5], [], [], [], [], [-2,2], [-1,1], [3,1], [6,2], [0,pi], 0 );
-assertElementsAlmostEqual( vr, [-2, -1, 0, 1], 1e-14);
-assertElementsAlmostEqual( vi, [-1, -0.5, 0, 0.5], 1e-14);
-assertElementsAlmostEqual( hr, [3, 2.5, 2, 1.5], 1e-14);
-assertElementsAlmostEqual( hi, [6, 5, 4, 3], 1e-14);
-assertElementsAlmostEqual( ds, [0, 0, 0, 0], 1e-14);
-assertElementsAlmostEqual( az, [0,1,2,3]*pi/4, 1e-14);
-assertElementsAlmostEqual( el, [-0.5, 0, 0, 0.5], 1e-14);
+%% Optional inputs: element (1-based, permuted, repeated), [] and omitted give all elements
+[ V_e, ~, ~, H_e ] = quadriga_lib.arrayant_interpolate( ant, az, el, [2, 1, 2] );
+assertEqual( V_e, V_re([2, 1, 2], :) );
+assertEqual( H_e, H_im([2, 1, 2], :) );
+assertEqual( quadriga_lib.arrayant_interpolate( ant, az, el, [] ), V_re );
+assertEqual( quadriga_lib.arrayant_interpolate( ant, az, el, [2; 1; 2] ), V_e );        % Column vector
+assertEqual( quadriga_lib.arrayant_interpolate( ant, az, el, uint32([2, 1, 2]) ), V_e ); % Integer class
 
-% Simple interpolation in el-direction
-ant = struct( 'e_theta_re', [-2; 2], 'e_theta_im', [-1; 1], ...
-    'e_phi_re', [3; 1], 'e_phi_im', [6; 2], ...
-    'azimuth_grid', 0, 'elevation_grid', [0, pi/2] );
+%% Optional inputs: orientation (heading -pi/8 adds pi/8 to the local azimuth)
+[ V_o, ~, ~, ~, ~, az_o ] = quadriga_lib.arrayant_interpolate( ant, az, el, [], [0; 0; -pi/8] );
+assertElementsAlmostEqual( az_o, [ az; az ] + pi/8, 'absolute', 1e-14 );
+assertElementsAlmostEqual( V_o(2, :), cos([0, 1, 2] * pi/8 + pi/16), 'absolute', 1e-14 );
+assertEqual( quadriga_lib.arrayant_interpolate( ant, az, el, [], [] ), V_re );
+ori = zeros(3, 2, 3);
+ori(3, 2, :) = -pi/8;                                                                    % Per output and angle
+[ ~, ~, ~, ~, ~, az_o2 ] = quadriga_lib.arrayant_interpolate( ant, az, el, [], ori );
+assertElementsAlmostEqual( az_o2, [ az; az + pi/8 ], 'absolute', 1e-14 );
 
-[vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( ant, [-0.5,0,0,0.5], [0,1,2,3]*pi/8 );
-assertElementsAlmostEqual( vr, [-2, -1, 0, 1], 1e-14);
-assertElementsAlmostEqual( vi, [-1, -0.5, 0, 0.5], 1e-14);
-assertElementsAlmostEqual( hr, [3, 2.5, 2, 1.5], 1e-14);
-assertElementsAlmostEqual( hi, [6, 5, 4, 3], 1e-14);
-assertElementsAlmostEqual( ds, [0, 0, 0, 0], 1e-14);
-assertElementsAlmostEqual( az, [-0.5, 0, 0, 0.5], 1e-14);
-assertElementsAlmostEqual( el, [0,1,2,3]*pi/8, 1e-14);
+%% Optional inputs: element_pos (distance from the wavefront plane, minus the projection onto the direction)
+pos = [ 1, 0; 0, 2; 0, 0 ];
+[ ~, ~, ~, ~, dist_p ] = quadriga_lib.arrayant_interpolate( ant, [0, pi/2], [0, 0], [], [], pos );
+assertElementsAlmostEqual( dist_p, [ -1, 0; 0, -2 ], 'absolute', 1e-14 );
+ant_p = ant;
+ant_p.element_pos = pos;
+[ ~, ~, ~, ~, dist_a ] = quadriga_lib.arrayant_interpolate( ant_p, [0, pi/2], [0, 0] );  % Positions of the arrayant
+assertEqual( dist_a, dist_p );
+[ ~, ~, ~, ~, dist_e ] = quadriga_lib.arrayant_interpolate( ant_p, [0, pi/2], [0, 0], [], [], [] );
+assertEqual( dist_e, dist_p );
 
-% Spheric interpolation in az-direction
-ant = struct( 'e_theta_re', [1,0], 'e_theta_im', [0,1], ...
-    'e_phi_re', [-2,0], 'e_phi_im', [0,-1], ...
-    'azimuth_grid', [0,pi], 'elevation_grid', 0 );
-
-[vr,vi,hr,hi] = quadriga_lib.arrayant_interpolate( ant, [0,1,2,3]*pi/4, [0,0,0,0] );
-assertElementsAlmostEqual( vr, cos([0,1,2,3]*pi/8), 1e-14);
-assertElementsAlmostEqual( vi, sin([0,1,2,3]*pi/8), 1e-14);
-assertElementsAlmostEqual( hr, -cos([0,1,2,3]*pi/8).*[2,1.75,1.5,1.25], 1e-14);
-assertElementsAlmostEqual( hi, -sin([0,1,2,3]*pi/8).*[2,1.75,1.5,1.25], 1e-14);
-
-% Spheric interpolation in el-direction
-ant = struct( 'e_theta_re', [1;0], 'e_theta_im', [0;1], ...
-    'e_phi_re', [-2;0], 'e_phi_im', [0;-1], ...
-    'azimuth_grid', 0, 'elevation_grid', [0,pi/2] );
-
-[vr,vi,hr,hi] = quadriga_lib.arrayant_interpolate( ant, [0,0,0,0], [0,1,2,3]*pi/8 );
-assertElementsAlmostEqual( vr, cos([0,1,2,3]*pi/8), 1e-14);
-assertElementsAlmostEqual( vi, sin([0,1,2,3]*pi/8), 1e-14);
-assertElementsAlmostEqual( hr, -cos([0,1,2,3]*pi/8).*[2,1.75,1.5,1.25], 1e-14);
-assertElementsAlmostEqual( hi, -sin([0,1,2,3]*pi/8).*[2,1.75,1.5,1.25], 1e-14);
-
-% Spheric interpolation in az-direction with z-rotation
-ant = struct( 'e_theta_re', [1,0], 'e_theta_im', [0,1], ...
-    'e_phi_re', [-2,0], 'e_phi_im', [0,-1], ...
-    'azimuth_grid', [0,pi], 'elevation_grid', 0 );
-
-[vr,vi,hr,hi,~,az] = quadriga_lib.arrayant_interpolate( ant, [0,1,2,3]*pi/4, [0,0,0,0], 1, [0;0;-pi/8] );
-assertElementsAlmostEqual( az, [0,1,2,3]*pi/4+pi/8, 1e-14);
-assertElementsAlmostEqual( vr, cos([0,1,2,3]*pi/8+pi/16), 1e-14);
-assertElementsAlmostEqual( vi, sin([0,1,2,3]*pi/8+pi/16), 1e-14);
-assertElementsAlmostEqual( hr, -cos([0,1,2,3]*pi/8+pi/16).*[1.875,1.625, 1.375, 1.125], 1e-14);
-assertElementsAlmostEqual( hi, -sin([0,1,2,3]*pi/8+pi/16).*[1.875,1.625, 1.375, 1.125], 1e-14);
-
-% Spheric interpolation in el-direction with y-rotation
-ant = struct( 'e_theta_re', [1;0], 'e_theta_im', [0;1], ...
-    'e_phi_re', [-2;0], 'e_phi_im', [0;-1], ...
-    'azimuth_grid', 0, 'elevation_grid', [0,pi/2] );
-
-[vr,vi,hr,hi,~,az,el] = quadriga_lib.arrayant_interpolate( ant, [0,0,0,0], [0,1,2,3]*pi/8, 1, [0;-pi/16;0] );
-assertElementsAlmostEqual( az, [0,0,0,0], 1e-14);
-assertElementsAlmostEqual( el, [0,1,2,3]*pi/8+pi/16, 1e-14);
-assertElementsAlmostEqual( vr, cos([0,1,2,3]*pi/8+pi/16), 1e-14);
-assertElementsAlmostEqual( vi, sin([0,1,2,3]*pi/8+pi/16), 1e-14);
-assertElementsAlmostEqual( hr, -cos([0,1,2,3]*pi/8+pi/16).*[1.875,1.625, 1.375, 1.125], 1e-14);
-assertElementsAlmostEqual( hi, -sin([0,1,2,3]*pi/8+pi/16).*[1.875,1.625, 1.375, 1.125], 1e-14);
-
-% Polarization rotation using x-rotation
-ant = struct( 'e_theta_re', [1,0], 'e_theta_im', [1,0], ...
-    'e_phi_re', [0,0], 'e_phi_im', [0,0], ...
-    'azimuth_grid', [0,pi], 'elevation_grid', 0 );
-
-[vr,vi,hr,hi] = quadriga_lib.arrayant_interpolate( ant, 0, 0, [1,1], [pi/4 -pi/4;0 0; 0 0] );
-assertElementsAlmostEqual( vr, [1;1]/sqrt(2), 1e-14);
-assertElementsAlmostEqual( vi, [1;1]/sqrt(2), 1e-14);
-assertElementsAlmostEqual( hr, [1;-1]/sqrt(2), 1e-14);
-assertElementsAlmostEqual( hi, [1;-1]/sqrt(2), 1e-14);
-
-% Test projected distance
-ant = struct( 'e_theta_re', 1, 'e_theta_im', 0, ...
-    'e_phi_re', 0, 'e_phi_im', 0, ...
-    'azimuth_grid', 0, 'elevation_grid', 0 );
-
-[vr,vi,hr,hi,ds] = quadriga_lib.arrayant_interpolate( ant, 0, 0, [1,1,1], [], eye(3));
-assertElementsAlmostEqual( vr, [1;1;1], 1e-14);
-assertElementsAlmostEqual( vi, [0;0;0], 1e-14);
-assertElementsAlmostEqual( hr, [0;0;0], 1e-14);
-assertElementsAlmostEqual( hi, [0;0;0], 1e-14);
-assertElementsAlmostEqual( ds, [-1;0;0], 1e-14);
-
-[~,~,~,~,ds] = quadriga_lib.arrayant_interpolate( ant, 0, 0, [1,1,1], [], eye(3));
-assertElementsAlmostEqual( ds, [-1;0;0], 1e-14);
-
-[~,~,~,~,ds] = quadriga_lib.arrayant_interpolate( ant, 3*pi/4, 0, [1,1,1], [], eye(3));
-assertElementsAlmostEqual( ds, [1;-1;0]/sqrt(2), 1e-14);
-
-[~,~,~,~,ds] = quadriga_lib.arrayant_interpolate( ant, 0, -pi/4, [1,1,1], [], eye(3));
-assertElementsAlmostEqual( ds, [-1;0;1]/sqrt(2), 1e-14);
-
-[~,~,~,~,ds] = quadriga_lib.arrayant_interpolate( ant, [-pi,-pi/2,0], [0,0,-pi/2], [1,1,1], [], -eye(3));
-assertElementsAlmostEqual( ds, -eye(3), 1e-14);
-
-% ===================== Multi-frequency mode =====================
-
-% Two isotropic single-element antennas at different center frequencies
-ant1 = struct( 'e_theta_re', 1, 'e_theta_im', 0, ...
-    'e_phi_re', 2, 'e_phi_im', 0, ...
-    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 1e9 );
-ant2 = struct( 'e_theta_re', 3, 'e_theta_im', 0, ...
-    'e_phi_re', 4, 'e_phi_im', 0, ...
-    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 2e9 );
-ant_multi = [ant1, ant2];
-
-% Request at the exact center frequencies -> stored values, cube [1,1,2]
-[vr, vi, hr, hi] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0, [], [], [], [1e9, 2e9] );
-assertEqual( size(vr), [1, 1, 2] );
-assertEqual( size(hi), [1, 1, 2] );
-assertElementsAlmostEqual( vr(:,:,1), 1, 1e-14 );
-assertElementsAlmostEqual( vr(:,:,2), 3, 1e-14 );
-assertElementsAlmostEqual( hr(:,:,1), 2, 1e-14 );
-assertElementsAlmostEqual( hr(:,:,2), 4, 1e-14 );
-assertElementsAlmostEqual( vi, zeros(1,1,2), 1e-14 );
-assertElementsAlmostEqual( hi, zeros(1,1,2), 1e-14 );
-
-% Out-of-range frequencies clamp to nearest center_freq (no extrapolation)
-[vr, ~, hr, ~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0, [], [], [], [0.5e9, 3e9] );
-assertElementsAlmostEqual( vr(:,:,1), 1, 1e-14 );
-assertElementsAlmostEqual( vr(:,:,2), 3, 1e-14 );
-assertElementsAlmostEqual( hr(:,:,1), 2, 1e-14 );
-assertElementsAlmostEqual( hr(:,:,2), 4, 1e-14 );
-
-% Struct array with freq omitted -> multi-freq auto-mode using center_freq values
-[vr, ~, hr, ~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0 );
-assertEqual( size(vr), [1, 1, 2] );
-assertElementsAlmostEqual( vr(:,:,1), 1, 1e-14 );
-assertElementsAlmostEqual( vr(:,:,2), 3, 1e-14 );
-
-% Multiple angles + multiple frequencies -> cube [n_out, n_ang, n_freq]
-az_q = [0, 0, 0, 0];
-el_q = [0, 0, 0, 0];
-[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_multi, az_q, el_q, [], [], [], [1e9, 2e9] );
-assertEqual( size(vr), [1, 4, 2] );
-assertElementsAlmostEqual( vr(:,:,1), [1 1 1 1], 1e-14 );
-assertElementsAlmostEqual( vr(:,:,2), [3 3 3 3], 1e-14 );
-
-% Multi-freq with element selection and duplication
-ant_me_a = struct( 'e_theta_re', cat(3, 1, 10), 'e_theta_im', cat(3, 0, 0), ...
-    'e_phi_re', cat(3, 0, 0), 'e_phi_im', cat(3, 0, 0), ...
-    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 1e9 );
-ant_me_b = struct( 'e_theta_re', cat(3, 3, 30), 'e_theta_im', cat(3, 0, 0), ...
-    'e_phi_re', cat(3, 0, 0), 'e_phi_im', cat(3, 0, 0), ...
-    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 2e9 );
-ant_me = [ant_me_a, ant_me_b];
-
-% Select only element 2
-[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_me, 0, 0, 2, [], [], [1e9, 2e9] );
-assertEqual( size(vr), [1, 1, 2] );
-assertElementsAlmostEqual( vr(:,:,1), 10, 1e-14 );
-assertElementsAlmostEqual( vr(:,:,2), 30, 1e-14 );
-
-% Duplicate elements: [1, 2, 1] -> n_out = 3
-[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_me, 0, 0, [1, 2, 1], [], [], [1e9, 2e9] );
-assertEqual( size(vr), [3, 1, 2] );
-assertElementsAlmostEqual( vr(:,:,1), [1;10;1], 1e-14 );
-assertElementsAlmostEqual( vr(:,:,2), [3;30;3], 1e-14 );
-
-% Multi-freq with element_pos override
-[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_me, 0, 0, [1, 2], [], [0 0; 0 0; 0 1], [1e9, 2e9] );
-assertEqual( size(vr), [2, 1, 2] );
-assertElementsAlmostEqual( vr(:,:,1), [1;10], 1e-14 );
-assertElementsAlmostEqual( vr(:,:,2), [3;30], 1e-14 );
-
-% Exceptins
-
-e = rand( 5,10,3 );
-az_grid = linspace(-pi,pi,10);
-el_grid = linspace(-pi/2, pi/2, 5);
-az = 2*pi*(rand(1,6)-0.5);
-el = pi*(rand(1,6)-0.5);
-
-ant = struct( 'e_theta_re', e, 'e_theta_im', e, 'e_phi_re', e, 'e_phi_im', e, 'azimuth_grid', az_grid, 'elevation_grid', el_grid );
-
+%% Optional inputs: use_kernel
+assertEqual( quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], [] ), V_re );
+assertEqual( quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 1 ), V_re );
+assertEqual( quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], true ), V_re ); % Logical 1 = GENERIC
+has_avx2 = true;
 try
-    vr = quadriga_lib.arrayant_interpolate(  );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
+    V_k = quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 2 );
 catch ME
-    expectedErrorMessage = 'Wrong number of input arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
+    has_avx2 = false;
+    assertTrue( ~isempty(strfind(ME.message, 'AVX2 kernel requested but not available')) ); %#ok<STREMP>
+end
+if has_avx2
+    assertElementsAlmostEqual( V_k, V_re, 'absolute', 1e-6 );                           % Single precision
 end
 
-try
-    [vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( [], [0,1,2,3]*pi/4, [-0.5,0,0,0.5], [], [], [], [], [-2,2], [-1,1], [3,1], [6,2], [0,pi], 0, 1 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of input arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
+%% Multi-frequency mode: struct array with two entries (the second one is twice the first)
+ant_m = ant;
+ant_m.center_freq = 1e9;
+ant_m(2) = ant_m(1);
+ant_m(2).e_theta_re = 2 * ant.e_theta_re;
+ant_m(2).e_theta_im = 2 * ant.e_theta_im;
+ant_m(2).e_phi_re = 2 * ant.e_phi_re;
+ant_m(2).e_phi_im = 2 * ant.e_phi_im;
+ant_m(2).center_freq = 2e9;
+[ MV_re, MV_im, MH_re, MH_im ] = quadriga_lib.arrayant_interpolate( ant_m, az, el, [], [], [], [1e9, 1.5e9, 2e9] );
+assertEqual( size(MV_re), [2, 3, 3] );
+assertElementsAlmostEqual( MV_re, cat(3, V_re, 1.5 * V_re, 2 * V_re), 'absolute', 1e-12 ); % In phase: linear
+assertElementsAlmostEqual( MV_im, cat(3, V_im, 1.5 * V_im, 2 * V_im), 'absolute', 1e-12 );
+assertElementsAlmostEqual( MH_re, cat(3, H_re, 1.5 * H_re, 2 * H_re), 'absolute', 1e-12 );
+assertElementsAlmostEqual( MH_im, cat(3, H_im, 1.5 * H_im, 2 * H_im), 'absolute', 1e-12 );
+MV_d = quadriga_lib.arrayant_interpolate( ant_m, az, el );                              % Default: center frequencies
+assertEqual( MV_d, MV_re(:, :, [1, 3]) );
+assertEqual( quadriga_lib.arrayant_interpolate( ant_m, az, el, [], [], [], [] ), MV_d );
+MV_e = quadriga_lib.arrayant_interpolate( ant_m, az, el, [2, 1, 2], [], [], 1.5e9 );     % Element indices
+assertEqual( MV_e, MV_re([2, 1, 2], :, 2) );
+MV_1 = quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [1e9, 2e9] );        % 1x1 struct with frequency
+assertEqual( MV_1, cat(3, V_re, V_re) );
+
+%% Outputs: none, and fewer than the maximum
+quadriga_lib.arrayant_interpolate( ant, az, el );
+[ V_2, V_i2 ] = quadriga_lib.arrayant_interpolate( ant, az, el );
+assertEqual( V_2, V_re );
+assertEqual( V_i2, V_im );
+[ ~, ~, ~, ~, dist_5 ] = quadriga_lib.arrayant_interpolate( ant_p, az, el );
+[ ~, ~, ~, ~, dist_8, ~, ~, gamma_8 ] = quadriga_lib.arrayant_interpolate( ant_p, az, el );
+assertEqual( dist_5, dist_8 );
+assertEqual( gamma_8, gamma );
+
+%% Type handling and shapes: single precision inputs, empty angle input
+[ V_s, ~, ~, H_s ] = quadriga_lib.arrayant_interpolate( ant, single(az), single(el) );
+assertTrue( isa(V_s, 'double') );
+assertElementsAlmostEqual( V_s, V_re, 'absolute', 1e-6 );                               % Angles rounded to single
+assertElementsAlmostEqual( H_s, H_im, 'absolute', 1e-6 );
+[ V_0, ~, ~, ~, dist_0 ] = quadriga_lib.arrayant_interpolate( ant, zeros(1, 0), zeros(1, 0) );
+assertEqual( size(V_0), [2, 0] );
+assertEqual( size(dist_0), [2, 0] );
+MV_0 = quadriga_lib.arrayant_interpolate( ant_m, zeros(2, 0), zeros(2, 0) );
+assertEqual( size(MV_0), [2, 0, 2] );
+
+%% Errors
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 0, 1 ), ...
+    'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.arrayant_interpolate( [], az, el, [], [], [], [], [-2, 2], [-1, 1], [3, 1], ...
+    [6, 2], [0, pi], 0 ), 'Wrong number of input arguments.' );                          % Separate fields: removed
+assert_throws( @() out9( ant, az, el ), 'Wrong number of output arguments.' );
+assert_throws( @() out5( ant_m, az, el ), 'Multi-frequency mode supports at most 4 outputs' );
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [0, 1] ), 'cannot be 0 (1-based index)' );
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant_m([]), az, el ), 'Input ''arrayant'' cannot be empty.' );
+assert_throws( @() quadriga_lib.arrayant_interpolate( 1, az, el ), 'Input must be a struct.' );
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, [], [] ), 'Input ''azimuth'' must have 1 or n_out rows.' ); % C++
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el(1:2) ), ...
+    'Input ''elevation'' must have the same size as ''azimuth''.' );                   % C++
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, 3 ), 'exceed the number of elements' ); % C++
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 3 ), ...
+    'Input ''use_kernel'' must be 0, 1 or 2.' );                                       % C++
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant_m, az, el, [], [], [], [1e9, NaN] ), ...
+    'Input ''frequency'' must contain finite values.' );                               % C++, multi-frequency
+assert_throws( @() out0( ant, az, el(1:2) ), 'must have the same size' );                % C++ called with 0 outputs
+
 end
 
-try
-    [vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( [], [0,1,2,3]*pi/4, [-0.5,0,0,0.5], [], [], [], [-2,2]);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of input arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
+% Call without outputs
+function out0(varargin)
+quadriga_lib.arrayant_interpolate( varargin{:} );
 end
 
-try
-    vr = quadriga_lib.arrayant_interpolate( ant );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of input arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
+% Request one output more than the wrapper allows
+function out9(varargin)
+[~, ~, ~, ~, ~, ~, ~, ~, ~] = quadriga_lib.arrayant_interpolate( varargin{:} ); %#ok<ASGLU>
 end
 
-try
-    [~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of output arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
+% Request 5 outputs in the multi-frequency mode
+function out5(varargin)
+[~, ~, ~, ~, ~] = quadriga_lib.arrayant_interpolate( varargin{:} ); %#ok<ASGLU>
 end
 
-ant.e_theta_re = [];
+% Assert that fn() raises an error whose message contains expected (substring).
+function assert_throws(fn, expected)
 try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
+    fn();
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-ant.e_theta_re = 1;
-try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Sizes of ''e_theta_re'' and ''e_theta_im'' do not match.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-ant.e_theta_re = single(e);
-[~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, single(az), single(el) );
-[~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, single(az), single(el),[] );
-
-ant.azimuth_grid = 2*az_grid;
-try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Values of ''azimuth_grid'' must be between -pi and pi (equivalent to -180 to 180 degree).';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-ant.azimuth_grid = az_grid;
-ant.elevation_grid = 2*el_grid;
-try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Values of ''elevation_grid'' must be between -pi/2 and pi/2 (equivalent to -90 to 90 degree).';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% A NaN in a grid is out of range
-ant.elevation_grid = el_grid;
-ant.azimuth_grid = az_grid;
-ant.azimuth_grid(4) = NaN;
-try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Values of ''azimuth_grid'' must be between -pi and pi (equivalent to -180 to 180 degree).';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% Grids must be strictly increasing: two equal neighbours are rejected
-ant.azimuth_grid = az_grid;
-ant.elevation_grid = el_grid;
-ant.elevation_grid(3) = ant.elevation_grid(2);
-try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Values of ''elevation_grid'' must be sorted in strictly ascending order.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-ant.elevation_grid = el_grid;
-try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant, az, el, [], 1 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Input ''orientation'' must have 3 elements on the first dimension.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% >4 outputs in multi-frequency mode
-try
-    [~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0, [], [], [], [1e9, 2e9] );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Multi-frequency mode supports at most 4 outputs';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-% Struct array without freq -> requesting dist (5th output) must fail: multi-freq auto-selected
-try
-    [~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0 );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Multi-frequency mode supports at most 4 outputs';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-%% Element indices: 1-based, converted to 0-based; 0 and non-integers are rejected
-ant1 = quadriga_lib.arrayant_generate('omni');
-assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, 0 ), 'Entries in ''element'' cannot be 0 (1-based index).' );
-assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, [1 0] ), 'Entries in ''element'' cannot be 0 (1-based index).' );
-assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, 1.7 ), 'Entries in ''element'' must be integers from 0 to' );
-assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, -1 ), 'Entries in ''element'' must be integers from 0 to' );
-assert_cpp_error( @() quadriga_lib.arrayant_interpolate( ant1, 0, 0, sparse(1) ), 'Input ''element'' is sparse' );
-end
-
-% Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).
-% One output is requested: without outputs, the wrapper returns before it reads the inputs.
-function assert_cpp_error(fn, expected)
-try
-    [~] = fn();
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    if ~strcmp(ME.identifier, 'quadriga_lib:CPPerror') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
-        error('moxunit:exceptionNotRaised', ['EXPECTED: quadriga_lib:CPPerror "', expected, '", GOT: ', ...
-            ME.identifier, ' "', ME.message, '"']);
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
     end
 end
 end

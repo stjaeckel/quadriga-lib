@@ -850,7 +850,8 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects (must pass [[arrayant_is_valid_multi]])
 - **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to `arrayant_vec[0].azimuth_grid`
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to `arrayant_vec[0].elevation_grid`
-- **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz; defaults to per-entry `center_frequency`
+- **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz, positive and finite; defaults to per-entry
+  `center_frequency`
 - **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ## Returns:
@@ -876,11 +877,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     if (!(propagation_speed > dtype(0.0)) || !std::isfinite(propagation_speed))
         throw std::invalid_argument("arrayant_combine_pattern_multi: Input 'propagation_speed' must be positive and finite.");
 
-    // Validate input vector (deep check)
-    std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant_vec, false);
-    if (!err.empty())
-        throw std::invalid_argument("arrayant_combine_pattern_multi: Input validation failed: " + err);
-
+    // The entries are validated by arrayant_interpolate_multi below, before their pattern data is used
     arma::uword n_freq_in = (arma::uword)arrayant_vec.size();
 
     // Validate optional output grids
@@ -898,8 +895,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     {
         const dtype *p_freq = freq_grid_new->memptr();
         for (arma::uword i = 0; i < freq_grid_new->n_elem; ++i)
-            if (!(p_freq[i] > dtype(0.0)))
-                throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'freq_grid_new' must be positive.");
+            if (!(p_freq[i] > dtype(0.0)) || !std::isfinite(p_freq[i]))
+                throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'freq_grid_new' must be positive and finite.");
     }
 
     // Output grids
@@ -940,8 +937,8 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     // Interpolate fields across angles and freq; pass zero element_pos so no phase is baked in
     arma::Mat<dtype> zero_pos(3, n_elements, arma::fill::zeros);
     arma::Cube<dtype> V_re, V_im, H_re, H_im;
-    quadriga_lib::arrayant_interpolate_multi<dtype>(arrayant_vec, &azimuth, &elevation, &freq_grid,
-                                                    &V_re, &V_im, &H_re, &H_im, arma::uvec{}, nullptr, &zero_pos, false);
+    quadriga_lib::arrayant_interpolate_multi<dtype>(arrayant_vec, azimuth, elevation, V_re, V_im, H_re, H_im,
+                                                    &freq_grid, nullptr, nullptr, &zero_pos, 1);
 
     // Geometric dist matrix: dist(e, a) = element_pos[:,e] · wave_direction(az[a], el[a])
     arma::Mat<dtype> dist(n_elements, n_ang, arma::fill::none);

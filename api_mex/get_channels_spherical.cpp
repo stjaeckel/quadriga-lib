@@ -40,7 +40,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ```
 [ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
     rx_array, fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, ...
-    rx_orientation, center_freq, use_absolute_delays, add_fake_los_path, use_avx2 );
+    rx_orientation, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ## Inputs:
@@ -60,8 +60,9 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
-- **`use_avx2`** — If `true`, use AVX2 for antenna interpolation; reduces accuracy to single-precision interpolation, 
-  equivalent precision loss to the AVX2 kernel in arrayant_interpolate; default: `false`
+- **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision; error if unavailable); auto selects GENERIC in this version, see
+  [[arrayant_interpolate]]; default: 0
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -105,7 +106,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double center_freq = (nrhs < 12) ? 0.0 : qd_mex_get_scalar<double>(prhs[11], "center_freq", 0.0);
     bool use_absolute_delays = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "use_absolute_delays", false);
     bool add_fake_los_path = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "add_fake_los_path", false);
-    bool use_avx2 = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "use_avx2", false);
+    const int use_kernel = (nrhs < 15) ? 0 : qd_mex_get_scalar<int>(prhs[14], "use_kernel", 0);
 
     // Extract scalar values
     double Tx = tx_pos.at(0), Ty = tx_pos.at(1), Tz = tx_pos.at(2);
@@ -144,5 +145,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
                                                          &coeff_re, &coeff_im, &delay,
                                                          center_freq, use_absolute_delays, add_fake_los_path,
-                                                         p_aod, p_eod, p_aoa, p_eoa, use_avx2));
+                                                         p_aod, p_eod, p_aoa, p_eoa, use_kernel));
 }
