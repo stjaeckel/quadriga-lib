@@ -103,16 +103,17 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("interpolate", &arrayant_interpolate,
           py::arg("arrayant"),
-          py::arg("azimuth") = py::none(),
-          py::arg("elevation") = py::none(),
+          py::arg("azimuth").none(false),
+          py::arg("elevation").none(false),
           py::arg("element") = py::none(),
           py::arg("orientation") = py::none(),
           py::arg("element_pos") = py::none(),
           py::arg("frequency") = py::none(),
-          py::arg("complex") = false,
           py::arg("dist") = false,
           py::arg("local_angles") = false,
-          py::arg("fast_access") = false);
+          py::arg("fast_access") = false,
+          py::arg("use_kernel") = 0,
+          py::arg("complex") = false);
 
     m.def("qdant_read", &arrayant_qdant_read, py::arg("fn"), py::arg("id") = 1);
 
@@ -167,7 +168,8 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false,
           py::arg("complex") = false,
-          py::arg("freq") = 0);
+          py::arg("freq") = 0,
+          py::arg("use_kernel") = 0);
 
     m.def("get_channels_multifreq", &get_channels_multifreq,
           py::arg("ant_tx"),

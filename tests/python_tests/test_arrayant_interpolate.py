@@ -2,807 +2,269 @@
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 # Part of quadriga-lib — see LICENSE for terms.
 
+# Python interface test for quadriga_lib.arrayant.interpolate.
+# Scope: argument and output handling, defaults, single- and multi-frequency mode, kernels, flags, error paths.
+# Physics validation lives in the Catch2 suites (test_arrayant_interpolate.cpp, test_arrayant_interpolate_multi.cpp).
+
 import sys
 import os
 import unittest
 import numpy as np
 import numpy.testing as npt
 
-# Append the directory containing your package to sys.path
+# Append the directory containing the package to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-package_path = os.path.join(current_dir, '../../lib')
+package_path = os.path.join(current_dir, "../../lib")
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-from quadriga_lib import arrayant
+import quadriga_lib
 
 
-def make_single_freq_ant(scale=1.0, n_az=2, polarimetric=False):
-    """Build a simple single-frequency arrayant dict with 1 element, 1 elevation sample."""
-    az_grid = np.linspace(0, np.pi, n_az)
-    values = np.array([scale * (1.0 - 2.0 * i / max(n_az - 1, 1)) for i in range(n_az)])
-    ant = {
-        "e_theta_re": values.reshape(1, n_az, 1),                # (n_el=1, n_az, n_elem=1)
-        "e_theta_im": (0.5 * values).reshape(1, n_az, 1),
-        "e_phi_re": np.zeros((1, n_az, 1)),
-        "e_phi_im": np.zeros((1, n_az, 1)),
-        "azimuth_grid": az_grid,
-        "elevation_grid": np.array([0.0]),
-    }
-    if polarimetric:
-        ant["e_phi_re"] = (-0.5 * values).reshape(1, n_az, 1)
-        ant["e_phi_im"] = (0.25 * values).reshape(1, n_az, 1)
-    return ant
-
-
-def make_multi_freq_ant(center_freqs, polarimetric=False):
-    """Build a multi-frequency arrayant dict (4D patterns). Scale grows with frequency index."""
-    n_freq = len(center_freqs)
-    # Each frequency entry has pattern scaled by (index+1)
-    e_theta_re = np.zeros((1, 2, 1, n_freq))
-    e_theta_im = np.zeros((1, 2, 1, n_freq))
-    e_phi_re = np.zeros((1, 2, 1, n_freq))
-    e_phi_im = np.zeros((1, 2, 1, n_freq))
-    for i in range(n_freq):
-        scale = float(i + 1)
-        e_theta_re[0, :, 0, i] = [scale, -scale]
-        e_theta_im[0, :, 0, i] = [0.5 * scale, -0.5 * scale]
-        if polarimetric:
-            e_phi_re[0, :, 0, i] = [-0.5 * scale, 0.5 * scale]
-            e_phi_im[0, :, 0, i] = [0.25 * scale, -0.25 * scale]
-    ant = {
-        "e_theta_re": e_theta_re,
-        "e_theta_im": e_theta_im,
-        "e_phi_re": e_phi_re,
-        "e_phi_im": e_phi_im,
+def two_element_ant():
+    """Two elements with two azimuth samples (0 and pi): element 0 has e-theta in opposite phase (linear) and e-phi
+    in phase, element 1 has e-theta with a 90 degree phase step. Only the mandatory keys."""
+    return {
+        "e_theta_re": np.stack([[[-2.0, 2.0]], [[1.0, 0.0]]], axis=2),
+        "e_theta_im": np.stack([[[-1.0, 1.0]], [[0.0, 1.0]]], axis=2),
+        "e_phi_re": np.stack([[[3.0, 1.0]], [[0.0, 0.0]]], axis=2),
+        "e_phi_im": np.stack([[[6.0, 2.0]], [[0.0, 0.0]]], axis=2),
         "azimuth_grid": np.array([0.0, np.pi]),
         "elevation_grid": np.array([0.0]),
-        "center_freq": np.array(center_freqs, dtype=np.float64),
     }
-    return ant
 
 
-# ======================================================================================
-# Single-frequency tests (backward compatibility with existing API)
-# ======================================================================================
+class test_case(unittest.TestCase):
 
-class TestSingleFreqBasic(unittest.TestCase):
-    """Original single-frequency tests — must not regress."""
+    def setUp(self):
+        self.ant = two_element_ant()
+        self.az = np.array([[0.0, 1.0, 2.0]]) * np.pi / 4
+        self.el = np.array([[-0.5, 0.0, 0.5]])
+        c, s = np.cos(np.arange(3) * np.pi / 8), np.sin(np.arange(3) * np.pi / 8)
+        self.V_re = np.array([[-2.0, -1.0, 0.0], c])
+        self.V_im = np.array([[-1.0, -0.5, 0.0], s])
+        self.H_re = np.array([[3.0, 2.5, 2.0], [0.0, 0.0, 0.0]])
+        self.H_im = np.array([[6.0, 5.0, 4.0], [0.0, 0.0, 0.0]])
+        # Multi-frequency dict: entry 1 is twice entry 0
+        a = self.ant
+        self.ant_m = {k: np.stack([a[k], 2.0 * a[k]], axis=3) for k in ("e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im")}
+        self.ant_m.update({"azimuth_grid": a["azimuth_grid"], "elevation_grid": a["elevation_grid"],
+                           "center_freq": np.array([1e9, 2e9])})
 
-    def test_az_interpolation(self):
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = [[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4]]
-        el = [[-0.5, 0, 0, 0.5]]
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el)
-        npt.assert_almost_equal(vr, [[-2, -1, 0, 1]], decimal=14)
-        npt.assert_almost_equal(vi, [[-1, -0.5, 0, 0.5]], decimal=14)
-        npt.assert_almost_equal(hr, [[3, 2.5, 2, 1.5]], decimal=14)
-        npt.assert_almost_equal(hi, [[6, 5, 4, 3]], decimal=14)
-
-    def test_el_interpolation(self):
-        ant = {"e_theta_re": [-2, 2], "e_theta_im": [-1, 1],
-               "e_phi_re": [3, 1], "e_phi_im": [6, 2],
-               "azimuth_grid": 0, "elevation_grid": [0, np.pi / 2]}
-        az = [[-0.5, 0, 0, 0.5]]
-        el = [[0, np.pi / 8, np.pi / 4, 3 * np.pi / 8]]
-        res = arrayant.interpolate(ant, az, el, dist=1, local_angles=1)
-        npt.assert_almost_equal(res[0], [[-2, -1, 0, 1]], decimal=14)
-        npt.assert_almost_equal(res[1], [[-1, -0.5, 0, 0.5]], decimal=14)
-        npt.assert_almost_equal(res[2], [[3, 2.5, 2, 1.5]], decimal=14)
-        npt.assert_almost_equal(res[3], [[6, 5, 4, 3]], decimal=14)
-        npt.assert_almost_equal(res[4], [[0, 0, 0, 0]], decimal=14)
-        npt.assert_almost_equal(res[5], az, decimal=14)
-        npt.assert_almost_equal(res[6], el, decimal=14)
-
-    def test_complex_output(self):
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = [[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4]]
-        el = [[-0.5, 0, 0, 0.5]]
-        v, h = arrayant.interpolate(ant, az, el, complex=1)
-        npt.assert_almost_equal(v.real, [[-2, -1, 0, 1]], decimal=14)
-        npt.assert_almost_equal(v.imag, [[-1, -0.5, 0, 0.5]], decimal=14)
-        npt.assert_almost_equal(h.real, [[3, 2.5, 2, 1.5]], decimal=14)
-        npt.assert_almost_equal(h.imag, [[6, 5, 4, 3]], decimal=14)
-
-    def test_polarization_rotation(self):
-        ant = {"e_theta_re": [[1, 0]], "e_theta_im": [[1, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        ori = [[np.pi / 4, -np.pi / 4], [0, 0], [0, 0]]
-        vr, vi, hr, hi = arrayant.interpolate(ant, 0, 0, [0, 0], ori)
-        rs2 = 1 / np.sqrt(2)
-        npt.assert_almost_equal(vr[:, 0], [rs2, rs2], decimal=14)
-        npt.assert_almost_equal(vi[:, 0], [rs2, rs2], decimal=14)
-        npt.assert_almost_equal(hr[:, 0], [rs2, -rs2], decimal=14)
-        npt.assert_almost_equal(hi[:, 0], [rs2, -rs2], decimal=14)
-
-    def test_projected_distance(self):
-        ant = {"e_theta_re": 1, "e_theta_im": 0,
-               "e_phi_re": 0, "e_phi_im": 0,
-               "azimuth_grid": 0, "elevation_grid": 0}
-        _, _, _, _, ds = arrayant.interpolate(ant, 0, 0, [0, 0, 0], element_pos=np.eye(3), dist=1)
-        npt.assert_almost_equal(ds[:, 0], [-1, 0, 0], decimal=14)
-
-    def test_dist_and_local_angles_output_count(self):
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = [[0, np.pi / 4]]
-        el = [[0, 0]]
-        # 4 field + 1 dist + 3 local = 8
-        res = arrayant.interpolate(ant, az, el, dist=1, local_angles=1)
-        self.assertEqual(len(res), 8)
-        # Complex: 2 field + 1 dist = 3
-        res = arrayant.interpolate(ant, az, el, complex=1, dist=1)
-        self.assertEqual(len(res), 3)
-
-    def test_fast_access(self):
-        ant = arrayant.generate("3gpp", az_3dB=90, el_3dB=90, res=10, N=2)
-        arrayant.interpolate(ant, 0, 0, fast_access=1)
-
-
-# ======================================================================================
-# Single-frequency + frequency duplication
-# ======================================================================================
-
-class TestSingleFreqWithFrequency(unittest.TestCase):
-    """Single-frequency (3D) arrayant with `frequency` parameter → duplicated 3D output."""
-
-    def test_single_angle_single_freq(self):
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        vr, vi, hr, hi = arrayant.interpolate(ant, [[0]], [[0]], frequency=[1000])
-        self.assertEqual(vr.ndim, 3)
-        self.assertEqual(vr.shape, (1, 1, 1))
-        npt.assert_almost_equal(vr[0, 0, 0], -2, decimal=14)
-
-    def test_multiple_freqs_duplicate(self):
-        """Output must be identical across all frequency slices."""
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = [[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4]]
-        el = [[-0.5, 0, 0, 0.5]]
-        freqs = [100, 500, 1000, 5000, 20000]
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el, frequency=freqs)
-        self.assertEqual(vr.shape, (1, 4, 5))
-        for f in range(len(freqs)):
-            npt.assert_almost_equal(vr[:, :, f], [[-2, -1, 0, 1]], decimal=14)
-            npt.assert_almost_equal(vi[:, :, f], [[-1, -0.5, 0, 0.5]], decimal=14)
-            npt.assert_almost_equal(hr[:, :, f], [[3, 2.5, 2, 1.5]], decimal=14)
-            npt.assert_almost_equal(hi[:, :, f], [[6, 5, 4, 3]], decimal=14)
-
-    def test_complex_output_with_freq(self):
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = [[0, np.pi / 2]]
-        el = [[0, 0]]
-        v, h = arrayant.interpolate(ant, az, el, frequency=[1000, 2000], complex=1)
-        self.assertEqual(v.ndim, 3)
-        self.assertEqual(v.shape, (1, 2, 2))
-        npt.assert_almost_equal(v[:, :, 0], v[:, :, 1])
-        npt.assert_almost_equal(h[:, :, 0], h[:, :, 1])
-
-    def test_output_count_with_freq(self):
-        """With frequency: always 4 (real) or 2 (complex) outputs, no dist/local_angles."""
-        ant = {"e_theta_re": [[1, 0]], "e_theta_im": [[0, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        res = arrayant.interpolate(ant, 0, 0, frequency=[1000])
+    def test_basic_call(self):
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
+        self.assertIsInstance(res, tuple)
         self.assertEqual(len(res), 4)
-        res = arrayant.interpolate(ant, 0, 0, frequency=[1000], complex=1)
-        self.assertEqual(len(res), 2)
-
-    def test_dist_with_freq_throws(self):
-        ant = {"e_theta_re": [[1, 0]], "e_theta_im": [[0, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        with self.assertRaises(ValueError):
-            arrayant.interpolate(ant, 0, 0, frequency=[1000], dist=1)
-
-    def test_local_angles_with_freq_throws(self):
-        ant = {"e_theta_re": [[1, 0]], "e_theta_im": [[0, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        with self.assertRaises(ValueError):
-            arrayant.interpolate(ant, 0, 0, frequency=[1000], local_angles=1)
-
-    def test_multi_element_duplication(self):
-        """Multiple elements with orientation, duplicated across freqs."""
-        ant = {"e_theta_re": [[1, 0]], "e_theta_im": [[1, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        ori = [[np.pi / 4, -np.pi / 4], [0, 0], [0, 0]]
-        vr, vi, hr, hi = arrayant.interpolate(ant, 0, 0, [0, 0], ori, frequency=[100, 200, 300])
-        self.assertEqual(vr.shape, (2, 1, 3))
-        # All freq slices identical
-        for f in range(3):
-            npt.assert_almost_equal(vr[:, :, f], vr[:, :, 0], decimal=14)
-            npt.assert_almost_equal(hr[:, :, f], hr[:, :, 0], decimal=14)
-
-    def test_acoustic_freqs_duplication(self):
-        """Acoustic frequency range: pattern duplicated identically."""
-        ant = {"e_theta_re": [[1, -1]], "e_theta_im": [[0, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        freqs = [20, 100, 500, 1000, 4000, 16000, 20000]  # Full audible range
-        vr, vi, hr, hi = arrayant.interpolate(ant, [[0, np.pi / 2]], [[0, 0]], frequency=freqs)
-        self.assertEqual(vr.shape, (1, 2, 7))
-        for f in range(len(freqs)):
-            npt.assert_almost_equal(vr[0, 0, f], 1.0, decimal=14)
-            npt.assert_almost_equal(vr[0, 1, f], 0.0, decimal=14)
-
-
-# ======================================================================================
-# Multi-frequency tests (4D patterns)
-# ======================================================================================
-
-class TestMultiFreqBasic(unittest.TestCase):
-    """Multi-frequency arrayant (4D patterns) with frequency interpolation."""
-
-    def test_output_dimensions(self):
-        ant = make_multi_freq_ant([500, 1000, 2000])
-        az = np.zeros((1, 7))
-        el = np.zeros((1, 7))
-        freqs = [600, 1500, 1800, 3000]
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el, frequency=freqs)
-        self.assertEqual(vr.shape, (1, 7, 4))
-        self.assertEqual(vi.shape, (1, 7, 4))
-        self.assertEqual(hr.shape, (1, 7, 4))
-        self.assertEqual(hi.shape, (1, 7, 4))
-
-    def test_complex_output_dimensions(self):
-        ant = make_multi_freq_ant([500, 1000, 2000])
-        v, h = arrayant.interpolate(ant, [[0]], [[0]], frequency=[600, 1800], complex=1)
-        self.assertEqual(v.ndim, 3)
-        self.assertEqual(v.shape, (1, 1, 2))
-        self.assertTrue(np.iscomplexobj(v))
-        self.assertTrue(np.iscomplexobj(h))
-
-    def test_exact_frequency_match(self):
-        """Querying at exact center frequencies must recover single-freq interpolation."""
-        freqs = [500, 1000, 2000]
-        ant = make_multi_freq_ant(freqs, polarimetric=True)
-        az = [[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4]]
-        el = np.zeros((1, 4))
-
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el, frequency=freqs)
-
-        # Compare each slice against single-freq extraction
-        for f_idx, cf in enumerate(freqs):
-            scale = float(f_idx + 1)
-            single = {
-                "e_theta_re": np.array([scale, -scale]).reshape(1, 2, 1),
-                "e_theta_im": np.array([0.5 * scale, -0.5 * scale]).reshape(1, 2, 1),
-                "e_phi_re": np.array([-0.5 * scale, 0.5 * scale]).reshape(1, 2, 1),
-                "e_phi_im": np.array([0.25 * scale, -0.25 * scale]).reshape(1, 2, 1),
-                "azimuth_grid": np.array([0.0, np.pi]),
-                "elevation_grid": np.array([0.0]),
-            }
-            vr_s, vi_s, hr_s, hi_s = arrayant.interpolate(single, az, el)
-            npt.assert_almost_equal(vr[:, :, f_idx], vr_s, decimal=12)
-            npt.assert_almost_equal(vi[:, :, f_idx], vi_s, decimal=12)
-            npt.assert_almost_equal(hr[:, :, f_idx], hr_s, decimal=12)
-            npt.assert_almost_equal(hi[:, :, f_idx], hi_s, decimal=12)
-
-    def test_extrapolation_below_clamps(self):
-        ant = make_multi_freq_ant([500, 1000, 2000])
-        vr_low, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[10])
-        vr_exact, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[500])
-        npt.assert_almost_equal(vr_low[0, 0, 0], vr_exact[0, 0, 0], decimal=12)
-
-    def test_extrapolation_above_clamps(self):
-        ant = make_multi_freq_ant([500, 1000, 2000])
-        vr_high, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[99999])
-        vr_exact, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[2000])
-        npt.assert_almost_equal(vr_high[0, 0, 0], vr_exact[0, 0, 0], decimal=12)
-
-    def test_single_entry_same_for_all_freqs(self):
-        """Single-entry multi-freq vector always returns same result."""
-        ant = make_multi_freq_ant([1000])
-        freqs = [100, 1000, 50000]
-        vr, vi, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=freqs)
-        for s in range(3):
-            npt.assert_almost_equal(vr[0, 0, s], 1.0, decimal=12)
-            npt.assert_almost_equal(vi[0, 0, s], 0.5, decimal=12)
-
-    def test_midpoint_in_phase_linear_blend(self):
-        """Two in-phase entries → slerp = linear amplitude blend at midpoint."""
-        e_theta_re = np.zeros((1, 2, 1, 2))
-        e_theta_re[0, :, 0, 0] = 1.0   # freq 0: value 1.0 at both az
-        e_theta_re[0, :, 0, 1] = 3.0   # freq 1: value 3.0 at both az
-        ant = {
-            "e_theta_re": e_theta_re,
-            "e_theta_im": np.zeros((1, 2, 1, 2)),
-            "e_phi_re": np.zeros((1, 2, 1, 2)),
-            "e_phi_im": np.zeros((1, 2, 1, 2)),
-            "azimuth_grid": np.array([0.0, np.pi]),
-            "elevation_grid": np.array([0.0]),
-            "center_freq": np.array([1000.0, 2000.0]),
-        }
-        vr, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[1500])
-        npt.assert_almost_equal(vr[0, 0, 0], 2.0, decimal=10)
-
-    def test_slerp_90deg_phase_shift(self):
-        """Entry 0: (1,0), Entry 1: (0,1) → midpoint slerp → (cos(pi/4), sin(pi/4))."""
-        ant = {
-            "e_theta_re": np.array([[[[1.0, 0.0]]]]),   # (1,1,1,2)
-            "e_theta_im": np.array([[[[0.0, 1.0]]]]),
-            "e_phi_re": np.zeros((1, 1, 1, 2)),
-            "e_phi_im": np.zeros((1, 1, 1, 2)),
-            "azimuth_grid": np.array([0.0]),
-            "elevation_grid": np.array([0.0]),
-            "center_freq": np.array([1000.0, 2000.0]),
-        }
-        v, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[1500], complex=1)
-        rs2 = 1 / np.sqrt(2)
-        npt.assert_almost_equal(v[0, 0, 0].real, rs2, decimal=10)
-        npt.assert_almost_equal(v[0, 0, 0].imag, rs2, decimal=10)
-
-    def test_reversed_query_order(self):
-        ant = make_multi_freq_ant([1000, 2000, 3000])
-        fwd = [1200, 1800, 2500]
-        rev = [2500, 1800, 1200]
-        vr_f, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=fwd)
-        vr_r, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=rev)
-        npt.assert_almost_equal(vr_f[0, 0, 0], vr_r[0, 0, 2], decimal=12)
-        npt.assert_almost_equal(vr_f[0, 0, 1], vr_r[0, 0, 1], decimal=12)
-        npt.assert_almost_equal(vr_f[0, 0, 2], vr_r[0, 0, 0], decimal=12)
-
-    def test_single_query_frequency(self):
-        ant = make_multi_freq_ant([1000, 2000, 3000])
-        vr, _, _, _ = arrayant.interpolate(ant, [[0, 1, 2]], np.zeros((1, 3)), frequency=[1500])
-        self.assertEqual(vr.shape[2], 1)
-        self.assertEqual(vr.shape[1], 3)
-
-
-# ======================================================================================
-# Multi-frequency with orientation and element selection
-# ======================================================================================
-
-class TestMultiFreqAdvanced(unittest.TestCase):
-
-    def test_element_selection(self):
-        """Duplicate element via i_element for multi-freq path."""
-        ant = make_multi_freq_ant([1000])
-        vr, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], element=[0, 0, 0], frequency=[1000])
-        self.assertEqual(vr.shape[0], 3)
-        npt.assert_almost_equal(vr[0, 0, 0], vr[1, 0, 0], decimal=14)
-        npt.assert_almost_equal(vr[0, 0, 0], vr[2, 0, 0], decimal=14)
-
-    def test_orientation_applied(self):
-        """Orientation parameter should affect output for multi-freq path."""
-        ant = make_multi_freq_ant([1000])
-        ori_zero = np.array([[0], [0], [0]], dtype=np.float64)
-        ori_rot = np.array([[0], [0], [np.pi / 4]], dtype=np.float64)
-        vr0, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], orientation=ori_zero, frequency=[1000])
-        vr1, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], orientation=ori_rot, frequency=[1000])
-        # With rotation the interpolated value at az=0 must change
-        self.assertFalse(np.allclose(vr0, vr1))
-
-    def test_all_outputs_finite(self):
-        ant = make_multi_freq_ant([500, 1000, 2000], polarimetric=True)
-        freqs = np.linspace(400, 2100, 20)
-        az = np.linspace(-np.pi, np.pi, 36).reshape(1, -1)
-        el = np.zeros_like(az)
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el, frequency=freqs)
-        self.assertTrue(np.all(np.isfinite(vr)))
-        self.assertTrue(np.all(np.isfinite(vi)))
-        self.assertTrue(np.all(np.isfinite(hr)))
-        self.assertTrue(np.all(np.isfinite(hi)))
-
-
-# ======================================================================================
-# Acoustic frequency scenarios
-# ======================================================================================
-
-class TestAcousticFrequencies(unittest.TestCase):
-    """Test with acoustic frequency ranges (20 Hz – 20 kHz)."""
-
-    def _make_acoustic_multi(self):
-        """Build a simple multi-freq arrayant at octave-band center frequencies."""
-        freqs = [63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
-        n_freq = len(freqs)
-        n_az = 36
-        az_grid = np.linspace(-np.pi, np.pi, n_az, endpoint=False)
-        # Simple dipole-like pattern: cos(az) * scale
-        e_theta_re = np.zeros((1, n_az, 1, n_freq))
-        for i in range(n_freq):
-            scale = 1.0 + 0.1 * i
-            e_theta_re[0, :, 0, i] = scale * np.cos(az_grid)
-        ant = {
-            "e_theta_re": e_theta_re,
-            "e_theta_im": np.zeros_like(e_theta_re),
-            "e_phi_re": np.zeros_like(e_theta_re),
-            "e_phi_im": np.zeros_like(e_theta_re),
-            "azimuth_grid": az_grid,
-            "elevation_grid": np.array([0.0]),
-            "center_freq": np.array(freqs, dtype=np.float64),
-        }
-        return ant, freqs
-
-    def test_octave_band_interpolation(self):
-        ant, freqs = self._make_acoustic_multi()
-        query_freqs = [100, 350, 750, 1500, 3000, 6000, 12000]
-        vr, vi, hr, hi = arrayant.interpolate(ant, [[0]], [[0]], frequency=query_freqs)
-        self.assertEqual(vr.shape[2], len(query_freqs))
-        self.assertTrue(np.all(np.isfinite(vr)))
-
-    def test_exact_octave_match(self):
-        ant, freqs = self._make_acoustic_multi()
-        vr, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=freqs)
-        # On-axis (az=0) value should increase with frequency index
-        for i in range(1, len(freqs)):
-            self.assertGreater(vr[0, 0, i], vr[0, 0, i - 1])
-
-    def test_subwoofer_extrapolation(self):
-        """Below-range query clamps to lowest entry."""
-        ant, freqs = self._make_acoustic_multi()
-        vr_low, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[10])
-        vr_first, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[freqs[0]])
-        npt.assert_almost_equal(vr_low[0, 0, 0], vr_first[0, 0, 0], decimal=12)
-
-    def test_ultrasonic_extrapolation(self):
-        """Above-range query clamps to highest entry."""
-        ant, freqs = self._make_acoustic_multi()
-        vr_high, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[40000])
-        vr_last, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[freqs[-1]])
-        npt.assert_almost_equal(vr_high[0, 0, 0], vr_last[0, 0, 0], decimal=12)
-
-    def test_single_freq_ant_acoustic_duplication(self):
-        """Single-freq omnidirectional speaker duplicated across 1/3-octave bands."""
-        ant = {"e_theta_re": np.ones((1, 1, 1)), "e_theta_im": np.zeros((1, 1, 1)),
-               "e_phi_re": np.zeros((1, 1, 1)), "e_phi_im": np.zeros((1, 1, 1)),
-               "azimuth_grid": np.array([0.0]), "elevation_grid": np.array([0.0])}
-        third_octave = [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250,
-                        315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500,
-                        3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000]
-        vr, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=third_octave)
-        self.assertEqual(vr.shape, (1, 1, len(third_octave)))
-        # All slices must be 1.0
-        npt.assert_almost_equal(vr.ravel(), np.ones(len(third_octave)), decimal=14)
-
-
-# ======================================================================================
-# Radio frequency scenarios
-# ======================================================================================
-
-class TestRadioFrequencies(unittest.TestCase):
-    """Test with radio frequency ranges (GHz)."""
-
-    def test_wifi_band_interpolation(self):
-        """Multi-freq antenna at WiFi 2.4 GHz band edges, query at channel centers."""
-        freqs = [2.4e9, 2.45e9, 2.5e9]
-        n_freq = len(freqs)
-        n_az = 36
-        az_grid = np.linspace(-np.pi, np.pi, n_az, endpoint=False)
-        e_theta_re = np.zeros((1, n_az, 1, n_freq))
-        for i in range(n_freq):
-            scale = 1.0 + 0.1 * i
-            e_theta_re[0, :, 0, i] = scale * np.cos(az_grid)
-        ant = {
-            "e_theta_re": e_theta_re,
-            "e_theta_im": np.zeros_like(e_theta_re),
-            "e_phi_re": np.zeros_like(e_theta_re),
-            "e_phi_im": np.zeros_like(e_theta_re),
-            "azimuth_grid": az_grid,
-            "elevation_grid": np.array([0.0]),
-            "center_freq": np.array(freqs, dtype=np.float64),
-        }
-        wifi_channels = [2.412e9, 2.437e9, 2.462e9, 2.484e9]
-        vr, vi, hr, hi = arrayant.interpolate(ant, [[0]], [[0]], frequency=wifi_channels)
-        self.assertEqual(vr.shape[2], 4)
-        self.assertTrue(np.all(np.isfinite(vr)))
-        # On-axis gain should generally increase with frequency
-        self.assertLessEqual(abs(vr[0, 0, 0]), abs(vr[0, 0, 3]) + 0.01)
-
-    def test_5g_mmwave_band(self):
-        """Multi-freq at 28 GHz mmWave band."""
-        freqs = [27.5e9, 28.0e9, 28.5e9]
-        ant = make_multi_freq_ant(freqs)
-        query = np.linspace(27.0e9, 29.0e9, 10)
-        vr, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=query)
-        self.assertEqual(vr.shape[2], 10)
-        self.assertTrue(np.all(np.isfinite(vr)))
-
-
-# ======================================================================================
-# Error handling
-# ======================================================================================
-
-class TestErrorHandling(unittest.TestCase):
-
-    def test_no_arrayant_raises(self):
-        with self.assertRaises(KeyError):
-            arrayant.interpolate({}, azimuth=0)
-
-    def test_empty_azimuth_raises(self):
-        ant = {"e_theta_re": np.random.random((5, 10, 3)),
-               "e_theta_im": np.random.random((5, 10, 3)),
-               "e_phi_re": np.random.random((5, 10, 3)),
-               "e_phi_im": np.random.random((5, 10, 3)),
-               "azimuth_grid": np.linspace(-np.pi, np.pi, 10),
-               "elevation_grid": np.linspace(-np.pi / 2, np.pi / 2, 5)}
-        with self.assertRaises(ValueError) as ctx:
-            arrayant.interpolate(ant)
-        self.assertEqual(str(ctx.exception), "Azimuth angles cannot be empty.")
-
-    def test_mismatched_az_el_raises(self):
-        ant = {"e_theta_re": np.random.random((5, 10, 3)),
-               "e_theta_im": np.random.random((5, 10, 3)),
-               "e_phi_re": np.random.random((5, 10, 3)),
-               "e_phi_im": np.random.random((5, 10, 3)),
-               "azimuth_grid": np.linspace(-np.pi, np.pi, 10),
-               "elevation_grid": np.linspace(-np.pi / 2, np.pi / 2, 5)}
-        with self.assertRaises(ValueError):
-            arrayant.interpolate(ant, 0)
-
-    def test_element_out_of_range_raises(self):
-        ant = {"e_theta_re": np.random.random((2, 10, 3)),
-               "e_theta_im": np.random.random((2, 10, 3)),
-               "e_phi_re": np.random.random((2, 10, 3)),
-               "e_phi_im": np.random.random((2, 10, 3)),
-               "azimuth_grid": np.linspace(-np.pi, np.pi, 10),
-               "elevation_grid": np.array([-np.pi / 4, np.pi / 4])}
-        with self.assertRaises(ValueError):
-            arrayant.interpolate(ant, 0, 0, element=5)
-
-    def test_fast_access_non_contiguous_raises(self):
-        ant = {"e_theta_re": np.random.random((2, 10, 3)),
-               "e_theta_im": np.random.random((2, 10, 3)),
-               "e_phi_re": np.random.random((2, 10, 3)),
-               "e_phi_im": np.random.random((2, 10, 3)),
-               "azimuth_grid": np.linspace(-np.pi, np.pi, 10),
-               "elevation_grid": np.array([-np.pi / 4, np.pi / 4])}
-        with self.assertRaises(ValueError):
-            arrayant.interpolate(ant, 0, 0, fast_access=1)
-
-    def test_multi_freq_dist_raises(self):
-        ant = make_multi_freq_ant([1000, 2000])
-        with self.assertRaises(ValueError) as ctx:
-            arrayant.interpolate(ant, [[0]], [[0]], frequency=[1500], dist=1)
-        self.assertIn("dist", str(ctx.exception).lower())
-
-    def test_multi_freq_local_angles_raises(self):
-        ant = make_multi_freq_ant([1000, 2000])
-        with self.assertRaises(ValueError) as ctx:
-            arrayant.interpolate(ant, [[0]], [[0]], frequency=[1500], local_angles=1)
-        self.assertIn("local_angles", str(ctx.exception).lower())
-
-    def test_multi_freq_inconsistent_grids_raises(self):
-        """Corrupted multi-freq dict (mismatched grid) should fail validation."""
-        ant = make_multi_freq_ant([1000, 2000])
-        # Corrupt: make e_theta_re have wrong shape in 2nd azimuth dimension
-        bad = ant.copy()
-        shape = list(bad["e_theta_re"].shape)
-        bad_data = np.zeros((shape[0], shape[1] + 1, shape[2], shape[3]))
-        bad_data[:, :shape[1], :, :] = bad["e_theta_re"]
-        bad["e_theta_re"] = bad_data
-        with self.assertRaises(ValueError):
-            arrayant.interpolate(bad, [[0]], [[0]], frequency=[1500])
-
-    def test_multi_freq_element_out_of_range_raises(self):
-        ant = make_multi_freq_ant([1000])
-        with self.assertRaises(ValueError):
-            arrayant.interpolate(ant, [[0]], [[0]], element=[5], frequency=[1000])
-
-    def test_nan_or_repeated_grid_raises(self):
-        """Grids must be finite and strictly increasing; otherwise patterns would be zero or NaN."""
-        def ant():
-            return {"e_theta_re": np.ones((5, 10, 1)),
-                    "e_theta_im": np.zeros((5, 10, 1)),
-                    "e_phi_re": np.zeros((5, 10, 1)),
-                    "e_phi_im": np.zeros((5, 10, 1)),
-                    "azimuth_grid": np.linspace(-np.pi, np.pi, 10),
-                    "elevation_grid": np.linspace(-np.pi / 2, np.pi / 2, 5)}
-
-        a = ant()
-        a["azimuth_grid"][3] = np.nan
-        with self.assertRaises(ValueError) as ctx:
-            arrayant.interpolate(a, [[0.1]], [[0.2]])
-        self.assertIn("'azimuth_grid' must be between -pi and pi", str(ctx.exception))
-
-        a = ant()
-        a["elevation_grid"][2] = a["elevation_grid"][1]
-        with self.assertRaises(ValueError) as ctx:
-            arrayant.interpolate(a, [[0.1]], [[0.2]])
-        self.assertIn("'elevation_grid' must be sorted in strictly ascending order", str(ctx.exception))
-
-
-# ======================================================================================
-# Edge cases
-# ======================================================================================
-
-class TestEdgeCases(unittest.TestCase):
-
-    def test_single_angle_single_element(self):
-        ant = {"e_theta_re": [[[1]]], "e_theta_im": [[[0]]],
-               "e_phi_re": [[[0]]], "e_phi_im": [[[0]]],
-               "azimuth_grid": [0], "elevation_grid": [0]}
-        vr, vi, hr, hi = arrayant.interpolate(ant, 0, 0)
-        self.assertEqual(vr.shape, (1, 1))
-        npt.assert_almost_equal(vr[0, 0], 1.0, decimal=14)
-
-    def test_many_angles(self):
-        ant = arrayant.generate("omni")
-        n = 10000
-        az = np.random.uniform(-np.pi, np.pi, (1, n))
-        el = np.random.uniform(-np.pi / 2, np.pi / 2, (1, n))
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el)
-        self.assertEqual(vr.shape, (1, n))
-        self.assertTrue(np.all(np.isfinite(vr)))
-
-    def test_single_freq_no_frequency_gives_2d(self):
-        """Without frequency kwarg, output is 2D (original behavior)."""
-        ant = {"e_theta_re": [[1, 0]], "e_theta_im": [[0, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        vr, vi, hr, hi = arrayant.interpolate(ant, 0, 0)
-        self.assertEqual(vr.ndim, 2)
-
-    def test_single_freq_with_frequency_gives_3d(self):
-        """With frequency kwarg, output is 3D even for single freq."""
-        ant = {"e_theta_re": [[1, 0]], "e_theta_im": [[0, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        vr, vi, hr, hi = arrayant.interpolate(ant, 0, 0, frequency=[1000])
-        self.assertEqual(vr.ndim, 3)
-
-    def test_multi_freq_single_entry(self):
-        """4D arrayant with only 1 frequency entry."""
-        ant = make_multi_freq_ant([1000])
-        vr, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[500, 1000, 2000])
-        self.assertEqual(vr.shape[2], 3)
-        # All slices identical since only one freq entry (clamped)
-        npt.assert_almost_equal(vr[0, 0, 0], vr[0, 0, 1], decimal=12)
-        npt.assert_almost_equal(vr[0, 0, 1], vr[0, 0, 2], decimal=12)
-
-    def test_multi_freq_many_query_freqs(self):
-        ant = make_multi_freq_ant([100, 1000, 10000])
-        freqs = np.linspace(50, 15000, 200).tolist()
-        vr, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=freqs)
-        self.assertEqual(vr.shape[2], 200)
-        self.assertTrue(np.all(np.isfinite(vr)))
-
-    def test_near_exact_frequency_tolerance(self):
-        """Query at center_freq + tiny offset should match exact."""
-        ant = make_multi_freq_ant([1000, 2000])
-        vr_near, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[1000.0000001])
-        vr_exact, _, _, _ = arrayant.interpolate(ant, [[0]], [[0]], frequency=[1000.0])
-        npt.assert_almost_equal(vr_near[0, 0, 0], vr_exact[0, 0, 0], decimal=10)
-
-    def test_complex_vs_real_consistency(self):
-        """Complex output Re/Im must match separate real outputs for both paths."""
-        # Single-freq path
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = [[0, np.pi / 4, np.pi / 2]]
-        el = [[0, 0, 0]]
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el)
-        v, h = arrayant.interpolate(ant, az, el, complex=1)
-        npt.assert_almost_equal(v.real, vr, decimal=14)
-        npt.assert_almost_equal(v.imag, vi, decimal=14)
-        npt.assert_almost_equal(h.real, hr, decimal=14)
-        npt.assert_almost_equal(h.imag, hi, decimal=14)
-
-    def test_complex_vs_real_consistency_with_freq(self):
-        """Complex vs real consistency for single-freq + frequency duplication."""
-        ant = {"e_theta_re": [[-2, 2]], "e_theta_im": [[-1, 1]],
-               "e_phi_re": [[3, 1]], "e_phi_im": [[6, 2]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = [[0, np.pi / 4]]
-        el = [[0, 0]]
-        freqs = [100, 1000]
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el, frequency=freqs)
-        v, h = arrayant.interpolate(ant, az, el, frequency=freqs, complex=1)
-        npt.assert_almost_equal(v.real, vr, decimal=14)
-        npt.assert_almost_equal(v.imag, vi, decimal=14)
-        npt.assert_almost_equal(h.real, hr, decimal=14)
-        npt.assert_almost_equal(h.imag, hi, decimal=14)
-
-    def test_complex_vs_real_consistency_multi_freq(self):
-        """Complex vs real consistency for multi-freq path."""
-        ant = make_multi_freq_ant([500, 1000, 2000], polarimetric=True)
-        az = [[0, np.pi / 4]]
-        el = [[0, 0]]
-        freqs = [750, 1500]
-        vr, vi, hr, hi = arrayant.interpolate(ant, az, el, frequency=freqs)
-        v, h = arrayant.interpolate(ant, az, el, frequency=freqs, complex=1)
-        npt.assert_almost_equal(v.real, vr, decimal=12)
-        npt.assert_almost_equal(v.imag, vi, decimal=12)
-        npt.assert_almost_equal(h.real, hr, decimal=12)
-        npt.assert_almost_equal(h.imag, hi, decimal=12)
-
-    def test_spherical_wave_per_element_angles(self):
-        """n_out angles (different az/el per element) with frequency duplication."""
-        ant = {"e_theta_re": [[1, -1]], "e_theta_im": [[0, 0]],
-               "e_phi_re": [[0, 0]], "e_phi_im": [[0, 0]],
-               "azimuth_grid": [0, np.pi], "elevation_grid": 0}
-        az = np.array([[0, np.pi / 4], [np.pi / 4, np.pi / 2]])  # (2, 2)
-        el = np.zeros((2, 2))
-        vr, _, _, _ = arrayant.interpolate(ant, az, el, element=[0, 0], frequency=[1000, 2000])
-        self.assertEqual(vr.shape, (2, 2, 2))
-        # Slices must be identical (single-freq duplication)
-        npt.assert_almost_equal(vr[:, :, 0], vr[:, :, 1], decimal=14)
-
-    def test_local_angles_without_dist(self):
-        """local_angles=True alone returns the same local angles as dist=True, local_angles=True."""
-        ant = arrayant.generate('3gpp', M=1, N=2, pol=1, res=10.0)
-        az = np.array([[0.1, 0.5, -1.0]])
-        el = np.array([[0.0, 0.2, -0.3]])
-        ori = np.array([[0.0], [0.0], [0.7]])
-        ref = arrayant.interpolate(ant, az, el, orientation=ori, dist=True, local_angles=True)
-        for _ in range(3):
-            r = arrayant.interpolate(ant, az, el, orientation=ori, local_angles=True)
-            self.assertEqual(len(r), 7)
-            for k in range(4):
-                npt.assert_array_equal(r[k], ref[k])
-            npt.assert_array_equal(r[4], ref[5])  # azimuth_loc
-            npt.assert_array_equal(r[5], ref[6])  # elevation_loc
-            npt.assert_array_equal(r[6], ref[7])  # gamma
-        npt.assert_allclose(r[4][0], az[0] - 0.7, atol=1e-6)
-        rc = arrayant.interpolate(ant, az, el, orientation=ori, local_angles=True, complex=True)
-        self.assertEqual(len(rc), 5)
-        npt.assert_array_equal(rc[2], ref[5])
-
-    def test_input_memory_layouts_give_equal_results(self):
-        """F-order, C-order, float32 and sliced angle inputs give the same result, with and without
-        fast_access (inputs are aliased only when they are F-contiguous float64)."""
-        ant = arrayant.generate('3gpp', M=2, N=2, pol=2, res=5.0)
-        n_out = ant['e_theta_re'].shape[2]
-        rng = np.random.default_rng(3)
-        az = rng.uniform(-np.pi, np.pi, (n_out, 50)).astype(np.float32).astype(np.float64)
-        el = rng.uniform(-1.5, 1.5, (n_out, 50)).astype(np.float32).astype(np.float64)
+        for x in res:
+            self.assertIsInstance(x, np.ndarray)
+            self.assertEqual(x.shape, (2, 3))
+            self.assertEqual(x.dtype, np.float64)
+        for x, ref in zip(res, (self.V_re, self.V_im, self.H_re, self.H_im)):
+            npt.assert_allclose(x, ref, atol=1e-14, rtol=0)
+
+    def test_keyword_arguments(self):
         ori = np.array([[0.1], [0.2], [0.3]])
-        ref = arrayant.interpolate(ant, np.asfortranarray(az), np.asfortranarray(el), orientation=ori,
-                                   dist=True, fast_access=True)
-        big_az = np.zeros((n_out, 100)); big_az[:, ::2] = az
-        big_el = np.zeros((n_out, 100)); big_el[:, ::2] = el
-        variants = {
-            'C-order': (np.ascontiguousarray(az), np.ascontiguousarray(el)),
-            'float32': (az.astype(np.float32), el.astype(np.float32)),
-            'sliced': (big_az[:, ::2], big_el[:, ::2]),
-            'negative strides': (np.flip(np.ascontiguousarray(az[:, ::-1]), axis=1),
-                                 np.flip(np.ascontiguousarray(el[::-1, ::-1]), axis=(0, 1))),
-            'list': (az.tolist(), el.tolist()),
-        }
+        pos = np.array([[1.0, 0.0], [0.0, 2.0], [0.0, 0.5]])
+        pos_res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0], ori, pos, None, True, True,
+                                                    False, 1, False)
+        kw_res = quadriga_lib.arrayant.interpolate(arrayant=self.ant, azimuth=self.az, elevation=self.el, element=[1, 0],
+                                                   orientation=ori, element_pos=pos, frequency=None, dist=True,
+                                                   local_angles=True, fast_access=False, use_kernel=1, complex=False)
+        self.assertEqual(len(kw_res), 8)
+        for a, b in zip(pos_res, kw_res):
+            npt.assert_array_equal(a, b)
+
+    def test_element(self):
+        V_re = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)[0]
+        for e in (None, [], np.zeros(0)):
+            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e)[0], V_re)
+        # 0-based, permuted, repeated; integer and list input
+        ref = V_re[[1, 0, 1], :]
+        for e in ([1, 0, 1], np.array([1, 0, 1], dtype=np.uint32), np.array([1.0, 0.0, 1.0])):
+            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e)[0], ref)
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=[1])[0], V_re[[1], :])
+
+    def test_orientation(self):
+        V_re = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)[0]
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=None)[0], V_re)
+        # Heading -pi/8 adds pi/8 to the local azimuth
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=[[0.0], [0.0], [-np.pi / 8]],
+                                                local_angles=True)
+        npt.assert_allclose(res[4], np.vstack([self.az, self.az]) + np.pi / 8, atol=1e-14, rtol=0)
+        npt.assert_allclose(res[0][1], np.cos(np.arange(3) * np.pi / 8 + np.pi / 16), atol=1e-14, rtol=0)
+        # Per output and angle
+        ori = np.zeros((3, 2, 3))
+        ori[2, 1, :] = -np.pi / 8
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=ori, local_angles=True)
+        npt.assert_allclose(res[4], np.vstack([self.az, self.az + np.pi / 8]), atol=1e-14, rtol=0)
+
+    def test_element_pos_and_dist(self):
+        pos = np.array([[1.0, 0.0], [0.0, 2.0], [0.0, 0.0]])
+        az, el = np.array([[0.0, np.pi / 2]]), np.zeros((1, 2))
+        res = quadriga_lib.arrayant.interpolate(self.ant, az, el, element_pos=pos, dist=True)
+        self.assertEqual(len(res), 5)
+        npt.assert_allclose(res[4], [[-1.0, 0.0], [0.0, -2.0]], atol=1e-14, rtol=0)
+        # Default: the positions of the arrayant, zeros if it has none
+        ant_p = dict(self.ant, element_pos=pos)
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(ant_p, az, el, dist=True)[4], res[4])
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, az, el, dist=True)[4], np.zeros((2, 2)))
+
+    def test_local_angles(self):
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, local_angles=True)
+        self.assertEqual(len(res), 7)
+        npt.assert_allclose(res[4], np.vstack([self.az, self.az]), atol=1e-14, rtol=0)
+        npt.assert_allclose(res[5], np.vstack([self.el, self.el]), atol=1e-14, rtol=0)
+        npt.assert_allclose(res[6], np.zeros((2, 3)), atol=1e-14, rtol=0)
+        res8 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True)
+        self.assertEqual(len(res8), 8)
+        for k in range(4):
+            npt.assert_array_equal(res8[k], res[k])
+        npt.assert_array_equal(res8[5], res[4])
+
+    def test_multi_frequency(self):
+        V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
+        res = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, 1.5e9, 2e9])
+        self.assertEqual(len(res), 4)
+        self.assertEqual(res[0].shape, (2, 3, 3))
+        for x, ref in zip(res, (V_re, V_im, H_re, H_im)):
+            npt.assert_allclose(x, np.stack([ref, 1.5 * ref, 2.0 * ref], axis=2), atol=1e-12, rtol=0)  # In phase: linear
+        # Default: the center frequencies of the entries
+        res_d = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el)
+        npt.assert_array_equal(res_d[0], res[0][:, :, [0, 2]])
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=None)[0], res_d[0])
+        # A 3D pattern with target frequencies is the same at every frequency
+        r3 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, frequency=1e9)
+        self.assertEqual(r3[0].shape, (2, 3, 1))
+        npt.assert_array_equal(r3[0][:, :, 0], V_re)
+        # Element indices in the multi-frequency mode
+        r_e = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, element=[1, 0, 1], frequency=[1.5e9])
+        npt.assert_array_equal(r_e[0][:, :, 0], res[0][[1, 0, 1], :, 1])
+        # Complex output
+        V, H = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, 1.5e9, 2e9], complex=True)
+        self.assertEqual(V.dtype, np.complex128)
+        npt.assert_array_equal(V.real, res[0])
+        npt.assert_array_equal(H.imag, res[3])
+
+    def test_use_kernel(self):
+        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
+        for k in (0, 1):
+            res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=k)
+            for a, b in zip(res, ref):
+                npt.assert_array_equal(a, b)
+        try:
+            res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=2)
+            for a, b in zip(res, ref):
+                npt.assert_allclose(a, b, atol=1e-5, rtol=0)  # Single precision, values up to 6
+        except ValueError as e:
+            self.assertIn("AVX2 kernel requested but not available", str(e))
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=3)
+        self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
+
+    def test_complex_flag(self):
+        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True)
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True, complex=True)
+        self.assertEqual(len(res), 6)
+        self.assertEqual(res[0].dtype, np.complex128)
+        npt.assert_array_equal(res[0].real, ref[0])
+        npt.assert_array_equal(res[0].imag, ref[1])
+        npt.assert_array_equal(res[1].real, ref[2])
+        npt.assert_array_equal(res[1].imag, ref[3])
+        for k in range(4):
+            npt.assert_array_equal(res[2 + k], ref[4 + k])
+
+    def test_flags(self):
+        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=None, local_angles=None,
+                                                fast_access=None, complex=None)
+        self.assertEqual(len(res), 4)
+        for a, b in zip(res, ref):
+            npt.assert_array_equal(a, b)
+        self.assertEqual(len(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=np.bool_(True))), 5)
+        for flag in ("dist", "local_angles", "fast_access", "complex"):
+            for bad in (1, 2.5, "yes"):
+                with self.assertRaises(TypeError) as ctx:
+                    quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, **{flag: bad})
+                self.assertIn("Input '%s' must be a bool or None." % flag, str(ctx.exception))
+
+    def test_memory_layout_and_dtype(self):
+        ant = quadriga_lib.arrayant.generate("3gpp", M=2, N=2, pol=2, res=10.0)
+        n_out = ant["e_theta_re"].shape[2]
+        rng = np.random.default_rng(0)
+        az = rng.uniform(-3.0, 3.0, (n_out, 20)).astype(np.float32).astype(np.float64)
+        el = rng.uniform(-1.5, 1.5, (n_out, 20)).astype(np.float32).astype(np.float64)
+        ref = quadriga_lib.arrayant.interpolate(ant, np.asfortranarray(az), np.asfortranarray(el), dist=True,
+                                                fast_access=True)
+        big_az, big_el = np.zeros((n_out, 40)), np.zeros((n_out, 40))
+        big_az[:, ::2], big_el[:, ::2] = az, el
+        variants = {"C-order": (np.ascontiguousarray(az), np.ascontiguousarray(el)),
+                    "float32": (az.astype(np.float32), el.astype(np.float32)),
+                    "sliced": (big_az[:, ::2], big_el[:, ::2]),
+                    "list": (az.tolist(), el.tolist())}
         ant_c = {k: (np.ascontiguousarray(v) if isinstance(v, np.ndarray) else v) for k, v in ant.items()}
         for name, (a, e) in variants.items():
-            for fast in (True, False):
-                r = arrayant.interpolate(ant, a, e, orientation=ori, dist=True, fast_access=fast)
+            for pattern in (ant, ant_c):
+                res = quadriga_lib.arrayant.interpolate(pattern, a, e, dist=True)
                 for k in range(5):
-                    npt.assert_array_equal(r[k], ref[k], err_msg="%s, fast_access=%s" % (name, fast))
-            r = arrayant.interpolate(ant_c, a, e, orientation=ori, dist=True)
-            for k in range(5):
-                npt.assert_array_equal(r[k], ref[k], err_msg="%s, C-order pattern" % name)
-        # The inputs are not modified
-        npt.assert_array_equal(variants['sliced'][0], az)
+                    npt.assert_array_equal(res[k], ref[k], err_msg=name)
+        # fast_access requires Fortran-ordered float64 pattern arrays
         with self.assertRaises(ValueError):
-            arrayant.interpolate(ant_c, az, el, fast_access=True)
+            quadriga_lib.arrayant.interpolate(ant_c, az, el, fast_access=True)
+
+    def test_inputs_not_modified(self):
+        ant_copy = {k: np.copy(v) for k, v in self.ant.items()}
+        element = np.array([1, 0, 1], dtype=np.uint64)
+        ori = np.array([[0.1], [0.2], [0.3]])
+        pos = np.array([[1.0, 0.0, 1.0], [0.0, 2.0, 0.0], [0.0, 0.0, 0.0]])
+        inputs = (np.asfortranarray(self.az), np.asfortranarray(self.el), element, ori, pos)
+        copies = [np.copy(x) for x in inputs]
+        quadriga_lib.arrayant.interpolate(self.ant, *inputs, dist=True, local_angles=True)
+        for x, y in zip(inputs, copies):
+            npt.assert_array_equal(x, y)
+        for k in self.ant:
+            npt.assert_array_equal(self.ant[k], ant_copy[k])
+
+    def test_empty_and_nonfinite_angles(self):
+        res = quadriga_lib.arrayant.interpolate(self.ant, np.zeros((1, 0)), np.zeros((1, 0)), dist=True)
+        for x in res:
+            self.assertEqual(x.shape, (2, 0))
+        res = quadriga_lib.arrayant.interpolate(self.ant_m, np.zeros((2, 0)), np.zeros((2, 0)))
+        self.assertEqual(res[0].shape, (2, 0, 2))
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.arrayant.interpolate(self.ant, np.array([]), np.array([]))
+        self.assertIn("'azimuth' must have 1 or n_out rows", str(ctx.exception))
+        res = quadriga_lib.arrayant.interpolate(self.ant, [[0.1, np.nan]], [[0.0, 0.0]])
+        self.assertTrue(np.all(np.isnan(res[0][:, 1])))
+        self.assertTrue(np.all(np.isfinite(res[0][:, 0])))
+
+    def test_errors(self):
+        # From C++
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el[:, :2])
+        self.assertIn("'elevation' must have the same size as 'azimuth'", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=[2])
+        self.assertIn("exceed the number of elements", str(ctx.exception))
+        bad = dict(self.ant, azimuth_grid=np.array([0.0, np.nan]))
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.arrayant.interpolate(bad, self.az, self.el)
+        self.assertIn("'azimuth_grid' must be between -pi and pi", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, np.inf])
+        self.assertIn("'frequency' must contain finite values", str(ctx.exception))
+        # From the wrapper
+        for flag in ("dist", "local_angles"):
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, **{flag: True})
+            self.assertIn("not available in the multi-frequency mode", str(ctx.exception))
+        # From pybind11
+        with self.assertRaises(TypeError):
+            quadriga_lib.arrayant.interpolate(self.ant, self.az)
+        with self.assertRaises(TypeError):
+            quadriga_lib.arrayant.interpolate(self.ant, None, self.el)
+        with self.assertRaises(TypeError):
+            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, freq=[1e9])
 
 
-    def test_multi_freq_without_center_freq_raises(self):
-        """A 4D arrayant dict needs center_freq with one value per entry."""
-        s = arrayant.generate_speaker(frequencies=np.array([500.0, 1000.0, 2000.0]), angular_resolution=10)
-        az, el = np.array([[0.1]]), np.array([[0.2]])
-        ref = arrayant.interpolate(s, az, el)[0].ravel()
-        self.assertGreater(np.ptp(ref), 1e-3)
-        for cf in ('del', 1000.0, np.array([500.0, 1000.0])):
-            t = dict(s)
-            if isinstance(cf, str):
-                del t['center_freq']
-            else:
-                t['center_freq'] = cf
-            with self.assertRaises(ValueError):
-                arrayant.interpolate(t, az, el)
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

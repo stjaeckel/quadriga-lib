@@ -1923,6 +1923,9 @@ TEST_CASE("Get Channels Spherical - Rows of M follow the Jones convention rx by 
 
 TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude pattern")
 {
+    if (!quadriga_lib::quadriga_lib_has_AVX2()) // use_kernel = 2 needs the AVX2 kernel
+        return;
+
     // The AVX2 antenna interpolation must not set the result to zero where all corner amplitudes are small
     // (here 1e-9 times a directional pattern); it must agree with the generic interpolation.
     auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
@@ -1942,10 +1945,10 @@ TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude patter
     arma::cube cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
     quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 30.0, 5.0, 1.5, 0.0, 0.0, 0.0,
                                                  &fbs, &fbs, &gain, &len, &M, &cr_g, &ci_g, &dl_g, 3.5e9, true, false,
-                                                 nullptr, nullptr, nullptr, nullptr, false);
+                                                 nullptr, nullptr, nullptr, nullptr, 1);
     quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 30.0, 5.0, 1.5, 0.0, 0.0, 0.0,
                                                  &fbs, &fbs, &gain, &len, &M, &cr_v, &ci_v, &dl_v, 3.5e9, true, false,
-                                                 nullptr, nullptr, nullptr, nullptr, true);
+                                                 nullptr, nullptr, nullptr, nullptr, 2);
 
     arma::vec amp_g = arma::sqrt(arma::vectorise(arma::square(cr_g) + arma::square(ci_g)));
     const double amax = amp_g.max();
@@ -1957,7 +1960,7 @@ TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude patter
     CHECK(dmax / amax < 1e-4);
 }
 
-// With use_avx2 = true, get_channels_spherical passes per-element angles of size [n_links, n_ang] to the AVX2
+// With use_kernel = 2, get_channels_spherical passes per-element angles of size [n_links, n_ang] to the AVX2
 // kernel. For n_links not a multiple of 8, the last block must not load angles past the end of the matrices (heap
 // over-read, visible only in the ASan suite). The result must agree with the generic interpolation.
 template <typename dtype>
@@ -1981,10 +1984,10 @@ static void get_channels_spherical_avx2_tail_check()
     arma::Cube<dtype> cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
     quadriga_lib::get_channels_spherical<dtype>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
                                                 &fbs, &fbs, &gain, &len, &M, &cr_g, &ci_g, &dl_g, dtype(3e9),
-                                                false, false, nullptr, nullptr, nullptr, nullptr, false);
+                                                false, false, nullptr, nullptr, nullptr, nullptr, 1);
     quadriga_lib::get_channels_spherical<dtype>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
                                                 &fbs, &fbs, &gain, &len, &M, &cr_v, &ci_v, &dl_v, dtype(3e9),
-                                                false, false, nullptr, nullptr, nullptr, nullptr, true);
+                                                false, false, nullptr, nullptr, nullptr, nullptr, 2);
     REQUIRE(cr_v.n_elem == cr_g.n_elem);
     REQUIRE(cr_v.n_elem == 2 * n_path);
     double amax = 0.0, dmax = 0.0;
@@ -1999,6 +2002,8 @@ static void get_channels_spherical_avx2_tail_check()
 
 TEST_CASE("Get Channels Spherical - AVX2 with per-element angles, n_links not a multiple of 8")
 {
+    if (!quadriga_lib::quadriga_lib_has_AVX2()) // use_kernel = 2 needs the AVX2 kernel
+        return;
     get_channels_spherical_avx2_tail_check<float>();
     get_channels_spherical_avx2_tail_check<double>();
 }

@@ -235,6 +235,8 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_chann
     angles=True )
 
 coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
+
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
 ```
 
 ### Inputs:
@@ -260,6 +262,9 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   separate `coeff_re` and `coeff_im`; default: `False`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
+- **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate);
+  `int`; default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`

@@ -440,7 +440,7 @@ void quadriga_lib::get_channels_spherical(
     arma::Cube<dtype> *eod = nullptr,
     arma::Cube<dtype> *aoa = nullptr,
     arma::Cube<dtype> *eoa = nullptr,
-    bool use_avx2 = false);
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -461,7 +461,9 @@ void quadriga_lib::get_channels_spherical(
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot
-- **`use_avx2`** *(optional)* — If `true`, use AVX2 for antenna interpolation; faster, but less accurate; ignored when not supported
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto,
+  1 = GENERIC, 2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto
+  selects GENERIC in this version, see [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`

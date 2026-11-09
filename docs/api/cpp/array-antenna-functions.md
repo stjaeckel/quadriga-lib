@@ -7,7 +7,8 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-array-
 | [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency) |
 | [arrayant_concat_multi](#arrayant_concat_multi) | Concatenate two multi-frequency arrayant vectors into a single multi-element model |
 | [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Interpolate multi-frequency arrayant patterns at arbitrary angles and frequencies |
+| [arrayant_interpolate](#arrayant_interpolate) | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Interpolate a multi-frequency array antenna at given angles and frequencies |
 | [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Validate a vector of arrayant objects for multi-frequency consistency |
 | [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Apply Euler rotations to all entries in a multi-frequency arrayant vector |
 | [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Set element positions for all entries in a multi-frequency arrayant vector |
@@ -54,7 +55,8 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects (must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi))
 - **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to `arrayant_vec[0].azimuth_grid`
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to `arrayant_vec[0].elevation_grid`
-- **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz; defaults to per-entry `center_frequency`
+- **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz, positive and finite; defaults to per-entry
+  `center_frequency`
 - **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ### Returns:
@@ -146,66 +148,156 @@ quadriga_lib::arrayant_copy_element_multi(driver, 0, arma::uvec{1, 2, 3});
 - [arrayant_concat_multi](#arrayant_concat_multi) (combine multiple arrayant vectors)
 
 ---
-<a id="arrayant_interpolate_multi"></a>
-## arrayant_interpolate_multi
-Interpolate multi-frequency arrayant patterns at arbitrary angles and frequencies
+<a id="arrayant_interpolate"></a>
+## arrayant_interpolate
+Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
 
 Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_interpolate) · [Python](../python/array-antenna-functions.md#interpolate)
 
-- For each requested frequency, finds the two bracketing `center_frequency` entries, runs spatial interpolation on both via `qd_arrayant_interpolate`, then blends results in the frequency dimension.
-- Frequency blending uses SLERP of complex field values with automatic fallback to linear interpolation when phase difference exceeds a threshold.
-- Out-of-range frequencies are clamped to the nearest entry (no extrapolation).
-- Consecutive frequency requests sharing the same bracketing entries reuse cached spatial interpolation results; sort `frequency` ascending or descending for best cache utilization.
-- If `validate_input` is true, calls [arrayant_is_valid_multi](#arrayant_is_valid_multi) once before processing; set to `false` in performance-critical loops after initial validation.
+- Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
+  global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
+- Between the samples of the pattern, amplitude and phase are interpolated separately (spherical interpolation),
+  with linear interpolation where neighbouring samples have nearly opposite phases; the azimuth grid wraps around,
+  elevations outside the grid take the values of the first or last grid row
+- `azimuth` with one row gives the same angles for all outputs (planar wave), `n_out` rows one angle per output
+  (spherical wave); `n_ang = 0` gives outputs of size `[n_out, 0]`
+- Angles are not range-checked; values outside [-pi, pi] and [-pi/2, pi/2] denote the corresponding direction. NaN or
+  infinite angles give NaN in all outputs of that angle and output, without an exception
+- Outputs are resized only when their size differs, so pre-allocated outputs are written in place
+- Kernels: GENERIC computes in the precision of `dtype`; AVX2 computes in single precision also for `double`, with
+  errors of up to a few 1e-5 of the peak field value and about 1e-4 rad in the angles (more near the poles of the
+  local frame); auto selects GENERIC in this version, which may change in a later version
+- Throws `std::invalid_argument` for an invalid `ant`, sizes that do not match, element indices `>= n_elements`, an
+  unknown or unavailable kernel, and outputs that are an input, a data member of `ant` or another output, or share
+  memory with one
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_interpolate(
+    const arrayant<dtype> &ant,
+    const arma::Mat<dtype> &azimuth,
+    const arma::Mat<dtype> &elevation,
+    arma::Mat<dtype> &V_re,
+    arma::Mat<dtype> &V_im,
+    arma::Mat<dtype> &H_re,
+    arma::Mat<dtype> &H_im,
+    const arma::uvec *i_element = nullptr,
+    const arma::Cube<dtype> *orientation = nullptr,
+    const arma::Mat<dtype> *element_pos = nullptr,
+    arma::Mat<dtype> *dist = nullptr,
+    arma::Mat<dtype> *azimuth_loc = nullptr,
+    arma::Mat<dtype> *elevation_loc = nullptr,
+    arma::Mat<dtype> *gamma = nullptr,
+    int use_kernel = 0);
+```
+
+### Inputs:
+- **`ant`** — Array antenna with `n_elements` elements; see [arrayant](array-antenna-class.md#arrayant)
+- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
+- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements in
+  order (`n_out = n_elements`); `[n_out]`
+- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading) of the antenna, for all outputs and angles,
+  per output, per angle, or both; `nullptr` or empty: no rotation; `[3, 1, 1]`, `[3, n_out, 1]`, `[3, 1, n_ang]` or
+  `[3, n_out, n_ang]`
+- **`element_pos`** *(optional)* — Element positions in local antenna coordinates, used for `dist`; `nullptr` or
+  empty: the columns `i_element` of `ant.element_pos`, zeros if that is empty; `[3, n_out]`
+- **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (throws if unavailable or if the pattern
+  has more than `INT_MAX` samples); other values throw
+
+### Outputs:
+- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang]`
+- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; `[n_out, n_ang]`
+- **`dist`** *(optional)* — Distance of each element from the wavefront plane through the origin of the antenna;
+  negative for elements closer to the source; `[n_out, n_ang]`
+- **`azimuth_loc`** / **`elevation_loc`** *(optional)* — Azimuth and elevation in the local antenna frame;
+  `[n_out, n_ang]`
+- **`gamma`** *(optional)* — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`
+
+### Example:
+```cpp
+auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+arma::mat azimuth = {0.0, 0.5 * arma::datum::pi, -0.5 * arma::datum::pi, arma::datum::pi};
+arma::mat elevation(1, azimuth.n_elem, arma::fill::zeros);
+arma::mat V_re, V_im, H_re, H_im;
+quadriga_lib::arrayant_interpolate(ant, azimuth, elevation, V_re, V_im, H_re, H_im);
+```
+
+### See also:
+- [arrayant_interpolate_multi](#arrayant_interpolate_multi) (frequency-dependent array antennas)
+- [arrayant](array-antenna-class.md#arrayant) (array antenna class)
+- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (channel coefficients from the interpolated patterns)
+
+---
+<a id="arrayant_interpolate_multi"></a>
+## arrayant_interpolate_multi
+Interpolate a multi-frequency array antenna at given angles and frequencies
+
+Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_interpolate) · [Python](../python/array-antenna-functions.md#interpolate)
+
+- For each target frequency, interpolates the two entries whose center frequencies bracket it, each as
+  [arrayant_interpolate](#arrayant_interpolate), and blends their fields: spherical interpolation of the complex values over frequency,
+  linear where the two values have nearly opposite phases or one of them is zero
+- Target frequencies outside the range of the center frequencies take the nearest entry (no extrapolation)
+- Consecutive target frequencies with the same bracketing entries reuse the spatial results; target frequencies in
+  ascending or descending order are fastest
+- The entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi): same grids, number of elements and element positions
+- Angles, element indices, orientation and kernels as in [arrayant_interpolate](#arrayant_interpolate); `n_ang = 0` gives outputs of size
+  `[n_out, 0, n_freq]`
+- Throws `std::invalid_argument` for an empty or invalid `arrayant_vec`, target frequencies that are not finite, and
+  for the errors of [arrayant_interpolate](#arrayant_interpolate)
 
 ### Declaration:
 ```cpp
 void quadriga_lib::arrayant_interpolate_multi(
-        const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        const arma::Mat<dtype> *azimuth,
-        const arma::Mat<dtype> *elevation,
-        const arma::Col<dtype> *frequency,
-        arma::Cube<dtype> *V_re,
-        arma::Cube<dtype> *V_im,
-        arma::Cube<dtype> *H_re,
-        arma::Cube<dtype> *H_im,
-        arma::uvec i_element = {},
-        const arma::Cube<dtype> *orientation = nullptr,
-        const arma::Mat<dtype> *element_pos_i = nullptr,
-        bool validate_input = true);
+    const std::vector<arrayant<dtype>> &arrayant_vec,
+    const arma::Mat<dtype> &azimuth,
+    const arma::Mat<dtype> &elevation,
+    arma::Cube<dtype> &V_re,
+    arma::Cube<dtype> &V_im,
+    arma::Cube<dtype> &H_re,
+    arma::Cube<dtype> &H_im,
+    const arma::Col<dtype> *frequency = nullptr,
+    const arma::uvec *i_element = nullptr,
+    const arma::Cube<dtype> *orientation = nullptr,
+    const arma::Mat<dtype> *element_pos = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
-- **`arrayant_vec`** — Multi-frequency arrayant vector; entries need not be sorted by frequency
-- **`azimuth`** — Azimuth angles in rad; must not be NULL, `[1, n_ang]` or `[n_out, n_ang]`
-- **`elevation`** — Elevation angles in rad; must not be NULL; size must match `azimuth`
-- **`frequency`** — Target frequencies in Hz; must not be NULL or empty; `[n_freq]`
-- **`i_element`** *(optional)* — Element indices to interpolate; if empty, all elements are used (`n_out = n_elements`)
-- **`orientation`** *(optional)* — Antenna orientation (bank, tilt, heading) in rad, applied at all frequencies; `[3,1,1]`; `[3,n_out,1]`; `[3,1,n_ang]`, or `[3,n_out,n_ang]`
-- **`element_pos_i`** *(optional)* — Override element positions; if `nullptr`, positions from freq index 0 are used; `[3, n_out]`
-- **`validate_input`** *(optional)* — If `true`, validates `arrayant_vec` with [arrayant_is_valid_multi](#arrayant_is_valid_multi) before processing
+- **`arrayant_vec`** — Multi-frequency array antenna, one entry per center frequency; entries need not be sorted by
+  frequency
+- **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
+- **`elevation`** — Elevation angles in GCS; same size as `azimuth`
+- **`frequency`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
+  in vector order; `[n_freq]`
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements;
+  `[n_out]`
+- **`orientation`** *(optional)* — Euler angles (bank, tilt, heading), applied at all frequencies; shapes as in
+  [arrayant_interpolate](#arrayant_interpolate)
+- **`element_pos`** *(optional)* — Element positions in m; checked for its size only, since no output depends on the
+  positions; `[3, n_out]`
+- **`use_kernel`** *(optional)* — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2; as in [arrayant_interpolate](#arrayant_interpolate)
 
 ### Outputs:
-- **`V_re`** — Real part of interpolated e-theta field; must not be NULL; `[n_out, n_ang, n_freq]`
-- **`V_im`** — Imaginary part of interpolated e-theta field; must not be NULL; `[n_out, n_ang, n_freq]`
-- **`H_re`** — Real part of interpolated e-phi field; must not be NULL; `[n_out, n_ang, n_freq]`
-- **`H_im`** — Imaginary part of interpolated e-phi field; must not be NULL; `[n_out, n_ang, n_freq]`
+- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang, n_freq]`
+- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; `[n_out, n_ang, n_freq]`
 
 ### Example:
 ```cpp
 auto speaker = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
 arma::mat az = {0.0, 1.5708, -1.5708, 3.14159};
 arma::mat el(1, 4, arma::fill::zeros);
-arma::vec qf = {250.0, 1500.0, 8000.0};
+arma::vec freq = {250.0, 1500.0, 8000.0};
 arma::cube V_re, V_im, H_re, H_im;
-quadriga_lib::arrayant_interpolate_multi(speaker, &az, &el, &qf, &V_re, &V_im, &H_re, &H_im);
+quadriga_lib::arrayant_interpolate_multi(speaker, az, el, V_re, V_im, H_re, H_im, &freq);
 ```
 
 ### See also:
-- [.interpolate](array-antenna-class.md#.interpolate) (single-frequency spatial interpolation)
-- [arrayant_concat_multi](#arrayant_concat_multi) (build multi-element/multi-frequency models)
-- [arrayant_is_valid_multi](#arrayant_is_valid_multi) (validation called when validate_input is true)
-- [generate_speaker](#generate_speaker) (typical source of multi-frequency arrayant vectors)
+- [arrayant_interpolate](#arrayant_interpolate) (single-frequency interpolation)
+- [arrayant_concat_multi](#arrayant_concat_multi) (build multi-element, multi-frequency models)
+- [arrayant_is_valid_multi](#arrayant_is_valid_multi) (validation of the entries)
+- [generate_speaker](#generate_speaker) (typical source of multi-frequency array antennas)
 
 ---
 <a id="arrayant_is_valid_multi"></a>

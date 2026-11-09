@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "quadriga_arrayant.hpp"
-#include "qd_arrayant_interpolate.hpp"
+#include "qd_arrayant_functions.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
@@ -282,33 +282,22 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
             rx_Doppler->at(0) = zero;
     }
 
-    arma::Col<unsigned> i_element(n_tx, arma::fill::none);
-    unsigned *p_element = i_element.memptr();
-    for (unsigned t = 0; t < unsigned(n_tx); ++t)
-        *p_element++ = t + 1;
-
-    arma::Mat<dtype> element_pos_interp(3ULL, n_tx);
+    arma::uvec i_element = arma::regspace<arma::uvec>(0, n_tx - 1);
+    arma::Mat<dtype> element_pos_interp(3ULL, n_tx, arma::fill::zeros);
     if (tx_array->element_pos.n_elem != 0ULL)
         std::memcpy(element_pos_interp.memptr(), tx_array->element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
 
-    qd_arrayant_interpolate(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
-                            tx_array->azimuth_grid, tx_array->elevation_grid, AOD, EOD,
-                            i_element, tx_orientation, element_pos_interp,
-                            Vt_re, Vt_im, Ht_re, Ht_im, &Pt);
+    qd_arrayant_interpolate_dispatch<dtype>(*tx_array, AOD, EOD, i_element, tx_orientation, element_pos_interp,
+                                            Vt_re, Vt_im, Ht_re, Ht_im, &Pt, nullptr, nullptr, nullptr, 1);
 
-    i_element.set_size(n_rx);
-    p_element = i_element.memptr();
-    for (unsigned r = 0; r < unsigned(n_rx); ++r)
-        *p_element++ = r + 1;
-
+    i_element = arma::regspace<arma::uvec>(0, n_rx - 1);
     element_pos_interp.zeros(3ULL, n_rx);
     if (rx_array->element_pos.n_elem != 0ULL)
         std::memcpy(element_pos_interp.memptr(), rx_array->element_pos.memptr(), 3ULL * n_rx * sizeof(dtype));
 
-    qd_arrayant_interpolate(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
-                            rx_array->azimuth_grid, rx_array->elevation_grid, AOA, EOA,
-                            i_element, rx_orientation, element_pos_interp,
-                            Vr_re, Vr_im, Hr_re, Hr_im, &Pr, &AOA_loc, &EOA_loc);
+    qd_arrayant_interpolate_dispatch<dtype>(*rx_array, AOA, EOA, i_element, rx_orientation, element_pos_interp,
+                                            Vr_re, Vr_im, Hr_re, Hr_im, &Pr, rx_Doppler == nullptr ? nullptr : &AOA_loc,
+                                            rx_Doppler == nullptr ? nullptr : &EOA_loc, nullptr, 1);
 
     element_pos_interp.reset();
 

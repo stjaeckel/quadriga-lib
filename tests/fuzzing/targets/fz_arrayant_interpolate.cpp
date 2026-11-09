@@ -2,9 +2,9 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Array antenna interpolation: arrayant::interpolate and arrayant_interpolate_multi on a fuzzed arrayant (grids,
+// Array antenna interpolation: arrayant_interpolate and arrayant_interpolate_multi on a fuzzed arrayant (grids,
 // patterns, positions and coupling of consistent or mismatched sizes) with fuzzed angles, element indices,
-// orientations, element positions and optional outputs
+// orientations, element positions, optional outputs, target frequencies and the available kernels
 
 #include "fuzz_target.hpp"
 
@@ -69,7 +69,10 @@ static void run(fz::input &in)
     const bool use_pos = in.ConsumeBool();
     element_pos_i = in.ConsumeBool() ? in.mat<T>(3, n_out) : in.mat<T>(in.size(4), in.size(n_out + 1));
 
-    // Outputs, each sometimes nullptr, sometimes with a stale size
+    // Kernel: auto, GENERIC, or AVX2 where available
+    const int use_kernel = in.ConsumeIntegralInRange<int>(0, quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1);
+
+    // Optional outputs, each sometimes nullptr; outputs sometimes with a stale size
     arma::Mat<T> V_re, V_im, H_re, H_im, dist, az_loc, el_loc, gamma;
     uint8_t out_mask = in.ConsumeIntegral<uint8_t>();
     if (in.ConsumeBool())
@@ -77,9 +80,9 @@ static void run(fz::input &in)
     auto opt = [&](arma::Mat<T> &m, int bit) { return (out_mask >> bit) & 1 ? &m : nullptr; };
 
     fz::clean([&]
-              { a.interpolate(&az, &el, opt(V_re, 0), opt(V_im, 1), opt(H_re, 2), opt(H_im, 3), i_element,
-                              use_orientation ? &orientation : nullptr, use_pos ? &element_pos_i : nullptr,
-                              opt(dist, 4), opt(az_loc, 5), opt(el_loc, 6), opt(gamma, 7)); });
+              { quadriga_lib::arrayant_interpolate<T>(a, az, el, V_re, V_im, H_re, H_im, &i_element,
+                                                      use_orientation ? &orientation : nullptr, use_pos ? &element_pos_i : nullptr,
+                                                      opt(dist, 4), opt(az_loc, 5), opt(el_loc, 6), opt(gamma, 7), use_kernel); });
 
     // Same arrayant at up to three frequencies (the copies may get a different grid size)
     std::vector<quadriga_lib::arrayant<T>> vec;
@@ -89,16 +92,12 @@ static void run(fz::input &in)
         vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? fz::arrayant<T>(in) : a);
         vec.back().center_frequency = in.value<T>();
     }
-    arma::Col<T> freq = in.col<T>(in.size(5));
+    arma::Col<T> freq = in.col<T>(in.size(5)); // May be empty: the center frequencies of the entries
     arma::Cube<T> CV_re, CV_im, CH_re, CH_im;
-    // Skipping the validation is allowed only for a vector that passed it
-    bool validate = true;
-    if (in.ConsumeBool())
-        fz::clean([&] { validate = !quadriga_lib::arrayant_is_valid_multi(vec, false).empty(); });
     fz::clean([&]
-              { quadriga_lib::arrayant_interpolate_multi(vec, &az, &el, &freq, &CV_re, &CV_im, &CH_re, &CH_im, i_element,
-                                                         use_orientation ? &orientation : nullptr,
-                                                         use_pos ? &element_pos_i : nullptr, validate); });
+              { quadriga_lib::arrayant_interpolate_multi<T>(vec, az, el, CV_re, CV_im, CH_re, CH_im, &freq, &i_element,
+                                                            use_orientation ? &orientation : nullptr,
+                                                            use_pos ? &element_pos_i : nullptr, use_kernel); });
 }
 
 void fuzz_seeds(const fz::seeds &) {}

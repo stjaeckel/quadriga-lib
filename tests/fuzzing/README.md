@@ -114,7 +114,7 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 | `fz_qrt` | QRT file | `qrt_file_parse`, `qrt_read_cache_init`, `qrt_file_read` for several origins and CIRs in both directions, `qrt_file_read_raw` |
 | `fz_hdf5` | HDF5 channel file | `hdf5_read_layout`, `hdf5_read_channel`, `hdf5_read_dset_names`, `hdf5_read_dset` for the first slots |
 | `fz_arrayant_generate` | Parameters | The `generate_arrayant_*` functions and `generate_speaker` |
-| `fz_arrayant_interpolate` | Array antenna, angles | `arrayant::interpolate`, `arrayant_interpolate_multi` |
+| `fz_arrayant_interpolate` | Array antenna, angles | `arrayant_interpolate`, `arrayant_interpolate_multi` |
 | `fz_arrayant_edit` | Array antenna | The `arrayant` member functions in a fuzzed order, the `arrayant_*_multi` functions, `qdant_write` and `qdant_read` |
 | `fz_get_channels` | Array antennas, paths | `get_channels_spherical`, `get_channels_planar`, `get_channels_irs`, `get_channels_multifreq` |
 | `fz_channel_tools` | Coefficients, delays | `quantize_delays`, the `baseband_freq_response` functions |

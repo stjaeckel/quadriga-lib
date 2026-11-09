@@ -194,12 +194,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     if (calc_angles)
     {
         quadriga_lib::get_channels_spherical<dtype>(tx_array, &irs, Tx, Ty, Tz, Tb, Tt, Th, Ix, Iy, Iz, Ib, It, Ih, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_frequency, true, false, &aod_1, &eod_1);
+                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_frequency, true, false, &aod_1, &eod_1, nullptr, nullptr, 1);
     }
     else
     {
         quadriga_lib::get_channels_spherical<dtype>(tx_array, &irs, Tx, Ty, Tz, Tb, Tt, Th, Ix, Iy, Iz, Ib, It, Ih, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_frequency, true, false);
+                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_frequency, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 
     // Update the IRS array for the second segment
@@ -245,12 +245,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     if (calc_angles)
     {
         quadriga_lib::get_channels_spherical<dtype>(&irs, rx_array, Ix, Iy, Iz, Ib, It, Ih, Rx, Ry, Rz, Rb, Rt, Rh, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_frequency, true, false, nullptr, nullptr, &aoa_2, &eoa_2);
+                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_frequency, true, false, nullptr, nullptr, &aoa_2, &eoa_2, 1);
     }
     else
     {
         quadriga_lib::get_channels_spherical<dtype>(&irs, rx_array, Ix, Iy, Iz, Ib, It, Ih, Rx, Ry, Rz, Rb, Rt, Rh, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_frequency, true, false);
+                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_frequency, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 
     // Calculate the LOS delay between TX and RX

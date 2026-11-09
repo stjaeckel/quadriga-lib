@@ -58,7 +58,7 @@ namespace quadriga_lib
                                         const arma::Col<dtype> *elevation_grid_new = nullptr,       // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
                                         dtype propagation_speed = dtype(299792458.0)) const;        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
 
-        // Creates a copy of the array antenna object
+        // Creates a copy of the array antenna object; a copy of a valid arrayant is marked as validated
         arrayant<dtype> copy() const;
 
         // Copy a single antenna element to one or more destination slots
@@ -72,21 +72,6 @@ namespace quadriga_lib
                              dtype object_radius = 1.0,        // Radius of the exported object
                              arma::uword icosphere_n_div = 4,  // Icosphere subdivision count; higher = finer mesh
                              arma::uvec i_element = {}) const; // 0-based element indices to export
-
-        // Interpolate polarimetric antenna field patterns for given azimuth/elevation angles
-        void interpolate(const arma::Mat<dtype> *azimuth,                 // Azimuth angles in rad, in [-pi, pi]; [1, n_ang] or [n_out, n_ang]
-                         const arma::Mat<dtype> *elevation,               // Elevation angles in rad, in [-pi/2, pi/2]; [1, n_ang] or [n_out, n_ang]
-                         arma::Mat<dtype> *V_re,                          // Real e-theta (vertical) field component; [n_out, n_ang]
-                         arma::Mat<dtype> *V_im,                          // Imaginary e-theta (vertical) field component; [n_out, n_ang]
-                         arma::Mat<dtype> *H_re,                          // Real/imaginary e-phi (horizontal) field component; [n_out, n_ang]
-                         arma::Mat<dtype> *H_im,                          // Imaginary e-phi (horizontal) field component; [n_out, n_ang]
-                         arma::uvec i_element = {},                       // Element indices to interpolate; duplicates allowed; defaults to all elements; [n_out] or {}
-                         const arma::Cube<dtype> *orientation = nullptr,  // Euler angles in rad; nullptr; [3, 1]; [3, n_out]; [3, 1, n_ang], or [3, n_out, n_ang]
-                         const arma::Mat<dtype> *element_pos_i = nullptr, // Override element positions in m; nullptr uses arrayant.element_pos; [3, n_out]
-                         arma::Mat<dtype> *dist = nullptr,                // Distance from the wavefront plane to each element; nullptr or [n_out, n_ang]
-                         arma::Mat<dtype> *azimuth_loc = nullptr,         // Azimuth angles in local (rotated) element frame in rad; nullptr or [n_out, n_ang]
-                         arma::Mat<dtype> *elevation_loc = nullptr,       // Elevation angles in local element frame in rad; nullptr or [n_out, n_ang]
-                         arma::Mat<dtype> *gamma = nullptr) const;        // Polarization rotation angles in rad; nullptr or [n_out, n_ang]
 
         // Write arrayant data to a QDANT (XML) file
         unsigned qdant_write(std::string fn,                   // Output QDANT filename; must not be empty
@@ -150,25 +135,43 @@ namespace quadriga_lib
                                      arma::uword source,                         // Index of the element to copy from; must be within current element count
                                      arma::uword destination);                   // Index or indices of target elements; enlarges all entries if any index exceeds current count
 
-    // Interpolate multi-frequency arrayant patterns at arbitrary angles and frequencies
-    // - For each requested frequency, finds the two bracketing center_frequency entries, runs spatial interpolation on both via qd_arrayant_interpolate, then blends results in the frequency dimension.
-    // - Frequency blending uses SLERP of complex field values with automatic fallback to linear interpolation when phase difference exceeds a threshold.
-    // - Out-of-range frequencies are clamped to the nearest entry (no extrapolation).
-    // - Consecutive frequency requests sharing the same bracketing entries reuse cached spatial interpolation results; sort frequency ascending or descending for best cache utilization.
-    // - If validate_input is true, calls arrayant_is_valid_multi once before processing; set to false in performance-critical loops after initial validation.
+    // Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
+    // - Angles [1, n_ang]: the same for all outputs (planar wave); [n_out, n_ang]: one angle per output (spherical wave)
+    // - Kernel GENERIC computes in the precision of dtype, AVX2 in single precision also for double; auto selects GENERIC
+    template <typename dtype>
+    void arrayant_interpolate(const arrayant<dtype> &ant,                     // Array antenna with n_elements elements
+                              const arma::Mat<dtype> &azimuth,                // Azimuth angles in GCS in rad; [1, n_ang] or [n_out, n_ang]
+                              const arma::Mat<dtype> &elevation,              // Elevation angles in GCS in rad; same size as azimuth
+                              arma::Mat<dtype> &V_re,                         // Output: e-theta (vertical) field, real part; [n_out, n_ang]
+                              arma::Mat<dtype> &V_im,                         // Output: e-theta (vertical) field, imaginary part; [n_out, n_ang]
+                              arma::Mat<dtype> &H_re,                         // Output: e-phi (horizontal) field, real part; [n_out, n_ang]
+                              arma::Mat<dtype> &H_im,                         // Output: e-phi (horizontal) field, imaginary part; [n_out, n_ang]
+                              const arma::uvec *i_element = nullptr,          // Optional: 0-based element indices, duplicates allowed; [n_out]
+                              const arma::Cube<dtype> *orientation = nullptr, // Optional: Euler angles (bank, tilt, heading) in rad; [3, 1, 1], [3, n_out, 1], [3, 1, n_ang] or [3, n_out, n_ang]
+                              const arma::Mat<dtype> *element_pos = nullptr,  // Optional: element positions in m, replacing ant.element_pos; [3, n_out]
+                              arma::Mat<dtype> *dist = nullptr,               // Optional output: distance of each element from the wavefront plane through the origin in m; [n_out, n_ang]
+                              arma::Mat<dtype> *azimuth_loc = nullptr,        // Optional output: azimuth in the local antenna frame in rad; [n_out, n_ang]
+                              arma::Mat<dtype> *elevation_loc = nullptr,      // Optional output: elevation in the local antenna frame in rad; [n_out, n_ang]
+                              arma::Mat<dtype> *gamma = nullptr,              // Optional output: polarization rotation angle in rad; [n_out, n_ang]
+                              int use_kernel = 0);                            // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
+
+    // Interpolate a multi-frequency array antenna at given angles and frequencies
+    // - Blends the spatial interpolation of the two entries that bracket each target frequency (spherical interpolation
+    //   of the complex values with linear fallback); target frequencies outside the entries take the nearest entry
+    // - Consecutive target frequencies with the same bracketing entries reuse the spatial results
     template <typename dtype>
     void arrayant_interpolate_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Multi-frequency arrayant vector; entries need not be sorted by frequency
-                                    const arma::Mat<dtype> *azimuth,                  // Azimuth angles in rad; must not be NULL, [1, n_ang] or [n_out, n_ang]
-                                    const arma::Mat<dtype> *elevation,                // Elevation angles in rad; must not be NULL; size must match azimuth
-                                    const arma::Col<dtype> *frequency,                // Target frequencies in Hz; must not be NULL or empty; [n_freq]
-                                    arma::Cube<dtype> *V_re,                          // Real part of interpolated e-theta field; must not be NULL; [n_out, n_ang, n_freq]
-                                    arma::Cube<dtype> *V_im,                          // Imaginary part of interpolated e-theta field; must not be NULL; [n_out, n_ang, n_freq]
-                                    arma::Cube<dtype> *H_re,                          // Real part of interpolated e-phi field; must not be NULL; [n_out, n_ang, n_freq]
-                                    arma::Cube<dtype> *H_im,                          // Imaginary part of interpolated e-phi field; must not be NULL; [n_out, n_ang, n_freq]
-                                    arma::uvec i_element = {},                        // Element indices to interpolate; if empty, all elements are used (n_out = n_elements)
-                                    const arma::Cube<dtype> *orientation = nullptr,   // Antenna orientation; Euler angles; applied at all frequencies; [3,1,1]; [3,n_out,1]; [3,1,n_ang], or [3,n_out,n_ang]
-                                    const arma::Mat<dtype> *element_pos_i = nullptr,  // Override element positions; if nullptr, positions from freq index 0 are used; [3, n_out]
-                                    bool validate_input = true);                      // If true, validates arrayant_vec before processing
+                                    const arma::Mat<dtype> &azimuth,                  // Azimuth angles in rad; [1, n_ang] or [n_out, n_ang]
+                                    const arma::Mat<dtype> &elevation,                // Elevation angles in rad; same size as azimuth
+                                    arma::Cube<dtype> &V_re,                          // Output: e-theta field, real part; [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> &V_im,                          // Output: e-theta field, imaginary part; [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> &H_re,                          // Output: e-phi field, real part; [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> &H_im,                          // Output: e-phi field, imaginary part; [n_out, n_ang, n_freq]
+                                    const arma::Col<dtype> *frequency = nullptr,      // Optional: target frequencies in Hz; default: the center frequencies of the entries; [n_freq]
+                                    const arma::uvec *i_element = nullptr,            // Optional: 0-based element indices; [n_out]
+                                    const arma::Cube<dtype> *orientation = nullptr,   // Optional: Euler angles in rad, applied at all frequencies; shapes as in arrayant_interpolate
+                                    const arma::Mat<dtype> *element_pos = nullptr,    // Optional: element positions in m; default: those of entry 0; [3, n_out]
+                                    int use_kernel = 0);                              // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
     // Validate a vector of arrayant objects for multi-frequency consistency
     // - Each entry is validated individually via its is_valid member; quick_check is forwarded to that call.
@@ -374,7 +377,7 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *eoa = nullptr,    // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
-                                bool use_avx2 = false);              // Use AVX2 for antenna interpolation (faster, but less accurate, ignored when not supported)
+                                int use_kernel = 0);                 // Kernel of antenna interpolation and coefficients: 0 = auto, 1 = GENERIC, 2 = AVX2
 
     // Calculate channel coefficients for spherical waves across multiple frequencies
     // - Extends get_channels_spherical to support frequency-dependent antenna patterns, path gains, and Jones matrices

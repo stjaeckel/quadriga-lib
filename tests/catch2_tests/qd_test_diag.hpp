@@ -11,6 +11,7 @@
 //   QD_DIAG_GBSM   geometry-based stochastic model tests (test_gbsm_phases_*.cpp,
 //                  test_ssf_clusters*.cpp, test_path_loss.cpp, test_lsp_generate.cpp, ...)
 //   QD_DIAG_HDF    HDF5 channel-file tests (test_qd_hdf5_internal.cpp, test_hdf_robustness_internal.cpp)
+//   QD_DIAG_ANT    array antenna interpolation tests (test_arrayant_interpolate*.cpp)
 //   QD_DIAG        all areas
 //
 // Example: QD_DIAG_SOS=1 ./build_linux/test_bin "sos_val*"
