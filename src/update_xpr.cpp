@@ -324,7 +324,7 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
                               bool apply_gain,
                               const arma::uvec *ray_index)
 {
-    qd_check_alias(update, "update", &xprmat);
+    qd_check_alias(&xprmat, "xprmat", update);
     qd_check_alias(gain, "gain", &xprmat, update);
 
     const bool have_state = !xprmat.is_empty();
