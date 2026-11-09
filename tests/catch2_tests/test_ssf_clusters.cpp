@@ -833,7 +833,7 @@ TEST_CASE("ssf_clusters - empty input and pre-sized outputs")
     // Pre-sized outputs with NaN are written completely; wrong sizes are resized
     fix_t f = make_fix(N, 4, 1, 162, true);
     f.use_eps = f.use_ncl = true;
-    f.ncl = {N, 11, 12, 11};
+    f.ncl = {(unsigned)N, 11, 12, 11};
     const out_t ref = run(sp, f);
     for (const arma::uword r : {4, 2})
     {
