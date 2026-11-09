@@ -70,7 +70,10 @@ else()
         set(OPT_FLAGS -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize-recover=address)
         add_link_options(-fsanitize=address,undefined)
     endif()
-    add_compile_options(${OPT_FLAGS} -fPIC -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
+    # One section per function and data object, so that the MATLAB MEX links (-Wl,--gc-sections) drop the library
+    # code a MEX file does not use. MATLAB disassembles every MEX file when it first loads it, which takes time in
+    # proportion to the code size.
+    add_compile_options(${OPT_FLAGS} -fPIC -ffunction-sections -fdata-sections -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
     set(MEX_CXXFLAGS "-std=c++17 -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
 endif()
 
@@ -454,9 +457,10 @@ if(BUILD_MATLAB)
             add_custom_command(
                 OUTPUT ${mex_output}
                 COMMAND ${CMAKE_CXX_COMPILER}
-                        -std=c++17 -O3 -shared -fPIC -DMATLAB_MEX_FILE
+                        -std=c++17 -O3 -shared -fPIC -ffunction-sections -fdata-sections -DMATLAB_MEX_FILE
                         -I${MATLAB_MEX_INCLUDE_DIR} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                         ${mex_src} ${MEX_COMPAT_SHIM} $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS} -lgomp
+                        -Wl,--gc-sections
                         -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT} -Wl,--no-undefined-version -Wl,--unresolved-symbols=ignore-all
                         -o ${mex_output}
                 DEPENDS ${mex_deps}
