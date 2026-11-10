@@ -5,6 +5,8 @@
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
+#include <climits>
+
 /*!SECTION
 Site-specific simulation tools
 SECTION!*/
@@ -84,11 +86,20 @@ void quadriga_lib::combine_irs_coord(dtype Ix, dtype Iy, dtype Iz,
 
     // The coordinates must hold exactly the interactions counted in 'no_interact_1' / '_2'
     // - With no interactions an empty matrix is accepted
-    arma::uword sum_1 = 0ULL, sum_2 = 0ULL;
+    // - The interaction count of a combined path, max_1 + max_2 + 1, must fit its 32-bit output
+    arma::uword sum_1 = 0ULL, sum_2 = 0ULL, max_1 = 0ULL, max_2 = 0ULL;
     for (arma::uword i = 0ULL; i < n_path_1; ++i)
-        sum_1 += (arma::uword)no_interact_1->at(i);
+    {
+        const arma::uword v = (arma::uword)no_interact_1->at(i);
+        sum_1 += v, max_1 = v > max_1 ? v : max_1;
+    }
     for (arma::uword i = 0ULL; i < n_path_2; ++i)
-        sum_2 += (arma::uword)no_interact_2->at(i);
+    {
+        const arma::uword v = (arma::uword)no_interact_2->at(i);
+        sum_2 += v, max_2 = v > max_2 ? v : max_2;
+    }
+    if (max_1 + max_2 + 1ULL > (arma::uword)UINT_MAX)
+        throw std::invalid_argument("The interaction count of a combined path exceeds the 32-bit range.");
     if (interact_coord_1->n_cols != sum_1 || (sum_1 != 0ULL && interact_coord_1->n_rows != 3ULL))
         throw std::invalid_argument("Input 'interact_coord_1' must have 3 rows and sum(no_interact_1) = " + std::to_string(sum_1) + " columns.");
     if (interact_coord_2->n_cols != sum_2 || (sum_2 != 0ULL && interact_coord_2->n_rows != 3ULL))

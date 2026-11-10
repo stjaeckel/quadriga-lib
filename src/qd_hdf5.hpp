@@ -1084,6 +1084,9 @@ namespace qd
                           std::to_string(stored) + " bytes");
             if (!d.compact && (d.size == 0 ? d.address != undef : !in_bounds(d.address, d.size, eof, superblock_size)))
                 malformed("address " + std::to_string(d.address) + " is outside the file");
+            for (int i = 0; i < d.rank; ++i) // Only possible without elements: each extent is bounded by the data size
+                if (d.dims[i] > eof)
+                    bad("declares an extent of " + std::to_string(d.dims[i]) + " but the file has " + std::to_string(eof) + " bytes");
             return d;
         }
 

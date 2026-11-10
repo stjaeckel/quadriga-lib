@@ -93,6 +93,7 @@ void quadriga_lib::write_png(const arma::Mat<dtype> &data, std::string fn, std::
     // Convert the data to the map
     const dtype *values = data.memptr();
     double scl = degenerate ? 0.0 : double(n_cmap - 1) / (ma - mi);
+    const bool tiny_range = !degenerate && !std::isfinite(scl); // Range below about 1e-306: divide by it instead
 
     for (size_t i_val = 0; i_val < no_values; ++i_val)
     {
@@ -106,7 +107,7 @@ void quadriga_lib::write_png(const arma::Mat<dtype> &data, std::string fn, std::
             x = (x < mi) ? mi : x; // clips -Inf
             x = (x > ma) ? ma : x; // clips +Inf
             x = x - mi;
-            x = x * scl;
+            x = tiny_range ? (x / (ma - mi)) * double(n_cmap - 1) : x * scl;
             x = std::round(x);
             i_cmap = (size_t)x;
             i_cmap = (i_cmap >= n_cmap) ? n_cmap - 1 : i_cmap;

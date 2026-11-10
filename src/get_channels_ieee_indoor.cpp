@@ -77,10 +77,10 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
 - **`Doppler_effect`** *(optional)* — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); `0.0` disables
 - **`seed`** *(optional)* — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device
-- **`KF_linear`** *(optional)* — Overrides model KF (linear scale); NAN or negative restores model default
+- **`KF_linear`** *(optional)* — Overrides model KF (linear scale); NAN or negative restores model default; Inf throws
 - **`XPR_NLOS_linear`** *(optional)* — Overrides NLOS cross-polarization ratio (linear scale); NAN restores model default; must otherwise be finite and > 0 (0, negative and Inf throw)
-- **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default
-- **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default
+- **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default; Inf throws
+- **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default; Inf throws
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default
 - **`n_walls`** *(optional)* — Number of walls per user TGax models; `[n_users]` or `[1]`
 - **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
@@ -190,7 +190,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     // Random number generator; the draws use the portable helpers qd_rng_uniform and qd_rng_normal
     std::mt19937_64 rng;
     if (seed != -1)
-        rng.seed(seed + 1); // Use different seed as for "qd_ieee_indoor_param"
+        rng.seed((unsigned long long)seed + 1ULL); // Use different seed as for "qd_ieee_indoor_param"
     else
     {
         std::random_device rd;
@@ -731,9 +731,12 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
                 // write results into pre-sized vectors at this snapshot index
                 size_t n_bytes = size_t(n_tx * n_rx * n_path_out) * sizeof(double);
-                std::memcpy(chan_user.coeff_re[i_snap].memptr(), coeff_snap_re.memptr(), n_bytes);
-                std::memcpy(chan_user.coeff_im[i_snap].memptr(), coeff_snap_im.memptr(), n_bytes);
-                std::memcpy(chan_user.delay[i_snap].memptr(), coeff_delay.memptr(), n_bytes);
+                if (n_bytes != 0)
+                {
+                    std::memcpy(chan_user.coeff_re[i_snap].memptr(), coeff_snap_re.memptr(), n_bytes);
+                    std::memcpy(chan_user.coeff_im[i_snap].memptr(), coeff_snap_im.memptr(), n_bytes);
+                    std::memcpy(chan_user.delay[i_snap].memptr(), coeff_delay.memptr(), n_bytes);
+                }
 
                 // Store path loss
                 double *p_pow_dynamic = pow_dynamic.colptr(i_snap);

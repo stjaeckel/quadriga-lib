@@ -5,6 +5,7 @@
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -101,7 +102,8 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
     {
         size_t operator()(const CellKey &k) const
         {
-            return (size_t)(k.x * 73856093LL) ^ (size_t)(k.y * 19349663LL) ^ (size_t)(k.z * 83492791LL);
+            return (size_t)((unsigned long long)k.x * 73856093ULL) ^ (size_t)((unsigned long long)k.y * 19349663ULL) ^
+                   (size_t)((unsigned long long)k.z * 83492791ULL);
         }
     };
 
@@ -109,6 +111,7 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
 
     // Per-object vertex coordinates, concatenated later
     std::vector<std::vector<dtype>> bvx(n_blk), bvy(n_blk), bvz(n_blk);
+    std::vector<char> non_finite(n_blk, 0); // Per object, set when a coordinate is NaN or infinite
 
     // Weld each object independently; objects never share vertices
 #pragma omp parallel for schedule(dynamic) if (n_blk > 1 && n_mesh >= 64)
@@ -134,9 +137,23 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
                 const dtype y = mesh.at(n, 3 * k + 1);
                 const dtype z = mesh.at(n, 3 * k + 2);
 
-                const long long cx = (long long)std::floor((double)x * inv_cell);
-                const long long cy = (long long)std::floor((double)y * inv_cell);
-                const long long cz = (long long)std::floor((double)z * inv_cell);
+                // Cell indices; far-away cells are clamped to +/- 2^62 (the distance test still decides), which keeps
+                // the casts and the neighbour indices below in range; the same comparison catches NaN and Inf
+                constexpr double cell_max = 4611686018427387904.0; // 2^62
+                double fx = std::floor((double)x * inv_cell), fy = std::floor((double)y * inv_cell), fz = std::floor((double)z * inv_cell);
+                if (!(std::abs(fx) < cell_max && std::abs(fy) < cell_max && std::abs(fz) < cell_max))
+                {
+                    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+                    {
+                        non_finite[bb] = 1;
+                        face_ind.at(n, k) = 0;
+                        continue;
+                    }
+                    fx = std::max(-cell_max, std::min(cell_max, fx));
+                    fy = std::max(-cell_max, std::min(cell_max, fy));
+                    fz = std::max(-cell_max, std::min(cell_max, fz));
+                }
+                const long long cx = (long long)fx, cy = (long long)fy, cz = (long long)fz;
 
                 // Search the 27 neighboring cells; lowest index wins (= greedy scan order)
                 arma::uword idx = NONE;
@@ -173,6 +190,10 @@ static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh
                 face_ind.at(n, k) = idx; // object-local index, shifted to global below
             }
     }
+
+    for (size_t b = 0; b < n_blk; ++b)
+        if (non_finite[b])
+            throw std::invalid_argument("Input 'mesh' must contain finite coordinates only.");
 
     // Prefix offsets over the per-object vertex lists
     std::vector<arma::uword> offs(n_blk + 1, 0);

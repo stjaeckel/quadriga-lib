@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <limits>
 #include "ieee_channel_model_functions.hpp"
 #include "quadriga_lib.hpp"
 
@@ -1165,4 +1166,31 @@ TEST_CASE("IEEE Chan - Tap spacing 10 ns / 2^k and non-finite carrier frequency,
         CHECK_THROWS_AS(run(fc, 10e-9, d, bad, 1.2), std::invalid_argument);
         CHECK_THROWS_AS(run(fc, 10e-9, d, 0.0, bad), std::invalid_argument);
     }
+}
+
+TEST_CASE("IEEE Chan - Infinite overrides throw, NaN selects the default")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    const double inf = arma::datum::inf, nan = arma::datum::nan;
+    auto run = [&](double kf, double sf_los, double sf_nlos, double dbp, arma::sword seed = 1)
+    {
+        return quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {4.99}, {0}, false, {},
+                                                      20, 50.0, seed, kf, nan, sf_los, sf_nlos, dbp);
+    };
+    for (double v : {inf, -inf})
+    {
+        CHECK_THROWS_AS(run(v, nan, nan, nan), std::invalid_argument);
+        CHECK_THROWS_AS(run(nan, v, nan, nan), std::invalid_argument);
+        CHECK_THROWS_AS(run(nan, nan, v, nan), std::invalid_argument);
+    }
+
+    // An infinite breakpoint distance means "no breakpoint" and is valid
+    auto c = run(nan, nan, nan, inf);
+    REQUIRE(c.size() == 1);
+    CHECK(c[0].coeff_re[0].is_finite());
+
+    // The largest seed is valid and reproducible
+    const arma::sword s_max = std::numeric_limits<arma::sword>::max();
+    auto a = run(nan, nan, nan, nan, s_max), b = run(nan, nan, nan, nan, s_max);
+    CHECK(arma::approx_equal(a[0].coeff_re[0], b[0].coeff_re[0], "absdiff", 0.0));
 }
