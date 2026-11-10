@@ -832,10 +832,11 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     // time, so every call gets a zero-copy view: the direction slice for that frequency and its own
     // refracted-distance column. The geometric column is shared across frequencies. These are strict
     // aliases over dir_prev / acc_dist: they own no memory and are never resized, so they must not
-    // outlive their owners in use.
-    const arma::fvec acc_geo(acc_dist.colptr(0), n_interact, false, true);
-    const arma::fmat dir_0(dir_prev.colptr(0), n_interact, 3, false, true);
-    const arma::fvec acc_ref_0(acc_dist.colptr(1), n_interact, false, true);
+    // outlive their owners in use. The column offsets are added to memptr() instead of calling
+    // colptr(): with no ray left the owners hold no memory, and colptr() would bind a reference to null.
+    const arma::fvec acc_geo(acc_dist.memptr(), n_interact, false, true);
+    const arma::fmat dir_0(dir_prev.memptr(), n_interact, 3, false, true);
+    const arma::fvec acc_ref_0(acc_dist.memptr() + n_interact, n_interact, false, true);
 
     // Build material indices
     arma::Col<short> mtl_ind_fbs, mtl_ind_sbs;
@@ -1075,8 +1076,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             // Zero-copy views of this frequency's incoming state. The geometric accumulator is shared
             // and its output is not requested here: the traced polyline is the base-frequency geometry,
             // so its arc length is the base-frequency value by definition.
-            const arma::fmat dir_f(dir_prev.colptr(3 * i_freq), n_interact, 3, false, true);
-            const arma::fvec acc_ref_f(acc_dist.colptr(1 + i_freq), n_interact, false, true);
+            const arma::fmat dir_f(dir_prev.memptr() + 3 * i_freq * n_interact, n_interact, 3, false, true);
+            const arma::fvec acc_ref_f(acc_dist.memptr() + (1 + i_freq) * n_interact, n_interact, false, true);
 
             quadriga_lib::ray_state_update<float>(interaction_type, center_frequency[i_freq], &orig, &dest,
                                                   &fbsN, &sbsN, &no_interact, &fbs_angleN, &normal_vecN,
