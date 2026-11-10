@@ -1051,3 +1051,18 @@ TEST_CASE("Rotate Pattern - Output that is the object itself")
             CHECK(arma::approx_equal(b.e_theta_re, a.e_theta_re, "absdiff", 0.0));
         }
 }
+
+TEST_CASE("Rotate Pattern - Non-finite angles throw")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    const auto ref = ant.e_theta_re;
+    for (double v : {arma::datum::nan, arma::datum::inf, -arma::datum::inf})
+    {
+        REQUIRE_THROWS_AS(ant.rotate_pattern(v, 0.0, 0.0), std::invalid_argument);
+        REQUIRE_THROWS_AS(ant.rotate_pattern(0.0, v, 0.0, 2), std::invalid_argument);
+        REQUIRE_THROWS_AS(ant.rotate_pattern(0.0, 0.0, v, 3), std::invalid_argument);
+        std::vector<quadriga_lib::arrayant<double>> vec = {ant, ant};
+        REQUIRE_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(vec, 0.0, v, 0.0, 0, {}), std::invalid_argument);
+    }
+    CHECK(arma::approx_equal(ant.e_theta_re, ref, "absdiff", 0.0)); // Unchanged after the failed calls
+}

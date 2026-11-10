@@ -246,6 +246,8 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
         return "Malformed number list in 'ElevationGrid'.";
     *elevation_grid = grid_file * deg2rad;
     unsigned long long n_elevation = elevation_grid->n_elem;
+    if (n_elevation == 0)
+        return "'ElevationGrid' must not be empty.";
 
     // Read the azimuth grid
     node_name = pfx + "AzimuthGrid";
@@ -256,6 +258,8 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
         return "Malformed number list in 'AzimuthGrid'.";
     *azimuth_grid = grid_file * deg2rad;
     unsigned long long n_azimuth = azimuth_grid->n_elem;
+    if (n_azimuth == 0)
+        return "'AzimuthGrid' must not be empty.";
 
     // Pattern nodes of each element (first one wins), the node without "el" attribute for a single element
     std::vector<pugi::xml_node> pattern_node(4ULL * n_elements); // Index 4 * element + component

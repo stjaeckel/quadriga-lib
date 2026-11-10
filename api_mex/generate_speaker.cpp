@@ -59,7 +59,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`baffle_width`** - Baffle width; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** - Baffle height; used by `hemisphere` model; default: 0.25
 - **`frequencies`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
-- **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees; default: 5
+- **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
 ## Outputs:
 - **`arrayant`** - Struct array with one arrayant per frequency sample; directivity is stored in

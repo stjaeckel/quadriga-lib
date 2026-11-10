@@ -290,7 +290,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 
 ### Inputs (common):
 - **`type`** — Antenna model type; str
-- **`res`** — Pattern sampling grid resolution in degrees; default: 10 for `omni` and `xpol`, 1 otherwise
+- **`res`** — Pattern sampling grid resolution in degrees, 0.1 to 90; default: 10 for `omni` and `xpol`, 1 otherwise
 - **`freq`** — Center frequency in Hz; default: 299792458 (λ = 1 m)
 
 ### Inputs (custom, 3gpp, multibeam):
@@ -417,7 +417,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 5
 - **`baffle_height`** — Baffle height in m; used by `hemisphere` model; default: 0.25
 - **`frequencies`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
   `(n_freq,)` or None; default: None
-- **`angular_resolution`** — Azimuth and elevation grid resolution in degrees; default: 5
+- **`angular_resolution`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
 
 ### Outputs:
 - **`speaker`** — Multi-frequency arrayant dict with the fields below; for `n_freq = 1` the pattern fields

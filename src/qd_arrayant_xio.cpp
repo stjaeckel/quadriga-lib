@@ -628,6 +628,9 @@ void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::array
     if (usage > 2)
         throw std::invalid_argument("arrayant_rotate_pattern_multi: Usage must be 0, 1, or 2.");
 
+    if (!std::isfinite(x_deg) || !std::isfinite(y_deg) || !std::isfinite(z_deg))
+        throw std::invalid_argument("arrayant_rotate_pattern_multi: Rotation angles must be finite.");
+
     // Validate input vector before modifying any entries
     std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant_vec, true);
     if (!err.empty())

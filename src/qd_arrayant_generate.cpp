@@ -29,7 +29,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1
 ```
 
 ## Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — Isotropic radiator antenna object
@@ -40,7 +40,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
-    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+    res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
@@ -85,7 +85,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1
 ```
 
 ## Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — Cross-polarized isotropic radiator antenna object
@@ -96,7 +96,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
-    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+    res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
@@ -151,7 +151,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res =
 ```
 
 ## Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — Vertically polarized short dipole antenna object
@@ -162,7 +162,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
-    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+    res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
@@ -212,7 +212,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
 ```
 
 ## Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — Vertically polarized half-wave dipole antenna object
@@ -223,7 +223,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
 {
     quadriga_lib::arrayant<dtype> ant;
 
-    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+    res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
@@ -283,7 +283,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
 - **`az_3dB`** *(optional)* — Azimuth 3dB beamwidth in degrees
 - **`el_3dB`** *(optional)* — Elevation 3dB beamwidth in degrees
 - **`rear_gain_lin`** *(optional)* — Front-to-back gain ratio (linear)
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — Antenna object with specified beamwidth and rear gain
@@ -296,7 +296,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     az_3dB = (az_3dB <= (dtype)0.0) ? (dtype)90.0 : az_3dB;
     el_3dB = (el_3dB <= (dtype)0.0) ? (dtype)90.0 : el_3dB;
     rear_gain_lin = (rear_gain_lin <= (dtype)0.0) ? (dtype)0.0 : rear_gain_lin;
-    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+    res = qd_arrayant_grid_resolution(res, (dtype)1.0, "res");
 
     constexpr dtype zero = dtype(0.0), one = dtype(1.0), half = dtype(0.5),
                     limit = dtype(1e-7), step = dtype(-0.382), limit_inf = dtype(1e38);
@@ -412,7 +412,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
 - **`center_freq`** *(optional)* — Center frequency
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
 - **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; ignored if `pattern` is provided
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — ULA antenna array object
@@ -523,7 +523,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`dgv`** *(optional)* — Panel spacing in vertical direction in wavelengths
 - **`dgh`** *(optional)* — Panel spacing in horizontal direction in wavelengths
 - **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; ignored if `pattern` is provided
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — 3GPP-NR antenna array object
@@ -778,7 +778,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees; values <= 0 select the default 120
 - **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees; values <= 0 select the default 120
 - **`rear_gain_lin`** *(optional)* — Per-element front-to-back gain ratio (linear)
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 - **`separate_beams`** *(optional)* — If `true`, generate one independent beam per angle pair
 - **`apply_weights`** *(optional)* — If `true`, bake beamforming weights into the coupling matrix
 

@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 #include "quadriga_tools.hpp"
@@ -332,5 +333,25 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw invalid_arg
         CHECK(a.e_phi_re(0, 1, 1) == 0.0);
     }
 
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("Arrayant reading from QDANT file - Empty grid throws")
+{
+    // An empty grid with pattern nodes present used to reach the pattern copy with empty buffers
+    const std::string fn = "test_qdant_empty_grid.qdant";
+    for (int empty_az = 0; empty_az < 2; ++empty_az)
+    {
+        std::ofstream f(fn);
+        f << "<?xml version=\"1.0\"?>\n<qdant xmlns=\"http://www.quadriga-channel-model.de\">\n<layout>1</layout>\n"
+          << "<arrayant id=\"1\">\n<name>e</name>\n<CenterFrequency>299792458</CenterFrequency>\n"
+          << (empty_az ? "<ElevationGrid>0</ElevationGrid>\n<AzimuthGrid></AzimuthGrid>\n" : "<ElevationGrid></ElevationGrid>\n<AzimuthGrid>0</AzimuthGrid>\n")
+          << "<EthetaMag el=\"1\"></EthetaMag>\n<EthetaPhase el=\"1\"></EthetaPhase>\n<EphiMag el=\"1\"></EphiMag>\n"
+          << "</arrayant>\n</qdant>\n";
+        f.close();
+        const std::string grid = empty_az ? "AzimuthGrid" : "ElevationGrid";
+        CHECK_THROWS_WITH(quadriga_lib::qdant_read<double>(fn, 1), Catch::Matchers::ContainsSubstring(grid));
+        CHECK_THROWS_WITH(quadriga_lib::qdant_read<float>(fn, 1), Catch::Matchers::ContainsSubstring(grid));
+    }
     std::remove(fn.c_str());
 }

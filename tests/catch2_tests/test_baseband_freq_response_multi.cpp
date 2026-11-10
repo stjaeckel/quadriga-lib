@@ -1106,3 +1106,20 @@ TEST_CASE("baseband_freq_response_multi - Outputs that alias inputs")
     arma::cube cim_view(cim[1].memptr(), 2, 2, 2, false, true);
     CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &cim_view, &Hi, no_cplx), std::invalid_argument);
 }
+
+TEST_CASE("baseband_freq_response_multi - Non-finite frequencies throw")
+{
+    std::vector<arma::Cube<double>> cre(2, arma::cube(1, 1, 1, arma::fill::ones)), cim(2, arma::cube(1, 1, 1, arma::fill::zeros)),
+        dl(2, arma::cube(1, 1, 1, arma::fill::value(1.0e-7)));
+    arma::Cube<double> Hr, Hi;
+    for (double v : {arma::datum::nan, arma::datum::inf})
+    {
+        arma::vec fin = {1.0e9, 2.0e9}, fout = {1.0e9, 1.5e9, 2.0e9};
+        fout(1) = v;
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, fin, fout, &Hr, &Hi), std::invalid_argument);
+        fout(1) = 1.5e9, fin(1) = v;
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, fin, fout, &Hr, &Hi), std::invalid_argument);
+        fin = {v, 2.0e9};
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, fin, fout, &Hr, &Hi), std::invalid_argument);
+    }
+}

@@ -780,7 +780,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 - **`fn`** — Output `.obj` file path
 - **`max_no_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded
+- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
 - **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
@@ -820,6 +820,9 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
         throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
 
     // Input validation
+    if (!std::isfinite(gain_max) || !std::isfinite(gain_min) || !(gain_max > gain_min))
+        throw std::invalid_argument("Inputs 'gain_max' and 'gain_min' must be finite, with 'gain_max' larger than 'gain_min'.");
+
     std::string fn_suffix = ".obj";
     std::string fn_mtl;
 
@@ -923,7 +926,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
         arma::Col<dtype> path_power_dB(n_path);
         arma::s32_vec color_index(n_path);
 
-        dtype scl = (dtype)63.0 / (gain_max - gain_min);
+        dtype scl = (dtype)63.0 / (gain_max - gain_min); // gain_max > gain_min, checked at the start
         for (arma::uword i_path = 0ULL; i_path < n_path; ++i_path)
         {
             // Lambda to calculate the power and check if the pattern has any entry > -200 dB
@@ -957,7 +960,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
             x = (x > (dtype)63.0) ? (dtype)63.0 : x;
             x = std::round(x);
 
-            color_index(i_path) = (p < gain_min) ? -1 : (int)x;
+            color_index(i_path) = (p >= gain_min) ? (int)x : -1; // NaN power is excluded
 
             // Paths with non-finite coordinates cannot be drawn
             if (!path_coord[i_path].is_finite())

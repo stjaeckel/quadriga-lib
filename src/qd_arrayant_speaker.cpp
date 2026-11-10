@@ -77,7 +77,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
 - **`frequencies`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
-- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees
+- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 5°
 
 ## Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion
@@ -126,12 +126,12 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
 
     // --- Fix input ranges ---
     radius = (radius <= dtype(0.0)) ? dtype(0.05) : radius;
-    lower_cutoff = (lower_cutoff <= dtype(0.0)) ? dtype(80.0) : lower_cutoff;
-    upper_cutoff = (upper_cutoff <= lower_cutoff) ? dtype(12000.0) : upper_cutoff;
+    lower_cutoff = (lower_cutoff <= dtype(0.0) || !std::isfinite(lower_cutoff)) ? dtype(80.0) : lower_cutoff;
+    upper_cutoff = (upper_cutoff <= lower_cutoff || !std::isfinite(upper_cutoff)) ? dtype(12000.0) : upper_cutoff;
     lower_rolloff_slope = (lower_rolloff_slope <= dtype(0.0)) ? dtype(12.0) : lower_rolloff_slope;
     upper_rolloff_slope = (upper_rolloff_slope <= dtype(0.0)) ? dtype(12.0) : upper_rolloff_slope;
     sensitivity = (sensitivity <= dtype(0.0)) ? dtype(85.0) : sensitivity;
-    angular_resolution = (angular_resolution <= dtype(0.0)) ? dtype(5.0) : (angular_resolution > dtype(90.0) ? dtype(90.0) : angular_resolution);
+    angular_resolution = qd_arrayant_grid_resolution(angular_resolution, dtype(5.0), "angular_resolution");
     baffle_width = (baffle_width <= dtype(0.0)) ? dtype(0.15) : baffle_width;
     baffle_height = (baffle_height <= dtype(0.0)) ? dtype(0.25) : baffle_height;
 

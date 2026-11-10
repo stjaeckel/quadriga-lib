@@ -979,6 +979,8 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
             double p = a * a + b * b + c * c + d * d;
             max_pow = (p > max_pow) ? p : max_pow;
         }
+    if (!(max_pow > 0.0))
+        throw std::invalid_argument("Pattern is zero in all directions for the exported elements.");
     max_pow = 1.0 / max_pow;
 
     // Write OBJ File
@@ -1564,6 +1566,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         throw std::invalid_argument(error_message.c_str());
 
     bool use_all_elements = false;
+    if (!std::isfinite(x_deg) || !std::isfinite(y_deg) || !std::isfinite(z_deg))
+        error_message = "Rotation angles must be finite.";
     if (usage > 4)
         error_message = "Input parameter 'usage' must be 0, 1, 2, 3 or 4.";
     if (element == unsigned(-1) || e_theta_re.n_slices == 1)

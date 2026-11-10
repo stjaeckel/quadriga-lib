@@ -9,6 +9,7 @@
 #include <iostream>
 #include <string>
 #include <cmath>
+#include <limits>
 
 // Grid at 10 deg resolution: no_az = 37, no_el = 19
 // Azimuth:   linspace(-pi, pi, 37)  → ia=0: -180°, ia=9: -90°, ia=18: 0°, ia=27: 90°, ia=36: 180°
@@ -1827,4 +1828,32 @@ TEST_CASE("Speaker - set_element_pos_multi: positions that are an entry's own el
     CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, spk[1].element_pos), std::invalid_argument);
     arma::mat pos_on_entry(spk[1].element_pos.memptr(), 3, 2, false, true);
     CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, pos_on_entry, swap), std::invalid_argument);
+}
+
+TEST_CASE("Speaker - Non-finite and too fine inputs")
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN(), inf = std::numeric_limits<double>::infinity();
+    const arma::vec f = {1000.0};
+
+    // Resolution: NaN, infinite or below 0.1 deg throws
+    for (double res : {nan, inf, 0.09})
+        REQUIRE_THROWS_AS(quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
+                                                                 0.0, 0.0, 0.0, 0.15, 0.25, f, res),
+                          std::invalid_argument);
+
+    // Non-finite cutoffs select the defaults (80 Hz, 12 kHz), as values <= 0 do
+    auto freqs = [](double lo, double hi)
+    {
+        auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, lo, hi, 12.0, 12.0, 85.0, "monopole",
+                                                          0.0, 0.0, 0.0, 0.15, 0.25, arma::vec(), 90.0);
+        arma::vec out(spk.size());
+        for (size_t i = 0; i < spk.size(); ++i)
+            out[i] = spk[i].center_frequency;
+        return out;
+    };
+    const arma::vec ref = freqs(80.0, 12000.0);
+    for (double lo : {nan, inf, 0.0})
+        CHECK(arma::approx_equal(freqs(lo, 12000.0), ref, "absdiff", 0.0));
+    for (double hi : {nan, inf})
+        CHECK(arma::approx_equal(freqs(80.0, hi), ref, "absdiff", 0.0));
 }

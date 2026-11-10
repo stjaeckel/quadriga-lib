@@ -441,7 +441,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`dgv`** *(optional)* — Panel spacing in vertical direction in wavelengths
 - **`dgh`** *(optional)* — Panel spacing in horizontal direction in wavelengths
 - **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; ignored if `pattern` is provided
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ### Returns:
 - `quadriga_lib::arrayant<dtype>` — 3GPP-NR antenna array object
@@ -469,7 +469,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
 - **`az_3dB`** *(optional)* — Azimuth 3dB beamwidth in degrees
 - **`el_3dB`** *(optional)* — Elevation 3dB beamwidth in degrees
 - **`rear_gain_lin`** *(optional)* — Front-to-back gain ratio (linear)
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
 - `quadriga_lib::arrayant<dtype>` — Antenna object with specified beamwidth and rear gain
@@ -489,7 +489,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res =
 ```
 
 ### Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
 - `quadriga_lib::arrayant<dtype>` — Vertically polarized short dipole antenna object
@@ -509,7 +509,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
 ```
 
 ### Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
 - `quadriga_lib::arrayant<dtype>` — Vertically polarized half-wave dipole antenna object
@@ -564,7 +564,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees; values <= 0 select the default 120
 - **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees; values <= 0 select the default 120
 - **`rear_gain_lin`** *(optional)* — Per-element front-to-back gain ratio (linear)
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 - **`separate_beams`** *(optional)* — If `true`, generate one independent beam per angle pair
 - **`apply_weights`** *(optional)* — If `true`, bake beamforming weights into the coupling matrix
 
@@ -586,7 +586,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1
 ```
 
 ### Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
 - `quadriga_lib::arrayant<dtype>` — Isotropic radiator antenna object
@@ -617,7 +617,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
 - **`center_freq`** *(optional)* — Center frequency
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
 - **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; ignored if `pattern` is provided
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°; ignored if `pattern` is provided
 
 ### Returns:
 - `quadriga_lib::arrayant<dtype>` — ULA antenna array object
@@ -637,7 +637,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1
 ```
 
 ### Inputs:
-- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 1°
 
 ### Returns:
 - `quadriga_lib::arrayant<dtype>` — Cross-polarized isotropic radiator antenna object
@@ -705,7 +705,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
 - **`frequencies`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
-- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees
+- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 5°
 
 ### Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion

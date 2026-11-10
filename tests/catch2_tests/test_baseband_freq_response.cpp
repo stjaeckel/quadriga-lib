@@ -357,3 +357,22 @@ TEST_CASE("baseband_freq_response_vec - Outputs that alias inputs")
     // Both outputs are the same object
     CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(&cre, &cim, &dl, &pilot, 1.0e8, &Hr, &Hr), std::invalid_argument);
 }
+
+TEST_CASE("Baseband Frequency Response - Non-finite bandwidth or pilots throw")
+{
+    arma::cube coeff_re(1, 1, 1, arma::fill::ones), coeff_im(1, 1, 1, arma::fill::zeros), delay(1, 1, 1, arma::fill::value(1.0e-7));
+    arma::vec pilots = arma::linspace<arma::vec>(0.0, 1.0, 3);
+    arma::cube hr, hi;
+    std::vector<arma::cube> vr = {coeff_re}, vhr, vhi; std::vector<arma::cube> vi = {coeff_im}, vd = {delay};
+    for (double bw : {std::nan(""), (double)INFINITY})
+    {
+        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response(&coeff_re, &coeff_im, &delay, &pilots, bw, &hr, &hi), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response_vec(&vr, &vi, &vd, &pilots, bw, &vhr, &vhi), std::invalid_argument);
+
+        // Non-finite pilot entries throw as well
+        arma::vec p = pilots;
+        p(1) = bw;
+        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response(&coeff_re, &coeff_im, &delay, &p, 1.0e8, &hr, &hi), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response_vec(&vr, &vi, &vd, &p, 1.0e8, &vhr, &vhi), std::invalid_argument);
+    }
+}

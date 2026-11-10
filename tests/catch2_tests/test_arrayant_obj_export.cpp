@@ -25,6 +25,11 @@ TEST_CASE("Arrayant OBJ Export")
 
     ant.export_obj_file("testantenna.obj", 30.0, "jet", 0.4, 4);
 
+    // An all-zero pattern has no shape to draw
+    auto z = quadriga_lib::generate_arrayant_omni<float>(10.0f);
+    z.e_theta_re.zeros();
+    REQUIRE_THROWS_AS(z.export_obj_file("testantenna.obj"), std::invalid_argument);
+
     std::remove("testantenna.obj");
     std::remove("testantenna.mtl");
 }
