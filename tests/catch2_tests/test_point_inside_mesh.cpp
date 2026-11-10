@@ -28,6 +28,10 @@ TEST_CASE("Test Point inside Mesh")
     CHECK(res.at(0) == 2);
     CHECK(res.at(1) == 0);
 
+    // A distance outside [0, 20] m throws, NaN included (it used to act as 0)
+    for (double d : {arma::datum::nan, -0.1, 20.1, arma::datum::inf})
+        CHECK_THROWS_AS(quadriga_lib::point_inside_mesh<double>(&points, &mesh, &obj_ind, d), std::invalid_argument);
+
     res = quadriga_lib::point_inside_mesh(&points, &mesh);
     CHECK(res.n_elem == 2);
     CHECK(res.at(0) == 1);
