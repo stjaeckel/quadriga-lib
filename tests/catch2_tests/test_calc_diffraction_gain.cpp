@@ -1136,6 +1136,51 @@ TEST_CASE("Calc Diffraction Gain - Co-located TX and RX is finite")
     CHECK(std::abs(xpr_cx(X, 0, 1) - ref_prop_phase(3.5e9, 5.0, false)) < 1e-9);
 }
 
+// A ray leaves a metal solid (sigma = 1e7 S/m) at an oblique angle through a face on which a hollow
+// board of a 25 mm sheet material is glued. Inside the metal the wave runs along the normal of the face
+// it entered through, so along the glued face it varies on the scale of the skin depth, and in the
+// sheet it is evanescent: the sheet passes nothing. The gain is finite, zero on the direct path
+// (lod 0), and with lod 2 keeps the diffracted part, at most what the metal box alone lets around.
+TEST_CASE("Calc Diffraction Gain - Metal solid with a sheet glued to its exit face")
+{
+    // Metal box x in [0, 0.5]; board x in [-0.1, 0] touching it at x = 0
+    const arma::mat metal = quadriga_lib::cube<double>({0.25, 0.2, 0.4}, {}, {0.25, 0.0, 1.5});
+    const arma::mat board = quadriga_lib::cube<double>({0.05, 2.0, 1.5}, {}, {-0.05, 0.0, 1.5});
+    const arma::mat mesh = arma::join_cols(metal, board);
+    arma::uvec ind_metal(12, arma::fill::ones), ind(24, arma::fill::ones);
+    ind.tail(12).fill(2);
+    const std::unordered_map<std::string, std::vector<double>> prop = {
+        {"a", {1.0, 2.73}}, {"b", {0.0, 0.0}}, {"c", {1.0e7, 0.0085}}, {"d", {0.0, 0.9395}}, {"att", {0.0, 0.0}}, {"thk", {0.0, 0.025}}};
+
+    // Straight links through the exit point (0, -0.05, 1.4), off the diagonals of the triangulated faces,
+    // leaving the metal through x = 0 at 30, 60 and 85 deg
+    arma::mat orig(3, 3), dest(3, 3);
+    const double deg = arma::datum::pi / 180.0;
+    for (arma::uword i = 0; i < 3; ++i)
+    {
+        const double a = (i == 0 ? 30.0 : (i == 1 ? 60.0 : 85.0)) * deg;
+        const arma::rowvec d = {-std::cos(a), std::sin(a), 0.0}, p = {0.0, -0.05, 1.4};
+        orig.row(i) = p - 2.0 * d, dest.row(i) = p + 5.0 * d;
+    }
+
+    for (double f : {3.75e9, 28.0e9})
+    {
+        arma::vec g0, g2, g2_metal;
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, ind, prop, f, 0, &g0);
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, ind, prop, f, 2, &g2);
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, metal, ind_metal, prop, f, 2, &g2_metal);
+        for (arma::uword i = 0; i < 3; ++i)
+        {
+            INFO("f = " << f << " Hz, link " << i);
+            CHECK(std::isfinite(g0(i)));
+            CHECK(std::isfinite(g2(i)));
+            CHECK(g0(i) < 1e-12);
+            CHECK(g2(i) > 0.0);
+            CHECK(g2(i) <= g2_metal(i));
+        }
+    }
+}
+
 // Single-precision instantiation of the new flags. Float carries ~7 significant digits, so the
 // phase is checked at a short distance and a low frequency to keep the argument small, and the
 // tolerances are loosened accordingly.
