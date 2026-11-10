@@ -742,7 +742,7 @@ static std::string qd_python_path(const py::handle &value, const std::string &na
 // Read a dict value as a C-contiguous double array
 // - Accepts Python numbers and numpy scalars or arrays of the kinds bool, int, uint and float
 // - str, None, complex values and anything numpy cannot convert throw std::invalid_argument with 'error_msg'
-static py::array_t<double, py::array::c_style | py::array::forcecast> qd_python_real_array(const py::handle &value,
+static py::array_t<double, py::array::c_style | py::array::forcecast | py::detail::npy_api::NPY_ARRAY_ALIGNED_> qd_python_real_array(const py::handle &value,
                                                                                           const std::string &error_msg)
 {
     py::array arr = py::array::ensure(value);
@@ -751,7 +751,7 @@ static py::array_t<double, py::array::c_style | py::array::forcecast> qd_python_
     const char kind = arr.dtype().kind();
     if (kind != 'b' && kind != 'i' && kind != 'u' && kind != 'f')
         throw std::invalid_argument(error_msg);
-    return py::array_t<double, py::array::c_style | py::array::forcecast>::ensure(arr);
+    return py::array_t<double, py::array::c_style | py::array::forcecast | py::detail::npy_api::NPY_ARRAY_ALIGNED_>::ensure(arr);
 }
 
 // Dict of QuaDRiGa scenario parameters -> map of the numeric values

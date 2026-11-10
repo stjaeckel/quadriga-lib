@@ -99,6 +99,13 @@ class test_case(unittest.TestCase):
         with self.assertRaises(TypeError):
             quadriga_lib.sos.init_phases(7.0)  # no implicit conversion from float
 
+    def test_output_size_overflow(self):
+        # The byte size of the output exceeds the address range; rejected before numpy sees the strides
+        for n_coeff, n_gen in ((2**63 - 1, 1), (2**62, 4), (2**33, 2**33)):
+            with self.assertRaises(ValueError) as ctx:
+                quadriga_lib.sos.init_phases(n_coeff, n_gen)
+            self.assertIn("too large", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
