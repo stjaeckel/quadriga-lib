@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <string>
 
 TEST_CASE("Get Channels Spherical - Minimal test")
@@ -2127,4 +2128,68 @@ TEST_CASE("Get Channels Spherical - outputs that alias inputs")
         arma::cube cr_on_M(M.memptr(), 1, 1, 8, false, true);
         CHECK_THROWS_AS(call(&cr_on_M, &ci, &dl, &aod, &eoa, &M), std::invalid_argument);
     }
+}
+
+TEST_CASE("Get Channels Spherical - non-finite TX or RX position or orientation throws")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    arma::mat fbs = arma::vec({5.0, 5.0, 0.0});
+    arma::vec gain = {1.0}, length = {15.0};
+    arma::mat M = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0});
+    arma::mat fbs_0, M_0;
+    arma::vec gain_0, length_0;
+    arma::cube cr, ci, dl;
+
+    // Pose values Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh; the baseline is a valid link
+    auto call = [&](const arma::vec &v, bool no_paths)
+    {
+        quadriga_lib::get_channels_spherical<double>(&ant, &ant, v(0), v(1), v(2), v(3), v(4), v(5),
+                                                     v(6), v(7), v(8), v(9), v(10), v(11),
+                                                     no_paths ? &fbs_0 : &fbs, no_paths ? &fbs_0 : &fbs,
+                                                     no_paths ? &gain_0 : &gain, no_paths ? &length_0 : &length,
+                                                     no_paths ? &M_0 : &M, &cr, &ci, &dl, 3.5e9, true, true);
+    };
+    const arma::vec base = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    CHECK_NOTHROW(call(base, false));
+    CHECK_NOTHROW(call(base, true));
+
+    for (double bad : {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+                       std::numeric_limits<double>::quiet_NaN()})
+        for (arma::uword i = 0; i < 12; ++i)
+        {
+            arma::vec v = base;
+            v(i) = bad;
+            CHECK_THROWS_AS(call(v, false), std::invalid_argument);
+            CHECK_THROWS_AS(call(v, true), std::invalid_argument); // 0 paths, only the LOS slot
+        }
+}
+
+template <typename dtype>
+static void check_fake_los_slot_far_rx(dtype ry)
+{
+    // TX at the origin, RX at (0, ry, 0), six NLOS paths via a scatterer at (5, 5, 0). The squared TX-RX
+    // distance overflows, so the distance is inf. Slot 0 still holds the LOS direction: departure along +y,
+    // arrival from -y, both horizontal.
+    auto ant = quadriga_lib::generate_arrayant_omni<dtype>();
+    const arma::uword n = 6;
+    arma::Mat<dtype> fbs = arma::repmat(arma::Mat<dtype>({5.0, 5.0, 0.0}).t(), 1, n);
+    arma::Mat<dtype> M = arma::repmat(arma::Mat<dtype>({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t(), 1, n);
+    arma::Col<dtype> gain(n, arma::fill::ones), length(n, arma::fill::value(15.0));
+    arma::Cube<dtype> cr, ci, dl, aod, eod, aoa, eoa;
+    quadriga_lib::get_channels_spherical<dtype>(&ant, &ant, 0, 0, 0, 0, 0, 0, 0, ry, 0, 0, 0, 0,
+                                                &fbs, &fbs, &gain, &length, &M, &cr, &ci, &dl,
+                                                (dtype)3.5e9, true, true, &aod, &eod, &aoa, &eoa);
+    REQUIRE(aod.n_slices == n + 1);
+    const double half_pi = 1.5707963267948966;
+    CHECK(std::abs((double)aod(0) - half_pi) < 1e-6);
+    CHECK(std::abs((double)aoa(0) + half_pi) < 1e-6);
+    CHECK(eod(0) == (dtype)0);
+    CHECK(eoa(0) == (dtype)0);
+    CHECK(std::abs((double)aod(1) - 0.25 * 3.141592653589793) < 1e-6); // Slot 1 is the first NLOS path
+}
+
+TEST_CASE("Get Channels Spherical - fake LOS slot when the TX-RX distance overflows")
+{
+    check_fake_los_slot_far_rx<float>(1.0e20f); // squared distance above the float range
+    check_fake_los_slot_far_rx<double>(1.0e200);
 }

@@ -60,10 +60,10 @@ Compute channel coefficients for spherical waves across multiple frequencies
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
 - **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq_in]` (full pol) or
   `[2, n_path, n_freq_in]` (scalar pressure)
-- **`tx_pos`** — Transmitter position; `[3, 1]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`rx_pos`** — Receiver position; `[3, 1]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
+- **`tx_pos`** — Transmitter position, finite; `[3, 1]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
+- **`rx_pos`** — Receiver position, finite; `[3, 1]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in, 1]`
 - **`freq_out`** — Target output frequencies; `[n_freq_out, 1]`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`

@@ -7,6 +7,7 @@
 #include "quadriga_lib.hpp"
 
 #include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -144,6 +145,44 @@ TEST_CASE("Multifreq - Non-positive propagation speed throws")
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                               false, false, -1.0),
         std::invalid_argument);
+}
+
+TEST_CASE("Multifreq - Non-finite TX or RX position or orientation throws")
+{
+    auto ant = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
+    arma::mat fbs = arma::vec({5.0, 5.0, 0.0});
+    arma::mat pg(1, 1, arma::fill::ones);
+    arma::vec pl = {15.0};
+    arma::cube M(8, 1, 1, arma::fill::zeros);
+    M(0, 0, 0) = 1.0, M(6, 0, 0) = -1.0;
+    arma::mat fbs_0, pg_0;
+    arma::vec pl_0;
+    arma::cube M_0;
+    arma::vec fi = {1e9}, fo = {1e9};
+    std::vector<arma::cube> cr, ci, dl;
+
+    // Pose values Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh; the baseline is a valid link
+    auto call = [&](const arma::vec &v, bool no_paths)
+    {
+        quadriga_lib::get_channels_multifreq<double>(ant, ant, v(0), v(1), v(2), v(3), v(4), v(5),
+                                                     v(6), v(7), v(8), v(9), v(10), v(11),
+                                                     no_paths ? fbs_0 : fbs, no_paths ? fbs_0 : fbs,
+                                                     no_paths ? pg_0 : pg, no_paths ? pl_0 : pl,
+                                                     no_paths ? M_0 : M, fi, fo, cr, ci, dl, true, true);
+    };
+    const arma::vec base = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    CHECK_NOTHROW(call(base, false));
+    CHECK_NOTHROW(call(base, true));
+
+    for (double bad : {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+                       std::numeric_limits<double>::quiet_NaN()})
+        for (arma::uword i = 0; i < 12; ++i)
+        {
+            arma::vec v = base;
+            v(i) = bad;
+            CHECK_THROWS_AS(call(v, false), std::invalid_argument);
+            CHECK_THROWS_AS(call(v, true), std::invalid_argument); // 0 paths, only the LOS slot
+        }
 }
 
 // ================================================================================================

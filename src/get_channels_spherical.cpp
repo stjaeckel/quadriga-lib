@@ -76,10 +76,10 @@ void quadriga_lib::get_channels_spherical(
 ## Inputs:
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [[arrayant]]
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [[arrayant]]
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading)
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading)
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, finite
+- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, finite
+- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), finite
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
@@ -141,6 +141,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         error_message = "Mandatory inputs and outputs cannot be NULL";
         throw std::invalid_argument(error_message.c_str());
     }
+
+    for (dtype v : {Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh})
+        if (!std::isfinite(v))
+            throw std::invalid_argument("TX and RX positions and orientations must be finite.");
 
     // Kernel of the antenna interpolation and the coefficient computation, checked before any early return
     const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array->e_theta_re.n_elem, rx_array->e_theta_re.n_elem));
@@ -353,7 +357,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         }
 
         // Calculate path delays, departure angles and arrival angles
-        if (std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
+        // Slot 0 of add_fake_los_path is the LOS path by definition, also when the TX-RX distance overflows
+        if ((add_fake_los_path && i_out == 0ULL) || std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
         {
             if (!add_fake_los_path || i_out != 0ULL)
                 true_los_path = i_out, shortest_path = std::abs(d_length - dist_rx_tx);

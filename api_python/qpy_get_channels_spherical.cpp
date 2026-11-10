@@ -85,10 +85,10 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_out` in batch mode
 - **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_out`
   in batch mode
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`, or `(3, n_out)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_out)` in batch mode
+- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_out)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_out)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip phase computation; default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was

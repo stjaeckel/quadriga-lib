@@ -67,10 +67,10 @@ coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
 - **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq_in)` full pol or
   `(2, n_path, n_freq_in)` scalar pressure
-- **`tx_pos`** — Transmitter position; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`rx_pos`** — Receiver position; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`tx_pos`** — Transmitter position, finite; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
+- **`rx_pos`** — Receiver position, finite; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
 - **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `(n_freq_in,)`
 - **`freq_out`** — Target output frequencies; `(n_freq_out,)`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
