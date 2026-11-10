@@ -188,6 +188,8 @@ Not in: MATLAB, Python
 - Elements may be inter-coupled via a complex coupling matrix
 - Field pattern cubes `e_theta_re/im`, `e_phi_re/im` must all be `[n_elevation, n_azimuth, n_elements]`
 - `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity)
+- Field values and coupling weights must be finite with magnitudes below about 1e18; larger values overflow in the
+  interpolation and in the channel functions and give NaN results
 
 ### Attributes:
 | Attribute                         | Size                                   | Description                                                    |
@@ -3128,7 +3130,8 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 ```
 
 ### Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
+- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, larger
+  values overflow in `sig`; `[n_samples, n_sets]`
 - **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, 
   used as-is if non-empty (finite, strictly ascending), ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
@@ -3216,7 +3219,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_cross_polarization_ratio) · [Pyt
   Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` of [get_channels_spherical](#get_channels_spherical) is
   co-polar (handedness kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar.
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR.
-- Normalization of `M` does not affect XPR (cancels in ratio) but does affect `pg`.
+- Normalization of `M` does not affect XPR (cancels in ratio) but does affect `pg`; magnitudes in `M` above about
+  1e18 overflow and give NaN.
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`.
 

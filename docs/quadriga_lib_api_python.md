@@ -1782,7 +1782,8 @@ cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, n
 ```
 
 ### Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; `(n_samples, n_sets)`
+- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, 
+  larger values overflow in `sig`; `(n_samples, n_sets)`
 - **`bins`** — Bin centers; used as-is if non-empty (must be finite and strictly ascending, else a
   `ValueError` is raised); if empty, equally spaced bins spanning the data range are generated;
   `(n_bins_in,)` or empty; if `None` or empty, bins are auto-generated.
@@ -1868,7 +1869,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [MATLAB
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
 - LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
   `path_length <= dTR + window_size` are excluded by default
-- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
+- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `M` above about 1e18 overflow and give NaN
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR
   is set to 0
 - TX/RX positions may be fixed `(3, 1)` or mobile `(3, n_cir)`

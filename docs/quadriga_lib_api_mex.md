@@ -1804,7 +1804,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#acdf) · [Python](quadriga_lib_api_python
 ```
 
 ### Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
+- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, 
+  larger values overflow in `sig`; `[n_samples, n_sets]`
 - **`bins_in`** — Bin centers; used as-is if non-empty (must be finite and strictly ascending, else an
   error is raised); if empty, equally spaced bins spanning the data range are generated; `[n_bins_in]` or
   empty; default: `[]`
@@ -1890,7 +1891,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [Python
   Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` is co-polar (handedness
   kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
-- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
+- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `M` above about 1e18 overflow and give NaN
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`
 

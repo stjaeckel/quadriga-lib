@@ -42,7 +42,8 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 ```
 
 ## Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
+- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, larger
+  values overflow in `sig`; `[n_samples, n_sets]`
 - **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, 
   used as-is if non-empty (finite, strictly ascending), ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
