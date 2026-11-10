@@ -331,8 +331,10 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     *e_phi_im = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
 
     // Magnitudes are powers in dB; powers below the smallest normal number of dtype lose precision or become 0 in
-    // sqrt(10^(0.1 * x)), these amplitudes are computed directly as 10^(0.05 * x) in double precision
+    // sqrt(10^(0.1 * x)), and powers above the largest one overflow; these amplitudes are computed directly as
+    // 10^(0.05 * x) in double precision
     const double x_min = 10.0 * std::log10((double)std::numeric_limits<dtype>::min());
+    const double x_max = 10.0 * std::log10((double)std::numeric_limits<dtype>::max());
 
     for (auto el = 0ULL; el < n_elements; ++el)
         for (int c = 0; c < 4; c += 2) // Etheta, then Ephi
@@ -357,7 +359,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                 dtype *p_R = R.memptr();
                 const dtype *p_X = X.memptr();
                 for (arma::uword i = 0; i < R.n_elem; ++i)
-                    if ((double)p_X[i] < x_min && std::isfinite(p_X[i]))
+                    if (((double)p_X[i] < x_min || (double)p_X[i] > x_max) && std::isfinite(p_X[i]))
                         p_R[i] = dtype(std::pow(10.0, 0.05 * (double)p_X[i]));
             }
 
@@ -827,11 +829,11 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         {
             double re = (double)Re[i], im = (double)Im[i];
             double p = re * re + im * im;
-            if (p >= std::numeric_limits<double>::min())
+            if (p >= std::numeric_limits<double>::min() && p <= std::numeric_limits<double>::max())
                 p = 10.0 * std::log10(p);
             else if (re == 0.0 && im == 0.0)
                 p = -INFINITY;
-            else // Power below the smallest normal double, or NaN
+            else // Power below the smallest normal double, above the largest double, or NaN
                 p = 20.0 * std::log10(std::hypot(re, im));
             pow[i] = p;
             if (p > peak)

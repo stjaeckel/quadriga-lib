@@ -464,3 +464,19 @@ TEST_CASE("Arrayant writing to QDANT file - append to a file with a namespace pr
     CHECK(txt.find("<EthetaMag") == std::string::npos);
     std::remove(fn.c_str());
 }
+
+TEST_CASE("Arrayant writing to QDANT file - Field values with power above the double range")
+{
+    // |E|^2 overflows double for amplitudes above about 1e154; the written dB values must stay finite
+    const std::string fn = "test_qdant_large.qdant";
+    std::remove(fn.c_str());
+    auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 30.0);
+    a.e_theta_re *= 1.0e160;
+    a.e_phi_im = a.e_theta_re * 0.5;
+    a.qdant_write(fn, 1);
+    auto b = quadriga_lib::qdant_read<double>(fn, 1);
+    std::remove(fn.c_str());
+    REQUIRE(b.e_theta_re.is_finite());
+    CHECK(arma::approx_equal(b.e_theta_re * 1.0e-160, a.e_theta_re * 1.0e-160, "absdiff", 1.0e-6));
+    CHECK(arma::approx_equal(b.e_phi_im * 1.0e-160, a.e_phi_im * 1.0e-160, "absdiff", 1.0e-6));
+}

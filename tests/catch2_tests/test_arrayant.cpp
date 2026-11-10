@@ -215,7 +215,7 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns")
     quadriga_lib::arrayant<double> o_ref;
     a.remove_zeros(&o_ref);
 
-    for (double s : {1e-6, 1e-8, 1e-12, 1e-30})
+    for (double s : {1e-6, 1e-8, 1e-12, 1e-30, 1e160, 1e300}) // power above the double range at 1e160
     {
         auto b = a.copy();
         b.e_theta_re *= s;
