@@ -15,6 +15,20 @@
 #include "qd_arrayant_functions.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
+// Inverse of the largest absolute field value of n samples; scaling by it keeps the power of double patterns with
+// amplitudes above about 1e154 inside the double range (only called when the unscaled power overflowed)
+template <typename dtype>
+static double qd_inverse_max_field(const dtype *a, const dtype *b, const dtype *c, const dtype *d, size_t n)
+{
+    double m = 0.0;
+    for (size_t i = 0; i < n; ++i)
+    {
+        double x = std::max(std::max(std::abs((double)a[i]), std::abs((double)b[i])), std::max(std::abs((double)c[i]), std::abs((double)d[i])));
+        m = x > m ? x : m;
+    }
+    return 1.0 / m;
+}
+
 /*!SECTION
 Array antenna class
 SECTION!*/
@@ -481,13 +495,20 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
     double p_sum = 0.0, p_max = 0.0;
     const dtype *p_theta_re = e_theta_re.slice_memptr(i_element), *p_theta_im = e_theta_im.slice_memptr(i_element);
     const dtype *p_phi_re = e_phi_re.slice_memptr(i_element), *p_phi_im = e_phi_im.slice_memptr(i_element);
-    for (arma::uword i = 0; i < naz * nel; ++i)
+    auto sum_power = [&](double s)
     {
-        double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
-        double pow = a * a + b * b + c * c + d * d;
-        p_max = pow > p_max ? pow : p_max;
-        p_sum += pow * ptr[i];
-    }
+        p_sum = 0.0, p_max = 0.0;
+        for (arma::uword i = 0; i < naz * nel; ++i)
+        {
+            double a = s * double(p_theta_re[i]), b = s * double(p_theta_im[i]), c = s * double(p_phi_re[i]), d = s * double(p_phi_im[i]);
+            double pow = a * a + b * b + c * c + d * d;
+            p_max = pow > p_max ? pow : p_max;
+            p_sum += pow * ptr[i];
+        }
+    };
+    sum_power(1.0);
+    if (std::isinf(p_max) || std::isinf(p_sum)) // Power above the double range
+        sum_power(qd_inverse_max_field(p_theta_re, p_theta_im, p_phi_re, p_phi_im, naz * nel));
 
     // An all-zero element has no directivity; 0 dBi is returned
     double directivity = (p_max > 0.0 && p_sum > 0.0) ? 10.0 * std::log10(p_max / p_sum) : 0.0;
@@ -971,14 +992,23 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
 
     // Calculate maximum Power in the Pattern
     double max_pow = 0.0;
-    for (size_t i_el = 0; i_el < no_elements_t; ++i_el)
-        for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+    auto find_max_pow = [&]()
+    {
+        max_pow = 0.0;
+        for (size_t i = 0; i < no_vert * no_elements_t; ++i)
         {
-            size_t i = i_vert * no_elements_t + i_el;
             double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
             double p = a * a + b * b + c * c + d * d;
             max_pow = (p > max_pow) ? p : max_pow;
         }
+    };
+    find_max_pow();
+    if (std::isinf(max_pow)) // Power above the double range: rescale the interpolated fields
+    {
+        dtype s = (dtype)qd_inverse_max_field(vr, vi, hr, hi, no_vert * no_elements_t);
+        V_re *= s, V_im *= s, H_re *= s, H_im *= s;
+        find_max_pow();
+    }
     if (!(max_pow > 0.0))
         throw std::invalid_argument("Pattern is zero in all directions for the exported elements.");
     max_pow = 1.0 / max_pow;
@@ -1278,19 +1308,29 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     dtype pi_half = dtype(arma::datum::pi / 2.0);
     dtype two_pi = dtype(2.0 * arma::datum::pi);
 
-    for (auto is = 0ULL; is < n_slices; ++is)
+    auto sum_power = [&](double s)
     {
-        dtype *pa = e_theta_re.slice_memptr(is), *pb = e_theta_im.slice_memptr(is),
-              *pc = e_phi_re.slice_memptr(is), *pd = e_phi_im.slice_memptr(is);
-        for (auto j = 0ULL; j < n_el * n_az; ++j)
+        for (auto is = 0ULL; is < n_slices; ++is)
         {
-            double a = double(pa[j]), b = double(pb[j]), c = double(pc[j]), d = double(pd[j]);
-            pw[j] += a * a + b * b + c * c + d * d;
+            dtype *pa = e_theta_re.slice_memptr(is), *pb = e_theta_im.slice_memptr(is),
+                  *pc = e_phi_re.slice_memptr(is), *pd = e_phi_im.slice_memptr(is);
+            for (auto j = 0ULL; j < n_el * n_az; ++j)
+            {
+                double a = s * double(pa[j]), b = s * double(pb[j]), c = s * double(pc[j]), d = s * double(pd[j]);
+                pw[j] += a * a + b * b + c * c + d * d;
+            }
         }
-    }
+    };
+    sum_power(1.0);
 
     // Threshold relative to the peak power
-    const double p_peak = pow.max();
+    double p_peak = pow.max();
+    if (std::isinf(p_peak)) // Power above the double range
+    {
+        pow.zeros();
+        sum_power(qd_inverse_max_field(e_theta_re.memptr(), e_theta_im.memptr(), e_phi_re.memptr(), e_phi_im.memptr(), e_theta_re.n_elem));
+        p_peak = pow.max();
+    }
     const double limit = 1.0e-12 * p_peak;
 
     arma::rowvec az_sum = arma::sum(pow, 0);
