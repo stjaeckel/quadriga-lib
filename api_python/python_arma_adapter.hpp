@@ -767,10 +767,26 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Cu
 
 // -------------------------------- qd_python_init_output --------------------------------
 
+// Checks that the strides and the byte size of an output array fit py::ssize_t; zero extents are skipped, so that
+// the strides of the other dimensions are checked as well
+static inline void qd_python_check_output_size(std::initializer_list<arma::uword> dims, size_t elem_size)
+{
+    const unsigned long long limit = (unsigned long long)PY_SSIZE_T_MAX;
+    unsigned long long n = (unsigned long long)elem_size;
+    for (const arma::uword d : dims)
+        if (d != 0)
+        {
+            if ((unsigned long long)d > limit / n)
+                throw std::invalid_argument("Output array is too large.");
+            n *= (unsigned long long)d;
+        }
+}
+
 template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_elem,
                                                 arma::Col<dtype> *wrapper = nullptr)
 {
+    qd_python_check_output_size({n_elem}, sizeof(dtype));
     const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
     std::array<py::ssize_t, 1> shape = {(py::ssize_t)n_elem};
@@ -790,6 +806,7 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols,
                                                 arma::Mat<dtype> *wrapper = nullptr)
 {
+    qd_python_check_output_size({n_rows, n_cols}, sizeof(dtype));
     const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
     std::array<py::ssize_t, 2> shape = {(py::ssize_t)n_rows, (py::ssize_t)n_cols};
@@ -809,6 +826,7 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols, arma::uword n_slices,
                                                 arma::Cube<dtype> *wrapper = nullptr)
 {
+    qd_python_check_output_size({n_rows, n_cols, n_slices}, sizeof(dtype));
     const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
     std::array<py::ssize_t, 3> shape = {(py::ssize_t)n_rows, (py::ssize_t)n_cols, (py::ssize_t)n_slices};
@@ -828,6 +846,7 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols, arma::uword n_slices, arma::uword n_frames,
                                                 std::vector<arma::Cube<dtype>> *cubes = nullptr)
 {
+    qd_python_check_output_size({n_rows, n_cols, n_slices, n_frames}, sizeof(dtype));
     const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
     std::array<py::ssize_t, 4> shape = {(py::ssize_t)n_rows, (py::ssize_t)n_cols, (py::ssize_t)n_slices, (py::ssize_t)n_frames};
@@ -1517,8 +1536,12 @@ static std::any qd_python_anycast_array(const py::array &obj, const std::string 
 
     switch (arr.ndim())
     {
-    case 0:
-        return *arr.data();
+    case 0: // The element may be unaligned (e.g. a view into a byte buffer)
+    {
+        dtype value;
+        std::memcpy(&value, arr.data(), sizeof(dtype));
+        return value;
+    }
     case 1: // Stored as a column vector
     {
         const arma::uword n = (arma::uword)arr.shape(0);
