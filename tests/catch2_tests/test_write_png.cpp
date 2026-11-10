@@ -108,3 +108,13 @@ TEST_CASE("Write PNG - Degenerate ranges / NaN / Inf")
     CHECK((img[0] == cmap(0, 0) && img[1] == cmap(0, 1) && img[2] == cmap(0, 2)));
     std::remove("test_png_f.png");
 }
+
+TEST_CASE("Write PNG - Range narrower than the smallest normal number")
+{
+    // The colour scale (n_cmap - 1) / (max - min) overflows for a denormal range
+    const double dn = std::numeric_limits<double>::denorm_min();
+    const int last = (int)quadriga_lib::colormap("jet", true).n_rows - 1;
+    arma::mat data = {{0.0, dn}};
+    CHECK(png_colour_rows(data) == std::vector<int>({0, last}));
+    CHECK(png_colour_rows(data, 0.0, dn) == std::vector<int>({0, last}));
+}

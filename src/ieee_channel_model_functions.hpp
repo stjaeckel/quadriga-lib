@@ -279,6 +279,10 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
     if (!std::isnan(XPR_NLOS_linear_overwrite) && !(XPR_NLOS_linear_overwrite > 0.0 && std::isfinite(XPR_NLOS_linear_overwrite)))
         throw std::invalid_argument("XPR_NLOS_linear must be NAN (model default) or a finite value larger than 0.");
 
+    // An infinite KF removes all NLOS paths and an infinite SF spread gives NaN path powers; NAN selects the default
+    if (std::isinf(KF_linear_overwrite) || std::isinf(SF_std_dB_LOS_overwrite) || std::isinf(SF_std_dB_NLOS_overwrite))
+        throw std::invalid_argument("KF_linear, SF_std_dB_LOS and SF_std_dB_NLOS must be NAN (model default) or finite.");
+
     // Apply parameter overwrites
     KF_linear_overwrite = (KF_linear_overwrite < 0.0) ? NAN : KF_linear_overwrite;
     dBP_m_overwrite = (dBP_m_overwrite < 0.0) ? NAN : dBP_m_overwrite;

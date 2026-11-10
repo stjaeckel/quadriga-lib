@@ -1450,11 +1450,11 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 - **`doppler_effect`** — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); 0 disables; default: 50
 - **`seed`** — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device; default: -1
 - **`KF_linear`** — Overrides model KF (linear scale); default:  A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; 
-  applied to first tap only; breakpoint ignored when `KF_linear >= 0`
+  applied to first tap only; breakpoint ignored when `KF_linear >= 0`; Inf throws
 - **`XPR_NLOS_linear`** — Overrides NLOS cross-polarization ratio (linear scale); NAN or `[]` restores the default; must otherwise
   be finite and > 0 (0, negative and Inf throw); default: XPR NLOS: 2 (3 dB)
-- **`SF_std_dB_LOS`** — Overrides LOS shadow fading std in dB (applied when d < dBP); default: 3 dB
-- **`SF_std_dB_NLOS`** — Overrides NLOS shadow fading std in dB (applied when d >= dBP); default: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
+- **`SF_std_dB_LOS`** — Overrides LOS shadow fading std in dB (applied when d < dBP); Inf throws; default: 3 dB
+- **`SF_std_dB_NLOS`** — Overrides NLOS shadow fading std in dB (applied when d >= dBP); Inf throws; default: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
 - **`dBP_m`** — Overrides breakpoint distance; default: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
 - **`n_walls`** — Number of walls per user TGax models; `[n_users]` or `[1]`; default: 0
 - **`wall_loss`** — Penetration loss for a single wall; TGax defines 5 or 7; default: 5

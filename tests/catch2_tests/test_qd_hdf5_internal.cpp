@@ -609,3 +609,31 @@ TEST_CASE("qd_hdf5 - decimal names and the superblock checks")
     sb0[40] ^= 1; // Checksum
     CHECK_THROWS_AS(check_superblock(sb0, 1000), std::invalid_argument);
 }
+
+TEST_CASE("qd_hdf5 - a dataset without elements must not declare extents larger than the file")
+{
+    // Dataspace {0, 2^62} holds no elements; readers used to build an Armadillo object with 2^62 rows from it
+    auto dataset_object = [](uint64_t d0, uint64_t d1)
+    {
+        h5::chunk c;
+        auto add = [&](uint8_t type, const std::vector<uint8_t> &data)
+        {
+            c.messages.push_back({type, 0, (uint32_t)c.image.size(), (uint32_t)data.size()});
+            c.image.insert(c.image.end(), data.begin(), data.end());
+        };
+        std::vector<uint8_t> ds, dt;
+        const uint64_t dims[2] = {d0, d1};
+        h5::encode_dataspace(ds, 2, dims);
+        h5::encode_datatype(dt, h5::float64);
+        add(h5::msg_dataspace, ds);
+        add(h5::msg_datatype, dt);
+        add(h5::msg_layout, {3, 0, 0, 0}); // Compact, 0 bytes
+        h5::object o;
+        o.chunks.push_back(c);
+        return o;
+    };
+    const uint64_t eof = 4096;
+    CHECK(h5::decode_dataset(dataset_object(0, 5), eof).n_elem == 0); // Small empty extents stay valid
+    CHECK_THROWS_AS(h5::decode_dataset(dataset_object(0, 1ULL << 62), eof), std::invalid_argument);
+    CHECK_THROWS_AS(h5::decode_dataset(dataset_object(1ULL << 62, 0), eof), std::invalid_argument);
+}

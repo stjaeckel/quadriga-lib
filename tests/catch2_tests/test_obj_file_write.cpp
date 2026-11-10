@@ -1176,3 +1176,38 @@ TEST_CASE("obj_file_write - outputs that alias inputs")
     arma::umat fi = fio;
     CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, &vlo, &fi, &vlo, &fi), std::invalid_argument);
 }
+
+TEST_CASE("Test OBJ File Write - Non-finite and very large coordinates")
+{
+    // Two triangles sharing an edge weld to 4 vertices
+    auto n_vert = [](const arma::mat &mesh, double threshold)
+    {
+        arma::mat vert;
+        arma::umat faces;
+        quadriga_lib::obj_file_write<double>("", &mesh, nullptr, nullptr, nullptr, nullptr, &vert, &faces, nullptr, nullptr,
+                                             nullptr, threshold);
+        return vert.n_rows;
+    };
+    const arma::mat base = {{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0},
+                            {1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}};
+    CHECK(n_vert(base, 0.001) == 4);
+
+    // Cell indices beyond the 64-bit range: 1e13 m / 1 mm overflowed the hash, 1e15 m / 0.1 mm the cell index; the
+    // points stay distinct (the spacing of doubles at 1e15 is 0.125)
+    CHECK(n_vert(base + 1.0e13, 0.001) == 4);
+    for (double offset : {1.0e15, -1.0e15})
+        CHECK(n_vert(base + offset, 1.0e-4) == 4);
+    CHECK(n_vert(base, 1.0e-300) == 4);
+
+    // At 1e300 m the corners coincide in double precision and weld to one vertex
+    for (double offset : {1.0e300, -1.0e300})
+        CHECK(n_vert(base + offset, 0.001) == 1);
+
+    // NaN and infinite coordinates throw
+    for (double v : {arma::datum::nan, arma::datum::inf, -arma::datum::inf})
+    {
+        arma::mat m = base;
+        m(1, 7) = v;
+        CHECK_THROWS_AS(n_vert(m, 0.001), std::invalid_argument);
+    }
+}
