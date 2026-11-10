@@ -28,7 +28,8 @@ cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, n
 ```
 
 ## Inputs:
-- **`data`** — Input data matrix; each column is one independent data set; `(n_samples, n_sets)`
+- **`data`** — Input data matrix; each column is one independent data set; magnitudes below about 1e18, 
+  larger values overflow in `sig`; `(n_samples, n_sets)`
 - **`bins`** — Bin centers; used as-is if non-empty (must be finite and strictly ascending, else a
   `ValueError` is raised); if empty, equally spaced bins spanning the data range are generated;
   `(n_bins_in,)` or empty; if `None` or empty, bins are auto-generated.

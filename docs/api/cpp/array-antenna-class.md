@@ -28,6 +28,8 @@ Not in: MATLAB, Python
 - Elements may be inter-coupled via a complex coupling matrix
 - Field pattern cubes `e_theta_re/im`, `e_phi_re/im` must all be `[n_elevation, n_azimuth, n_elements]`
 - `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity)
+- Field values and coupling weights must be finite with magnitudes below about 1e18; larger values overflow in the
+  interpolation and in the channel functions and give NaN results
 
 ### Attributes:
 | Attribute                         | Size                                   | Description                                                    |

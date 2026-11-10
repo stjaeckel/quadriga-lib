@@ -34,7 +34,7 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
   Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` is co-polar (handedness
   kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
-- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
+- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `M` above about 1e18 overflow and give NaN
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`
 

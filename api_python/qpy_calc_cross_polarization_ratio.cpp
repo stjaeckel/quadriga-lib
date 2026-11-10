@@ -34,7 +34,7 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
 - LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
   `path_length <= dTR + window_size` are excluded by default
-- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
+- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `M` above about 1e18 overflow and give NaN
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR
   is set to 0
 - TX/RX positions may be fixed `(3, 1)` or mobile `(3, n_cir)`
