@@ -78,7 +78,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 
 ## Inputs (common):
 - **`type`** — Antenna model type; string (see usage above)
-- **`res`** — Pattern sampling grid resolution in degrees; default: 10 for types omni+xpol, 1 otherwise
+- **`res`** — Pattern sampling grid resolution in degrees, 0.1 to 90; default: 10 for types omni+xpol, 1 otherwise
 - **`freq`** — Center frequency in Hz; default: 299792458; equivalent to λ = 1 m
 
 ## Inputs (type custom, 3GPP, multibeam, multibeam_sep):

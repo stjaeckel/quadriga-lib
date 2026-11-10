@@ -9,12 +9,23 @@
 
 #include <armadillo>
 #include <climits>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
 #endif
+
+// Grid resolution in degrees for the pattern generators: values <= 0 select the default, values above 90 are set to 90;
+// NaN, infinite values and values below 0.1 deg throw (a 0.1 deg grid has 3601 x 1801 samples per element)
+template <typename dtype>
+inline dtype qd_arrayant_grid_resolution(dtype res, dtype res_default, const char *name)
+{
+    if (!std::isfinite(res) || (res > (dtype)0.0 && res < (dtype)0.1))
+        throw std::invalid_argument(std::string("Input '") + name + "' must be finite and at least 0.1 degrees, or <= 0 for the default.");
+    return (res <= (dtype)0.0) ? res_default : (res > (dtype)90.0 ? (dtype)90.0 : res);
+}
 
 // Returns empty string if there was no error or an error message otherwise
 template <typename dtype> // float or double

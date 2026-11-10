@@ -64,7 +64,6 @@ Not in: MATLAB, Python
 | [.combine_pattern](#.combine_pattern)      | Compute effective patterns from elements, positions, and coupling |
 | [.copy_element](#.copy_element)         | Copy a single element to one or more destination slots            |
 | [.export_obj_file](#.export_obj_file)      | Export pattern geometry to Wavefront OBJ                          |
-| [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)  | Interpolate field patterns at given azimuth/elevation angles      |
 | [.qdant_write](#.qdant_write)          | Write arrayant to QDANT file                                      |
 | [.remove_zeros](#.remove_zeros)         | Remove zero-valued entries from pattern data                      |
 | [.rotate_pattern](#.rotate_pattern)       | Rotate pattern and/or polarization via Euler angles               |

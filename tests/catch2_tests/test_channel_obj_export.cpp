@@ -100,6 +100,10 @@ TEST_CASE("Channel - OBJ Export skips paths with non-finite coordinates")
     c.coeff_im.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
     c.delay.push_back(arma::cube(1, 1, 2, arma::fill::value(1.0e-7)));
 
+    // The gain range must be positive
+    REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan_nonfinite.obj", 0, -100.0, -100.0), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan_nonfinite.obj", 0, -100.0, -60.0), std::invalid_argument);
+
     c.write_paths_to_obj_file("test_chan_nonfinite.obj", 0, 0.0, -100.0);
 
     std::ifstream file("test_chan_nonfinite.obj");

@@ -7,6 +7,7 @@
 #include "quadriga_lib.hpp"
 
 #include <iostream>
+#include <limits>
 #include <string>
 
 TEST_CASE("Generate Arrayant - Minimal test omni")
@@ -339,4 +340,24 @@ TEST_CASE("Arrayant generation - Multibeam beamwidth <= 0 selects the default 12
     auto b = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, az, el, {}, 3.75e9, 1, 0.5, 120.0, 90.0, 0.0, 10.0);
     CHECK(arma::approx_equal(a.e_theta_re, b.e_theta_re, "absdiff", 0.0)); // each angle separately
     CHECK(arma::abs(ref.e_theta_re - b90.e_theta_re).max() > 0.01);
+}
+
+TEST_CASE("Generate Arrayant - Invalid resolution")
+{
+    // NaN, infinite and too fine resolutions throw; res <= 0 selects the default (1 deg)
+    const double nan = std::numeric_limits<double>::quiet_NaN(), inf = std::numeric_limits<double>::infinity();
+    for (double res : {nan, inf, -inf, 0.09, 1.0e-300})
+    {
+        REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_omni<double>(res), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_xpol<double>(res), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_dipole<double>(res), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_half_wave_dipole<double>(res), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, res), std::invalid_argument);
+    }
+    REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_omni<float>(std::numeric_limits<float>::denorm_min()), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_ula<double>(2, 3.0e9, 0.5, nullptr, nan), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.0e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, nan), std::invalid_argument);
+
+    CHECK(quadriga_lib::generate_arrayant_omni<double>(0.0).n_azimuth() == 361);
+    CHECK(quadriga_lib::generate_arrayant_omni<double>(-5.0).n_azimuth() == 361);
 }

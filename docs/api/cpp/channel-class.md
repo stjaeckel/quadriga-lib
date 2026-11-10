@@ -153,7 +153,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 - **`fn`** — Output `.obj` file path
 - **`max_no_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded
+- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
 - **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain

@@ -81,6 +81,9 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
     if (pilot_grid->n_elem == 0)
         throw std::invalid_argument("Pilot grid must have at least one element.");
 
+    if (!pilot_grid->is_finite())
+        throw std::invalid_argument("Pilot grid must contain finite values only.");
+
     arma::uword n_rx = coeff_re->n_rows;
     arma::uword n_tx = coeff_re->n_cols;
     arma::uword n_ant = n_rx * n_tx;
@@ -95,8 +98,8 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
         !(delay->n_rows == 1 && delay->n_cols == 1 && delay->n_slices == n_path))
         throw std::invalid_argument("Input 'delay' must match the size as 'coeff_re'");
 
-    if (bandwidth < 0.0)
-        throw std::invalid_argument("Bandwidth cannot be negative");
+    if (!(bandwidth >= 0.0) || !std::isfinite(bandwidth))
+        throw std::invalid_argument("Bandwidth must be finite and cannot be negative");
 
     qd_check_alias(hmat_re, "hmat_re", coeff_re, coeff_im, delay);
     qd_check_alias(hmat_im, "hmat_im", coeff_re, coeff_im, delay);
@@ -243,8 +246,11 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
     if (coeff_re->size() == 0 || pilot_grid->n_elem == 0)
         throw std::invalid_argument("Inputs cannot be empty");
 
-    if (bandwidth < 0.0)
-        throw std::invalid_argument("Bandwidth cannot be negative");
+    if (!pilot_grid->is_finite())
+        throw std::invalid_argument("Pilot grid must contain finite values only.");
+
+    if (!(bandwidth >= 0.0) || !std::isfinite(bandwidth))
+        throw std::invalid_argument("Bandwidth must be finite and cannot be negative");
 
     size_t n_snap_t = coeff_re->size();
     arma::uword n_carrier = pilot_grid->n_elem;
@@ -432,6 +438,9 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 
     if (delay.size() != n_freq_in)
         throw std::invalid_argument("Length of 'delay' must match length of 'freq_in'.");
+
+    if (!freq_in.is_finite() || !freq_out.is_finite())
+        throw std::invalid_argument("Inputs 'freq_in' and 'freq_out' must contain finite values only.");
 
     // Verify that freq_in is sorted in strictly ascending order
     for (size_t f = 1; f < n_freq_in; ++f)
