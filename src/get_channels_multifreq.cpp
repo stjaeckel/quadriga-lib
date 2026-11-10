@@ -170,10 +170,10 @@ void quadriga_lib::get_channels_multifreq(
 ## Inputs:
 - **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
 - **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
-- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates
-- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading)
-- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates
-- **`Rb, Rt, Rh`** — RX orientation, Euler angles  (bank, tilt, heading)
+- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates, finite
+- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading), finite
+- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates, finite
+- **`Rb, Rt, Rh`** — RX orientation, Euler angles (bank, tilt, heading), finite
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains; `[n_path, n_freq_in]`
@@ -224,6 +224,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         throw std::invalid_argument("get_channels_multifreq: TX array vector is empty.");
     if (rx_array.empty())
         throw std::invalid_argument("get_channels_multifreq: RX array vector is empty.");
+    for (dtype v : {Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh})
+        if (!std::isfinite(v))
+            throw std::invalid_argument("get_channels_multifreq: TX and RX positions and orientations must be finite.");
 
     const std::vector<arma::Cube<dtype>> *outs[] = {&coeff_re, &coeff_im, &delay};
     const char *names[] = {"coeff_re", "coeff_im", "delay"};
@@ -450,7 +453,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             d_fbs_lbs += d_length - d_shortest;
         }
 
-        if (std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
+        // Slot 0 of add_fake_los_path is the LOS path by definition, also when the TX-RX distance overflows
+        if ((add_fake_los_path && i_out == 0) || std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
         {
             if (!add_fake_los_path || i_out != 0)
                 true_los_path = i_out, shortest_path = std::abs(d_length - dist_rx_tx);

@@ -52,10 +52,10 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
   (e.g. 0) use the polyline length; `[n_path, 1]`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`tx_pos`** — Transmitter position; `[3, 1]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`rx_pos`** — Receiver position; `[3, 1]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
+- **`tx_pos`** — Transmitter position, finite; `[3, 1]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
+- **`rx_pos`** — Receiver position, finite; `[3, 1]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was

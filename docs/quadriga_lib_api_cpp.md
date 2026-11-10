@@ -2886,10 +2886,10 @@ void quadriga_lib::get_channels_multifreq(
 ### Inputs:
 - **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi)
 - **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi)
-- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates
-- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading)
-- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates
-- **`Rb, Rt, Rh`** — RX orientation, Euler angles  (bank, tilt, heading)
+- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates, finite
+- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading), finite
+- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates, finite
+- **`Rb, Rt, Rh`** — RX orientation, Euler angles (bank, tilt, heading), finite
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains; `[n_path, n_freq_in]`
@@ -3059,10 +3059,10 @@ void quadriga_lib::get_channels_spherical(
 ### Inputs:
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](#arrayant)
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](#arrayant)
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading)
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading)
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, finite
+- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, finite
+- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), finite
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
