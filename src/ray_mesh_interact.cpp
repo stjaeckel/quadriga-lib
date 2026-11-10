@@ -1168,16 +1168,17 @@ namespace
         (cB ? run.fl_in : run.fl_out) *= g;
     }
 
-    // One-way factor of coherent layer j: exp(-j k0 n thk c), index and cosine complex, times the alpha column
-    // over the path thk / |Re c|. A wave that does not advance in the layer has no path, and is opaque to it.
-    inline std::complex<double> stack_layer_phase(const StackMedia &sm, int j)
+    // Logarithm of the one-way factor of coherent layer j (the factor can overflow): -j k0 n thk c, index and
+    // cosine complex, minus the alpha column over the path thk / |Re c|. A wave that does not advance in the
+    // layer has no path, and is opaque to it.
+    inline std::complex<double> stack_layer_log_phase(const StackMedia &sm, int j)
     {
         const Material &L = sm.med(j);
         const double fGHz = sm.fGHz;
         std::complex<double> c_L = sm.cosine(j);
         double thk = sm.layers[j - 1].thk, a_dB = L.alpha * std::pow(fGHz / L.fRef, L.alphaB);
         double a_Np = (a_dB > 0.0 && thk > 0.0) ? 0.05 * std::log(10.0) * a_dB * thk / std::abs(std::real(c_L)) : 0.0;
-        return std::exp(std::complex<double>(0.0, -1.0) * k0(fGHz) * std::sqrt(sm.w(j)) * c_L * thk - a_Np);
+        return std::complex<double>(0.0, -1.0) * k0(fGHz) * std::sqrt(sm.w(j)) * c_L * thk - a_Np;
     }
 
     // Composite of an ordered list of layers between two half-spaces: one sheet, or a stack of two. A sheet
@@ -1196,6 +1197,11 @@ namespace
     // (the characteristic matrix in another basis; no inverse of a closed boundary or an opaque layer; the
     // Airy pair at one layer). Amplitudes propagate; the conversion to normal flux is applied once, at the
     // outer pair, on the transmit port. Nothing is clamped.
+    //
+    // phi belongs to the partial wave of root c (Re c >= 0, as flux_amp, tf_face and closed_face assume; the
+    // decaying root breaks their energy balance). Out of a lossy near medium that wave can grow across the layer
+    // and phi overflow (at a metal face the field varies on the skin depth along it); where |phi| > 1 the
+    // recursion runs on 1/phi, numerator and denominator divided by phi^2: the same values.
     //
     //   tf         per boundary: the transformer (tf_face) at an open coherent face, the pad (closed_face)
     //              where nothing propagates behind, the pair rule on the reflectance at an open mass-law face.
@@ -1259,14 +1265,17 @@ namespace
                     run.a_run = run.a_entry, run.tau_run = 1.0;
                 for (int j = q - 2; j >= p; --j)
                 {
-                    std::complex<double> phi = stack_layer_phase(sm, j + 1), p2 = phi * phi;
+                    // The same recursion in 1/phi where the wave of root c grows across the layer
+                    const std::complex<double> lp = stack_layer_log_phase(sm, j + 1);
+                    const bool grows = std::real(lp) > 0.0;
+                    const std::complex<double> phi = std::exp(grows ? -lp : lp), p2 = phi * phi;
                     stack_boundary(sm, j, pol, is_scalar, opt, z_n, run, r, t, tb);
-                    std::complex<double> den = 1.0 + r * G * p2;
+                    const std::complex<double> den = grows ? p2 + r * G : 1.0 + r * G * p2, g2 = grows ? 1.0 : p2;
                     if (!(std::abs(den) > 0.0))
                         return false;
                     T = t * phi * T / den;
-                    Ge = r + std::sqrt(sm.med(j + 1).interface_gain(fGHz)) * t * tb * Ge * p2 / den;
-                    G = r + t * tb * G * p2 / den;
+                    Ge = r + std::sqrt(sm.med(j + 1).interface_gain(fGHz)) * t * tb * Ge * g2 / den;
+                    G = r + t * tb * G * g2 / den;
                 }
                 Tt *= T;
                 if (p == 0)
