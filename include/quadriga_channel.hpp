@@ -450,7 +450,7 @@ namespace quadriga_lib
     // Read ray-tracing data from QRT file
     // normalize_M options:
     //  0 : M as in QRT file, path_gain is -FSPL
-    //  1 : M has a maximum column power of 1, path_gain is -FSPL - material losses
+    //  1 : M has a maximum column power of 1 (uplink: row power), path_gain is -FSPL - material losses
     template <typename dtype>
     void qrt_file_read(const std::string &fn,                               // Path to the QRT file
                        arma::uword i_cir = 0,                               // Snapshot index

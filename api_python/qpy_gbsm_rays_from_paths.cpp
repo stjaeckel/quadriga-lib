@@ -13,8 +13,8 @@ SECTION!*/
 Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Returns the ray dict of [[ssf_rays]] (`fallback` empty) from path data in the names and order of [[qrt_file_read]],
-  read with `downlink = True` and `normalize_M = 1` (an uplink read gives swapped ends and a conjugated `M`, which this
-  function does not undo; `normalize_M = 0` leaves only the free-space gain in `power`)
+  read with `normalize_M = 1` (`downlink = False` gives the reverse link; `normalize_M = 0` leaves only the
+  free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
@@ -48,7 +48,7 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`rays`** — Ray dict with `n_ray = n_path`, see [[ssf_rays]]; use with `link_gain_dB = 0` and without `kf_ratio`
 
 ## See also:
-- [[qrt_file_read]] (source of the path data, `downlink = True`)
+- [[qrt_file_read]] (source of the path data)
 - [[ssf_paths]] (paths at moved positions)
 - [[gbsm.single_link_channel]] (channel of the link)
 MD!*/

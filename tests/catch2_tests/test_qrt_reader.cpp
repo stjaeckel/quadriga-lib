@@ -302,6 +302,8 @@ TEST_CASE("QRT Reader")
         CHECK(arma::approx_equal(rx_orientation, T, "absdiff", 1.5e-4));
 
         // Test uplink
+        const arma::cube M_dl = M;
+        const arma::mat path_gain_dl = path_gain;
         arma::mat B, C;
         quadriga_lib::qrt_file_read<double>(fn, 1, 1, false, &center_frequency, &tx_pos, &tx_orientation,
                                             &rx_pos, &rx_orientation, &B, &C, &path_gain,
@@ -323,6 +325,18 @@ TEST_CASE("QRT Reader")
         CHECK(arma::approx_equal(lbs_pos, B, "absdiff", 1.5e-4));
         CHECK(arma::approx_equal(aod, aoa, "absdiff", 1.5e-4));
         CHECK(arma::approx_equal(eod, eoa, "absdiff", 1.5e-4));
+
+        // Reciprocity: the uplink M is the plain transpose of the downlink M, without conjugation.
+        // Rows (re, im): 0-1 VV, 2-3 HV, 4-5 VH, 6-7 HH (rx, tx); the transpose swaps HV and VH.
+        // This link has paths with complex, non-symmetric M, so a conjugation or a missing swap shows.
+        REQUIRE(M.n_rows == 8);
+        REQUIRE(M.n_cols == M_dl.n_cols);
+        REQUIRE(M.n_slices == M_dl.n_slices);
+        arma::cube M_T = M_dl;
+        M_T.rows(2, 3) = M_dl.rows(4, 5);
+        M_T.rows(4, 5) = M_dl.rows(2, 3);
+        CHECK(arma::approx_equal(M, M_T, "absdiff", 1e-12));
+        CHECK(arma::approx_equal(path_gain, path_gain_dl, "reldiff", 1e-12));
     }
 }
 

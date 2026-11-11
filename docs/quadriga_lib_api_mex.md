@@ -1284,7 +1284,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped
+- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
+  that traversal
 
 ### Usage:
 ```matlab
@@ -1302,10 +1305,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 - **`normalize_M`** — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-    | `normalize_M` | `M`                   | `path_gain`                      |
-    | :-----------: | :-------------------: | :------------------------------: |
-    | 0             | As stored in QRT file | -PL                              |
-    | 1             | Max column power = 1  | -PL minus material losses        |
+    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | :-----------: | :---------------------------------------------: | :------------------------------: |
+    | 0             | As stored in QRT file                           | -PL                              |
+    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
 
     Other values are rejected with an error.
 
@@ -2374,8 +2377,8 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [Python](quadriga_lib_api_python.md#gbsm.rays_from_paths)
 
 - Returns the ray struct of [ssf_rays](#ssf_rays) (`fallback` empty) from path data in the names and order of [qrt_file_read](#qrt_file_read),
-  read with `downlink = true` and `normalize_M = 1` (an uplink read gives swapped ends and a conjugated `M`, which this
-  function does not undo; `normalize_M = 0` leaves only the free-space gain in `power`)
+  read with `normalize_M = 1` (`downlink = false` gives the reverse link; `normalize_M = 0` leaves only the
+  free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
@@ -2408,7 +2411,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`rays`** — Ray struct with `n_ray = n_path`, see [ssf_rays](#ssf_rays); use with `link_gain_dB = 0` and without `kf_ratio`
 
 ### See also:
-- [qrt_file_read](#qrt_file_read) (source of the path data, `downlink = true`)
+- [qrt_file_read](#qrt_file_read) (source of the path data)
 - [ssf_paths](#ssf_paths) (paths at moved positions)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)
 

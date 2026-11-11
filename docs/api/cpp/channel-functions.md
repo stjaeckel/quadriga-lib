@@ -812,7 +812,10 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_read) · [Python](../pyth
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped.
+- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
+  that traversal.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
 - `fn` is ignored when both `file` and `cache` are provided.
 - Reading a TX slot that was reserved by [qrt_file_init](#qrt_file_init) but not yet written by [qrt_file_append](#qrt_file_append) returns
@@ -858,10 +861,10 @@ void quadriga_lib::qrt_file_read(
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
 
-    | `normalize_M` | `M`                   | `path_gain`                      |
-    | ------------- | --------------------- | -------------------------------- |
-    | 0             | As stored in QRT file | -PL                              |
-    | 1             | Max column power = 1  | -PL minus material losses        |
+    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | ------------- | ----------------------------------------------- | -------------------------------- |
+    | 0             | As stored in QRT file                           | -PL                              |
+    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
 
   Other values throw `std::invalid_argument`.
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return

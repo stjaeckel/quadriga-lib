@@ -996,7 +996,10 @@ Read ray-tracing CIR data from a QRT file
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped.
+- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
+  that traversal.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [[qrt_read_cache_init]]-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
 - `fn` is ignored when both `file` and `cache` are provided.
 - Reading a TX slot that was reserved by [[qrt_file_init]] but not yet written by [[qrt_file_append]] returns
@@ -1042,10 +1045,10 @@ void quadriga_lib::qrt_file_read(
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
 
-    | `normalize_M` | `M`                   | `path_gain`                      |
-    | ------------- | --------------------- | -------------------------------- |
-    | 0             | As stored in QRT file | -PL                              |
-    | 1             | Max column power = 1  | -PL minus material losses        |<br><br>
+    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | ------------- | ----------------------------------------------- | -------------------------------- |
+    | 0             | As stored in QRT file                           | -PL                              |
+    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |<br><br>
 
   Other values throw `std::invalid_argument`.
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
@@ -1633,19 +1636,20 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
                             dst[7] = i22 * scale;
                         }
                     }
-                    else // uplink: conjugate transpose, normalize
+                    else // uplink: transpose, normalize
                     {
-                        // H_UL = H_DL^H
-                        dst[0] = r11 * scale;  // Re(h11)
-                        dst[1] = -i11 * scale; // -Im(h11)
+                        // Reciprocal medium: H_UL = H_DL^T, no conjugation (TR 38.901 clause 7.5)
+                        // The scale stays that of the downlink matrix, so path_gain is the same in both directions
+                        dst[0] = r11 * scale;
+                        dst[1] = i11 * scale;
                         if (!v6)
                         {
-                            dst[2] = r12 * scale;  // Re(h12)
-                            dst[3] = -i12 * scale; // -Im(h12)
-                            dst[4] = r21 * scale;  // Re(h21)
-                            dst[5] = -i21 * scale; // -Im(h21)
-                            dst[6] = r22 * scale;  // Re(h22)
-                            dst[7] = -i22 * scale; // -Im(h22)
+                            dst[2] = r12 * scale;
+                            dst[3] = i12 * scale;
+                            dst[4] = r21 * scale;
+                            dst[5] = i21 * scale;
+                            dst[6] = r22 * scale;
+                            dst[7] = i22 * scale;
                         }
                     }
                     dst += v6 ? 2 : 8;

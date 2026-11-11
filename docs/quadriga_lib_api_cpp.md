@@ -2310,7 +2310,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_read) · [Python](quadriga_li
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped.
+- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
+  that traversal.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
 - `fn` is ignored when both `file` and `cache` are provided.
 - Reading a TX slot that was reserved by [qrt_file_init](#qrt_file_init) but not yet written by [qrt_file_append](#qrt_file_append) returns
@@ -2356,10 +2359,10 @@ void quadriga_lib::qrt_file_read(
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
 
-    | `normalize_M` | `M`                   | `path_gain`                      |
-    | ------------- | --------------------- | -------------------------------- |
-    | 0             | As stored in QRT file | -PL                              |
-    | 1             | Max column power = 1  | -PL minus material losses        |
+    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | ------------- | ----------------------------------------------- | -------------------------------- |
+    | 0             | As stored in QRT file                           | -PL                              |
+    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
 
   Other values throw `std::invalid_argument`.
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
@@ -3806,9 +3809,8 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quadriga_lib_api_python.md#gbsm.rays_from_paths)
 
 - Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [qrt_file_read](#qrt_file_read), read as `qrt_file_read<double>` with `downlink = true` and `normalize_M = 1` (an uplink read gives
-  swapped ends and a conjugated `M`, which this function does not undo; `normalize_M = 0` leaves only the free-space
-  gain in `power`)
+  [qrt_file_read](#qrt_file_read), read as `qrt_file_read<double>` with `normalize_M = 1` (`downlink = false` gives the reverse
+  link; `normalize_M = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
@@ -3853,7 +3855,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`rays`** — Ray data with `n_ray = n_path`, see [gbsm_rays](#gbsm_rays); use with `link_gain_dB = 0` and without `kf_ratio`
 
 ### See also:
-- [qrt_file_read](#qrt_file_read) (source of the path data, `downlink = true`)
+- [qrt_file_read](#qrt_file_read) (source of the path data)
 - [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) (write the paths of [ssf_paths](#ssf_paths) to a QRT file)
 - [ssf_paths](#ssf_paths) (paths at moved positions)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)

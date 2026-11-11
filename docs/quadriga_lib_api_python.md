@@ -1260,7 +1260,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [MATLAB](quadriga_lib_a
   significantly speeds up multi-snapshot reads
 - File reading and the conversion to numpy arrays are overlapped: a background thread reads the
   next snapshot into a double buffer while the main thread converts the previous one
-- If `downlink = True`, origin is TX and destination is RX; if `False`, the roles are swapped
+- If `downlink = True`, origin is TX and destination is RX; if `False`, roles are swapped and `M` is the transpose
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
+  that traversal
 - Per-snapshot outputs are returned as lists with one entry per requested snapshot
 
 ### Usage:
@@ -1277,13 +1280,13 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
 - **`downlink`** — If `True`, origin=TX and destination=RX; if `False`, the roles are swapped; default: `True`
 - **`normalize_M`** — Controls `M` and `path_gain` scaling; 0 = values as stored in the QRT file with
-  `path_gain` = -PL; 1 = `M` columns scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
+  `path_gain` = -PL; 1 = `M` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-    | `normalize_M` | `M`                   | `path_gain`                      |
-    | :-----------: | :-------------------: | :------------------------------: |
-    | 0             | As stored in QRT file | -PL                              |
-    | 1             | Max column power = 1  | -PL minus material losses        |
+    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | :-----------: | :---------------------------------------------: | :------------------------------: |
+    | 0             | As stored in QRT file                           | -PL                              |
+    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
 
     Other values raise an error.
 
@@ -2357,8 +2360,8 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths)
 
 - Returns the ray dict of [ssf_rays](#ssf_rays) (`fallback` empty) from path data in the names and order of [qrt_file_read](#qrt_file_read),
-  read with `downlink = True` and `normalize_M = 1` (an uplink read gives swapped ends and a conjugated `M`, which this
-  function does not undo; `normalize_M = 0` leaves only the free-space gain in `power`)
+  read with `normalize_M = 1` (`downlink = False` gives the reverse link; `normalize_M = 0` leaves only the
+  free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
@@ -2392,7 +2395,7 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`rays`** — Ray dict with `n_ray = n_path`, see [ssf_rays](#ssf_rays); use with `link_gain_dB = 0` and without `kf_ratio`
 
 ### See also:
-- [qrt_file_read](#qrt_file_read) (source of the path data, `downlink = True`)
+- [qrt_file_read](#qrt_file_read) (source of the path data)
 - [ssf_paths](#ssf_paths) (paths at moved positions)
 - [gbsm.single_link_channel](#gbsm.single_link_channel) (channel of the link)
 

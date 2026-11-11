@@ -515,7 +515,10 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [MATLAB](../mex/cha
   significantly speeds up multi-snapshot reads
 - File reading and the conversion to numpy arrays are overlapped: a background thread reads the
   next snapshot into a double buffer while the main thread converts the previous one
-- If `downlink = True`, origin is TX and destination is RX; if `False`, the roles are swapped
+- If `downlink = True`, origin is TX and destination is RX; if `False`, roles are swapped and `M` is the transpose
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
+  that traversal
 - Per-snapshot outputs are returned as lists with one entry per requested snapshot
 
 ### Usage:
@@ -532,13 +535,13 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
 - **`downlink`** — If `True`, origin=TX and destination=RX; if `False`, the roles are swapped; default: `True`
 - **`normalize_M`** — Controls `M` and `path_gain` scaling; 0 = values as stored in the QRT file with
-  `path_gain` = -PL; 1 = `M` columns scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
+  `path_gain` = -PL; 1 = `M` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-    | `normalize_M` | `M`                   | `path_gain`                      |
-    | :-----------: | :-------------------: | :------------------------------: |
-    | 0             | As stored in QRT file | -PL                              |
-    | 1             | Max column power = 1  | -PL minus material losses        |
+    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | :-----------: | :---------------------------------------------: | :------------------------------: |
+    | 0             | As stored in QRT file                           | -PL                              |
+    | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
 
     Other values raise an error.
 
