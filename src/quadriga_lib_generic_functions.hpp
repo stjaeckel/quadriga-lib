@@ -29,6 +29,37 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
                      std::vector<unsigned> *hit_index,            // Output: flat list of ray indices grouped by point, resized to the total hit count
                      unsigned *hit_offset);                       // Output: 0-based start of each point's block, length n_point + 1
 
+// Per-thread staging of packed hit records for RayPointIntersect, in chunks of fixed size
+// Appending a chunk never moves the records already written, so the staged data is written exactly once and the peak
+// memory is the payload size. Used by the GENERIC and AVX2 implementations. All members are defined in
+// ray_point_intersect_generic.cpp, so the AVX2 file compiles no std::vector code (see quadriga_lib_avx2_functions.hpp).
+class qd_RPI_staging
+{
+public:
+    static constexpr size_t chunk_size = 16384; // Number of records per chunk
+
+    explicit qd_RPI_staging(int n_threads);
+    ~qd_RPI_staging();
+    qd_RPI_staging(const qd_RPI_staging &) = delete;
+    qd_RPI_staging &operator=(const qd_RPI_staging &) = delete;
+
+    // Appends a chunk for thread i_thread and returns its first record, the chunk holds chunk_size records
+    unsigned long long *new_chunk(size_t i_thread);
+
+    // Marks the end of the records that thread i_thread wrote into its last chunk
+    void close(size_t i_thread, const unsigned long long *p_end);
+
+    // Zero-filled scratch space of n values for thread i_thread, kept until the object is destroyed
+    int *scratch(size_t i_thread, size_t n);
+
+    // Assembles the point-major CSR hit list from the chunks in thread order, which preserves the ray order
+    void assemble(size_t n_point, std::vector<unsigned> *hit_index, unsigned *hit_offset) const;
+
+private:
+    std::vector<std::vector<std::vector<unsigned long long>>> chunks; // [n_threads][n_chunks][chunk_size or less]
+    std::vector<std::vector<int>> scratch_space;                      // [n_threads][n]
+};
+
 // Generic C++ implementation of RayTriangleIntersect
 template <typename dtype>
 void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First vertex coordinate in GCS, length n_mesh

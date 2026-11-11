@@ -8,7 +8,7 @@
 #include <immintrin.h>
 
 #include "quadriga_lib_avx2_functions.hpp"
-#include "quadriga_lib_generic_functions.hpp" // qd_RPI_assemble
+#include "quadriga_lib_generic_functions.hpp" // qd_RPI_staging
 
 #if defined(_MSC_VER) // Windows
 #include <intrin.h>
@@ -20,9 +20,6 @@
 
 // Vector size for AVX2
 #define VEC_SIZE 8
-
-// Number of packed hit records per staging chunk
-static const size_t QD_RPI_CHUNK = 16384;
 
 // Index of the lowest set bit, mask must not be zero
 static inline int qd_first_set_bit(int mask)
@@ -59,9 +56,9 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
 {
     // Point and ray indices are packed into 32 bit fields of the hit records
     if ((unsigned long long)n_point > 0xFFFFFFFFULL)
-        throw std::invalid_argument("Number of points exceeds maximum supported number.");
+        qd_avx2_throw_invalid_argument("Number of points exceeds maximum supported number.");
     if ((unsigned long long)n_ray > 0xFFFFFFFFULL)
-        throw std::invalid_argument("Number of rays exceeds maximum supported number.");
+        qd_avx2_throw_invalid_argument("Number of rays exceeds maximum supported number.");
 
     // Constant values needed for some operations
     const size_t n_sub_s = (n_sub % VEC_SIZE == 0) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1);
@@ -80,10 +77,8 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
     const int n_threads = 1;
 #endif
 
-    // Per-thread staging, a list of fixed size chunks of packed hit records
-    // Appending a chunk never moves the records already written, so the staged
-    // data is written exactly once and the peak memory is the payload size
-    std::vector<std::vector<std::vector<unsigned long long>>> stage((size_t)n_threads);
+    // Per-thread staging of the packed hit records
+    qd_RPI_staging stage(n_threads);
 
 #pragma omp parallel if (n_ray_l > 1 && n_ray_l * n_point_l >= 131072)
     {
@@ -92,15 +87,11 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
 #else
         const size_t i_thread = 0;
 #endif
-        std::vector<std::vector<unsigned long long>> &chunks = stage[i_thread];
-        chunks.reserve(64);
-        chunks.push_back(std::vector<unsigned long long>(QD_RPI_CHUNK));
-        unsigned long long *p_write = chunks.back().data();
-        unsigned long long *p_stop = p_write + QD_RPI_CHUNK;
+        unsigned long long *p_write = stage.new_chunk(i_thread);
+        unsigned long long *p_stop = p_write + qd_RPI_staging::chunk_size;
 
         // Per-thread storage for sub-cloud hit indicators, reused across ray iterations
-        std::vector<int> sub_hit_vec(n_sub_s);
-        int *p_sub_hit = sub_hit_vec.data();
+        int *p_sub_hit = stage.scratch(i_thread, n_sub_s);
 
         // Static scheduling gives each thread one contiguous ray range, so the
         // staged hits are ray-ascending both within and across the buffers
@@ -402,9 +393,8 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
 
                     if (p_write == p_stop) // Current chunk is full
                     {
-                        chunks.push_back(std::vector<unsigned long long>(QD_RPI_CHUNK));
-                        p_write = chunks.back().data();
-                        p_stop = p_write + QD_RPI_CHUNK;
+                        p_write = stage.new_chunk(i_thread);
+                        p_stop = p_write + qd_RPI_staging::chunk_size;
                     }
                     *p_write++ = ray_bits | ((unsigned long long)(i_point + i) << 32);
                 }
@@ -414,19 +404,9 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
         } // end ray loop
 
         // Trim the last chunk to the number of records actually written
-        chunks.back().resize((size_t)(p_write - chunks.back().data()));
+        stage.close(i_thread, p_write);
     } // end omp parallel
 
-    // Collect the chunks in thread order, which preserves the ray order
-    std::vector<const unsigned long long *> p_buffer;
-    std::vector<size_t> n_hit_buffer;
-
-    for (size_t i_thread = 0; i_thread < (size_t)n_threads; ++i_thread)
-        for (size_t i_chunk = 0; i_chunk < stage[i_thread].size(); ++i_chunk)
-            if (!stage[i_thread][i_chunk].empty())
-                p_buffer.push_back(stage[i_thread][i_chunk].data()),
-                    n_hit_buffer.push_back(stage[i_thread][i_chunk].size());
-
     // Assemble the point-major CSR hit list
-    qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_index, hit_offset);
+    stage.assemble(n_point, hit_index, hit_offset);
 }

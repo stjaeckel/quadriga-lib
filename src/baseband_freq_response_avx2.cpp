@@ -3,8 +3,6 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <immintrin.h>
-#include <iostream>
-#include <vector>
 
 #include "quadriga_lib_avx2_functions.hpp"
 #include "fastmath_avx2.h"
@@ -28,8 +26,9 @@ void qd_DFT_AVX2(const dtype *__restrict CFr,    // Channel coefficients, real p
                  float *__restrict Hi)           // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
 {
     // Preallocate per-path, per-antenna scalars to avoid per-block casts
-    std::vector<float> crf(n_path), cif(n_path);
-    std::vector<double> dld(n_path);
+    qd_avx2_buffer crf_buf(n_path, sizeof(float)), cif_buf(n_path, sizeof(float)), dld_buf(n_path, sizeof(double));
+    float *crf = (float *)crf_buf.ptr, *cif = (float *)cif_buf.ptr;
+    double *dld = (double *)dld_buf.ptr;
 
     for (size_t i_ant = 0; i_ant < n_ant; ++i_ant) // Antenna loop
     {
