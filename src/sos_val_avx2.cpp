@@ -4,7 +4,6 @@
 
 #include <immintrin.h>
 #include <cstddef>
-#include <new>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -180,7 +179,7 @@ void qd_SOS_AVX2(const double *fx, const double *fy, const double *fz,
     {
         _mm_free(weights);
         _mm_free(buffer);
-        throw std::bad_alloc();
+        qd_avx2_throw_bad_alloc();
     }
 
     for (size_t g0 = 0; g0 < n_gen; g0 += 8)

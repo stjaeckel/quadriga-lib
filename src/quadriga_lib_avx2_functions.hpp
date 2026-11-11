@@ -3,6 +3,14 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // A collection of AVX2 accelerated functions
+//
+// The files src/*_avx2.cpp are compiled with AVX2 flags, so every function emitted there may contain AVX instructions.
+// Templates and inline functions (std::vector, std::unique_ptr, std::numeric_limits, and with MSVC also the exception
+// constructors) are emitted as weak symbols, and the linker keeps one copy for all callers in a program. If it keeps
+// the AVX2 copy, plain code calls it and stops with "Illegal instruction" on CPUs without AVX2. Only the kernels below
+// are protected, by runtime_AVX2_Check(). Therefore the AVX2 files use no standard library templates or inline
+// functions: heap buffers come from qd_avx2_buffer, exceptions from qd_avx2_throw_*, constants from <cfloat> and
+// <cmath> macros. The test script tests/check_avx2_objects.sh checks the compiled objects (GCC and Clang).
 
 #ifndef quadriga_lib_avx2fun_H
 #define quadriga_lib_avx2fun_H
@@ -13,6 +21,24 @@
 #include <climits>
 #include <stdexcept>
 #include <cstdint>
+
+// Zero-filled heap buffer of n values of elem_size bytes, released by the destructor; no allocation for n = 0 (ptr is
+// then nullptr). The members are defined in the plain file qd_avx2_buffer.cpp, compiled without AVX2 flags.
+class qd_avx2_buffer
+{
+public:
+    void *ptr;
+
+    qd_avx2_buffer(size_t n, size_t elem_size);
+    ~qd_avx2_buffer();
+    qd_avx2_buffer(const qd_avx2_buffer &) = delete;
+    qd_avx2_buffer &operator=(const qd_avx2_buffer &) = delete;
+};
+
+// Throw std::invalid_argument or std::bad_alloc. Defined in the plain file qd_avx2_buffer.cpp, so the exception
+// constructors, which MSVC defines inline, are not compiled with AVX2 flags.
+[[noreturn]] void qd_avx2_throw_invalid_argument(const char *message);
+[[noreturn]] void qd_avx2_throw_bad_alloc();
 
 // Perform a simple test calculation
 void qd_TEST_AVX2(const float *X, // Aligned memory, 16 floats

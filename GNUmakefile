@@ -98,6 +98,7 @@ python_install: python
 test:   all moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --parallel $(shell nproc)
+	bash tests/check_avx2_objects.sh $(CMAKE_BUILD_DIR)
 	OMP_WAIT_POLICY=$${OMP_WAIT_POLICY:-passive} time $(CMAKE_BUILD_DIR)/test_bin
 ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)
@@ -133,6 +134,7 @@ test-asan:
 		-D ENABLE_STATIC_LIB=ON \
 		-D ENABLE_SHARED_LIB=OFF
 	cmake --build $(ASAN_BUILD_DIR) --target test_bin --parallel $(shell nproc) $(BUILD_TOOL_ARGS)
+	bash tests/check_avx2_objects.sh $(ASAN_BUILD_DIR)
 	OMP_WAIT_POLICY=$${OMP_WAIT_POLICY:-passive} \
 		ASAN_OPTIONS=$${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1} \
 		UBSAN_OPTIONS=$${UBSAN_OPTIONS:-print_stacktrace=1:halt_on_error=1} \

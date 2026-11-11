@@ -12,8 +12,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <limits>
-#include <memory>
 #include "fastmath_avx2.h"
 
 namespace
@@ -624,14 +622,13 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
     // All constants are float — avoids double-eps vanishing below float precision
     const float two_pi = (float)dtype(6.28318530717958647692528676655900576);
-    const float eps = std::numeric_limits<float>::epsilon(); // pole guard
+    const float eps = FLT_EPSILON; // pole guard
     const float eps_cubed = eps * eps * eps;                 // tiny guard for weight computation
     constexpr float one = 1.0f;
 
     // Reciprocal grid spacings: 1/(grid[i] - grid[i-1]), used as interpolation weight multipliers
-    auto az_step_inv_buf = std::make_unique<float[]>(n_azimuth);
-    auto el_step_inv_buf = std::make_unique<float[]>(n_elevation);
-    float *az_step_inv = az_step_inv_buf.get(), *el_step_inv = el_step_inv_buf.get();
+    qd_avx2_buffer az_step_inv_buf(n_azimuth, sizeof(float)), el_step_inv_buf(n_elevation, sizeof(float));
+    float *az_step_inv = (float *)az_step_inv_buf.ptr, *el_step_inv = (float *)el_step_inv_buf.ptr;
     *az_step_inv = two_pi - (float)p_azimuth_grid[n_azimuth - 1] + (float)*p_azimuth_grid;
     *az_step_inv = one / *az_step_inv;
     *el_step_inv = one;
@@ -680,17 +677,16 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
     // grid_f arrays are allocated below and assigned to the structs
 
     // Grid arrays (standalone, small allocations)
-    auto az_grid_f_buf = std::make_unique<float[]>(n_azimuth + 1);
-    auto el_grid_f_buf = std::make_unique<float[]>(n_elevation + 1);
-    float *az_grid_f = az_grid_f_buf.get();
-    float *el_grid_f = el_grid_f_buf.get();
+    qd_avx2_buffer az_grid_f_buf(n_azimuth + 1, sizeof(float)), el_grid_f_buf(n_elevation + 1, sizeof(float));
+    float *az_grid_f = (float *)az_grid_f_buf.ptr;
+    float *el_grid_f = (float *)el_grid_f_buf.ptr;
 
     for (size_t a = 0; a < n_azimuth; ++a)
         az_grid_f[a] = (float)p_azimuth_grid[a];
-    az_grid_f[n_azimuth] = std::numeric_limits<float>::infinity();
+    az_grid_f[n_azimuth] = INFINITY;
     for (size_t a = 0; a < n_elevation; ++a)
         el_grid_f[a] = (float)p_elevation_grid[a];
-    el_grid_f[n_elevation] = std::numeric_limits<float>::infinity();
+    el_grid_f[n_elevation] = INFINITY;
 
     az_gp.grid_f = az_grid_f;
     el_gp.grid_f = el_grid_f;
@@ -701,14 +697,14 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
     // SoA layout: R_elem[9 * n_out_padded], pos_elem[3 * n_out_padded]
     const size_t elem_floats = 9 * n_out_padded + 3 * n_out_padded;
-    auto elem_buf_ptr = std::make_unique<float[]>(elem_floats);
-    float *elem_buf = elem_buf_ptr.get();
+    qd_avx2_buffer elem_buf_ptr(elem_floats, sizeof(float));
+    float *elem_buf = (float *)elem_buf_ptr.ptr;
     float *R_elem = elem_buf;
     float *pos_elem = elem_buf + 9 * n_out_padded;
 
     // Precomputed i_element * n_pattern_samples offsets (0-based index, int32)
-    auto offset_elem_ptr = std::make_unique<int[]>(n_out_padded);
-    int *offset_elem = offset_elem_ptr.get();
+    qd_avx2_buffer offset_elem_ptr(n_out_padded, sizeof(int));
+    int *offset_elem = (int *)offset_elem_ptr.ptr;
 
     // Fill per-element buffers (for the non-per_angle_rotation case, R is constant across angles)
     for (size_t o = 0; o < n_out; ++o)
@@ -1182,15 +1178,12 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
             // Thread-local R buffer for per_angle_rotation
             // Stack allocation for typical sizes, heap for large n_out
             float R_local[9 * 64];
-            std::unique_ptr<float[]> R_heap;
+            qd_avx2_buffer R_heap(n_out_padded > 64 && per_angle_rotation ? 9 * n_out_padded : 0, sizeof(float));
             float *R_work;
             if (n_out_padded <= 64)
                 R_work = R_local;
             else if (per_angle_rotation)
-            {
-                R_heap = std::make_unique<float[]>(9 * n_out_padded);
-                R_work = R_heap.get();
-            }
+                R_work = (float *)R_heap.ptr;
             else
                 R_work = nullptr; // unused
 

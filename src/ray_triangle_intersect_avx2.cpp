@@ -293,9 +293,9 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
                         unsigned *hit_cnt)                                 // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
     if (n_mesh >= INT32_MAX)
-        throw std::invalid_argument("Number of triangles exceeds maximum supported number.");
+        qd_avx2_throw_invalid_argument("Number of triangles exceeds maximum supported number.");
     if (n_ray >= INT32_MAX)
-        throw std::invalid_argument("Number of rays exceeds maximum supported number.");
+        qd_avx2_throw_invalid_argument("Number of rays exceeds maximum supported number.");
 
     bool count_hits = hit_cnt != nullptr;
 
@@ -312,8 +312,8 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // Fi
 #pragma omp parallel if (n_ray_int >= 64)
     {
         // Per-thread storage for sub-mesh hit indicators, reused across ray iterations
-        std::vector<int> sub_mesh_hit(n_sub_pad);
-        int *p_sub_mesh_hit = sub_mesh_hit.data();
+        qd_avx2_buffer sub_mesh_hit(n_sub_pad, sizeof(int));
+        int *p_sub_mesh_hit = (int *)sub_mesh_hit.ptr;
 
 #pragma omp for schedule(static)
         for (int i_ray = 0; i_ray < n_ray_int; ++i_ray)
@@ -466,9 +466,9 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
                          unsigned *hit_cnt)                                    // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
     if (n_mesh >= INT32_MAX)
-        throw std::invalid_argument("Number of triangles exceeds maximum supported number.");
+        qd_avx2_throw_invalid_argument("Number of triangles exceeds maximum supported number.");
     if (n_ray >= INT32_MAX)
-        throw std::invalid_argument("Number of rays exceeds maximum supported number.");
+        qd_avx2_throw_invalid_argument("Number of rays exceeds maximum supported number.");
 
     bool count_hits = hit_cnt != nullptr;
 
@@ -484,11 +484,11 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
     // Edges U - T and V - T, formed in double and narrowed to float. With enough rays they are computed once here
     // and loaded by the triangle loop; otherwise the triangle loop forms them in the same way (same values).
     const bool cache_edges = n_ray * 16 >= n_mesh;
-    std::vector<float> edge_cache(cache_edges ? 6 * n_mesh : 0);
+    qd_avx2_buffer edge_cache(cache_edges ? 6 * n_mesh : 0, sizeof(float));
     float *E1x = nullptr, *E1y = nullptr, *E1z = nullptr, *E2x = nullptr, *E2y = nullptr, *E2z = nullptr;
     if (cache_edges)
     {
-        E1x = edge_cache.data(), E1y = E1x + n_mesh, E1z = E1y + n_mesh;
+        E1x = (float *)edge_cache.ptr, E1y = E1x + n_mesh, E1z = E1y + n_mesh;
         E2x = E1z + n_mesh, E2y = E2x + n_mesh, E2z = E2y + n_mesh;
 #pragma omp parallel for if (n_mesh_int >= 65536)
         for (int i = 0; i < n_mesh_int; ++i)
@@ -501,8 +501,8 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, /
 #pragma omp parallel if (n_ray_int >= 64)
     {
         // Per-thread storage for sub-mesh hit indicators, reused across ray iterations
-        std::vector<int> sub_mesh_hit(n_sub_pad);
-        int *p_sub_mesh_hit = sub_mesh_hit.data();
+        qd_avx2_buffer sub_mesh_hit(n_sub_pad, sizeof(int));
+        int *p_sub_mesh_hit = (int *)sub_mesh_hit.ptr;
 
 #pragma omp for schedule(static)
         for (int i_ray = 0; i_ray < n_ray_int; ++i_ray)
