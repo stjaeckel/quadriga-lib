@@ -8,6 +8,7 @@
 #include "quadriga_lib_avx2_functions.hpp"
 
 #include <immintrin.h>
+#include <cfloat>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -322,7 +323,6 @@ namespace
     //   cAZi8       — cos(input_azimuth),   8 lanes
     //   sELi8       — sin(input_elevation), 8 lanes
     //   cELi8       — cos(input_elevation), 8 lanes  (must already include pole guard: += eps)
-    //   eps_sq_8    — squared eps for rsqrt Newton-Raphson guard
     //
     // Outputs:
     //   dx8, dy8, dz8   — rotated direction vector (needed for distance computation)
@@ -332,7 +332,6 @@ namespace
     static inline void avx2_rotate_and_polarize(
         const RMatrix8 &R,
         __m256 sAZi8, __m256 cAZi8, __m256 sELi8, __m256 cELi8,
-        __m256 eps_sq_8,
         __m256 *dx8, __m256 *dy8, __m256 *dz8,
         __m256 *az8, __m256 *el8,
         __m256 *cos_gamma8, __m256 *sin_gamma8)
@@ -350,12 +349,16 @@ namespace
         __m256 len;
         _fm256_cart2geo_ps(*dx8, *dy8, *dz8, az8, el8, &len);
 
-        // Derive sin/cos of output angles from dx/dy/dz directly (avoids extra sincos)
+        // Derive sin/cos of output angles from dx/dy/dz directly (avoids extra sincos). The pattern lookup (az8) and the
+        // polarization basis (cAZo8, sAZo8) must use the same azimuth with a unit-length basis, also next to the local
+        // pole; on the pole itself (dx^2 + dy^2 below the smallest normal float) the azimuth is undefined and set to 0
+        const __m256 tiny8 = _mm256_set1_ps(FLT_MIN);
         __m256 hyp_sq8 = _mm256_fmadd_ps(*dx8, *dx8, _mm256_mul_ps(*dy8, *dy8));
-        __m256 safe_sq8 = _mm256_max_ps(hyp_sq8, eps_sq_8);
-        __m256 inv_hypot8 = _fm256_rsqrt_nr_ps(safe_sq8);
-        __m256 cAZo8 = _mm256_mul_ps(*dx8, inv_hypot8);
-        __m256 sAZo8 = _mm256_mul_ps(*dy8, inv_hypot8);
+        __m256 pole8 = _mm256_cmp_ps(hyp_sq8, tiny8, _CMP_LT_OQ);
+        __m256 inv_hypot8 = _fm256_rsqrt_nr_ps(_mm256_max_ps(hyp_sq8, tiny8));
+        __m256 cAZo8 = _mm256_blendv_ps(_mm256_mul_ps(*dx8, inv_hypot8), _mm256_set1_ps(1.0f), pole8);
+        __m256 sAZo8 = _mm256_andnot_ps(pole8, _mm256_mul_ps(*dy8, inv_hypot8));
+        *az8 = _mm256_andnot_ps(pole8, *az8);
         __m256 cELo8 = _mm256_mul_ps(hyp_sq8, inv_hypot8);
 
         // Input basis vectors: eTHi = [sEL*cAZ, sEL*sAZ, -cEL], ePHi = [-sAZ, cAZ, 0]
@@ -564,6 +567,28 @@ namespace
         if (compute_gamma)
             *gamma8 = _fm256_atan2256_ps(sin_gamma8, cos_gamma8);
     }
+
+    // Runs body(i) for i = 0 .. n - 1, as an OpenMP loop only if 'parallel' is true; entering an OpenMP region costs
+    // about 0.5 us even when its if-clause makes it run serially, which dominates calls with few outputs and angles
+    template <typename Body>
+    static inline void avx2_for(long long n, bool parallel, bool dynamic, const Body &body)
+    {
+        if (parallel && dynamic)
+        {
+#pragma omp parallel for schedule(dynamic, 1)
+            for (long long i = 0; i < n; ++i)
+                body(i);
+        }
+        else if (parallel)
+        {
+#pragma omp parallel for schedule(static)
+            for (long long i = 0; i < n; ++i)
+                body(i);
+        }
+        else
+            for (long long i = 0; i < n; ++i)
+                body(i);
+    }
 } // namespace
 
 // Main interpolation function; preconditions in quadriga_lib_avx2_functions.hpp
@@ -615,50 +640,36 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
     for (size_t a = 1; a < n_elevation; ++a)
         el_step_inv[a] = one / ((float)(p_elevation_grid[a] - p_elevation_grid[a - 1]));
 
-    // Precomputation: uniform-grid detection
-    bool az_uniform = false, el_uniform = false;
-    float az_fmin = 0.0f, az_fmax = 0.0f, az_step_rinv = 0.0f;
-    float el_fmin = 0.0f, el_step_rinv = 0.0f;
-    int az_bsearch_iters = 0, el_bsearch_iters = 0;
-
-    if (n_azimuth > 1)
+    // Uniform-grid detection: the step is fitted over the whole grid in double precision, and the grid counts as
+    // uniform when every value lies within 1e-6 rad of the fitted grid; the O(1) index of the grid search is then off
+    // by at most that much (a step from two neighbouring values would carry their rounding into every index). Other
+    // grids use the binary search. Returns 1 / step, or 0 for a grid that is not uniform.
+    auto uniform_step_rinv = [](const dtype *g, size_t n) -> float
     {
-        az_fmin = (float)p_azimuth_grid[0];
-        az_fmax = (float)p_azimuth_grid[n_azimuth - 1];
-        float step0 = (float)(p_azimuth_grid[1] - p_azimuth_grid[0]);
-        az_uniform = (step0 > 0.0f);
-        for (size_t a = 2; a < n_azimuth && az_uniform; ++a)
+        const double step = ((double)g[n - 1] - (double)g[0]) / (double)(n - 1);
+        if (!(step > 0.0))
+            return 0.0f;
+        for (size_t i = 1; i + 1 < n; ++i)
         {
-            float step_a = (float)(p_azimuth_grid[a] - p_azimuth_grid[a - 1]);
-            if (std::abs(step_a - step0) > 1e-4f * step0)
-                az_uniform = false;
+            const double dev = (double)g[i] - (double)g[0] - (double)i * step;
+            if (dev > 1e-6 || dev < -1e-6)
+                return 0.0f;
         }
-        if (az_uniform)
-            az_step_rinv = 1.0f / step0;
-
-        int tmp = (int)n_azimuth + 1;
-        while ((1 << az_bsearch_iters) < tmp)
-            ++az_bsearch_iters;
-    }
-
-    if (n_elevation > 1)
+        return (float)(1.0 / step);
+    };
+    auto bsearch_iters = [](size_t n)
     {
-        el_fmin = (float)p_elevation_grid[0];
-        float step0 = (float)(p_elevation_grid[1] - p_elevation_grid[0]);
-        el_uniform = (step0 > 0.0f);
-        for (size_t a = 2; a < n_elevation && el_uniform; ++a)
-        {
-            float step_a = (float)(p_elevation_grid[a] - p_elevation_grid[a - 1]);
-            if (std::abs(step_a - step0) > 1e-4f * step0)
-                el_uniform = false;
-        }
-        if (el_uniform)
-            el_step_rinv = 1.0f / step0;
-
-        int tmp = (int)n_elevation + 1;
-        while ((1 << el_bsearch_iters) < tmp)
-            ++el_bsearch_iters;
-    }
+        int iters = 0;
+        while ((size_t(1) << iters) < n + 1)
+            ++iters;
+        return iters;
+    };
+    const float az_fmin = (float)p_azimuth_grid[0], az_fmax = (float)p_azimuth_grid[n_azimuth - 1];
+    const float el_fmin = (float)p_elevation_grid[0];
+    const float az_step_rinv = n_azimuth > 1 ? uniform_step_rinv(p_azimuth_grid, n_azimuth) : 0.0f;
+    const float el_step_rinv = n_elevation > 1 ? uniform_step_rinv(p_elevation_grid, n_elevation) : 0.0f;
+    const bool az_uniform = az_step_rinv > 0.0f, el_uniform = el_step_rinv > 0.0f;
+    const int az_bsearch_iters = bsearch_iters(n_azimuth), el_bsearch_iters = bsearch_iters(n_elevation);
 
     // Pack grid search parameters into structs
     // grid_f fields are assigned below after the grid arrays are allocated
@@ -725,7 +736,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
     // AVX2 constants
     const __m256 eps_8 = _mm256_set1_ps(eps);
-    const __m256 eps_sq_8 = _mm256_set1_ps(eps * eps); // squared eps for rsqrt guard
 
     // Tail mask for masked stores (based on n_out % 8)
     const int tail = (int)(n_out % 8);
@@ -745,8 +755,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
     // Two-level loop: outer over angles (OMP), inner over elements (AVX2, 8 elements/vector)
     if (!per_angle_rotation && !per_element_angles && n_out >= 8)
     {
-#pragma omp parallel for schedule(dynamic, 1) if (n_ang >= 4 && n_ang * n_out >= 512)
-        for (long long a = 0; a < (long long)n_ang; ++a)
+        avx2_for((long long)n_ang, n_ang >= 4 && n_ang * n_out >= 512, true, [&](long long a)
         {
             // Output base pointers for this angle's column (column-major: column a starts at offset a*n_out)
             dtype *out_vr = p_v_re + a * n_out;
@@ -785,7 +794,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                 // Stages B+C: Rotation, cart2geo, basis vectors, gamma
                 __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
-                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8, eps_sq_8,
+                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
                                          &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
 
                 // Stage D: Distance
@@ -910,12 +919,12 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 #undef STORE_F2D
                 }
             } // end inner element loop
-        } // end outer angle loop
+        }); // end outer angle loop
     }
     // Angle-vectorized path: n_out < 8, no per-angle rotation, no per-element angles
-    // Outer loop over elements (1–7 iters), inner loop over angle chunks (AVX2, 8 angles/vector)
+    // One loop over all pairs of element (1–7) and chunk of 8 angles (AVX2, 8 angles/vector)
     // R, position, offset are broadcast (constant for one element across all angles).
-    // sincos is vectorized across 8 angles in the inner loop.
+    // sincos is vectorized across the 8 angles of a chunk.
     else if (!per_angle_rotation && !per_element_angles)
     {
         const size_t n_ang_padded = ((n_ang + 7) / 8) * 8;
@@ -933,8 +942,13 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
         }
         const size_t n_valid_ang_tail = (ang_tail == 0) ? 8 : (size_t)ang_tail;
 
-        for (size_t o = 0; o < n_out; ++o)
+        // One parallel region for all elements and angle chunks
+        const long long n_items = (long long)n_out * n_ang_vec;
+        avx2_for(n_items, n_ang_vec >= 16, false, [&](long long item)
         {
+            const size_t o = (size_t)(item / n_ang_vec);
+            const long long av = item % n_ang_vec;
+
             // Broadcast per-element data across 8 angle lanes
             RMatrix8 R;
             for (int k = 0; k < 9; ++k)
@@ -946,9 +960,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
             __m256i offset_bc = _mm256_set1_epi32(offset_elem[o]);
 
-            // Inner loop over angle chunks of 8 (AVX2)
-#pragma omp parallel for schedule(static) if (n_ang_vec >= 16)
-            for (long long av = 0; av < n_ang_vec; ++av)
+            // Chunk of 8 angles (AVX2)
             {
                 const size_t a_base = (size_t)av * 8;
                 const bool is_ang_tail_iter = (av == n_ang_vec - 1) && (ang_tail != 0);
@@ -1000,7 +1012,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                 // Stages B+C: Rotation, cart2geo, basis vectors, gamma
                 __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
-                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8, eps_sq_8,
+                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
                                          &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
 
                 // Stage D: Distance
@@ -1145,16 +1157,15 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                             p_gamma[idx] = (dtype)tmp_g[j];
                     }
                 }
-            } // end inner angle loop
-        } // end outer element loop
+            } // end angle chunk
+        }); // end loop over elements and angle chunks
     }
     // General path: per-angle rotation or per-element angles
     // Two-level loop without angle hoisting (sincos computed per vector iteration)
     else
     {
         // For per_angle_rotation with OMP, each thread needs its own R buffer
-#pragma omp parallel for schedule(dynamic, 1) if (n_ang >= 4 && n_ang * n_out >= 512)
-        for (long long a = 0; a < (long long)n_ang; ++a)
+        avx2_for((long long)n_ang, n_ang >= 4 && n_ang * n_out >= 512, true, [&](long long a)
         {
             // Output base pointers for this angle's column
             dtype *out_vr = p_v_re + a * n_out;
@@ -1268,7 +1279,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                 // Stages B+C: Rotation, cart2geo, basis vectors, gamma
                 __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
-                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8, eps_sq_8,
+                avx2_rotate_and_polarize(R, sAZi8, cAZi8, sELi8, cELi8,
                                          &dx8, &dy8, &dz8, &az8, &el8, &cos_gamma8, &sin_gamma8);
 
                 // Stage D: Distance
@@ -1392,7 +1403,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 #undef STORE_F2D
                 }
             } // end inner element loop
-        } // end outer angle loop (general path)
+        }); // end outer angle loop (general path)
     }
 }
 

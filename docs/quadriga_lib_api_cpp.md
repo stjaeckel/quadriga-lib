@@ -709,8 +709,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_interpolate) · [Python](quad
   infinite angles give NaN in all outputs of that angle and output, without an exception
 - Outputs are resized only when their size differs, so pre-allocated outputs are written in place
 - Kernels: GENERIC computes in the precision of `dtype`; AVX2 computes in single precision also for `double`, with
-  errors of up to a few 1e-5 of the peak field value and about 1e-4 rad in the angles (more near the poles of the
-  local frame); auto selects GENERIC in this version, which may change in a later version
+  errors of up to about 2e-6 of the peak field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole
+  of the local frame up to about 2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most
+  4e-4 rad) in the local elevation; auto selects GENERIC in this version, which may change in a later version
 - Throws `std::invalid_argument` for an invalid `ant`, sizes that do not match, element indices `>= n_elements`, an
   unknown or unavailable kernel, and outputs that are an input, a data member of `ant` or another output, or share
   memory with one

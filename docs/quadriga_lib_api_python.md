@@ -544,9 +544,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [MATLAB](quadrig
   nearest entry; outputs `(n_out, n_ang, n_freq)`; a 3D pattern is the same at every frequency
 - `azimuth` of shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
 - NaN or infinite angles give NaN in all outputs of that angle and output, without an error
-- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to a few 1e-5 of the peak
-  field value and about 1e-4 rad in the angles (more near the poles of the local frame); auto selects GENERIC in this
-  version, which may change in a later version
+- Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the peak
+  field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
+  2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
+  elevation; auto selects GENERIC in this version, which may change in a later version
 - The flags `dist`, `local_angles`, `fast_access` and `complex` take a bool or `numpy.bool_`; `None` selects the
   default, any other type raises `TypeError`
 
