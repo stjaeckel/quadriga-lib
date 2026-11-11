@@ -2009,6 +2009,45 @@ TEST_CASE("Get Channels Spherical - AVX2 with per-element angles, n_links not a 
     get_channels_spherical_avx2_tail_check<double>();
 }
 
+// Receiver directly above the transmitter: the path leaves and arrives along the zenith and the nadir, the poles of
+// both antenna frames. Cross-polarized isotropic radiators at both ends and a polarization-preserving path give a total
+// power of 2 (V to V and H to H, 1 each), with the AVX2 kernel as with the generic one.
+template <typename dtype>
+static void get_channels_spherical_vertical_link_check()
+{
+    const auto ant = quadriga_lib::generate_arrayant_xpol<dtype>(10.0);
+    arma::Mat<dtype> fbs(3, 1, arma::fill::zeros);
+    fbs(2) = dtype(5.0);
+    const arma::Col<dtype> gain(1, arma::fill::ones), len(1, arma::fill::zeros);
+    arma::Mat<dtype> M(8, 1, arma::fill::zeros);
+    M(0) = dtype(1.0), M(6) = dtype(1.0);
+
+    arma::Cube<dtype> cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
+    quadriga_lib::get_channels_spherical<dtype>(&ant, &ant, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, &fbs, &fbs, &gain, &len, &M,
+                                                &cr_g, &ci_g, &dl_g, dtype(0), false, false, nullptr, nullptr, nullptr, nullptr, 1);
+    quadriga_lib::get_channels_spherical<dtype>(&ant, &ant, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, &fbs, &fbs, &gain, &len, &M,
+                                                &cr_v, &ci_v, &dl_v, dtype(0), false, false, nullptr, nullptr, nullptr, nullptr, 2);
+    REQUIRE(cr_v.n_elem == cr_g.n_elem);
+    double p_g = 0.0, p_v = 0.0, dmax = 0.0;
+    for (arma::uword i = 0; i < cr_g.n_elem; ++i)
+    {
+        p_g += double(cr_g(i)) * double(cr_g(i)) + double(ci_g(i)) * double(ci_g(i));
+        p_v += double(cr_v(i)) * double(cr_v(i)) + double(ci_v(i)) * double(ci_v(i));
+        dmax = std::max(dmax, std::hypot(double(cr_g(i) - cr_v(i)), double(ci_g(i) - ci_v(i))));
+    }
+    CHECK(std::abs(p_g - 2.0) < 1e-5);
+    CHECK(std::abs(p_v - 2.0) < 1e-5);
+    CHECK(dmax < 1e-5);
+}
+
+TEST_CASE("Get Channels Spherical - AVX2 with the receiver directly above the transmitter")
+{
+    if (!quadriga_lib::quadriga_lib_has_AVX2()) // use_kernel = 2 needs the AVX2 kernel
+        return;
+    get_channels_spherical_vertical_link_check<float>();
+    get_channels_spherical_vertical_link_check<double>();
+}
+
 TEST_CASE("Get Channels Spherical - 0 paths with add_fake_los_path")
 {
     // The output holds exactly the zero-power LOS path; its delays and angles per antenna pair equal those of a real

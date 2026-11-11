@@ -19,9 +19,9 @@
 //    calc_rotation_matrix (library call); the local field comes from the smooth pattern; the polarization rotation
 //    angle follows from the theta basis vectors of the global and the local frame, the projected distance from the
 //    local direction and the element position. The signs of heading and tilt are pinned by hand values.
-//  - The AVX2 kernel is compared with the GENERIC kernel on a 3GPP panel, with tolerances from single-precision
-//    arithmetic.
-// No case evaluates the AVX2 kernel at exactly +/- 90 degree elevation, neither at the input nor in the local frame.
+//  - The AVX2 kernel is compared with the GENERIC kernel on a 3GPP panel at random directions, with tolerances from
+//    single-precision arithmetic, and at fixed directions (poles of the global and the local frame, azimuth wrap,
+//    grid points), with tolerances pinned to the measured accuracy.
 //
 // Conventions: angles in rad; the smooth pattern has 3 elements on a 20 x 15 degree grid; test angles keep the local
 // azimuth within +/- 170 degree and the local elevation within +/- 80 degree (except where a case says otherwise).
@@ -575,17 +575,14 @@ TEST_CASE("arrayant_interpolate - the projected distance follows the element pos
         struct qd_dir
         {
             double az, el, dx, dy, dz;
-            bool pole;
         };
-        const qd_dir dirs[4] = {{0.0, 0.0, -1.0, 0.0, 0.0, false},
-                                {0.75 * pi, 0.0, rs2, -rs2, 0.0, false},
-                                {0.0, -0.25 * pi, -rs2, 0.0, rs2, false},
-                                {0.0, -0.5 * pi, 0.0, 0.0, 1.0, true}};
+        const qd_dir dirs[4] = {{0.0, 0.0, -1.0, 0.0, 0.0},
+                                {0.75 * pi, 0.0, rs2, -rs2, 0.0},
+                                {0.0, -0.25 * pi, -rs2, 0.0, rs2},
+                                {0.0, -0.5 * pi, 0.0, 0.0, 1.0}};
         for (int kernel : kernels())
             for (const auto &d : dirs)
             {
-                if (d.pole && kernel == 2) // Not at the poles for AVX2
-                    continue;
                 INFO("kernel " << kernel << ", az " << d.az << ", el " << d.el);
                 const arma::Mat<dtype> az(1, 1, arma::fill::value((dtype)d.az)), el(1, 1, arma::fill::value((dtype)d.el));
                 const auto r = run(ant, az, el, &i_element, nullptr, &pos, kernel);
@@ -893,6 +890,123 @@ TEST_CASE("arrayant_interpolate - GENERIC and AVX2 agree on a 3GPP panel")
     SECTION("vectorized over angles")
     {
         check(0.0f, 3, 1, 150, 1, "over angles"), check(0.0, 3, 1, 150, 1, "over angles");
+    }
+}
+
+TEST_CASE("arrayant_interpolate - AVX2 accuracy at fixed directions and at the poles")
+{
+    // Fixed directions where single-precision arithmetic is weakest: the poles of the global frame (zenith, nadir),
+    // the pole of the local frame (antenna tilted by 90 degree) and 1e-3 rad next to it, the azimuth wrap, grid points
+    // and midpoints, and a pattern whose grid is built in single precision. Reference: GENERIC with double on the same
+    // double inputs. Each case runs through the three AVX2 code paths (8 outputs: vectorized over elements; 3 outputs:
+    // vectorized over angles; per-element angles: per element and angle), with float and double. Tolerances: 3 to 5
+    // times the largest deviation measured on an AVX2 CPU, at least about one single-precision rounding (1e-7 for
+    // field and power, 2e-7 rad for angles); field and power (|V|^2 + |H|^2) relative to the peak amplitude M and M^2
+    // of the pattern, angles in rad, distance in m (element positions up to 0.4 m). At the exact local pole the local
+    // azimuth is undefined (inf: not compared), so the field components depend on the azimuth each kernel picks; the
+    // power does not. Near the local pole the azimuth error grows as about 2e-7 rad divided by the distance from it.
+    if (!quadriga_lib::quadriga_lib_has_AVX2())
+        return;
+
+    const double inf = std::numeric_limits<double>::infinity(), deg = pi / 180.0;
+    std::vector<double> az_gen, el_gen, az_8, el_pole, el_near, az_grid, el_grid, az_fgrid, el_fgrid;
+    for (int i = 0; i < 16; ++i)
+        az_gen.push_back((-170.0 + 21.3 * i) * deg), el_gen.push_back((-75.0 + 9.7 * i) * deg);
+    for (int i = 0; i < 8; ++i)
+    {
+        const double sgn = i % 2 ? -1.0 : 1.0, half = i % 2 ? 0.5 : 0.0;
+        az_8.push_back((-170.0 + 45.0 * i) * deg), el_pole.push_back(sgn * 0.5 * pi), el_near.push_back(sgn * (0.5 * pi - 1e-3));
+        az_grid.push_back((-150.0 + 37.0 * i + half) * deg), el_grid.push_back((-60.0 + 15.0 * i + half) * deg);
+    }
+    for (int k = -20; k <= 20; ++k)
+        az_fgrid.push_back(89.0 * deg + 2.5e-6 * k), el_fgrid.push_back(0.1);
+
+    // Patterns: 0 = 3GPP element, 1 = the same element generated in float, 2 = cross-polarized isotropic radiator,
+    // 3 = half-wave dipole; all on the default 1 degree grid, in both precisions
+    const quadriga_lib::arrayant<double> patterns_d[4] = {quadriga_lib::generate_arrayant_3GPP<double>(),
+                                                          convert<double>(quadriga_lib::generate_arrayant_3GPP<float>()),
+                                                          quadriga_lib::generate_arrayant_xpol<double>(),
+                                                          quadriga_lib::generate_arrayant_half_wave_dipole<double>()};
+    const quadriga_lib::arrayant<float> patterns_f[4] = {convert<float>(patterns_d[0]), convert<float>(patterns_d[1]),
+                                                         convert<float>(patterns_d[2]), convert<float>(patterns_d[3])};
+    struct qd_case
+    {
+        const char *name;
+        int pattern;
+        std::vector<double> az, el;
+        double bank, tilt, heading;
+        double t_field, t_power, t_az, t_el, t_gamma, t_dist;
+    };
+    const qd_case cases[] = {
+        {"generic", 0, az_gen, el_gen, 0.3, -0.2, 0.7, 1e-6, 1e-6, 4e-6, 6e-7, 4e-6, 6e-7},
+        {"global poles", 2, az_8, el_pole, 0.0, 0.0, 0.0, 5e-7, 1e-6, 5e-7, 2e-7, 2e-7, 1.5e-7},
+        {"local pole", 2, {0.0, pi, 0.0, pi}, {0.0, 0.0, 0.0, 0.0}, 0.0, -0.5 * pi, 0.0, inf, 2e-6, inf, 2e-7, inf, 3e-7},
+        {"1e-3 from the local pole", 2, {0.0, pi, 0.0, pi}, {1e-3, 1e-3, -1e-3, -1e-3}, 0.0, -0.5 * pi, 0.0, 3e-4, 2e-6, 3e-4, 1e-4, 3e-4, 3e-7},
+        {"1e-3 from the poles, dipole", 3, az_8, el_near, 0.0, 0.0, 0.0, 7e-5, 1.5e-7, 5e-7, 1e-4, 2e-7, 3e-7},
+        {"azimuth wrap", 0, {pi - 1e-6, -pi + 1e-6, pi - 0.3 * deg, -pi + 0.3 * deg, pi}, {0.1, -0.2, 0.3, 0.0, 0.5}, 0.0, 0.0, 0.0, 1e-7, 1e-7, 4e-7, 2e-7, 2e-7, 5e-7},
+        {"grid points and midpoints", 0, az_grid, el_grid, 0.0, 0.0, 0.0, 3e-6, 5e-6, 3e-7, 4e-7, 2e-7, 5e-7},
+        {"grid built in float", 1, az_fgrid, el_fgrid, 0.0, 0.0, 0.0, 2e-7, 1e-7, 2e-7, 2e-7, 2e-7, 4e-7}};
+
+    QD_DIAG("\n# diag: AVX2 at fixed directions against GENERIC (double); d_field / M, d_power / M^2, angles in rad, dist in m\n");
+    QD_DIAG("case,path,dtype,d_field,d_power,d_az,d_el,d_gamma,d_dist\n");
+    auto check = [](const auto &ant, const qd_case &c, const quadriga_lib::arrayant<double> &ant_d)
+    {
+        using dtype = typename std::decay<decltype(ant.e_theta_re)>::type::elem_type;
+        double M = 0.0;
+        for (arma::uword i = 0; i < ant_d.e_theta_re.n_elem; ++i)
+            M = std::max({M, std::hypot(ant_d.e_theta_re(i), ant_d.e_theta_im(i)), std::hypot(ant_d.e_phi_re(i), ant_d.e_phi_im(i))});
+        const arma::uword n_ang = c.az.size();
+        arma::cube ori_d(3, 1, 1);
+        ori_d(0) = c.bank, ori_d(1) = c.tilt, ori_d(2) = c.heading;
+        const arma::Cube<dtype> ori = arma::conv_to<arma::Cube<dtype>>::from(ori_d);
+
+        struct qd_path
+        {
+            const char *name;
+            arma::uword n_out, n_rows;
+        };
+        const qd_path paths[3] = {{"over elements", 8, 1}, {"over angles", 3, 1}, {"per element and angle", 3, 3}};
+        for (const auto &p : paths)
+        {
+            arma::uvec i_element(p.n_out);
+            for (arma::uword o = 0; o < p.n_out; ++o)
+                i_element(o) = o % ant_d.e_theta_re.n_slices;
+            arma::mat az_d(p.n_rows, n_ang), el_d(p.n_rows, n_ang), pos_d(3, p.n_out);
+            for (arma::uword a = 0; a < n_ang; ++a)
+                az_d.col(a).fill(c.az[a]), el_d.col(a).fill(c.el[a]);
+            for (arma::uword o = 0; o < p.n_out; ++o)
+                pos_d(0, o) = 0.1 * (double)o - 0.3, pos_d(1, o) = 0.2 - 0.05 * (double)o, pos_d(2, o) = 0.04 * (double)o;
+            const arma::Mat<dtype> pos = arma::conv_to<arma::Mat<dtype>>::from(pos_d);
+            const auto ref = run(ant_d, az_d, el_d, &i_element, &ori_d, &pos_d, 1);
+            const auto r = run(ant, arma::conv_to<arma::Mat<dtype>>::from(az_d), arma::conv_to<arma::Mat<dtype>>::from(el_d), &i_element, &ori, &pos, 2);
+
+            double d_field = 0.0, d_power = 0.0, d_az = 0.0, d_el = 0.0, d_gamma = 0.0, d_dist = 0.0;
+            for (arma::uword i = 0; i < ref.V_re.n_elem; ++i)
+            {
+                const cxd V((double)r.V_re(i), (double)r.V_im(i)), H((double)r.H_re(i), (double)r.H_im(i));
+                const cxd Vr(ref.V_re(i), ref.V_im(i)), Hr(ref.H_re(i), ref.H_im(i));
+                d_field = std::max({d_field, std::abs(V - Vr) / M, std::abs(H - Hr) / M});
+                d_power = std::max(d_power, std::abs(std::norm(V) + std::norm(H) - std::norm(Vr) - std::norm(Hr)) / (M * M));
+                d_az = std::max(d_az, std::abs(wrap((double)r.az_loc(i) - ref.az_loc(i))));
+                d_el = std::max(d_el, std::abs((double)r.el_loc(i) - ref.el_loc(i)));
+                d_gamma = std::max(d_gamma, std::abs(wrap((double)r.gamma(i) - ref.gamma(i))));
+                d_dist = std::max(d_dist, std::abs((double)r.dist(i) - ref.dist(i)));
+            }
+            QD_DIAG("%s,%s,%s,%.3e,%.3e,%.3e,%.3e,%.3e,%.3e\n", c.name, p.name, std::is_same<dtype, float>::value ? "float" : "double",
+                    d_field, d_power, d_az, d_el, d_gamma, d_dist);
+            INFO(c.name << ", " << p.name << ", " << (std::is_same<dtype, float>::value ? "float" : "double"));
+            CHECK(d_power < c.t_power); // Also where the fields are not compared
+            CHECK((std::isinf(c.t_field) || d_field < c.t_field));
+            CHECK((std::isinf(c.t_az) || d_az < c.t_az));
+            CHECK(d_el < c.t_el);
+            CHECK((std::isinf(c.t_gamma) || d_gamma < c.t_gamma));
+            CHECK(d_dist < c.t_dist);
+        }
+    };
+    for (const auto &c : cases)
+    {
+        check(patterns_f[c.pattern], c, patterns_d[c.pattern]);
+        check(patterns_d[c.pattern], c, patterns_d[c.pattern]);
     }
 }
 
