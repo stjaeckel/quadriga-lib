@@ -131,6 +131,8 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(rx_pos[:, 0], [-5.86144, 53.8124, 1.0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(rx_orientation[:, 0], [0.0, 0.0, 1.2753], atol=1.5e-4, rtol=0)
 
+        M_dl, path_gain_dl = M[0], path_gain[0]
+
         # --- uplink: i_cir=1, i_orig=1, downlink=False ---
         (center_freq, tx_pos_ul, tx_ori_ul, rx_pos_ul, rx_ori_ul,
          fbs_ul, lbs_ul, path_gain, path_length, M,
@@ -150,6 +152,11 @@ class test_case(unittest.TestCase):
         # AoD / EoD (uplink) match AoA / EoA (downlink)
         npt.assert_allclose(aod_ul[0], aoa_dl[0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(eod_ul[0], eoa_dl[0], atol=1.5e-4, rtol=0)
+
+        # Reciprocity: uplink M is the plain transpose of the downlink M (rows HV and VH swap),
+        # without conjugation; the path gain is the same in both directions
+        npt.assert_allclose(M[0], M_dl[[0, 1, 4, 5, 2, 3, 6, 7]], atol=1e-12, rtol=0)
+        npt.assert_allclose(path_gain[0], path_gain_dl, rtol=1e-12, atol=0)
 
     # ------------------------------------------------------------------
     # qrt_file_read - v5 file, normalize_M switch

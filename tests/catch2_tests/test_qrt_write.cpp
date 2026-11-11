@@ -537,6 +537,48 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
     }
 }
 
+TEST_CASE("QRT Write - uplink read returns the transposed M")
+{
+    // Reciprocity: the uplink M is the plain transpose of the downlink M (v5: HV and VH swap; v6: the same
+    // scalar), without conjugation, and the path gain is the same in both directions. The written entries
+    // are complex and non-symmetric, so a conjugation or a missing swap shows.
+    for (bool scalar : {false, true})
+    {
+        std::string fn = scalar ? "tests/data/test_write_uplink_v6.qrt" : "tests/data/test_write_uplink_v5.qrt";
+        arma::vec freq = scalar ? arma::vec{1000.0, 2000.0} : arma::vec{3.5, 28.0};
+        arma::mat cir_pos = {{1.0, 2.0, 3.0}};
+        quadriga_lib::qrt_file_init<double>(fn, freq, cir_pos, arma::mat(), {"RX"}, {0}, 1, scalar);
+
+        auto mk = [&](unsigned nSEG, std::vector<uint8_t> t)
+        { return scalar ? make_scalar_path(0, nSEG, 2, t) : make_em_path(0, nSEG, 2, t); };
+        std::vector<path> paths = {mk(0, {}), mk(2, {1, 2})};
+        REQUIRE(quadriga_lib::qrt_file_append<double>(fn, paths, arma::vec{100.0, 200.0, 30.0},
+                                                      arma::vec{0.0, 0.0, 0.0}, "TX") == 2);
+
+        for (int normalize_M : {0, 1})
+        {
+            arma::mat pg_dl, pg_ul;
+            arma::cube M_dl, M_ul;
+            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                &pg_dl, nullptr, &M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_M);
+            quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                &pg_ul, nullptr, &M_ul, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_M);
+            REQUIRE(M_dl.n_rows == (scalar ? 2u : 8u));
+            REQUIRE(M_dl.n_cols == 2);
+            REQUIRE(M_dl.n_slices == 2);
+            arma::cube M_T = M_dl;
+            if (!scalar)
+            {
+                M_T.rows(2, 3) = M_dl.rows(4, 5);
+                M_T.rows(4, 5) = M_dl.rows(2, 3);
+            }
+            CHECK(arma::approx_equal(M_ul, M_T, "absdiff", 1e-12));
+            CHECK(arma::approx_equal(pg_ul, pg_dl, "reldiff", 1e-12));
+        }
+        std::remove(fn.c_str());
+    }
+}
+
 TEST_CASE("QRT Write - append to a v4 file is rejected")
 {
     // v4 legacy files cannot be appended to; the file must stay unchanged

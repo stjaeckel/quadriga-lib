@@ -488,9 +488,8 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths) · [Python](../python/geometry-based-stochastic-model.md#gbsm.rays_from_paths)
 
 - Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [qrt_file_read](channel-functions.md#qrt_file_read), read as `qrt_file_read<double>` with `downlink = true` and `normalize_M = 1` (an uplink read gives
-  swapped ends and a conjugated `M`, which this function does not undo; `normalize_M = 0` leaves only the free-space
-  gain in `power`)
+  [qrt_file_read](channel-functions.md#qrt_file_read), read as `qrt_file_read<double>` with `normalize_M = 1` (`downlink = false` gives the reverse
+  link; `normalize_M = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
@@ -535,7 +534,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`rays`** — Ray data with `n_ray = n_path`, see [gbsm_rays](#gbsm_rays); use with `link_gain_dB = 0` and without `kf_ratio`
 
 ### See also:
-- [qrt_file_read](channel-functions.md#qrt_file_read) (source of the path data, `downlink = true`)
+- [qrt_file_read](channel-functions.md#qrt_file_read) (source of the path data)
 - [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers) (write the paths of [ssf_paths](#ssf_paths) to a QRT file)
 - [ssf_paths](#ssf_paths) (paths at moved positions)
 - [gbsm_single_link_channel](#gbsm_single_link_channel) (channel of the link)

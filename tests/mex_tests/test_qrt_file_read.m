@@ -100,10 +100,12 @@ aoa_dl = aoa{1};
 eoa_dl = eoa{1};
 fbs_dl = fbs_pos{1};
 lbs_dl = lbs_pos{1};
+M_dl = M{1};
+path_gain_dl = path_gain{1};
 
 % Uplink call: only request up to eod (12 outputs), matching C++ test
 [~, tx_pos_ul, tx_ori_ul, rx_pos_ul, rx_ori_ul, fbs_ul, lbs_ul, ...
-    ~, ~, ~, aod_ul, eod_ul] = ...
+    path_gain_ul, ~, M_ul, aod_ul, eod_ul] = ...
     quadriga_lib.qrt_file_read(fn, 2, 2, false, 1);
 
 T = [-5.86144; 53.8124; 1.0];
@@ -125,6 +127,11 @@ assertElementsAlmostEqual(lbs_ul{1}, fbs_dl, 'absolute', 1.5e-4);
 % uplink aod/eod match downlink aoa/eoa
 assertElementsAlmostEqual(aod_ul{1}, aoa_dl, 'absolute', 1.5e-4);
 assertElementsAlmostEqual(eod_ul{1}, eoa_dl, 'absolute', 1.5e-4);
+
+% Reciprocity: uplink M is the plain transpose of the downlink M (rows HV and VH swap),
+% without conjugation; the path gain is the same in both directions
+assertElementsAlmostEqual(M_ul{1}, M_dl([1 2 5 6 3 4 7 8], :, :), 'absolute', 1e-12);
+assertElementsAlmostEqual(path_gain_ul{1}, path_gain_dl, 'relative', 1e-12);
 
 % ---------- qrt_file_parse: v5 file ----------
 fn5 = 'data/test_v5.qrt';
