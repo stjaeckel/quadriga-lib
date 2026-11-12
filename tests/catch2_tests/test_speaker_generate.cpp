@@ -1852,4 +1852,23 @@ TEST_CASE("Speaker - Non-finite and too fine inputs")
         CHECK(arma::approx_equal(freqs(lo, 12000.0), ref, "absdiff", 0.0));
     for (double hi : {nan, inf})
         CHECK(arma::approx_equal(freqs(80.0, hi), ref, "absdiff", 0.0));
+
+    // A subnormal lower cutoff gives the bands of a 10 Hz cutoff (bands below 20 Hz are dropped)
+    CHECK(arma::approx_equal(freqs(std::numeric_limits<double>::denorm_min(), 12000.0), freqs(10.0, 12000.0), "absdiff", 0.0));
+
+    // Other non-finite scalars and non-finite or non-positive frequencies throw
+    auto call = [&](int i, double v)
+    {
+        double a[9] = {0.05, 12.0, 12.0, 85.0, 0.0, 0.0, 0.0, 0.15, 0.25};
+        a[i] = v;
+        quadriga_lib::generate_speaker<double>("horn", a[0], 80.0, 12000.0, a[1], a[2], a[3], "hemisphere",
+                                               a[4], a[5], a[6], a[7], a[8], f, 90.0);
+    };
+    for (int i = 0; i < 9; ++i)
+        for (double v : {nan, inf})
+            CHECK_THROWS_AS(call(i, v), std::invalid_argument);
+    for (double v : {nan, inf, 0.0, -1.0})
+        CHECK_THROWS_AS(quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
+                                                               0.0, 0.0, 0.0, 0.15, 0.25, arma::vec({1000.0, v}), 90.0),
+                        std::invalid_argument);
 }

@@ -7,6 +7,7 @@
 #include "qd_arrayant_functions.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <cmath>
 #include <cstring>
@@ -124,6 +125,16 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
     if (radiation_type != "monopole" && radiation_type != "hemisphere" && radiation_type != "dipole" && radiation_type != "cardioid")
         throw std::invalid_argument("generate_speaker: radiation_type must be 'monopole', 'hemisphere', 'dipole', or 'cardioid'.");
 
+    // Non-finite values cannot be replaced by a default (except the cutoffs, see below)
+    const dtype scalars[9] = {radius, lower_rolloff_slope, upper_rolloff_slope, sensitivity, hor_coverage, ver_coverage,
+                              horn_control_freq, baffle_width, baffle_height};
+    for (dtype v : scalars)
+        if (!std::isfinite(v))
+            throw std::invalid_argument("generate_speaker: radius, slopes, sensitivity, coverage, horn_control_freq and baffle size must be finite.");
+    for (dtype f : frequencies)
+        if (!std::isfinite(f) || f <= dtype(0.0))
+            throw std::invalid_argument("generate_speaker: frequencies must be finite and positive.");
+
     // --- Fix input ranges ---
     radius = (radius <= dtype(0.0)) ? dtype(0.05) : radius;
     lower_cutoff = (lower_cutoff <= dtype(0.0) || !std::isfinite(lower_cutoff)) ? dtype(80.0) : lower_cutoff;
@@ -151,8 +162,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
     {
         // Third-octave bands: f_n = 1000 * 2^(n/3)
         double f_ref = 1000.0;
-        int n_start = (int)std::floor(3.0 * std::log2((double)lower_cutoff / f_ref)) - 1;
-        int n_end = (int)std::ceil(3.0 * std::log2((double)upper_cutoff / f_ref)) + 1;
+        // Cutoffs below 10 Hz give the same bands (bands below 20 Hz are dropped); the bound keeps log2 finite for
+        // subnormal cutoffs
+        int n_start = (int)std::floor(3.0 * std::log2(std::max((double)lower_cutoff, 10.0) / f_ref)) - 1;
+        int n_end = (int)std::ceil(3.0 * std::log2(std::max((double)upper_cutoff, 10.0) / f_ref)) + 1;
 
         std::vector<dtype> freq_vec;
         for (int n = n_start; n <= n_end; ++n)
