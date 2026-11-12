@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "quadriga_gbsm.hpp"
+#include "qd_arrayant_functions.hpp"
 
 #include <algorithm>
 #include <any>
@@ -129,7 +130,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     // Validation; the ground-reflection checks of ssf_paths for "drift" follow in the snapshot loop
     for (int e = 0; e < 2; ++e)
     {
-        const std::string msg = (e == 0) ? tx_array.is_valid() : rx_array.is_valid();
+        const std::string msg = (e == 0) ? qd_arrayant_is_valid_quick(tx_array) : qd_arrayant_is_valid_quick(rx_array);
         if (!msg.empty())
             throw std::invalid_argument((e == 0 ? "Transmit antenna: " : "Receive antenna: ") + msg);
     }

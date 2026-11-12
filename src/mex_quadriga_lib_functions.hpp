@@ -156,7 +156,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
 
     if (validate)
     {
-        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant, false);
+        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant);
         if (!error_msg.empty())
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
     }

@@ -56,7 +56,7 @@ void quadriga_lib::qdant_write_multi(const std::string &fn,
     // Validate all entries before writing anything
     for (arma::uword i = 0; i < n_entries; ++i)
     {
-        std::string err = arrayant_vec[i].is_valid(false);
+        std::string err = qd_arrayant_check(arrayant_vec[i]);
         if (!err.empty())
             throw std::invalid_argument("qdant_write_multi: Entry " + std::to_string(i) + " is invalid: " + err);
     }
@@ -278,7 +278,7 @@ template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::qdant_read_mu
 # arrayant_is_valid_multi
 Validate a vector of arrayant objects for multi-frequency consistency
 
-- Each entry is validated individually via its `is_valid` member; `quick_check` is forwarded to that call.
+- Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
 - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
 - Stops at first error and returns a message identifying the failing entry and property.
@@ -286,13 +286,11 @@ Validate a vector of arrayant objects for multi-frequency consistency
 ## Declaration:
 ```
 std::string quadriga_lib::arrayant_is_valid_multi(
-        const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        bool quick_check = true);
+        const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
-- **`quick_check`** *(optional)* — If `true`, uses fast pointer-based per-entry validation; if `false`, performs full deep validation
 
 ## Returns:
 - Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match entry 0."`
@@ -302,14 +300,23 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 - [[generate_speaker]] (typical source of multi-frequency arrayant vectors)
 MD!*/
 
+// Checks of arrayant_is_valid_multi; per entry the public check (marks), the read-only full check or the read-only
+// quick check
+enum class qd_multi_check { mark, full, quick };
 template <typename dtype>
-std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec, bool quick_check)
+static std::string qd_is_valid_multi(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec, qd_multi_check mode)
 {
+    auto check = [mode](const quadriga_lib::arrayant<dtype> &ant)
+    {
+        return mode == qd_multi_check::mark ? ant.is_valid()
+                                            : (mode == qd_multi_check::full ? qd_arrayant_check(ant) : qd_arrayant_is_valid_quick(ant));
+    };
+
     if (arrayant_vec.empty())
         return std::string("Input vector is empty.");
 
-    // Validate first entry (always deep-check the reference entry)
-    std::string err = arrayant_vec[0].is_valid(quick_check);
+    // Validate the reference entry
+    std::string err = check(arrayant_vec[0]);
     if (!err.empty())
         return std::string("Entry 0: ") + err;
 
@@ -327,7 +334,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib
         std::string idx = std::to_string(i);
 
         // Validate individual entry
-        err = arrayant_vec[i].is_valid(quick_check);
+        err = check(arrayant_vec[i]);
         if (!err.empty())
             return std::string("Entry ") + idx + ": " + err;
 
@@ -401,8 +408,30 @@ std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib
     return std::string("");
 }
 
-template std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib::arrayant<float>> &, bool);
-template std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib::arrayant<double>> &, bool);
+template <typename dtype>
+std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec)
+{
+    return qd_is_valid_multi(arrayant_vec, qd_multi_check::mark);
+}
+
+template <typename dtype>
+std::string qd_arrayant_is_valid_multi_quick(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec)
+{
+    return qd_is_valid_multi(arrayant_vec, qd_multi_check::quick);
+}
+
+template <typename dtype>
+std::string qd_arrayant_check_multi(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec)
+{
+    return qd_is_valid_multi(arrayant_vec, qd_multi_check::full);
+}
+
+template std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib::arrayant<float>> &);
+template std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<quadriga_lib::arrayant<double>> &);
+template std::string qd_arrayant_is_valid_multi_quick(const std::vector<quadriga_lib::arrayant<float>> &);
+template std::string qd_arrayant_is_valid_multi_quick(const std::vector<quadriga_lib::arrayant<double>> &);
+template std::string qd_arrayant_check_multi(const std::vector<quadriga_lib::arrayant<float>> &);
+template std::string qd_arrayant_check_multi(const std::vector<quadriga_lib::arrayant<double>> &);
 
 /*!MD
 # arrayant_copy_element_multi
@@ -632,7 +661,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::array
         throw std::invalid_argument("arrayant_rotate_pattern_multi: Rotation angles must be finite.");
 
     // Validate input vector before modifying any entries
-    std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant_vec, true);
+    std::string err = qd_arrayant_is_valid_multi_quick(arrayant_vec);
     if (!err.empty())
         throw std::invalid_argument("arrayant_rotate_pattern_multi: Input validation failed: " + err);
 
@@ -725,11 +754,11 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
     const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec2)
 {
     // --- Validate individual inputs ---
-    std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant_vec1, false);
+    std::string err = qd_arrayant_check_multi(arrayant_vec1);
     if (!err.empty())
         throw std::invalid_argument("arrayant_concat_multi: First input invalid: " + err);
 
-    err = quadriga_lib::arrayant_is_valid_multi(arrayant_vec2, false);
+    err = qd_arrayant_check_multi(arrayant_vec2);
     if (!err.empty())
         throw std::invalid_argument("arrayant_concat_multi: Second input invalid: " + err);
 
@@ -1084,15 +1113,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
         out.name = arrayant_vec[0].name;
 
         // Quick-check pointers
-        out.check_ptr[0] = out.e_theta_re.memptr();
-        out.check_ptr[1] = out.e_theta_im.memptr();
-        out.check_ptr[2] = out.e_phi_re.memptr();
-        out.check_ptr[3] = out.e_phi_im.memptr();
-        out.check_ptr[4] = out.azimuth_grid.memptr();
-        out.check_ptr[5] = out.elevation_grid.memptr();
-        out.check_ptr[6] = out.element_pos.memptr();
-        out.check_ptr[7] = out.coupling_re.memptr();
-        out.check_ptr[8] = out.coupling_im.memptr();
+        qd_arrayant_mark_valid(out);
     }
 
     return output;

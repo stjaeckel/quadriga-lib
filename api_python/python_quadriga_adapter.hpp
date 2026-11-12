@@ -301,7 +301,7 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
 
     if (validate)
     {
-        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant, false);
+        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant);
         if (!error_msg.empty())
             throw std::invalid_argument(error_msg.c_str());
     }

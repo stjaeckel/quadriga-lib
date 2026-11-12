@@ -239,10 +239,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     }
 
     {
-        std::string err = quadriga_lib::arrayant_is_valid_multi(tx_array, false);
+        std::string err = qd_arrayant_check_multi(tx_array);
         if (!err.empty())
             throw std::invalid_argument("get_channels_multifreq: TX array validation failed: " + err);
-        err = quadriga_lib::arrayant_is_valid_multi(rx_array, false);
+        err = qd_arrayant_check_multi(rx_array);
         if (!err.empty())
             throw std::invalid_argument("get_channels_multifreq: RX array validation failed: " + err);
     }

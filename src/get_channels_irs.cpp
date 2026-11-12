@@ -10,6 +10,7 @@
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include "qd_arrayant_functions.hpp"
 
 /*!SECTION
 Channel generation functions
@@ -145,7 +146,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
                         fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
                         fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2);
 
-    std::string error_message = irs_array->is_valid();
+    std::string error_message = qd_arrayant_is_valid_quick(*irs_array);
     if (error_message.length() != 0)
     {
         error_message = "IRS array: " + error_message;
@@ -205,7 +206,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     // Update the IRS array for the second segment
     if (irs_array_2 != nullptr)
     {
-        std::string error_message = irs_array_2->is_valid();
+        std::string error_message = qd_arrayant_is_valid_quick(*irs_array_2);
         if (error_message.length() != 0)
         {
             error_message = "IRS array 2: " + error_message;

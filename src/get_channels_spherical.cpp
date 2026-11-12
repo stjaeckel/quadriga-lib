@@ -189,13 +189,13 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     }
 
     // Check if the antennas are valid
-    error_message = tx_array->is_valid();
+    error_message = qd_arrayant_is_valid_quick(*tx_array);
     if (error_message.length() != 0)
     {
         error_message = "Transmit antenna: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
-    error_message = rx_array->is_valid();
+    error_message = qd_arrayant_is_valid_quick(*rx_array);
     if (error_message.length() != 0)
     {
         error_message = "Receive antenna: " + error_message;

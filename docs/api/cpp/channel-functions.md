@@ -465,8 +465,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_channel) · [Python](..
 - Throws if the index was not reserved during [hdf5_create](#hdf5_create).
 - Structured data is always stored in single precision; input may be float or double.
 - Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.
-- Set `assume_valid = true` to skip integrity validation (faster but unsafe for potentially corrupted data).
-- The channel name is stored with at most 255 characters.
+- Channel names longer than 255 characters are rejected.
 - One writer per file at a time; files are not locked. Reading is safe while no one writes; different files can be
   read and written from parallel threads.
 
@@ -478,8 +477,7 @@ int quadriga_lib::hdf5_write(
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
-    unsigned iw = 0,
-    bool assume_valid = false);
+    unsigned iw = 0);
 ```
 
 ### Inputs:
@@ -489,7 +487,6 @@ int quadriga_lib::hdf5_write(
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`assume_valid`** *(optional)* — Skip channel integrity validation before writing
 
 ### Returns:
 - `0` if the slot was empty, `1` if existing data in the slot was replaced

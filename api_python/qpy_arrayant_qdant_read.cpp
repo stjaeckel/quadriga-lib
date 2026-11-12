@@ -69,7 +69,7 @@ py::dict arrayant_qdant_read(const std::string &fn,
             throw std::runtime_error("File does not contain any antenna data.");
         if (ant_vec.size() > 1) // The entries must form a frequency set
         {
-            std::string err = quadriga_lib::arrayant_is_valid_multi(ant_vec, true);
+            std::string err = quadriga_lib::arrayant_is_valid_multi(ant_vec);
             if (!err.empty())
                 throw std::invalid_argument("Entries in file '" + fn + "' do not form a frequency set (" + err +
                                             "); pass 'id' to read single entries.");

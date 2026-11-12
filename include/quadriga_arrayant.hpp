@@ -6,6 +6,7 @@
 #define quadriga_arrayant_H
 
 #include <armadillo>
+#include <atomic>
 #include <string>
 
 namespace quadriga_lib
@@ -29,8 +30,15 @@ namespace quadriga_lib
         arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part; [n_elements, n_ports]
         dtype center_frequency = dtype(299792458.0); // Center frequency
         bool read_only = false;                      // Prevent member functions from writing to the properties
-        dtype *check_ptr[9] = {};                    // Data pointers for quick validation
+        mutable std::atomic<const dtype *> check_ptr[9] = {}; // Data pointers of the last passed validity check (cache of the quick check)
         arrayant() {};                               // Default constructor
+
+        // Copy: the target is marked as validated when the source passes the full check; move: the target takes over
+        // the mark of the source (cache pointing to the target's own data)
+        arrayant(const arrayant &other);
+        arrayant(arrayant &&other);
+        arrayant &operator=(const arrayant &other);
+        arrayant &operator=(arrayant &&other);
 
         // Functions to determine the size of the array antenna properties
         arma::uword n_elevation() const; // Number of elevation angles
@@ -100,7 +108,7 @@ namespace quadriga_lib
                       arma::uword n_ports);    // Number of ports (after coupling of elements)
 
         // Validate integrity
-        std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise
+        std::string is_valid() const;                        // Full check; returns an empty string if valid or an error message otherwise
         std::string validate();                              // Same, but sets the "valid" property in the object and initializes the element positions and coupling matrix
     };
 
@@ -174,13 +182,12 @@ namespace quadriga_lib
                                     int use_kernel = 0);                              // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
     // Validate a vector of arrayant objects for multi-frequency consistency
-    // - Each entry is validated individually via its is_valid member; quick_check is forwarded to that call.
+    // - Each entry is validated individually via its is_valid member (full check).
     // - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
     // - Pattern data, center_frequency, and coupling matrix values are not compared (expected to vary).
     // - Stops at first error and returns a message identifying the failing entry and property.
     template <typename dtype>
-    std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects to validate
-                                        bool quick_check = true);                         // If true, uses fast pointer-based per-entry validation; if false, performs full deep validation
+    std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec); // Non-empty vector of arrayant objects to validate
 
     // Apply Euler rotations to all entries in a multi-frequency arrayant vector
     // - Calls .rotate_pattern on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).

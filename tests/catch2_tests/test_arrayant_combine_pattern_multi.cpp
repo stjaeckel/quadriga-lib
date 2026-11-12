@@ -268,7 +268,7 @@ TEST_CASE("Combine multi - Output passes is_valid")
     auto vec = build_simple_multi(freqs);
     auto out = quadriga_lib::arrayant_combine_pattern_multi(vec);
     for (auto &o : out)
-        CHECK(o.is_valid(false).empty());
+        CHECK(o.is_valid().empty());
 }
 
 TEST_CASE("Combine multi - Output center_frequency matches requested freq grid")
@@ -805,7 +805,7 @@ TEST_CASE("Combine multi - GHz antenna with varying pattern and coupling")
     REQUIRE(out.size() == 4);
     for (auto &o : out)
     {
-        CHECK(o.is_valid(false).empty());
+        CHECK(o.is_valid().empty());
         CHECK(o.e_theta_re.is_finite());
         CHECK(!o.e_theta_re.has_nan());
     }
@@ -864,7 +864,7 @@ TEST_CASE("Combine multi - 2-way speaker workflow with arrayant_concat_multi")
     REQUIRE(out.size() == 4);
     for (auto &o : out)
     {
-        CHECK(o.is_valid(false).empty());
+        CHECK(o.is_valid().empty());
         CHECK(o.n_elements() == 2); // 2 ports → 2 output "elements"
         CHECK(o.e_theta_re.is_finite());
         CHECK(!o.e_theta_re.has_nan());
@@ -962,7 +962,7 @@ TEST_CASE("Combine multi - Float instantiation")
 
     auto out = quadriga_lib::arrayant_combine_pattern_multi(vec);
     REQUIRE(out.size() == 1);
-    CHECK(out[0].is_valid(false).empty());
+    CHECK(out[0].is_valid().empty());
 }
 
 // ================================================================================================

@@ -144,12 +144,8 @@ static void run(fz::input &in)
         c.par_data.resize(in.size(n_par + 1));
     c.initial_position = in.ConsumeBool() ? 0 : in.ConsumeIntegral<int>();
 
-    // The integrity check may be skipped only for an object that passed it
-    std::string err = "?";
-    fz::clean([&] { err = c.is_valid(); });
-    const bool valid = err.empty(), skip_check = valid && in.ConsumeBool();
-
-    fz::clean([&] { c.calc_effective_path_gain(skip_check); });
+    fz::clean([&] { c.is_valid(); });
+    fz::clean([&] { c.calc_effective_path_gain(); });
     {
         const arma::uword i_snap = in.index(n_snap), n_add = in.size(4);
         const uint16_t add = in.ConsumeIntegral<uint16_t>();
@@ -185,9 +181,9 @@ static void run(fz::input &in)
         fz::clean([&] { quadriga_lib::hdf5_create(fn, nx, ny, nz, nw); });
     }
     unsigned ix = (unsigned)in.index(2), iy = (unsigned)in.index(2), iz = (unsigned)in.size(1), iw = (unsigned)in.size(1);
-    fz::clean([&] { quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw, skip_check); });
+    fz::clean([&] { quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw); });
     if (in.ConsumeBool()) // overwrite the slot
-        fz::clean([&] { quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw, false); });
+        fz::clean([&] { quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw); });
     {
         std::string name = fuzzed_name(in);
         std::any par = fuzzed_any<T>(in);

@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Array antenna member functions in a fuzzed order on a fuzzed arrayant: is_valid, validate, append,
+// Array antenna member functions in a fuzzed order on a fuzzed arrayant: is_valid, copy and move, validate, append,
 // calc_beamwidth_deg, calc_directivity_dBi, combine_pattern, copy_element, export_obj_file, qdant_write / qdant_read,
 // remove_zeros, rotate_pattern, set_size, reset; and the multi-frequency functions arrayant_is_valid_multi,
 // arrayant_concat_multi, arrayant_copy_element_multi, arrayant_rotate_pattern_multi, arrayant_set_element_pos_multi,
@@ -36,7 +36,10 @@ static void run(fz::input &in)
         switch (in.ConsumeIntegralInRange<int>(0, 19))
         {
         case 0:
-            fz::clean([&] { a.is_valid(in.ConsumeBool()); });
+            if (in.ConsumeBool())
+                fz::clean([&] { a.is_valid(); });
+            else // Copy and move pass the validity mark on
+                fz::clean([&] { quadriga_lib::arrayant<T> b = a; b.is_valid(); a = std::move(b); });
             break;
         case 1:
             fz::clean([&] { a.validate(); });
@@ -149,8 +152,7 @@ static void run(fz::input &in)
         case 14:
         {
             auto vec = fuzzed_vector<T>(in, a);
-            bool quick = in.ConsumeBool();
-            fz::clean([&] { quadriga_lib::arrayant_is_valid_multi(vec, quick); });
+            fz::clean([&] { quadriga_lib::arrayant_is_valid_multi(vec); });
             auto vec2 = in.ConsumeBool() ? vec : fuzzed_vector<T>(in, a);
             fz::clean([&] { quadriga_lib::arrayant_concat_multi(vec, vec2); });
             break;

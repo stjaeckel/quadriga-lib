@@ -261,13 +261,17 @@ Validate the integrity of an arrayant object
 
 Not in: MATLAB, Python
 
+- Always checks the data: sizes of all members, ranges and order of the angle grids, sizes of element positions and
+  coupling matrix; empty `element_pos` and coupling are allowed
+- A passing check marks the object as validated: the library functions then skip the full check as long as no data
+  member was reallocated or resized; values changed in place after the check are not seen by them
+- The mark is updated atomically, so `is_valid` may be called while other threads read the object
+- A copy is marked if its source passes the full check; a moved-to object takes over the mark of its source
+
 ### Declaration:
 ```cpp
-std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check = true) const;
+std::string quadriga_lib::arrayant<dtype>::is_valid() const;
 ```
-
-### Inputs:
-- **`quick_check`** *(optional)* — `true` for fast structural check; `false` for full data validation; full check additionally verifies data values
 
 ### Returns:
 - Empty string if valid; error message string if invalid

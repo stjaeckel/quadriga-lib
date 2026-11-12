@@ -256,7 +256,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam towards the poles")
             const arma::uword n_el = pol == 1 ? 4 : 8;
             CHECK(a.n_elements() == n_el);
             CHECK(a.n_ports() == (pol == 1 ? 1 : 2));
-            CHECK(a.is_valid(false).empty());
+            CHECK(a.is_valid().empty());
             CHECK(arma::is_finite(a.coupling_re));
             CHECK(arma::is_finite(a.coupling_im));
             CHECK(arma::accu(arma::abs(a.coupling_re)) + arma::accu(arma::abs(a.coupling_im)) > 0.0);
@@ -267,7 +267,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam towards the poles")
                                                                0.5, 120.0, 120.0, 0.0, 10.0, true);
     CHECK(b.n_elements() == 8);
     CHECK(b.n_ports() == 4);
-    CHECK(b.is_valid(false).empty());
+    CHECK(b.is_valid().empty());
 }
 
 // The ULA and 3GPP generators use only the radiation pattern of a custom pattern; its element positions and

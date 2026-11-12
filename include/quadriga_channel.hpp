@@ -77,7 +77,7 @@ namespace quadriga_lib
         // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
         // - throws an error if neither coeff_re/im nor path_polarization is available
         // - returns one value for each snapshot (vector with n_snap elements)
-        arma::Col<dtype> calc_effective_path_gain(bool assume_valid = false) const;
+        arma::Col<dtype> calc_effective_path_gain() const;
 
         // Write propagation paths to a Wavefront OBJ file
         // - e.g. for visualization in Blender
@@ -229,7 +229,6 @@ namespace quadriga_lib
     //   (also those written with hdf5_write_dset) are removed; the file does not shrink; copy the channels into a new
     //   file to reclaim the space
     // - One writer per file at a time (no file locking)
-    // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
     // - Throws an error if the requested index in the file has not been reserved during hdf5_create
     template <typename dtype>                              // Float or double
     int hdf5_write(const quadriga_lib::channel<dtype> *ch, // Channel object to write
@@ -237,8 +236,7 @@ namespace quadriga_lib
                    unsigned ix = 0,                        // x-Index in the HDF file
                    unsigned iy = 0,                        // y-Index in the HDF file
                    unsigned iz = 0,                        // z-Index in the HDF file
-                   unsigned iw = 0,                        // w-Index in the HDF file
-                   bool assume_valid = false);             // Switch to skip the data integrity check
+                   unsigned iw = 0);                       // w-Index in the HDF file
 
     // Read the storage layout of channel data inside an HDF5 file
     // - Returns 4-element vector with storage layout in form: {nx, ny, nz, nw}

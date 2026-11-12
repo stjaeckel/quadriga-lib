@@ -992,7 +992,7 @@ TEST_CASE("Rotate Pattern - Output keeps coupling, centre frequency and name")
         CHECK(arma::approx_equal(out.coupling_im, a.coupling_im, "absdiff", 0.0));
         CHECK(out.center_frequency == 3.5e9);
         CHECK(out.name == "myant");
-        CHECK(out.is_valid(false).empty());
+        CHECK(out.is_valid().empty());
     }
 
     // An output that already holds data of the same size must not keep its old coupling
@@ -1027,7 +1027,7 @@ TEST_CASE("Rotate Pattern - In place with a grid update keeps the coupling")
     CHECK(arma::approx_equal(c.coupling_im, a.coupling_im, "absdiff", 0.0));
     CHECK(c.center_frequency == 3.5e9);
     CHECK(c.name == "myant");
-    CHECK(c.is_valid(false).empty());
+    CHECK(c.is_valid().empty());
 
     // Same with an output
     quadriga_lib::arrayant<double> out;

@@ -48,7 +48,7 @@ TEST_CASE("Speaker - Default call, basic structure")
         CHECK(spk[i].center_frequency > 0.0);
 
         // Validate arrayant structure
-        std::string err = spk[i].is_valid(false);
+        std::string err = spk[i].is_valid();
         CHECK(err.empty());
     }
 }
@@ -555,7 +555,7 @@ TEST_CASE("Speaker - All 12 driver x radiation combinations produce valid output
             for (size_t i = 0; i < spk.size(); ++i)
             {
                 // Validate structure
-                std::string err = spk[i].is_valid(false);
+                std::string err = spk[i].is_valid();
                 INFO("driver=" << drv << " radiation=" << rad << " freq_idx=" << i << " error=" << err);
                 CHECK(err.empty());
 
@@ -636,11 +636,7 @@ TEST_CASE("Speaker - is_valid_multi: generated speaker passes")
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
-    CHECK(err.empty());
-
-    // Quick check should also pass
-    err = quadriga_lib::arrayant_is_valid_multi(spk, true);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -656,7 +652,7 @@ TEST_CASE("Speaker - is_valid_multi: all driver/radiation combos pass")
         {
             auto spk = quadriga_lib::generate_speaker<double>(drv, 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                               rad, 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
-            std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+            std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
             INFO("driver=" << drv << " radiation=" << rad << " error=" << err);
             CHECK(err.empty());
         }
@@ -669,7 +665,7 @@ TEST_CASE("Speaker - is_valid_multi: float template passes")
     auto spk = quadriga_lib::generate_speaker<float>("piston", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
                                                      "hemisphere", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -679,7 +675,7 @@ TEST_CASE("Speaker - is_valid_multi: single entry passes")
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -705,7 +701,7 @@ TEST_CASE("Speaker - is_valid_multi: mismatched azimuth grid size fails")
     mixed.push_back(spk5[0]);
     mixed.push_back(spk10[0]);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(mixed, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(mixed);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
     CHECK(err.find("elevation") != std::string::npos);
@@ -731,7 +727,7 @@ TEST_CASE("Speaker - is_valid_multi: mismatched elevation grid size fails")
     bad.e_phi_im.zeros(new_n_el, bad.n_azimuth(), 1);
     vec.push_back(bad);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(vec, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(vec);
 
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
@@ -747,7 +743,7 @@ TEST_CASE("Speaker - is_valid_multi: shifted azimuth grid values fails")
     // Shift the azimuth grid of entry 1 by a tiny amount
     spk[1].azimuth_grid[0] += 0.001;
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
     CHECK(err.find("Azimuth grid values") != std::string::npos);
@@ -762,7 +758,7 @@ TEST_CASE("Speaker - is_valid_multi: shifted elevation grid values fails")
     // Shift the elevation grid of entry 1
     spk[1].elevation_grid[5] += 0.001;
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
     CHECK(err.find("Elevation grid values") != std::string::npos);
@@ -790,7 +786,7 @@ TEST_CASE("Speaker - is_valid_multi: mismatched element count fails")
     vec.push_back(spk[0]);
     vec.push_back(two_elem);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(vec, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(vec);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
     CHECK(err.find("elements") != std::string::npos);
@@ -805,7 +801,7 @@ TEST_CASE("Speaker - is_valid_multi: modified element position fails")
     // Move the element position in entry 1
     spk[1].element_pos(0, 0) = 1.5;
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
     CHECK(err.find("position") != std::string::npos);
@@ -821,7 +817,7 @@ TEST_CASE("Speaker - is_valid_multi: mismatched coupling shape fails")
     spk[1].coupling_re.ones(1, 2);
     spk[1].coupling_im.zeros(1, 2);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
     CHECK(err.find("oupling") != std::string::npos); // "Coupling" with capital or lowercase
@@ -836,7 +832,7 @@ TEST_CASE("Speaker - is_valid_multi: invalid individual entry caught")
     // Corrupt entry 1: clear the pattern data
     spk[1].e_theta_re.reset();
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
 }
@@ -850,7 +846,7 @@ TEST_CASE("Speaker - is_valid_multi: invalid first entry caught")
     // Corrupt entry 0
     spk[0].e_theta_re.reset();
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 0") != std::string::npos);
 }
@@ -866,7 +862,7 @@ TEST_CASE("Speaker - is_valid_multi: error at middle entry")
     // Shift elevation grid of the middle entry
     spk[1].elevation_grid[0] += 0.01;
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
     CHECK(err.find("Elevation grid values") != std::string::npos);
@@ -883,7 +879,7 @@ TEST_CASE("Speaker - is_valid_multi: different pattern values are allowed")
     CHECK(!arma::approx_equal(spk[0].e_theta_re, spk[1].e_theta_re, "absdiff", 1e-3));
 
     // But multi-validation should still pass
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -895,7 +891,7 @@ TEST_CASE("Speaker - is_valid_multi: different center frequencies are allowed")
 
     CHECK(std::abs(spk[0].center_frequency - spk[1].center_frequency) > 1000.0);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -1087,7 +1083,7 @@ TEST_CASE("Speaker - concat_multi: output passes arrayant_is_valid_multi")
 
     auto combined = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(combined, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(combined);
     CHECK(err.empty());
 }
 
@@ -1118,7 +1114,7 @@ TEST_CASE("Speaker - concat_multi: three-driver chained concatenation")
     CHECK(std::abs(three_way[0].coupling_re(0, 2)) < 1e-12);
     CHECK(std::abs(three_way[0].coupling_re(2, 0)) < 1e-12);
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(three_way, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(three_way);
     CHECK(err.empty());
 }
 
@@ -1219,7 +1215,7 @@ TEST_CASE("Speaker - concat_multi: documentation example 2-way speaker")
     CHECK(tweeter_10k > woofer_10k * 2.0); // Tweeter >> woofer at 10 kHz
 
     // Multi-validation passes
-    std::string err = quadriga_lib::arrayant_is_valid_multi(speaker_2way, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(speaker_2way);
     CHECK(err.empty());
 }
 
@@ -1352,12 +1348,12 @@ TEST_CASE("Speaker - copy_element_multi: valid after operation")
     // Individual validation
     for (size_t i = 0; i < spk.size(); ++i)
     {
-        std::string err = spk[i].is_valid(false);
+        std::string err = spk[i].is_valid();
         CHECK(err.empty());
     }
 
     // Multi-validation (element_pos are identical since copy_element copies positions too)
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -1422,7 +1418,7 @@ TEST_CASE("Speaker - copy_element_multi: set positions after copy")
         CHECK(std::abs(spk[i].element_pos(2, 2) - 0.15) < 1e-12);
     }
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -1465,7 +1461,7 @@ TEST_CASE("Speaker - copy_element_multi: documentation example line array")
     }
 
     // Multi-validation passes
-    std::string err = quadriga_lib::arrayant_is_valid_multi(driver, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(driver);
     CHECK(err.empty());
 
     // Write and read back to verify QDANT roundtrip works with enlarged arrays
@@ -1548,7 +1544,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: consistent across frequencies")
         CHECK(arma::approx_equal(spk[i].elevation_grid, spk[0].elevation_grid, "absdiff", 1e-12));
     }
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -1741,12 +1737,12 @@ TEST_CASE("Speaker - rotate_pattern_multi: valid after rotation")
 
     for (size_t i = 0; i < spk.size(); ++i)
     {
-        std::string err = spk[i].is_valid(false);
+        std::string err = spk[i].is_valid();
         CHECK(err.empty());
         CHECK(spk[i].e_theta_re.is_finite());
     }
 
-    std::string err = quadriga_lib::arrayant_is_valid_multi(spk, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
 }
 
@@ -1809,7 +1805,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: documentation example 2-way speaker")
     CHECK(!arma::approx_equal(speaker[4].e_theta_re.slice(1), tweeter_10k_before, "absdiff", 0.01));
 
     // Validation passes
-    std::string err = quadriga_lib::arrayant_is_valid_multi(speaker, false);
+    std::string err = quadriga_lib::arrayant_is_valid_multi(speaker);
     CHECK(err.empty());
 }
 
