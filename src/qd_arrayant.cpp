@@ -836,12 +836,12 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
         fn_mtl_base = fn_mtl;
 
     double range = -std::abs((double)directivity_range);
-    if (range == 0.0)
-        throw std::invalid_argument("Directivity range cannot be 0.");
+    if (range == 0.0 || !std::isfinite(range))
+        throw std::invalid_argument("Directivity range must be finite and not 0.");
 
     double radius = (double)object_radius;
-    if (radius <= 0.0)
-        throw std::invalid_argument("Object radius must be larger than 0.");
+    if (!(radius > 0.0) || !std::isfinite(radius))
+        throw std::invalid_argument("Object radius must be finite and larger than 0.");
 
     arma::uword no_elements = n_elements();
 
@@ -949,14 +949,16 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
 
     // Calculate maximum Power in the Pattern
     double max_pow = 0.0;
+    bool has_nan = false;
     auto find_max_pow = [&]()
     {
-        max_pow = 0.0;
+        max_pow = 0.0, has_nan = false;
         for (size_t i = 0; i < no_vert * no_elements_t; ++i)
         {
             double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
             double p = a * a + b * b + c * c + d * d;
             max_pow = (p > max_pow) ? p : max_pow;
+            has_nan = has_nan || std::isnan(p);
         }
     };
     find_max_pow();
@@ -966,9 +968,10 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
         V_re *= s, V_im *= s, H_re *= s, H_im *= s;
         find_max_pow();
     }
+    if (has_nan) // NaN field values, or infinite ones (NaN after the rescaling)
+        throw std::invalid_argument("Field values must be finite.");
     if (!(max_pow > 0.0))
         throw std::invalid_argument("Pattern is zero in all directions for the exported elements.");
-    max_pow = 1.0 / max_pow;
 
     // Write OBJ File
     outFile = std::ofstream(fn);
@@ -981,7 +984,6 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
         unsigned face_offset = 1; // OBJ starts counting at 1
 
         // Export each element to the OBJ file
-        double scale = 1.0 / (-range);
         for (size_t i_el = 0; i_el < no_elements_t; ++i_el)
         {
             arma::uword i_array_element = i_element(i_el);
@@ -995,10 +997,10 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
                 size_t i = i_vert * no_elements_t + i_el;
                 double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
                 double p = a * a + b * b + c * c + d * d;
-                p *= max_pow;                // Scale by maximum power
+                p /= max_pow;                // Scale by maximum power (division: no overflow for tiny powers)
                 p = 10.0 * std::log10(p);    // Convert to dB
                 p = (p < range) ? range : p; // Set minimum
-                p = (p - range) * scale;     // Set to range 0 ... 1
+                p = (p - range) / (-range);  // Set to range 0 ... 1 (division: no overflow for tiny ranges)
                 pp[i_vert] = p;
             }
 
@@ -1293,6 +1295,8 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     arma::rowvec az_sum = arma::sum(pow, 0);
     arma::vec el_sum = arma::sum(pow, 1);
     pow.reset();
+    if (az_sum.has_nan()) // NaN or Inf in the field values
+        throw std::invalid_argument("Field values must be finite.");
 
     // Determine which parts of the pattern should be kept; an all-zero pattern is kept unchanged
     arma::uvec keep_az(n_az, arma::fill::zeros), keep_el(n_el, arma::fill::zeros);

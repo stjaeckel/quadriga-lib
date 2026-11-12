@@ -365,6 +365,20 @@ TEST_CASE("Arrayant remove_zeros - output that is the object itself")
     CHECK(arma::approx_equal(b.e_theta_re, a.e_theta_re, "absdiff", 0.0));
 }
 
+TEST_CASE("Arrayant remove_zeros - non-finite field values")
+{
+    // A NaN in every azimuth column would remove all columns; an Inf would keep the pattern unchanged
+    for (double v : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()})
+    {
+        auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
+        a.e_theta_re.slice(0).row(3).fill(v);
+        quadriga_lib::arrayant<double> o;
+        CHECK_THROWS_AS(a.remove_zeros(&o), std::invalid_argument);
+        CHECK_THROWS_AS(a.remove_zeros(), std::invalid_argument);
+        CHECK(a.n_azimuth() == 37);
+    }
+}
+
 TEST_CASE("Arrayant calc_beamwidth_deg - outputs that are the same variable")
 {
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 60.0, 0.0, 10.0);
