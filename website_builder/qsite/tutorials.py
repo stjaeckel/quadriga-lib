@@ -16,10 +16,13 @@ STEM_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 LANGUAGES = {"python": ("Python", "python"), "matlab": ("MATLAB", "matlab"), "octave": ("Octave", "matlab")}
 META_KEYS = {"title": (str, True), "summary": (str, True), "level": (str, True), "duration_min": (int, True),
-             "order": (int, True)}
+             "order": (int, True), "series": (str, False)}
 LEVELS = ("beginner", "intermediate", "advanced")
 FOLDER = "tutorials"
 EXECUTED = "tutorials/executed"  # written by the tutorial build (tutorials/GNUmakefile), not by this builder
+SERIES_DIR = "website_builder/content/tutorials"  # one file per series: title, order and its introduction
+SERIES_KEYS = {"title": (str, True), "order": (int, True)}
+OTHER = ("other", "Other tutorials")  # id and title of the group of tutorials without a series
 
 
 @dataclass
@@ -48,7 +51,8 @@ class Tutorial:
     summary: str
     level: str
     duration: int
-    order: int
+    order: int          # position in its series (or among the tutorials without a series)
+    series: str         # series id (file stem in SERIES_DIR), "" without a series
     language: str       # display name
     lexer: str          # fence language of the code cells
     cells: list
@@ -87,8 +91,19 @@ def read_all(root, diag, release=False):
             continue
         t = read(run, rel, diag)
         if t:
+            if _meta(p) not in (None, _meta(run)):
+                report(rel, None, "the executed copy %s/%s has other tutorial metadata than the notebook "
+                       "(make tutorials)" % (EXECUTED, p.name))
             out.append(t)
     return sorted(out, key=lambda t: (t.order, t.title))
+
+
+def _meta(p):
+    """metadata.quadriga_tutorial of a notebook file, None if the file is not a JSON notebook."""
+    try:
+        return json.loads(p.read_text(encoding="utf-8")).get("metadata", {}).get("quadriga_tutorial")
+    except (ValueError, AttributeError):
+        return None
 
 
 def left_out(root):
@@ -131,7 +146,7 @@ def read(p, rel, diag):
         return None
     language, lexer = LANGUAGES[kernel]
     t = Tutorial(stem, rel, info["title"], info["summary"], info["level"], info["duration_min"], info["order"],
-                 language, lexer, [], {"%s/%s.ipynb" % (FOLDER, stem): raw})
+                 info.get("series", ""), language, lexer, [], {"%s/%s.ipynb" % (FOLDER, stem): raw})
     md_lines, offsets = [], []
     for n, c in enumerate(nb.get("cells", []), 1):
         lines = _text(c.get("source")).split("\n")
@@ -159,8 +174,82 @@ def read(p, rel, diag):
                        "the notebook metadata" % cell.number)
     if diag.errors > errors:
         return None
-    t.files["%s/%s.md" % (FOLDER, stem)] = twin(t).encode("utf-8")
     return t
+
+
+@dataclass
+class Series:
+    id: str             # file stem; the section id on tutorials.html
+    title: str
+    page: object        # prose.Page of the series file, None for the group without a series
+    tutorials: list     # in series order (order, then title)
+
+    @property
+    def numbered(self):
+        """A series has parts (Part n of m, previous and next); the group without a series has none."""
+        return self.page is not None
+
+
+def read_series(root, index, diag):
+    """The series files in page order (order, then id); their heading ids share one set with the index page's
+    headings, the series ids and the id of the group without a series, since all are on tutorials.html."""
+    folder = root / SERIES_DIR
+    files = sorted(folder.glob("*.md"), key=lambda p: p.name) if folder.is_dir() else []
+    pages = sorted((prose.read_page(p, diag, root, SERIES_KEYS, ids=False) for p in files),
+                   key=lambda s: (s.order, s.page_id))
+    for h in index.headings:
+        if h.id == OTHER[0]:
+            diag.error(index.path, index.body_line + h.index, "E-anchor: the id '%s' is the section of the "
+                       "tutorials without a series" % OTHER[0])
+    used = set(config.RESERVED_IDS) | {h.id for h in index.headings if h.id} | {OTHER[0]}
+    for s in pages:
+        if not STEM_RE.match(s.page_id):
+            diag.error(s.path, None, "series file name must match [a-z0-9][a-z0-9_-]*.md")
+        if s.page_id in used:
+            diag.error(s.path, None, "E-anchor: the series id '%s' is already an id on tutorials.html" % s.page_id)
+        used.add(s.page_id)
+    for s in pages:  # in page order, so that a repeated heading gets -2 in the later section
+        s.headings = prose.heading_ids(s.body, diag, s.path, s.body_line, used)
+    return pages
+
+
+def _declared(root):
+    """{series id: [notebook path]} from the committed notebooks, executed or not (unreadable ones are
+    reported by read_all)."""
+    out = {}
+    for p in sorted((root / FOLDER).glob("*.ipynb")) if (root / FOLDER).is_dir() else []:
+        info = _meta(p)
+        if isinstance(info, dict) and isinstance(info.get("series"), str) and info["series"]:
+            out.setdefault(info["series"], []).append("%s/%s" % (FOLDER, p.name))
+    return out
+
+
+def group(root, pages, tutorials, diag):
+    """The groups of tutorials.html: one Series per series file (also without tutorials, e.g. before the
+    tutorials are run), then the tutorials without a series; also writes each tutorial's twin, which names its
+    place in the series. The series ids are checked in the committed
+    notebooks, run or not: an id without a file is an error; a series file that no notebook names gives the
+    warning series-empty."""
+    by_id = {s.page_id: Series(s.page_id, s.title, s, []) for s in pages}
+    other = Series(OTHER[0], OTHER[1], None, [])
+    declared = _declared(root)
+    for sid, paths in sorted(declared.items()):
+        if sid not in by_id:
+            for rel in paths:
+                diag.error(rel, None, "metadata.quadriga_tutorial.series: no series file %s/%s.md"
+                           % (SERIES_DIR, sid))
+    for t in tutorials:  # an executed copy that differs from its notebook was reported by read_all
+        by_id.get(t.series, other).tutorials.append(t)
+    for s in pages:
+        if s.page_id not in declared:
+            diag.warning(s.path, None, "no notebook names this series (metadata.quadriga_tutorial.series)",
+                         "series-empty")
+    out = list(by_id.values()) + ([other] if other.tutorials else [])
+    for g in out:
+        g.tutorials.sort(key=lambda t: (t.order, t.title))
+        for t in g.tutorials:
+            t.files["%s/%s.md" % (FOLDER, t.stem)] = twin(t, g).encode("utf-8")
+    return out
 
 
 class _CellDiag:
@@ -210,12 +299,23 @@ def _fence(lines, lang):
     return [ticks + lang] + lines + [ticks]
 
 
-def twin(t):
-    """tutorials/<stem>.md: twin header, the downloads, Markdown cells through the twin writer, code and outputs."""
+def twin(t, g):
+    """tutorials/<stem>.md: twin header, the downloads, the place in the series g (part n of m, previous and
+    next; not for the tutorials without a series), Markdown cells through the twin writer, code and outputs."""
     loc = "%s/%s.md" % (FOLDER, t.stem)
-    h2 = [(h.text, h.id, None) for c in t.cells for h in c.headings if h.id and h.level == 2]
+    rows = render_md.index_rows([h for c in t.cells for h in c.headings])  # links as their text
+    h2 = [(text, hid, None) for text, hid, _ in rows]
     out = render_md.twin_header(t.title, "%s/%s/%s.html" % (config.SITE_BASE_URL, FOLDER, t.stem), h2)
     out += ["", "[Download notebook .ipynb](%s.ipynb) · [Markdown .md](%s.md)" % (t.stem, t.stem)]
+    if g.numbered:
+        n = g.tutorials.index(t)
+        line = ["Part %d of %d of [%s](../tutorials.md#%s)" % (n + 1, len(g.tutorials),
+                                                             prose.plain_text(prose.strip_gaps(g.title)), g.id)]
+        if n > 0:
+            line.append("Previous: [%s](%s.md)" % (g.tutorials[n - 1].title, g.tutorials[n - 1].stem))
+        if n + 1 < len(g.tutorials):
+            line.append("Next: [%s](%s.md)" % (g.tutorials[n + 1].title, g.tutorials[n + 1].stem))
+        out += ["", " · ".join(line)]
     for c in t.cells:
         if c.kind == "markdown":
             block = render_md.twin_lines(c.lines, loc, headings=c.headings)
@@ -228,11 +328,20 @@ def twin(t):
     return "\n".join(out) + "\n"
 
 
-def index_twin(page, tutorials):
-    """tutorials.md: the twin of the index page with one list item per tutorial."""
+def index_twin(page, groups):
+    """tutorials.md: the twin of the index page; per series a ## heading, its introduction (headings one level
+    down) and one list item per tutorial."""
     loc = "tutorials.md"
     text = render_md.prose_twin(page, loc).rstrip("\n").split("\n")
-    items = ["- [%s](%s/%s.md) · %s · %s · %s" % (t.title, FOLDER, t.stem, t.language, t.level,
-                                                    " ".join(render_md.twin_lines([t.summary], loc)))
-             for t in tutorials]
-    return "\n".join(text + ([""] + items if items else [])) + "\n"
+    for g in groups:
+        text += ["", '<a id="%s"></a>' % g.id, "## " + prose.strip_gaps(g.title)]
+        if g.page is not None and g.page.body:
+            heads = [dataclasses.replace(h, level=h.level + 1) for h in g.page.headings]
+            body = render_md.twin_lines(g.page.body, loc, headings=heads)
+            text += [""] + body if body else []
+        items = ["%s [%s](%s/%s.md) · %s · %s · about %d min · %s" % (
+                     "%d." % n if g.numbered else "-", t.title, FOLDER, t.stem, t.language, t.level, t.duration,
+                     " ".join(render_md.twin_lines([t.summary], loc)))
+                 for n, t in enumerate(g.tutorials, 1)]
+        text += [""] + items if items else []
+    return "\n".join(text) + "\n"

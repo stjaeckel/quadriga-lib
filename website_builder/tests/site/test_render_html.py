@@ -3,6 +3,7 @@
 # Part of quadriga-lib — see LICENSE for terms.
 """Rendered pages of the fixture repository, checked by substrings."""
 
+import re
 import shutil
 
 import pytest
@@ -82,6 +83,14 @@ def test_formats_page(site):
     assert 'id="qdant"' in formats and 'id="materials"' in formats
     assert '<h3 id="entry-arrayant">' in formats and '<h3 id="notes-2">' in formats  # ## moves down to h3
     assert formats.count('href="formats/qdant.md"') == 1 and formats.count('href="formats/materials.md"') == 1
+
+
+def test_publications_index(site):
+    pubs = site("publications.html")
+    side = re.search(r'<nav class="doc-side idx" aria-label="Publications">(.*?)</nav>', pubs, re.S).group(1).strip()
+    assert side == ('<ul><li><a href="#quadriga-lib">Quadriga-Lib</a></li>'
+                    '<li><a href="#quadriga-background">QuaDRiGa background</a></li></ul>')  # groups only
+    assert '<details class="doc-index"><summary>On this page</summary>' in pubs
 
 
 def test_code_colouring(site):

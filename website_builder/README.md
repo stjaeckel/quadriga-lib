@@ -57,7 +57,7 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `qsite/mdparse.py` | markdown-it set-up for doc blocks, content pages and notebook cells, with the builder's rules (`[[name]]` links, raw links, `<br>`, heading ids, note boxes, site URLs). | — |
 | `qsite/render_html.py` | HTML output: pages from the templates, code colouring, the formula step (pandoc), the gap pass. | every `.html` file |
 | `qsite/checks.py` | Link and anchor check of the whole site, HTML well-formedness, size budgets. | — |
-| `qsite/tutorials.py` | Notebook reading, tutorial pages and their twins. | `tutorials/` |
+| `qsite/tutorials.py` | Notebook reading, the series and their groups, tutorial pages and their twins. | `tutorials/` |
 | `qsite/assets.py` | Static files, landing figures, the preview image, the skill copy; the constants `STATIC_DIR`, `TEMPLATES_DIR`, `LANDING_FIGURES`. | — |
 | `templates/base.html` | Page frame: head, skip link, header, `<main id="content">`, footer. | — |
 | `templates/_header.html` | Menu (grouped), logo, name, version, GitHub link, tab row from `PAGES`. | — |
@@ -65,12 +65,13 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `templates/_logo.svg` | The logo, inline (`fill="currentColor"`). | — |
 | `templates/landing.html` | The landing page with its text. | `index.html` |
 | `templates/api.html`, `_api_index.html`, `_fn_entry.html` | API page, its index (sidebar and "Sections and functions"), one function entry. | `cpp_api.html`, `mex_api.html`, `python_api.html` |
-| `templates/text.html`, `_text_index.html` | Content page and its index. | `download.html`, `faq.html`, `ai_agents.html` |
+| `templates/text.html`, `_text_index.html` | Content page and its index (sidebar). | `download.html`, `faq.html`, `ai_agents.html` |
 | `templates/formats.html`, `_formats_index.html` | The formats page: intro, one section per format file, and its index. | `formats.html` |
-| `templates/publications.html` | Publications. | `publications.html` |
+| `templates/publications.html`, `_publications_index.html` | Publications and its index (one link per group). | `publications.html` |
 | `templates/legal.html` | Impressum and privacy. | `impressum.html`, `privacy.html` |
 | `templates/notfound.html` | Not-found page. | `404.html` |
-| `templates/tutorials_index.html`, `tutorial.html` | Tutorial index and one tutorial. | `tutorials.html`, `tutorials/<stem>.html` |
+| `templates/tutorials_index.html`, `_tutorials_index.html` | Tutorial index and its sidebar (Setup, then one group per series with its tutorials). | `tutorials.html` |
+| `templates/tutorial.html`, `_tutorial_side.html` | One tutorial and its sidebar (the tutorials of its series, the sections of the current one). | `tutorials/<stem>.html` |
 | `static/css/site.css` | The one stylesheet. | `css/site.css` |
 | `static/js/site.js` | Optional extras (see [Design and static parts](#design-and-static-parts)). | `js/site.js` |
 | `static/fonts/` | IBM Plex Sans and Mono (seven `woff2` files) and their licence `LICENSE.txt`. | `fonts/` |
@@ -81,6 +82,7 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `content/impressum.md`, `content/privacy.md` | Legal pages. | `impressum.html`, `privacy.html` |
 | `content/404.md` | Title and sentence of the not-found page. | `404.html` |
 | `content/tutorials.md` | Title, lead and the common text (e.g. the setup) of the tutorial index; see [The tutorial index page](#the-tutorial-index-page). | `tutorials.html`, `tutorials.md` |
+| `content/tutorials/<series>.md` | One file per tutorial series: title, position and introduction; see [Tutorial series](#tutorial-series). | sections of `tutorials.html` and `tutorials.md` |
 | `skill/quadriga-lib/SKILL.md` | The agent skill (a placeholder for now); build variables are filled in. | `skill/SKILL.md` |
 | `pandoc_math.yaml` | pandoc defaults file of the formula step. | — |
 | `logo/` | Logo sources (SVG and PNG); not deployed. | — |
@@ -120,7 +122,9 @@ It checks the metadata `metadata.quadriga_tutorial` (keys and types as in the tu
 
 What is shown: Markdown cells like a content page; code cells as "In [n]" with the code coloured; `stream` output as text (colour codes removed); of each result or display bundle the first of SVG, PNG and plain text. Images are written to `tutorials/<stem>/fig-<cell>-<output>.<ext>`. A bundle with none of the three is left out (warning `output-type`); a code cell without execution count gives `not-run`; an `error` output stops the build.
 
-Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<stem>.md`, the executed notebook as `tutorials/<stem>.ipynb` for download and its figures; the page links "Download notebook .ipynb" and "Markdown .md". The index `tutorials.html` and its twin `tutorials.md` show the common part of `content/tutorials.md` and list the tutorials; without tutorials the list is left out. The tutorial pages and their twins exist only on the website, never in `docs/`.
+Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<stem>.md`, the executed notebook as `tutorials/<stem>.ipynb` for download and its figures; the page links "Download notebook .ipynb" and "Markdown .md". Under the title it shows "Part n of m" of its series, the language, the level and the reading time; the breadcrumb names the series, and the end of the page links the previous and the next tutorial of the series. Its sidebar lists the tutorials of its series, with the `##` sections of the current one below it, and "All tutorials"; on narrow screens the same list is a closed box "In this series". The twin has the same information as a line under the downloads, "Part n of m of <series>" with links to the series section of `tutorials.md` and to the previous and the next twin. A tutorial without a series has neither part number nor previous and next, and its sidebar lists the other tutorials without a series.
+
+The index `tutorials.html` and its twin `tutorials.md` show the common part of `content/tutorials.md`, then one section per series ([Tutorial series](#tutorial-series)) with its introduction and its tutorials as a vertical list (part, title, summary, language, level, reading time), then the tutorials without a series under "Other tutorials" (id `other`). The sidebar of the index has the `##` headings of `content/tutorials.md` (e.g. Setup), then one closed group per series with an "Overview" link to its section and links to its tutorial pages. A series whose tutorials are left out is shown with its introduction and no list. The tutorial pages and their twins exist only on the website, never in `docs/`.
 
 ### The tutorial index page
 
@@ -134,6 +138,26 @@ Each tutorial gives `tutorials/<stem>.html`, its Markdown version `tutorials/<st
 | Body | Between the lead and the list of tutorials: the setup that all tutorials need, and anything else that applies to all of them; `##` sections with ids as on other content pages (e.g. `## Setup` gets the id `setup`, so a notebook links to it as `tutorials.html#setup`) |
 
 Notes on a single tutorial or a family of tutorials (e.g. extra packages of one series) belong in the notebooks, not here. Gap markers are allowed in all parts; each fails `--release`.
+
+### Tutorial series
+
+Each series is a file `website_builder/content/tutorials/<series>.md` in the same format: TOML front matter between two `+++` lines, then the Markdown body. A notebook names its series with the key `series` of its metadata (tutorials README); the file stem is the series id and the section id on the index (`tutorials.html#<series>`). The series files are website-only, like the tutorials: they are never part of `docs/`, and the docs builder does not read them.
+
+| Part | Shown |
+|------|-------|
+| `title` | Heading (`h2`) of the series section, its sidebar group, the breadcrumb and the sidebar of its tutorial pages; `##` heading of the series in `tutorials.md` |
+| `order` | Position of the series on the index (then by id); leave gaps (10, 20, 30) so that series can be inserted |
+| Body | The introduction: what the series covers and for whom. Its headings move down one level (`##` becomes `h3`), as on the formats page; their ids share one set with the index page, the series ids and `other` |
+
+Inside a series, the tutorials are sorted by their `order`, then by title; the position in this list is the part number. A new series needs only its file and the key in the notebooks; nothing in the templates changes. The series ids are checked in the committed notebooks, run or not: a series id that no file has is an error of the notebook that names it, and a series file that no notebook names gives the warning `series-empty` (for a series being written); its section is then shown with its introduction only. The page itself takes series and order from the executed copy, like everything else; an executed copy whose tutorial metadata differs from its notebook (for example one made before the series was set) gives the warning `not-executed`, an error with `--release`.
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `metadata.quadriga_tutorial.series: no series file website_builder/content/tutorials/<id>.md` | The notebook names a series without a file, or the name is misspelt | Add the series file or correct the key |
+| `series file name must match [a-z0-9][a-z0-9_-]*.md` | Upper-case letters, spaces or other characters in the file name | Rename the file |
+| `E-anchor: the series id '<id>' is already an id on tutorials.html` | The series id equals a heading id of `content/tutorials.md` (e.g. `setup`), `other` or an id the templates use | Rename the series file and the key in its notebooks |
+| `E-anchor: the id 'other' is the section of the tutorials without a series` (in `content/tutorials.md`) | A heading of the index page gets the id `other` | Give the heading another text or an explicit id `{#...}` |
+| `the executed copy tutorials/executed/<stem>.ipynb has other tutorial metadata than the notebook` (warning `not-executed`; an error with `--release`) | The notebook's metadata was changed after its last run | `make tutorials` |
 
 Notebook errors stop the build; each names the notebook, and the cell where there is one:
 
@@ -164,7 +188,7 @@ pandoc reads LaTeX math, not full LaTeX. Known to work: accents with subscripts,
 
 ## Design and static parts
 
-**Styles.** `static/css/site.css` is the only stylesheet. Every colour is a custom property on `:root`; the dark values replace them inside `@media (prefers-color-scheme: dark)`, so the site follows the device setting. Components use these tokens rather than literal colours (exceptions: white text on the green buttons, the print styles); all text pairs meet WCAG 2.2 AA contrast in both themes, so check the ratio when you change a colour. `theme-color` in `templates/base.html` repeats `--bar` of both themes (`#2e7d46`, `#24603a`). Layouts are mobile first, with breakpoints at 600 px and 960 px and a smallest supported width of 360 px; wide code blocks and tables scroll inside their box. Supported browsers: current Chrome, Edge, Firefox and Safari, desktop and mobile. Print styles hide the header, footer, index and copy buttons.
+**Styles.** `static/css/site.css` is the only stylesheet. Every colour is a custom property on `:root`; the dark values replace them inside `@media (prefers-color-scheme: dark)`, so the site follows the device setting. Components use these tokens rather than literal colours (exceptions: white text on the green buttons, the print styles); all text pairs meet WCAG 2.2 AA contrast in both themes, so check the ratio when you change a colour. `theme-color` in `templates/base.html` repeats `--bar` of both themes (`#2e7d46`, `#24603a`). Layouts are mobile first, with breakpoints at 600 px and 960 px and a smallest supported width of 360 px; the main column of every page is at most `--main-max` (900 px) wide, about 105 characters of code, and from 960 px the API, formats, publications and tutorial pages and the text pages with at least two sections have a sidebar; wide code blocks and tables scroll inside their box. Supported browsers: current Chrome, Edge, Firefox and Safari, desktop and mobile. Print styles hide the header, footer, index and copy buttons.
 
 **Fonts.** IBM Plex Sans (400, 400 italic, 500, 600, 700) and IBM Plex Mono (400, 500), Latin subset, self-hosted under the SIL Open Font License 1.1; the licence file `static/fonts/LICENSE.txt` is published next to them and must stay. The Latin subset has no Greek letters and no arrows; such characters fall back to the system font.
 

@@ -1,0 +1,3 @@
+<p class="idx-head"><a href="{{ url("tutorials") }}#{{ tut.series.id }}">{{ tut.series.title }}</a></p>
+<ol class="tut-parts{% if tut.series.numbered %} numbered{% endif %}">{% for t in tut.series.tutorials %}{% if t.stem == tut.stem %}<li><a class="current" href="{{ t.stem }}.html" aria-current="page">{{ t.title }}</a>{% if tut.index %}<ul>{% for text, hid in tut.index %}<li class="sub"><a href="#{{ hid }}">{{ text }}</a></li>{% endfor %}</ul>{% endif %}</li>{% else %}<li><a href="{{ t.stem }}.html">{{ t.title }}</a></li>{% endif %}{% endfor %}</ol>
+<p class="idx-other"><a href="{{ url("tutorials") }}">All tutorials</a></p>

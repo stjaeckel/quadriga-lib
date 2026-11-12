@@ -57,8 +57,7 @@
   --shadow: 0 1px 2px rgba(19,36,26,.06), 0 2px 8px rgba(19,36,26,.06);
   --header-h: 56px;
   --content-max: 1300px;
-  --text-max: 760px;
-  --api-max: 900px;         /* main column of the API pages */
+  --main-max: 900px;        /* main column of every page: API, text, tutorials; about 105 code characters */
 }
 @media (min-width: 600px) { :root { --gutter: 24px; } }
 @media (min-width: 960px) { :root { --gutter: 32px; } }
@@ -257,10 +256,9 @@ tr:last-child td { border-bottom: 0; }
 .math-block { overflow-x: auto; padding: var(--s3) 0; text-align: center; font-size: 1.1em; }
 math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; }
 
-/* ---------- Doc layout: sidebar + content (API and text pages) ---------- */
+/* ---------- Doc layout: sidebar + content (API, text, formats, publications and tutorial pages) ---------- */
 .doc { display: grid; gap: var(--s5); padding-top: var(--s5); padding-bottom: var(--s8); }
-.doc-main { min-width: 0; max-width: var(--text-max); }
-.doc-main.api-main { max-width: var(--api-max); }
+.doc-main { min-width: 0; max-width: var(--main-max); }
 .doc-main > * + * { margin-top: var(--s4); }
 .doc-main h1 { margin-bottom: var(--s2); }
 .crumbs { font-size: var(--fs-xs); color: var(--muted); }
@@ -359,16 +357,34 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; 
 .prose li + li { margin-top: 4px; }
 .lead { font-size: var(--fs-lg); color: var(--muted); }
 
-/* ---------- Page frames without sidebar (legal pages, publications, tutorials) ---------- */
+/* ---------- Page frames without sidebar (legal pages, text pages with fewer than two sections) ---------- */
 .page { padding-top: var(--s6); padding-bottom: var(--s8); }
-.page-narrow { margin: 0 auto; }
 
 /* ---------- Tutorials ---------- */
-.tut-index > h1, .tut-index > .lead { margin-top: var(--s2); }
-.tut-index > .lead, .tut-index > .note-box { max-width: 46em; }
-.tut-index > .note-box, .tut-index > .grid-2, .tut-index > .prose { margin-top: var(--s5); }
-.tut-card { display: flex; flex-direction: column; gap: var(--s2); }
-.tut-card .meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: var(--fs-xs); }
+/* index: one section per series, its tutorials as a vertical list of rows */
+.tut-series > * + * { margin-top: var(--s4); }
+.prose .tut-series > h2 { margin-top: var(--s7); }
+.tut-list { list-style: none; padding: 0 !important; display: grid; gap: var(--s3); }
+.prose .tut-list li + li { margin-top: 0; }
+.tut-row { display: grid; gap: 6px; padding: var(--s4) var(--s5); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); text-decoration: none; color: var(--fg); transition: border-color .15s; }
+.tut-row:hover { border-color: var(--link); color: var(--fg); }
+.prose .tut-row h3 { margin: 0; font-size: 1.0625rem; color: var(--link); }
+.tut-row p { color: var(--muted); font-size: .9375rem; margin: 0; }
+.tut-part { font-size: var(--fs-xs); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tut-row .meta, .tut-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--fs-xs); }
+.tut-meta .tut-part { margin-right: 6px; }
+/* tutorial page: the series in the sidebar, previous and next at the end */
+.idx-head { font-weight: 600; margin-bottom: var(--s2); }
+.idx-head a { padding: 5px 8px; display: block; text-decoration: none; color: var(--fg); }
+.idx .tut-parts { list-style: none; margin: 0; padding: 0; counter-reset: part; }
+.idx .tut-parts.numbered > li { counter-increment: part; }
+.idx .tut-parts.numbered > li > a::before { content: counter(part) ". "; color: var(--muted); font-weight: 400; }
+.tut-pager { display: grid; gap: var(--s3); margin-top: var(--s7) !important; }
+@media (min-width: 600px) { .tut-pager { grid-template-columns: 1fr 1fr; } .tut-pager .next { grid-column: 2; text-align: right; } }
+.tut-pager a { display: grid; gap: 2px; padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none; color: var(--fg); }
+.tut-pager a:hover { border-color: var(--link); }
+.tut-pager small { color: var(--muted); font-size: var(--fs-xs); }
+.tut-pager span { color: var(--link); font-weight: 600; }
 .tag { border: 1px solid var(--line); border-radius: 12px; padding: 1px 8px; color: var(--muted); }
 .tag.lang { border-color: var(--link); color: var(--link); }
 .cell { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
