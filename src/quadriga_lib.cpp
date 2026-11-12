@@ -60,43 +60,26 @@ namespace arma
 }
 #endif
 
-// Check if AVX2 is supported
+// Check if AVX2 is supported; the test kernel runs once, later calls return the stored result
 bool quadriga_lib::quadriga_lib_has_AVX2()
 {
-    // Create an aligned dataset
-    size_t no_data = 16;
-#if defined(_MSC_VER) // Windows
-    float *X = (float *)_aligned_malloc(no_data * sizeof(float), 32);
-#else // Linux
-    float *X = (float *)aligned_alloc(32, no_data * sizeof(float));
-#endif
-
-    // Fill
-    for (size_t i = 0; i < 16; ++i)
-        X[i] = (float)i;
-
-    float Z[8];
-    for (size_t i = 0; i < 8; ++i)
-        Z[i] = 0.0f;
+    static const bool has_avx2 = []
+    {
+        float Z[8] = {};
 
 #if BUILD_WITH_AVX2
-    if (runtime_AVX2_Check()) // CPU support for AVX2
-    {
-        qd_TEST_AVX2(X, Z);
-    }
+        if (runtime_AVX2_Check()) // CPU support for AVX2
+        {
+            alignas(32) float X[16];
+            for (size_t i = 0; i < 16; ++i)
+                X[i] = (float)i;
+            qd_TEST_AVX2(X, Z);
+        }
 #endif
 
-    // Free aligned memory
-#if defined(_MSC_VER) // Windows
-    _aligned_free(X);
-#else // Linux
-    free(X);
-#endif
-
-    if (Z[0] == 2.0f && Z[7] == 107.0f)
-        return true;
-
-    return false;
+        return Z[0] == 2.0f && Z[7] == 107.0f;
+    }();
+    return has_avx2;
 }
 
 // Check if CUDA is supported

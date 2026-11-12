@@ -26,4 +26,12 @@ TEST_CASE("quadriga_lib_has_AVX2 - agrees with the CPU features")
 #else
     CHECK(!quadriga_lib::quadriga_lib_has_AVX2());
 #endif
+
+    // Concurrent calls from several threads return the same value as a call from one thread
+    const bool expected = quadriga_lib::quadriga_lib_has_AVX2();
+    int n_differ = 0;
+#pragma omp parallel for reduction(+ : n_differ)
+    for (int i = 0; i < 256; ++i)
+        n_differ += (quadriga_lib::quadriga_lib_has_AVX2() != expected) ? 1 : 0;
+    CHECK(n_differ == 0);
 }
