@@ -247,11 +247,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             throw std::invalid_argument("get_channels_multifreq: RX array validation failed: " + err);
     }
 
+    // 0 paths: all path inputs empty; 'fbs_pos' of size [0, n] with n > 0 gives n paths without data (missing data)
+    const bool no_paths = fbs_pos.n_elem == 0 && fbs_pos.n_cols == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
+                          path_length.n_elem == 0 && M.n_elem == 0;
+
     // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot (delays from the TX-RX
     // geometry) does not depend on the path data, so a dummy NLOS path (1 m longer than the LOS path, never detected
     // as LOS) fills the input; its own slot is dropped.
-    if (add_fake_los_path && fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
-        path_length.n_elem == 0 && M.n_elem == 0)
+    if (add_fake_los_path && no_paths)
     {
         const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
         const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
@@ -289,9 +292,6 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     }
 
     // 0 paths without add_fake_los_path: the path inputs are not checked, the outputs are empty [n_rx, n_tx, 0]
-    const bool no_paths = fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
-                          path_length.n_elem == 0 && M.n_elem == 0;
-
     if (!no_paths && (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 ||
                       path_length.n_elem == 0 || M.n_elem == 0))
         throw std::invalid_argument("get_channels_multifreq: Missing path data.");

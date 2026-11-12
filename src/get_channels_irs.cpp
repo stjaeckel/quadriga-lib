@@ -140,6 +140,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     // Check if IRS array is valid
     if (irs_array == nullptr)
         throw std::invalid_argument("IRS array cannot be NULL");
+    if (coeff_re == nullptr || coeff_im == nullptr || delay == nullptr)
+        throw std::invalid_argument("Outputs 'coeff_re', 'coeff_im' and 'delay' cannot be NULL");
 
     qd_check_alias_list({coeff_re, coeff_im, delay, aod, eod, aoa, eoa},
                         {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
