@@ -27,6 +27,8 @@ def build_site(root, diag, release=False):
         else:
             diag.error("%s/%s.md" % (config.WEBSITE_CONTENT, pid), None, "content file missing")
     tuts = tutorials.read_all(root, diag, release)
+    series = tutorials.read_series(root, web["tutorials"], diag) if "tutorials" in web else []
+    groups = tutorials.group(root, series, tuts, diag)
     files = assets.static_files()
     files.update(assets.skill(root, diag))
     for t in tuts:
@@ -37,8 +39,8 @@ def build_site(root, diag, release=False):
     diag.gaps.extend(prose.gap_scan(code_root, [assets.TEMPLATES_DIR.relative_to(code_root).as_posix()], diag))
     if diag.errors:
         return {}, {}
-    files["tutorials.md"] = tutorials.index_twin(web["tutorials"], tuts).encode("utf-8")
-    model.update(docs=docs, website=web, tutorials=tuts, files=files)
+    files["tutorials.md"] = tutorials.index_twin(web["tutorials"], groups).encode("utf-8")
+    model.update(docs=docs, website=web, tutorials=tuts, tutorial_groups=groups, files=files)
     site, markers = render_html.render_site(model, diag)
     if diag.errors:
         return {}, {}

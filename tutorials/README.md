@@ -65,17 +65,18 @@ A notebook can also start as a copy of an existing tutorial: copy the file, rena
 
 ## Naming and metadata
 
-The file name `<stem>.ipynb` uses lower-case letters, digits, `_` and `-`, and starts with a letter or digit; the stem is also the name of the web page. Tutorials of a series share a prefix and a number, `<series>_<nn>_<topic>`, so that they sort together and keep their order when topics are renamed.
+The file name `<stem>.ipynb` uses lower-case letters, digits, `_` and `-`, and starts with a letter or digit; the stem is also the name of the web page. Tutorials of a series share a prefix and a number, `<series>_<nn>_<topic>`, so that they sort together in the folder and keep their order when topics are renamed; on the website, the metadata decides the series and the order.
 
 The notebook metadata `metadata.quadriga_tutorial` describes the tutorial:
 
 | Key | Type | Use |
 |-----|------|-----|
-| `title` | string | Page title and card title |
-| `summary` | string, inline Markdown | Card text; as plain text the page description |
-| `level` | `beginner`, `intermediate` or `advanced` | Tag on card and page |
+| `title` | string | Page title and title in the tutorial list |
+| `summary` | string, inline Markdown | Text in the tutorial list; as plain text the page description |
+| `level` | `beginner`, `intermediate` or `advanced` | Tag in the tutorial list and on the page |
 | `duration_min` | integer | Reading time in minutes |
-| `order` | integer | Position on the index (then by title); leave gaps between series (e.g. 10, 11, 12 for one series, 20, 21 for the next) so that tutorials can be inserted |
+| `order` | integer | Position within the series (then by title), shown as "Part n"; e.g. 1, 2, 3 |
+| `series` | string, optional | Id of the series: the stem of its file `website_builder/content/tutorials/<series>.md`; without it, or with an empty string, the tutorial is listed under "Other tutorials" |
 
 Example, as it appears in the notebook metadata:
 
@@ -85,7 +86,8 @@ Example, as it appears in the notebook metadata:
   "summary": "What random fields are, and how the sum-of-sinusoids generator of Quadriga-Lib makes them.",
   "level": "beginner",
   "duration_min": 25,
-  "order": 10
+  "order": 1,
+  "series": "sos"
 }
 ```
 
@@ -127,6 +129,7 @@ Markdown cells follow the format of the content pages:
 - The text uses American English (realization, modeled, color) and the terms of the API documentation.
 - Tutorials are written for engineers and scientists who know the basics of their field but not necessarily the topic. Theory is short and serves the code: enough to understand what the code does, with references for further reading.
 - Code cells are short, typically a handful of lines, and each is introduced by the text before it. They use numpy and matplotlib; other packages only where the topic needs them, named at the start. Variable names say what they hold; comments give units and array shapes.
+- On a wide screen, a code box on the website shows about 105 characters per line; longer lines scroll horizontally. This is not a hard limit, but lines that fit read more easily, so a long comment can go on its own line above the code.
 - Terms are introduced before they are used. A term that appears early, e.g. in the first result, is explained in the same sentence or announced for later.
 - Outputs are published. They contain nothing private, such as local paths, user names or machine names.
 - A tutorial runs in seconds, at most about a minute, so that readers can run it and the build stays practical. Larger computations use smaller sizes and say how a full study would differ.
@@ -173,7 +176,7 @@ Troubleshooting:
 
 ## Checking the page on the website
 
-The website builder publishes one tutorial for each notebook `tutorials/<stem>.ipynb` and reads its content from the executed copy `tutorials/executed/<stem>.ipynb`; it never runs or changes the notebooks. Each tutorial gives a page `tutorials/<stem>.html`, a Markdown version `tutorials/<stem>.md`, its figures, and the executed notebook as a download. The tutorial index `tutorials.html` lists the tutorials as cards below a common part.
+The website builder publishes one tutorial for each notebook `tutorials/<stem>.ipynb` and reads its content from the executed copy `tutorials/executed/<stem>.ipynb`; it never runs or changes the notebooks. Each tutorial gives a page `tutorials/<stem>.html`, a Markdown version `tutorials/<stem>.md`, its figures, and the executed notebook as a download. The tutorial index `tutorials.html` lists the tutorials by series, below a common part.
 
 ```bash
 make website                                     # in an environment with the website tools
@@ -184,6 +187,7 @@ python3 -m http.server --directory website       # then open http://localhost:80
 - Without `tutorials/executed/` the index lists no tutorial, and a notebook without an executed copy is left out; both give the warning `not-executed`, and so does a link from another page to a tutorial left out this way. The release build, `python3 website_builder/build.py website --release`, treats them as errors, so a published site has every tutorial.
 - `make website` also regenerates `docs/` from the sources of the documentation. Changes there do not come from the tutorial and are not part of its pull request.
 - The common part of the index (title, lead, the setup that all tutorials need) is the content page `website_builder/content/tutorials.md`; its format is described in [The tutorial index page](../website_builder/README.md#the-tutorial-index-page) in the website README.
+- Each series has a file `website_builder/content/tutorials/<series>.md` with its title, its position and an introduction of what the series covers; a new series needs this file before its first notebook is published. The format is described in [Tutorial series](../website_builder/README.md#tutorial-series) in the website README.
 
 How the builder renders notebooks and the full list of its error messages are in [Tutorials](../website_builder/README.md#tutorials) in the website README.
 

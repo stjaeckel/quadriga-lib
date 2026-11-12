@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block main %}
-<div class="wrap page">
+<div class="wrap doc">
+<nav class="doc-side idx" aria-label="Publications">{% include "_publications_index.html" %}</nav>
 <div class="doc-main prose">
   <p class="crumbs"><a href="{{ url("index") }}">Home</a> › {{ pubs.title }}</p>
   <h1>{{ pubs.title }}</h1>
   <p class="lead">{{ pubs.lead }}</p>
   <div class="page-tools"><a href="{{ root }}{{ twin }}">Markdown version</a></div>
+  <details class="doc-index"><summary>On this page</summary><nav class="idx" aria-label="Publications (collapsible)">{% include "_publications_index.html" %}</nav></details>
 {% for g in pubs.groups %}
   <h2 id="{{ g.id }}">{{ g.title }}</h2>
 {% if g.intro %}

@@ -1,16 +1,24 @@
 {% extends "base.html" %}
 {% block main %}
-<div class="wrap page tut-index">
+<div class="wrap doc">
+<nav class="doc-side idx" aria-label="Tutorials">{% include "_tutorials_index.html" %}</nav>
+<div class="doc-main prose">
   <p class="crumbs"><a href="{{ url("index") }}">Home</a> › {{ page.title }}</p>
   <h1>{{ page.title }}</h1>
 {% if lead %}
   <p class="lead">{{ lead }}</p>
 {% endif %}
-{% if body %}
-  <div class="prose">{{ body }}</div>
+  <div class="page-tools"><a href="{{ root }}{{ twin }}">Markdown version</a></div>
+  <details class="doc-index"><summary>Series and tutorials</summary><nav class="idx" aria-label="Tutorials (collapsible)">{% include "_tutorials_index.html" %}</nav></details>
+{{ body }}
+{% for g in groups %}
+<section class="tut-series" id="{{ g.id }}"><h2>{{ g.title }}</h2>
+{{ g.body }}
+{% if g.tutorials %}
+<ol class="tut-list">{% for t in g.tutorials %}<li><a class="tut-row" href="tutorials/{{ t.stem }}.html">{% if g.numbered %}<span class="tut-part">Part {{ t.part }}</span>{% endif %}<h3>{{ t.title }}</h3><p>{{ t.summary }}</p><span class="meta"><span class="tag lang">{{ t.language }}</span><span class="tag">{{ t.level }}</span><span class="tag">about {{ t.duration }} min</span></span></a></li>{% endfor %}</ol>
 {% endif %}
-{% if cards %}
-  <div class="grid-2">{% for c in cards %}<a class="card tut-card" href="tutorials/{{ c.stem }}.html"><div class="meta"><span class="tag lang">{{ c.language }}</span><span class="tag">{{ c.level }}</span></div><h3>{{ c.title }}</h3><p>{{ c.summary }}</p></a>{% endfor %}</div>
-{% endif %}
+</section>
+{% endfor %}
+</div>
 </div>
 {% endblock %}

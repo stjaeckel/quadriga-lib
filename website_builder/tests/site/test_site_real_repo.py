@@ -43,7 +43,8 @@ def site(tmp_path_factory):
 
 def test_tutorials_without_warnings(site):
     _, out, files = site
-    warnings = [ln for ln in out.splitlines() if ln.startswith("tutorials/") and ": warning:" in ln]
+    warnings = [ln for ln in out.splitlines()
+                if ln.startswith(("tutorials/", "website_builder/content/tutorials/")) and ": warning:" in ln]
     notebooks = sorted((REPO / "tutorials").glob("*.ipynb"))
     if notebooks and not (REPO / "tutorials/executed").is_dir():  # tutorials not run in this checkout
         assert warnings == ["tutorials/executed: warning: missing: the tutorials have not been run (make tutorials); "

@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block main %}
-<div class="wrap page">
-<div class="doc-main prose page-narrow">
-  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › <a href="{{ url("tutorials") }}">Tutorials</a> › {{ tut.title }}</p>
+<div class="wrap doc">
+<nav class="doc-side idx" aria-label="Tutorials of this series">{% include "_tutorial_side.html" %}</nav>
+<div class="doc-main prose">
+  <p class="crumbs"><a href="{{ url("index") }}">Home</a> › <a href="{{ url("tutorials") }}">Tutorials</a> › <a href="{{ url("tutorials") }}#{{ tut.series.id }}">{{ tut.series.title }}</a></p>
   <h1>{{ tut.title }}</h1>
-  <div class="tut-card"><div class="meta"><span class="tag lang">{{ tut.language }}</span><span class="tag">{{ tut.level }}</span><span class="tag">about {{ tut.duration }} minutes</span></div></div>
+  <div class="tut-meta">{% if tut.series.numbered %}<span class="tut-part">Part {{ tut.part }} of {{ tut.parts }}</span>{% endif %}<span class="tag lang">{{ tut.language }}</span><span class="tag">{{ tut.level }}</span><span class="tag">about {{ tut.duration }} min</span></div>
   <div class="downloads"><a class="dl" href="{{ tut.stem }}.ipynb">Download notebook <small>.ipynb</small></a><a class="dl" href="{{ tut.stem }}.md">Markdown <small>.md</small></a></div>
+  <details class="doc-index"><summary>In this series</summary><nav class="idx" aria-label="Tutorials of this series (collapsible)">{% include "_tutorial_side.html" %}</nav></details>
 {% for c in tut.cells %}
 {% if c.md is not none %}
 {{ c.md }}
@@ -13,6 +15,9 @@
   <div class="cell"><div class="cell-label">In [{{ c.label }}]</div><pre><code class="language-{{ c.lang }}">{{ c.code }}</code></pre>{% for o in c.outs %}<div class="out">{{ o }}</div>{% endfor %}</div>
 {% endif %}
 {% endfor %}
+{% if tut.prev or tut.next %}
+  <nav class="tut-pager" aria-label="Previous and next tutorial">{% if tut.prev %}<a class="prev" href="{{ tut.prev.stem }}.html"><small>← Previous</small><span>{{ tut.prev.title }}</span></a>{% endif %}{% if tut.next %}<a class="next" href="{{ tut.next.stem }}.html"><small>Next →</small><span>{{ tut.next.title }}</span></a>{% endif %}</nav>
+{% endif %}
   <p><a href="{{ url("tutorials") }}">← All tutorials</a></p>
 </div>
 </div>

@@ -305,7 +305,27 @@ def _plain(html_text):
     return html.unescape(re.sub(r"<[^>]*>", "", str(html_text)))
 
 
-def tutorial_page(ctx, t):
+def _tut_item(ctx, t, n):
+    return {"stem": t.stem, "title": t.title, "summary": ctx.inline(t.summary, t.path), "language": t.language,
+            "level": t.level.capitalize(), "duration": t.duration, "part": n}
+
+
+def tutorial_groups(ctx, groups):
+    """The groups of tutorials.html: id, title, introduction (headings one level down), the index entries of
+    its ## headings and its tutorials as list items."""
+    out = []
+    for g in groups:
+        p = g.page
+        body = ctx.fragment(p.body, "prose", p.path, p.body_line, headings=p.headings, shift=1) \
+            if p is not None and p.body else Markup("")
+        out.append({"id": g.id, "title": ctx.inline(g.title, p.path) if p is not None else g.title, "body": body,
+                    "numbered": g.numbered, "tutorials": [_tut_item(ctx, t, n) for n, t in enumerate(g.tutorials, 1)]})
+    return out
+
+
+def tutorial_page(ctx, t, g):
+    """One tutorial: cells, tags, its place in the series g (part n of m, previous and next; none for the
+    tutorials without a series) and the index entries of its ## headings."""
     cells = []
     for c in t.cells:
         if c.kind == "markdown":
@@ -321,8 +341,18 @@ def tutorial_page(ctx, t):
             cells.append({"md": None, "label": c.count, "lang": t.lexer,
                           "code": highlight("\n".join(c.lines), t.lexer), "outs": outs})
     summary = ctx.inline(t.summary, t.path)
+    n = g.tutorials.index(t)
+    items = [_tut_item(ctx, x, k) for k, x in enumerate(g.tutorials, 1)]
+    rows = render_md.index_rows([h for c in t.cells for h in c.headings])  # links as their text
+    heads = [(ctx.inline(text, t.path), hid) for text, hid, _ in rows]
+    numbered = g.numbered
     return {"stem": t.stem, "title": t.title, "summary": summary, "description": _plain(summary),
-            "language": t.language, "level": t.level.capitalize(), "duration": t.duration, "cells": cells}
+            "language": t.language, "level": t.level.capitalize(), "duration": t.duration, "cells": cells,
+            # the series title is shown inside links (breadcrumb, sidebar), so as plain text
+            "series": {"id": g.id, "title": prose.plain_text(g.title), "numbered": numbered, "tutorials": items},
+            "part": n + 1, "parts": len(items),
+            "prev": items[n - 1] if numbered and n > 0 else None,
+            "next": items[n + 1] if numbered and n + 1 < len(items) else None, "index": heads}
 
 
 def render_site(model, diag):
@@ -372,20 +402,18 @@ def render_site(model, diag):
         page(pid + ".html", "notfound.html" if pid == "404" else "legal.html", root="/" if pid == "404" else "",
              page=p, body=_prose(ctx, p), title=p.title, description=p.description)
 
-    tuts = model["tutorials"]
     ctx.location = "tutorials.html"
     idx = web["tutorials"]
-    cards = [{"stem": t.stem, "title": t.title, "summary": ctx.inline(t.summary, t.path), "language": t.language,
-              "level": t.level.capitalize()} for t in tuts]
     page("tutorials.html", "tutorials_index.html", current="tutorials", twin="tutorials.md", page=idx,
-         lead=ctx.inline(idx.lead, idx.path), body=_prose(ctx, idx), cards=cards,
-         title=idx.title, description=idx.description)
-    for t in tuts:
-        path = "tutorials/%s.html" % t.stem
-        ctx.location = path
-        tut = tutorial_page(ctx, t)
-        page(path, "tutorial.html", root="../", current="tutorials", twin="tutorials/%s.md" % t.stem, tut=tut,
-             title=t.title, description=tut["description"])
+         lead=ctx.inline(idx.lead, idx.path), body=_prose(ctx, idx), intro_index=_index(ctx, idx, 1),
+         groups=tutorial_groups(ctx, model["tutorial_groups"]), title=idx.title, description=idx.description)
+    for g in model["tutorial_groups"]:
+        for t in g.tutorials:
+            path = "tutorials/%s.html" % t.stem
+            ctx.location = path
+            tut = tutorial_page(ctx, t, g)
+            page(path, "tutorial.html", root="../", current="tutorials", twin="tutorials/%s.md" % t.stem,
+                 tut=tut, title=t.title, description=tut["description"])
 
     pages = formulas(ctx, pages)
     files, markers = {}, 0

@@ -26,6 +26,21 @@ def site(root, rel):
     return (root / "website" / rel).read_text(encoding="utf-8")
 
 
+def both(root, change, stem="mini_demo"):
+    """Change the tutorial metadata of a notebook and of its executed copy alike (a re-run notebook)."""
+    for path in (root / "tutorials" / (stem + ".ipynb"), root / "tutorials/executed" / (stem + ".ipynb")):
+        nb = json.loads(path.read_text(encoding="utf-8"))
+        change(nb["metadata"]["quadriga_tutorial"])
+        path.write_text(json.dumps(nb), encoding="utf-8")
+
+
+def second(root, **meta):
+    """A second tutorial mini_zero, a copy of mini_demo with other metadata."""
+    for folder in ("tutorials", "tutorials/executed"):
+        shutil.copy(root / folder / "mini_demo.ipynb", root / folder / "mini_zero.ipynb")
+    both(root, lambda m: m.update(meta), "mini_zero")
+
+
 def test_metadata_errors(mini_repo, run_site):
     def bad(nb):
         meta = nb["metadata"]["quadriga_tutorial"]
@@ -123,16 +138,148 @@ def test_pages_twins_and_index(mini_repo, run_site):
     assert '<a class="dl" href="mini_demo.ipynb">Download notebook <small>.ipynb</small></a>' in page
     index = site(mini_repo, "tutorials.html")
     assert 'href="tutorials/mini_demo.html"' in index and ">Python</span>" in index and ">Beginner</span>" in index
-    assert "<h3>Mini demo</h3>" in index
+    assert "<h3>Mini demo</h3>" in index and ">about 5 min</span>" in index
     md = site(mini_repo, "tutorials.md")
-    assert "- [Mini demo](tutorials/mini_demo.md) · Python · beginner · A *small* notebook for the tests." in md
+    assert ("1. [Mini demo](tutorials/mini_demo.md) · Python · beginner · about 5 min · A *small* notebook for the "
+            "tests.") in md
+
+
+SERIES = "website_builder/content/tutorials/demo.md"
+
+
+def test_series(mini_repo, run_site):
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert "series-empty" not in out
+    index = site(mini_repo, "tutorials.html")
+    assert '<section class="tut-series" id="demo"><h2>Demo series</h2>' in index
+    assert "What the <em>demo</em> series covers." in index
+    assert '<h3 id="before-you-start">Before you start</h3>' in index  # series headings one level down
+    assert '<span class="tut-part">Part 1</span><h3>Mini demo</h3>' in index
+    assert '<summary><span>Demo series</span><span class="count">1</span></summary>' in index  # sidebar, closed
+    assert '<li class="sub"><a href="tutorials/mini_demo.html">Mini demo</a></li>' in index
+    md = site(mini_repo, "tutorials.md")
+    assert '<a id="demo"></a>\n## Demo series\n\nWhat the *demo* series covers.' in md
+    assert '<a id="before-you-start"></a>\n### Before you start' in md
+    page = site(mini_repo, "tutorials/mini_demo.html")
+    assert '<a href="../tutorials.html#demo">Demo series</a></p>' in page  # breadcrumb
+    assert '<span class="tut-part">Part 1 of 1</span>' in page
+    assert '<a class="current" href="mini_demo.html" aria-current="page">Mini demo</a>' in page
+    assert "tut-pager" not in page  # a series of one has no previous or next
+    assert "\n\nPart 1 of 1 of [Demo series](../tutorials.md#demo)\n" in site(mini_repo, "tutorials/mini_demo.md")
+
+
+def test_series_order_and_pager(mini_repo, run_site):
+    second(mini_repo, order=0, title="Zero")
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    index = site(mini_repo, "tutorials.html")
+    assert index.index("<h3>Zero</h3>") < index.index("<h3>Mini demo</h3>")
+    page = site(mini_repo, "tutorials/mini_demo.html")
+    assert '<span class="tut-part">Part 2 of 2</span>' in page
+    assert '<a class="prev" href="mini_zero.html"><small>← Previous</small><span>Zero</span></a>' in page
+    assert 'class="next"' not in page
+    zero = site(mini_repo, "tutorials/mini_zero.html")
+    assert '<a class="next" href="mini_demo.html"><small>Next →</small><span>Mini demo</span></a>' in zero
+    assert 'class="prev"' not in zero and '<ol class="tut-parts numbered">' in zero
+    assert ("Part 2 of 2 of [Demo series](../tutorials.md#demo) · Previous: [Zero](mini_zero.md)\n"
+            in site(mini_repo, "tutorials/mini_demo.md"))
+    assert ("Part 1 of 2 of [Demo series](../tutorials.md#demo) · Next: [Mini demo](mini_demo.md)\n"
+            in site(mini_repo, "tutorials/mini_zero.md"))
+
+
+def test_series_order_and_repeated_headings(mini_repo, run_site):
+    content = mini_repo / "website_builder/content/tutorials"
+    (content / "early.md").write_text('+++\ntitle = "Early"\norder = 0\n+++\n\n## Before you start\n\nText.\n',
+                                      encoding="utf-8")
+    second(mini_repo, series="early")
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    index = site(mini_repo, "tutorials.html")
+    assert index.index('id="early"') < index.index('id="demo"')  # series by order
+    assert '<h3 id="before-you-start">' in index and '<h3 id="before-you-start-2">' in index  # one set of ids
+
+
+def test_unknown_series(mini_repo, run_site):
+    both(mini_repo, lambda m: m.update(series="nope"))
+    code, out = run_site(mini_repo)
+    assert code == 1
+    assert ("tutorials/mini_demo.ipynb: error: metadata.quadriga_tutorial.series: no series file "
+            "website_builder/content/tutorials/nope.md") in out
+    shutil.rmtree(mini_repo / "tutorials/executed")  # checked in the committed notebook, run or not
+    code, out = run_site(mini_repo)
+    assert code == 1 and "tutorials/mini_demo.ipynb: error: metadata.quadriga_tutorial.series: no series" in out
+
+
+def test_executed_copy_with_other_metadata(mini_repo, run_site):
+    edit(mini_repo, lambda nb: nb["metadata"]["quadriga_tutorial"].pop("series"))  # run before the key was set
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert ("tutorials/mini_demo.ipynb: warning: the executed copy tutorials/executed/mini_demo.ipynb has other "
+            "tutorial metadata than the notebook (make tutorials) [not-executed]") in out
+    assert "series-empty" not in out  # the notebook names the series
+    code, out = run_site(mini_repo, "--release")
+    assert code == 1 and "tutorials/mini_demo.ipynb: error: the executed copy" in out
+
+
+def test_tutorials_without_series(mini_repo, run_site):
+    both(mini_repo, lambda m: m.pop("series"))
+    second(mini_repo, title="Two", order=2)
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    assert ("%s: warning: no notebook names this series (metadata.quadriga_tutorial.series) [series-empty]"
+            % SERIES) in out
+    index = site(mini_repo, "tutorials.html")
+    assert '<section class="tut-series" id="demo"><h2>Demo series</h2>' in index  # kept, without tutorials
+    assert '<section class="tut-series" id="other"><h2>Other tutorials</h2>' in index
+    assert "<h3>Mini demo</h3>" in index and 'class="tut-part"' not in index
+    page = site(mini_repo, "tutorials/mini_demo.html")
+    assert 'class="tut-part"' not in page and "tut-pager" not in page  # no parts, no previous and next
+    assert '<ol class="tut-parts">' in page and 'href="mini_zero.html">Two</a>' in page
+    md = site(mini_repo, "tutorials.md")
+    assert "## Other tutorials\n\n- [Mini demo](tutorials/mini_demo.md) · " in md
+    assert "\n- [Two](tutorials/mini_zero.md) · " in md
+    assert "Part " not in site(mini_repo, "tutorials/mini_demo.md")
+
+
+def test_links_in_titles_and_headings(mini_repo, run_site):
+    path = mini_repo / SERIES
+    path.write_text(path.read_text(encoding="utf-8").replace('"Demo series"', '"Demo [FAQ](faq.html)"'),
+                    encoding="utf-8")
+    edit(mini_repo, lambda nb: nb["cells"].append(
+        {"cell_type": "markdown", "metadata": {}, "source": ["## About [the FAQ](faq.html)"]}))
+    code, out = run_site(mini_repo)
+    assert code == 0, out
+    page = site(mini_repo, "tutorials/mini_demo.html")
+    assert '<a href="../tutorials.html#demo">Demo FAQ</a></p>' in page  # inside links as plain text
+    assert "Part 1 of 1 of [Demo FAQ](../tutorials.md#demo)" in site(mini_repo, "tutorials/mini_demo.md")
+    assert '<li class="sub"><a href="#about-the-faq">About the FAQ</a></li>' in page
+
+
+def test_series_id_clash(mini_repo, run_site):
+    (mini_repo / SERIES).rename(mini_repo / "website_builder/content/tutorials/content.md")
+    both(mini_repo, lambda m: m.update(series="content"))
+    code, out = run_site(mini_repo)
+    assert code == 1
+    assert ("website_builder/content/tutorials/content.md: error: E-anchor: the series id 'content' is already "
+            "an id on tutorials.html") in out
+
+
+def test_series_id_clash_with_index_heading(mini_repo, run_site):
+    with open(mini_repo / "website_builder/content/tutorials.md", "a", encoding="utf-8") as f:
+        f.write("\n## Demo\n\nText.\n\n## Other\n\nText.\n")
+    code, out = run_site(mini_repo)
+    assert code == 1
+    assert ("%s: error: E-anchor: the series id 'demo' is already an id on tutorials.html" % SERIES) in out
+    assert re.search(r"website_builder/content/tutorials\.md:11: error: E-anchor: the id 'other' is the section "
+                     r"of the tutorials without a series", out), out
 
 
 def test_no_tutorials(mini_repo, run_site):
     (mini_repo / NB).unlink()
     code, out = run_site(mini_repo)
     assert code == 0 and "not-executed" not in out
-    assert "tut-card" not in site(mini_repo, "tutorials.html")
+    assert "tut-row" not in site(mini_repo, "tutorials.html")
     assert "tutorials/mini_demo" not in site(mini_repo, "tutorials.md")
     assert not (mini_repo / "website/tutorials/mini_demo.html").exists()
 
@@ -144,7 +291,9 @@ def test_not_executed(mini_repo, run_site):
     assert ("tutorials/executed: warning: missing: the tutorials have not been run (make tutorials); the tutorials "
             "page lists none [not-executed]") in out
     index = site(mini_repo, "tutorials.html")
-    assert "<h1>Tutorials</h1>" in index and "tut-card" not in index
+    assert "<h1>Tutorials</h1>" in index and "tut-row" not in index
+    assert '<section class="tut-series" id="demo"><h2>Demo series</h2>' in index  # the series stays
+    assert "series-empty" not in out
     assert not (mini_repo / "website/tutorials/mini_demo.html").exists()
     code, out = run_site(mini_repo, "--release")
     assert code == 1 and "tutorials/executed: error: missing: the tutorials have not been run" in out
@@ -156,7 +305,7 @@ def test_executed_copy_missing(mini_repo, run_site):
     assert code == 0, out
     assert ("tutorials/mini_demo.ipynb: warning: no executed copy tutorials/executed/mini_demo.ipynb "
             "(make tutorials); left out [not-executed]") in out
-    assert "tut-card" not in site(mini_repo, "tutorials.html")
+    assert "tut-row" not in site(mini_repo, "tutorials.html")
     code, out = run_site(mini_repo, "--release")
     assert code == 1 and "tutorials/mini_demo.ipynb: error: no executed copy" in out
 
