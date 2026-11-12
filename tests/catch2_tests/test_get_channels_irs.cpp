@@ -168,6 +168,26 @@ TEST_CASE("Get Channels IRS - Minimal test")
     CHECK(eoa.n_elem == 0);
 }
 
+TEST_CASE("Get Channels IRS - Missing outputs throw")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    arma::mat fbs(3, 1, arma::fill::zeros), M(8, 1, arma::fill::zeros);
+    fbs(0) = 10.0, M(0) = 1.0, M(6) = -1.0;
+    arma::vec gain = {1.0}, len = {0.0};
+    arma::cube cre, cim, dl;
+    auto run = [&](arma::cube *a, arma::cube *b, arma::cube *c)
+    {
+        quadriga_lib::get_channels_irs<double>(&ant, &ant, &ant, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               10.0, 5.0, 0.0, 0.0, 0.0, 0.0, &fbs, &fbs, &gain, &len, &M, &fbs, &fbs, &gain, &len, &M,
+                                               a, b, c);
+    };
+    REQUIRE_THROWS_AS(run(nullptr, &cim, &dl), std::invalid_argument);
+    REQUIRE_THROWS_AS(run(&cre, nullptr, &dl), std::invalid_argument);
+    REQUIRE_THROWS_AS(run(&cre, &cim, nullptr), std::invalid_argument);
+    REQUIRE_NOTHROW(run(&cre, &cim, &dl));
+    CHECK(cre.n_slices == 1);
+}
+
 TEST_CASE("Tools - Combine IRS Coord")
 {
     double Ix = 10.0, Iy = 10.0, Iz = 0.0;

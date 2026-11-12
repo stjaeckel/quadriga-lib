@@ -40,6 +40,23 @@ TEST_CASE("Multifreq - Empty TX array throws")
         std::invalid_argument);
 }
 
+TEST_CASE("Multifreq - fbs_pos with columns but no rows throws")
+{
+    // [0, 4] has no elements but 4 columns; with all other path inputs empty it is missing data, not 0 paths
+    auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>()), rx = tx;
+    arma::mat fbs(0, 4), lbs, pg;
+    arma::vec pl;
+    arma::cube M;
+    arma::vec fi = {1e9}, fo = {1e9};
+    std::vector<arma::cube> cr, ci, dl;
+    for (bool fake_los : {false, true})
+        REQUIRE_THROWS_AS(
+            quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                  10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                  fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, false, fake_los),
+            std::invalid_argument);
+}
+
 TEST_CASE("Multifreq - Empty RX array throws")
 {
     std::vector<quadriga_lib::arrayant<double>> rx;
