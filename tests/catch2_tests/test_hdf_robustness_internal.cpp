@@ -1207,8 +1207,8 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         quadriga_lib::channel<double> c;
         c.tx_pos = arma::vec({0.0, 0.0, 1.0});
         c.rx_pos = arma::vec({10.0, 0.0, 1.5});
-        c.delay = {arma::cube(1, 0, 3)};
-        quadriga_lib::hdf5_write(&c, fn, 0, 0, 0, 0, true);
+        c.delay = {arma::cube(1, 1, 0)}; // A valid channel without paths; the test sets the extents in the file
+        quadriga_lib::hdf5_write(&c, fn, 0, 0, 0, 0);
         set_dataspace("channel_1/delay", {1ULL << 29, 0, 1});
         edit_messages(fn, "channel_1", 0, [&](std::vector<message> &m)
                       {

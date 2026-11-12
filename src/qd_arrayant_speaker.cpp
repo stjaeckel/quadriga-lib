@@ -373,15 +373,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
         }
 
         // Set the data pointers for quick validation
-        ant.check_ptr[0] = ant.e_theta_re.memptr();
-        ant.check_ptr[1] = ant.e_theta_im.memptr();
-        ant.check_ptr[2] = ant.e_phi_re.memptr();
-        ant.check_ptr[3] = ant.e_phi_im.memptr();
-        ant.check_ptr[4] = ant.azimuth_grid.memptr();
-        ant.check_ptr[5] = ant.elevation_grid.memptr();
-        ant.check_ptr[6] = ant.element_pos.memptr();
-        ant.check_ptr[7] = ant.coupling_re.memptr();
-        ant.check_ptr[8] = ant.coupling_im.memptr();
+        qd_arrayant_mark_valid(ant);
     }
 
     return output;

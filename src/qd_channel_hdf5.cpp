@@ -616,28 +616,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(std::string fn, arma::u32_vec *chan
     return arma::u32_vec({h.dims[0], h.dims[1], h.dims[2], h.dims[3]});
 }
 
-// Check the structured data of a channel before anything is written (the checks of hdf5_write in their order)
-template <typename dtype>
-static void qHDF_check_channel(const quadriga_lib::channel<dtype> *ch)
-{
-    const arma::uword n_snap = ch->n_snap();
-    if (n_snap > (arma::uword)UINT_MAX)
-        throw std::invalid_argument("Too many snapshots.");
-    if (ch->n_path().n_elem != n_snap)
-        throw std::invalid_argument("Number of elements returned by 'n_path()' does not match number of snapshots.");
-    const std::pair<const arma::Mat<dtype> *, const char *> positions[4] = {
-        {&ch->tx_pos, "tx_pos"}, {&ch->rx_pos, "rx_pos"}, {&ch->tx_orientation, "tx_orientation"}, {&ch->rx_orientation, "rx_orientation"}};
-    for (const auto &p : positions)
-        if (p.first->n_elem != 0 && p.first->n_rows != 3)
-            throw std::invalid_argument("'" + std::string(p.second) + "' must have 3 rows.");
-    if (ch->coeff_re.size() == (size_t)n_snap && ch->coeff_im.size() == (size_t)n_snap)
-        for (size_t i = 0; i < (size_t)n_snap; ++i)
-            if (arma::size(ch->coeff_re[i]) != arma::size(ch->coeff_im[i]))
-                throw std::invalid_argument("Size mismatch between 'coeff_re[" + std::to_string(i) + "]' and 'coeff_im[" +
-                                            std::to_string(i) + "]'.");
-}
-
-// Emit the structured data of a channel (checked by qHDF_check_channel) and set the attribute values
+// Emit the structured data of a channel (checked by channel::is_valid) and set the attribute values
 // - Snapshot data: a field is written for every snapshot if it has one entry per snapshot, also for snapshots without
 //   paths (datasets with extent 0). Several snapshots: the datasets of snapshot i, then its group 'Snap_<i>' with the
 //   attribute 'NumPath'. One snapshot: the datasets go into the channel group, 'NumPath' becomes a channel attribute.
@@ -776,8 +755,7 @@ Write a channel object to an HDF5 file at a specified 4D index
 - Throws if the index was not reserved during [[hdf5_create]].
 - Structured data is always stored in single precision; input may be float or double.
 - Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.
-- Set `assume_valid = true` to skip integrity validation (faster but unsafe for potentially corrupted data).
-- The channel name is stored with at most 255 characters.
+- Channel names longer than 255 characters are rejected.
 - One writer per file at a time; files are not locked. Reading is safe while no one writes; different files can be
   read and written from parallel threads.
 
@@ -789,8 +767,7 @@ int quadriga_lib::hdf5_write(
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
-    unsigned iw = 0,
-    bool assume_valid = false);
+    unsigned iw = 0);
 ```
 
 ## Inputs:
@@ -800,7 +777,6 @@ int quadriga_lib::hdf5_write(
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`assume_valid`** *(optional)* — Skip channel integrity validation before writing
 
 ## Returns:
 - `0` if the slot was empty, `1` if existing data in the slot was replaced
@@ -812,21 +788,17 @@ MD!*/
 
 template <typename dtype>
 int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string fn,
-                             unsigned ix, unsigned iy, unsigned iz, unsigned iw, bool assume_valid)
+                             unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
     // Validate the channel data
-    bool channel_is_empty = false;
-    if (!assume_valid)
-    {
-        std::string error_message = ch->is_valid();
-        if (error_message.length() != 0)
-            throw std::invalid_argument(error_message.c_str());
+    std::string error_message = ch->is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+    if (ch->n_snap() > (arma::uword)UINT_MAX) // The snapshot count is stored in 32 bits; is_valid does not check it
+        throw std::invalid_argument("Too many snapshots.");
 
-        // Determine if the channel object has no structured data fields
-        channel_is_empty = ch->empty();
-    }
-    if (ch->par_names.size() != ch->par_data.size())
-        throw std::invalid_argument("Number of elements in 'par_data' must match number of elements in 'par_name'.");
+    // Determine if the channel object has no structured data fields
+    const bool channel_is_empty = ch->empty();
 
     // Are there unstructured fields?
     if (channel_is_empty && ch->par_names.size() == 0)
@@ -859,8 +831,6 @@ int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string
     h5::root_links root("channel_");
     root.load(h.f, h.root, h.eof, old);
     qHDF_check_chunks(h, root.ranges());
-    if (!channel_is_empty)
-        qHDF_check_channel(ch);
     const uint32_t id = qHDF_new_channel_id(root);
 
     // The new channel is written as one block at the end of the file: structured data, unstructured data and their
@@ -886,10 +856,10 @@ int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string
 }
 
 template int quadriga_lib::hdf5_write(const quadriga_lib::channel<float> *ch, std::string fn,
-                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw, bool assume_valid);
+                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
 template int quadriga_lib::hdf5_write(const quadriga_lib::channel<double> *ch, std::string fn,
-                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw, bool assume_valid);
+                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
 /*!MD
 # hdf5_read_channel

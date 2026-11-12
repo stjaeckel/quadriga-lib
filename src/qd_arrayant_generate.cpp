@@ -57,16 +57,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res)
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
 
-    // Set the data pointers for the quick check.
-    ant.check_ptr[0] = ant.e_theta_re.memptr();
-    ant.check_ptr[1] = ant.e_theta_im.memptr();
-    ant.check_ptr[2] = ant.e_phi_re.memptr();
-    ant.check_ptr[3] = ant.e_phi_im.memptr();
-    ant.check_ptr[4] = ant.azimuth_grid.memptr();
-    ant.check_ptr[5] = ant.elevation_grid.memptr();
-    ant.check_ptr[6] = ant.element_pos.memptr();
-    ant.check_ptr[7] = ant.coupling_re.memptr();
-    ant.check_ptr[8] = ant.coupling_im.memptr();
+    qd_arrayant_mark_valid(ant);
 
     return ant;
 }
@@ -123,16 +114,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res)
     ant.coupling_re.eye(2, 2);
     ant.coupling_im.zeros(2, 2);
 
-    // Set the data pointers for the quick check.
-    ant.check_ptr[0] = ant.e_theta_re.memptr();
-    ant.check_ptr[1] = ant.e_theta_im.memptr();
-    ant.check_ptr[2] = ant.e_phi_re.memptr();
-    ant.check_ptr[3] = ant.e_phi_im.memptr();
-    ant.check_ptr[4] = ant.azimuth_grid.memptr();
-    ant.check_ptr[5] = ant.elevation_grid.memptr();
-    ant.check_ptr[6] = ant.element_pos.memptr();
-    ant.check_ptr[7] = ant.coupling_re.memptr();
-    ant.check_ptr[8] = ant.coupling_im.memptr();
+    qd_arrayant_mark_valid(ant);
 
     return ant;
 }
@@ -184,16 +166,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
 
-    // Set the data pointers for the quick check.
-    ant.check_ptr[0] = ant.e_theta_re.memptr();
-    ant.check_ptr[1] = ant.e_theta_im.memptr();
-    ant.check_ptr[2] = ant.e_phi_re.memptr();
-    ant.check_ptr[3] = ant.e_phi_im.memptr();
-    ant.check_ptr[4] = ant.azimuth_grid.memptr();
-    ant.check_ptr[5] = ant.elevation_grid.memptr();
-    ant.check_ptr[6] = ant.element_pos.memptr();
-    ant.check_ptr[7] = ant.coupling_re.memptr();
-    ant.check_ptr[8] = ant.coupling_im.memptr();
+    qd_arrayant_mark_valid(ant);
 
     return ant;
 }
@@ -247,16 +220,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
 
-    // Set the data pointers for the quick check.
-    ant.check_ptr[0] = ant.e_theta_re.memptr();
-    ant.check_ptr[1] = ant.e_theta_im.memptr();
-    ant.check_ptr[2] = ant.e_phi_re.memptr();
-    ant.check_ptr[3] = ant.e_phi_im.memptr();
-    ant.check_ptr[4] = ant.azimuth_grid.memptr();
-    ant.check_ptr[5] = ant.elevation_grid.memptr();
-    ant.check_ptr[6] = ant.element_pos.memptr();
-    ant.check_ptr[7] = ant.coupling_re.memptr();
-    ant.check_ptr[8] = ant.coupling_im.memptr();
+    qd_arrayant_mark_valid(ant);
 
     return ant;
 }
@@ -366,16 +330,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     ant.coupling_im.zeros(1, 1);
     ant.name = "custom";
 
-    // Set the data pointers for the quick check.
-    ant.check_ptr[0] = ant.e_theta_re.memptr();
-    ant.check_ptr[1] = ant.e_theta_im.memptr();
-    ant.check_ptr[2] = ant.e_phi_re.memptr();
-    ant.check_ptr[3] = ant.e_phi_im.memptr();
-    ant.check_ptr[4] = ant.azimuth_grid.memptr();
-    ant.check_ptr[5] = ant.elevation_grid.memptr();
-    ant.check_ptr[6] = ant.element_pos.memptr();
-    ant.check_ptr[7] = ant.coupling_re.memptr();
-    ant.check_ptr[8] = ant.coupling_im.memptr();
+    qd_arrayant_mark_valid(ant);
 
     // Normalize to Gain
     dtype directivity = ant.calc_directivity_dBi(0);
@@ -1062,8 +1017,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
         ant.coupling_im = cpl_im;
     }
 
-    // Make sure the generated antenna is valid
-    auto err = ant.is_valid(false);
+    // Make sure the generated antenna is valid; the check marks the result (a local object)
+    auto err = ant.is_valid();
     if (!err.empty())
         throw std::invalid_argument(err);
 

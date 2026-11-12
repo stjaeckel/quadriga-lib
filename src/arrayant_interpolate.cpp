@@ -219,7 +219,7 @@ void quadriga_lib::arrayant_interpolate(const arrayant<dtype> &ant,
                                         arma::Mat<dtype> *gamma,
                                         int use_kernel)
 {
-    const std::string error_message = ant.is_valid();
+    const std::string error_message = qd_arrayant_is_valid_quick(ant);
     if (!error_message.empty())
         throw std::invalid_argument("Input 'ant' is not valid: " + error_message);
 
@@ -352,7 +352,7 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
-    const std::string error_message = quadriga_lib::arrayant_is_valid_multi(arrayant_vec, true);
+    const std::string error_message = qd_arrayant_is_valid_multi_quick(arrayant_vec);
     if (!error_message.empty())
         throw std::invalid_argument("Input 'arrayant_vec' is not valid: " + error_message);
 

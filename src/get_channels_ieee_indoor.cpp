@@ -4,6 +4,7 @@
 
 #include "quadriga_lib.hpp"
 #include "ieee_channel_model_functions.hpp"
+#include "qd_arrayant_functions.hpp"
 
 /*!SECTION
 Channel generation functions
@@ -125,13 +126,13 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
 {
     // Check if the antennas are valid
-    auto error_message = ap_array.is_valid();
+    auto error_message = qd_arrayant_is_valid_quick(ap_array);
     if (error_message.length() != 0)
     {
         error_message = "Transmit antenna: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
-    error_message = sta_array.is_valid();
+    error_message = qd_arrayant_is_valid_quick(sta_array);
     if (error_message.length() != 0)
     {
         error_message = "Receive antenna: " + error_message;

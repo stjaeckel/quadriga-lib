@@ -140,10 +140,10 @@ template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadriga_lib::arrayant<dtype> *new_arrayant) const
 {
     // Check if arrayant objects are valid
-    std::string error_message = is_valid();
+    std::string error_message = qd_arrayant_is_valid_quick(*this);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
-    error_message = new_arrayant->is_valid();
+    error_message = qd_arrayant_is_valid_quick(*new_arrayant);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -246,7 +246,7 @@ void quadriga_lib::arrayant<dtype>::calc_beamwidth_deg(arma::uword i_element, dt
                                                        dtype *az_point_ang, dtype *el_point_ang) const
 {
     // Validate arrayant
-    std::string error_message = is_valid();
+    std::string error_message = qd_arrayant_is_valid_quick(*this);
     if (error_message.length() == 0 && i_element >= n_elements())
         error_message = "Element index out of bound.";
     if (error_message.length() != 0)
@@ -445,7 +445,7 @@ template <typename dtype>
 dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const
 {
     // Check if arrayant object is valid
-    std::string error_message = is_valid();
+    std::string error_message = qd_arrayant_is_valid_quick(*this);
     if (error_message.length() == 0 && i_element >= n_elements())
         error_message = "Element index out of bound.";
     if (error_message.length() != 0)
@@ -554,7 +554,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
                                                                              dtype propagation_speed) const
 {
     // Check if calling arrayant object is valid
-    std::string error_message = this->is_valid(false); // Deep check
+    std::string error_message = qd_arrayant_check(*this);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -657,16 +657,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
         output.center_frequency = this->center_frequency;
         output.name = name;
 
-        // Set the data pointers for the quick check.
-        output.check_ptr[0] = output.e_theta_re.memptr();
-        output.check_ptr[1] = output.e_theta_im.memptr();
-        output.check_ptr[2] = output.e_phi_re.memptr();
-        output.check_ptr[3] = output.e_phi_im.memptr();
-        output.check_ptr[4] = output.azimuth_grid.memptr();
-        output.check_ptr[5] = output.elevation_grid.memptr();
-        output.check_ptr[6] = output.element_pos.memptr();
-        output.check_ptr[7] = output.coupling_re.memptr();
-        output.check_ptr[8] = output.coupling_im.memptr();
+        qd_arrayant_mark_valid(output);
     }
 
     return output;
@@ -676,35 +667,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
 {
-    quadriga_lib::arrayant<dtype> ant;
-
-    ant.name = name;
-    ant.e_theta_re = e_theta_re;
-    ant.e_theta_im = e_theta_im;
-    ant.e_phi_re = e_phi_re;
-    ant.e_phi_im = e_phi_im;
-    ant.azimuth_grid = azimuth_grid;
-    ant.elevation_grid = elevation_grid;
-    ant.element_pos = element_pos;
-    ant.coupling_re = coupling_re;
-    ant.coupling_im = coupling_im;
-    ant.center_frequency = center_frequency;
+    quadriga_lib::arrayant<dtype> ant(*this); // The copy of a valid arrayant is marked as validated
     ant.read_only = false;
-
-    // The copy holds the same data as a valid source, so it is marked as validated for the quick check of is_valid
-    if (is_valid().empty())
-    {
-        ant.check_ptr[0] = ant.e_theta_re.memptr();
-        ant.check_ptr[1] = ant.e_theta_im.memptr();
-        ant.check_ptr[2] = ant.e_phi_re.memptr();
-        ant.check_ptr[3] = ant.e_phi_im.memptr();
-        ant.check_ptr[4] = ant.azimuth_grid.memptr();
-        ant.check_ptr[5] = ant.elevation_grid.memptr();
-        ant.check_ptr[6] = ant.element_pos.memptr();
-        ant.check_ptr[7] = ant.coupling_re.memptr();
-        ant.check_ptr[8] = ant.coupling_im.memptr();
-    }
-
     return ant;
 }
 
@@ -794,16 +758,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec 
             std::memcpy(element_pos.colptr(*dest), element_pos.colptr(source), 3 * sizeof(dtype));
         }
 
-    // Set the data pointers for the quick check.
-    check_ptr[0] = e_theta_re.memptr();
-    check_ptr[1] = e_theta_im.memptr();
-    check_ptr[2] = e_phi_re.memptr();
-    check_ptr[3] = e_phi_im.memptr();
-    check_ptr[4] = azimuth_grid.memptr();
-    check_ptr[5] = elevation_grid.memptr();
-    check_ptr[6] = element_pos.memptr();
-    check_ptr[7] = coupling_re.memptr();
-    check_ptr[8] = coupling_im.memptr();
+    qd_arrayant_mark_valid(*this);
 }
 
 template <typename dtype>
@@ -852,7 +807,7 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
                                                     arma::uvec i_element) const
 {
     // Check if arrayant object is valid
-    std::string error_message = is_valid();
+    std::string error_message = qd_arrayant_is_valid_quick(*this);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -1248,7 +1203,7 @@ template <typename dtype>
 unsigned quadriga_lib::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::u32_mat layout) const
 {
     // Check if arrayant object is valid
-    std::string error_message = is_valid();
+    std::string error_message = qd_arrayant_is_valid_quick(*this);
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -2034,13 +1989,17 @@ void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uwor
 # .is_valid
 Validate the integrity of an arrayant object
 
+- Always checks the data: sizes of all members, ranges and order of the angle grids, sizes of element positions and
+  coupling matrix; empty `element_pos` and coupling are allowed
+- A passing check marks the object as validated: the library functions then skip the full check as long as no data
+  member was reallocated or resized; values changed in place after the check are not seen by them
+- The mark is updated atomically, so `is_valid` may be called while other threads read the object
+- A copy is marked if its source passes the full check; a moved-to object takes over the mark of its source
+
 ## Declaration:
 ```
-std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check = true) const;
+std::string quadriga_lib::arrayant<dtype>::is_valid() const;
 ```
-
-## Inputs:
-- **`quick_check`** *(optional)* — `true` for fast structural check; `false` for full data validation; full check additionally verifies data values
 
 ## Returns:
 - Empty string if valid; error message string if invalid
@@ -2049,38 +2008,32 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check = true) con
 - [[arrayant_is_valid_multi]] (multi-freq counterpart)
 MD!*/
 
-// ARRAYANT METHOD : Validates correctness of the member functions
+// Range and order of an angle grid in one pass; stops at the first value out of range
 template <typename dtype>
-std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
+static inline void qd_grid_range_order(const arma::Col<dtype> &grid, dtype max_abs, bool &in_range, bool &ascending)
 {
+    const dtype *p = grid.memptr();
+    in_range = true, ascending = true;
+    for (arma::uword i = 0; i < grid.n_elem; ++i)
+    {
+        if (!(p[i] >= -max_abs && p[i] <= max_abs))
+        {
+            in_range = false;
+            return;
+        }
+        if (i != 0 && p[i] <= p[i - 1])
+            ascending = false;
+    }
+}
 
-    // Assuming that the data has been validated before, we can quickly check if the data pointers were updated
-    // and if the member sizes still fit together. If neither changed, we can assume that the data is still valid.
-    // The size check is needed because Armadillo can keep the data pointer when a member is resized.
-    if (quick_check)
-        quick_check = arma::size(e_theta_im) == arma::size(e_theta_re) &&
-                      arma::size(e_phi_re) == arma::size(e_theta_re) &&
-                      arma::size(e_phi_im) == arma::size(e_theta_re) &&
-                      azimuth_grid.n_elem == e_theta_re.n_cols &&
-                      elevation_grid.n_elem == e_theta_re.n_rows &&
-                      element_pos.n_rows == 3 && element_pos.n_cols == e_theta_re.n_slices &&
-                      coupling_re.n_rows == e_theta_re.n_slices &&
-                      arma::size(coupling_im) == arma::size(coupling_re) &&
-                      check_ptr[0] != nullptr && check_ptr[1] != nullptr && check_ptr[2] != nullptr &&
-                      check_ptr[3] != nullptr && check_ptr[4] != nullptr && check_ptr[5] != nullptr &&
-                      check_ptr[0] == e_theta_re.memptr() &&
-                      check_ptr[1] == e_theta_im.memptr() &&
-                      check_ptr[2] == e_phi_re.memptr() &&
-                      check_ptr[3] == e_phi_im.memptr() &&
-                      check_ptr[4] == azimuth_grid.memptr() &&
-                      check_ptr[5] == elevation_grid.memptr() &&
-                      check_ptr[6] == element_pos.memptr() &&
-                      check_ptr[7] == coupling_re.memptr() &&
-                      check_ptr[8] == coupling_im.memptr();
-    if (quick_check)
-        return std::string("");
+// Full check of an arrayant without writing to it
+template <typename dtype>
+std::string qd_arrayant_check(const quadriga_lib::arrayant<dtype> &ant)
+{
+    const auto &e_theta_re = ant.e_theta_re, &e_theta_im = ant.e_theta_im, &e_phi_re = ant.e_phi_re, &e_phi_im = ant.e_phi_im;
+    const auto &azimuth_grid = ant.azimuth_grid, &elevation_grid = ant.elevation_grid;
+    const auto &element_pos = ant.element_pos, &coupling_re = ant.coupling_re, &coupling_im = ant.coupling_im;
 
-    // Perform a deep check
     if (e_theta_re.n_elem == 0ULL || e_theta_im.n_elem == 0ULL || e_phi_re.n_elem == 0ULL || e_phi_im.n_elem == 0ULL ||
         azimuth_grid.n_elem == 0ULL || elevation_grid.n_elem == 0ULL)
         return std::string("Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid");
@@ -2104,19 +2057,20 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
     if (elevation_grid.n_elem != n_elevation)
         return std::string("Number of elements in 'elevation_grid' does not match number of rows in pattern data.");
 
-    const dtype *p_az = azimuth_grid.memptr(), *p_el = elevation_grid.memptr();
-    const dtype az_max = dtype(3.1415930), el_max = dtype(1.5707965);
+    bool az_in_range, az_ascending, el_in_range, el_ascending;
+    qd_grid_range_order(azimuth_grid, dtype(3.1415930), az_in_range, az_ascending);
+    qd_grid_range_order(elevation_grid, dtype(1.5707965), el_in_range, el_ascending);
 
-    if (!qd_in_range(p_az, n_azimuth, -az_max, az_max))
+    if (!az_in_range)
         return std::string("Values of 'azimuth_grid' must be between -pi and pi (equivalent to -180 to 180 degree).");
 
-    if (!qd_in_range(p_el, n_elevation, -el_max, el_max))
+    if (!el_in_range)
         return std::string("Values of 'elevation_grid' must be between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
 
-    if (!qd_in_range(p_az, n_azimuth, -az_max, az_max, true, true))
+    if (!az_ascending)
         return std::string("Values of 'azimuth_grid' must be sorted in strictly ascending order.");
 
-    if (!qd_in_range(p_el, n_elevation, -el_max, el_max, true, true))
+    if (!el_ascending)
         return std::string("Values of 'elevation_grid' must be sorted in strictly ascending order.");
 
     if (!element_pos.empty() && (element_pos.n_rows != 3 || element_pos.n_cols != n_elements))
@@ -2134,11 +2088,24 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
     return std::string("");
 }
 
+template std::string qd_arrayant_check(const quadriga_lib::arrayant<float> &);
+template std::string qd_arrayant_check(const quadriga_lib::arrayant<double> &);
+
+// ARRAYANT METHOD : Full check; a passing check marks the object as validated
+template <typename dtype>
+std::string quadriga_lib::arrayant<dtype>::is_valid() const
+{
+    std::string error_message = qd_arrayant_check(*this);
+    if (error_message.empty())
+        qd_arrayant_mark_valid(*this);
+    return error_message;
+}
+
 // ARRAYANT METHOD : Validates correctness of the member functions and initializes element positions and coupling matrix
 template <typename dtype>
 std::string quadriga_lib::arrayant<dtype>::validate()
 {
-    std::string error_message = is_valid(false); // Deep check
+    std::string error_message = qd_arrayant_check(*this);
     if (error_message.length() != 0)
         return error_message;
 
@@ -2154,19 +2121,65 @@ std::string quadriga_lib::arrayant<dtype>::validate()
     if (coupling_im.empty())
         coupling_im.zeros(n_elements, n_prt);
 
-    // Set the data pointers for the quick check.
-    check_ptr[0] = e_theta_re.memptr();
-    check_ptr[1] = e_theta_im.memptr();
-    check_ptr[2] = e_phi_re.memptr();
-    check_ptr[3] = e_phi_im.memptr();
-    check_ptr[4] = azimuth_grid.memptr();
-    check_ptr[5] = elevation_grid.memptr();
-    check_ptr[6] = element_pos.memptr();
-    check_ptr[7] = coupling_re.memptr();
-    check_ptr[8] = coupling_im.memptr();
-
+    qd_arrayant_mark_valid(*this); // After filling the defaults, which may change the data pointers
     return std::string("");
 }
+
+// Copy: the members are copied; the copy of a valid source is marked as validated with its own data pointers.
+// The source gets the full check (read only), so a mark that no longer fits the data is not passed on.
+template <typename dtype>
+quadriga_lib::arrayant<dtype>::arrayant(const arrayant &other)
+{
+    *this = other;
+}
+
+template <typename dtype>
+quadriga_lib::arrayant<dtype> &quadriga_lib::arrayant<dtype>::operator=(const arrayant &other)
+{
+    if (this == &other)
+        return *this;
+    qd_arrayant_clear_mark(*this); // Cleared first: a member copy that throws leaves an unmarked object
+    name = other.name;
+    e_theta_re = other.e_theta_re, e_theta_im = other.e_theta_im, e_phi_re = other.e_phi_re, e_phi_im = other.e_phi_im;
+    azimuth_grid = other.azimuth_grid, elevation_grid = other.elevation_grid;
+    element_pos = other.element_pos, coupling_re = other.coupling_re, coupling_im = other.coupling_im;
+    center_frequency = other.center_frequency, read_only = other.read_only;
+    if (qd_arrayant_check(other).empty())
+        qd_arrayant_mark_valid(*this);
+    return *this;
+}
+
+// Move: Armadillo takes over heap memory but copies small members (up to 16 values are stored inside the object),
+// so data pointers can change. The target of a marked source is marked with its own pointers (no check, the target
+// takes over the data of the source); the source loses its mark.
+template <typename dtype>
+quadriga_lib::arrayant<dtype>::arrayant(arrayant &&other)
+{
+    *this = std::move(other);
+}
+
+template <typename dtype>
+quadriga_lib::arrayant<dtype> &quadriga_lib::arrayant<dtype>::operator=(arrayant &&other)
+{
+    if (this == &other)
+        return *this;
+    const bool marked = qd_arrayant_cache_matches(other);
+    qd_arrayant_clear_mark(*this), qd_arrayant_clear_mark(other);
+    name = std::move(other.name);
+    e_theta_re = std::move(other.e_theta_re), e_theta_im = std::move(other.e_theta_im);
+    e_phi_re = std::move(other.e_phi_re), e_phi_im = std::move(other.e_phi_im);
+    azimuth_grid = std::move(other.azimuth_grid), elevation_grid = std::move(other.elevation_grid);
+    element_pos = std::move(other.element_pos), coupling_re = std::move(other.coupling_re);
+    coupling_im = std::move(other.coupling_im);
+    center_frequency = other.center_frequency, read_only = other.read_only;
+    if (marked)
+        qd_arrayant_mark_valid(*this);
+    return *this;
+}
+
+// The validity cache must not need a lock (concurrent is_valid and quick checks; no libatomic)
+static_assert(std::atomic<const float *>::is_always_lock_free && std::atomic<const double *>::is_always_lock_free,
+              "Atomic pointers are not lock-free on this platform.");
 
 // Instantiate templates
 template class quadriga_lib::arrayant<float>;

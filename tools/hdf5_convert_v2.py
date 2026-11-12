@@ -22,11 +22,11 @@ Requirements: Python 3.10 or newer, numpy, h5py 3.0 or newer, and a quadriga_lib
 (any version newer than 0.12.4). The installed module is used; if there is none, the build in the folder ../lib next
 to this script (a source checkout after "make python"). PYTHONPATH=<folder with the module> selects another one.
 
-Limits: some items that only the C++ API with assume_valid = true or edits with other HDF5 tools can create have no
-place in version 3 and are skipped with a warning: an occupied slot without any channel data (the slot is left
-empty), the name of a channel that has no structured data, the bytes of a name beyond 255, and unstructured datasets
-whose name has characters other than letters, digits and '_', whose type or rank (> 3) the library does not support,
-or which hold a string that is not valid UTF-8.
+Limits: some items that only the C++ API with assume_valid = true (up to version 0.12.4) or edits with other HDF5
+tools can create have no place in version 3 and are skipped with a warning: an occupied slot without any channel data
+(the slot is left empty), the name of a channel that has no structured data, the bytes of a name beyond 255, and
+unstructured datasets whose name has characters other than letters, digits and '_', whose type or rank (> 3) the
+library does not support, or which hold a string that is not valid UTF-8.
 
 Exit codes: 0 converted completely; 3 converted except the items named in the warnings; 1 error (nothing written);
 2 wrong arguments; 130 interrupted by Ctrl-C, SIGTERM or SIGHUP (nothing written). Slot indices in messages are

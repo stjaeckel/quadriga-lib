@@ -88,7 +88,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Separate-fields output only available in single-frequency mode.");
 
             // The entries must form a frequency set (same element count, grids, positions and coupling size)
-            std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant, true);
+            std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant);
             if (!err.empty())
             {
                 err = "Entries in file '" + fn + "' do not form a frequency set (" + err +

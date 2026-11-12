@@ -674,18 +674,15 @@ Calculate the effective path gain per snapshot in linear scale
 
 ## Declaration:
 ```
-arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid = false) const;
+arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const;
 ```
-
-## Inputs:
-- **`assume_valid`** *(optional)* — Skip internal consistency checks for performance in trusted contexts
 
 ## Returns:
 - Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
 MD!*/
 
 template <typename dtype>
-arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid) const
+arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const
 {
     arma::uword n_snap_arma = this->n_snap();
     size_t n_snap_vector = (size_t)n_snap_arma;
@@ -697,12 +694,9 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool ass
         throw std::invalid_argument("Neither coefficients nor polarization are provided.");
 
     // Check if data is valid
-    if (!assume_valid)
-    {
-        std::string error_message = this->is_valid();
-        if (error_message.length() != 0)
-            throw std::invalid_argument(error_message.c_str());
-    }
+    std::string error_message = this->is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
 
     bool use_coeff = !coeff_re.empty();
     bool has_path_gain = !path_gain.empty();

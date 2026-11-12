@@ -618,13 +618,11 @@ TEST_CASE("hdf5_write - channel names are stored with at most 255 characters")
     quadriga_lib::hdf5_write(&c, f.fn);
     CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn).name == c.name);
 
-    // A name of 300 characters is rejected by the validation; with assume_valid it is stored truncated to 255
+    // A name of 300 characters is rejected by the validation
     std::remove(f.fn.c_str());
     c.name = std::string(300, 'L');
     CHECK_THROWS_AS(quadriga_lib::hdf5_write(&c, f.fn), std::invalid_argument);
     CHECK(!file_exists(f.fn));
-    quadriga_lib::hdf5_write(&c, f.fn, 0, 0, 0, 0, true);
-    CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn).name == std::string(255, 'L'));
 }
 
 TEST_CASE("hdf5_write - unstructured data of every supported type round trips")
@@ -803,39 +801,33 @@ TEST_CASE("hdf5_write - a channel without structured data")
     CHECK(r.par_names[0] == "x");
     CHECK(channel_ids(f.fn)(2) == 1);
 
-    // With assume_valid, the empty channel is written (it occupies the slot and keeps its name)
-    CHECK(quadriga_lib::hdf5_write(&e, f.fn, 3, 0, 0, 0, true) == 0);
-    CHECK(channel_ids(f.fn)(3) == 2);
-    r = quadriga_lib::hdf5_read_channel<double>(f.fn, 3);
-    CHECK(r.empty());
-    CHECK(r.name == e.name);
+    // The empty channel leaves the existing file and its slots unchanged
+    CHECK(quadriga_lib::hdf5_write(&e, f.fn, 3) == 0);
+    CHECK(channel_ids(f.fn)(3) == 0);
 }
 
-TEST_CASE("hdf5_write - assume_valid skips the validation of the channel")
+TEST_CASE("hdf5_write - an invalid channel leaves the file unchanged")
 {
-    test_file f("test_hdf5_write_assume_valid.hdf5");
+    test_file f("test_hdf5_write_invalid_channel.hdf5");
     quadriga_lib::hdf5_create(f.fn, 4);
     auto good = small_channel("good");
     quadriga_lib::hdf5_write(&good, f.fn, 0);
 
-    // Invalid channels that the writer itself rejects: the file is unchanged, no channel ID is used up
+    // Invalid channels are rejected before the file is changed: no slot is written, no channel ID is used up
     auto coeff = small_channel("coeff");
     coeff.coeff_im[0].set_size(2, 3, 3);
     CHECK_THROWS_AS(quadriga_lib::hdf5_write(&coeff, f.fn, 1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write(&coeff, f.fn, 1, 0, 0, 0, true), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write(&coeff, f.fn, 0, 0, 0, 0, true), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write(&coeff, f.fn, 0), std::invalid_argument);
 
     auto pos = small_channel("pos");
     pos.tx_pos.set_size(2, 1);
     CHECK_THROWS_AS(quadriga_lib::hdf5_write(&pos, f.fn, 1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write(&pos, f.fn, 1, 0, 0, 0, true), std::invalid_argument);
 
     auto par = small_channel("par");
     par.par_names = {"a"}; // Without data
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write(&par, f.fn, 1, 0, 0, 0, true), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write(&par, f.fn, 1), std::invalid_argument);
     par.par_data = {std::any(arma::cx_mat(2, 2))}; // Unsupported type
     CHECK_THROWS_AS(quadriga_lib::hdf5_write(&par, f.fn, 1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write(&par, f.fn, 1, 0, 0, 0, true), std::invalid_argument);
 
     arma::u32_vec id = channel_ids(f.fn);
     CHECK(id(0) == 1);

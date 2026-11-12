@@ -35,105 +35,30 @@ TEST_CASE("Arrayant append")
     CHECK(std::abs(g1 - 25.627f) < 0.001f);
 }
 
-#if defined(_MSC_VER)
-#define ARRAYANT_TEST_NOINLINE __declspec(noinline)
-#else
-#define ARRAYANT_TEST_NOINLINE __attribute__((noinline))
-#endif
-
-// The default constructor must initialise check_ptr. The arrayant is created twice in the same stack slot;
-// small matrices live inside the Armadillo objects, so stale check_ptr values of the first object would match the
-// data pointers of the second one and let the quick is_valid() pass an invalid, never validated object.
-static ARRAYANT_TEST_NOINLINE std::string arrayant_check_ptr_helper(bool first)
+// is_valid always checks the data: a value changed in place is found although the data pointers are unchanged
+TEST_CASE("Arrayant is_valid - Checks the data")
 {
-    quadriga_lib::arrayant<double> a;
-    a.e_theta_re.ones(2, 2, 1), a.e_theta_im.zeros(2, 2, 1), a.e_phi_re.zeros(2, 2, 1), a.e_phi_im.zeros(2, 2, 1);
-    a.elevation_grid = {-0.5, 0.5};
-    a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
-    if (first)
-    {
-        a.azimuth_grid = {-1.0, 1.0};
-        return a.validate();
-    }
-    a.azimuth_grid = {1.0, -1.0}; // invalid: unsorted; never validated
-    return a.is_valid();
-}
+    auto a = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    a.azimuth_grid.memptr()[1] = 4.0; // Out of range, written in place
+    CHECK(a.is_valid() == "Values of 'azimuth_grid' must be between -pi and pi (equivalent to -180 to 180 degree).");
 
-TEST_CASE("Arrayant - Default constructor initialises check_ptr")
-{
-    quadriga_lib::arrayant<double> a;
-    for (auto p : a.check_ptr)
-        CHECK(p == nullptr);
+    // Empty element_pos and coupling are allowed
+    quadriga_lib::arrayant<double> c;
+    c.e_theta_re.ones(2, 3, 1), c.e_theta_im.zeros(2, 3, 1), c.e_phi_re.zeros(2, 3, 1), c.e_phi_im.zeros(2, 3, 1);
+    c.azimuth_grid = {-1.0, 0.0, 1.0}, c.elevation_grid = {-0.5, 0.5};
+    CHECK(c.is_valid().empty());
 
-    CHECK(arrayant_check_ptr_helper(true).empty());
-    CHECK(!arrayant_check_ptr_helper(false).empty());
-}
-
-// Armadillo can keep the data pointer when a member is resized, e.g. within its built-in storage for small objects
-// or for a heap buffer with the same number of values. The quick is_valid() must still notice that the member sizes
-// no longer fit together, so that interpolate throws instead of reading element_pos and the grids out of bounds.
-// Whether a resize keeps the pointer differs between Armadillo versions, so the test sets check_ptr to the current
-// pointers after the resize. This gives the same state on every version.
-TEST_CASE("Arrayant - Quick is_valid detects resized members with unchanged data pointers")
-{
-    quadriga_lib::arrayant<double> a;
-    arma::mat az = {0.1}, el = {0.0}, vr, vi, hr, hi;
-
-    SECTION("Built-in storage")
-    {
-        a.e_theta_re.zeros(1, 1, 1), a.e_theta_im.zeros(1, 1, 1), a.e_phi_re.zeros(1, 1, 1), a.e_phi_im.zeros(1, 1, 1);
-        a.azimuth_grid = {0.0}, a.elevation_grid = {0.0};
-        REQUIRE(a.validate().empty());
-        a.e_theta_re.ones(1, 1, 64), a.e_theta_im.zeros(1, 1, 64), a.e_phi_re.zeros(1, 1, 64), a.e_phi_im.zeros(1, 1, 64);
-    }
-
-    SECTION("Heap storage, same number of values")
-    {
-        a.e_theta_re.ones(2, 2, 20), a.e_theta_im.zeros(2, 2, 20), a.e_phi_re.zeros(2, 2, 20), a.e_phi_im.zeros(2, 2, 20);
-        a.azimuth_grid = {-0.5, 0.5}, a.elevation_grid = {-0.5, 0.5};
-        REQUIRE(a.validate().empty());
-        a.e_theta_re.ones(2, 1, 40), a.e_theta_im.zeros(2, 1, 40), a.e_phi_re.zeros(2, 1, 40), a.e_phi_im.zeros(2, 1, 40);
-    }
-
-    // Pointers as if the resize had kept them all, so a pointer comparison alone cannot see the change
-    a.check_ptr[0] = a.e_theta_re.memptr(), a.check_ptr[1] = a.e_theta_im.memptr();
-    a.check_ptr[2] = a.e_phi_re.memptr(), a.check_ptr[3] = a.e_phi_im.memptr();
-    REQUIRE(!a.is_valid(false).empty());
-
-    REQUIRE(!a.is_valid().empty()); // stops here if the quick check misses the change
-    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate(a, az, el, vr, vi, hr, hi), std::invalid_argument);
-}
-
-// A copy of a valid arrayant passes the quick check of is_valid with its own data: its cache holds the data
-// pointers of the copy. The members of the pattern used here have more than 16 elements, so they live on the heap and
-// keep their data pointers when the copy is returned. A copy of an invalid arrayant gets no cache.
-TEST_CASE("Arrayant copy - A copy of a valid arrayant is marked as validated")
-{
-    // 6 elements on a 10 degree grid: grids of 19 and 37 values, positions [3, 6], coupling [6, 6]
-    auto a = quadriga_lib::generate_arrayant_3GPP<double>(1, 3, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0);
-    REQUIRE(a.validate().empty());
-    REQUIRE(a.element_pos.n_elem > 16);
-    REQUIRE(a.coupling_im.n_elem > 16);
-
-    const auto b = a.copy();
-    const arma::Cube<double> *pattern[4] = {&b.e_theta_re, &b.e_theta_im, &b.e_phi_re, &b.e_phi_im};
-    for (int i = 0; i < 4; ++i)
-        CHECK(b.check_ptr[i] == pattern[i]->memptr());
-    CHECK(b.check_ptr[4] == b.azimuth_grid.memptr());
-    CHECK(b.check_ptr[5] == b.elevation_grid.memptr());
-    CHECK(b.check_ptr[6] == b.element_pos.memptr());
-    CHECK(b.check_ptr[7] == b.coupling_re.memptr());
-    CHECK(b.check_ptr[8] == b.coupling_im.memptr());
-    CHECK(b.check_ptr[0] != a.check_ptr[0]); // Own data, not the cache of the source
-    CHECK(b.is_valid().empty());
-
-    // The copy of an invalid arrayant has an empty cache and fails the check
-    auto c = a.copy();
-    c.e_theta_im.set_size(19, 36, 6);
-    const auto d = c.copy();
-    for (int i = 0; i < 9; ++i)
-        CHECK(d.check_ptr[i] == nullptr);
-    CHECK(!d.is_valid().empty());
+    // Range errors are reported before order errors, azimuth before elevation
+    c.azimuth_grid = {1.0, 0.0, 4.0}; // Unsorted and out of range
+    CHECK(c.is_valid() == "Values of 'azimuth_grid' must be between -pi and pi (equivalent to -180 to 180 degree).");
+    c.azimuth_grid = {1.0, 0.0, -1.0}, c.elevation_grid = {0.5, 2.0}; // Azimuth unsorted, elevation out of range
+    CHECK(c.is_valid() == "Values of 'elevation_grid' must be between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
+    c.elevation_grid = {0.5, -0.5}; // Both unsorted
+    CHECK(c.is_valid() == "Values of 'azimuth_grid' must be sorted in strictly ascending order.");
+    c.azimuth_grid = {-1.0, 0.0, 1.0};
+    CHECK(c.is_valid() == "Values of 'elevation_grid' must be sorted in strictly ascending order.");
+    c.elevation_grid = {-0.5, std::nan("")};
+    CHECK(c.is_valid() == "Values of 'elevation_grid' must be between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
 }
 
 // Append must build the block-diagonal coupling [C1 0; 0 C2] (as arrayant_concat_multi), also when the number
@@ -171,7 +96,7 @@ TEST_CASE("Arrayant append - Block-diagonal coupling with fewer ports than eleme
                                                   std::vector<quadriga_lib::arrayant<double>>{b});
     CHECK(arma::approx_equal(d.coupling_re, dm[0].coupling_re, "absdiff", 1e-14));
     CHECK(arma::approx_equal(d.coupling_im, dm[0].coupling_im, "absdiff", 1e-14));
-    CHECK(d.is_valid(false).empty());
+    CHECK(d.is_valid().empty());
 }
 
 TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
@@ -179,7 +104,7 @@ TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
     auto b = quadriga_lib::generate_arrayant_omni<double>(10.0);
     b.coupling_re = arma::mat(1, 1, arma::fill::value(2.0));
     b.coupling_im.reset();
-    REQUIRE(b.is_valid(false).empty());
+    REQUIRE(b.is_valid().empty());
 
     quadriga_lib::arrayant<double> d;
     REQUIRE_NOTHROW(d = b.append(&b));
@@ -192,7 +117,7 @@ TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
     // Both couplings empty (allowed by is_valid): identity blocks
     auto e = quadriga_lib::generate_arrayant_xpol<double>(10.0);
     e.coupling_re.reset(), e.coupling_im.reset();
-    REQUIRE(e.is_valid(false).empty());
+    REQUIRE(e.is_valid().empty());
     auto f = e.append(&b);
     T = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 2.0}};
     CHECK(arma::approx_equal(f.coupling_re, T, "absdiff", 1e-14));
@@ -248,11 +173,11 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns")
     CHECK(oz.n_elevation() == z.n_elevation());
     CHECK(oz.n_azimuth() == z.n_azimuth());
     CHECK(arma::approx_equal(oz.azimuth_grid, z.azimuth_grid, "absdiff", 0.0));
-    CHECK(oz.is_valid(false).empty());
+    CHECK(oz.is_valid().empty());
     z.remove_zeros();
     CHECK(z.n_elevation() == 19);
     CHECK(z.n_azimuth() == 37);
-    CHECK(z.is_valid(false).empty());
+    CHECK(z.is_valid().empty());
 }
 
 // remove_zeros copies the name to the output, and the azimuth spacing of the first and the last grid point wraps
@@ -337,7 +262,7 @@ TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values",
     a.azimuth_grid = {T(-3.0), T(-1.0), T(1.0), T(3.0)};
     a.elevation_grid = {T(-1.0), T(0.0), T(1.0)};
     a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
-    REQUIRE(a.is_valid(false).empty());
+    REQUIRE(a.is_valid().empty());
 
     arma::Mat<T> az = {T(0.1)}, el = {T(0.2)}, vr, vi, hr, hi;
 
@@ -345,7 +270,7 @@ TEMPLATE_TEST_CASE("Arrayant - Full check rejects NaN and repeated grid values",
     auto rejected = [&](const quadriga_lib::arrayant<T> &b)
     {
         quadriga_lib::arrayant<T> c = b, d = b;
-        CHECK(!c.is_valid(false).empty());
+        CHECK(!c.is_valid().empty());
         CHECK(!c.validate().empty());
         CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate(d, az, el, vr, vi, hr, hi), std::invalid_argument);
     };

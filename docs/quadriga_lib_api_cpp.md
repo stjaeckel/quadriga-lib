@@ -421,13 +421,17 @@ Validate the integrity of an arrayant object
 
 Not in: MATLAB, Python
 
+- Always checks the data: sizes of all members, ranges and order of the angle grids, sizes of element positions and
+  coupling matrix; empty `element_pos` and coupling are allowed
+- A passing check marks the object as validated: the library functions then skip the full check as long as no data
+  member was reallocated or resized; values changed in place after the check are not seen by them
+- The mark is updated atomically, so `is_valid` may be called while other threads read the object
+- A copy is marked if its source passes the full check; a moved-to object takes over the mark of its source
+
 ### Declaration:
 ```cpp
-std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check = true) const;
+std::string quadriga_lib::arrayant<dtype>::is_valid() const;
 ```
-
-### Inputs:
-- **`quick_check`** *(optional)* — `true` for fast structural check; `false` for full data validation; full check additionally verifies data values
 
 ### Returns:
 - Empty string if valid; error message string if invalid
@@ -851,7 +855,7 @@ Validate a vector of arrayant objects for multi-frequency consistency
 
 Not in: MATLAB, Python
 
-- Each entry is validated individually via its `is_valid` member; `quick_check` is forwarded to that call.
+- Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
 - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
 - Stops at first error and returns a message identifying the failing entry and property.
@@ -859,13 +863,11 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 std::string quadriga_lib::arrayant_is_valid_multi(
-        const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        bool quick_check = true);
+        const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
-- **`quick_check`** *(optional)* — If `true`, uses fast pointer-based per-entry validation; if `false`, performs full deep validation
 
 ### Returns:
 - Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match entry 0."`
@@ -1469,11 +1471,8 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid = false) const;
+arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const;
 ```
-
-### Inputs:
-- **`assume_valid`** *(optional)* — Skip internal consistency checks for performance in trusted contexts
 
 ### Returns:
 - Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
@@ -1963,8 +1962,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel) · [Python](quadri
 - Throws if the index was not reserved during [hdf5_create](#hdf5_create).
 - Structured data is always stored in single precision; input may be float or double.
 - Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.
-- Set `assume_valid = true` to skip integrity validation (faster but unsafe for potentially corrupted data).
-- The channel name is stored with at most 255 characters.
+- Channel names longer than 255 characters are rejected.
 - One writer per file at a time; files are not locked. Reading is safe while no one writes; different files can be
   read and written from parallel threads.
 
@@ -1976,8 +1974,7 @@ int quadriga_lib::hdf5_write(
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
-    unsigned iw = 0,
-    bool assume_valid = false);
+    unsigned iw = 0);
 ```
 
 ### Inputs:
@@ -1987,7 +1984,6 @@ int quadriga_lib::hdf5_write(
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`assume_valid`** *(optional)* — Skip channel integrity validation before writing
 
 ### Returns:
 - `0` if the slot was empty, `1` if existing data in the slot was replaced

@@ -114,11 +114,8 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid = false) const;
+arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const;
 ```
-
-### Inputs:
-- **`assume_valid`** *(optional)* — Skip internal consistency checks for performance in trusted contexts
 
 ### Returns:
 - Effective path gains in linear scale, one entry per snapshot; `[n_snap]`

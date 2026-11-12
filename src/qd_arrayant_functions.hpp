@@ -8,10 +8,12 @@
 #include "quadriga_arrayant.hpp"
 
 #include <armadillo>
+#include <atomic>
 #include <climits>
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
@@ -141,5 +143,72 @@ void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant, 
                                       arma::Mat<dtype> *elevation_loc,          // Optional output: local elevation in rad; [n_out, n_ang] or nullptr
                                       arma::Mat<dtype> *gamma,                  // Optional output: polarization rotation angle in rad; [n_out, n_ang] or nullptr
                                       int kernel);                              // Kernel: 1 = GENERIC, 2 = AVX2
+
+// Validity cache of an arrayant (member check_ptr): the data pointers of the members at the last passed check.
+// The cache matches when all pointers are unchanged and the member sizes still fit together (Armadillo can keep a
+// data pointer when a member is resized). A matching cache does not prove that the values are unchanged.
+template <typename dtype>
+inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
+{
+    // Relaxed atomic loads: is_valid may mark the object in another thread at the same time
+    const dtype *p[9];
+    for (int i = 0; i < 9; ++i)
+        p[i] = ant.check_ptr[i].load(std::memory_order_relaxed);
+    return arma::size(ant.e_theta_im) == arma::size(ant.e_theta_re) &&
+           arma::size(ant.e_phi_re) == arma::size(ant.e_theta_re) &&
+           arma::size(ant.e_phi_im) == arma::size(ant.e_theta_re) &&
+           ant.azimuth_grid.n_elem == ant.e_theta_re.n_cols &&
+           ant.elevation_grid.n_elem == ant.e_theta_re.n_rows &&
+           ant.element_pos.n_rows == 3 && ant.element_pos.n_cols == ant.e_theta_re.n_slices &&
+           ant.coupling_re.n_rows == ant.e_theta_re.n_slices &&
+           arma::size(ant.coupling_im) == arma::size(ant.coupling_re) &&
+           p[0] != nullptr && p[1] != nullptr && p[2] != nullptr && p[3] != nullptr && p[4] != nullptr && p[5] != nullptr &&
+           p[0] == ant.e_theta_re.memptr() && p[1] == ant.e_theta_im.memptr() &&
+           p[2] == ant.e_phi_re.memptr() && p[3] == ant.e_phi_im.memptr() &&
+           p[4] == ant.azimuth_grid.memptr() && p[5] == ant.elevation_grid.memptr() &&
+           p[6] == ant.element_pos.memptr() && p[7] == ant.coupling_re.memptr() && p[8] == ant.coupling_im.memptr();
+}
+
+// Marks an arrayant as validated: sets the cache to the current data pointers (relaxed atomic stores, so threads that
+// read the object at the same time see either the old or the new mark)
+template <typename dtype>
+inline void qd_arrayant_mark_valid(const quadriga_lib::arrayant<dtype> &ant)
+{
+    const dtype *p[9] = {ant.e_theta_re.memptr(), ant.e_theta_im.memptr(), ant.e_phi_re.memptr(), ant.e_phi_im.memptr(),
+                         ant.azimuth_grid.memptr(), ant.elevation_grid.memptr(), ant.element_pos.memptr(),
+                         ant.coupling_re.memptr(), ant.coupling_im.memptr()};
+    for (int i = 0; i < 9; ++i)
+        ant.check_ptr[i].store(p[i], std::memory_order_relaxed);
+}
+
+// Removes the mark of an arrayant
+template <typename dtype>
+inline void qd_arrayant_clear_mark(const quadriga_lib::arrayant<dtype> &ant)
+{
+    for (auto &p : ant.check_ptr)
+        p.store(nullptr, std::memory_order_relaxed);
+}
+
+// Full validity check of an arrayant (the checks of arrayant::is_valid), without writing to the object
+// - Returns an empty string if valid or the error message of the first failed check
+// - For library functions that need the full check: read only, so threads may check a shared object at the same time
+template <typename dtype>
+std::string qd_arrayant_check(const quadriga_lib::arrayant<dtype> &ant);
+
+// Validity check for library functions: passes at once when the cache matches, else runs the full check
+// - Read only, so threads may check a shared object at the same time
+template <typename dtype>
+inline std::string qd_arrayant_is_valid_quick(const quadriga_lib::arrayant<dtype> &ant)
+{
+    return qd_arrayant_cache_matches(ant) ? std::string() : qd_arrayant_check(ant);
+}
+
+// arrayant_is_valid_multi with the per-entry check of qd_arrayant_is_valid_quick (read only)
+template <typename dtype>
+std::string qd_arrayant_is_valid_multi_quick(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
+
+// arrayant_is_valid_multi with the per-entry full check qd_arrayant_check (read only)
+template <typename dtype>
+std::string qd_arrayant_check_multi(const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 
 #endif
