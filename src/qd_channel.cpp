@@ -164,6 +164,9 @@ arma::uvec quadriga_lib::channel<dtype>::n_path() const
     else if (path_lbs_pos.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
             p_path[i] = path_lbs_pos[i].n_cols;
+    else if (delay.size() == n_snap)
+        for (size_t i = 0; i < n_snap; ++i)
+            p_path[i] = delay[i].n_slices;
 
     return n_path;
 }
@@ -295,9 +298,14 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     else if (!coeff_im.empty())
         return std::string("Real part of channel coefficients 'coeff_re' is missing or incomplete.");
     else if (!delay.empty())
+    {
+        if (delay.size() != n_snap_vector)
+            return std::string("'delay' must be empty or match the number of snapshots.");
+
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (delay[i].n_rows != 1 || delay[i].n_cols != 1 || delay[i].n_slices != n_pth[i])
                 return std::string("Size mismatch in 'delay[" + std::to_string(i) + "]'.");
+    }
 
     if (path_gain.size() != 0 && path_gain.size() != n_snap_vector)
         return std::string("'path_gain' must be empty or match the number of snapshots.");
@@ -349,10 +357,10 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
 
     if (no_interact.size() != 0 && no_interact.size() != n_snap_vector)
         return std::string("'no_interact' must be empty or match the number of snapshots.");
-    else if (no_interact.size() == n_snap_vector && interact_coord.size() != n_snap_vector)
-        return std::string("'no_interact' is provided but 'interact_coord' is missing or has wrong number of snapshots.");
     else if (no_interact.size() == 0 && interact_coord.size() != 0)
         return std::string("'interact_coord' is provided but 'no_interact' is missing.");
+    else if (no_interact.size() == n_snap_vector && interact_coord.size() != n_snap_vector)
+        return std::string("'no_interact' is provided but 'interact_coord' is missing or has wrong number of snapshots.");
     else if (no_interact.size() == n_snap_vector && interact_coord.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
         {
