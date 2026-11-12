@@ -179,3 +179,46 @@ TEST_CASE("Channel - add_paths with inputs that are fields of the channel")
     CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &fbs_view), std::invalid_argument);
     CHECK(d.n_path().at(0) == 2);
 }
+
+TEST_CASE("Channel - Delays without coefficients")
+{
+    const std::string msg = "'delay' must be empty or match the number of snapshots.";
+
+    // Three snapshots (moving TX, fixed RX), one path each, delays but no coefficients
+    quadriga_lib::channel<double> c;
+    c.tx_pos = arma::mat(3, 3, arma::fill::zeros);
+    c.rx_pos = arma::mat(3, 1, arma::fill::ones);
+    for (int s = 0; s < 3; ++s)
+        c.path_gain.push_back(arma::vec(1, arma::fill::ones)), c.delay.push_back(arma::cube(1, 1, 1, arma::fill::zeros));
+    REQUIRE(c.is_valid().empty());
+
+    // Delays for the first snapshot only
+    auto d = c;
+    d.delay = {arma::cube(1, 1, 1, arma::fill::zeros)};
+    CHECK(d.is_valid() == msg);
+
+    // The vector is shortened but keeps its capacity, so the dropped entries still look valid
+    d = c;
+    d.delay.resize(1);
+    CHECK(d.is_valid() == msg);
+
+    // Delays are the only per-path member: the path counts come from the delays
+    quadriga_lib::channel<double> e;
+    e.tx_pos = arma::mat(3, 1, arma::fill::zeros);
+    e.rx_pos = arma::mat(3, 2, arma::fill::ones);
+    e.delay.push_back(arma::cube(1, 1, 3, arma::fill::zeros));
+    e.delay.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
+    CHECK(e.is_valid().empty());
+    const arma::uvec n_path = e.n_path();
+    REQUIRE(n_path.n_elem == 2);
+    CHECK(n_path.at(0) == 3);
+    CHECK(n_path.at(1) == 2);
+
+    // Interaction coordinates without interaction counts, also when nothing else sets the snapshot count
+    quadriga_lib::channel<double> f;
+    f.interact_coord.push_back(arma::mat(3, 1, arma::fill::zeros));
+    CHECK(f.is_valid() == "'interact_coord' is provided but 'no_interact' is missing.");
+    f.tx_pos = arma::mat(3, 1, arma::fill::zeros);
+    f.rx_pos = arma::mat(3, 1, arma::fill::ones);
+    CHECK(f.is_valid() == "'interact_coord' is provided but 'no_interact' is missing.");
+}
