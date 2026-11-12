@@ -1189,32 +1189,39 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
                       { m[find(m, h5::msg_dataspace)] = dataspace_message(dims); });
     };
 
-    SECTION("unstructured cube with 2^29 empty slices and with extents whose product exceeds 64 bits")
+    SECTION("unstructured cube with 2^29 empty slices, extents whose product exceeds 64 bits, or a 2^40 by 0 matrix")
     {
         quadriga_lib::hdf5_create(fn, 4);
         std::any x = arma::fcube(0, 0, 5);
         quadriga_lib::hdf5_write_dset(fn, "c", &x, 0);
-        for (std::vector<uint64_t> dims : {std::vector<uint64_t>{1ULL << 29, 0, 0}, {0, 1ULL << 40, 1ULL << 40}})
+        for (std::vector<uint64_t> dims : {std::vector<uint64_t>{1ULL << 29, 0, 0}, {0, 1ULL << 40, 1ULL << 40}, {1ULL << 40, 0}})
         {
             set_dataspace("channel_1/Data/par_c", dims);
             CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "c", 0), std::invalid_argument);
             CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::invalid_argument);
         }
     }
-    SECTION("delay with 2^29 empty slices and NumPath 2^29")
+    SECTION("delay with as many empty slices as the file has bytes, or 2^29, and a matching NumPath")
     {
-        quadriga_lib::hdf5_create(fn, 4);
-        quadriga_lib::channel<double> c;
-        c.tx_pos = arma::vec({0.0, 0.0, 1.0});
-        c.rx_pos = arma::vec({10.0, 0.0, 1.5});
-        c.delay = {arma::cube(1, 1, 0)}; // A valid channel without paths; the test sets the extents in the file
-        quadriga_lib::hdf5_write(&c, fn, 0, 0, 0, 0);
-        set_dataspace("channel_1/delay", {1ULL << 29, 0, 1});
-        edit_messages(fn, "channel_1", 0, [&](std::vector<message> &m)
-                      {
-                          bytes &data = m[find(m, h5::msg_attribute, "NumPath")].data;
-                          h5::put_le(&data[data.size() - 4], 1ULL << 29, 4); });
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::invalid_argument);
+        // NumPath matches the extent, so only the size checks of the reader stop the read. With one slice per file
+        // byte, the extent fits the file, but the slice pointers of the cube (8 bytes each) do not.
+        for (bool huge : {false, true})
+        {
+            quadriga_lib::hdf5_create(fn, 4);
+            quadriga_lib::channel<double> c;
+            c.tx_pos = arma::vec({0.0, 0.0, 1.0});
+            c.rx_pos = arma::vec({10.0, 0.0, 1.5});
+            c.delay = {arma::cube(1, 1, 0)}; // A valid channel without paths; the test sets the extents in the file
+            quadriga_lib::hdf5_write(&c, fn, 0, 0, 0, 0);
+            const uint64_t n = huge ? 1ULL << 29 : eof_of(fn);
+            INFO("slices " << n);
+            set_dataspace("channel_1/delay", {n, 0, 1});
+            edit_messages(fn, "channel_1", 0, [&](std::vector<message> &m)
+                          {
+                              bytes &data = m[find(m, h5::msg_attribute, "NumPath")].data;
+                              h5::put_le(&data[data.size() - 4], n, 4); });
+            CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::invalid_argument);
+        }
     }
     SECTION("interaction counts of 2^32 - 1 and 2^29 without matching coordinates")
     {
