@@ -10,9 +10,9 @@ catch ME
     end
 end
 
-% 4 inputs should throw error
+% 3 inputs should throw error
 try
-    [~] = quadriga_lib.calc_rotation_matrix(1,1,1,1);
+    [~] = quadriga_lib.calc_rotation_matrix(1,1,1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -58,7 +58,7 @@ R = quadriga_lib.calc_rotation_matrix(int32([0;0;0]));
 assert( isa(R,'double') );
 assertElementsAlmostEqual( R, [1,0,0, 0,1,0, 0,0,1]', 'absolute', 1e-5 );
 
-% invert_y_axis
+% transpose
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],0);
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],2);
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],false);
@@ -82,14 +82,11 @@ assertElementsAlmostEqual( R(:,2), [c,s,0,-s,c,0,0,0,1]', 'absolute', 1e-5 );
 R = quadriga_lib.calc_rotation_matrix([0;-pi/8;0],1);
 assertElementsAlmostEqual( R, [c,0,-s,0,1,0,s,0,c]', 'absolute', 1e-5 );
 
-R = quadriga_lib.calc_rotation_matrix([0;-pi/8;0],0,1);
-assertElementsAlmostEqual( R, [c,0,-s,0,1,0,s,0,c]', 'absolute', 1e-5 );
-
 %% Malformed input is rejected by the MEX helpers
 assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( sparse([0;0;1]) ), 'Sparse inputs are not supported.' );
-assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], sparse(true) ), 'Input ''invert_y_axis'' is sparse' );
+assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], sparse(true) ), 'Input ''transpose'' is sparse' );
 assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( zeros(3,1,1,1,2) ), 'Inputs with more than 4 dimensions are not supported.' );
-assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], [true, false] ), 'Input ''invert_y_axis'' must be a scalar.' );
+assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], [true, false] ), 'Input ''transpose'' must be a scalar.' );
 
 end
 

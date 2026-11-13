@@ -217,12 +217,12 @@ class TestGetChannelsSpherical(unittest.TestCase):
         npt.assert_almost_equal(cr[1, 1, 0], 2.0, decimal=5)
         npt.assert_almost_equal(ci[:, :, 0], np.zeros((2, 2)), decimal=5)
 
-        # Bank = -pi/2, tilt = pi/2: delays flip sign
+        # Bank -pi/2 turns element 0 (y = +15) to z = -15; tilt -pi/2 (an uptilt) turns it to x = +15, toward the RX
         cr2, ci2, delay2 = arrayant.get_channels_spherical(
             ant, probe, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [-PI / 2, PI / 2, 0], [20, 0, 1], [PI / 2, 0, 0], 2997924580.0, False)
+            [0, 0, 1], [-PI / 2, -PI / 2, 0], [20, 0, 1], [PI / 2, 0, 0], 2997924580.0, False)
 
-        # Bank = -pi/2, tilt = pi/2: elements shift along z → delays ±15/C
+        # Element 0 is 15 m closer to the RX, element 1 15 m farther: delays -15/C and +15/C
         d1 = 15.0 / C
         npt.assert_almost_equal(delay2[0, 0, 0], -d1, decimal=14)
         npt.assert_almost_equal(delay2[1, 0, 0], -d1, decimal=14)

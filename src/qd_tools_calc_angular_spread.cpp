@@ -139,8 +139,10 @@ void quadriga_lib::calc_angular_spreads_sphere(
 ## Outputs:
 - **`azimuth_spread`** *(optional)* — RMS azimuth spread; `[n_cir]`
 - **`elevation_spread`** *(optional)* — RMS elevation spread; `[n_cir]`
-- **`orientation`** *(optional)* — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `[3, n_cir]`
-- **`phi`** *(optional)* — Rotated azimuth angles; `[n_cir]` vector, each element of length `n_path`
+- **`orientation`** *(optional)* — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
+  direction (a positive tilt points down); `[3, n_cir]`
+- **`phi`** *(optional)* — Rotated azimuth angles, the path azimuths in the local frame of that antenna (as
+  [[arrayant_interpolate]] returns them); `[n_cir]` vector, each element of length `n_path`
 - **`theta`** *(optional)* — Rotated elevation angles; same structure as `phi`
 MD!*/
 
@@ -262,15 +264,15 @@ void quadriga_lib::calc_angular_spreads_sphere(const std::vector<arma::Col<dtype
         }
 
         dtype heading = std::atan2(my, mx);
-        dtype tilt = std::atan2(mz, std::sqrt(mx * mx + my * my));
+        dtype elevation = std::atan2(mz, std::sqrt(mx * mx + my * my));
 
-        // --- Step 2: Compound rotation Ry(-tilt) * Rz(-heading) ---
+        // --- Step 2: Compound rotation Ry(elevation) * Rz(-heading), moves the mean direction to (1, 0, 0) ---
         dtype ch = std::cos(heading), sh = std::sin(heading);
-        dtype ct = std::cos(tilt), st = std::sin(tilt);
+        dtype ct = std::cos(elevation), st = std::sin(elevation);
 
-        dtype R00 = ct * ch, R01 = ct * sh, R02 = -st;
+        dtype R00 = ct * ch, R01 = ct * sh, R02 = st;
         dtype R10 = -sh, R11 = ch, R12 = (dtype)0;
-        dtype R20 = st * ch, R21 = st * sh, R22 = ct;
+        dtype R20 = -st * ch, R21 = -st * sh, R22 = ct;
 
         arma::Col<dtype> phi_n(L), theta_n(L);
         arma::Col<dtype> Cx(L), Cy(L), Cz(L);
@@ -376,8 +378,8 @@ void quadriga_lib::calc_angular_spreads_sphere(const std::vector<arma::Col<dtype
         if (orientation != nullptr)
         {
             dtype *op = orientation->colptr(n);
-            op[0] = std::atan2(std::sin(bank), std::cos(bank));
-            op[1] = std::atan2(std::sin(tilt), std::cos(tilt));
+            op[0] = std::atan2(-std::sin(bank), std::cos(bank)); // Paths rotated by +bank: the antenna frame by -bank
+            op[1] = -elevation; // A positive tilt points down
             op[2] = std::atan2(std::sin(heading), std::cos(heading));
         }
 

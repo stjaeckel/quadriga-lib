@@ -4,36 +4,52 @@ function test_arrayant_rotate_pattern
 
 ant = quadriga_lib.arrayant_generate('custom',[],[],5,20,0);
 
-out = quadriga_lib.arrayant_rotate_pattern(ant, 0, 0, 90);
+out = quadriga_lib.arrayant_rotate_pattern(ant, [0; 0; pi/2]);
 
 [~,ii] = max(out.e_theta_re(:));
 [s0,s1] = ind2sub(size(out.e_theta_re),ii);
 assertEqual(s0,91);
 assertEqual(s1,271);
 
-out = quadriga_lib.arrayant_rotate_pattern(ant, 0, -45, 0);
+% A positive tilt points the beam down (3GPP TR 38.901): tilt -45 degree moves it to elevation +45, +10 to -10
+out = quadriga_lib.arrayant_rotate_pattern(ant, [0; -pi/4; 0]);
 
 [~,ii] = max(out.e_theta_re(:));
 [s0,s1] = ind2sub(size(out.e_theta_re),ii);
 assertEqual(s0,136);
 assertEqual(s1,181);
 
+out = quadriga_lib.arrayant_rotate_pattern(ant, [0; pi/18; 0], 3);
+[~,ii] = max(out.e_theta_re(:));
+[s0,~] = ind2sub(size(out.e_theta_re),ii);
+assertEqual(s0, 81);
+
+% The rotated pattern equals arrayant_interpolate with the same orientation, at the grid points
+o = [0.2; 0.3; -0.4];
+out = quadriga_lib.arrayant_rotate_pattern(ant, o, 3);
+[az, el] = meshgrid(ant.azimuth_grid, ant.elevation_grid);
+[V_re, V_im, H_re, H_im] = quadriga_lib.arrayant_interpolate(ant, az(:).', el(:).', 1, o);
+assertElementsAlmostEqual( out.e_theta_re(:), V_re(:), 'absolute', 1e-12 );
+assertElementsAlmostEqual( out.e_theta_im(:), V_im(:), 'absolute', 1e-12 );
+assertElementsAlmostEqual( out.e_phi_re(:), H_re(:), 'absolute', 1e-12 );
+assertElementsAlmostEqual( out.e_phi_im(:), H_im(:), 'absolute', 1e-12 );
+
 v = ant.e_theta_re(91,181);
-out = quadriga_lib.arrayant_rotate_pattern(ant, 45, 0, 0);
+out = quadriga_lib.arrayant_rotate_pattern(ant, [pi/4; 0; 0]);
 
 assertElementsAlmostEqual( out.e_theta_re(91,181) * sqrt(2), v, 'absolute', 1e-14 );
 assertElementsAlmostEqual( out.e_phi_re(91,181) * sqrt(2), v, 'absolute', 1e-14 );
 
-out = quadriga_lib.arrayant_rotate_pattern(ant, 180, 180, 180);
+out = quadriga_lib.arrayant_rotate_pattern(ant, [pi; pi; pi]);
 
 assertElementsAlmostEqual( ant.e_theta_re, out.e_theta_re, 'absolute', 1e-13 );
 
-out = quadriga_lib.arrayant_rotate_pattern(ant, 90, 0, 0, 1);
+out = quadriga_lib.arrayant_rotate_pattern(ant, [pi/2; 0; 0], 1);
 
 assertElementsAlmostEqual( out.e_theta_re(91,181) , v, 'absolute', 1e-14 );
 assertElementsAlmostEqual( ant.e_theta_re(92,181) , out.e_theta_re(91,182), 'absolute', 1e-14 );
 
-out = quadriga_lib.arrayant_rotate_pattern(ant, 90, 0, 0, 2);
+out = quadriga_lib.arrayant_rotate_pattern(ant, [pi/2; 0; 0], 2);
 
 assertElementsAlmostEqual( (out.e_theta_re.^2 + out.e_phi_re.^2 - ant.e_theta_re.^2 - ant.e_phi_re.^2) , zeros(181,361), 'absolute', 1e-13 );
 assertElementsAlmostEqual( out.e_theta_re(91,181), 0, 'absolute', 1e-14 );
@@ -61,8 +77,11 @@ z = round(z/res)*res;
 
 R = quadriga_lib.calc_rotation_matrix([x;y;z]*pi/180);
 
-[e_theta_re_r, e_theta_im_r, e_phi_re_r, e_phi_im_r, azimuth_grid_r, elevation_grid_r, element_pos_r, ~, ~, ~, ~] ...
-    = quadriga_lib.arrayant_rotate_pattern([], x, y, z, usage, [], e_theta_re, zr, zr, zr, azimuth_grid, elevation_grid, element_pos);
+a = struct('e_theta_re', e_theta_re, 'e_theta_im', zr, 'e_phi_re', zr, 'e_phi_im', zr, ...
+    'azimuth_grid', azimuth_grid, 'elevation_grid', elevation_grid, 'element_pos', element_pos);
+r = quadriga_lib.arrayant_rotate_pattern(a, [x; y; z] * pi / 180, usage);
+e_theta_re_r = r.e_theta_re; e_theta_im_r = r.e_theta_im; e_phi_re_r = r.e_phi_re; e_phi_im_r = r.e_phi_im;
+azimuth_grid_r = r.azimuth_grid; elevation_grid_r = r.elevation_grid; element_pos_r = r.element_pos;
 
 assertElementsAlmostEqual( diff( azimuth_grid_r*180/pi ) , ones(1,numel(azimuth_grid_r)-1)*0.05, 'absolute', 1e-12 );
 assertElementsAlmostEqual( diff( elevation_grid_r*180/pi ) , ones(1,numel(elevation_grid_r)-1)*0.05, 'absolute', 1e-12 );
@@ -89,23 +108,18 @@ assertTrue( all(abs( e_phi_re_r(end,:) ) < 1e-12) );
 assertTrue( all(abs( e_theta_im_r(:) ) < 1e-12) );
 assertTrue( all(abs( e_phi_im_r(:) ) < 1e-12) );
 
-[e_theta_re_q, e_theta_im_q, e_phi_re_q, e_phi_im_q, azimuth_grid_q, elevation_grid_q, element_pos_q, ~, ~, ~, ~] ...
-    = quadriga_lib.arrayant_rotate_pattern([], 0, 0, -z, usage, [], e_theta_re_r, e_theta_im_r, e_phi_re_r, e_phi_im_r, azimuth_grid_r, elevation_grid_r, element_pos_r);
+q = quadriga_lib.arrayant_rotate_pattern(r, [0; 0; -z] * pi / 180, usage);
+q = quadriga_lib.arrayant_rotate_pattern(q, [0; -y; 0] * pi / 180, usage);
+q = quadriga_lib.arrayant_rotate_pattern(q, [-x; 0; 0] * pi / 180, usage);
 
-[e_theta_re_q, e_theta_im_q, e_phi_re_q, e_phi_im_q, azimuth_grid_q, elevation_grid_q, element_pos_q, ~, ~, ~, ~] ...
-    = quadriga_lib.arrayant_rotate_pattern([], 0, -y, 0, usage, [], e_theta_re_q, e_theta_im_q, e_phi_re_q, e_phi_im_q, azimuth_grid_q, elevation_grid_q, element_pos_q);
-
-[~, ~, ~, ~, ~, ~, element_pos_q, ~, ~, ~, ~] ...
-    = quadriga_lib.arrayant_rotate_pattern([], -x, 0, 0, usage, [], e_theta_re_q, e_theta_im_q, e_phi_re_q, e_phi_im_q, azimuth_grid_q, elevation_grid_q, element_pos_q);
-
-assertElementsAlmostEqual( element_pos, element_pos_q, 'absolute', 1e-12 );
+assertElementsAlmostEqual( element_pos, q.element_pos, 'absolute', 1e-12 );
 
 % Single element rotation
 try
-    out = quadriga_lib.arrayant_rotate_pattern(ant, 0, 0, 90, 1, 3);
+    out = quadriga_lib.arrayant_rotate_pattern(ant, [0; 0; pi/2], 1, 3);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input parameter ''element'' out of bound.';
+    expectedErrorMessage = 'Input ''i_element'' contains indices that exceed the number of elements.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -113,7 +127,7 @@ end
 
 ant = quadriga_lib.arrayant_copy_element(ant,1,[2,3]);
 ant = quadriga_lib.arrayant_copy_element(ant,[1,2],[2,3]);
-out = quadriga_lib.arrayant_rotate_pattern(ant, 0, 0, 90, [], [2,3]);
+out = quadriga_lib.arrayant_rotate_pattern(ant, [0; 0; pi/2], [], [2,3]);
 
 tmp = out.e_theta_re(:,:,1);
 [~,ii] = max(tmp(:));
@@ -135,17 +149,17 @@ assertEqual(s1,271);
 
 % Errors
 try
-    [~, ~] = quadriga_lib.arrayant_rotate_pattern( e_theta_re );
+    quadriga_lib.arrayant_rotate_pattern( e_theta_re, [0; 0; 0] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First input must be an arrayant struct/struct array';
+    expectedErrorMessage = 'Input ''arrayant_in'' must be an arrayant struct or struct array.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_rotate_pattern( ant );
+    [~, ~] = quadriga_lib.arrayant_rotate_pattern( ant, [0; 0; 0] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -167,7 +181,7 @@ mf_multi(1).center_freq = 3.5e9;
 mf_multi(2).center_freq = 28e9;
 
 % --- Basic dispatch: struct array in -> struct array out ---
-out_mf = quadriga_lib.arrayant_rotate_pattern(mf_multi, 0, 0, 90);
+out_mf = quadriga_lib.arrayant_rotate_pattern(mf_multi, [0; 0; pi/2]);
 assertEqual(numel(out_mf), 2);
 
 for k = 1:2
@@ -195,13 +209,13 @@ assertElementsAlmostEqual(out_mf(2).elevation_grid, mf_ant.elevation_grid, 'abso
 % multi usage=0 maps internally to single-freq usage=3 (both, no grid adj)
 % multi usage=1 maps internally to single-freq usage=4 (pattern only, no grid adj)
 % multi usage=2 stays at single-freq usage=2 (pol only, no grid adj)
-ref_0 = quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 3);
-ref_1 = quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 4);
-ref_2 = quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 2);
+ref_0 = quadriga_lib.arrayant_rotate_pattern(mf_ant, [pi/6; pi/4; pi/3], 3);
+ref_1 = quadriga_lib.arrayant_rotate_pattern(mf_ant, [pi/6; pi/4; pi/3], 4);
+ref_2 = quadriga_lib.arrayant_rotate_pattern(mf_ant, [pi/6; pi/4; pi/3], 2);
 
-out_0 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 0);
-out_1 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 1);
-out_2 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 2);
+out_0 = quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 0);
+out_1 = quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 1);
+out_2 = quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 2);
 
 for k = 1:2
     assertElementsAlmostEqual(out_0(k).e_theta_re, ref_0.e_theta_re, 'absolute', 1e-12);
@@ -217,15 +231,15 @@ for k = 1:2
 end
 
 % --- usage 3 and 4 in multi-freq mode map to 0 and 1, as in Python ---
-out_3 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 3);
-out_4 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 4);
+out_3 = quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 3);
+out_4 = quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 4);
 assertEqual(out_3, out_0);
 assertEqual(out_4, out_1);
 
 % --- A call without output argument returns the result as ans (both branches) ---
-quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 3);
+quadriga_lib.arrayant_rotate_pattern(mf_ant, [pi/6; pi/4; pi/3], 3);
 assertEqual(ans, ref_0); %#ok<NOANS>
-quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 0);
+quadriga_lib.arrayant_rotate_pattern(mf_multi, [pi/6; pi/4; pi/3], 0);
 assertEqual(ans, out_0); %#ok<NOANS>
 
 % --- Element selection in multi-freq mode ---
@@ -237,7 +251,7 @@ mf_multi3(1).center_freq = 3.5e9;
 mf_multi3(2).center_freq = 28e9;
 
 % Rotate only elements 2 and 3 (element 1 stays put)
-out_mf = quadriga_lib.arrayant_rotate_pattern(mf_multi3, 0, 0, 90, 0, [2,3]);
+out_mf = quadriga_lib.arrayant_rotate_pattern(mf_multi3, [0; 0; pi/2], 0, [2,3]);
 
 for k = 1:2
     % Element 1 unrotated
@@ -257,12 +271,12 @@ for k = 1:2
     end
 end
 
-% --- Error: multi-freq with multiple outputs ---
+% --- Error: orientation with other than 3 elements ---
 try
-    [~, ~] = quadriga_lib.arrayant_rotate_pattern(mf_multi, 0, 0, 90);
+    out = quadriga_lib.arrayant_rotate_pattern(mf_multi, [0; 0]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Multi-frequency output supports only struct output';
+    expectedErrorMessage = 'Input ''orientation'' must have 3 elements.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

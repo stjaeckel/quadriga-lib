@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_test_arrayant.hpp"
 
 #include <cstdio>
 #include <fstream>
@@ -180,24 +181,19 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
         std::remove(fn.c_str()), std::remove("test_empty_defaults.mtl");
     }
 
-    SECTION("rotate_pattern")
+    SECTION("arrayant_rotate_pattern")
     {
         for (unsigned usage : {0U, 1U, 2U, 3U})
         {
             auto f = F, e = E;
-            f.rotate_pattern(10.0, 20.0, 30.0, usage);
-            e.rotate_pattern(10.0, 20.0, 30.0, usage);
+            qd_rotate(f, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, usage);
+            qd_rotate(e, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, usage);
             check_same(f, e);
 
             f = F, e = E; // Single element
-            f.rotate_pattern(10.0, 20.0, 30.0, usage, 1);
-            e.rotate_pattern(10.0, 20.0, 30.0, usage, 1);
+            qd_rotate(f, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, usage, 1);
+            qd_rotate(e, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, usage, 1);
             check_same(f, e);
-
-            quadriga_lib::arrayant<double> fo, eo; // Into an output
-            F.copy().rotate_pattern(10.0, 20.0, 30.0, usage, unsigned(-1), &fo);
-            E.copy().rotate_pattern(10.0, 20.0, 30.0, usage, unsigned(-1), &eo);
-            check_same(fo, eo);
         }
 
         // A non-uniform azimuth grid makes usage 0 resample the pattern onto a new grid
@@ -205,14 +201,10 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
         const arma::vec t = arma::linspace<arma::vec>(-1.0, 1.0, F.n_azimuth());
         fn.azimuth_grid = arma::sign(t) % arma::pow(arma::abs(t), 1.5) * (arma::datum::pi - 0.01);
         auto en = emptied(fn), f = fn, e = en;
-        f.rotate_pattern(10.0, 20.0, 30.0, 0);
-        e.rotate_pattern(10.0, 20.0, 30.0, 0);
+        qd_rotate(f, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 0);
+        qd_rotate(e, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 0);
         REQUIRE(f.n_azimuth() != fn.n_azimuth());
         check_same(f, e);
-        quadriga_lib::arrayant<double> fo, eo;
-        fn.copy().rotate_pattern(10.0, 20.0, 30.0, 0, unsigned(-1), &fo);
-        en.copy().rotate_pattern(10.0, 20.0, 30.0, 0, unsigned(-1), &eo);
-        check_same(fo, eo);
     }
 
     SECTION("calc_beamwidth_deg and calc_directivity_dBi")
@@ -259,8 +251,8 @@ TEST_CASE("Arrayant multi-frequency functions - Empty element_pos and coupling e
     SECTION("arrayant_rotate_pattern_multi")
     {
         auto f = F, e = E;
-        quadriga_lib::arrayant_rotate_pattern_multi(f, 10.0, 20.0, 30.0);
-        quadriga_lib::arrayant_rotate_pattern_multi(e, 10.0, 20.0, 30.0);
+        qd_rotate_multi(f, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0);
+        qd_rotate_multi(e, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0);
         check_same_multi(f, e);
     }
 

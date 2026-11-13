@@ -88,8 +88,9 @@ Also in: [C++](../cpp/channel-statistics.md#calc_angular_spreads_sphere) · [Pyt
 ### Outputs:
 - **`as`** — RMS azimuth angular spread; `[n_cir]`
 - **`es`** — RMS elevation angular spread; `[n_cir]`
-- **`orientation`** — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `[3, n_cir]`
-- **`phi`** — Rotated azimuth angles; `[n_path, n_cir]`
+- **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
+  direction (a positive tilt points down); `[3, n_cir]`
+- **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; `[n_path, n_cir]`
 - **`theta`** — Rotated elevation angles; `[n_path, n_cir]`
 
 ---

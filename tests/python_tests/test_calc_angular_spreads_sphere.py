@@ -29,7 +29,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(a_s[0], 0.0, atol=1e-10, rtol=0)
         npt.assert_allclose(e_s[0], 0.0, atol=1e-10, rtol=0)
         npt.assert_allclose(orient[2, 0], 0.5, atol=1e-10, rtol=0)
-        npt.assert_allclose(orient[1, 0], 0.3, atol=1e-10, rtol=0)
+        npt.assert_allclose(orient[1, 0], -0.3, atol=1e-10, rtol=0)  # tilt = -elevation (a positive tilt points down)
 
     def test_symmetric_azimuth_paths(self):
         az = [np.array([0.1, -0.1])]

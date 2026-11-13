@@ -63,14 +63,6 @@ namespace quadriga_lib
         // Reset the size to zero (the arrayant object will contain no data)
         void reset();
 
-        // Rotate antenna radiation patterns around the principal axes using Euler rotations
-        void rotate_pattern(dtype x_deg = 0.0,                  // Rotation around x-axis (bank) in degrees
-                            dtype y_deg = 0.0,                  // Rotation around y-axis (tilt) in degrees
-                            dtype z_deg = 0.0,                  // Rotation around z-axis (heading) in degrees
-                            unsigned usage = 0,                 // Rotation mode, see docs
-                            unsigned element = -1,              // Element index, 0-based, default (-1) =  update all elements
-                            arrayant<dtype> *output = nullptr); // Target arrayant; nullptr modifies in-place
-
         // Resize an arrayant object to new dimensions
         void set_size(arma::uword n_elevation, // Number of elevation angles
                       arma::uword n_azimuth,   // Number of azimuth angles
@@ -115,6 +107,15 @@ namespace quadriga_lib
     // Remove zero-valued entries from antenna pattern data, in place, reducing its size
     template <typename dtype>
     void arrayant_remove_zeros(arrayant<dtype> &ant); // Valid arrayant; updated in-place
+
+    // Rotate antenna patterns by Euler angles, in place; the result equals arrayant_interpolate with the same orientation
+    // - A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+    // - Usage 0 and 1 adjust the sampling grid of non-uniformly sampled antennas, which needs all elements
+    template <typename dtype>
+    void arrayant_rotate_pattern(arrayant<dtype> &ant,                   // Valid arrayant; updated in-place
+                                 const arma::Mat<dtype> &orientation,    // Euler angles (bank, tilt, heading) in rad, finite; [3, 1]
+                                 unsigned usage = 0,                     // 0 = pattern+polarization, 1 = pattern, 2 = polarization; 3, 4 = 0, 1 without grid adjustment
+                                 const arma::uvec *i_element = nullptr); // Element indices, 0-based, no duplicates; nullptr or empty = all
 
     // Write arrayant data to a QDANT (XML) file; returns the ID written
     template <typename dtype>
@@ -196,17 +197,14 @@ namespace quadriga_lib
     template <typename dtype>
     std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec); // Non-empty vector of arrayant objects to validate
 
-    // Apply Euler rotations to all entries in a multi-frequency arrayant vector
-    // - Calls .rotate_pattern on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
-    // - If i_element is empty, all elements are rotated; otherwise only the specified indices are affected.
+    // Apply Euler rotations to all entries in a multi-frequency arrayant vector, in place
+    // - Calls arrayant_rotate_pattern on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
     // - For scalar acoustic fields (pressure stored in e_theta_re only), use usage = 1 to avoid spurious polarization effects.
     template <typename dtype>
     void arrayant_rotate_pattern_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
-                                       dtype x_deg = 0.0,                          // Rotation angle around x-axis (bank) in [deg]
-                                       dtype y_deg = 0.0,                          // Rotation angle around y-axis (tilt) in [deg]
-                                       dtype z_deg = 0.0,                          // Rotation angle around z-axis (heading) in [deg]
+                                       const arma::Mat<dtype> &orientation,        // Euler angles (bank, tilt, heading) in rad, finite; [3, 1]
                                        unsigned usage = 0,                         // Usage: 0 = pattern+polarization, 1 = pattern only, 2 = polarization only
-                                       arma::uvec i_element = arma::uvec());       // Element indices (0-based), empty = all
+                                       const arma::uvec *i_element = nullptr);     // Element indices, 0-based, no duplicates; nullptr or empty = all
 
     // Set element positions for all entries in a multi-frequency arrayant vector
     // - Updates element_pos in-place on every entry in the vector identically.

@@ -554,16 +554,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
         Y.reset();
 
         // Adjust polarization
+        const arma::uvec el_0 = {0}, el_1 = {1};
         if (pol == 2 || pol == 5)
         {
             quadriga_lib::arrayant_copy_element(ant, 0, {1});
-            ant.rotate_pattern(90.0, zero, zero, 2, 1);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 2.0), zero, zero}, 2, &el_1);
         }
         else if (pol == 3 || pol == 6)
         {
             quadriga_lib::arrayant_copy_element(ant, 0, {1});
-            ant.rotate_pattern(dtype(45.0), zero, zero, 2, 0);
-            ant.rotate_pattern(dtype(-45.0), zero, zero, 2, 1);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 4.0), zero, zero}, 2, &el_0);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(-arma::datum::pi / 4.0), zero, zero}, 2, &el_1);
         }
     }
 
@@ -963,20 +964,21 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
         arma::uvec dest = arma::regspace<arma::uvec>(n_elements, 2 * n_elements - 1);
         quadriga_lib::arrayant_copy_element(ant, 0, dest);
 
-        // Update polarization
+        // Update polarization (element 0 and the first copy at n_elements)
+        const arma::uvec first = {0}, second = {n_elements};
         if (pol == 2)
         {
-            ant.rotate_pattern(90.0, 0.0, 0.0, 2, (unsigned)n_elements);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 2.0), 0, 0}, 2, &second);
             dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
             quadriga_lib::arrayant_copy_element(ant, n_elements, dest);
         }
         else if (pol == 3)
         {
-            ant.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(arma::datum::pi / 4.0), 0, 0}, 2, &first);
             dest = arma::regspace<arma::uvec>(1, n_elements - 1);
             quadriga_lib::arrayant_copy_element(ant, 0, dest);
 
-            ant.rotate_pattern(-45.0, 0.0, 0.0, 2, (unsigned)n_elements);
+            quadriga_lib::arrayant_rotate_pattern(ant, arma::Col<dtype>{dtype(-arma::datum::pi / 4.0), 0, 0}, 2, &second);
             dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
             quadriga_lib::arrayant_copy_element(ant, n_elements, dest);
 

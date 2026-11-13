@@ -12,7 +12,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-array-
 | [arrayant_export_obj_file](#arrayant_export_obj_file) | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
 | [arrayant_generate](#arrayant_generate) | Generates predefined array antenna models |
 | [arrayant_interpolate](#arrayant_interpolate) | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
-| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Rotate antenna radiation patterns around the principal axes using Euler rotations |
+| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Rotate antenna radiation patterns using Euler rotations |
 | [generate_speaker](#generate_speaker) | Generate a parametric frequency-dependent loudspeaker directivity model |
 | [qdant_read](#qdant_read) | Reads array antenna data from QDANT files |
 | [qdant_write](#qdant_write) | Writes array antenna data to QDANT files |
@@ -474,39 +474,28 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [Pytho
 ---
 <a id="arrayant_rotate_pattern"></a>
 ## arrayant_rotate_pattern
-Rotate antenna radiation patterns around the principal axes using Euler rotations
+Rotate antenna radiation patterns using Euler rotations
 
-Also in: [C++](../cpp/array-antenna-class.md#.rotate_pattern) · [Python](../python/array-antenna-functions.md#rotate_pattern)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_rotate_pattern) · [Python](../python/array-antenna-functions.md#rotate_pattern)
 
-- Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes
-- Rotations applied in order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
-- Adjusts the sampling grid for non-uniformly sampled antennas when `usage` is 0 or 1
-- Coupling, `center_freq` and `name` are kept, also when the sampling grid is adjusted
+- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
+  [arrayant_interpolate](#arrayant_interpolate) returns for the unrotated pattern with the same `orientation`
+- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_freq` and `name` are kept
+- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
+  in `i_element` is an error when the grid must be adjusted
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid
   spurious polarization effects
 
 ### Usage:
 ```matlab
-% Struct in / struct out
-arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, x_deg, y_deg, z_deg, usage, i_element);
-
-% Separate-field outputs (single-frequency results only)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_rotate_pattern( ...
-    arrayant_in, x_deg, y_deg, z_deg, usage, i_element);
-
-% Separate inputs (single-frequency only)
-arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usage, element, ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name);
+arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, orientation, usage, i_element);
 ```
 
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array represents a frequency-dependent model
-- **`x_deg`** — Rotation around x-axis (bank) in degrees; default: 0
-- **`y_deg`** — Rotation around y-axis (tilt) in degrees; default: 0
-- **`z_deg`** — Rotation around z-axis (heading) in degrees; default: 0
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad; 3-element vector
 - **`usage`** — Rotation mode; default: 0
    | Mode | Pattern | Polarization | Grid adj. |
    | :--: | :-----: | :----------: | :-------: |
@@ -518,14 +507,11 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usa
 
   Multi-frequency input never adjusts the grid (uniform-grid consistency across frequencies): 0 and 3
   rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
-- **`i_element`** — 1-based element indices to rotate; defaults to all elements; `[n]`
+- **`i_element`** — Element indices to rotate, 1-based, no duplicates; default: all elements; `[n]`
 
 ### Outputs:
-- **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
-  result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when input is a
-  single struct; struct array of size `numel(arrayant_in)` when input is a struct array.
-- **`e_theta_re`, ..., `name`** — Separate-field outputs; **only available for single-frequency
-  results** (single-struct input).
+- **`arrayant_out`** — Arrayant struct, or struct array of size `numel(arrayant_in)` for multi-frequency input;
+  field layout as documented in [arrayant_generate](#arrayant_generate)
 
 ---
 <a id="generate_speaker"></a>

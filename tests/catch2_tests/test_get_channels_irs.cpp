@@ -769,3 +769,30 @@ TEST_CASE("Get Channels IRS - outputs that alias inputs")
         CHECK_THROWS_AS(call(&cr, &ci, &ad, &M_cube, &M_on_ea), std::invalid_argument);
     }
 }
+
+TEST_CASE("get_channels_irs - a positive tilt points down (3GPP TR 38.901)")
+{
+    // TX 10 m above the IRS and 10 m away on the -x side, the RX 10 m below it (or level with it); the IRS faces them
+    // (heading pi). A beam along x reaches the other end only when turned toward it: TX tilt +pi/4 (down), RX tilt
+    // -pi/4 (up, heading 0 toward the IRS), IRS tilt -pi/4 (up, toward the TX; the level RX is 45 degree off either way).
+    const double q = arma::datum::pi / 4.0, pi = arma::datum::pi;
+    const auto beam = quadriga_lib::generate_arrayant_custom<double>(40.0, 40.0, 0.0, 5.0);
+    const auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    const arma::mat pos_1(arma::vec{5.0, 0.0, 5.0}); // A scatterer on the LOS of the TX-IRS segment
+    const arma::vec gain = {1.0}, length = {0.0};
+    arma::mat M(8, 1, arma::fill::zeros);
+    M(0, 0) = 1.0, M(6, 0) = -1.0;
+    auto power = [&](const quadriga_lib::arrayant<double> &tx, const quadriga_lib::arrayant<double> &rx,
+                     const quadriga_lib::arrayant<double> &irs, double Tt, double Rt, double It, double Rz)
+    {
+        const arma::mat pos_2(arma::vec{5.0, 0.0, 0.5 * Rz}); // A scatterer on the LOS of the IRS-RX segment
+        arma::cube cr, ci, dl;
+        quadriga_lib::get_channels_irs<double>(&tx, &rx, &irs, 0.0, 0.0, 10.0, 0.0, Tt, 0.0, 0.0, 0.0, Rz, 0.0, Rt, 0.0,
+                                               10.0, 0.0, 0.0, 0.0, It, pi, &pos_1, &pos_1, &gain, &length, &M,
+                                               &pos_2, &pos_2, &gain, &length, &M, &cr, &ci, &dl);
+        return arma::accu(cr % cr + ci % ci);
+    };
+    CHECK(power(beam, omni, omni, q, 0.0, 0.0, -10.0) > 100.0 * power(beam, omni, omni, -q, 0.0, 0.0, -10.0));
+    CHECK(power(omni, beam, omni, 0.0, -q, 0.0, -10.0) > 100.0 * power(omni, beam, omni, 0.0, q, 0.0, -10.0));
+    CHECK(power(omni, omni, beam, 0.0, 0.0, -q, 0.0) > 100.0 * power(omni, omni, beam, 0.0, 0.0, q, 0.0));
+}

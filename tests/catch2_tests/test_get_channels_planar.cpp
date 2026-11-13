@@ -418,3 +418,24 @@ TEST_CASE("Get Channels Planar - outputs that alias inputs")
         CHECK_THROWS_AS(call(&cr, &dl, &doppler, &gain_on_cr, false), std::invalid_argument);
     }
 }
+
+TEST_CASE("get_channels_planar - a positive tilt points down (3GPP TR 38.901)")
+{
+    // The path leaves the TX 45 degree downward and arrives at the RX from 45 degree above, from the -x side. A beam
+    // along x catches it only when turned toward it: TX tilt +pi/4 (down); RX heading pi and tilt -pi/4 (up).
+    const double q = arma::datum::pi / 4.0;
+    const auto beam = quadriga_lib::generate_arrayant_custom<double>(40.0, 40.0, 0.0, 5.0);
+    const auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    const arma::vec aod = {0.0}, eod = {-q}, aoa = {arma::datum::pi}, eoa = {q}, gain = {1.0}, length = {20.0};
+    arma::mat M(8, 1, arma::fill::zeros);
+    M(0, 0) = 1.0, M(6, 0) = -1.0;
+    auto power = [&](const quadriga_lib::arrayant<double> &tx, const quadriga_lib::arrayant<double> &rx, double Tt, double Rt)
+    {
+        arma::cube cr, ci, dl;
+        quadriga_lib::get_channels_planar<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, Tt, 0.0, 10.0, 0.0, 0.0, 0.0, Rt, arma::datum::pi,
+                                                  &aod, &eod, &aoa, &eoa, &gain, &length, &M, &cr, &ci, &dl);
+        return arma::accu(cr % cr + ci % ci);
+    };
+    CHECK(power(beam, omni, q, 0.0) > 100.0 * power(beam, omni, -q, 0.0));
+    CHECK(power(omni, beam, 0.0, -q) > 100.0 * power(omni, beam, 0.0, q));
+}

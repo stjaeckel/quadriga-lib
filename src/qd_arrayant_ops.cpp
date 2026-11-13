@@ -11,6 +11,7 @@
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include "qd_arrayant_functions.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
@@ -50,7 +51,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
 ## See also:
 - [[arrayant_combine_pattern_multi]] (multi-freq counterpart)
 - [[arrayant_interpolate]] (used internally to compute effective radiation patterns)
-- .[[rotate_pattern]] (useful for orienting array antenna patterns)
+- [[arrayant_rotate_pattern]] (useful for orienting array antenna patterns)
 MD!*/
 
 template <typename dtype>
@@ -894,6 +895,340 @@ void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant)
 
 template void quadriga_lib::arrayant_remove_zeros(arrayant<float> &);
 template void quadriga_lib::arrayant_remove_zeros(arrayant<double> &);
+
+/*!MD
+# arrayant_rotate_pattern
+Rotate antenna radiation patterns using Euler rotations, in place
+
+- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
+  [[arrayant_interpolate]] returns for the unrotated pattern with the same `orientation`
+- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_frequency` and `name` are kept
+- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
+  in `i_element` throws when the grid must be adjusted
+- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
+
+## Declaration:
+```
+void quadriga_lib::arrayant_rotate_pattern(
+    arrayant<dtype> &ant,
+    const arma::Mat<dtype> &orientation,
+    unsigned usage = 0,
+    const arma::uvec *i_element = nullptr);
+```
+
+## Inputs:
+- **`ant`** — Valid arrayant; updated in place
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
+- **`usage`** *(optional)* — Rotation mode:<br><br>
+   | Mode | Pattern | Polarization | Grid adjustment |
+   | ---- | ------- | ------------ | --------------- |
+   | 0    | Yes     | Yes          | Yes             |
+   | 1    | Yes     | No           | Yes             |
+   | 2    | No      | Yes          | No              |
+   | 3    | Yes     | Yes          | No              |
+   | 4    | Yes     | No           | No              |
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_3GPP<double>(4, 1);
+arma::vec downtilt = {0.0, 10.0 * arma::datum::pi / 180.0, 0.0}; // 10 degree mechanical downtilt
+quadriga_lib::arrayant_rotate_pattern(ant, downtilt);
+```
+
+## See also:
+- [[arrayant_rotate_pattern_multi]] (multi-freq counterpart)
+- [[arrayant_interpolate]] (same orientation convention)
+- [[calc_rotation_matrix]] (rotation matrix of the orientation)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat<dtype> &orientation,
+                                           unsigned usage, const arma::uvec *i_element)
+{
+    // Check if arrayant object is valid
+    std::string error_message = qd_arrayant_check(ant); // Deep check
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    if (orientation.n_rows != 3 || orientation.n_cols != 1)
+        throw std::invalid_argument("Input 'orientation' must have size [3, 1].");
+    if (!orientation.is_finite())
+        throw std::invalid_argument("Input 'orientation' must be finite.");
+    if (usage > 4)
+        throw std::invalid_argument("Input parameter 'usage' must be 0, 1, 2, 3 or 4.");
+    if (ant.read_only)
+        throw std::invalid_argument("Cannot update read-only array antenna object inplace.");
+
+    // Set element indices; a subset without duplicates that holds every element counts as all elements
+    const arma::uword n_elements = ant.e_theta_re.n_slices;
+    arma::uvec i_out;
+    if (i_element == nullptr || i_element->n_elem == 0)
+        i_out = arma::regspace<arma::uvec>(0, n_elements - 1);
+    else
+    {
+        if (arma::any(*i_element >= n_elements))
+            throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+        i_out = *i_element;
+        if (arma::find_unique(i_out).eval().n_elem != i_out.n_elem)
+            throw std::invalid_argument("Input 'i_element' must not contain duplicates.");
+    }
+    const bool use_all_elements = i_out.n_elem == n_elements;
+
+    // Extract the element positions
+    arma::Mat<dtype> element_pos_update;
+    if (ant.element_pos.n_elem == 0)
+        element_pos_update.zeros(3, n_elements);
+    else
+        element_pos_update = ant.element_pos;
+    const arma::Mat<dtype> element_pos_interp = element_pos_update.cols(i_out);
+
+    unsigned long long n_el = ant.e_theta_re.n_rows;
+    unsigned long long n_az = ant.e_theta_re.n_cols;
+    unsigned long long n_out = i_out.n_elem;
+    unsigned long long n_ang = n_el * n_az;
+
+    dtype tau = dtype(arma::datum::tau), pi_half = dtype(arma::datum::pi / 2.0), pi = dtype(arma::datum::pi),
+          deg2rad = dtype(arma::datum::pi / 180.0), limit = dtype(1.0e-6);
+
+    // Calculate the coverage range for the angle sampling grid
+    dtype zero = dtype(0.0), az_step_min = dtype(1e38), az_step_max = zero, el_step_min = az_step_min,
+          el_step_max = zero, step = zero;
+    const dtype *ptr = ant.azimuth_grid.memptr();
+    for (auto i = 0ULL; i < n_az; ++i)
+    {
+        step = i == 0 ? *ptr - ptr[n_az - 1] + tau : ptr[i] - ptr[i - 1];
+        az_step_min = step < az_step_min && step > limit ? step : az_step_min;
+        az_step_max = step > az_step_max ? step : az_step_max;
+    }
+    ptr = ant.elevation_grid.memptr();
+    for (auto i = 0ULL; i <= n_el; ++i)
+    {
+        if (i == 0)
+            step = *ptr + pi_half;
+        else if (i == n_el)
+            step = pi_half - ptr[i - 1];
+        else
+            step = ptr[i] - ptr[i - 1];
+
+        el_step_min = step < el_step_min && step > limit ? step : el_step_min;
+        el_step_max = step > el_step_max ? step : el_step_max;
+    }
+    step = pi_half - ptr[n_el - 1];
+    el_step_min = step < el_step_min && step > limit ? step : el_step_min;
+    el_step_max = step > el_step_max ? step : el_step_max;
+    step = el_step_min < az_step_min ? el_step_min : az_step_min;
+
+    const bool update_grid = (usage == 0 || usage == 1) && (az_step_max - az_step_min > limit ||
+                                                            el_step_max - el_step_min > limit ||
+                                                            std::abs(az_step_min - el_step_min) > limit ||
+                                                            n_az == 1 || n_el == 1);
+
+    // Obtain interpolation angles
+    arma::Col<dtype> azimuth_grid_update, elevation_grid_update;
+    if (update_grid)
+    {
+        if (!use_all_elements)
+            throw std::invalid_argument("Update of sampling grid cannot be done for single elements of an array antenna!");
+
+        if (step > dtype(0.0017)) // >= 0.1 degree --> Use entire sphere
+        {
+            unsigned long long N = (unsigned long long)std::round(pi / step);
+            N = N < 4ULL ? 4ULL : N;
+
+            azimuth_grid_update = arma::linspace<arma::Col<dtype>>(-pi, pi, 2ULL * N + 1ULL);
+
+            if (std::abs(orientation.at(0)) < limit && std::abs(orientation.at(1)) < limit)
+                elevation_grid_update = ant.elevation_grid;
+            else
+                elevation_grid_update = arma::linspace<arma::Col<dtype>>(-pi_half + step, pi_half - step, N - 1ULL);
+        }
+        else // step < 0.1 degree --> Use subsampled sphere
+        {
+            auto sub = quadriga_lib::generate_arrayant_omni<dtype>();
+            sub.e_theta_re.zeros();
+            arma::Col<unsigned> has_az(361), has_el(181);
+
+            // Select azimuth angles
+            const dtype *p = ant.azimuth_grid.memptr();
+            dtype *q = sub.azimuth_grid.memptr();
+            unsigned *ra = has_az.memptr();
+            for (unsigned i = 0; i < 360; ++i)
+            {
+                while (p != ant.azimuth_grid.end() && *p <= q[i + 1])
+                {
+                    ra[i] = *p >= q[i] && *p <= q[i + 1] ? 1 : ra[i];
+                    p++;
+                }
+                ra[i + 1] = ra[i];
+                if (p == ant.azimuth_grid.end())
+                    break;
+            }
+
+            // Select elevation angles
+            p = ant.elevation_grid.memptr(), q = sub.elevation_grid.memptr();
+            unsigned *re = has_el.memptr();
+            for (unsigned i = 0; i < 180; ++i)
+            {
+                while (p != ant.elevation_grid.end() && *p <= q[i + 1])
+                {
+                    re[i] = *p >= q[i] && *p <= q[i + 1] ? 1 : re[i];
+                    p++;
+                }
+                re[i + 1] = re[i];
+                if (p == ant.elevation_grid.end())
+                    break;
+            }
+
+            // Set interpolation target
+            dtype *pt = sub.e_theta_re.memptr();
+            for (auto i = 0ULL; i < sub.e_theta_re.n_elem; ++i)
+                pt[i] = ra[i / 181] == 1 && re[i % 181] == 1 ? 1.0 : 0.0;
+
+            // Find target area for interpolation
+            quadriga_lib::arrayant_rotate_pattern(sub, orientation, 1);
+            quadriga_lib::arrayant_remove_zeros(sub);
+
+            // Subdivide target grid
+            dtype sdiv = std::fmod(deg2rad, step) < 0.1 * step ? std::floor(deg2rad / step) : std::ceil(deg2rad / step);
+            dtype stp = deg2rad / sdiv;
+            unsigned long long ndiv = (unsigned long long)sdiv;
+
+            bool wrap = sub.azimuth_grid.at(sub.azimuth_grid.n_elem - 1) + stp > pi;
+            unsigned long long N = wrap ? ndiv * (sub.azimuth_grid.n_elem - 1) + 1 : ndiv * sub.azimuth_grid.n_elem;
+            azimuth_grid_update.set_size(N);
+            pt = azimuth_grid_update.memptr(), q = sub.azimuth_grid.memptr();
+            for (auto i = 0ULL; i < sub.azimuth_grid.n_elem; ++i)
+                if (wrap && i == sub.azimuth_grid.n_elem - 1ULL)
+                    *pt = q[i];
+                else
+                    for (auto j = 0ULL; j < ndiv; ++j)
+                        *pt++ = q[i] + dtype(j) * stp;
+
+            wrap = sub.elevation_grid.at(sub.elevation_grid.n_elem - 1) + stp > pi_half;
+            N = wrap ? ndiv * (sub.elevation_grid.n_elem - 1) + 1 : ndiv * sub.elevation_grid.n_elem;
+            elevation_grid_update.set_size(N);
+            pt = elevation_grid_update.memptr(), q = sub.elevation_grid.memptr();
+            for (auto i = 0ULL; i < sub.elevation_grid.n_elem; ++i)
+                if (wrap && i == sub.elevation_grid.n_elem - 1)
+                    *pt = q[i];
+                else
+                    for (auto j = 0ULL; j < ndiv; ++j)
+                        *pt++ = q[i] + dtype(j) * stp;
+        }
+
+        n_az = azimuth_grid_update.n_elem;
+        n_el = elevation_grid_update.n_elem;
+        n_ang = n_az * n_el;
+    }
+    else
+    {
+        azimuth_grid_update = ant.azimuth_grid;
+        elevation_grid_update = ant.elevation_grid;
+    }
+
+    // Initiate output variables
+    arma::Mat<dtype> V_re(n_out, n_ang, arma::fill::none), V_im(n_out, n_ang, arma::fill::none);
+    arma::Mat<dtype> H_re(n_out, n_ang, arma::fill::none), H_im(n_out, n_ang, arma::fill::none);
+    arma::Mat<dtype> azimuth_loc, elevation_loc, gamma;
+
+    // Create list of angles for pattern interpolation
+    arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
+    arma::Mat<dtype> elevation(1, n_ang, arma::fill::none);
+    dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr(),
+          *p_phi = azimuth_grid_update.memptr(), *p_theta = elevation_grid_update.memptr();
+
+    for (auto ia = 0ULL; ia < n_az; ++ia)
+        for (auto ie = 0ULL; ie < n_el; ++ie)
+            *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
+
+    // The rotated pattern is the unrotated pattern seen by an antenna with this orientation
+    arma::Cube<dtype> orientation_cube(orientation.memptr(), 3, 1, 1);
+
+    // Rotation matrix for the element positions
+    const arma::Col<dtype> R = quadriga_lib::calc_rotation_matrix(arma::Col<dtype>(orientation_cube.memptr(), 3));
+
+    if (usage == 1 || usage == 4)
+        azimuth_loc.set_size(n_out, n_ang), elevation_loc.set_size(n_out, n_ang);
+    else if (usage == 2)
+        gamma.set_size(n_out, n_ang);
+
+    const bool loc_angles = usage == 1 || usage == 4;
+    qd_arrayant_interpolate_dispatch<dtype>(ant, azimuth, elevation, i_out, orientation_cube, element_pos_interp,
+                                            V_re, V_im, H_re, H_im, nullptr, loc_angles ? &azimuth_loc : nullptr,
+                                            loc_angles ? &elevation_loc : nullptr, usage == 2 ? &gamma : nullptr, 1);
+    azimuth.reset(), elevation.reset();
+
+    orientation_cube.zeros();
+    if (loc_angles) // Only return interpolated pattern (ignore polarization)
+        qd_arrayant_interpolate_dispatch<dtype>(ant, azimuth_loc, elevation_loc, i_out, orientation_cube, element_pos_interp,
+                                                V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr, nullptr, 1);
+    azimuth_loc.reset(), elevation_loc.reset();
+
+    if (usage == 2) // Only adjust the polarization
+    {
+        gamma = gamma.t();
+        for (auto i = 0ULL; i < n_out; ++i)
+        {
+            const dtype *p_gamma = gamma.colptr(i);
+            dtype *p_theta_re = ant.e_theta_re.slice_memptr(i_out.at(i)), *p_theta_im = ant.e_theta_im.slice_memptr(i_out.at(i));
+            dtype *p_phi_re = ant.e_phi_re.slice_memptr(i_out.at(i)), *p_phi_im = ant.e_phi_im.slice_memptr(i_out.at(i));
+
+            for (auto j = 0ULL; j < n_ang; ++j)
+            {
+                dtype sin_gamma = std::sin(p_gamma[j]), cos_gamma = std::cos(p_gamma[j]);
+                dtype tmp = sin_gamma * p_theta_re[j];
+                p_theta_re[j] = cos_gamma * p_theta_re[j] - sin_gamma * p_phi_re[j];
+                p_phi_re[j] = tmp + cos_gamma * p_phi_re[j];
+                tmp = sin_gamma * p_theta_im[j];
+                p_theta_im[j] = cos_gamma * p_theta_im[j] - sin_gamma * p_phi_im[j];
+                p_phi_im[j] = tmp + cos_gamma * p_phi_im[j];
+            }
+        }
+        return;
+    }
+
+    // Usage 0, 1, 3 or 4: write the interpolated patterns, [n_ang, n_out] after the transpose
+    if (n_out > 1)
+        V_re = V_re.t(), V_im = V_im.t(), H_re = H_re.t(), H_im = H_im.t();
+
+    if (update_grid) // Set new array size, keep the coupling (all elements here)
+    {
+        ant.set_size(n_el, n_az, n_out, ant.n_ports()); // Writes out empty positions and coupling (zeros, identity)
+        ant.azimuth_grid = azimuth_grid_update;
+        ant.elevation_grid = elevation_grid_update;
+    }
+
+    for (auto i = 0ULL; i < n_out; ++i)
+    {
+        const arma::uword s = i_out.at(i);
+        std::memcpy(ant.e_theta_re.slice_memptr(s), V_re.colptr(0) + i * n_ang, n_ang * sizeof(dtype));
+        std::memcpy(ant.e_theta_im.slice_memptr(s), V_im.colptr(0) + i * n_ang, n_ang * sizeof(dtype));
+        std::memcpy(ant.e_phi_re.slice_memptr(s), H_re.colptr(0) + i * n_ang, n_ang * sizeof(dtype));
+        std::memcpy(ant.e_phi_im.slice_memptr(s), H_im.colptr(0) + i * n_ang, n_ang * sizeof(dtype));
+    }
+
+    // Rotate the element positions; empty positions stay empty unless set_size above wrote zeros (grid update)
+    if (ant.element_pos.n_elem != 0)
+    {
+        const dtype *R_ptr = R.memptr(), *pI = element_pos_update.memptr();
+        for (auto i = 0ULL; i < n_out; ++i)
+        {
+            const arma::uword j = 3 * i_out.at(i);
+            dtype *pO = ant.element_pos.colptr(i_out.at(i));
+            pO[0] = R_ptr[0] * pI[j] + R_ptr[3] * pI[j + 1] + R_ptr[6] * pI[j + 2];
+            pO[1] = R_ptr[1] * pI[j] + R_ptr[4] * pI[j + 1] + R_ptr[7] * pI[j + 2];
+            pO[2] = R_ptr[2] * pI[j] + R_ptr[5] * pI[j + 1] + R_ptr[8] * pI[j + 2];
+        }
+    }
+
+    if (update_grid)
+        quadriga_lib::arrayant_remove_zeros(ant);
+}
+
+template void quadriga_lib::arrayant_rotate_pattern(arrayant<float> &, const arma::Mat<float> &, unsigned, const arma::uvec *);
+template void quadriga_lib::arrayant_rotate_pattern(arrayant<double> &, const arma::Mat<double> &, unsigned, const arma::uvec *);
 
 /*!MD
 # qdant_write

@@ -17,7 +17,7 @@ lang: en-US
 - Invalid inputs (shape/domain) and I/O failures raise a MATLAB error with the identifier `quadriga_lib:CPPerror`.
 - Index conventions: 1-based unless the field is explicitly called 0-based.
 - Units: angles in radians (degrees only where stated, e.g. `*_deg`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
-- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
+- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation as in 3GPP TR 38.901 (bearing, downtilt, slant): a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down, a positive bank turns the y-axis toward z.
 - Polarization transfer matrix `M`: 8 rows per path, interleaved real/imaginary, order `[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]`. A 2-row form `[ReVV, ImVV]` is used for scalar (acoustic) fields.
 - The canonical arrayant struct is defined in [arrayant_generate](#arrayant_generate). Mandatory fields: `e_theta_re/im`, `e_phi_re/im`, `azimuth_grid`, `elevation_grid`. Optional field defaults: `element_pos = zeros(3, n_elements)`, identity coupling, `center_freq = 299792458`, empty `name`. A struct array represents a frequency-dependent (multi-frequency) model with one entry per frequency. Each call builds a new arrayant from the struct, so its data is checked in full on every call.
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
@@ -36,7 +36,7 @@ lang: en-US
 | [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
 | [arrayant_generate](#arrayant_generate) | Array antenna functions | Generates predefined array antenna models |
 | [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
-| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns around the principal axes using Euler rotations |
+| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns using Euler rotations |
 | [generate_speaker](#generate_speaker) | Array antenna functions | Generate a parametric frequency-dependent loudspeaker directivity model |
 | [qdant_read](#qdant_read) | Array antenna functions | Reads array antenna data from QDANT files |
 | [qdant_write](#qdant_write) | Array antenna functions | Writes array antenna data to QDANT files |
@@ -579,39 +579,28 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadrig
 ---
 <a id="arrayant_rotate_pattern"></a>
 ## arrayant_rotate_pattern
-Rotate antenna radiation patterns around the principal axes using Euler rotations
+Rotate antenna radiation patterns using Euler rotations
 
-Also in: [C++](quadriga_lib_api_cpp.md#.rotate_pattern) · [Python](quadriga_lib_api_python.md#rotate_pattern)
+Also in: [C++](quadriga_lib_api_cpp.md#arrayant_rotate_pattern) · [Python](quadriga_lib_api_python.md#rotate_pattern)
 
-- Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes
-- Rotations applied in order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
-- Adjusts the sampling grid for non-uniformly sampled antennas when `usage` is 0 or 1
-- Coupling, `center_freq` and `name` are kept, also when the sampling grid is adjusted
+- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
+  [arrayant_interpolate](#arrayant_interpolate) returns for the unrotated pattern with the same `orientation`
+- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_freq` and `name` are kept
+- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
+  in `i_element` is an error when the grid must be adjusted
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid
   spurious polarization effects
 
 ### Usage:
 ```matlab
-% Struct in / struct out
-arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, x_deg, y_deg, z_deg, usage, i_element);
-
-% Separate-field outputs (single-frequency results only)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_rotate_pattern( ...
-    arrayant_in, x_deg, y_deg, z_deg, usage, i_element);
-
-% Separate inputs (single-frequency only)
-arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usage, element, ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name);
+arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, orientation, usage, i_element);
 ```
 
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array represents a frequency-dependent model
-- **`x_deg`** — Rotation around x-axis (bank) in degrees; default: 0
-- **`y_deg`** — Rotation around y-axis (tilt) in degrees; default: 0
-- **`z_deg`** — Rotation around z-axis (heading) in degrees; default: 0
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad; 3-element vector
 - **`usage`** — Rotation mode; default: 0
    | Mode | Pattern | Polarization | Grid adj. |
    | :--: | :-----: | :----------: | :-------: |
@@ -623,14 +612,11 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usa
 
   Multi-frequency input never adjusts the grid (uniform-grid consistency across frequencies): 0 and 3
   rotate pattern and polarization, 1 and 4 the pattern only, 2 the polarization only (as in Python).
-- **`i_element`** — 1-based element indices to rotate; defaults to all elements; `[n]`
+- **`i_element`** — Element indices to rotate, 1-based, no duplicates; default: all elements; `[n]`
 
 ### Outputs:
-- **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
-  result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when input is a
-  single struct; struct array of size `numel(arrayant_in)` when input is a struct array.
-- **`e_theta_re`, ..., `name`** — Separate-field outputs; **only available for single-frequency
-  results** (single-struct input).
+- **`arrayant_out`** — Arrayant struct, or struct array of size `numel(arrayant_in)` for multi-frequency input;
+  field layout as documented in [arrayant_generate](#arrayant_generate)
 
 ---
 <a id="generate_speaker"></a>
@@ -1864,8 +1850,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_angular_spreads_sphere) · [Python](
 ### Outputs:
 - **`as`** — RMS azimuth angular spread; `[n_cir]`
 - **`es`** — RMS elevation angular spread; `[n_cir]`
-- **`orientation`** — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `[3, n_cir]`
-- **`phi`** — Rotated azimuth angles; `[n_path, n_cir]`
+- **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
+  direction (a positive tilt points down); `[3, n_cir]`
+- **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; `[n_path, n_cir]`
 - **`theta`** — Rotated elevation angles; `[n_path, n_cir]`
 
 ---
@@ -3140,13 +3127,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_rotation_matrix) · Not in: Python
 
 ### Usage:
 ```matlab
-rotation = quadriga_lib.calc_rotation_matrix( orientation, invert_y_axis, transpose );
+rotation = quadriga_lib.calc_rotation_matrix( orientation, transpose );
 ```
 
 ### Inputs:
 - **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`invert_y_axis`** — Flips the sign of the tilt angle, i.e. applies `-tilt` instead of
-  `tilt`; use when the input convention defines positive tilt as downward; logical; default: false
 - **`transpose`** — Returns the transpose of the rotation matrix; logical; default: false
 
 ### Outputs:

@@ -1496,3 +1496,42 @@ TEST_CASE("Multifreq - outputs that alias inputs")
                         std::invalid_argument);
     }
 }
+
+TEST_CASE("get_channels_multifreq - a positive tilt points down (3GPP TR 38.901)")
+{
+    // The TX is 10 m above the RX and 10 m away: the RX is 45 degree below the TX. A beam along x reaches the other
+    // end only when turned toward it: TX tilt +pi/4 (down); RX heading pi and tilt -pi/4 (up).
+    const double q = arma::datum::pi / 4.0;
+    const auto beam = wrap_single(quadriga_lib::generate_arrayant_custom<double>(40.0, 40.0, 0.0, 5.0));
+    const auto omni = wrap_single(quadriga_lib::generate_arrayant_omni<double>(5.0));
+    const arma::mat pos(arma::vec{5.0, 0.0, 5.0}), gain(1, 1, arma::fill::ones); // A scatterer on the LOS
+    const arma::vec length = {0.0}, freq = {299792458.0};
+    arma::cube M(8, 1, 1, arma::fill::zeros);
+    M(0, 0, 0) = 1.0, M(6, 0, 0) = -1.0;
+    auto power = [&](const std::vector<quadriga_lib::arrayant<double>> &tx, const std::vector<quadriga_lib::arrayant<double>> &rx,
+                     double Tt, double Rt)
+    {
+        std::vector<arma::cube> cr, ci, dl;
+        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 10.0, 0.0, Tt, 0.0, 10.0, 0.0, 0.0, 0.0, Rt, arma::datum::pi,
+                                             pos, pos, gain, length, M, freq, freq, cr, ci, dl);
+        return arma::accu(cr[0] % cr[0] + ci[0] % ci[0]);
+    };
+    CHECK(power(beam, omni, q, 0.0) > 100.0 * power(beam, omni, -q, 0.0));
+    CHECK(power(omni, beam, 0.0, -q) > 100.0 * power(omni, beam, 0.0, q));
+
+    // Element positions turn with the array as in get_channels_spherical (two elements along y, tilted and banked)
+    auto pair = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    quadriga_lib::arrayant_copy_element(pair, 0, {1});
+    pair.element_pos = {{0.0, 0.0}, {1.0, -1.0}, {0.0, 0.0}};
+    std::vector<arma::cube> cr, ci, dl;
+    quadriga_lib::get_channels_multifreq(wrap_single(pair), wrap_single(pair), 0.0, 0.0, 10.0, -q, 0.5, 0.2, 10.0, 0.0, 0.0,
+                                         0.3, -0.4, arma::datum::pi, pos, pos, gain, length, M, freq, freq, cr, ci, dl);
+    arma::cube sr, si, sd;
+    const arma::vec g = {1.0};
+    const arma::mat M1 = M.slice(0);
+    quadriga_lib::get_channels_spherical<double>(&pair, &pair, 0.0, 0.0, 10.0, -q, 0.5, 0.2, 10.0, 0.0, 0.0, 0.3, -0.4,
+                                                 arma::datum::pi, &pos, &pos, &g, &length, &M1, &sr, &si, &sd, freq(0));
+    CHECK(arma::approx_equal(dl[0], sd, "absdiff", 1e-15));
+    CHECK(arma::approx_equal(cr[0], sr, "absdiff", 1e-9));
+    CHECK(arma::approx_equal(ci[0], si, "absdiff", 1e-9));
+}

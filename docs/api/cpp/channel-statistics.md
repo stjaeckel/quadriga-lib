@@ -97,8 +97,10 @@ void quadriga_lib::calc_angular_spreads_sphere(
 ### Outputs:
 - **`azimuth_spread`** *(optional)* — RMS azimuth spread; `[n_cir]`
 - **`elevation_spread`** *(optional)* — RMS elevation spread; `[n_cir]`
-- **`orientation`** *(optional)* — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `[3, n_cir]`
-- **`phi`** *(optional)* — Rotated azimuth angles; `[n_cir]` vector, each element of length `n_path`
+- **`orientation`** *(optional)* — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
+  direction (a positive tilt points down); `[3, n_cir]`
+- **`phi`** *(optional)* — Rotated azimuth angles, the path azimuths in the local frame of that antenna (as
+  [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate) returns them); `[n_cir]` vector, each element of length `n_path`
 - **`theta`** *(optional)* — Rotated elevation angles; same structure as `phi`
 
 ---

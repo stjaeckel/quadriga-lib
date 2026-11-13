@@ -9,7 +9,7 @@ powers = 1.0;
 assertElementsAlmostEqual(as, 0.0, 'absolute', 1e-10);
 assertElementsAlmostEqual(es, 0.0, 'absolute', 1e-10);
 assertElementsAlmostEqual(orient(3,1), 0.5, 'absolute', 1e-10);   % heading ~ azimuth
-assertElementsAlmostEqual(orient(2,1), 0.3, 'absolute', 1e-10);   % tilt ~ elevation
+assertElementsAlmostEqual(orient(2,1), -0.3, 'absolute', 1e-10);  % tilt = -elevation (a positive tilt points down)
 
 % --- Two symmetric azimuth paths ---
 az = [0.1; -0.1];

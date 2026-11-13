@@ -902,3 +902,21 @@ TEST_CASE("gbsm_single_link_channel - input validation")
         CHECK_NOTHROW(call(omni, omni, r, lg, "phase", "rays", 0, nullptr, &Rb, nullptr, nullptr, nullptr));
     }
 }
+
+TEST_CASE("gbsm_single_link_channel - a positive tilt points down (3GPP TR 38.901)")
+{
+    // LOS only, the Rx 10.5 degree below the Tx: a Tx beam along x, turned to the Rx heading, reaches the Rx when
+    // tilted down by +10.5 degree and misses it when tilted up by the same angle
+    const rays_t r = make_rays(5, true, false, 0, 1, "38.901");
+    const arr_t beam = quadriga_lib::generate_arrayant_custom<double>(20.0, 20.0, 0.0, 5.0);
+    const arr_t omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    const double h = std::atan2(49.0, 117.0), e = std::atan2(23.5, std::hypot(117.0, 49.0));
+    args_t a{&beam, &omni, &r};
+    auto power = [&](double tilt)
+    {
+        a.To = arma::mat{{0.0, tilt, h}};
+        const chan_t c = a.run();
+        return arma::accu(c.coeff_re[0] % c.coeff_re[0] + c.coeff_im[0] % c.coeff_im[0]);
+    };
+    CHECK(power(e) > 10.0 * power(-e));
+}
