@@ -152,7 +152,7 @@ the whole pipeline, with the engine as its methods core).
    ("meaningful combinations") is defined and named in the CSV.
 5. **Stop.** Report the files created, the baseline counts, the questions phase 1 needs from Stephan (ask them with
    the question tool, recommendation first, explanation before the question), and a commit message for the phase-0
-   files (no internal labels; Co-Authored-By trailer).
+   files (no internal labels; no attribution trailer).
 
 ## Hard rules for the whole step
 
