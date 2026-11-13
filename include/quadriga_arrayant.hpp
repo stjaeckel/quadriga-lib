@@ -46,9 +46,6 @@ namespace quadriga_lib
         arma::uword n_elements() const;  // Number of antenna elements
         arma::uword n_ports() const;     // Number of ports (after coupling of elements)
 
-        // Append elements of another arrayant to the current one
-        arrayant<dtype> append(const arrayant<dtype> *new_arrayant) const;
-
         // Calculate the beam width of an antenna element in degree
         void calc_beamwidth_deg(arma::uword i_element,                // Element index, 0-based
                                 dtype threshold_dB = 3.0,             // Threshold in dB
@@ -60,35 +57,8 @@ namespace quadriga_lib
         // Calculate the directivity in dBi of a single array element
         dtype calc_directivity_dBi(arma::uword i_element) const;
 
-        // Combine element patterns, positions, and coupling weights into effective radiation patterns
-        // Returns new arrayant with n_ports elements (= number of columns in coupling_re/im), each holding the combined effective pattern for that port
-        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,         // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
-                                        const arma::Col<dtype> *elevation_grid_new = nullptr,       // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
-                                        dtype propagation_speed = dtype(299792458.0)) const;        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
-
         // Creates a copy of the array antenna object; a copy of a valid arrayant is marked as validated
         arrayant<dtype> copy() const;
-
-        // Copy a single antenna element to one or more destination slots
-        void copy_element(arma::uword source, arma::uvec destination);
-        void copy_element(arma::uword source, arma::uword destination);
-
-        // Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
-        void export_obj_file(std::string fn,                   // Output OBJ filename; must not be empty; filename must end in .obj
-                             dtype directivity_range = 30.0,   // Dynamic range of the visualized directivity pattern in dB
-                             std::string colormap = "jet",     // Colormap for the visualization
-                             dtype object_radius = 1.0,        // Radius of the exported object
-                             arma::uword icosphere_n_div = 4,  // Icosphere subdivision count; higher = finer mesh
-                             arma::uvec i_element = {}) const; // 0-based element indices to export
-
-        // Write arrayant data to a QDANT (XML) file
-        unsigned qdant_write(std::string fn,                   // Output QDANT filename; must not be empty
-                             unsigned id = 0,                  // Target ID in file; 0 appends with auto-assigned ID
-                             arma::u32_mat layout = {}) const; // Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file
-
-        // Remove zero-valued entries from antenna pattern data, reducing its size
-        // Calling this function without an argument updates the arrayant properties inplace
-        void remove_zeros(arrayant<dtype> *output = nullptr);
 
         // Reset the size to zero (the arrayant object will contain no data)
         void reset();
@@ -107,10 +77,51 @@ namespace quadriga_lib
                       arma::uword n_elements,  // Number of antenna elements
                       arma::uword n_ports);    // Number of ports (after coupling of elements)
 
-        // Validate integrity
-        std::string is_valid() const;                        // Full check; returns an empty string if valid or an error message otherwise
-        std::string validate();                              // Same, but sets the "valid" property in the object and initializes the element positions and coupling matrix
+        // Validate integrity (full check); returns an empty string if valid or an error message otherwise
+        std::string is_valid() const;
     };
+
+    // ---- Array antenna functions ----
+
+    // Combine element patterns, positions, and coupling weights into effective radiation patterns
+    // Returns new arrayant with n_ports elements (= number of columns in coupling_re/im), each holding the combined effective pattern for that port
+    template <typename dtype>
+    arrayant<dtype> arrayant_combine_pattern(const arrayant<dtype> &ant,                          // Valid arrayant
+                                             const arma::Col<dtype> *azimuth_grid_new = nullptr,   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
+                                             const arma::Col<dtype> *elevation_grid_new = nullptr, // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
+                                             dtype propagation_speed = dtype(299792458.0));        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
+
+    // Concatenate the elements of two arrayants into a new arrayant (block-diagonal coupling)
+    template <typename dtype>
+    arrayant<dtype> arrayant_concat(const arrayant<dtype> &ant_1,  // First arrayant; name and center frequency are taken from it
+                                    const arrayant<dtype> &ant_2); // Second arrayant; sampling grids must match ant_1
+
+    // Copy a single antenna element to one or more destination slots, in place
+    template <typename dtype>
+    void arrayant_copy_element(arrayant<dtype> &ant,           // Valid arrayant; updated in-place
+                               arma::uword source,             // Index of the element to copy, 0-based
+                               const arma::uvec &destination); // Target indices, 0-based; the array is enlarged to fit the largest index
+
+    // Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
+    template <typename dtype>
+    void arrayant_export_obj_file(const std::string &fn,                  // Output OBJ filename; must end in .obj
+                                  const arrayant<dtype> &ant,             // Valid arrayant
+                                  dtype directivity_range = 30.0,         // Dynamic range of the visualized directivity pattern in dB
+                                  const std::string &colormap = "jet",    // Colormap for the visualization
+                                  dtype object_radius = 1.0,              // Radius of the exported object
+                                  arma::uword icosphere_n_div = 4,        // Icosphere subdivision count; higher = finer mesh
+                                  const arma::uvec *i_element = nullptr); // Optional: 0-based element indices to export; default: all
+
+    // Remove zero-valued entries from antenna pattern data, in place, reducing its size
+    template <typename dtype>
+    void arrayant_remove_zeros(arrayant<dtype> &ant); // Valid arrayant; updated in-place
+
+    // Write arrayant data to a QDANT (XML) file; returns the ID written
+    template <typename dtype>
+    unsigned qdant_write(const std::string &fn,                  // Output QDANT filename; must not be empty
+                         const arrayant<dtype> &ant,             // Valid arrayant
+                         unsigned id = 0,                        // Target ID in file; 0 appends with auto-assigned ID
+                         const arma::u32_mat *layout = nullptr); // Optional: matrix of the antenna IDs in the file; must reference only IDs present in the file
 
     // ---- Multi-frequency array antenna functions ----
 
@@ -131,17 +142,12 @@ namespace quadriga_lib
                                                        const std::vector<arrayant<dtype>> &arrayant_vec2); // Second arrayant vector; must match entry count, grids, and center frequencies of arrayant_vec1
 
     // Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector
-    // - Calls .copy_element on every entry in the vector with the same source and destination indices.
+    // - Calls arrayant_copy_element on every entry in the vector with the same source and destination indices.
     // - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry.
     template <typename dtype>
     void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of valid arrayant objects; modified in-place
                                      arma::uword source,                         // Index of the element to copy from; must be within current element count
-                                     arma::uvec destination);                    // Index or indices of target element; enlarges all entries if any index exceeds current count
-
-    template <typename dtype>
-    void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of valid arrayant objects; modified in-place
-                                     arma::uword source,                         // Index of the element to copy from; must be within current element count
-                                     arma::uword destination);                   // Index or indices of target elements; enlarges all entries if any index exceeds current count
+                                     const arma::uvec &destination);             // Indices of target elements; enlarges all entries if any index exceeds current count
 
     // Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
     // - Angles [1, n_ang]: the same for all outputs (planar wave); [n_out, n_ang]: one angle per output (spherical wave)
@@ -184,6 +190,7 @@ namespace quadriga_lib
     // Validate a vector of arrayant objects for multi-frequency consistency
     // - Each entry is validated individually via its is_valid member (full check).
     // - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
+    // - All entries use the same form for element_pos and coupling: all empty or all given (a mix is rejected).
     // - Pattern data, center_frequency, and coupling matrix values are not compared (expected to vary).
     // - Stops at first error and returns a message identifying the failing entry and property.
     template <typename dtype>
@@ -322,7 +329,7 @@ namespace quadriga_lib
     // - Returns a vector of arrayant objects, one per frequency sample
     // - Each arrayant contains the complex-valued directivity balloon at that frequency
     // - Each arrayant has a single element; multi-driver speakers are built by calling this function per driver
-    //   and combining the results via append and element_pos
+    //   and combining the results via arrayant_concat and element_pos
     // - Supported driver types: "piston" (cone/dome), "horn" (constant directivity), "omni" (subwoofer)
     // - Supported radiation types: "monopole" (4pi), "hemisphere" (2pi, sealed box), "dipole" (figure-8), "cardioid"
     // - Horn parameters that are 0: hor_coverage and ver_coverage default to 90 and 60 deg, horn_control_freq is derived from radius
@@ -422,7 +429,7 @@ namespace quadriga_lib
     // - IRS is provided as a 3rd array antenna model comprised of 'n_irs' elements
     // - Requires 2 channel segments: (1) TX -> IRS and (2) IRS -> RX
     // - Assumes a low-rank channel where the IRS creates additional multipath components
-    // - The IRS weights (phase shifts) are provided as Coupling matrix of the IRS array (column vectors)
+    // - The IRS weights (phase shifts) are provided as Coupling matrix of the IRS array (column vectors); it must not be empty
     // - Multiple columns in the Coupling matrix can be seen as multiple IRS codebook entries. Only one entry can be selected
     // - Generates n_path_irs output paths where n_path_irs <= n_path_1 * n_path_2
     // - By default the 'irs_array' for both, the receive (TX-IRS) and receive (IRS-RX) direction.

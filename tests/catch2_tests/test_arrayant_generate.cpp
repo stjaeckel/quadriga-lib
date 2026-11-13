@@ -131,8 +131,8 @@ TEST_CASE("Generate Arrayant - 3GPP")
 
     // Custom pattern
     auto pattern = quadriga_lib::generate_arrayant_custom<float>(90.0, 90.0, 0.0);
-    pattern.copy_element(0, 1);
-    pattern.copy_element(0, 2);
+    quadriga_lib::arrayant_copy_element(pattern, 0, {1});
+    quadriga_lib::arrayant_copy_element(pattern, 0, {2});
 
     float gain = pattern.e_theta_re.at(90, 180, 0);
     gain = std::sqrt(2.0 * gain * gain);
@@ -171,7 +171,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     arma::vec azg = arma::regspace<arma::vec>(-180.0, 1.0, 180.0) * 0.017453292519943;
     arma::vec elg = arma::regspace<arma::vec>(-90.0, 1.0, 90.0) * 0.017453292519943;
 
-    auto comb = ant.combine_pattern(&azg, &elg);
+    auto comb = quadriga_lib::arrayant_combine_pattern(ant, &azg, &elg);
 
     CHECK(comb.n_elements() == 1);
     CHECK(comb.n_elevation() == 181);
@@ -188,7 +188,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     az = {20.0, 0.0, 20.0};
     el = {-7.0, 30.0, -7.0};
     auto ant2 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 1, 0.4, 120.0, 120.0, 0.0, 15.0);
-    auto comb2 = ant2.combine_pattern(&azg, &elg);
+    auto comb2 = quadriga_lib::arrayant_combine_pattern(ant2, &azg, &elg);
 
     CHECK(arma::approx_equal(ant.coupling_re, ant2.coupling_re, "absdiff", 1e-6));
     CHECK(arma::approx_equal(ant.coupling_im, ant2.coupling_im, "absdiff", 1e-6));
@@ -275,7 +275,7 @@ TEST_CASE("Generate Arrayant - Multi-Beam towards the poles")
 TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a custom pattern")
 {
     auto p = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    p.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(p, 0, {1});
     p.element_pos = {{0.3, 0.3}, {0.0, 0.0}, {0.7, -0.7}};
     p.coupling_re = arma::mat(2, 1, arma::fill::ones); // 2 elements -> 1 port
     p.coupling_im = arma::mat(2, 1, arma::fill::zeros);

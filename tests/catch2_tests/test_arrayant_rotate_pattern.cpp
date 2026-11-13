@@ -477,7 +477,7 @@ TEST_CASE("Rotate Pattern - Element positions are rotated correctly (z-rotation)
     ant.element_pos.zeros(3, 2);
     ant.element_pos(0, 0) = 1.0; // Element 0 at (1, 0, 0)
     ant.element_pos(1, 1) = 1.0; // Element 1 at (0, 1, 0)
-    ant.validate();
+    ant.is_valid();
 
     // 90° z-rotation: (1,0,0) -> (0,1,0), (0,1,0) -> (-1,0,0)
     ant.rotate_pattern(0.0, 0.0, 90.0, 3);
@@ -497,7 +497,7 @@ TEST_CASE("Rotate Pattern - Element positions unchanged for usage 2")
     ant.element_pos.zeros(3, 2);
     ant.element_pos(0, 0) = 1.0;
     ant.element_pos(1, 1) = 2.0;
-    ant.validate();
+    ant.is_valid();
     auto ref_pos = ant.element_pos;
 
     // Usage 2 only rotates polarization - positions should not change
@@ -550,7 +550,7 @@ TEST_CASE("Rotate Pattern - Usage 0 may adjust grid for non-uniform antenna")
     ant.e_theta_im.zeros(n_el, n_az, 1);
     ant.e_phi_re.zeros(n_el, n_az, 1);
     ant.e_phi_im.zeros(n_el, n_az, 1);
-    ant.validate();
+    ant.is_valid();
 
     // Usage 0 should detect non-uniform grid and resamples
     ant.rotate_pattern(0.0, 0.0, 45.0, 0);
@@ -572,7 +572,7 @@ TEST_CASE("Rotate Pattern - Usage 0 preserves directivity for non-uniform grid")
     ant.e_theta_im.zeros(n_el, n_az, 1);
     ant.e_phi_re.zeros(n_el, n_az, 1);
     ant.e_phi_im.zeros(n_el, n_az, 1);
-    ant.validate();
+    ant.is_valid();
 
     double dir_before = ant.calc_directivity_dBi(0);
     ant.rotate_pattern(0.0, 0.0, 45.0, 0);
@@ -970,7 +970,7 @@ TEST_CASE("Rotate Pattern - ULA antenna rotation")
 static quadriga_lib::arrayant<double> rotate_pattern_two_element_one_port()
 {
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 10.0);
-    a.copy_element(0, 1); // 2 elements
+    quadriga_lib::arrayant_copy_element(a, 0, {1}); // 2 elements
     a.element_pos = {{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}};
     a.coupling_re = arma::mat(arma::colvec{0.6, 0.8}); // -> 1 port
     a.coupling_im = arma::mat(arma::colvec{0.1, -0.2});

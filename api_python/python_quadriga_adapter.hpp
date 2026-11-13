@@ -119,6 +119,20 @@ static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::ar
     return output;
 }
 
+// Wrapper defaults of the optional arrayant fields, as in the MATLAB / Octave reader: an empty element_pos becomes
+// zeros, an empty coupling identity, an empty coupling_im zeros (the library treats empty members the same way;
+// filled members keep the arrays that the wrappers return unchanged)
+static void qd_python_fill_arrayant_defaults(quadriga_lib::arrayant<double> &ant)
+{
+    const arma::uword n_elements = ant.e_theta_re.n_slices;
+    if (ant.element_pos.is_empty())
+        ant.element_pos.zeros(3, n_elements);
+    if (ant.coupling_re.is_empty() && ant.coupling_im.is_empty())
+        ant.coupling_re.eye(n_elements, n_elements);
+    if (ant.coupling_im.is_empty())
+        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
+}
+
 static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
                                                               bool view = false, bool strict = false,
                                                               bool validate = false)
@@ -133,23 +147,14 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
     ant.azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], view, strict);
     ant.elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], view, strict);
 
-    arma::uword n_elements = ant.e_theta_re.n_slices;
-
-    // Optional fields
+    // Optional fields; absent or empty ones get their defaults (zeros, identity)
     if (arrayant.contains("element_pos"))
         ant.element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], view, strict);
-    else
-        ant.element_pos.zeros(3, n_elements);
-
     if (arrayant.contains("coupling_re"))
         ant.coupling_re = qd_python_numpy2arma_Mat<double>(arrayant["coupling_re"], view, strict);
-    else if (!arrayant.contains("coupling_im"))
-        ant.coupling_re.eye(n_elements, n_elements);
-
     if (arrayant.contains("coupling_im"))
         ant.coupling_im = qd_python_numpy2arma_Mat<double>(arrayant["coupling_im"], view, strict);
-    else
-        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
+    qd_python_fill_arrayant_defaults(ant);
 
     if (arrayant.contains("center_freq")) // Scalar or array with exactly one element
     {
@@ -164,7 +169,7 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
 
     if (validate)
     {
-        auto error_msg = ant.validate();
+        auto error_msg = ant.is_valid();
         if (!error_msg.empty())
             throw std::invalid_argument(error_msg.c_str());
     }
@@ -297,6 +302,7 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
             ant[f].coupling_re = std::move(coupling_re_vec[f]);
         if (has_coupling_im)
             ant[f].coupling_im = std::move(coupling_im_vec[f]);
+        qd_python_fill_arrayant_defaults(ant[f]);
     }
 
     if (validate)

@@ -163,7 +163,7 @@ py::dict arrayant_generate(const std::string &type,
             else // pol == 3 || pol == 6
             {
                 custom_array = quadriga_lib::generate_arrayant_omni<double>(res);
-                custom_array.copy_element(0, 1);
+                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
                 custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
                 custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
             }
@@ -186,12 +186,12 @@ py::dict arrayant_generate(const std::string &type,
             auto custom_array = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, rear_gain_lin, res);
             if (pol == 2 || pol == 5)
             {
-                custom_array.copy_element(0, 1);
+                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
                 custom_array.rotate_pattern(90.0, 0.0, 0.0, 2, 1);
             }
             else if (pol == 3 || pol == 6)
             {
-                custom_array.copy_element(0, 1);
+                quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
                 custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
                 custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
             }

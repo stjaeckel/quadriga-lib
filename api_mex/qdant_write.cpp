@@ -9,7 +9,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_QDANT_WRITE
+# QDANT_WRITE
 Writes array antenna data to QDANT files
 
 - The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
@@ -31,10 +31,10 @@ Writes array antenna data to QDANT files
 ## Usage:
 ```
 % Arrayant as struct
-id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout );
+id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
 
 % Arrayant as separate inputs
-id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
+id_in_file = quadriga_lib.qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
     e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
 ```
 
@@ -65,7 +65,7 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 - **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
 
 ## See also:
-- [[arrayant_qdant_read]] (for reading QDANT data)
+- [[qdant_read]] (for reading QDANT data)
 - [[arrayant_generate]] (for the arrayant struct layout)
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
@@ -140,7 +140,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (is_multi)
         CALL_QD(qdant_write_multi(fn, ant_multi));
     else
-        CALL_QD(id = ant.qdant_write(fn, id, layout));
+        CALL_QD(id = quadriga_lib::qdant_write(fn, ant, id, &layout));
 
     if (nlhs == 1)
         plhs[0] = qd_mex_copy2matlab(&id);

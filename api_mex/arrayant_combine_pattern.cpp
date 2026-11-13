@@ -148,9 +148,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (freq.n_elem == 1)
         ant.center_frequency = freq[0];
 
-    // Call member function
+    // Call library function
     auto arrayant_out = quadriga_lib::arrayant<double>();
-    CALL_QD(arrayant_out = ant.combine_pattern(&az, &el, propagation_speed));
+    CALL_QD(arrayant_out = quadriga_lib::arrayant_combine_pattern(ant, &az, &el, propagation_speed));
 
     // Return to MATLAB
     if (nlhs == 1)

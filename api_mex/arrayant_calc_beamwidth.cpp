@@ -103,7 +103,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant.e_phi_im = qd_mex_get_Cube<double>(prhs[3]);
         ant.azimuth_grid = qd_mex_get_Col<double>(prhs[4]);
         ant.elevation_grid = qd_mex_get_Col<double>(prhs[5]);
-        ant.validate();
+        ant.is_valid(); // Marks a valid arrayant for the per-element calls, which report an invalid one
     }
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");

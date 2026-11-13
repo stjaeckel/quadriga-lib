@@ -129,7 +129,7 @@ TEST_CASE("IEEE Chan - A + 2user + Steering")
 {
     // Generate a probe antenna with 10° steps
     auto ant = quadriga_lib::generate_arrayant_custom(6.0, 10.0);
-    ant.copy_element(0, arma::regspace<arma::uvec>(1, 35));
+    quadriga_lib::arrayant_copy_element(ant, 0, arma::regspace<arma::uvec>(1, 35));
     for (int i = 1; i < 36; ++i)
         ant.rotate_pattern(0.0, 0.0, double(i) * 10.0, 0, i);
 

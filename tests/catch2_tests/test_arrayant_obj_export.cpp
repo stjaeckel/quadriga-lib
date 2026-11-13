@@ -22,30 +22,30 @@ TEST_CASE("Arrayant OBJ Export")
     CHECK(ant.name == "3gpp");
     ant.name = "g_pp";
 
-    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obx"), std::invalid_argument);
-    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obj", 0.0), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file("testantenna.obx", ant), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 0.0), std::invalid_argument);
 
     // Non-finite range or radius would give NaN or Inf vertex coordinates
     const float inf = std::numeric_limits<float>::infinity(), nan = std::numeric_limits<float>::quiet_NaN();
-    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obj", inf), std::invalid_argument);
-    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obj", nan), std::invalid_argument);
-    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obj", 30.0, "jet", nan), std::invalid_argument);
-    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obj", 30.0, "jet", inf), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, inf), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, nan), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 30.0, "jet", nan), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 30.0, "jet", inf), std::invalid_argument);
 
     // Non-finite field values
     for (float v : {nan, inf})
     {
         auto b = ant.copy();
         b.e_phi_re(b.n_elevation() / 2, b.n_azimuth() / 2, 0) = v; // A grid point the export samples
-        REQUIRE_THROWS_AS(b.export_obj_file("testantenna.obj"), std::invalid_argument);
+        REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", b), std::invalid_argument);
     }
 
-    ant.export_obj_file("testantenna.obj", 30.0, "jet", 0.4, 4);
+    quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 30.0, "jet", 0.4, 4);
 
     // An all-zero pattern has no shape to draw
     auto z = quadriga_lib::generate_arrayant_omni<float>(10.0f);
     z.e_theta_re.zeros();
-    REQUIRE_THROWS_AS(z.export_obj_file("testantenna.obj"), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file("testantenna.obj", z), std::invalid_argument);
 
     std::remove("testantenna.obj");
     std::remove("testantenna.mtl");
@@ -73,11 +73,11 @@ TEST_CASE("Arrayant OBJ Export - tiny range and tiny pattern give finite vertice
     };
 
     auto ant = quadriga_lib::generate_arrayant_dipole<double>(10.0);
-    ant.export_obj_file("testantenna_tiny.obj", std::numeric_limits<double>::denorm_min(), "jet", 1.0, 2);
+    quadriga_lib::arrayant_export_obj_file("testantenna_tiny.obj", ant, std::numeric_limits<double>::denorm_min(), "jet", 1.0, 2);
     CHECK(vertices_finite("testantenna_tiny.obj"));
 
     ant.e_theta_re *= 1.0e-160, ant.e_theta_im *= 1.0e-160, ant.e_phi_re *= 1.0e-160, ant.e_phi_im *= 1.0e-160;
-    ant.export_obj_file("testantenna_tiny.obj", 30.0, "jet", 1.0, 2);
+    quadriga_lib::arrayant_export_obj_file("testantenna_tiny.obj", ant, 30.0, "jet", 1.0, 2);
     CHECK(vertices_finite("testantenna_tiny.obj"));
     std::remove("testantenna_tiny.obj"), std::remove("testantenna_tiny.mtl");
 }
@@ -86,9 +86,9 @@ TEST_CASE("Arrayant OBJ Export - every vertex is written once per element")
 {
     // Vertex 0 of an element used to be written again for every face that uses it
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    ant.copy_element(0, 1); // two elements
+    quadriga_lib::arrayant_copy_element(ant, 0, {1}); // two elements
     ant.element_pos(0, 1) = 2.0;
-    ant.export_obj_file("testantenna_unique.obj", 30.0, "jet", 0.4, 3);
+    quadriga_lib::arrayant_export_obj_file("testantenna_unique.obj", ant, 30.0, "jet", 0.4, 3);
 
     std::ifstream f("testantenna_unique.obj");
     REQUIRE(f.is_open());

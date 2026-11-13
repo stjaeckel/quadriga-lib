@@ -144,9 +144,24 @@ void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant, 
                                       arma::Mat<dtype> *gamma,                  // Optional output: polarization rotation angle in rad; [n_out, n_ang] or nullptr
                                       int kernel);                              // Kernel: 1 = GENERIC, 2 = AVX2
 
+// Inverse of the largest absolute field value of n samples; scaling by it keeps the power of double patterns with
+// amplitudes above about 1e154 inside the double range (only called when the unscaled power overflowed)
+template <typename dtype>
+static inline double qd_inverse_max_field(const dtype *a, const dtype *b, const dtype *c, const dtype *d, size_t n)
+{
+    double m = 0.0;
+    for (size_t i = 0; i < n; ++i)
+    {
+        double x = std::max(std::max(std::abs((double)a[i]), std::abs((double)b[i])), std::max(std::abs((double)c[i]), std::abs((double)d[i])));
+        m = x > m ? x : m;
+    }
+    return 1.0 / m;
+}
+
 // Validity cache of an arrayant (member check_ptr): the data pointers of the members at the last passed check.
 // The cache matches when all pointers are unchanged and the member sizes still fit together (Armadillo can keep a
-// data pointer when a member is resized). A matching cache does not prove that the values are unchanged.
+// data pointer when a member is resized); empty element_pos (zeros) and coupling (identity) fit.
+// A matching cache does not prove that the values are unchanged.
 template <typename dtype>
 inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
 {
@@ -159,9 +174,9 @@ inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
            arma::size(ant.e_phi_im) == arma::size(ant.e_theta_re) &&
            ant.azimuth_grid.n_elem == ant.e_theta_re.n_cols &&
            ant.elevation_grid.n_elem == ant.e_theta_re.n_rows &&
-           ant.element_pos.n_rows == 3 && ant.element_pos.n_cols == ant.e_theta_re.n_slices &&
-           ant.coupling_re.n_rows == ant.e_theta_re.n_slices &&
-           arma::size(ant.coupling_im) == arma::size(ant.coupling_re) &&
+           (ant.element_pos.is_empty() || (ant.element_pos.n_rows == 3 && ant.element_pos.n_cols == ant.e_theta_re.n_slices)) &&
+           (ant.coupling_re.is_empty() ? ant.coupling_im.is_empty() : ant.coupling_re.n_rows == ant.e_theta_re.n_slices) &&
+           (ant.coupling_im.is_empty() || arma::size(ant.coupling_im) == arma::size(ant.coupling_re)) &&
            p[0] != nullptr && p[1] != nullptr && p[2] != nullptr && p[3] != nullptr && p[4] != nullptr && p[5] != nullptr &&
            p[0] == ant.e_theta_re.memptr() && p[1] == ant.e_theta_im.memptr() &&
            p[2] == ant.e_phi_re.memptr() && p[3] == ant.e_phi_im.memptr() &&

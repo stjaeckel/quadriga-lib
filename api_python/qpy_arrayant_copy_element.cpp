@@ -67,7 +67,7 @@ py::dict arrayant_copy_element(const py::dict &arrayant,
         quadriga_lib::arrayant_copy_element_multi(ant, source.at(0), dest);
     else
         for (arma::uword i = 0; i < source.n_elem; ++i)
-            quadriga_lib::arrayant_copy_element_multi(ant, source.at(i), dest.at(i));
+            quadriga_lib::arrayant_copy_element_multi(ant, source.at(i), arma::uvec{dest.at(i)});
 
     return qd_python_arrayant2dict_multi(ant);
 }

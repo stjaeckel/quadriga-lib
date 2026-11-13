@@ -81,15 +81,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             CALL_QD(quadriga_lib::arrayant_copy_element_multi(ant_multi, source.at(0), dest));
         else
             for (arma::uword i = 0; i < source.n_elem; ++i)
-                CALL_QD(quadriga_lib::arrayant_copy_element_multi(ant_multi, source.at(i), dest.at(i)));
+                CALL_QD(quadriga_lib::arrayant_copy_element_multi(ant_multi, source.at(i), arma::uvec{dest.at(i)}));
     }
     else
     {
         if (source.n_elem == 1)
-            CALL_QD(ant.copy_element(source.at(0), dest));
+            CALL_QD(quadriga_lib::arrayant_copy_element(ant, source.at(0), dest));
         else
             for (arma::uword i = 0; i < source.n_elem; ++i)
-                CALL_QD(ant.copy_element(source.at(i), dest.at(i)));
+                CALL_QD(quadriga_lib::arrayant_copy_element(ant, source.at(i), arma::uvec{dest.at(i)}));
     }
 
     // Output as struct (or struct array for multi-frequency)

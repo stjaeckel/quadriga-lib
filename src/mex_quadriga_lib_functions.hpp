@@ -83,7 +83,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
 
     if (qd_mex_has_field(input, "coupling_re") && !mxIsEmpty(qd_mex_get_field(input, "coupling_re")))
         ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re"), copy, "coupling_re");
-    else if (!qd_mex_has_field(input, "coupling_im"))
+    else if (!(qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im"))))
         ant.coupling_re.eye(n_elements, n_elements);
 
     if (qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im")))
@@ -99,7 +99,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
 
     if (validate)
     {
-        auto error_msg = ant.validate();
+        auto error_msg = ant.is_valid();
         if (!error_msg.empty())
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
     }

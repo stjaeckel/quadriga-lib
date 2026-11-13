@@ -268,7 +268,7 @@ TEST_CASE("Multifreq - Matches get_channels_spherical for single freq, single en
 
     // Create the antenna
     auto ant_single = quadriga_lib::generate_arrayant_omni<double>();
-    ant_single.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(ant_single, 0, {1});
     ant_single.element_pos(1, 0) = 1.0;
     ant_single.element_pos(1, 1) = -1.0;
     ant_single.e_theta_re.slice(1) *= 2;
@@ -732,7 +732,7 @@ TEST_CASE("Multifreq - Full polarimetric Jones with cross-pol coupling")
 TEST_CASE("Multifreq - TX orientation rotates pattern")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    ant.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 15.0;
     ant.element_pos(1, 1) = -15.0;
     ant.e_theta_re.slice(1) *= 2;
@@ -845,13 +845,13 @@ TEST_CASE("Multifreq - LOS and NLOS paths have different delays")
 TEST_CASE("Multifreq - 2x2 MIMO output dimensions and element scaling")
 {
     auto tx_ant = quadriga_lib::generate_arrayant_omni<double>();
-    tx_ant.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx_ant, 0, {1});
     tx_ant.element_pos(1, 0) = 0.5;
     tx_ant.element_pos(1, 1) = -0.5;
     tx_ant.e_theta_re.slice(1) *= 2.0;
 
     auto rx_ant = quadriga_lib::generate_arrayant_omni<double>();
-    rx_ant.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(rx_ant, 0, {1});
 
     auto tx = wrap_single(tx_ant);
     auto rx = wrap_single(rx_ant);
@@ -1144,7 +1144,7 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
     for (int i = 0; i < 2; ++i)
     {
         auto ant = quadriga_lib::generate_arrayant_omni<double>();
-        ant.copy_element(0, 1);
+        quadriga_lib::arrayant_copy_element(ant, 0, {1});
         ant.center_frequency = (i == 0) ? 1e9 : 2e9;
 
         // Coupling: mix elements differently at each frequency
@@ -1372,7 +1372,7 @@ TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
     // those of a real LOS path with the same geometry; without add_fake_los_path, the outputs are empty
     const double C = 299792458.0;
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     tx.center_frequency = 3e9;
     auto rx = tx;
@@ -1430,7 +1430,7 @@ TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
 {
     // Empty outputs of size [n_rx_ports, n_tx_ports, 0] for every output frequency
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.center_frequency = 3e9;
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port

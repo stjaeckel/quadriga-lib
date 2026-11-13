@@ -254,7 +254,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 - A 1x1 struct is a single-frequency arrayant; a 1xN struct array is a frequency-dependent (multi-frequency) model and maps to `std::vector<quadriga_lib::arrayant<double>>`.
 - Reading: `qd_mex_struct2arrayant(prhs[i], validate, copy)` or `qd_mex_struct2arrayant_multi(...)`.
   - `validate = true` runs the arrayant validation and throws on inconsistent data. Use `false` when the C++ function validates its inputs anyway.
-  - `copy = false` borrows the MATLAB memory (read-only). Use `copy = true` whenever the arrayant object is modified after reading (e.g. in-place member functions such as `rotate_pattern`, `copy_element`).
+  - `copy = false` borrows the MATLAB memory (read-only). Use `copy = true` whenever the arrayant object is modified after reading (e.g. by functions that work in place such as `arrayant_copy_element`, `arrayant_remove_zeros` or the member `rotate_pattern`).
 - Writing: `plhs[0] = qd_mex_arrayant2struct(ant);` or `qd_mex_arrayant2struct_multi(ant_vec);`
 - C++ functions that take `const arrayant<dtype> *` get the address of the local object, e.g. `&ant_tx`.
 - In the documentation, describe arrayant arguments as: "Struct containing the arrayant data; field layout as documented in [[arrayant_generate]]" and add "; a struct array may contain a frequency-dependent model" where multi-frequency input is supported. Do not repeat the field table.

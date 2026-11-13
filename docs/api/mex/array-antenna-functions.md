@@ -12,10 +12,10 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-array-
 | [arrayant_export_obj_file](#arrayant_export_obj_file) | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
 | [arrayant_generate](#arrayant_generate) | Generates predefined array antenna models |
 | [arrayant_interpolate](#arrayant_interpolate) | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
-| [arrayant_qdant_read](#arrayant_qdant_read) | Reads array antenna data from QDANT files |
-| [arrayant_qdant_write](#arrayant_qdant_write) | Writes array antenna data to QDANT files |
 | [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Rotate antenna radiation patterns around the principal axes using Euler rotations |
 | [generate_speaker](#generate_speaker) | Generate a parametric frequency-dependent loudspeaker directivity model |
+| [qdant_read](#qdant_read) | Reads array antenna data from QDANT files |
+| [qdant_write](#qdant_write) | Writes array antenna data to QDANT files |
 
 ---
 <a id="arrayant_calc_beamwidth"></a>
@@ -128,7 +128,7 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ## arrayant_combine_pattern
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
-Also in: [C++](../cpp/array-antenna-class.md#.combine_pattern) · [Python](../python/array-antenna-functions.md#combine_pattern)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_combine_pattern) · [Python](../python/array-antenna-functions.md#combine_pattern)
 
 - Integrates the element field patterns, element positions, and coupling weights into one effective
   pattern per port (column of the coupling matrix)
@@ -187,7 +187,7 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 ## arrayant_concat
 Concatenate two arrayant structs into a single one
 
-Also in: [C++](../cpp/array-antenna-functions.md#arrayant_concat_multi) · [Python](../python/array-antenna-functions.md#concat)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_concat) · [Python](../python/array-antenna-functions.md#concat)
 
 - Concatenates all elements from `arrayant_in2` onto `arrayant_in1` along the element dimension; 
   `element_pos` matrices are joined horizontally
@@ -220,7 +220,7 @@ arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
 ## arrayant_copy_element
 Create copies of array antenna elements
 
-Also in: [C++](../cpp/array-antenna-class.md#.copy_element) · [Python](../python/array-antenna-functions.md#copy_element)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_copy_element) · [Python](../python/array-antenna-functions.md#copy_element)
 
 - Copies a source element to one or more destination slots within an arrayant
 - Array is resized if any destination index exceeds the current number of elements
@@ -251,7 +251,7 @@ arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, source_element, 
 ## arrayant_export_obj_file
 Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
-Also in: [C++](../cpp/array-antenna-class.md#.export_obj_file) · [Python](../python/array-antenna-functions.md#export_obj_file)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_export_obj_file) · [Python](../python/array-antenna-functions.md#export_obj_file)
 
 - Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives a finer mesh
 - Supports multi-frequency arrayant models: pass a struct array and select the entry to export
@@ -468,121 +468,8 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [Pytho
 
 ### See also:
 - [arrayant_generate](#arrayant_generate) (arrayant struct layout)
-- [arrayant_qdant_read](#arrayant_qdant_read) (load arrayant data)
+- [qdant_read](#qdant_read) (load arrayant data)
 - [generate_speaker](#generate_speaker) (typical source of multi-frequency struct arrays)
-
----
-<a id="arrayant_qdant_read"></a>
-## arrayant_qdant_read
-Reads array antenna data from QDANT files
-
-Also in: [C++](../cpp/array-antenna-functions.md#qdant_read) · [Python](../python/array-antenna-functions.md#qdant_read)
-
-- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
-- Without `id`, all entries are read: returns a struct array when the file has multiple entries (frequency-dependent model) 
-  or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
-  same azimuth and elevation grids, element positions and coupling size), otherwise
-  an error asks to pass `id`
-- Differs from Python, where `qdant_read(fn)` reads ID 1 only
-- With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
-- Separate-fields output (3 to 12 outputs) is only available when the result is a single entry 
-  (i.e. `id` was provided, or the file contains exactly one entry)
-- An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
-- Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;
-  elements without pattern data read as zeros (at most 2^24 zero values per entry)
-
-### Usage:
-```matlab
-% Multi-frequency read (struct array, all entries)
-[ ant, layout ] = quadriga_lib.arrayant_qdant_read( fn );
-
-% Single-frequency read (struct output)
-[ ant, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
-
-% Single-frequency read (separate fields)
-[ e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
-```
-
-### Inputs:
-- **`fn`** — Path to the QDANT file; string; must not be empty
-- **`id`** — 1-based ID of the antenna entry to read; pass `[]` or omit to read every entry in the file
-
-### Outputs:
-- **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout as documented in [arrayant_generate](#arrayant_generate)
-- **`layout`** — Matrix of element IDs describing how entries are arranged in the file; datatype: uint32
-- **`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`, `element_pos`, 
-  `coupling_re`, `coupling_im`, `center_freq`, `name`** — Separate-field outputs with contents and sizes as 
-  in [arrayant_generate](#arrayant_generate); only available when the result is a single entry
-
-### See also:
-- [arrayant_qdant_write](#arrayant_qdant_write) (for writing QDANT data)
-- [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))
-
----
-<a id="arrayant_qdant_write"></a>
-## arrayant_qdant_write
-Writes array antenna data to QDANT files
-
-Also in: [C++](../cpp/array-antenna-class.md#.qdant_write) · [Python](../python/array-antenna-functions.md#qdant_write)
-
-- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
-- Multiple array antennas can be stored in the same file using distinct `id` values
-- If writing to an existing file without specifying an `id`, the data is appended at the end and
-  the returned `id_in_file` identifies its location in the file
-- An optional `layout` can be provided to organize the data inside the file
-- Without `layout`, the layout in the file is replaced by a row of all IDs in the file in file order;
-  a custom layout written before is lost (pass it again with every write that should keep it)
-- The file has single-precision-equivalent accuracy relative to the element peak: pattern
-  magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak
-  amplitude of its element; samples far below the peak are less accurate relative to their own
-  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and coupling are
-  written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
-  degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
-- Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
-  1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error
-
-### Usage:
-```matlab
-% Arrayant as struct
-id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout );
-
-% Arrayant as separate inputs
-id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
-```
-
-### Inputs:
-- **`fn`** — Output QDANT filename; string; must not be empty
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate); 
-  pass `[]` to provide the data via separate inputs instead; a struct array writes a frequency-dependent 
-  model and requires `id` and `layout` to be omitted
-- **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
-  ignored for multi-frequency model
-- **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
-  default: a row of all IDs in the file (replaces a layout written before)
-
-### Inputs (separate arrayant data, required when `arrayant` is `[]`):
-- **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
-- **`element_pos`** — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
-- **`coupling_re`** — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
-- **`coupling_im`** — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros
-- **`center_freq`** — Center frequency in Hz; default: 299792458
-- **`name`** — Name of the array antenna object; string
-
-### Outputs:
-- **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
-
-### See also:
-- [arrayant_qdant_read](#arrayant_qdant_read) (for reading QDANT data)
-- [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
-- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))
 
 ---
 <a id="arrayant_rotate_pattern"></a>
@@ -700,3 +587,116 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`arrayant`** - Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
   see [arrayant_generate](#arrayant_generate) for struct fields; `[n_freq]`
+
+---
+<a id="qdant_read"></a>
+## qdant_read
+Reads array antenna data from QDANT files
+
+Also in: [C++](../cpp/array-antenna-functions.md#qdant_read) · [Python](../python/array-antenna-functions.md#qdant_read)
+
+- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
+- Without `id`, all entries are read: returns a struct array when the file has multiple entries (frequency-dependent model) 
+  or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
+  same azimuth and elevation grids, element positions and coupling size), otherwise
+  an error asks to pass `id`
+- Differs from Python, where `qdant_read(fn)` reads ID 1 only
+- With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
+- Separate-fields output (3 to 12 outputs) is only available when the result is a single entry 
+  (i.e. `id` was provided, or the file contains exactly one entry)
+- An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
+- Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;
+  elements without pattern data read as zeros (at most 2^24 zero values per entry)
+
+### Usage:
+```matlab
+% Multi-frequency read (struct array, all entries)
+[ ant, layout ] = quadriga_lib.qdant_read( fn );
+
+% Single-frequency read (struct output)
+[ ant, layout ] = quadriga_lib.qdant_read( fn, id );
+
+% Single-frequency read (separate fields)
+[ e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+    coupling_re, coupling_im, center_freq, name, layout ] = quadriga_lib.qdant_read( fn, id );
+```
+
+### Inputs:
+- **`fn`** — Path to the QDANT file; string; must not be empty
+- **`id`** — 1-based ID of the antenna entry to read; pass `[]` or omit to read every entry in the file
+
+### Outputs:
+- **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout as documented in [arrayant_generate](#arrayant_generate)
+- **`layout`** — Matrix of element IDs describing how entries are arranged in the file; datatype: uint32
+- **`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`, `element_pos`, 
+  `coupling_re`, `coupling_im`, `center_freq`, `name`** — Separate-field outputs with contents and sizes as 
+  in [arrayant_generate](#arrayant_generate); only available when the result is a single entry
+
+### See also:
+- [qdant_write](#qdant_write) (for writing QDANT data)
+- [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))
+
+---
+<a id="qdant_write"></a>
+## qdant_write
+Writes array antenna data to QDANT files
+
+Also in: [C++](../cpp/array-antenna-functions.md#qdant_write) · [Python](../python/array-antenna-functions.md#qdant_write)
+
+- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
+- Multiple array antennas can be stored in the same file using distinct `id` values
+- If writing to an existing file without specifying an `id`, the data is appended at the end and
+  the returned `id_in_file` identifies its location in the file
+- An optional `layout` can be provided to organize the data inside the file
+- Without `layout`, the layout in the file is replaced by a row of all IDs in the file in file order;
+  a custom layout written before is lost (pass it again with every write that should keep it)
+- The file has single-precision-equivalent accuracy relative to the element peak: pattern
+  magnitudes (dB) and phases (degree) are rounded so that every sample is within 6e-8 of the peak
+  amplitude of its element; samples far below the peak are less accurate relative to their own
+  amplitude (about 6e-4 at -80 dB, 6e-2 at -120 dB below the peak); positions and coupling are
+  written as float values (at most 9 significant digits); sampling grids are rounded to 0.001
+  degree; all non-zero pattern samples are written at any level, exact zeros as `-inf` dB
+- Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
+  1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error
+
+### Usage:
+```matlab
+% Arrayant as struct
+id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
+
+% Arrayant as separate inputs
+id_in_file = quadriga_lib.qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
+    e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
+```
+
+### Inputs:
+- **`fn`** — Output QDANT filename; string; must not be empty
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate); 
+  pass `[]` to provide the data via separate inputs instead; a struct array writes a frequency-dependent 
+  model and requires `id` and `layout` to be omitted
+- **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
+  ignored for multi-frequency model
+- **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
+  default: a row of all IDs in the file (replaces a layout written before)
+
+### Inputs (separate arrayant data, required when `arrayant` is `[]`):
+- **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
+- **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
+- **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
+- **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
+- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
+- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
+- **`element_pos`** — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
+- **`coupling_re`** — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
+- **`coupling_im`** — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros
+- **`center_freq`** — Center frequency in Hz; default: 299792458
+- **`name`** — Name of the array antenna object; string
+
+### Outputs:
+- **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
+
+### See also:
+- [qdant_read](#qdant_read) (for reading QDANT data)
+- [arrayant_generate](#arrayant_generate) (for the arrayant struct layout)
+- QuaDRiGa Array Antenna Exchange Format ([QDANT](../../formats/qdant.md))

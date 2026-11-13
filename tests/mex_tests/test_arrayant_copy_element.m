@@ -198,6 +198,16 @@ catch ME
     end
 end
 
+% Empty element_pos / coupling fields give zeros / identity in the output (no growth)
+ant_e = quadriga_lib.arrayant_generate('xpol');
+ant_e.element_pos = [];
+ant_e.coupling_re = [];
+ant_e.coupling_im = [];
+ant_out = quadriga_lib.arrayant_copy_element(ant_e, 1, 2);
+assertElementsAlmostEqual( ant_out.element_pos, zeros(3, 2), 'absolute', 0 );
+assertElementsAlmostEqual( ant_out.coupling_re, eye(2), 'absolute', 0 );
+assertElementsAlmostEqual( ant_out.coupling_im, zeros(2, 2), 'absolute', 0 );
+
 % Source index out of bound (only 2 elements in ant)
 try
     quadriga_lib.arrayant_copy_element( ant, 5, 3 );

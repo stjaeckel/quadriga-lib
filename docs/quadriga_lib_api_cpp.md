@@ -30,23 +30,22 @@ lang: en-US
 | Function | Section | Summary |
 | --- | --- | --- |
 | [arrayant](#arrayant) | Array antenna class | Class for storing and manipulating array antenna models |
-| [.append](#.append) | Array antenna class | Append elements of another arrayant to the current one |
 | [.calc_beamwidth_deg](#.calc_beamwidth_deg) | Array antenna class | Calculate the beamwidth and pointing angles of array antenna elements in degrees |
 | [.calc_directivity_dBi](#.calc_directivity_dBi) | Array antenna class | Calculate the directivity in dBi of a single array element |
-| [.combine_pattern](#.combine_pattern) | Array antenna class | Combine element patterns, positions, and coupling weights into effective radiation patterns |
-| [.copy_element](#.copy_element) | Array antenna class | Copy a single antenna element to one or more destination slots |
-| [.export_obj_file](#.export_obj_file) | Array antenna class | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
 | [.is_valid](#.is_valid) | Array antenna class | Validate the integrity of an arrayant object |
-| [.qdant_write](#.qdant_write) | Array antenna class | Write arrayant data to a QDANT (XML) file |
-| [.remove_zeros](#.remove_zeros) | Array antenna class | Remove zero-valued entries from antenna pattern data, reducing its size |
 | [.rotate_pattern](#.rotate_pattern) | Array antenna class | Rotate antenna radiation patterns around the principal axes using Euler rotations |
 | [.set_size](#.set_size) | Array antenna class | Resize an arrayant object to new dimensions |
+| [arrayant_combine_pattern](#arrayant_combine_pattern) | Array antenna functions | Combine element patterns, positions, and coupling weights into effective radiation patterns |
 | [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency) |
+| [arrayant_concat](#arrayant_concat) | Array antenna functions | Concatenate the elements of two arrayants into a new arrayant |
 | [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | Concatenate two multi-frequency arrayant vectors into a single multi-element model |
+| [arrayant_copy_element](#arrayant_copy_element) | Array antenna functions | Copy a single antenna element to one or more destination slots |
 | [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector |
+| [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
 | [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
 | [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | Interpolate a multi-frequency array antenna at given angles and frequencies |
 | [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | Validate a vector of arrayant objects for multi-frequency consistency |
+| [arrayant_remove_zeros](#arrayant_remove_zeros) | Array antenna functions | Remove zero-valued entries from antenna pattern data, reducing its size |
 | [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | Apply Euler rotations to all entries in a multi-frequency arrayant vector |
 | [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | Set element positions for all entries in a multi-frequency arrayant vector |
 | [generate_arrayant_3GPP](#generate_arrayant_3GPP) | Array antenna functions | Generate a 3GPP-NR compliant antenna array model |
@@ -60,6 +59,7 @@ lang: en-US
 | [generate_speaker](#generate_speaker) | Array antenna functions | Generate a parametric frequency-dependent loudspeaker directivity model |
 | [qdant_read](#qdant_read) | Array antenna functions | Read an arrayant object from a QDANT file |
 | [qdant_read_multi](#qdant_read_multi) | Array antenna functions | Read all arrayant objects from a QDANT file into a vector |
+| [qdant_write](#qdant_write) | Array antenna functions | Write arrayant data to a QDANT (XML) file |
 | [qdant_write_multi](#qdant_write_multi) | Array antenna functions | Write a vector of arrayant objects to a single QDANT file |
 | [channel](#channel) | Channel class | Class for storing and managing MIMO channel data and metadata across multiple snapshots |
 | [.add_paths](#.add_paths) | Channel class | Append new propagation paths to an existing channel snapshot |
@@ -187,7 +187,10 @@ Not in: MATLAB, Python
 - Represents a multi-element antenna array; each element has a position relative to the array phase-center
 - Elements may be inter-coupled via a complex coupling matrix
 - Field pattern cubes `e_theta_re/im`, `e_phi_re/im` must all be `[n_elevation, n_azimuth, n_elements]`
-- `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity)
+- `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity); all
+  functions give the same results for empty members as for zeros / identity, except the IRS array of
+  [get_channels_irs](#get_channels_irs), whose coupling holds the IRS weights and must be given. In a multi-frequency vector all
+  entries use the same form (see [arrayant_is_valid_multi](#arrayant_is_valid_multi))
 - Field values and coupling weights must be finite with magnitudes below about 1e18; larger values overflow in the
   interpolation and in the channel functions and give NaN results
 
@@ -201,8 +204,8 @@ Not in: MATLAB, Python
 | `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], strictly increasing       |
 | `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], strictly increasing |
 | `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords                    |
-| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                                     |
-| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                                |
+| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]` or empty       | Coupling matrix, real part                                     |
+| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]` or empty       | Coupling matrix, imaginary part                                |
 | `dtype center_frequency`          | scalar                                 | Center frequency                                               |
 | `std::string name`                | string                                 | Name of the array antenna object                               |
 
@@ -218,45 +221,16 @@ Not in: MATLAB, Python
 | `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
 ### Complex member functions:
-| Function                  | Description                                                       |
-| ------------------------- | ----------------------------------------------------------------- |
-| [.append](#.append)               | Append elements of another arrayant                               |
-| [.calc_beamwidth_deg](#.calc_beamwidth_deg)   | Calculate the beam width of an antenna element in degree          |
-| [.calc_directivity_dBi](#.calc_directivity_dBi) | Calculate the directivity in dBi of a single array element        |
-| [.combine_pattern](#.combine_pattern)      | Compute effective patterns from elements, positions, and coupling |
-| [.copy_element](#.copy_element)         | Copy a single element to one or more destination slots            |
-| [.export_obj_file](#.export_obj_file)      | Export pattern geometry to Wavefront OBJ                          |
-| [.qdant_write](#.qdant_write)          | Write arrayant to QDANT file                                      |
-| [.remove_zeros](#.remove_zeros)         | Remove zero-valued entries from pattern data                      |
-| [.rotate_pattern](#.rotate_pattern)       | Rotate pattern and/or polarization via Euler angles               |
-| [.set_size](#.set_size)             | Resize the arrayant to new dimensions                             |
-| [.is_valid](#.is_valid)             | Validate arrayant integrity                                       |
+| Function                  | Description                                                |
+| ------------------------- | ---------------------------------------------------------- |
+| [.calc_beamwidth_deg](#.calc_beamwidth_deg)   | Calculate the beam width of an antenna element in degree   |
+| [.calc_directivity_dBi](#.calc_directivity_dBi) | Calculate the directivity in dBi of a single array element |
+| [.rotate_pattern](#.rotate_pattern)       | Rotate pattern and/or polarization via Euler angles        |
+| [.set_size](#.set_size)             | Resize the arrayant to new dimensions                      |
+| [.is_valid](#.is_valid)             | Validate arrayant integrity                                |
 
----
-<a id=".append"></a>
-## .append
-Append elements of another arrayant to the current one
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_concat) · [Python](quadriga_lib_api_python.md#concat)
-
-- Both arrays must share identical sampling grids; throws otherwise
-- Coupling is block-diagonal (see [arrayant_concat_multi](#arrayant_concat_multi) diagram); center_frequency is taken from this
-- An empty `coupling_re` counts as identity (one port per element), an empty `coupling_im` as zeros
-
-### Declaration:
-```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(
-    const arrayant<dtype> *new_arrayant) const;
-```
-
-### Inputs:
-- **`new_arrayant`** — Array whose elements are appended; sampling grid must match
-
-### Returns:
-- New `arrayant` containing all elements from both arrays
-
-### See also:
-- [arrayant_concat_multi](#arrayant_concat_multi) (multi-freq counterpart)
+Computations and file I/O on an arrayant are free functions, see section "Array antenna functions"
+(e.g. [arrayant_concat](#arrayant_concat), [arrayant_combine_pattern](#arrayant_combine_pattern), [arrayant_copy_element](#arrayant_copy_element), [qdant_write](#qdant_write)).
 
 ---
 <a id=".calc_beamwidth_deg"></a>
@@ -322,97 +296,7 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
 - Directivity of the specified element in dBi
 
 ### See also:
-- [.combine_pattern](#.combine_pattern) (the per-port directivity is a typical follow-up)
-
----
-<a id=".combine_pattern"></a>
-## .combine_pattern
-Combine element patterns, positions, and coupling weights into effective radiation patterns
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_combine_pattern) · [Python](quadriga_lib_api_python.md#combine_pattern)
-
-- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output element per port (column) of the coupling matrix
-- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_frequency` and `d` the distance
-  of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use
-  about 343 m/s for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
-- Useful for beamforming and MIMO channel computation speedup
-
-### Declaration:
-```cpp
-quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
-    dtype propagation_speed = 299792458.0) const;
-```
-
-### Inputs:
-- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
-- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
-- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
-
-### Returns:
-- New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
-
-### See also:
-- [arrayant_interpolate](#arrayant_interpolate) (used internally to compute effective radiation patterns)
-- [.rotate_pattern](#.rotate_pattern) (useful for orienting array antenna patterns)
-
----
-<a id=".copy_element"></a>
-## .copy_element
-Copy a single antenna element to one or more destination slots
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_copy_element) · [Python](quadriga_lib_api_python.md#copy_element)
-
-- Array is resized if any destination index exceeds the current number of elements
-- Coupling matrix for added elements is set to identity; if not existing, it gets initialized to identity
-- Throws `std::invalid_argument` for a read-only object, an empty `destination`, or a destination index equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
-
-### Declaration:
-```cpp
-void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uword destination);
-void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec destination);
-```
-
-### Inputs:
-- **`source`** — Index of the element to copy, 0-based
-- **`destination`** — Target index or indices, 0-based; array resizes to fit the maximum index
-
-### See also:
-- [arrayant_copy_element_multi](#arrayant_copy_element_multi) (multi-freq counterpart)
-
----
-<a id=".export_obj_file"></a>
-## .export_obj_file
-Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_export_obj_file) · [Python](quadriga_lib_api_python.md#export_obj_file)
-
-- Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives finer mesh
-
-### Declaration:
-```cpp
-void quadriga_lib::arrayant<dtype>::export_obj_file(
-    std::string fn,
-    dtype directivity_range = 30.0,
-    std::string colormap = "jet",
-    dtype object_radius = 1.0,
-    arma::uword icosphere_n_div = 4,
-    arma::uvec i_element = {}) const;
-```
-
-### Inputs:
-- **`fn`** — Output OBJ filename; must not be empty; filename must end in .obj
-- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
-- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
-- **`object_radius`** *(optional)* — Radius of the exported object
-- **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](#icosphere)
-- **`i_element`** *(optional)* — 0-based element indices to export; `{}` exports all elements
-
-### See also:
-- [colormap](#colormap) (Used for setting the colormap)
-- [icosphere](#icosphere) (Used internally to generate icosphere primitive)
-- [.write_paths_to_obj_file](#.write_paths_to_obj_file) (function of Channel class to export propagation paths to OBJ 3D visualization)
+- [arrayant_combine_pattern](#arrayant_combine_pattern) (the per-port directivity is a typical follow-up)
 
 ---
 <a id=".is_valid"></a>
@@ -438,69 +322,6 @@ std::string quadriga_lib::arrayant<dtype>::is_valid() const;
 
 ### See also:
 - [arrayant_is_valid_multi](#arrayant_is_valid_multi) (multi-freq counterpart)
-
----
-<a id=".qdant_write"></a>
-## .qdant_write
-Write arrayant data to a QDANT (XML) file
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_qdant_write) · [Python](quadriga_lib_api_python.md#qdant_write)
-
-- Multiple antennas can be stored in the same file using distinct `id` values
-- If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
-- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file in file
-  order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
-- The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
-  pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
-  complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near
-  the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the
-  peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at
-  a low level is quantized relative to its own peak. Element positions and coupling (magnitude, phase) are written
-  as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
-  to 0.001 degree
-- All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
-  zero in both field components is written as an all `-inf` `EthetaMag` node.
-
-### Declaration:
-```cpp
-unsigned quadriga_lib::arrayant<dtype>::qdant_write(
-    std::string fn,
-    unsigned id = 0,
-    arma::u32_mat layout = {}) const;
-```
-
-### Inputs:
-- **`fn`** — Output QDANT filename; must not be empty
-- **`id`** *(optional)* — Target ID in file; `0` appends with auto-assigned ID
-- **`layout`** *(optional)* — Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file
-
-### Returns:
-- ID assigned to the written antenna within the file
-
-### See also:
-- [qdant_read](#qdant_read) (read back QDANT files)
-- [qdant_write_multi](#qdant_write_multi) (multi-freq counterpart)
-
----
-<a id=".remove_zeros"></a>
-## .remove_zeros
-Remove zero-valued entries from antenna pattern data, reducing its size
-
-Not in: MATLAB, Python
-
-- Modifies in-place when `output = nullptr`; otherwise writes to `*output`
-- A column or row is removed if the total power summed over all field components and array elements does not exceed
-  1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
-  depend on the scale of the pattern; an all-zero pattern is left unchanged
-- Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
-
-### Declaration:
-```cpp
-void quadriga_lib::arrayant<dtype>::remove_zeros(arrayant<dtype> *output = nullptr);
-```
-
-### Inputs:
-- **`output`** *(optional)* — Target arrayant to write result to; `nullptr` modifies in-place
 
 ---
 <a id=".rotate_pattern"></a>
@@ -574,13 +395,50 @@ void quadriga_lib::arrayant<dtype>::set_size(
 # Array antenna functions
 
 ---
+<a id="arrayant_combine_pattern"></a>
+## arrayant_combine_pattern
+Combine element patterns, positions, and coupling weights into effective radiation patterns
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_combine_pattern) · [Python](quadriga_lib_api_python.md#combine_pattern)
+
+- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output element per port (column) of the coupling matrix
+- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_frequency` and `d` the distance
+  of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use
+  about 343 m/s for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
+- Empty `element_pos` counts as zeros, empty coupling as identity
+- Useful for beamforming and MIMO channel computation speedup
+
+### Declaration:
+```cpp
+quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
+    const arrayant<dtype> &ant,
+    const arma::Col<dtype> *azimuth_grid_new = nullptr,
+    const arma::Col<dtype> *elevation_grid_new = nullptr,
+    dtype propagation_speed = 299792458.0);
+```
+
+### Inputs:
+- **`ant`** — Valid arrayant
+- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
+- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
+- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
+
+### Returns:
+- New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
+
+### See also:
+- [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) (multi-freq counterpart)
+- [arrayant_interpolate](#arrayant_interpolate) (used internally to compute effective radiation patterns)
+- [.rotate_pattern](#.rotate_pattern) (useful for orienting array antenna patterns)
+
+---
 <a id="arrayant_combine_pattern_multi"></a>
 ## arrayant_combine_pattern_multi
 Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency)
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_combine_pattern) · [Python](quadriga_lib_api_python.md#combine_pattern)
 
-- Multi-frequency counterpart to [.combine_pattern](#.combine_pattern)
+- Multi-frequency counterpart to [arrayant_combine_pattern](#arrayant_combine_pattern)
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
 - Output length = `freq_grid_new->n_elem` if provided; otherwise one entry per input arrayant
 - Field interpolation across frequency is delegated to [arrayant_interpolate_multi](#arrayant_interpolate_multi) (SLERP with linear-interpolation fallback)
@@ -611,9 +469,38 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
 - Vector of arrayant objects (length = `n_freq_out`), each with `n_ports` elements equal to the number of columns in the coupling matrix
 
 ### See also:
-- [.combine_pattern](#.combine_pattern) (single-frequency counterpart)
+- [arrayant_combine_pattern](#arrayant_combine_pattern) (single-frequency counterpart)
 - [arrayant_interpolate_multi](#arrayant_interpolate_multi) (used internally for spatial+frequency field interpolation)
 - [arrayant_is_valid_multi](#arrayant_is_valid_multi) (input validation)
+
+---
+<a id="arrayant_concat"></a>
+## arrayant_concat
+Concatenate the elements of two arrayants into a new arrayant
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_concat) · [Python](quadriga_lib_api_python.md#concat)
+
+- Both arrays must share identical sampling grids; throws otherwise
+- Coupling is block-diagonal (see [arrayant_concat_multi](#arrayant_concat_multi) diagram); name and center_frequency are taken from `ant_1`
+- An empty `element_pos` counts as zeros, an empty `coupling_re` as identity (one port per element), an empty
+  `coupling_im` as zeros
+
+### Declaration:
+```cpp
+quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_concat(
+    const arrayant<dtype> &ant_1,
+    const arrayant<dtype> &ant_2);
+```
+
+### Inputs:
+- **`ant_1`** — First arrayant; its elements come first in the output
+- **`ant_2`** — Second arrayant; sampling grids must match `ant_1`
+
+### Returns:
+- New `arrayant` containing all elements of both arrays
+
+### See also:
+- [arrayant_concat_multi](#arrayant_concat_multi) (multi-freq counterpart)
 
 ---
 <a id="arrayant_concat_multi"></a>
@@ -653,13 +540,50 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
 - [qdant_write_multi](#qdant_write_multi) (persist the combined model)
 
 ---
+<a id="arrayant_copy_element"></a>
+## arrayant_copy_element
+Copy a single antenna element to one or more destination slots
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_copy_element) · [Python](quadriga_lib_api_python.md#copy_element)
+
+- Works in place; the array is enlarged if any destination index exceeds the current number of elements
+- Added elements get their own port with identity coupling; positions of added elements that are not copied are zero
+- When the array grows, an empty `element_pos` and an empty coupling are written out first (zeros, identity), so
+  that all elements can be edited afterwards; otherwise empty members stay empty
+- Throws `std::invalid_argument` for a read-only object, an empty `destination`, a source index out of bound, or a
+  destination index equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_copy_element(
+    arrayant<dtype> &ant,
+    arma::uword source,
+    const arma::uvec &destination);
+```
+
+### Inputs:
+- **`ant`** — Valid arrayant; updated in-place
+- **`source`** — Index of the element to copy, 0-based
+- **`destination`** — Target indices, 0-based; a single index is passed as `{i}`
+
+### Example:
+```cpp
+auto ant = quadriga_lib::generate_arrayant_dipole<double>();
+quadriga_lib::arrayant_copy_element(ant, 0, {1, 2, 3}); // 4 identical elements
+ant.element_pos.row(1) = arma::rowvec({-0.75, -0.25, 0.25, 0.75});
+```
+
+### See also:
+- [arrayant_copy_element_multi](#arrayant_copy_element_multi) (multi-freq counterpart)
+
+---
 <a id="arrayant_copy_element_multi"></a>
 ## arrayant_copy_element_multi
 Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_copy_element) · [Python](quadriga_lib_api_python.md#copy_element)
 
-- Calls [.copy_element](#.copy_element) on every entry in the vector with the same source and destination indices.
+- Calls [arrayant_copy_element](#arrayant_copy_element) on every entry in the vector with the same source and destination indices.
 - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry.
 - Source and destination indices are 0-based.
 
@@ -668,18 +592,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_copy_element) · [Python](qua
 void quadriga_lib::arrayant_copy_element_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         arma::uword source,
-        arma::uvec destination);
-
-void quadriga_lib::arrayant_copy_element_multi(
-        std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        arma::uword source,
-        arma::uword destination);
+        const arma::uvec &destination);
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
 - **`source`** — Index of the element to copy from; must be within current element count
-- **`destination`** — Index or indices of target elements; enlarges all entries if any index exceeds current count
+- **`destination`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
 
 ### Example:
 ```cpp
@@ -687,13 +606,49 @@ arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
     0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
-quadriga_lib::arrayant_copy_element_multi(driver, 0, arma::uvec{1, 2, 3});
+quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
 ### See also:
-- [.copy_element](#.copy_element) (per-entry operation called internally)
+- [arrayant_copy_element](#arrayant_copy_element) (per-entry operation called internally)
 - [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) (set element positions after copying)
 - [arrayant_concat_multi](#arrayant_concat_multi) (combine multiple arrayant vectors)
+
+---
+<a id="arrayant_export_obj_file"></a>
+## arrayant_export_obj_file
+Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_export_obj_file) · [Python](quadriga_lib_api_python.md#export_obj_file)
+
+- Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives finer mesh
+- Each element is placed at its position in `element_pos` (empty: at the origin)
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_export_obj_file(
+    const std::string &fn,
+    const arrayant<dtype> &ant,
+    dtype directivity_range = 30.0,
+    const std::string &colormap = "jet",
+    dtype object_radius = 1.0,
+    arma::uword icosphere_n_div = 4,
+    const arma::uvec *i_element = nullptr);
+```
+
+### Inputs:
+- **`fn`** — Output OBJ filename; must end in .obj; the colormap is written to a .mtl file of the same name
+- **`ant`** — Valid arrayant
+- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
+- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
+- **`object_radius`** *(optional)* — Radius of the exported object
+- **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](#icosphere)
+- **`i_element`** *(optional)* — 0-based element indices to export; `nullptr` or empty exports all elements
+
+### See also:
+- [colormap](#colormap) (Used for setting the colormap)
+- [icosphere](#icosphere) (Used internally to generate icosphere primitive)
+- [.write_paths_to_obj_file](#.write_paths_to_obj_file) (function of Channel class to export propagation paths to OBJ 3D visualization)
 
 ---
 <a id="arrayant_interpolate"></a>
@@ -858,6 +813,8 @@ Not in: MATLAB, Python
 - Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
 - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
+- All entries must use the same form for `element_pos`, `coupling_re` and `coupling_im`: all empty or all given; a
+  mix of empty members and explicit zeros / identity is rejected.
 - Stops at first error and returns a message identifying the failing entry and property.
 
 ### Declaration:
@@ -875,6 +832,28 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 ### See also:
 - [.is_valid](#.is_valid) (per-entry validation called internally)
 - [generate_speaker](#generate_speaker) (typical source of multi-frequency arrayant vectors)
+
+---
+<a id="arrayant_remove_zeros"></a>
+## arrayant_remove_zeros
+Remove zero-valued entries from antenna pattern data, reducing its size
+
+Not in: MATLAB, Python
+
+- Works in place on the sampling grid and the pattern cubes; positions, coupling, name and frequency are unchanged
+- A column or row is removed if the total power summed over all field components and array elements does not exceed
+  1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
+  depend on the scale of the pattern; an all-zero pattern is left unchanged
+- Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
+- To keep the original, call it on a `.copy()`
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant);
+```
+
+### Inputs:
+- **`ant`** — Valid arrayant; updated in-place
 
 ---
 <a id="arrayant_rotate_pattern_multi"></a>
@@ -1272,7 +1251,7 @@ auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
 ## qdant_read
 Read an arrayant object from a QDANT file
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_qdant_read) · [Python](quadriga_lib_api_python.md#qdant_read)
+Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_api_python.md#qdant_read)
 
 - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
 - Throws `std::invalid_argument` if the file has no entry with the given ID. The first entry of a file is ID 1 only
@@ -1299,7 +1278,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
 - `quadriga_lib::arrayant<dtype>` constructed from the specified entry in the file
 
 ### See also:
-- [.qdant_write](#.qdant_write) (write a single arrayant)
+- [qdant_write](#qdant_write) (write a single arrayant)
 - [qdant_write_multi](#qdant_write_multi) (write multiple arrayants with sequential IDs)
 
 ---
@@ -1307,7 +1286,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
 ## qdant_read_multi
 Read all arrayant objects from a QDANT file into a vector
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_qdant_read) · [Python](quadriga_lib_api_python.md#qdant_read)
+Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_api_python.md#qdant_read)
 
 - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
 - Each unique ID is read exactly once regardless of how many times it appears in the layout.
@@ -1333,13 +1312,59 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(
 - [generate_speaker](#generate_speaker) (typical source of frequency-dependent arrayant vectors)
 
 ---
+<a id="qdant_write"></a>
+## qdant_write
+Write arrayant data to a QDANT (XML) file
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_write) · [Python](quadriga_lib_api_python.md#qdant_write)
+
+- Multiple antennas can be stored in the same file using distinct `id` values
+- If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
+- Without `layout` (`nullptr` or empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file
+  in file order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
+- The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
+  pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
+  complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near
+  the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the
+  peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at
+  a low level is quantized relative to its own peak. Element positions and coupling (magnitude, phase) are written
+  as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
+  to 0.001 degree
+- An empty `element_pos` or coupling is not written; [qdant_read](#qdant_read) returns zeros and identity for it. Above 4096
+  elements the identity coupling is written, because the reader requires it in the file
+- All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
+  zero in both field components is written as an all `-inf` `EthetaMag` node.
+
+### Declaration:
+```cpp
+unsigned quadriga_lib::qdant_write(
+    const std::string &fn,
+    const arrayant<dtype> &ant,
+    unsigned id = 0,
+    const arma::u32_mat *layout = nullptr);
+```
+
+### Inputs:
+- **`fn`** — Output QDANT filename; must not be empty
+- **`ant`** — Valid arrayant
+- **`id`** *(optional)* — Target ID in file; `0` appends with auto-assigned ID
+- **`layout`** *(optional)* — Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file
+
+### Returns:
+- ID assigned to the written antenna within the file
+
+### See also:
+- [qdant_read](#qdant_read) (read back QDANT files)
+- [qdant_write_multi](#qdant_write_multi) (multi-freq counterpart)
+
+---
 <a id="qdant_write_multi"></a>
 ## qdant_write_multi
 Write a vector of arrayant objects to a single QDANT file
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_qdant_write) · [Python](quadriga_lib_api_python.md#qdant_write)
+Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_write) · [Python](quadriga_lib_api_python.md#qdant_write)
 
-- Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using [.qdant_write](#.qdant_write).
+- Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using [qdant_write](#qdant_write).
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
 - All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
   Invalid input throws and leaves an existing file unchanged.
@@ -1357,7 +1382,7 @@ void quadriga_lib::qdant_write_multi(
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects to store
 
 ### See also:
-- [.qdant_write](#.qdant_write) (per-object write used internally)
+- [qdant_write](#qdant_write) (per-object write used internally)
 - [qdant_read](#qdant_read) (read back individual entries by ID)
 - [generate_speaker](#generate_speaker) (typical source of frequency-dependent arrayant vectors)
 
@@ -2722,6 +2747,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_irs) · Not in: Python
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
+- The IRS coupling matrix holds the IRS weights and must be given: an empty coupling of `irs_array` throws, unlike
+  in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),

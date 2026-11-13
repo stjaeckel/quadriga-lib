@@ -60,7 +60,7 @@ py::dict arrayant_concat(const py::dict &arrayant1,
     }
 
     // Single-frequency: append the elements of in2 onto in1
-    auto out = ant1[0].append(&ant2[0]);
+    auto out = quadriga_lib::arrayant_concat(ant1[0], ant2[0]);
     return qd_python_arrayant2dict(out);
 }
 

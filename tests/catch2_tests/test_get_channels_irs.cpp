@@ -82,8 +82,8 @@ TEST_CASE("Get Channels IRS - Minimal test")
 
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
 
-    ant.copy_element(0, 1);
-    ant.copy_element(0, 2);
+    quadriga_lib::arrayant_copy_element(ant, 0, {1});
+    quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.element_pos(1, 0) = lambda * 0.5;
     ant.element_pos(1, 2) = -lambda * 0.5;
     ant.coupling_im.reset();
@@ -695,7 +695,7 @@ TEST_CASE("Get Channels IRS - A segment without paths gives empty outputs")
 {
     // get_channels_spherical returns empty segment outputs, so the IRS channel is [n_rx_ports, n_tx_ports, 0]
     auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    ant.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(ant, 0, {1});
     auto irs = ant;
     irs.coupling_re = arma::mat({{1.0, 0.0}, {0.0, 1.0}});
     irs.coupling_im = arma::mat(2, 2, arma::fill::zeros);

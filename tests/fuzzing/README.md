@@ -115,7 +115,7 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 | `fz_hdf5` | HDF5 channel file | `hdf5_read_layout`, `hdf5_read_channel`, `hdf5_read_dset_names`, `hdf5_read_dset` for the first slots |
 | `fz_arrayant_generate` | Parameters | The `generate_arrayant_*` functions and `generate_speaker` |
 | `fz_arrayant_interpolate` | Array antenna, angles | `arrayant_interpolate`, `arrayant_interpolate_multi` |
-| `fz_arrayant_edit` | Array antenna | The `arrayant` member functions in a fuzzed order, the `arrayant_*_multi` functions, `qdant_write` and `qdant_read` |
+| `fz_arrayant_edit` | Array antenna | The `arrayant` functions and members in a fuzzed order, the `arrayant_*_multi` functions, `qdant_write` and `qdant_read` |
 | `fz_get_channels` | Array antennas, paths | `get_channels_spherical`, `get_channels_planar`, `get_channels_irs`, `get_channels_multifreq` |
 | `fz_channel_tools` | Coefficients, delays | `quantize_delays`, the `baseband_freq_response` functions |
 | `fz_hdf5_write` | Channel object | `channel` member functions, the HDF5 writers, then the HDF5 readers on the written file |
@@ -150,7 +150,7 @@ void fuzz_one(const uint8_t *data, size_t size)
 }
 ```
 
-Seeds can also be written by the library's own writers through `s.path(<name>)`, for example `arrayant::qdant_write`. A target for API functions takes its arguments from the input with `fz::input`, which extends libFuzzer's `FuzzedDataProvider` by `size(max)`, `index(n)` (a valid index, one or two past the end, or the largest value), `value<T>()` (mostly moderate numbers, sometimes zero, NaN, infinity or extreme values), `col`, `mat` and `cube`; `fz::arrayant<T>(in)` builds an array antenna from it. The API targets run each input in `float` or `double`:
+Seeds can also be written by the library's own writers through `s.path(<name>)`, for example `qdant_write`. A target for API functions takes its arguments from the input with `fz::input`, which extends libFuzzer's `FuzzedDataProvider` by `size(max)`, `index(n)` (a valid index, one or two past the end, or the largest value), `value<T>()` (mostly moderate numbers, sometimes zero, NaN, infinity or extreme values), `col`, `mat` and `cube`; `fz::arrayant<T>(in)` builds an array antenna from it. The API targets run each input in `float` or `double`:
 
 ```cpp
 #include "fuzz_target.hpp"

@@ -1231,7 +1231,7 @@ TEST_CASE("Speaker - copy_element_multi: single destination")
     REQUIRE(spk[0].n_elements() == 1);
 
     // Copy element 0 to element 1 (enlarges)
-    quadriga_lib::arrayant_copy_element_multi(spk, 0, (arma::uword)1);
+    quadriga_lib::arrayant_copy_element_multi(spk, 0, {1});
 
     for (size_t i = 0; i < spk.size(); ++i)
     {
@@ -1300,7 +1300,7 @@ TEST_CASE("Speaker - copy_element_multi: consistent across frequencies")
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
-    quadriga_lib::arrayant_copy_element_multi(spk, 0, (arma::uword)1);
+    quadriga_lib::arrayant_copy_element_multi(spk, 0, {1});
 
     // All frequencies should have 2 elements
     for (size_t i = 0; i < spk.size(); ++i)
@@ -1330,7 +1330,7 @@ TEST_CASE("Speaker - copy_element_multi: overwrite existing element")
     CHECK(!arma::approx_equal(spk[0].e_theta_re.slice(0), spk[0].e_theta_re.slice(1), "absdiff", 1e-3));
 
     // Overwrite element 1 with element 0
-    quadriga_lib::arrayant_copy_element_multi(spk, 0, (arma::uword)1);
+    quadriga_lib::arrayant_copy_element_multi(spk, 0, {1});
 
     // Now they should be identical
     CHECK(arma::approx_equal(spk[0].e_theta_re.slice(0), spk[0].e_theta_re.slice(1), "absdiff", 1e-12));
@@ -1360,7 +1360,7 @@ TEST_CASE("Speaker - copy_element_multi: valid after operation")
 TEST_CASE("Speaker - copy_element_multi: empty vector throws")
 {
     std::vector<quadriga_lib::arrayant<double>> empty_vec;
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_copy_element_multi(empty_vec, 0, (arma::uword)1), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_copy_element_multi(empty_vec, 0, {1}), std::invalid_argument);
 }
 
 TEST_CASE("Speaker - copy_element_multi: empty destination throws")
@@ -1378,7 +1378,7 @@ TEST_CASE("Speaker - copy_element_multi: source out of range throws")
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
     // Only 1 element, source index 5 is out of range
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_copy_element_multi(spk, 5, (arma::uword)1), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_copy_element_multi(spk, 5, {1}), std::invalid_argument);
 }
 
 TEST_CASE("Speaker - copy_element_multi: float template")
@@ -1387,7 +1387,7 @@ TEST_CASE("Speaker - copy_element_multi: float template")
     auto spk = quadriga_lib::generate_speaker<float>("omni", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
                                                      "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
 
-    quadriga_lib::arrayant_copy_element_multi(spk, 0, (arma::uword)1);
+    quadriga_lib::arrayant_copy_element_multi(spk, 0, {1});
 
     CHECK(spk[0].n_elements() == 2);
     CHECK(arma::approx_equal(spk[0].e_theta_re.slice(0), spk[0].e_theta_re.slice(1), "absdiff", 1e-6f));

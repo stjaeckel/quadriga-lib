@@ -19,9 +19,9 @@ Coordinate convention (for interpreting pattern data):
 See related read / write functions in the API documentation for details on how to use this format:
 
 - C++ QDANT read function ([qdant_read](../api/cpp/array-antenna-functions.md#qdant_read))
-- C++ QDANT write function ([arrayant.qdant_write](../api/cpp/array-antenna-class.md#.qdant_write))
-- MATLAB / Octave QDANT read function ([arrayant_qdant_read](../api/mex/array-antenna-functions.md#arrayant_qdant_read))
-- MATLAB / Octave QDANT write function ([arrayant_qdant_write](../api/mex/array-antenna-functions.md#arrayant_qdant_write))
+- C++ QDANT write function ([qdant_write](../api/cpp/array-antenna-functions.md#qdant_write))
+- MATLAB / Octave QDANT read function ([qdant_read](../api/mex/array-antenna-functions.md#qdant_read))
+- MATLAB / Octave QDANT write function ([qdant_write](../api/mex/array-antenna-functions.md#qdant_write))
 - Python QDANT read function ([qdant_read](../api/python/array-antenna-functions.md#qdant_read))
 - Python QDANT write function ([qdant_write](../api/python/array-antenna-functions.md#qdant_write))
 

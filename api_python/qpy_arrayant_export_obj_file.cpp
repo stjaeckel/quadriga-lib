@@ -52,7 +52,7 @@ void arrayant_export_obj_file(const std::string &fn,
     if (freq_ind >= ant.size())
         throw std::invalid_argument("'freq_ind' is out of bound.");
 
-    ant[freq_ind].export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, element_a);
+    quadriga_lib::arrayant_export_obj_file(fn, ant[freq_ind], directivity_range, colormap, object_radius, icosphere_n_div, &element_a);
 }
 
 // pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
