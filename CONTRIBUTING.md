@@ -30,6 +30,8 @@ Fixes #N | Part of #N
 
 **Scope.** One logical change per commit. A part that could be reverted on its own goes in its own commit.
 
+**No attribution.** The message ends with the issue line (or the body when there is no issue). No `Co-Authored-By` or other attribution trailers; the repository's Claude Code settings switch them off.
+
 ## For the maintainer and coding sessions
 
 This part describes how issues are filed, fixed and closed. It is written so that a coding session can follow it on its own. Everything in an issue is public: no private details, no local paths, no local branch names, no references to temporary `md/` documents. Refer to release tags (e.g. `v0.12.4`) or commits on `main`.
@@ -80,7 +82,7 @@ Findings from a full bug scan ([md/BUG_SCAN.md](md/BUG_SCAN.md)) go through the 
 2. Work through the usual steps: plan, research (optional), specification (optional, for larger issues), review, code with tests, review. Plans, specifications and reports are working files; they stay outside the repository and are not committed.
 3. Code and test comments do not mention the issue number. A regression test describes the case in its own words; the commit links it to the issue.
 4. If the work changes what the issue says (different cause, smaller scope), add a short comment to the issue so its record stays right.
-5. The commit message follows the usual rules (title `<area>: <what changed>`, body in plain terms with measured numbers). Its last line before the `Co-Authored-By` trailer names the issue:
+5. The commit message follows the usual rules (title `<area>: <what changed>`, body in plain terms with measured numbers). Its last line names the issue:
    - `Fixes #<N>` when the commit fixes it completely. GitHub closes the issue when the commit reaches `main` and links the two.
    - `Part of #<N>` when it is one step of several. This links the commit without closing the issue.
    - One line per issue when a commit fixes several.

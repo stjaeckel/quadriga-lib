@@ -196,8 +196,8 @@ library's rules); a recommendation; a paste-ready message.
 - Working documents are deleted before a merge (phase 4 of step 3).
 
 **Commit messages:** title "<area>: <what changed>", body in plain physical terms with the measured numbers and the
-suite counts, no internal labels (no rule labels, no `md/` documents, briefs, reports, phases), trailer
-`Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+suite counts, no internal labels (no rule labels, no `md/` documents, briefs, reports, phases), no attribution
+trailer.
 
 ## 4. The review checklist
 
