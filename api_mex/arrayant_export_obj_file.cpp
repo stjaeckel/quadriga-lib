@@ -81,7 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         ant = qd_mex_struct2arrayant(prhs[1], true);
 
-    CALL_QD(ant.export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, element_ind));
+    CALL_QD(quadriga_lib::arrayant_export_obj_file(fn, ant, directivity_range, colormap, object_radius, icosphere_n_div, &element_ind));
 
     double out = 1.0;
     if (nlhs == 1)

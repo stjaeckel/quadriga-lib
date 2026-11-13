@@ -35,7 +35,7 @@ id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant )
 id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant, id )
 
 # Frequency-dependent write (4D patterns) — all entries written sequentially
-arrayant.quadriga_lib.qdant_write( fn, arrayant )
+quadriga_lib.arrayant.qdant_write( fn, arrayant )
 ```
 
 ## Inputs:
@@ -58,7 +58,7 @@ arrayant.quadriga_lib.qdant_write( fn, arrayant )
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
-py::ssize_t arrayant_qdant_write(const std::string &fn,
+py::ssize_t qdant_write(const std::string &fn,
                                  const py::dict &arrayant,
                                  unsigned id,
                                  py::handle layout)
@@ -83,11 +83,11 @@ py::ssize_t arrayant_qdant_write(const std::string &fn,
 
     // Single-frequency input: write one entry at the requested ID.
     const auto layout_a = qd_python_numpy2arma_Mat<unsigned>(layout, true);
-    return (py::ssize_t)ant_vec[0].qdant_write(fn, id, layout_a);
+    return (py::ssize_t)quadriga_lib::qdant_write(fn, ant_vec[0], id, &layout_a);
 }
 
 // pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("qdant_write", &arrayant_qdant_write,
+// m.def("qdant_write", &qdant_write,
 //       py::arg("fn"),
 //       py::arg("arrayant"),
 //       py::arg("id") = 0,

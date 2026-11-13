@@ -43,7 +43,7 @@ TEST_CASE("Arrayant writing to QDANT file - Minimal test")
     ant.center_frequency = 2.0e9f;
     ant.name = "name";
 
-    unsigned id = ant.qdant_write("test.qdant");
+    unsigned id = quadriga_lib::qdant_write("test.qdant", ant);
     CHECK(id == 1);
 
     // Load file again and compare
@@ -88,7 +88,7 @@ TEST_CASE("Arrayant writing/reading from QDANT file - Multi-Element Array")
     ant.coupling_re = A;
     ant.coupling_im = B;
 
-    unsigned id = ant.qdant_write("test2.qdant");
+    unsigned id = quadriga_lib::qdant_write("test2.qdant", ant);
     CHECK(id == 1);
 
     auto x = quadriga_lib::qdant_read<double>("test2.qdant");
@@ -146,7 +146,7 @@ TEST_CASE("Arrayant writing to QDANT file - Complex test")
     ant.name = "name";
 
     // Append new antenna
-    unsigned id = ant.qdant_write("test.qdant");
+    unsigned id = quadriga_lib::qdant_write("test.qdant", ant);
 
     CHECK(id == 2);
 
@@ -162,14 +162,14 @@ TEST_CASE("Arrayant writing to QDANT file - Complex test")
     layout = {1, 2};
     CHECK(arma::all(arma::vectorise(layout2 - layout) == 0));
 
-    id = ant.qdant_write("test.qdant", 112);
+    id = quadriga_lib::qdant_write("test.qdant", ant, 112);
     CHECK(id == 112);
 
     // Layout can only contain valid entries (error expected)
     layout = {{1, 2, 112}, {112, 112, 6}};
-    REQUIRE_THROWS_AS(ant.qdant_write("test.qdant", 5, layout), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::qdant_write("test.qdant", ant, 5, &layout), std::invalid_argument);
 
-    id = ant.qdant_write("test.qdant", 6, layout);
+    id = quadriga_lib::qdant_write("test.qdant", ant, 6, &layout);
     CHECK(id == 6);
 
     antI = quadriga_lib::qdant_read<float>("test.qdant", 6, &layout2);
@@ -230,7 +230,7 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
         std::remove(fn.c_str());
         auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.1, 10.0);
         a.e_theta_re *= scale;
-        a.qdant_write(fn);
+        quadriga_lib::qdant_write(fn, a);
         auto b = quadriga_lib::qdant_read<double>(fn, 1);
         CHECK(qdant_err_element(a, b) < 1.2e-7);
         CHECK(arma::abs(arma::vectorise(b.e_theta_re)).max() > 0.5 * scale);
@@ -242,7 +242,7 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
         auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.1, 10.0);
         a.e_theta_re(1, 0, 0) = 3e-6;
         a.e_theta_re(2, 0, 0) = 0.0;
-        a.qdant_write(fn);
+        quadriga_lib::qdant_write(fn, a);
         auto b = quadriga_lib::qdant_read<double>(fn, 1);
         CHECK(qdant_err_element(a, b) < 1.2e-7);
         CHECK(std::abs(b.e_theta_re(1, 0, 0) / 3e-6 - 1.0) < 0.06); // kept, with at most 0.5 dB rounding
@@ -254,10 +254,10 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
     {
         std::remove(fn.c_str());
         auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.1, 10.0);
-        a.copy_element(0, arma::uvec{1, 2});
+        quadriga_lib::arrayant_copy_element(a, 0, arma::uvec{1, 2});
         a.e_theta_re.slice(1).zeros(), a.e_theta_im.slice(1).zeros(), a.e_phi_re.slice(1).zeros(), a.e_phi_im.slice(1).zeros();
         a.e_theta_re.slice(2) *= 1e-10;
-        a.qdant_write(fn);
+        quadriga_lib::qdant_write(fn, a);
         auto b = quadriga_lib::qdant_read<double>(fn, 1);
         REQUIRE(b.n_elements() == 3);
         CHECK(arma::all(arma::vectorise(b.e_theta_re.slice(1)) == 0.0));
@@ -271,7 +271,7 @@ TEST_CASE("Arrayant writing to QDANT file - Low-level pattern data is kept")
         std::remove(fn.c_str());
         auto a = quadriga_lib::generate_arrayant_custom<float>(90.0f, 90.0f, 0.1f, 10.0f);
         a.e_theta_re *= 1e-20f;
-        a.qdant_write(fn);
+        quadriga_lib::qdant_write(fn, a);
         auto b = quadriga_lib::qdant_read<float>(fn, 1);
         CHECK(qdant_err_element(a, b) < 1e-5);
     }
@@ -301,7 +301,7 @@ TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positio
         a.coupling_re.randn(3, 2), a.coupling_im.randn(3, 2);
         a.coupling_re(0, 0) = 0.123456789;
         a.center_frequency = 3.456789012e9;
-        a.qdant_write(fn);
+        quadriga_lib::qdant_write(fn, a);
 
         auto b = quadriga_lib::qdant_read<double>(fn, 1);
 
@@ -331,7 +331,7 @@ TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positio
         a.element_pos.randn(3, 2);
         a.element_pos(0, 1) = 123.456789f;
         a.coupling_re.randn(2, 2), a.coupling_im.randn(2, 2);
-        a.qdant_write(fn);
+        quadriga_lib::qdant_write(fn, a);
 
         auto b = quadriga_lib::qdant_read<float>(fn, 1);
         CHECK(arma::approx_equal(b.element_pos, a.element_pos, "absdiff", 0.0f));
@@ -355,10 +355,10 @@ TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
     };
 
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    a.copy_element(0, {1, 2});
+    quadriga_lib::arrayant_copy_element(a, 0, {1, 2});
     a.element_pos = {{1200.0, 0.0001, 2.5e-7}, {-0.0, 1e-5, 1e15}, {123456.0, 0.1, 16777216.0}};
     std::remove(fn.c_str());
-    a.qdant_write(fn);
+    quadriga_lib::qdant_write(fn, a);
     const std::string txt = read_text(fn);
     CHECK(txt.find("<ElementPosition>1200,-0,123456 1e-04,1e-05,0.1 2.5e-07,1e+15,16777216</ElementPosition>") != std::string::npos);
 
@@ -374,7 +374,7 @@ TEST_CASE("Arrayant writing to QDANT file - Number text and locale")
     if (comma_locale != nullptr)
     {
         std::remove(fn_loc.c_str());
-        a.qdant_write(fn_loc);
+        quadriga_lib::qdant_write(fn_loc, a);
         std::setlocale(LC_NUMERIC, old_locale.c_str());
         INFO("locale " << comma_locale);
         CHECK(read_text(fn_loc) == txt);
@@ -396,9 +396,9 @@ TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the la
     std::remove(fn.c_str());
 
     auto a = quadriga_lib::generate_arrayant_omni<double>(30.0);
-    a.qdant_write(fn, 1), a.qdant_write(fn, 2), a.qdant_write(fn, 3);
+    quadriga_lib::qdant_write(fn, a, 1), quadriga_lib::qdant_write(fn, a, 2), quadriga_lib::qdant_write(fn, a, 3);
     arma::u32_mat L = {{1, 2}, {3, 3}};
-    a.qdant_write(fn, 3, L);
+    quadriga_lib::qdant_write(fn, a, 3, &L);
 
     arma::u32_mat L1;
     quadriga_lib::qdant_read<double>(fn, 1, &L1);
@@ -406,15 +406,15 @@ TEST_CASE("Arrayant writing to QDANT file - A write without layout resets the la
     CHECK(arma::all(arma::vectorise(L1 == L)));
 
     // Append without layout
-    CHECK(a.qdant_write(fn) == 4);
+    CHECK(quadriga_lib::qdant_write(fn, a) == 4);
     quadriga_lib::qdant_read<double>(fn, 1, &L1);
     arma::u32_mat L_reset = {{1, 2, 3, 4}};
     REQUIRE(arma::size(L1) == arma::size(L_reset));
     CHECK(arma::all(arma::vectorise(L1 == L_reset)));
 
     // Overwriting an entry without layout also resets a custom layout
-    a.qdant_write(fn, 4, L);
-    a.qdant_write(fn, 2);
+    quadriga_lib::qdant_write(fn, a, 4, &L);
+    quadriga_lib::qdant_write(fn, a, 2);
     quadriga_lib::qdant_read<double>(fn, 1, &L1);
     REQUIRE(arma::size(L1) == arma::size(L_reset));
     CHECK(arma::all(arma::vectorise(L1 == L_reset)));
@@ -438,7 +438,7 @@ TEST_CASE("Arrayant writing to QDANT file - append to a file with a namespace pr
 
     auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0);
     ant.name = "second";
-    unsigned id = ant.qdant_write(fn); // appended with ID 2
+    unsigned id = quadriga_lib::qdant_write(fn, ant); // appended with ID 2
     CHECK(id == 2);
 
     auto first = quadriga_lib::qdant_read<double>(fn, 1);
@@ -452,7 +452,7 @@ TEST_CASE("Arrayant writing to QDANT file - append to a file with a namespace pr
 
     // Overwrite entry 1 in place
     ant.name = "replaced";
-    CHECK(ant.qdant_write(fn, 1) == 1);
+    CHECK(quadriga_lib::qdant_write(fn, ant, 1) == 1);
     CHECK(quadriga_lib::qdant_read<double>(fn, 1).name == "replaced");
     CHECK(quadriga_lib::qdant_read<double>(fn, 2).name == "second");
 
@@ -473,7 +473,7 @@ TEST_CASE("Arrayant writing to QDANT file - Field values with power above the do
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 30.0);
     a.e_theta_re *= 1.0e160;
     a.e_phi_im = a.e_theta_re * 0.5;
-    a.qdant_write(fn, 1);
+    quadriga_lib::qdant_write(fn, a, 1);
     auto b = quadriga_lib::qdant_read<double>(fn, 1);
     std::remove(fn.c_str());
     REQUIRE(b.e_theta_re.is_finite());

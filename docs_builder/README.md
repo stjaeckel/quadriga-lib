@@ -315,10 +315,10 @@ Each function entry shows buttons "C++", "MATLAB", "Python" (on the website) and
 ```toml
 [families]
 arrayant_calc_directivity = [".calc_directivity_dBi"]
-arrayant_combine_pattern = [".combine_pattern", "arrayant_combine_pattern_multi"]
+arrayant_combine_pattern = ["arrayant_combine_pattern", "arrayant_combine_pattern_multi"]
 ```
 
-Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the member function before the `_multi` variant. All listed C++ functions link back to the family. An unknown stem, an unknown C++ name or a C++ function in two families stops the build.
+Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the single-frequency function before the `_multi` variant. All listed C++ functions link back to the family. An unknown stem, an unknown C++ name or a C++ function in two families stops the build.
 
 ### Formulas
 

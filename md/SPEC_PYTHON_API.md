@@ -256,7 +256,7 @@ py::object qd_python_any2numpy(const std::any &dset);
   - `qd_python_dict2arrayant(arrayant, view, strict, validate)` reads a single-frequency dict only.
   - The argument order is `(dict, view, strict, validate)` — NOT the MEX order `(input, validate, copy)`. A call `qd_python_dict2arrayant(ant, true)` sets `view`, not `validate`.
   - `validate = true` runs the arrayant validation and throws on inconsistent data. Use `false` when the C++ function validates its inputs anyway.
-  - Use `view = true` by default; use `view = false` whenever the arrayant object is modified after reading (e.g. in-place member functions such as `rotate_pattern`, `copy_element`), so that the user's arrays are never changed.
+  - Use `view = true` by default; use `view = false` whenever the arrayant object is modified after reading (e.g. by functions that work in place such as `arrayant_copy_element`, `arrayant_remove_zeros` or the member `rotate_pattern`), so that the user's arrays are never changed.
 - Writing: `return qd_python_arrayant2dict(ant);` or `return qd_python_arrayant2dict_multi(ant_vec);` (the latter returns the single-frequency layout for a vector of length 1).
 - The wrapper takes the dict as `const py::dict &arrayant` and returns `py::dict`.
 - In the documentation, describe arrayant arguments as: "Dict containing the arrayant data; layout as documented in [[generate]]" and add a note where frequency-dependent input is supported. Do not repeat the key table.

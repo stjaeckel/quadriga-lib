@@ -16,8 +16,8 @@ namespace py = pybind11;
 #include "qpy_arrayant_export_obj_file.cpp"
 #include "qpy_arrayant_generate.cpp"
 #include "qpy_arrayant_interpolate.cpp"
-#include "qpy_arrayant_qdant_read.cpp"
-#include "qpy_arrayant_qdant_write.cpp"
+#include "qpy_qdant_read.cpp"
+#include "qpy_qdant_write.cpp"
 #include "qpy_arrayant_rotate_pattern.cpp"
 #include "qpy_generate_speaker.cpp"
 #include "qpy_get_channels_planar.cpp"
@@ -115,9 +115,9 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("use_kernel") = 0,
           py::arg("complex") = false);
 
-    m.def("qdant_read", &arrayant_qdant_read, py::arg("fn"), py::arg("id") = 1);
+    m.def("qdant_read", &qdant_read, py::arg("fn"), py::arg("id") = 1);
 
-    m.def("qdant_write", &arrayant_qdant_write,
+    m.def("qdant_write", &qdant_write,
           py::arg("fn"),
           py::arg("arrayant"),
           py::arg("id") = 0,

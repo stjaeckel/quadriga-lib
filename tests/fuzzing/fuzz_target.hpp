@@ -242,7 +242,7 @@ namespace fz
         // Validated, then grid values changed in place (keeps the data pointers of the quick check)
         if (in.ConsumeBool())
         {
-            clean([&] { a.validate(); });
+            clean([&] { a.is_valid(); });
             if (in.ConsumeBool() && a.azimuth_grid.n_elem != 0)
                 a.azimuth_grid(in.ConsumeIntegralInRange<arma::uword>(0, a.azimuth_grid.n_elem - 1)) = in.value<T>();
             if (in.ConsumeBool() && a.elevation_grid.n_elem != 0)

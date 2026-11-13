@@ -16,9 +16,9 @@ Coordinate convention (for interpreting pattern data):
 See related read / write functions in the API documentation for details on how to use this format:
 
 - C++ QDANT read function ([qdant_read](cpp_api.html#qdant_read))
-- C++ QDANT write function ([arrayant.qdant_write](cpp_api.html#.qdant_write))
-- MATLAB / Octave QDANT read function ([arrayant_qdant_read](mex_api.html#arrayant_qdant_read))
-- MATLAB / Octave QDANT write function ([arrayant_qdant_write](mex_api.html#arrayant_qdant_write))
+- C++ QDANT write function ([qdant_write](cpp_api.html#qdant_write))
+- MATLAB / Octave QDANT read function ([qdant_read](mex_api.html#qdant_read))
+- MATLAB / Octave QDANT write function ([qdant_write](mex_api.html#qdant_write))
 - Python QDANT read function ([qdant_read](python_api.html#qdant_read))
 - Python QDANT write function ([qdant_write](python_api.html#qdant_write))
 

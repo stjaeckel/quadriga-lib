@@ -70,7 +70,7 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Multi-element selection")
 {
     // Three elements pointing at -60°, 0°, +60° respectively
     auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
-    ant.copy_element(0, arma::uvec({1, 2}));
+    quadriga_lib::arrayant_copy_element(ant, 0, arma::uvec({1, 2}));
     ant.rotate_pattern(0.0f, 0.0f,  60.0f, 0, 1);
     ant.rotate_pattern(0.0f, 0.0f, -60.0f, 0, 2);
 

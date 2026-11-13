@@ -407,7 +407,7 @@ TEST_CASE("QDANT Multi - Invalid entry keeps existing file")
     // Validation must happen before an existing file is removed
     std::string fn = "test_qdant_multi_invalid_keep.qdant";
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    a.qdant_write(fn);
+    quadriga_lib::qdant_write(fn, a);
     REQUIRE(std::filesystem::exists(fn));
     auto size_before = std::filesystem::file_size(fn);
 

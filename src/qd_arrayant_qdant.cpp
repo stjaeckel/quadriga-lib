@@ -798,7 +798,10 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     node_arrayant.append_child((pfx + "AzimuthGrid").c_str()).text().set(str.c_str());
     strm.str("");
 
-    // Coupling matrix
+    // Coupling matrix; an empty one (identity) is written out when the reader would not create it (too many elements)
+    arma::Mat<dtype> coupling_eye;
+    if (coupling_re->empty() && NoElements > QDANT_MAX_VALUES_WITHOUT_DATA / NoElements)
+        coupling_eye.eye(NoElements, NoElements), coupling_re = &coupling_eye;
     if (!coupling_re->empty())
     {
         // Coupling absolute value

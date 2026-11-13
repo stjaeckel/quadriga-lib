@@ -19,7 +19,7 @@ Reads array antenna data from QDANT files
   holds multiple entries, or a plain single-entry dict (3D fields) when it holds exactly one; multiple
   entries must form a frequency set (same number of elements, same azimuth and elevation grids, element
   positions and coupling size), otherwise an error asks to pass `id`
-- Differs from MATLAB, where `arrayant_qdant_read(fn)` without `id` reads every entry (here: `id = 0`)
+- Differs from MATLAB, where `qdant_read(fn)` without `id` reads every entry (here: `id = 0`)
 - Reading all entries is the inverse of `qdant_write` with a 4D-pattern dict
 - An `id` that is not in the file raises an error; the first entry counts as ID 1 only if it has no
   `id` attribute
@@ -56,7 +56,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id=0 )
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
-py::dict arrayant_qdant_read(const std::string &fn,
+py::dict qdant_read(const std::string &fn,
                              unsigned id)
 {
     arma::Mat<unsigned> layout;
@@ -87,6 +87,6 @@ py::dict arrayant_qdant_read(const std::string &fn,
 }
 
 // pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("qdant_read", &arrayant_qdant_read,
+// m.def("qdant_read", &qdant_read,
 //       py::arg("fn"),
 //       py::arg("id") = 1);

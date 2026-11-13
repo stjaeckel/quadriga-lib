@@ -262,7 +262,7 @@ SECTION!*/
 - Arrays: `CHECK(arma::approx_equal(A, B, "absdiff", tol));` (or `"reldiff"`). Scalars: `CHECK(std::abs(a - b) < tol);`. Integers, indices and flags are compared exactly. The Catch2 `Approx` class is not used in new tests.
 - Choose tolerances from the arithmetic, not from the observed error: near machine precision for exact-by-construction `double` results (1e-12 to 1e-14), a few `float` epsilons scaled by the magnitude for `float`, and the documented model accuracy where an approximation is tested. State the reason in a comment when a tolerance is loose.
 - Inside loops, add `INFO("angle " << a << ", type " << t);` before the checks so that a failure reports the case.
-- When `nullptr` is passed for a templated pointer argument and `dtype` cannot be deduced from another argument, cast it: `(arma::mat *)nullptr`.
+- When `nullptr` is passed for a templated pointer argument, give the template argument (`function<double>(...)`) or cast it (`(arma::mat *)nullptr`); a bare `nullptr` stops the deduction of `dtype` even when another argument would give it.
 
 ## Default coverage
 The plan or spec may narrow or extend this list.

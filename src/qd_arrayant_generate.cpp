@@ -391,7 +391,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
 
     if (pattern != nullptr)
     {
-        std::string error_message = ant.validate(); // Deep check
+        std::string error_message = ant.is_valid(); // Deep check
         if (error_message.length() != 0)
             throw std::invalid_argument(error_message.c_str());
 
@@ -413,7 +413,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
             arma::uword i_start = n_elements + source - 1ULL;
             arma::uword i_end = N * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1ULL, destination);
+            quadriga_lib::arrayant_copy_element(ant, source - 1ULL, destination);
         }
 
         arma::Col<dtype> y_position = arma::linspace<arma::Col<dtype>>(zero, dtype(N - 1ULL) * spacing * dtype(wavelength), N);
@@ -511,7 +511,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
 
     if (pattern != nullptr)
     {
-        std::string error_message = ant.validate(); // Deep check
+        std::string error_message = ant.is_valid(); // Deep check
         if (error_message.length() != 0)
             throw std::invalid_argument(error_message.c_str());
 
@@ -556,12 +556,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
         // Adjust polarization
         if (pol == 2 || pol == 5)
         {
-            ant.copy_element(0, 1);
+            quadriga_lib::arrayant_copy_element(ant, 0, {1});
             ant.rotate_pattern(90.0, zero, zero, 2, 1);
         }
         else if (pol == 3 || pol == 6)
         {
-            ant.copy_element(0, 1);
+            quadriga_lib::arrayant_copy_element(ant, 0, {1});
             ant.rotate_pattern(dtype(45.0), zero, zero, 2, 0);
             ant.rotate_pattern(dtype(-45.0), zero, zero, 2, 1);
         }
@@ -575,7 +575,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
             arma::uword i_start = n_elements + source - 1ULL;
             arma::uword i_end = M * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1ULL, destination);
+            quadriga_lib::arrayant_copy_element(ant, source - 1ULL, destination);
         }
 
     // Calculate the element z-position
@@ -609,7 +609,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
                 ant.coupling_im.at(m * n_elements + n, n) = cpl_im.at(m);
             }
 
-        ant = ant.combine_pattern();
+        ant = quadriga_lib::arrayant_combine_pattern(ant);
         M = 1ULL;
     }
 
@@ -622,7 +622,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
             arma::uword i_start = n_elements + source - 1ULL;
             arma::uword i_end = N * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1ULL, destination);
+            quadriga_lib::arrayant_copy_element(ant, source - 1ULL, destination);
         }
 
         arma::Col<dtype> y_position = arma::linspace<arma::Col<dtype>>(zero, dtype(N - 1ULL) * spacing * dtype(wavelength), N);
@@ -642,7 +642,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
             arma::uword i_start = n_elements + source - 1ULL;
             arma::uword i_end = Mg * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1ULL, destination);
+            quadriga_lib::arrayant_copy_element(ant, source - 1ULL, destination);
         }
 
         arma::Col<dtype> zg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Mg - 1ULL) * dgv * dtype(wavelength), Mg);
@@ -662,7 +662,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
             arma::uword i_start = n_elements + source - 1ULL;
             arma::uword i_end = Ng * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1ULL, destination);
+            quadriga_lib::arrayant_copy_element(ant, source - 1ULL, destination);
         }
 
         arma::Col<dtype> yg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Ng - 1ULL) * dgh * dtype(wavelength), Ng);
@@ -961,24 +961,24 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
 
         // Extend array for second polarization
         arma::uvec dest = arma::regspace<arma::uvec>(n_elements, 2 * n_elements - 1);
-        ant.copy_element(0, dest);
+        quadriga_lib::arrayant_copy_element(ant, 0, dest);
 
         // Update polarization
         if (pol == 2)
         {
             ant.rotate_pattern(90.0, 0.0, 0.0, 2, (unsigned)n_elements);
             dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
-            ant.copy_element(n_elements, dest);
+            quadriga_lib::arrayant_copy_element(ant, n_elements, dest);
         }
         else if (pol == 3)
         {
             ant.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
             dest = arma::regspace<arma::uvec>(1, n_elements - 1);
-            ant.copy_element(0, dest);
+            quadriga_lib::arrayant_copy_element(ant, 0, dest);
 
             ant.rotate_pattern(-45.0, 0.0, 0.0, 2, (unsigned)n_elements);
             dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
-            ant.copy_element(n_elements, dest);
+            quadriga_lib::arrayant_copy_element(ant, n_elements, dest);
 
             std::memcpy(ant.element_pos.memptr(), element_pos.memptr(), 3 * n_elements * sizeof(dtype));
         }
@@ -1023,7 +1023,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
         throw std::invalid_argument(err);
 
     if (apply_weights)
-        ant = ant.combine_pattern();
+        ant = quadriga_lib::arrayant_combine_pattern(ant);
 
     return ant;
 }

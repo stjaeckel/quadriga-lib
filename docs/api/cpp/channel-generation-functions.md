@@ -109,6 +109,8 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · No
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
+- The IRS coupling matrix holds the IRS weights and must be given: an empty coupling of `irs_array` throws, unlike
+  in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),

@@ -4,30 +4,13 @@
 
 #include <stdexcept>
 #include <cstring>   // std::memcopy
-#include <iomanip>   // std::setprecision
 #include <algorithm> // std::replace
-#include <iostream>
-#include <limits>    // std::numeric_limits
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 #include "quadriga_math.hpp"
 #include "qd_arrayant_functions.hpp"
 #include "quadriga_lib_helper_functions.hpp"
-
-// Inverse of the largest absolute field value of n samples; scaling by it keeps the power of double patterns with
-// amplitudes above about 1e154 inside the double range (only called when the unscaled power overflowed)
-template <typename dtype>
-static double qd_inverse_max_field(const dtype *a, const dtype *b, const dtype *c, const dtype *d, size_t n)
-{
-    double m = 0.0;
-    for (size_t i = 0; i < n; ++i)
-    {
-        double x = std::max(std::max(std::abs((double)a[i]), std::abs((double)b[i])), std::max(std::abs((double)c[i]), std::abs((double)d[i])));
-        m = x > m ? x : m;
-    }
-    return 1.0 / m;
-}
 
 /*!SECTION
 Array antenna class
@@ -40,7 +23,10 @@ Class for storing and manipulating array antenna models
 - Represents a multi-element antenna array; each element has a position relative to the array phase-center
 - Elements may be inter-coupled via a complex coupling matrix
 - Field pattern cubes `e_theta_re/im`, `e_phi_re/im` must all be `[n_elevation, n_azimuth, n_elements]`
-- `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity)
+- `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity); all
+  functions give the same results for empty members as for zeros / identity, except the IRS array of
+  [[get_channels_irs]], whose coupling holds the IRS weights and must be given. In a multi-frequency vector all
+  entries use the same form (see [[arrayant_is_valid_multi]])
 - Field values and coupling weights must be finite with magnitudes below about 1e18; larger values overflow in the
   interpolation and in the channel functions and give NaN results
 
@@ -54,8 +40,8 @@ Class for storing and manipulating array antenna models
 | `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], strictly increasing       |
 | `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], strictly increasing |
 | `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords                    |
-| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                                     |
-| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                                |
+| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]` or empty       | Coupling matrix, real part                                     |
+| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]` or empty       | Coupling matrix, imaginary part                                |
 | `dtype center_frequency`          | scalar                                 | Center frequency                                               |
 | `std::string name`                | string                                 | Name of the array antenna object                               |
 
@@ -71,19 +57,16 @@ Class for storing and manipulating array antenna models
 | `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
 ## Complex member functions:<br>
-| Function                  | Description                                                       |
-| ------------------------- | ----------------------------------------------------------------- |
-| .[[append]]               | Append elements of another arrayant                               |
-| .[[calc_beamwidth_deg]]   | Calculate the beam width of an antenna element in degree          |
-| .[[calc_directivity_dBi]] | Calculate the directivity in dBi of a single array element        |
-| .[[combine_pattern]]      | Compute effective patterns from elements, positions, and coupling |
-| .[[copy_element]]         | Copy a single element to one or more destination slots            |
-| .[[export_obj_file]]      | Export pattern geometry to Wavefront OBJ                          |
-| .[[qdant_write]]          | Write arrayant to QDANT file                                      |
-| .[[remove_zeros]]         | Remove zero-valued entries from pattern data                      |
-| .[[rotate_pattern]]       | Rotate pattern and/or polarization via Euler angles               |
-| .[[set_size]]             | Resize the arrayant to new dimensions                             |
-| .[[is_valid]]             | Validate arrayant integrity                                       |
+| Function                  | Description                                                |
+| ------------------------- | ---------------------------------------------------------- |
+| .[[calc_beamwidth_deg]]   | Calculate the beam width of an antenna element in degree   |
+| .[[calc_directivity_dBi]] | Calculate the directivity in dBi of a single array element |
+| .[[rotate_pattern]]       | Rotate pattern and/or polarization via Euler angles        |
+| .[[set_size]]             | Resize the arrayant to new dimensions                      |
+| .[[is_valid]]             | Validate arrayant integrity                                |
+
+Computations and file I/O on an arrayant are free functions, see section "Array antenna functions"
+(e.g. [[arrayant_concat]], [[arrayant_combine_pattern]], [[arrayant_copy_element]], [[qdant_write]]).
 MD!*/
 
 template <typename dtype>
@@ -110,95 +93,6 @@ arma::uword quadriga_lib::arrayant<dtype>::n_ports() const
         return coupling_im.n_cols;
     else
         return coupling_re.n_cols;
-}
-
-/*!MD
-# .append
-Append elements of another arrayant to the current one
-
-- Both arrays must share identical sampling grids; throws otherwise
-- Coupling is block-diagonal (see [[arrayant_concat_multi]] diagram); center_frequency is taken from this
-- An empty `coupling_re` counts as identity (one port per element), an empty `coupling_im` as zeros
-
-## Declaration:
-```
-quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(
-    const arrayant<dtype> *new_arrayant) const;
-```
-
-## Inputs:
-- **`new_arrayant`** — Array whose elements are appended; sampling grid must match
-
-## Returns:
-- New `arrayant` containing all elements from both arrays
-
-## See also:
-- [[arrayant_concat_multi]] (multi-freq counterpart)
-MD!*/
-
-template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadriga_lib::arrayant<dtype> *new_arrayant) const
-{
-    // Check if arrayant objects are valid
-    std::string error_message = qd_arrayant_is_valid_quick(*this);
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-    error_message = qd_arrayant_is_valid_quick(*new_arrayant);
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Check if grids are identical
-    bool eq = arma::approx_equal(azimuth_grid, new_arrayant->azimuth_grid, "absdiff", (dtype)1.0e-6);
-    if (!eq)
-    {
-        error_message = "Azimuth sampling grids don't match.";
-        throw std::invalid_argument(error_message.c_str());
-    }
-    eq = arma::approx_equal(elevation_grid, new_arrayant->elevation_grid, "absdiff", (dtype)1.0e-6);
-    if (!eq)
-    {
-        error_message = "Elevation sampling grids don't match.";
-        throw std::invalid_argument(error_message.c_str());
-    }
-
-    arma::uword n_elevation = this->n_elevation();
-    arma::uword n_azimuth = this->n_azimuth();
-    arma::uword n_elements_1 = this->n_elements();
-    arma::uword n_elements_2 = new_arrayant->n_elements();
-    arma::uword n_ports_1 = this->n_ports();
-    arma::uword n_ports_2 = new_arrayant->n_ports();
-
-    quadriga_lib::arrayant<dtype> output;
-    output.set_size(n_elevation, n_azimuth, n_elements_1 + n_elements_2, n_ports_1 + n_ports_2);
-
-    // Copy data from first antenna
-    std::memcpy(output.azimuth_grid.memptr(), this->azimuth_grid.memptr(), n_azimuth * sizeof(dtype));
-    std::memcpy(output.elevation_grid.memptr(), this->elevation_grid.memptr(), n_elevation * sizeof(dtype));
-    std::memcpy(output.e_theta_re.slice_memptr(0), this->e_theta_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
-    std::memcpy(output.e_theta_im.slice_memptr(0), this->e_theta_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
-    std::memcpy(output.e_phi_re.slice_memptr(0), this->e_phi_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
-    std::memcpy(output.e_phi_im.slice_memptr(0), this->e_phi_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
-    if (!this->element_pos.empty())
-        std::memcpy(output.element_pos.colptr(0), this->element_pos.colptr(0), 3 * n_elements_1 * sizeof(dtype));
-
-    // Inherit scalar/string metadata from *this
-    output.center_frequency = this->center_frequency;
-    output.name = this->name;
-
-    // Copy data from second antenna
-    std::memcpy(output.e_theta_re.slice_memptr(n_elements_1), new_arrayant->e_theta_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
-    std::memcpy(output.e_theta_im.slice_memptr(n_elements_1), new_arrayant->e_theta_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
-    std::memcpy(output.e_phi_re.slice_memptr(n_elements_1), new_arrayant->e_phi_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
-    std::memcpy(output.e_phi_im.slice_memptr(n_elements_1), new_arrayant->e_phi_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
-    if (!new_arrayant->element_pos.empty())
-        std::memcpy(output.element_pos.colptr(n_elements_1), new_arrayant->element_pos.colptr(0), 3 * n_elements_2 * sizeof(dtype));
-
-    // Block-diagonal coupling (empty coupling_re: identity block, empty coupling_im: zeros)
-    qd_arrayant_coupling_block_diag(this->coupling_re, this->coupling_im, n_elements_1,
-                                    new_arrayant->coupling_re, new_arrayant->coupling_im, n_elements_2,
-                                    output.coupling_re, output.coupling_im);
-
-    return output;
 }
 
 /*!MD
@@ -438,7 +332,7 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
 - Directivity of the specified element in dBi
 
 ## See also:
-- .[[combine_pattern]] (the per-port directivity is a typical follow-up)
+- [[arrayant_combine_pattern]] (the per-port directivity is a typical follow-up)
 MD!*/
 
 template <typename dtype>
@@ -517,152 +411,6 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
     return dtype(directivity);
 }
 
-/*!MD
-# .combine_pattern
-Combine element patterns, positions, and coupling weights into effective radiation patterns
-
-- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output element per port (column) of the coupling matrix
-- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_frequency` and `d` the distance
-  of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use
-  about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
-- Useful for beamforming and MIMO channel computation speedup
-
-## Declaration:
-```
-quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
-    const arma::Col<dtype> *azimuth_grid_new = nullptr,
-    const arma::Col<dtype> *elevation_grid_new = nullptr,
-    dtype propagation_speed = 299792458.0) const;
-```
-
-## Inputs:
-- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
-- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
-- **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
-
-## Returns:
-- New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
-
-## See also:
-- [[arrayant_interpolate]] (used internally to compute effective radiation patterns)
-- .[[rotate_pattern]] (useful for orienting array antenna patterns)
-MD!*/
-
-template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(const arma::Col<dtype> *azimuth_grid_new,
-                                                                             const arma::Col<dtype> *elevation_grid_new,
-                                                                             dtype propagation_speed) const
-{
-    // Check if calling arrayant object is valid
-    std::string error_message = qd_arrayant_check(*this);
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    if (!(propagation_speed > dtype(0.0)) || !std::isfinite(propagation_speed))
-        throw std::invalid_argument("Input 'propagation_speed' must be positive and finite.");
-
-    // Get output angular grid
-    bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
-    bool new_elgrid = elevation_grid_new != nullptr && elevation_grid_new->n_elem != 0;
-
-    if (new_azgrid && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
-        throw std::invalid_argument("Values of 'azimuth_grid_new' must be sorted and in between -pi and pi (equivalent to -180 to 180 degree).");
-
-    if (new_elgrid && !qd_in_range(elevation_grid_new->memptr(), elevation_grid_new->n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
-        throw std::invalid_argument("Values of 'elevation_grid_new' must be sorted and in between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
-
-    const dtype *p_azimuth_grid = (new_azgrid) ? azimuth_grid_new->memptr() : this->azimuth_grid.memptr();
-    const dtype *p_elevation_grid = (new_elgrid) ? elevation_grid_new->memptr() : this->elevation_grid.memptr();
-
-    arma::uword n_azimuth_out = (new_azgrid) ? azimuth_grid_new->n_elem : this->azimuth_grid.n_elem;
-    arma::uword n_elevation_out = (new_elgrid) ? elevation_grid_new->n_elem : this->elevation_grid.n_elem;
-    arma::uword n_ang = n_azimuth_out * n_elevation_out;
-
-    // Create list of angles for pattern interpolation
-    arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
-    arma::Mat<dtype> elevation(1, n_ang, arma::fill::none);
-    {
-        dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr();
-        for (arma::uword ia = 0ULL; ia < n_azimuth_out; ++ia)
-            for (arma::uword ie = 0ULL; ie < n_elevation_out; ++ie)
-                *p_azimuth++ = p_azimuth_grid[ia], *p_elevation++ = p_elevation_grid[ie];
-    }
-
-    // Get element positions
-    arma::uword n_elements = this->e_theta_re.n_slices;
-    arma::Mat<dtype> element_pos_empty(3, n_elements, arma::fill::zeros);
-    const auto p_element_pos = this->element_pos.empty() ? &element_pos_empty : &this->element_pos;
-
-    // Interpolate the pattern data
-    const arma::uvec i_element = arma::regspace<arma::uvec>(0, n_elements - 1);
-    const arma::Cube<dtype> orientation(3, 1, 1, arma::fill::zeros);
-    arma::Mat<dtype> V_re(n_elements, n_ang), V_im(n_elements, n_ang), H_re(n_elements, n_ang), H_im(n_elements, n_ang), dist(n_elements, n_ang);
-
-    qd_arrayant_interpolate_dispatch<dtype>(*this, azimuth, elevation, i_element, orientation, *p_element_pos,
-                                            V_re, V_im, H_re, H_im, &dist, nullptr, nullptr, nullptr, 1);
-
-    // Apply phase shift caused by element positions
-    double lambda = (double)propagation_speed / (double)this->center_frequency;
-    dtype wave_no = dtype(2.0 * arma::datum::pi / lambda);
-    arma::Mat<std::complex<dtype>> phase(arma::cos(wave_no * dist), arma::sin(-wave_no * dist));
-    arma::Mat<std::complex<dtype>> Vi(V_re, V_im), Hi(H_re, H_im);
-    Vi = Vi % phase, Hi = Hi % phase;
-
-    // Apply coupling
-    arma::uword n_ports_out = this->coupling_re.empty() ? n_elements : this->coupling_re.n_cols;
-    arma::Mat<std::complex<dtype>> Vo(n_ang, n_ports_out), Ho(n_ang, n_ports_out);
-    if (!this->coupling_re.empty())
-    {
-        arma::Mat<dtype> coupling_im_empty(n_elements, n_ports_out, arma::fill::zeros);
-        const auto p_coupling_im = this->coupling_im.empty() ? &coupling_im_empty : &this->coupling_im;
-        arma::Mat<std::complex<dtype>> coupling(this->coupling_re, *p_coupling_im);
-
-        for (arma::uword i = 0ULL; i < n_elements; ++i)
-        {
-            arma::Col<std::complex<dtype>> vi = Vi.row(i).as_col(), hi = Hi.row(i).as_col();
-            for (arma::uword o = 0ULL; o < n_ports_out; ++o)
-            {
-                std::complex<dtype> cpl = coupling.at(i, o);
-                Vo.col(o) += vi * cpl, Ho.col(o) += hi * cpl;
-            }
-        }
-    }
-    else
-        Vo = Vi, Ho = Hi;
-
-    // Write output data
-    quadriga_lib::arrayant<dtype> output;
-    {
-        output.set_size(n_elevation_out, n_azimuth_out, n_ports_out, n_ports_out);
-
-        std::memcpy(output.azimuth_grid.memptr(), p_azimuth_grid, n_azimuth_out * sizeof(dtype));
-        std::memcpy(output.elevation_grid.memptr(), p_elevation_grid, n_elevation_out * sizeof(dtype));
-
-        arma::Mat<dtype> cpy = arma::real(Vo);
-        arma::uword n_bytes = n_elevation_out * n_azimuth_out * n_ports_out * sizeof(dtype);
-        std::memcpy(output.e_theta_re.memptr(), cpy.memptr(), n_bytes);
-
-        cpy = arma::imag(Vo);
-        std::memcpy(output.e_theta_im.memptr(), cpy.memptr(), n_bytes);
-
-        cpy = arma::real(Ho);
-        std::memcpy(output.e_phi_re.memptr(), cpy.memptr(), n_bytes);
-
-        cpy = arma::imag(Ho);
-        std::memcpy(output.e_phi_im.memptr(), cpy.memptr(), n_bytes);
-
-        output.element_pos.zeros();
-        output.coupling_re.eye();
-        output.coupling_im.zeros();
-        output.center_frequency = this->center_frequency;
-        output.name = name;
-
-        qd_arrayant_mark_valid(output);
-    }
-
-    return output;
-}
-
 // Creates a copy of the array antenna object
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
@@ -670,808 +418,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
     quadriga_lib::arrayant<dtype> ant(*this); // The copy of a valid arrayant is marked as validated
     ant.read_only = false;
     return ant;
-}
-
-/*!MD
-# .copy_element
-Copy a single antenna element to one or more destination slots
-
-- Array is resized if any destination index exceeds the current number of elements
-- Coupling matrix for added elements is set to identity; if not existing, it gets initialized to identity
-- Throws `std::invalid_argument` for a read-only object, an empty `destination`, or a destination index equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
-
-## Declaration:
-```
-void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uword destination);
-void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec destination);
-```
-
-## Inputs:
-- **`source`** — Index of the element to copy, 0-based
-- **`destination`** — Target index or indices, 0-based; array resizes to fit the maximum index
-
-## See also:
-- [[arrayant_copy_element_multi]] (multi-freq counterpart)
-MD!*/
-
-// Copy antenna elements, enlarge array size if needed
-template <typename dtype>
-void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec destination)
-{
-    if (read_only)
-        throw std::invalid_argument("Cannot copy elements of a read-only array antenna object.");
-
-    if (destination.n_elem == 0)
-        throw std::invalid_argument("Input 'destination' is empty.");
-
-    // The largest index cannot be reached by resizing: index + 1 would wrap to 0
-    if (destination.max() == std::numeric_limits<arma::uword>::max())
-        throw std::invalid_argument("Destination index out of bound.");
-
-    // Check if arrayant object is valid
-    std::string error_message = validate(); // Deep check
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    arma::uword n_el = e_theta_re.n_rows;
-    arma::uword n_az = e_theta_re.n_cols;
-    arma::uword n_ang = n_el * n_az;
-    arma::uword n_elements = e_theta_re.n_slices;
-    arma::uword n_element_max = destination.max() + 1;
-    arma::uword n_ports = coupling_re.n_cols;
-
-    if (source >= n_elements)
-        error_message = "Source index out of bound";
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Enlarge existing arrayant object
-    if (n_element_max > n_elements)
-    {
-        arma::uword added_elements = n_element_max - n_elements;
-        e_theta_re.resize(n_el, n_az, n_element_max);
-        e_theta_im.resize(n_el, n_az, n_element_max);
-        e_phi_re.resize(n_el, n_az, n_element_max);
-        e_phi_im.resize(n_el, n_az, n_element_max);
-        element_pos.resize(3, n_element_max);
-        coupling_re.resize(n_element_max, n_ports + added_elements);
-        coupling_re.resize(n_element_max, n_ports + added_elements);
-        coupling_im.resize(n_element_max, n_ports + added_elements);
-        for (arma::uword c = n_ports; c < n_ports + added_elements; ++c)
-            for (arma::uword r = 0; r < n_element_max; ++r)
-                coupling_re.at(r, c) = (dtype)0.0, coupling_im.at(r, c) = (dtype)0.0;
-        for (arma::uword r = n_elements; r < n_element_max; ++r)
-            for (arma::uword c = 0; c < n_ports; ++c)
-                coupling_re.at(r, c) = (dtype)0.0, coupling_im.at(r, c) = (dtype)0.0;
-        for (arma::uword i = 0; i < added_elements; ++i)
-            coupling_re.at(n_elements + i, n_ports + i) = (dtype)1.0;
-    }
-
-    // Copy data from source to destination
-    for (auto dest = destination.begin(); dest != destination.end(); ++dest)
-        if (source != *dest)
-        {
-            std::memcpy(e_theta_re.slice_memptr(*dest), e_theta_re.slice_memptr(source), n_ang * sizeof(dtype));
-            std::memcpy(e_theta_im.slice_memptr(*dest), e_theta_im.slice_memptr(source), n_ang * sizeof(dtype));
-            std::memcpy(e_phi_re.slice_memptr(*dest), e_phi_re.slice_memptr(source), n_ang * sizeof(dtype));
-            std::memcpy(e_phi_im.slice_memptr(*dest), e_phi_im.slice_memptr(source), n_ang * sizeof(dtype));
-            std::memcpy(element_pos.colptr(*dest), element_pos.colptr(source), 3 * sizeof(dtype));
-        }
-
-    qd_arrayant_mark_valid(*this);
-}
-
-template <typename dtype>
-void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uword destination)
-{
-    arma::uvec dest(1);
-    dest.at(0) = destination;
-    copy_element(source, dest);
-}
-
-/*!MD
-# .export_obj_file
-Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
-
-- Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives finer mesh
-
-## Declaration:
-```
-void quadriga_lib::arrayant<dtype>::export_obj_file(
-    std::string fn,
-    dtype directivity_range = 30.0,
-    std::string colormap = "jet",
-    dtype object_radius = 1.0,
-    arma::uword icosphere_n_div = 4,
-    arma::uvec i_element = {}) const;
-```
-
-## Inputs:
-- **`fn`** — Output OBJ filename; must not be empty; filename must end in .obj
-- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
-- **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
-- **`object_radius`** *(optional)* — Radius of the exported object
-- **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [[icosphere]]
-- **`i_element`** *(optional)* — 0-based element indices to export; `{}` exports all elements
-
-## See also:
-- [[colormap]] (Used for setting the colormap)
-- [[icosphere]] (Used internally to generate icosphere primitive)
-- .[[write_paths_to_obj_file]] (function of Channel class to export propagation paths to OBJ 3D visualization)
-MD!*/
-
-// ARRAYANT METHOD : OBJ Export
-template <typename dtype>
-void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype directivity_range, std::string colormap,
-                                                    dtype object_radius, arma::uword icosphere_n_div,
-                                                    arma::uvec i_element) const
-{
-    // Check if arrayant object is valid
-    std::string error_message = qd_arrayant_is_valid_quick(*this);
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Input validation
-    std::string fn_suffix = ".obj";
-    std::string fn_mtl;
-
-    if (fn.size() >= fn_suffix.size() &&
-        fn.compare(fn.size() - fn_suffix.size(), fn_suffix.size(), fn_suffix) == 0)
-    {
-        fn_mtl = fn.substr(0, fn.size() - fn_suffix.size()) + ".mtl";
-    }
-    else
-        throw std::invalid_argument("OBJ-File name must end with .obj");
-
-    // Replace spaces in ant_name
-    std::string ant_name = name;
-    std::replace(ant_name.begin(), ant_name.end(), ' ', '_');
-
-    // Extract the file name from the path
-    std::string fn_mtl_base;
-    size_t pos = fn_mtl.find_last_of("/");
-    if (pos != std::string::npos)
-        fn_mtl_base = fn_mtl.substr(pos + 1);
-    else
-        fn_mtl_base = fn_mtl;
-
-    double range = -std::abs((double)directivity_range);
-    if (range == 0.0 || !std::isfinite(range))
-        throw std::invalid_argument("Directivity range must be finite and not 0.");
-
-    double radius = (double)object_radius;
-    if (!(radius > 0.0) || !std::isfinite(radius))
-        throw std::invalid_argument("Object radius must be finite and larger than 0.");
-
-    arma::uword no_elements = n_elements();
-
-    if (i_element.n_elem == 0)
-        i_element = arma::regspace<arma::uvec>(0, no_elements - 1);
-
-    if (arma::any(i_element >= no_elements))
-        throw std::invalid_argument("Element indices 'i_element' cannot exceed the array antenna size.");
-
-    size_t no_elements_t = (size_t)i_element.n_elem;
-
-    // Colormap
-    arma::uchar_mat cmap = quadriga_lib::colormap(colormap);
-    size_t n_cmap = (size_t)cmap.n_rows;
-
-    // Export colormap to material file
-    std::ofstream outFile(fn_mtl);
-    if (outFile.is_open())
-    {
-        // Write some text to the file
-        outFile << "# QuaDRiGa " << "antenna pattern colormap\n\n";
-        for (size_t i = 0; i < n_cmap; ++i)
-        {
-            double R = (double)cmap(i, 0) / 255.0;
-            double G = (double)cmap(i, 1) / 255.0;
-            double B = (double)cmap(i, 2) / 255.0;
-            outFile << "newmtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i << "\n";
-            outFile << std::fixed << std::setprecision(6) << "Kd " << R << " " << G << " " << B << "\n\n";
-        }
-        outFile.close();
-    }
-
-    // Generate vertices and faces
-    arma::mat vertices_icosphere; // double precision
-    arma::u32_mat faces_icosphere;
-    size_t no_faces, no_vert;
-    {
-        arma::mat center, vert;
-        no_faces = quadriga_lib::icosphere<double>(icosphere_n_div, 1.0, &center, nullptr, &vert);
-
-        vertices_icosphere.set_size(3 * no_faces, 3);
-        faces_icosphere.set_size(no_faces, 3);
-
-        double *pc = center.memptr(), *pv = vert.memptr(), *v = vertices_icosphere.memptr();
-        unsigned *f_ico = faces_icosphere.memptr();
-
-        for (size_t i_face = 0; i_face < no_faces; ++i_face)
-        {
-            double x, y, z;
-
-            x = pc[i_face] + pv[i_face];
-            y = pc[i_face + no_faces] + pv[i_face + no_faces];
-            z = pc[i_face + 2 * no_faces] + pv[i_face + 2 * no_faces];
-
-            v[3 * i_face] = x;
-            v[3 * i_face + 3 * no_faces] = y;
-            v[3 * i_face + 6 * no_faces] = z;
-            f_ico[i_face] = 3 * (unsigned)i_face + 1;
-
-            x = pc[i_face] + pv[i_face + 3 * no_faces];
-            y = pc[i_face + no_faces] + pv[i_face + 4 * no_faces];
-            z = pc[i_face + 2 * no_faces] + pv[i_face + 5 * no_faces];
-
-            v[3 * i_face + 1] = x;
-            v[3 * i_face + 3 * no_faces + 1] = y;
-            v[3 * i_face + 6 * no_faces + 1] = z;
-            f_ico[i_face + no_faces] = 3 * (unsigned)i_face + 2;
-
-            x = pc[i_face] + pv[i_face + 6 * no_faces];
-            y = pc[i_face + no_faces] + pv[i_face + 7 * no_faces];
-            z = pc[i_face + 2 * no_faces] + pv[i_face + 8 * no_faces];
-
-            v[3 * i_face + 2] = x;
-            v[3 * i_face + 3 * no_faces + 2] = y;
-            v[3 * i_face + 6 * no_faces + 2] = z;
-            f_ico[i_face + 2 * no_faces] = 3 * (unsigned)i_face + 3;
-        }
-    }
-    no_vert = 3 * no_faces;
-
-    // Convert vertices to angles
-    arma::Mat<dtype> azimuth, elevation;
-    azimuth.set_size(1, no_vert);
-    elevation.set_size(1, no_vert);
-    {
-        double *v = vertices_icosphere.memptr();
-        dtype *az = azimuth.memptr(), *el = elevation.memptr();
-        for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
-        {
-            double x = v[i_vert];
-            double y = v[i_vert + no_vert];
-            double z = v[i_vert + 2 * no_vert];
-            x = x > 1.0 ? 1.0 : x, y = y > 1.0 ? 1.0 : y, z = z > 1.0 ? 1.0 : z;
-            x = x < -1.0 ? -1.0 : x, y = y < -1.0 ? -1.0 : y, z = z < -1.0 ? -1.0 : z;
-            az[i_vert] = (dtype)std::atan2(y, x);
-            el[i_vert] = (dtype)std::asin(z);
-        }
-    }
-
-    // Interpolate antenna patterns (for all elements in the array)
-    arma::Mat<dtype> V_re, V_im, H_re, H_im;
-    quadriga_lib::arrayant_interpolate<dtype>(*this, azimuth, elevation, V_re, V_im, H_re, H_im, &i_element,
-                                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
-    dtype *vr = V_re.memptr(), *vi = V_im.memptr(), *hr = H_re.memptr(), *hi = H_im.memptr();
-
-    // Calculate maximum Power in the Pattern
-    double max_pow = 0.0;
-    bool has_nan = false;
-    auto find_max_pow = [&]()
-    {
-        max_pow = 0.0, has_nan = false;
-        for (size_t i = 0; i < no_vert * no_elements_t; ++i)
-        {
-            double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
-            double p = a * a + b * b + c * c + d * d;
-            max_pow = (p > max_pow) ? p : max_pow;
-            has_nan = has_nan || std::isnan(p);
-        }
-    };
-    find_max_pow();
-    if (std::isinf(max_pow)) // Power above the double range: rescale the interpolated fields
-    {
-        dtype s = (dtype)qd_inverse_max_field(vr, vi, hr, hi, no_vert * no_elements_t);
-        V_re *= s, V_im *= s, H_re *= s, H_im *= s;
-        find_max_pow();
-    }
-    if (has_nan) // NaN field values, or infinite ones (NaN after the rescaling)
-        throw std::invalid_argument("Field values must be finite.");
-    if (!(max_pow > 0.0))
-        throw std::invalid_argument("Pattern is zero in all directions for the exported elements.");
-
-    // Write OBJ File
-    outFile = std::ofstream(fn);
-    if (outFile.is_open())
-    {
-        outFile << "# QuaDRiGa " << "antenna pattern\n";
-        outFile << "mtllib " << fn_mtl_base << "\n";
-
-        // Face offset for previous element in the OBJ file
-        unsigned face_offset = 1; // OBJ starts counting at 1
-
-        // Export each element to the OBJ file
-        for (size_t i_el = 0; i_el < no_elements_t; ++i_el)
-        {
-            arma::uword i_array_element = i_element(i_el);
-            outFile << "\no " << "QuaDRiGa_ANT_" << ant_name << "_" << std::setfill('0') << std::setw(3) << i_array_element << "\n";
-
-            // Calculate Shape
-            arma::vec pow(no_vert);
-            double *pp = pow.memptr();
-            for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
-            {
-                size_t i = i_vert * no_elements_t + i_el;
-                double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
-                double p = a * a + b * b + c * c + d * d;
-                p /= max_pow;                // Scale by maximum power (division: no overflow for tiny powers)
-                p = 10.0 * std::log10(p);    // Convert to dB
-                p = (p < range) ? range : p; // Set minimum
-                p = (p - range) / (-range);  // Set to range 0 ... 1 (division: no overflow for tiny ranges)
-                pp[i_vert] = p;
-            }
-
-            // Scale vertices
-            arma::mat scaled_vertices(no_vert, 3);
-            double *v_scale = scaled_vertices.memptr();  // Scaled vertices
-            double *v_ico = vertices_icosphere.memptr(); // Icosphere vertices
-            for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
-            {
-                v_scale[i_vert] = v_ico[i_vert] * pp[i_vert];                             // x
-                v_scale[i_vert + no_vert] = v_ico[i_vert + no_vert] * pp[i_vert];         // y
-                v_scale[i_vert + 2 * no_vert] = v_ico[i_vert + 2 * no_vert] * pp[i_vert]; // z
-            }
-
-            // Process faces
-            double eps = 0.001; // Co-location tolerance in [m], relative to 1 m radius
-            eps *= eps;         // Squared value
-
-            arma::mat final_vertices(no_vert, 3);
-            arma::u32_mat vert_index(no_faces, 3);
-            arma::u32_vec cmap_index(no_faces);
-
-            double *v_final = final_vertices.memptr(); // Final vertices
-            unsigned *f_final = vert_index.memptr();   // Final face indices
-            unsigned *i_cmap = cmap_index.memptr();    // Colormap index
-
-            size_t no_final_vert = 0; // Number of final vertices
-            size_t no_final_face = 0; // Number of final faces
-
-            for (size_t i_face = 0; i_face < no_faces; ++i_face)
-            {
-                // Load the 3 scaled vertices of the face
-                double x0 = v_scale[3 * i_face];
-                double y0 = v_scale[3 * i_face + no_vert];
-                double z0 = v_scale[3 * i_face + 2 * no_vert];
-
-                double x1 = v_scale[3 * i_face + 1];
-                double y1 = v_scale[3 * i_face + no_vert + 1];
-                double z1 = v_scale[3 * i_face + 2 * no_vert + 1];
-
-                double x2 = v_scale[3 * i_face + 2];
-                double y2 = v_scale[3 * i_face + no_vert + 2];
-                double z2 = v_scale[3 * i_face + 2 * no_vert + 2];
-
-                // Check if face vertices collapse to a point or line
-                double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-                double dd = dx * dx + dy * dy + dz * dz;
-
-                if (dd < eps)
-                    continue;
-
-                dx = x2 - x0, dy = y2 - y0, dz = z2 - z0;
-                dd = dx * dx + dy * dy + dz * dz;
-
-                if (dd < eps)
-                    continue;
-
-                dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
-                dd = dx * dx + dy * dy + dz * dz;
-
-                if (dd < eps)
-                    continue;
-
-                // Do for each of the 3 vertices
-                for (size_t i3 = 0; i3 < 3; ++i3)
-                {
-                    double x = x0, y = y0, z = z0;
-                    if (i3 == 1)
-                        x = x1, y = y1, z = z1;
-                    else if (i3 == 2)
-                        x = x2, y = y2, z = z2;
-
-                    // Add the vertices to the final list
-                    size_t i_vert_final = 0; // Face index
-                    bool found = false;
-
-                    // Get vertex ID
-                    for (size_t i = 0; i < no_final_vert; ++i) // Search existing vertex
-                    {
-                        dx = v_final[i] - x;
-                        dy = v_final[i + no_vert] - y;
-                        dz = v_final[i + 2 * no_vert] - z;
-                        dd = dx * dx + dy * dy + dz * dz;
-                        if (dd < eps)
-                        {
-                            i_vert_final = i;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) // Add new vertex to list
-                    {
-                        i_vert_final = no_final_vert;
-                        v_final[i_vert_final] = x;
-                        v_final[i_vert_final + no_vert] = y;
-                        v_final[i_vert_final + 2 * no_vert] = z;
-                        ++no_final_vert;
-                    }
-
-                    // Write face ID
-                    f_final[no_final_face + i3 * no_faces] = (unsigned)i_vert_final;
-                }
-
-                // Get the colormap index
-                double pf = pp[3 * i_face] + pp[3 * i_face + 1] + pp[3 * i_face + 2];
-                pf *= 21.0; // 63 * 0.33
-                pf = std::round(pf);
-                unsigned c = (unsigned)pf;
-                c = (c > 63) ? 63 : c;
-                i_cmap[no_final_face] = c;
-
-                ++no_final_face;
-            }
-
-            // Write vertices to file
-            for (size_t i_vert = 0; i_vert < no_final_vert; ++i_vert)
-            {
-                double x = v_final[i_vert];
-                double y = v_final[i_vert + no_vert];
-                double z = v_final[i_vert + 2 * no_vert];
-
-                x *= radius;
-                y *= radius;
-                z *= radius;
-
-                if (element_pos.n_elem != 0)
-                {
-                    x += element_pos(0, i_array_element);
-                    y += element_pos(1, i_array_element);
-                    z += element_pos(2, i_array_element);
-                }
-
-                outFile << "v " << x << " " << y << " " << z << "\n";
-            }
-
-            // Write faces to file, ordered by color
-            for (unsigned i_color = 0; i_color < 64; ++i_color)
-            {
-                bool color_not_used = true;
-                for (size_t i_face = 0; i_face < no_final_face; ++i_face)
-                {
-                    if (i_cmap[i_face] == i_color)
-                    {
-                        if (color_not_used)
-                        {
-                            outFile << "usemtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i_color << "\n";
-                            color_not_used = false;
-                        }
-                        outFile << "f " << f_final[i_face] + face_offset << " " << f_final[i_face + no_faces] + face_offset << " " << f_final[i_face + 2 * no_faces] + face_offset << "\n";
-                    }
-                }
-            }
-            face_offset += (unsigned)no_final_vert;
-        }
-
-        outFile.close();
-    }
-}
-
-/*!MD
-# .qdant_write
-Write arrayant data to a QDANT (XML) file
-
-- Multiple antennas can be stored in the same file using distinct `id` values
-- If `id = 0` and the file exists, the antenna is appended with `id = max_existing_id + 1`; if file does not exist, `id = 1` gets assigned
-- Without `layout` (empty), the layout in the file is replaced by a `[1, n]` row of all IDs in the file in file
-  order; a custom layout written before is lost. Pass the layout again with every write that should keep it.
-- The file has single-precision-equivalent accuracy relative to the element peak, also for double-precision data:
-  pattern magnitudes (in dB) and phases (in degree) get the fewest decimals (0 to 6) that keep the error of each
-  complex sample at or below 6e-8 times the peak amplitude of its element (over e_theta and e_phi). Samples near
-  the peak are accurate to about 6e-8 of their own amplitude; the relative error grows by 10 per 20 dB below the
-  peak (about 6e-4 at -80 dB, 6e-2 at -120 dB), while the absolute error stays below 6e-8 of the peak. An element at
-  a low level is quantized relative to its own peak. Element positions and coupling (magnitude, phase) are written
-  as the shortest text that reads back as the same float (at most 9 significant digits); sampling grids are rounded
-  to 0.001 degree
-- All non-zero pattern samples are written, at any level; exact zeros are written as `-inf` dB. An element that is
-  zero in both field components is written as an all `-inf` `EthetaMag` node.
-
-## Declaration:
-```
-unsigned quadriga_lib::arrayant<dtype>::qdant_write(
-    std::string fn,
-    unsigned id = 0,
-    arma::u32_mat layout = {}) const;
-```
-
-## Inputs:
-- **`fn`** — Output QDANT filename; must not be empty
-- **`id`** *(optional)* — Target ID in file; `0` appends with auto-assigned ID
-- **`layout`** *(optional)* — Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file
-
-## Returns:
-- ID assigned to the written antenna within the file
-
-## See also:
-- [[qdant_read]] (read back QDANT files)
-- [[qdant_write_multi]] (multi-freq counterpart)
-MD!*/
-
-// ARRAYANT : Write to QDANT file
-template <typename dtype>
-unsigned quadriga_lib::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::u32_mat layout) const
-{
-    // Check if arrayant object is valid
-    std::string error_message = qd_arrayant_is_valid_quick(*this);
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    unsigned id_in_file = 0;
-    error_message = qd_arrayant_qdant_write(fn, id, &name, &e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
-                                            &azimuth_grid, &elevation_grid, &element_pos,
-                                            &coupling_re, &coupling_im, &center_frequency, &layout,
-                                            &id_in_file);
-
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    return id_in_file;
-}
-
-/*!MD
-# .remove_zeros
-Remove zero-valued entries from antenna pattern data, reducing its size
-
-- Modifies in-place when `output = nullptr`; otherwise writes to `*output`
-- A column or row is removed if the total power summed over all field components and array elements does not exceed
-  1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
-  depend on the scale of the pattern; an all-zero pattern is left unchanged
-- Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
-
-## Declaration:
-```
-void quadriga_lib::arrayant<dtype>::remove_zeros(arrayant<dtype> *output = nullptr);
-```
-
-## Inputs:
-- **`output`** *(optional)* — Target arrayant to write result to; `nullptr` modifies in-place
-MD!*/
-
-// Remove zeros from the pattern
-template <typename dtype>
-void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *output)
-{
-    qd_check_alias(output, "output", this); // nullptr modifies this object
-
-    // Check if arrayant object is valid
-    std::string error_message = validate(); // Deep check
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    if (output == nullptr && read_only)
-    {
-        error_message = "Cannot update read-only array antenna object inplace.";
-        throw std::invalid_argument(error_message.c_str());
-    }
-
-    unsigned long long n_el = e_theta_re.n_rows;
-    unsigned long long n_az = e_theta_re.n_cols;
-    unsigned long long n_slices = e_theta_re.n_slices;
-
-    // Calculate the power pattern (in double precision, so that low-level float patterns do not underflow)
-    arma::mat pow(n_el, n_az, arma::fill::zeros);
-    double *pw = pow.memptr();
-    dtype pi_half = dtype(arma::datum::pi / 2.0);
-    dtype two_pi = dtype(2.0 * arma::datum::pi);
-
-    auto sum_power = [&](double s)
-    {
-        for (auto is = 0ULL; is < n_slices; ++is)
-        {
-            dtype *pa = e_theta_re.slice_memptr(is), *pb = e_theta_im.slice_memptr(is),
-                  *pc = e_phi_re.slice_memptr(is), *pd = e_phi_im.slice_memptr(is);
-            for (auto j = 0ULL; j < n_el * n_az; ++j)
-            {
-                double a = s * double(pa[j]), b = s * double(pb[j]), c = s * double(pc[j]), d = s * double(pd[j]);
-                pw[j] += a * a + b * b + c * c + d * d;
-            }
-        }
-    };
-    sum_power(1.0);
-
-    // Threshold relative to the peak power
-    double p_peak = pow.max();
-    if (std::isinf(p_peak)) // Power above the double range
-    {
-        pow.zeros();
-        sum_power(qd_inverse_max_field(e_theta_re.memptr(), e_theta_im.memptr(), e_phi_re.memptr(), e_phi_im.memptr(), e_theta_re.n_elem));
-        p_peak = pow.max();
-    }
-    const double limit = 1.0e-12 * p_peak;
-
-    arma::rowvec az_sum = arma::sum(pow, 0);
-    arma::vec el_sum = arma::sum(pow, 1);
-    pow.reset();
-    if (az_sum.has_nan()) // NaN or Inf in the field values
-        throw std::invalid_argument("Field values must be finite.");
-
-    // Determine which parts of the pattern should be kept; an all-zero pattern is kept unchanged
-    arma::uvec keep_az(n_az, arma::fill::zeros), keep_el(n_el, arma::fill::zeros);
-    if (!(p_peak > 0.0))
-        keep_az.ones(), keep_el.ones();
-    unsigned long long *keep_az_ptr = keep_az.memptr();
-    unsigned long long *keep_el_ptr = keep_el.memptr();
-
-    const double *ps = az_sum.memptr();
-    dtype *grid_ptr = azimuth_grid.memptr();
-    for (auto ia = 0ULL; ia < n_az; ++ia)
-    {
-        // Spacing to the previous and the next grid point; the first and the last point are neighbours across +/- 180 deg
-        dtype p = ia == 0 ? *grid_ptr - grid_ptr[n_az - 1] + two_pi : grid_ptr[ia] - grid_ptr[ia - 1];
-        dtype n = ia == n_az - 1 ? *grid_ptr + two_pi - grid_ptr[ia] : grid_ptr[ia + 1] - grid_ptr[ia];
-
-        unsigned long long ip = ia == 0ULL ? n_az - 1ULL : ia - 1ULL;
-        unsigned long long in = ia == n_az - 1ULL ? 0ULL : ia + 1ULL;
-
-        if (ps[ia] > limit)
-            keep_az_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_az_ptr[ip] : 1,
-            keep_az_ptr[ia] = 1,
-            keep_az_ptr[in] = p > 0.001 * n && n > 1.5 * p ? keep_az_ptr[in] : 1;
-    }
-    az_sum.reset();
-
-    ps = el_sum.memptr(), grid_ptr = elevation_grid.memptr();
-
-    for (auto ie = 0ULL; ie < n_el; ++ie)
-    {
-        dtype p = ie == 0 ? *grid_ptr + pi_half : grid_ptr[ie] - grid_ptr[ie - 1];
-        dtype n = ie == n_el - 1 ? pi_half - grid_ptr[ie] : grid_ptr[ie + 1] - grid_ptr[ie];
-
-        unsigned long long ip = ie == 0ULL ? 0ULL : ie - 1ULL;
-        unsigned long long in = ie == n_el - 1ULL ? n_el - 1ULL : ie + 1ULL;
-
-        if (ps[ie] > limit)
-            keep_el_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_el_ptr[ip] : 1ULL,
-            keep_el_ptr[ie] = 1,
-            keep_el_ptr[in] = p > 0.001 * n && n > 1.5 * p ? keep_el_ptr[in] : 1ULL;
-    }
-    el_sum.reset();
-
-    // Copy the relevant pattern data
-    unsigned long long n_az_new = arma::sum(keep_az), n_el_new = arma::sum(keep_el);
-
-    for (int p = 0; p < 4; ++p)
-    {
-        dtype *data = nullptr, *ptrO = nullptr, *ptrI = nullptr;
-
-        if (output == nullptr)
-            data = new dtype[n_el_new * n_az_new * n_slices];
-        else if (p == 0)
-        {
-            if (output->e_theta_re.n_rows != n_el_new || output->e_theta_re.n_cols != n_az_new || output->e_theta_re.n_slices != n_slices)
-                output->e_theta_re.set_size(n_el_new, n_az_new, n_slices);
-            data = output->e_theta_re.memptr();
-        }
-        else if (p == 1)
-        {
-            if (output->e_theta_im.n_rows != n_el_new || output->e_theta_im.n_cols != n_az_new || output->e_theta_im.n_slices != n_slices)
-                output->e_theta_im.set_size(n_el_new, n_az_new, n_slices);
-            data = output->e_theta_im.memptr();
-        }
-        else if (p == 2)
-        {
-            if (output->e_phi_re.n_rows != n_el_new || output->e_phi_re.n_cols != n_az_new || output->e_phi_re.n_slices != n_slices)
-                output->e_phi_re.set_size(n_el_new, n_az_new, n_slices);
-            data = output->e_phi_re.memptr();
-        }
-        else if (p == 3)
-        {
-            if (output->e_phi_im.n_rows != n_el_new || output->e_phi_im.n_cols != n_az_new || output->e_phi_im.n_slices != n_slices)
-                output->e_phi_im.set_size(n_el_new, n_az_new, n_slices);
-            data = output->e_phi_im.memptr();
-        }
-
-        ptrO = data;
-        for (auto is = 0ULL; is < n_slices; ++is)
-        {
-            if (p == 0)
-                ptrI = e_theta_re.slice_memptr(is);
-            else if (p == 1)
-                ptrI = e_theta_im.slice_memptr(is);
-            else if (p == 2)
-                ptrI = e_phi_re.slice_memptr(is);
-            else if (p == 3)
-                ptrI = e_phi_im.slice_memptr(is);
-
-            for (auto ia = 0ULL; ia < n_az; ++ia)
-            {
-                bool keep_az = keep_az_ptr[ia] == 1;
-                for (auto ie = 0ULL; ie < n_el; ++ie)
-                    if (keep_az && keep_el_ptr[ie] == 1ULL)
-                        *ptrO++ = ptrI[ia * n_el + ie];
-            }
-        }
-
-        if (output == nullptr)
-        {
-            if (p == 0)
-                e_theta_re.set_size(n_el_new, n_az_new, n_slices),
-                    std::memcpy(e_theta_re.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
-            else if (p == 1)
-                e_theta_im.set_size(n_el_new, n_az_new, n_slices),
-                    std::memcpy(e_theta_im.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
-            else if (p == 2)
-                e_phi_re.set_size(n_el_new, n_az_new, n_slices),
-                    std::memcpy(e_phi_re.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
-            else if (p == 3)
-                e_phi_im.set_size(n_el_new, n_az_new, n_slices),
-                    std::memcpy(e_phi_im.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
-
-            delete[] data;
-        }
-    }
-
-    // Copy the new azimuth grid
-    dtype *azimuth_grid_new = new dtype[n_az_new];
-    dtype *pp = azimuth_grid_new;
-    for (auto ia = 0ULL; ia < n_az; ++ia)
-        if (keep_az_ptr[ia] == 1)
-            *pp++ = azimuth_grid[ia];
-    if (output == nullptr)
-        azimuth_grid.set_size(n_az_new), pp = azimuth_grid.memptr();
-    else if (output->azimuth_grid.n_elem != n_az_new)
-        output->azimuth_grid.set_size(n_az_new), pp = output->azimuth_grid.memptr();
-    else
-        pp = output->azimuth_grid.memptr();
-    std::memcpy(pp, azimuth_grid_new, n_az_new * sizeof(dtype));
-    delete[] azimuth_grid_new;
-
-    // Copy the new elevation grid
-    dtype *elevation_grid_new = new dtype[n_el_new];
-    pp = elevation_grid_new;
-    for (auto ie = 0ULL; ie < n_el; ++ie)
-        if (keep_el_ptr[ie] == 1)
-            *pp++ = elevation_grid[ie];
-    if (output == nullptr)
-        elevation_grid.set_size(n_el_new), pp = elevation_grid.memptr();
-    else if (output->elevation_grid.n_elem != n_el_new)
-        output->elevation_grid.set_size(n_el_new), pp = output->elevation_grid.memptr();
-    else
-        pp = output->elevation_grid.memptr();
-    std::memcpy(pp, elevation_grid_new, n_el_new * sizeof(dtype));
-    delete[] elevation_grid_new;
-
-    // Copy the unchanged data
-    if (output != nullptr)
-    {
-        if (!element_pos.empty())
-        {
-            if (output->element_pos.n_rows != 3 || output->element_pos.n_cols != n_slices)
-                output->element_pos.set_size(3, n_slices);
-            std::memcpy(output->element_pos.memptr(), element_pos.memptr(), 3 * n_slices * sizeof(dtype));
-        }
-
-        if (!coupling_re.empty())
-        {
-            if (output->coupling_re.n_rows != n_slices || output->coupling_re.n_cols != coupling_re.n_cols)
-                output->coupling_re.set_size(n_slices, coupling_re.n_cols);
-            std::memcpy(output->coupling_re.memptr(), coupling_re.memptr(), n_slices * coupling_re.n_cols * sizeof(dtype));
-        }
-
-        if (!coupling_im.empty())
-        {
-            if (output->coupling_im.n_rows != n_slices || output->coupling_im.n_cols != coupling_im.n_cols)
-                output->coupling_im.set_size(n_slices, coupling_im.n_cols);
-            std::memcpy(output->coupling_im.memptr(), coupling_im.memptr(), n_slices * coupling_im.n_cols * sizeof(dtype));
-        }
-
-        output->center_frequency = center_frequency;
-        output->name = name;
-        output->validate();
-    }
 }
 
 // ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
@@ -1562,7 +508,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     qd_check_alias(output, "output", this); // nullptr modifies this object
 
     // Check if arrayant object is valid
-    std::string error_message = validate(); // Deep check
+    std::string error_message = qd_arrayant_check(*this); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -1714,7 +660,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
 
             // Find target area for interpolation
             ant.rotate_pattern(x_deg, y_deg, z_deg, 1);
-            ant.remove_zeros();
+            quadriga_lib::arrayant_remove_zeros(ant);
 
             // Subdivide target grid
             dtype sdiv = std::fmod(deg2rad, step) < 0.1 * step ? std::floor(deg2rad / step) : std::ceil(deg2rad / step);
@@ -1802,7 +748,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     {
         if (use_all_elements)
         {
-            output->set_size(n_el, n_az, n_out, coupling_re.n_cols);
+            output->set_size(n_el, n_az, n_out, n_ports());
             output->coupling_re = coupling_re;
             output->coupling_im = coupling_im;
         }
@@ -1870,7 +816,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
             V_re = V_re.t(), V_im = V_im.t(), H_re = H_re.t(), H_im = H_im.t();
 
         if (output == nullptr && update_grid) // Set new array size, keep the coupling (n_out = n_elements here)
-            set_size(n_el, n_az, n_out, coupling_re.n_cols);
+            set_size(n_el, n_az, n_out, n_ports()); // Writes out empty positions and coupling (zeros, identity)
 
         dtype *ptrI, *ptrO;
 
@@ -1906,11 +852,11 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         ptrO = output == nullptr ? elevation_grid.memptr() : output->elevation_grid.memptr();
         std::memcpy(ptrO, ptrI, n_el * sizeof(dtype));
 
+        // Rotate the element positions; empty positions (zeros) stay empty
         ptrI = element_pos_update.memptr();
-        ptrO = use_all_elements ? element_pos.memptr() : element_pos.colptr(element);
-        ptrO = output == nullptr ? ptrO : output->element_pos.memptr();
+        ptrO = output != nullptr ? output->element_pos.memptr() : (element_pos.empty() ? nullptr : use_all_elements ? element_pos.memptr() : element_pos.colptr(element));
         dtype *R_ptr = R.memptr();
-        for (auto i = 0ULL; i < i_element.n_elem; ++i)
+        for (auto i = 0ULL; ptrO != nullptr && i < i_element.n_elem; ++i)
         {
             arma::uword j = 3 * i_element.at(i);
             arma::uword k = use_all_elements ? j : 0;
@@ -1920,10 +866,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
             ptrO[k] = a, ptrO[k + 1] = b, ptrO[k + 2] = c;
         }
 
-        if (output == nullptr && update_grid)
-            remove_zeros();
-        else if (output != nullptr && update_grid)
-            output->remove_zeros();
+        if (update_grid)
+            quadriga_lib::arrayant_remove_zeros(output == nullptr ? *this : *output);
     }
 }
 
@@ -2105,31 +1049,6 @@ std::string quadriga_lib::arrayant<dtype>::is_valid() const
     return error_message;
 }
 
-// ARRAYANT METHOD : Validates correctness of the member functions and initializes element positions and coupling matrix
-template <typename dtype>
-std::string quadriga_lib::arrayant<dtype>::validate()
-{
-    std::string error_message = qd_arrayant_check(*this);
-    if (error_message.length() != 0)
-        return error_message;
-
-    unsigned long long n_elements = e_theta_re.n_slices;
-    unsigned long long n_prt = coupling_re.empty() ? n_elements : coupling_re.n_cols;
-
-    if (element_pos.empty())
-        element_pos.zeros(3, n_elements);
-
-    if (coupling_re.empty())
-        coupling_re.eye(n_elements, n_elements), coupling_im.zeros(n_elements, n_elements);
-
-    if (coupling_im.empty())
-        coupling_im.zeros(n_elements, n_prt);
-
-    qd_arrayant_mark_valid(*this); // After filling the defaults, which may change the data pointers
-    return std::string("");
-}
-
-// Copy: the members are copied; the copy of a valid source is marked as validated with its own data pointers.
 // The source gets the full check (read only), so a mark that no longer fits the data is not passed on.
 template <typename dtype>
 quadriga_lib::arrayant<dtype>::arrayant(const arrayant &other)

@@ -64,7 +64,8 @@ TEST_CASE("Arrayant quick check - Detects resized members with unchanged data po
     {
         a.e_theta_re.zeros(1, 1, 1), a.e_theta_im.zeros(1, 1, 1), a.e_phi_re.zeros(1, 1, 1), a.e_phi_im.zeros(1, 1, 1);
         a.azimuth_grid = {0.0}, a.elevation_grid = {0.0};
-        REQUIRE(a.validate().empty());
+        a.element_pos.zeros(3, 1), a.coupling_re.eye(1, 1), a.coupling_im.zeros(1, 1);
+        REQUIRE(a.is_valid().empty());
         a.e_theta_re.ones(1, 1, 64), a.e_theta_im.zeros(1, 1, 64), a.e_phi_re.zeros(1, 1, 64), a.e_phi_im.zeros(1, 1, 64);
     }
 
@@ -72,7 +73,8 @@ TEST_CASE("Arrayant quick check - Detects resized members with unchanged data po
     {
         a.e_theta_re.ones(2, 2, 20), a.e_theta_im.zeros(2, 2, 20), a.e_phi_re.zeros(2, 2, 20), a.e_phi_im.zeros(2, 2, 20);
         a.azimuth_grid = {-0.5, 0.5}, a.elevation_grid = {-0.5, 0.5};
-        REQUIRE(a.validate().empty());
+        a.element_pos.zeros(3, 20), a.coupling_re.eye(20, 20), a.coupling_im.zeros(20, 20);
+        REQUIRE(a.is_valid().empty());
         a.e_theta_re.ones(2, 1, 40), a.e_theta_im.zeros(2, 1, 40), a.e_phi_re.zeros(2, 1, 40), a.e_phi_im.zeros(2, 1, 40);
     }
 
@@ -158,7 +160,7 @@ TEST_CASE("Arrayant copy and move - The target of a valid source is marked with 
     quadriga_lib::arrayant<double> small;                         // All members inside the objects
     small.e_theta_re.ones(1, 2, 1), small.e_theta_im.zeros(1, 2, 1), small.e_phi_re.zeros(1, 2, 1), small.e_phi_im.zeros(1, 2, 1);
     small.azimuth_grid = {-1.0, 1.0}, small.elevation_grid = {0.0};
-    REQUIRE(small.validate().empty());
+    REQUIRE(small.is_valid().empty());
 
     for (auto *src : {&big, &small})
     {
@@ -201,7 +203,7 @@ TEST_CASE("Arrayant copy - A copy of a valid arrayant is marked as validated")
 {
     // 6 elements on a 10 degree grid: grids of 19 and 37 values, positions [3, 6], coupling [6, 6]
     auto a = quadriga_lib::generate_arrayant_3GPP<double>(1, 3, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0);
-    REQUIRE(a.validate().empty());
+    REQUIRE(a.is_valid().empty());
     REQUIRE(a.element_pos.n_elem > 16);
     REQUIRE(a.coupling_im.n_elem > 16);
 
@@ -235,7 +237,7 @@ TEST_CASE("Arrayant quick check - Library functions do not mark their inputs")
     a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
     REQUIRE(a.check_ptr[0] == nullptr);
 
-    a.combine_pattern();
+    quadriga_lib::arrayant_combine_pattern(a);
     arma::mat az = {0.1}, el = {0.2}, vr, vi, hr, hi;
     quadriga_lib::arrayant_interpolate(a, az, el, vr, vi, hr, hi);
     CHECK(a.check_ptr[0] == nullptr);

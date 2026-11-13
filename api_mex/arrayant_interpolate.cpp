@@ -63,7 +63,7 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 
 ## See also:
 - [[arrayant_generate]] (arrayant struct layout)
-- [[arrayant_qdant_read]] (load arrayant data)
+- [[qdant_read]] (load arrayant data)
 - [[generate_speaker]] (typical source of multi-frequency struct arrays)
 MD!*/
 

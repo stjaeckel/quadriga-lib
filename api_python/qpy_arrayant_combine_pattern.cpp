@@ -87,7 +87,7 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
     if (freq_a.n_elem == 1)
         ant[0].center_frequency = freq_a[0];
 
-    auto arrayant_out = ant[0].combine_pattern(&azimuth_grid_a, &elevation_grid_a, propagation_speed);
+    auto arrayant_out = quadriga_lib::arrayant_combine_pattern(ant[0], &azimuth_grid_a, &elevation_grid_a, propagation_speed);
     return qd_python_arrayant2dict(arrayant_out);
 }
 

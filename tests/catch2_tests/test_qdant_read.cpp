@@ -185,9 +185,9 @@ TEST_CASE("Arrayant reading from QDANT file - Missing ID throws")
 
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
     a.name = "two";
-    a.qdant_write(fn, 2);
+    quadriga_lib::qdant_write(fn, a, 2);
     a.name = "three";
-    a.qdant_write(fn, 3);
+    quadriga_lib::qdant_write(fn, a, 3);
 
     CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::qdant_read<float>(fn, 4), std::invalid_argument);

@@ -83,6 +83,16 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         self.assertEqual(out['e_theta_re'].shape[2], 2)
         npt.assert_array_almost_equal(out['e_theta_re'][:, :, 0], out['e_theta_re'][:, :, 1])
 
+    def test_empty_positions_and_coupling_get_defaults(self):
+        """Empty element_pos / coupling arrays in the dict give zeros / identity in the output."""
+        ant = arrayant.generate('xpol', 10.0)
+        for key in ('element_pos', 'coupling_re', 'coupling_im'):
+            ant[key] = np.zeros((0, 0))
+        out = arrayant.copy_element(ant, 0, 1)  # No growth
+        npt.assert_array_equal(out['element_pos'], np.zeros((3, 2)))
+        npt.assert_array_equal(out['coupling_re'], np.eye(2))
+        npt.assert_array_equal(out['coupling_im'], np.zeros((2, 2)))
+
     def test_copy_preserves_pattern_values(self):
         """Copied element should have identical pattern to source."""
         ant = make_single_freq_ant(n_elem=2)

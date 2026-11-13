@@ -42,13 +42,13 @@ static void run(fz::input &in)
                 fz::clean([&] { quadriga_lib::arrayant<T> b = a; b.is_valid(); a = std::move(b); });
             break;
         case 1:
-            fz::clean([&] { a.validate(); });
+            fz::clean([&] { a.is_valid(); });
             break;
         case 2:
         {
             quadriga_lib::arrayant<T> b = in.ConsumeBool() ? a.copy() : fz::arrayant<T>(in);
             if (n_e <= 16) // keeps repeated appends small
-                fz::clean([&] { a = a.append(&b); });
+                fz::clean([&] { a = quadriga_lib::arrayant_concat(a, b); });
             break;
         }
         case 3:
@@ -73,13 +73,13 @@ static void run(fz::input &in)
                 az = arma::sort(az), el = arma::sort(el);
             const int mode = in.ConsumeIntegralInRange<int>(0, 3);
             T speed = in.ConsumeBool() ? T(299792458.0) : in.value<T>();
-            fz::clean([&] { a = a.combine_pattern(mode & 1 ? &az : nullptr, mode & 2 ? &el : nullptr, speed); });
+            fz::clean([&] { a = quadriga_lib::arrayant_combine_pattern(a, mode & 1 ? &az : nullptr, mode & 2 ? &el : nullptr, speed); });
             break;
         }
         case 6:
         {
             arma::uword src = in.index(n_e), dst = in.index(n_e);
-            fz::clean([&] { a.copy_element(src, dst); });
+            fz::clean([&] { quadriga_lib::arrayant_copy_element(a, src, {dst}); });
             break;
         }
         case 7:
@@ -88,7 +88,7 @@ static void run(fz::input &in)
             arma::uvec dst(in.size(4));
             for (auto &d : dst)
                 d = in.index(n_e);
-            fz::clean([&] { a.copy_element(src, dst); });
+            fz::clean([&] { quadriga_lib::arrayant_copy_element(a, src, dst); });
             break;
         }
         case 8:
@@ -100,7 +100,7 @@ static void run(fz::input &in)
                 i = in.index(n_e);
             const char *maps[] = {"jet", "parula", "winter", "hot", "turbo", "copper", "spring", "cool", "gray", "autumn", "summer", ""};
             std::string cmap = in.ConsumeBool() ? maps[in.ConsumeIntegralInRange<int>(0, 11)] : in.ConsumeRandomLengthString(12);
-            fz::clean([&] { a.export_obj_file(obj, range, cmap, radius, n_div, i_el); });
+            fz::clean([&] { quadriga_lib::arrayant_export_obj_file(obj, a, range, cmap, radius, n_div, &i_el); });
             break;
         }
         case 9:
@@ -111,15 +111,15 @@ static void run(fz::input &in)
                 l = in.ConsumeIntegralInRange<unsigned>(0, 4);
             if (in.ConsumeBool())
                 std::filesystem::remove(qdant);
-            fz::clean([&] { a.qdant_write(qdant, id, layout); });
+            fz::clean([&] { quadriga_lib::qdant_write(qdant, a, id, &layout); });
             fz::clean([&] { arma::u32_mat lay; quadriga_lib::qdant_read<T>(qdant, in.ConsumeIntegralInRange<unsigned>(0, 4), &lay); });
             break;
         }
         case 10:
             if (in.ConsumeBool())
-                fz::clean([&] { a.remove_zeros(); });
+                fz::clean([&] { quadriga_lib::arrayant_remove_zeros(a); });
             else
-                fz::clean([&] { quadriga_lib::arrayant<T> out; a.remove_zeros(&out); a = out; });
+                fz::clean([&] { quadriga_lib::arrayant<T> out = a.copy(); quadriga_lib::arrayant_remove_zeros(out); a = out; });
             break;
         case 11:
         {
@@ -165,7 +165,7 @@ static void run(fz::input &in)
             for (auto &d : dst)
                 d = in.index(n_e);
             fz::clean([&] { quadriga_lib::arrayant_copy_element_multi(vec, src, dst); });
-            fz::clean([&] { quadriga_lib::arrayant_copy_element_multi(vec, in.index(n_e), in.index(n_e)); });
+            fz::clean([&] { quadriga_lib::arrayant_copy_element_multi(vec, in.index(n_e), arma::uvec{in.index(n_e)}); });
             break;
         }
         case 16:

@@ -180,9 +180,9 @@ TEST_CASE("Combine multi - Reversed freq_grid_new (descending)")
 
     REQUIRE(out.size() == 3);
     // At exact match each output should equal that entry's single-freq combine_pattern
-    auto ref0 = vec[2].combine_pattern(); // 2000 Hz
-    auto ref1 = vec[1].combine_pattern(); // 1000 Hz
-    auto ref2 = vec[0].combine_pattern(); //  500 Hz
+    auto ref0 = quadriga_lib::arrayant_combine_pattern(vec[2]); // 2000 Hz
+    auto ref1 = quadriga_lib::arrayant_combine_pattern(vec[1]); // 1000 Hz
+    auto ref2 = quadriga_lib::arrayant_combine_pattern(vec[0]); //  500 Hz
     CHECK(arma::approx_equal(out[0].e_theta_re, ref0.e_theta_re, "absdiff", 1e-10));
     CHECK(arma::approx_equal(out[1].e_theta_re, ref1.e_theta_re, "absdiff", 1e-10));
     CHECK(arma::approx_equal(out[2].e_theta_re, ref2.e_theta_re, "absdiff", 1e-10));
@@ -310,7 +310,7 @@ TEST_CASE("Combine multi - Single entry matches single-freq combine_pattern")
 {
     arma::vec freqs = {1.0e9};
     auto vec = build_simple_multi(freqs, true);
-    auto ref = vec[0].combine_pattern();
+    auto ref = quadriga_lib::arrayant_combine_pattern(vec[0]);
     auto out = quadriga_lib::arrayant_combine_pattern_multi(vec);
 
     REQUIRE(out.size() == 1);
@@ -351,7 +351,7 @@ TEST_CASE("Combine multi - Default output matches per-entry single-freq combine_
     REQUIRE(out.size() == 3);
     for (arma::uword f = 0; f < 3; ++f)
     {
-        auto ref = vec[f].combine_pattern();
+        auto ref = quadriga_lib::arrayant_combine_pattern(vec[f]);
         CHECK(arma::approx_equal(out[f].e_theta_re, ref.e_theta_re, "absdiff", 1e-10));
         CHECK(arma::approx_equal(out[f].e_theta_im, ref.e_theta_im, "absdiff", 1e-10));
         CHECK(arma::approx_equal(out[f].e_phi_re, ref.e_phi_re, "absdiff", 1e-10));
@@ -545,7 +545,7 @@ TEST_CASE("Combine multi - Query below lowest center_freq clamps to first entry"
     arma::vec freq_out = {10.0}; // Way below lowest
     auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_out);
 
-    auto ref = vec[0].combine_pattern();
+    auto ref = quadriga_lib::arrayant_combine_pattern(vec[0]);
     REQUIRE(out.size() == 1);
     CHECK(arma::approx_equal(out[0].e_theta_re, ref.e_theta_re, "absdiff", 1e-9));
     CHECK(arma::approx_equal(out[0].e_theta_im, ref.e_theta_im, "absdiff", 1e-9));
@@ -559,7 +559,7 @@ TEST_CASE("Combine multi - Query above highest center_freq clamps to last entry"
     arma::vec freq_out = {1.0e9}; // Way above highest
     auto out = quadriga_lib::arrayant_combine_pattern_multi<double>(vec, nullptr, nullptr, &freq_out);
 
-    auto ref = vec[2].combine_pattern();
+    auto ref = quadriga_lib::arrayant_combine_pattern(vec[2]);
     REQUIRE(out.size() == 1);
     CHECK(arma::approx_equal(out[0].e_theta_re, ref.e_theta_re, "absdiff", 1e-9));
     CHECK(arma::approx_equal(out[0].e_theta_im, ref.e_theta_im, "absdiff", 1e-9));
@@ -698,7 +698,7 @@ TEST_CASE("Combine multi - Element position introduces frequency-dependent phase
 
     REQUIRE(out.size() == 1);
     // Cross-check against single-freq combine_pattern (also negates dist)
-    auto ref = ant.combine_pattern();
+    auto ref = quadriga_lib::arrayant_combine_pattern(ant);
     // Allow a slightly looser tolerance: single-freq uses c=299792448 (typo), multi uses c=299792458.
     CHECK(std::abs(out[0].e_theta_re(0, 0, 0) - ref.e_theta_re(0, 0, 0)) < 1e-5);
     CHECK(std::abs(out[0].e_theta_im(0, 0, 0) - ref.e_theta_im(0, 0, 0)) < 1e-5);
@@ -724,7 +724,7 @@ TEST_CASE("Combine multi - Doubling frequency doubles the phase shift")
     ant.e_phi_im.zeros(1, 1, 1);
     ant.azimuth_grid = {0.0};
     ant.elevation_grid = {0.0};
-    ant.element_pos.set_size(3, 1);
+    ant.element_pos.zeros(3, 1);
     ant.element_pos(0, 0) = x_pos;
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
@@ -771,7 +771,7 @@ TEST_CASE("Combine multi - Negated dist sign matches single-freq combine_pattern
 
     std::vector<quadriga_lib::arrayant<double>> vec = {ant};
     auto out = quadriga_lib::arrayant_combine_pattern_multi(vec);
-    auto ref = ant.combine_pattern();
+    auto ref = quadriga_lib::arrayant_combine_pattern(ant);
 
     REQUIRE(out.size() == 1);
     // Loose tolerance because of c=299792448 vs 299792458 difference; sign mismatch would be ~1.0
@@ -836,7 +836,7 @@ TEST_CASE("Combine multi - Single speaker generate_speaker workflow")
     // Each output entry has identity coupling and matches single-freq combine_pattern
     for (arma::uword f = 0; f < spk.size(); ++f)
     {
-        auto ref = spk[f].combine_pattern();
+        auto ref = quadriga_lib::arrayant_combine_pattern(spk[f]);
         CHECK(arma::approx_equal(out[f].e_theta_re, ref.e_theta_re, "absdiff", 1e-9));
         CHECK(arma::approx_equal(out[f].e_theta_im, ref.e_theta_im, "absdiff", 1e-9));
         CHECK(std::abs(out[f].center_frequency - spk[f].center_frequency) < 1e-6);
@@ -927,10 +927,10 @@ TEST_CASE("Combine multi - Input arrayant_vec in unsorted frequency order")
 
     REQUIRE(out.size() == 3);
     // Output at f=500 should match vec[1] (which has center_frequency=500, scale=2)
-    auto ref_500 = vec[1].combine_pattern();
+    auto ref_500 = quadriga_lib::arrayant_combine_pattern(vec[1]);
     CHECK(arma::approx_equal(out[0].e_theta_re, ref_500.e_theta_re, "absdiff", 1e-9));
     // Output at f=2000 should match vec[0] (scale=1)
-    auto ref_2000 = vec[0].combine_pattern();
+    auto ref_2000 = quadriga_lib::arrayant_combine_pattern(vec[0]);
     CHECK(arma::approx_equal(out[2].e_theta_re, ref_2000.e_theta_re, "absdiff", 1e-9));
 }
 
@@ -1022,7 +1022,7 @@ TEST_CASE("Combine multi - Default freq grid recovers per-entry combine_pattern 
 
     for (arma::uword f = 0; f < 3; ++f)
     {
-        auto ref = vec[f].combine_pattern();
+        auto ref = quadriga_lib::arrayant_combine_pattern(vec[f]);
         CHECK(arma::approx_equal(out[f].e_theta_re, ref.e_theta_re, "absdiff", 1e-9));
         CHECK(arma::approx_equal(out[f].e_theta_im, ref.e_theta_im, "absdiff", 1e-9));
     }
@@ -1057,7 +1057,7 @@ TEST_CASE("Combine multi - Propagation speed")
     CHECK(std::abs(amp(ac[0], ie, ia90) / p0 - ratio) < 1e-6);
 
     // Same as the single-frequency combine_pattern with the same speed
-    auto single = two[0].combine_pattern(nullptr, nullptr, c);
+    auto single = quadriga_lib::arrayant_combine_pattern<double>(two[0], nullptr, nullptr, c);
     CHECK(arma::approx_equal(ac[0].e_theta_re, single.e_theta_re, "absdiff", 1e-9));
     CHECK(arma::approx_equal(ac[0].e_theta_im, single.e_theta_im, "absdiff", 1e-9));
 

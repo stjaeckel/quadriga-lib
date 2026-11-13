@@ -100,7 +100,7 @@ directivity = quadriga_lib.arrayant.calc_directivity( arrayant, element )
 ## combine_pattern
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
-Also in: [C++](../cpp/array-antenna-class.md#.combine_pattern) · [MATLAB](../mex/array-antenna-functions.md#arrayant_combine_pattern)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_combine_pattern) · [MATLAB](../mex/array-antenna-functions.md#arrayant_combine_pattern)
 
 - Integrates the element field patterns, element positions, and coupling weights into one effective
   pattern per port (column of the coupling matrix)
@@ -152,7 +152,7 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 ## concat
 Concatenate two array antennas into a single one
 
-Also in: [C++](../cpp/array-antenna-functions.md#arrayant_concat_multi) · [MATLAB](../mex/array-antenna-functions.md#arrayant_concat)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_concat) · [MATLAB](../mex/array-antenna-functions.md#arrayant_concat)
 
 - Appends all elements of `arrayant2` onto `arrayant1` along the element dimension; the `element_pos`
   matrices are joined horizontally
@@ -185,7 +185,7 @@ arrayant_out = quadriga_lib.arrayant.concat( arrayant1, arrayant2 )
 ## copy_element
 Create copies of array antenna elements
 
-Also in: [C++](../cpp/array-antenna-class.md#.copy_element) · [MATLAB](../mex/array-antenna-functions.md#arrayant_copy_element)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_copy_element) · [MATLAB](../mex/array-antenna-functions.md#arrayant_copy_element)
 
 - Copies a source element to one or more destination slots within an arrayant
 - The antenna is resized when a destination index exceeds the current number of elements
@@ -224,7 +224,7 @@ arrayant_out = quadriga_lib.arrayant.copy_element( arrayant, [0, 1], [2, 3] )
 ## export_obj_file
 Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
-Also in: [C++](../cpp/array-antenna-class.md#.export_obj_file) · [MATLAB](../mex/array-antenna-functions.md#arrayant_export_obj_file)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_export_obj_file) · [MATLAB](../mex/array-antenna-functions.md#arrayant_export_obj_file)
 
 - The pattern is mapped onto an icosphere; a higher `icosphere_n_div` gives a finer mesh
 - The OBJ file is written to `fn`; the function returns nothing
@@ -519,7 +519,7 @@ V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., com
 ## qdant_read
 Reads array antenna data from QDANT files
 
-Also in: [C++](../cpp/array-antenna-functions.md#qdant_read) · [MATLAB](../mex/array-antenna-functions.md#arrayant_qdant_read)
+Also in: [C++](../cpp/array-antenna-functions.md#qdant_read) · [MATLAB](../mex/array-antenna-functions.md#qdant_read)
 
 - QDANT is the QuaDRiGa array antenna exchange format, an XML format for storing antenna patterns
 - A QDANT file may hold one or several entries (e.g. a frequency-dependent antenna model)
@@ -528,7 +528,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#qdant_read) · [MATLAB](../mex/
   holds multiple entries, or a plain single-entry dict (3D fields) when it holds exactly one; multiple
   entries must form a frequency set (same number of elements, same azimuth and elevation grids, element
   positions and coupling size), otherwise an error asks to pass `id`
-- Differs from MATLAB, where `arrayant_qdant_read(fn)` without `id` reads every entry (here: `id = 0`)
+- Differs from MATLAB, where `qdant_read(fn)` without `id` reads every entry (here: `id = 0`)
 - Reading all entries is the inverse of `qdant_write` with a 4D-pattern dict
 - An `id` that is not in the file raises an error; the first entry counts as ID 1 only if it has no
   `id` attribute
@@ -569,7 +569,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id=0 )
 ## qdant_write
 Writes array antenna data to QDANT files
 
-Also in: [C++](../cpp/array-antenna-class.md#.qdant_write) · [MATLAB](../mex/array-antenna-functions.md#arrayant_qdant_write)
+Also in: [C++](../cpp/array-antenna-functions.md#qdant_write) · [MATLAB](../mex/array-antenna-functions.md#qdant_write)
 
 - QDANT is the QuaDRiGa array antenna exchange format, an XML format for storing antenna patterns
 - Single-frequency input (3D pattern fields) writes one entry; `id` places it in the file, and
@@ -593,7 +593,7 @@ id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant )
 id_in_file = quadriga_lib.arrayant.qdant_write( fn, arrayant, id )
 
 # Frequency-dependent write (4D patterns) — all entries written sequentially
-arrayant.quadriga_lib.qdant_write( fn, arrayant )
+quadriga_lib.arrayant.qdant_write( fn, arrayant )
 ```
 
 ### Inputs:

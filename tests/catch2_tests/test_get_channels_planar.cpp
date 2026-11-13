@@ -16,7 +16,7 @@ TEST_CASE("Get Channels Planar - Minimal test")
 
     // Generate test antenna
     auto ant = quadriga_lib::generate_arrayant_omni<float>();
-    ant.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 1) = -1.0;
     ant.e_theta_re.slice(1) *= 2;
@@ -165,7 +165,7 @@ TEST_CASE("Get Channels Planar - Coupling")
     float pi = 3.141592653589793f;
 
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    ant.copy_element(0, 2);
+    quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 2) = -1.0;
 
@@ -305,7 +305,7 @@ TEST_CASE("Get Channels Planar - 0 paths with add_fake_los_path")
     // with the same geometry (which is moved to slot 0); without add_fake_los_path, the outputs are empty
     const double C = 299792458.0;
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
@@ -362,7 +362,7 @@ TEST_CASE("Get Channels Planar - 0 paths without add_fake_los_path")
 {
     // Empty outputs of size [n_rx_ports, n_tx_ports, 0], also into outputs that held data before
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
     rx.coupling_im = arma::vec({0.0, 0.2});

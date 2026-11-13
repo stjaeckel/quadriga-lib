@@ -18,7 +18,7 @@ TEST_CASE("Get Channels Spherical - Minimal test")
 
     // Generate test antenna
     auto ant = quadriga_lib::generate_arrayant_omni<float>();
-    ant.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 1) = -1.0;
     ant.e_theta_re.slice(1) *= 2;
@@ -148,7 +148,7 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
 
     // Generate test antenna
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    ant.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.element_pos(1, 0) = 15;
     ant.element_pos(1, 1) = -15;
     ant.e_theta_re.slice(1) *= 2;
@@ -323,7 +323,7 @@ TEST_CASE("Get Channels Spherical - Fake LOS")
 TEST_CASE("Get Channels Spherical - Coupling")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    ant.copy_element(0, 2);
+    quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.element_pos(1, 0) = 1.0;
     ant.element_pos(1, 2) = -1.0;
 
@@ -1375,14 +1375,14 @@ TEST_CASE("Get Channels Spherical - Output size with MIMO and multiple paths")
 {
     // Verify output cube dimensions for 2x3 MIMO with 4 paths
     auto tx = quadriga_lib::generate_arrayant_omni<double>();
-    tx.copy_element(0, 1);
-    tx.copy_element(0, 2);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    quadriga_lib::arrayant_copy_element(tx, 0, {2});
     tx.element_pos(1, 0) = 0.5;
     tx.element_pos(1, 1) = 0.0;
     tx.element_pos(1, 2) = -0.5;
 
     auto rx = quadriga_lib::generate_arrayant_omni<double>();
-    rx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(rx, 0, {1});
     rx.element_pos(1, 0) = 0.5;
     rx.element_pos(1, 1) = -0.5;
 
@@ -1535,7 +1535,7 @@ TEST_CASE("Get Channels Spherical - Asymmetric TX/RX antennas")
 {
     // TX has 2 elements, RX has 1 element → output should be [1, 2, n_path]
     auto tx = quadriga_lib::generate_arrayant_omni<double>();
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos(1, 0) = 0.5;
     tx.element_pos(1, 1) = -0.5;
 
@@ -1823,12 +1823,12 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
 
     // MIMO: the per-element spherical offsets of the polyline are kept, the phase-centre length is path_length
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos.zeros(3, 2);
     tx.element_pos(1, 0) = -0.3, tx.element_pos(1, 1) = 0.3, tx.element_pos(2, 1) = 0.1;
     auto rx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    rx.copy_element(0, 1);
-    rx.copy_element(0, 2);
+    quadriga_lib::arrayant_copy_element(rx, 0, {1});
+    quadriga_lib::arrayant_copy_element(rx, 0, {2});
     rx.element_pos.zeros(3, 3);
     rx.element_pos(0, 0) = 0.2, rx.element_pos(1, 1) = 0.25, rx.element_pos(2, 2) = -0.15;
     tx.coupling_re.eye(2, 2), tx.coupling_im.reset();
@@ -2054,7 +2054,7 @@ TEST_CASE("Get Channels Spherical - 0 paths with add_fake_los_path")
     // LOS path with the same geometry (which is moved to slot 0); without add_fake_los_path, the outputs are empty
     const double C = 299792458.0;
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
@@ -2115,7 +2115,7 @@ TEST_CASE("Get Channels Spherical - 0 paths without add_fake_los_path")
 {
     // Empty outputs of size [n_rx_ports, n_tx_ports, 0], also into outputs that held data before
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    tx.copy_element(0, 1);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
     rx.coupling_im = arma::vec({0.0, 0.2});

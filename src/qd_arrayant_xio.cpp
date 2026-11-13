@@ -18,7 +18,7 @@ SECTION!*/
 # qdant_write_multi
 Write a vector of arrayant objects to a single QDANT file
 
-- Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using .[[qdant_write]].
+- Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using [[qdant_write]].
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
 - All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
   Invalid input throws and leaves an existing file unchanged.
@@ -36,7 +36,7 @@ void quadriga_lib::qdant_write_multi(
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects to store
 
 ## See also:
-- .[[qdant_write]] (per-object write used internally)
+- [[qdant_write]] (per-object write used internally)
 - [[qdant_read]] (read back individual entries by ID)
 - [[generate_speaker]] (typical source of frequency-dependent arrayant vectors)
 MD!*/
@@ -67,14 +67,14 @@ void quadriga_lib::qdant_write_multi(const std::string &fn,
 
     // Write all entries without layout (layout validation requires all IDs to exist)
     for (arma::uword i = 0; i < n_entries; ++i)
-        arrayant_vec[i].qdant_write(fn, (unsigned)(i + 1));
+        quadriga_lib::qdant_write(fn, arrayant_vec[i], (unsigned)(i + 1));
 
     // Now all IDs 1..n_entries exist in the file; re-write entry 1 with the full layout
     arma::u32_mat layout(n_entries, 1);
     for (arma::uword i = 0; i < n_entries; ++i)
         layout(i, 0) = (unsigned)(i + 1);
 
-    arrayant_vec[0].qdant_write(fn, 1, layout);
+    quadriga_lib::qdant_write(fn, arrayant_vec[0], 1, &layout);
 }
 
 template void quadriga_lib::qdant_write_multi(const std::string &, const std::vector<quadriga_lib::arrayant<float>> &);
@@ -109,7 +109,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
 - `quadriga_lib::arrayant<dtype>` constructed from the specified entry in the file
 
 ## See also:
-- .[[qdant_write]] (write a single arrayant)
+- [[qdant_write]] (write a single arrayant)
 - [[qdant_write_multi]] (write multiple arrayants with sequential IDs)
 MD!*/
 
@@ -142,7 +142,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned 
         throw std::invalid_argument(error_message.c_str());
 
     // Throw validation errors
-    error_message = ant.validate();
+    error_message = ant.is_valid();
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -256,7 +256,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
             throw std::invalid_argument("qdant_read_multi: Error reading ID " + std::to_string(id) +
                                         " from '" + fn + "': " + error_message);
 
-        error_message = ant.validate();
+        error_message = ant.is_valid();
         if (!error_message.empty())
             throw std::invalid_argument("qdant_read_multi: Validation failed for ID " + std::to_string(id) +
                                         " from '" + fn + "': " + error_message);
@@ -281,6 +281,8 @@ Validate a vector of arrayant objects for multi-frequency consistency
 - Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
 - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
+- All entries must use the same form for `element_pos`, `coupling_re` and `coupling_im`: all empty or all given; a
+  mix of empty members and explicit zeros / identity is rejected.
 - Stops at first error and returns a message identifying the failing entry and property.
 
 ## Declaration:
@@ -437,7 +439,7 @@ template std::string qd_arrayant_check_multi(const std::vector<quadriga_lib::arr
 # arrayant_copy_element_multi
 Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector
 
-- Calls .[[copy_element]] on every entry in the vector with the same source and destination indices.
+- Calls [[arrayant_copy_element]] on every entry in the vector with the same source and destination indices.
 - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry.
 - Source and destination indices are 0-based.
 
@@ -446,18 +448,13 @@ Copy an antenna element to one or more destinations across all entries in a mult
 void quadriga_lib::arrayant_copy_element_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         arma::uword source,
-        arma::uvec destination);
-
-void quadriga_lib::arrayant_copy_element_multi(
-        std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        arma::uword source,
-        arma::uword destination);
+        const arma::uvec &destination);
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
 - **`source`** — Index of the element to copy from; must be within current element count
-- **`destination`** — Index or indices of target elements; enlarges all entries if any index exceeds current count
+- **`destination`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
 
 ## Example:
 ```
@@ -465,11 +462,11 @@ arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
     0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
-quadriga_lib::arrayant_copy_element_multi(driver, 0, arma::uvec{1, 2, 3});
+quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
 ## See also:
-- .[[copy_element]] (per-entry operation called internally)
+- [[arrayant_copy_element]] (per-entry operation called internally)
 - [[arrayant_set_element_pos_multi]] (set element positions after copying)
 - [[arrayant_concat_multi]] (combine multiple arrayant vectors)
 MD!*/
@@ -477,7 +474,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
                                                arma::uword source,
-                                               arma::uvec destination)
+                                               const arma::uvec &destination)
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("arrayant_copy_element_multi: Input vector is empty.");
@@ -489,7 +486,7 @@ void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayan
     {
         try
         {
-            arrayant_vec[i].copy_element(source, destination);
+            quadriga_lib::arrayant_copy_element(arrayant_vec[i], source, destination);
         }
         catch (const std::invalid_argument &e)
         {
@@ -499,20 +496,8 @@ void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayan
     }
 }
 
-template <typename dtype>
-void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-                                               arma::uword source,
-                                               arma::uword destination)
-{
-    arma::uvec dest(1);
-    dest.at(0) = destination;
-    quadriga_lib::arrayant_copy_element_multi(arrayant_vec, source, dest);
-}
-
-template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<float>> &, arma::uword, arma::uvec);
-template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<float>> &, arma::uword, arma::uword);
-template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<double>> &, arma::uword, arma::uvec);
-template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<double>> &, arma::uword, arma::uword);
+template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<float>> &, arma::uword, const arma::uvec &);
+template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<double>> &, arma::uword, const arma::uvec &);
 
 /*!MD
 # arrayant_set_element_pos_multi
@@ -840,7 +825,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
                                         out.coupling_re, out.coupling_im);
 
         // Validate and initialize check_ptr
-        err = out.validate();
+        err = out.is_valid();
         if (!err.empty())
             throw std::invalid_argument("arrayant_concat_multi: Output validation failed at index " +
                                         std::to_string(i) + ": " + err);
@@ -859,7 +844,7 @@ template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::arrayant_conc
 # arrayant_combine_pattern_multi
 Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency)
 
-- Multi-frequency counterpart to .[[combine_pattern]]
+- Multi-frequency counterpart to [[arrayant_combine_pattern]]
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
 - Output length = `freq_grid_new->n_elem` if provided; otherwise one entry per input arrayant
 - Field interpolation across frequency is delegated to [[arrayant_interpolate_multi]] (SLERP with linear-interpolation fallback)
@@ -890,7 +875,7 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
 - Vector of arrayant objects (length = `n_freq_out`), each with `n_ports` elements equal to the number of columns in the coupling matrix
 
 ## See also:
-- .[[combine_pattern]] (single-frequency counterpart)
+- [[arrayant_combine_pattern]] (single-frequency counterpart)
 - [[arrayant_interpolate_multi]] (used internally for spatial+frequency field interpolation)
 - [[arrayant_is_valid_multi]] (input validation)
 MD!*/
