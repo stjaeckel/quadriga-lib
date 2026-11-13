@@ -288,7 +288,7 @@ namespace
                                          const arma::Cube<dtype> &orientation, const arma::Mat<dtype> &pos)
     {
         const arma::uword n_out = i_element.n_elem, n_ang = az.n_cols;
-        const arma::cube R = quadriga_lib::calc_rotation_matrix(arma::conv_to<arma::cube>::from(orientation), true, false);
+        const arma::cube R = quadriga_lib::calc_rotation_matrix(arma::conv_to<arma::cube>::from(orientation));
         std::vector<qd_expect> x(n_out * n_ang);
         for (arma::uword a = 0; a < n_ang; ++a)
             for (arma::uword o = 0; o < n_out; ++o)
@@ -468,7 +468,8 @@ TEST_CASE("arrayant_interpolate - a smooth pattern is reproduced between the sam
 
 TEST_CASE("arrayant_interpolate - heading and tilt shift the local angles")
 {
-    // Heading -pi/8 adds pi/8 to the local azimuth; tilt -pi/16 adds pi/16 to the local elevation (hand values)
+    // Heading -pi/8 adds pi/8 to the local azimuth; tilt +pi/16 (a downtilt, 3GPP TR 38.901) adds pi/16 to the local
+    // elevation (hand values)
     QD_DIAG("\n# diag: heading and tilt, largest deviation from the hand values\n");
     QD_DIAG("case,dtype,kernel,d_field,d_az,d_el,d_gamma,d_dist\n");
     const cxd s[4] = {{1.0, 0.0}, {0.0, 1.0}, {-2.0, 0.0}, {0.0, -1.0}};
@@ -479,7 +480,7 @@ TEST_CASE("arrayant_interpolate - heading and tilt shift the local angles")
         const auto ant = two_sample_ant<dtype>(tilt, s[0], s[1], s[2], s[3]);
         const double shift = tilt ? pi / 16.0 : pi / 8.0, span = tilt ? 0.5 * pi : pi;
         arma::Cube<dtype> ori(3, 1, 1, arma::fill::zeros);
-        ori(tilt ? 1 : 2) = (dtype)(-shift);
+        ori(tilt ? 1 : 2) = (dtype)(tilt ? shift : -shift);
         arma::Mat<dtype> az(1, 4, arma::fill::zeros), el(1, 4, arma::fill::zeros);
         std::vector<qd_expect> x(4);
         for (arma::uword a = 0; a < 4; ++a)

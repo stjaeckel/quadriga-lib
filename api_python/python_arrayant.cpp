@@ -125,11 +125,9 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("rotate_pattern", &arrayant_rotate_pattern,
           py::arg("arrayant"),
-          py::arg("x_deg") = 0.0,
-          py::arg("y_deg") = 0.0,
-          py::arg("z_deg") = 0.0,
+          py::arg("orientation"),
           py::arg("usage") = 0,
-          py::arg("element") = py::none());
+          py::arg("i_element") = py::none());
 
     m.def("get_channels_planar", &get_channels_planar,
           py::arg("ant_tx"),

@@ -34,8 +34,8 @@ ant2.e_phi_im   = repmat(ant_c.e_phi_im,   [1 1 2]);
 ant2.element_pos = zeros(3, 2);
 ant2.coupling_re = eye(2);
 ant2.coupling_im = zeros(2, 2);
-ant2 = quadriga_lib.arrayant_rotate_pattern(ant2, 0, 0,  45, 0, 1);
-ant2 = quadriga_lib.arrayant_rotate_pattern(ant2, 0, 0, -45, 0, 2);
+ant2 = quadriga_lib.arrayant_rotate_pattern(ant2, [0; 0; pi/4], 0, 1);
+ant2 = quadriga_lib.arrayant_rotate_pattern(ant2, [0; 0; -pi/4], 0, 2);
 
 [~, ~, az_pt] = quadriga_lib.arrayant_calc_beamwidth(ant2);
 assertElementsAlmostEqual( az_pt, [45; -45], 'absolute', 0.5 );

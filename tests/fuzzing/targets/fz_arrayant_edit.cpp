@@ -4,7 +4,7 @@
 
 // Array antenna member functions in a fuzzed order on a fuzzed arrayant: is_valid, copy and move, validate, append,
 // calc_beamwidth_deg, calc_directivity_dBi, combine_pattern, copy_element, export_obj_file, qdant_write / qdant_read,
-// remove_zeros, rotate_pattern, set_size, reset; and the multi-frequency functions arrayant_is_valid_multi,
+// remove_zeros, set_size, reset; arrayant_rotate_pattern; and the multi-frequency functions arrayant_is_valid_multi,
 // arrayant_concat_multi, arrayant_copy_element_multi, arrayant_rotate_pattern_multi, arrayant_set_element_pos_multi,
 // arrayant_combine_pattern_multi, qdant_write_multi / qdant_read_multi
 
@@ -123,13 +123,12 @@ static void run(fz::input &in)
             break;
         case 11:
         {
-            T x = in.value<T>(), y = in.value<T>(), z = in.value<T>();
+            const arma::Col<T> orientation = {in.value<T>(), in.value<T>(), in.value<T>()};
             unsigned usage = in.ConsumeIntegralInRange<unsigned>(0, 5);
-            unsigned element = in.ConsumeBool() ? unsigned(-1) : (unsigned)in.index(n_e);
-            if (in.ConsumeBool())
-                fz::clean([&] { a.rotate_pattern(x, y, z, usage, element); });
-            else
-                fz::clean([&] { quadriga_lib::arrayant<T> out; a.rotate_pattern(x, y, z, usage, element, &out); a = out; });
+            arma::uvec i_el(in.size(3));
+            for (auto &i : i_el)
+                i = in.index(n_e);
+            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern(a, orientation, usage, &i_el); });
             break;
         }
         case 12:
@@ -171,12 +170,12 @@ static void run(fz::input &in)
         case 16:
         {
             auto vec = fuzzed_vector<T>(in, a);
-            T x = in.value<T>(), y = in.value<T>(), z = in.value<T>();
+            const arma::Col<T> orientation = {in.value<T>(), in.value<T>(), in.value<T>()};
             unsigned usage = in.ConsumeIntegralInRange<unsigned>(0, 5);
             arma::uvec i_el(in.size(3));
             for (auto &i : i_el)
                 i = in.index(n_e);
-            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern_multi(vec, x, y, z, usage, i_el); });
+            fz::clean([&] { quadriga_lib::arrayant_rotate_pattern_multi(vec, orientation, usage, &i_el); });
             break;
         }
         case 17:

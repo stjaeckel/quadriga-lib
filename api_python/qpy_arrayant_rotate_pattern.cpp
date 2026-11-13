@@ -10,34 +10,31 @@ SECTION!*/
 
 /*!MD
 # rotate_pattern
-Rotate antenna radiation patterns around the principal axes using Euler rotations
+Rotate antenna radiation patterns using Euler rotations
 
-- Rotates the pattern and/or polarization of array antenna elements around the x (bank), y (tilt), and z (heading) axes
-- Rotations are applied in the order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
-- Single-frequency input (3D pattern fields): `usage` 0 and 1 adjust the sampling grid for non-uniformly sampled antennas
-- Coupling, `center_freq` and `name` are kept, also when the sampling grid is adjusted
+- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
+  [[interpolate]] returns for the unrotated pattern with the same `orientation`
+- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_freq` and `name` are kept
+- Single-frequency input (3D pattern fields): `usage` 0 and 1 adjust the sampling grid for non-uniformly sampled
+  antennas; this needs all elements, so a subset in `i_element` raises an error when the grid must be adjusted
 - Frequency-dependent input (4D pattern fields): the rotation is applied to every entry and the grid is never adjusted,
   since all entries must share one grid
 - For scalar acoustic fields (pressure stored in `e_theta_re` only) use `usage = 1` to avoid spurious polarization effects
 
 ## Usage:
 ```
-# Rotate all elements by 45 deg bank
-arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, x_deg=45.0 )
+# 10 degree mechanical downtilt (0.1745 rad) of all elements
+arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.1745, 0.0])
 
-# Rotate only elements 0 and 1 by 90 deg heading
-arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, z_deg=90.0, element=[0, 1] )
-
-# Frequency-dependent input (4D patterns) — same interface
-arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, y_deg=10.0 )
+# Elements 0 and 1 only, 90 degree heading (1.5708 rad)
+arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.0, 1.5708], i_element=[0, 1])
 ```
 
 ## Inputs:
 - **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may
   be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`x_deg`** — Rotation around the x-axis (bank) in degrees; default: 0.0
-- **`y_deg`** — Rotation around the y-axis (tilt) in degrees; default: 0.0
-- **`z_deg`** — Rotation around the z-axis (heading) in degrees; default: 0.0
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad; 3 elements
 - **`usage`** — Rotation mode; default: 0<br><br>
    | Mode | Pattern | Polarization | Grid adj. |
    | :--: | :-----: | :----------: | :-------: |
@@ -48,8 +45,8 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, y_deg=10.0 )
    | 4    | Yes     | No           | No        |
 
    for 4D input the grid is never adjusted, so `0`/`3` and `1`/`4` are equivalent
-- **`element`** — Element indices to rotate; 1D list or array of int; `None` or empty rotates all
-  elements; default: `None`
+- **`i_element`** — Element indices to rotate, 0-based, no duplicates; `None` or empty rotates all elements;
+  default: `None`
 
 ## Outputs:
 - **`arrayant_out`** — Dict with the rotated array antenna data; same keys and layout as
@@ -57,32 +54,27 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, y_deg=10.0 )
 MD!*/
 
 py::dict arrayant_rotate_pattern(const py::dict &arrayant,
-                                 double x_deg,
-                                 double y_deg,
-                                 double z_deg,
+                                 const py::handle &orientation,
                                  unsigned usage,
-                                 py::handle element)
+                                 const py::handle &i_element)
 {
-    // Element indices (0-based); empty = rotate all elements
-    const arma::uvec element_ind = qd_python_numpy2arma_Col<arma::uword>(element, true);
+    const arma::vec ori = qd_python_numpy2arma_Col<double>(orientation, true);
+    if (ori.n_elem != 3)
+        throw std::invalid_argument("Input 'orientation' must have 3 elements.");
 
-    // Parse the (possibly frequency-dependent) antenna
-    auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false, false, true, false);
+    // Element indices (0-based); empty = rotate all elements
+    const arma::uvec i_el = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
+
+    // Parse the (possibly frequency-dependent) antenna (copy, the user's arrays are not changed)
+    auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false, false, false, false);
 
     if (ant_vec.size() > 1) // Frequency-dependent: rotate every entry
     {
-        unsigned usage_multi = (usage == 3) ? 0 : ((usage == 4) ? 1 : usage);
-        quadriga_lib::arrayant_rotate_pattern_multi(ant_vec, x_deg, y_deg, z_deg, usage_multi, element_ind);
+        const unsigned usage_multi = (usage == 3) ? 0 : ((usage == 4) ? 1 : usage);
+        quadriga_lib::arrayant_rotate_pattern_multi(ant_vec, ori, usage_multi, &i_el);
     }
-    else // Single-frequency: usage 0/1 adjust the sampling grid.
-    {
-        auto &ant = ant_vec[0];
-        if (element_ind.n_elem == 0)
-            ant.rotate_pattern(x_deg, y_deg, z_deg, usage);
-        else
-            for (arma::uword el : element_ind)
-                ant.rotate_pattern(x_deg, y_deg, z_deg, usage, (unsigned)el);
-    }
+    else // Single-frequency: usage 0/1 adjust the sampling grid
+        quadriga_lib::arrayant_rotate_pattern(ant_vec[0], ori, usage, &i_el);
 
     return qd_python_arrayant2dict_multi(ant_vec);
 }
@@ -90,8 +82,6 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
 // pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
 // m.def("rotate_pattern", &arrayant_rotate_pattern,
 //       py::arg("arrayant"),
-//       py::arg("x_deg") = 0.0,
-//       py::arg("y_deg") = 0.0,
-//       py::arg("z_deg") = 0.0,
+//       py::arg("orientation"),
 //       py::arg("usage") = 0,
-//       py::arg("element") = py::none());
+//       py::arg("i_element") = py::none());

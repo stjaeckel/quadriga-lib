@@ -192,8 +192,9 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
     CHECK(std::abs(coeff_im.at(0, 1, 0) - 0.0) < 1.0e-6);
     CHECK(std::abs(coeff_im.at(1, 1, 0) - 0.0) < 1.0e-6);
 
+    // Bank -pi/2 turns element 0 (y = +15) to z = -15; tilt -pi/2 (an uptilt) turns it to x = +15, toward the RX
     quadriga_lib::get_channels_spherical<double>(&ant, &probe,
-                                                 0.0, 0.0, 1.0, -pi / 2.0, pi / 2.0, 0.0,
+                                                 0.0, 0.0, 1.0, -pi / 2.0, -pi / 2.0, 0.0,
                                                  20.0, 0.0, 1.0, pi / 2.0, 0.0, 0.0,
                                                  &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
                                                  &coeff_re, &coeff_im, &delay, 2997924580.0, false);
@@ -2231,4 +2232,26 @@ TEST_CASE("Get Channels Spherical - fake LOS slot when the TX-RX distance overfl
 {
     check_fake_los_slot_far_rx<float>(1.0e20f); // squared distance above the float range
     check_fake_los_slot_far_rx<double>(1.0e200);
+}
+
+TEST_CASE("get_channels_spherical - a positive tilt points down (3GPP TR 38.901)")
+{
+    // The TX is 10 m above the RX and 10 m away: the RX is 45 degree below the TX. A beam along x reaches the other
+    // end only when turned toward it: TX tilt +pi/4 (down); RX heading pi and tilt -pi/4 (up).
+    const double q = arma::datum::pi / 4.0;
+    const auto beam = quadriga_lib::generate_arrayant_custom<double>(40.0, 40.0, 0.0, 5.0);
+    const auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
+    const arma::mat pos(arma::vec{5.0, 0.0, 5.0}); // A scatterer on the LOS
+    const arma::vec gain = {1.0}, length = {0.0};
+    arma::mat M(8, 1, arma::fill::zeros);
+    M(0, 0) = 1.0, M(6, 0) = -1.0;
+    auto power = [&](const quadriga_lib::arrayant<double> &tx, const quadriga_lib::arrayant<double> &rx, double Tt, double Rt)
+    {
+        arma::cube cr, ci, dl;
+        quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, Tt, 0.0, 10.0, 0.0, 0.0, 0.0, Rt, arma::datum::pi,
+                                                     &pos, &pos, &gain, &length, &M, &cr, &ci, &dl);
+        return arma::accu(cr % cr + ci % ci);
+    };
+    CHECK(power(beam, omni, q, 0.0) > 100.0 * power(beam, omni, -q, 0.0));
+    CHECK(power(omni, beam, 0.0, -q) > 100.0 * power(omni, beam, 0.0, q));
 }

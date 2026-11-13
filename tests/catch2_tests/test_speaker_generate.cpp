@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_test_arrayant.hpp"
 
 #include <iostream>
 #include <string>
@@ -1494,7 +1495,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: z-rotation shifts on-axis direction")
     double side_before = spk[0].e_theta_re(9, 27, 0);     // az=90, el=0 → +y
     CHECK(on_axis_before > side_before);                    // Piston beams forward
 
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 90.0, 1);
+    qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 2.0, 1);
 
     // After 90° z-rotation: peak should now be at az=90° (+y)
     double at_x_after = spk[0].e_theta_re(9, 18, 0);  // az=0
@@ -1520,7 +1521,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: 360° rotation is identity")
     }
 
     // Rotate 360° around z
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 360.0, 1);
+    qd_rotate_multi(spk, 0.0, 0.0, 2.0 * arma::datum::pi, 1);
 
     for (size_t i = 0; i < spk.size(); ++i)
     {
@@ -1535,7 +1536,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: consistent across frequencies")
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 45.0, 1);
+    qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 1);
 
     // All frequencies should have the same grid (grid not adjusted)
     for (size_t i = 1; i < spk.size(); ++i)
@@ -1559,7 +1560,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: grid preserved (no adjustment)")
     arma::uword n_az_orig = spk[0].n_azimuth();
     arma::uword n_el_orig = spk[0].n_elevation();
 
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 10.0, 20.0, 30.0, 1);
+    qd_rotate_multi(spk, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 1);
 
     // Grid dimensions and values must be unchanged
     CHECK(spk[0].n_azimuth() == n_az_orig);
@@ -1577,9 +1578,9 @@ TEST_CASE("Speaker - rotate_pattern_multi: usage 0 pattern+polarization")
                                                         "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
     // Usage 0 rotates both pattern and polarization
-    quadriga_lib::arrayant_rotate_pattern_multi(spk0, 0.0, 0.0, 45.0, 0);
+    qd_rotate_multi(spk0, 0.0, 0.0, arma::datum::pi / 4.0, 0);
     // Usage 1 rotates only pattern
-    quadriga_lib::arrayant_rotate_pattern_multi(spk1, 0.0, 0.0, 45.0, 1);
+    qd_rotate_multi(spk1, 0.0, 0.0, arma::datum::pi / 4.0, 1);
 
     // e_theta_re should be identical (same pattern rotation)
     CHECK(arma::approx_equal(spk0[0].e_theta_re, spk1[0].e_theta_re, "absdiff", 0.01));
@@ -1600,7 +1601,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: usage 2 polarization only")
     // Usage 2: only polarization, pattern should be unchanged
     // For a purely theta-polarized source, rotating polarization redistributes energy
     // but the total power per angle should remain the same
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 45.0, 2);
+    qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 2);
 
     // Check that total power at each grid point is preserved
     arma::cube power_orig = theta_orig % theta_orig;
@@ -1624,7 +1625,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: selected elements only")
 
     // Rotate only element 1
     arma::uvec idx = {1};
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 90.0, 1, idx);
+    qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 2.0, 1, idx);
 
     // Element 0 should be unchanged
     CHECK(arma::approx_equal(spk[0].e_theta_re.slice(0), elem0_before, "absdiff", 1e-12));
@@ -1645,7 +1646,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: multiple selected elements")
 
     // Rotate elements 0 and 1 but not 2
     arma::uvec idx = {0, 1};
-    quadriga_lib::arrayant_rotate_pattern_multi(drv, 0.0, 0.0, 90.0, 1, idx);
+    qd_rotate_multi(drv, 0.0, 0.0, arma::datum::pi / 2.0, 1, idx);
 
     // Element 2 should be unchanged
     CHECK(arma::approx_equal(drv[0].e_theta_re.slice(2), elem2_before, "absdiff", 1e-12));
@@ -1663,7 +1664,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: omni pattern stays omni after rotatio
     double val_before = spk[0].e_theta_re(9, 18, 0);
 
     // Any rotation of an omnidirectional pattern should stay omnidirectional
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 30.0, 45.0, 60.0, 1);
+    qd_rotate_multi(spk, arma::datum::pi / 6.0, arma::datum::pi / 4.0, arma::datum::pi / 3.0, 1);
 
     double val_max = spk[0].e_theta_re.max();
     double val_min = spk[0].e_theta_re.min();
@@ -1680,7 +1681,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: y-rotation tilts beam")
 
     double on_axis_before = spk[0].e_theta_re(9, 18, 0); // az=0, el=0
 
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 90.0, 0.0, 1);
+    qd_rotate_multi(spk, 0.0, arma::datum::pi / 2.0, 0.0, 1);
 
     // After tilt: peak should be near el=-90° (ie=0)
     double at_bottom = spk[0].e_theta_re(0, 18, 0);  // az=0, el=-90°
@@ -1693,7 +1694,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: y-rotation tilts beam")
 TEST_CASE("Speaker - rotate_pattern_multi: empty vector throws")
 {
     std::vector<quadriga_lib::arrayant<double>> empty_vec;
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(empty_vec, 0.0, 0.0, 45.0, 1), std::invalid_argument);
+    REQUIRE_THROWS_AS(qd_rotate_multi(empty_vec, 0.0, 0.0, arma::datum::pi / 4.0, 1), std::invalid_argument);
 }
 
 TEST_CASE("Speaker - rotate_pattern_multi: invalid usage throws")
@@ -1701,8 +1702,8 @@ TEST_CASE("Speaker - rotate_pattern_multi: invalid usage throws")
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 45.0, 3), std::invalid_argument);
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 45.0, 4), std::invalid_argument);
+    REQUIRE_THROWS_AS(qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 3), std::invalid_argument);
+    REQUIRE_THROWS_AS(qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 4), std::invalid_argument);
 }
 
 TEST_CASE("Speaker - rotate_pattern_multi: out-of-range element throws")
@@ -1711,7 +1712,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: out-of-range element throws")
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
     arma::uvec idx = {5};
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 45.0, 1, idx), std::invalid_argument);
+    REQUIRE_THROWS_AS(qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 1, idx), std::invalid_argument);
 }
 
 TEST_CASE("Speaker - rotate_pattern_multi: float template")
@@ -1721,7 +1722,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: float template")
                                                       "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
 
     float on_axis_before = spk[0].e_theta_re(9, 18, 0);
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0f, 0.0f, 90.0f, 1);
+    qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 2.0, 1);
     float at_y_after = spk[0].e_theta_re(9, 27, 0);
 
     CHECK(std::abs(at_y_after - on_axis_before) < 0.05f);
@@ -1733,7 +1734,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: valid after rotation")
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                        "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, freqs, 10.0);
 
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 15.0, 30.0, 45.0, 1);
+    qd_rotate_multi(spk, arma::datum::pi / 12.0, arma::datum::pi / 6.0, arma::datum::pi / 4.0, 1);
 
     for (size_t i = 0; i < spk.size(); ++i)
     {
@@ -1758,8 +1759,8 @@ TEST_CASE("Speaker - rotate_pattern_multi: two opposite rotations cancel")
         orig.push_back(spk[i].e_theta_re);
 
     // Rotate then un-rotate
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, 45.0, 1);
-    quadriga_lib::arrayant_rotate_pattern_multi(spk, 0.0, 0.0, -45.0, 1);
+    qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 1);
+    qd_rotate_multi(spk, 0.0, 0.0, -arma::datum::pi / 4.0, 1);
 
     // Should approximately recover original (interpolation introduces small errors)
     for (size_t i = 0; i < spk.size(); ++i)
@@ -1785,7 +1786,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: documentation example 2-way speaker")
     arma::mat woofer_1k_before = speaker[2].e_theta_re.slice(0);
 
     // Rotate entire speaker 30 degrees around the z-axis (heading)
-    quadriga_lib::arrayant_rotate_pattern_multi(speaker, 0.0, 0.0, 30.0, 1);
+    qd_rotate_multi(speaker, 0.0, 0.0, arma::datum::pi / 6.0, 1);
 
     // Both elements should have been rotated
     CHECK(!arma::approx_equal(speaker[2].e_theta_re.slice(0), woofer_1k_before, "absdiff", 0.01));
@@ -1796,7 +1797,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: documentation example 2-way speaker")
 
     // Tilt only the tweeter (element 1) upward by 10 degrees
     arma::uvec tweeter_idx = {1};
-    quadriga_lib::arrayant_rotate_pattern_multi(speaker, 0.0, 10.0, 0.0, 1, tweeter_idx);
+    qd_rotate_multi(speaker, 0.0, arma::datum::pi / 18.0, 0.0, 1, tweeter_idx);
 
     // Woofer (element 0) should be unchanged
     CHECK(arma::approx_equal(speaker[4].e_theta_re.slice(0), woofer_10k_before, "absdiff", 1e-12));

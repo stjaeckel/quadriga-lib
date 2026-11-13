@@ -196,8 +196,8 @@ void qd_SOS_GENERIC(const double *fx, const double *fy, const double *fz, // Fre
 
 // Interpolation of array antenna patterns (arrayant_interpolate), scalar kernel in the precision of dtype
 // Called through qd_arrayant_interpolate_dispatch, which checks the preconditions stated below; the kernel does not.
-// 'rotation' holds the transposed rotation matrices of the orientations with inverted tilt (qd_rotation_matrix with
-// invert_y_axis = true and transposeR = true), in column-major order.
+// 'rotation' holds the transposed rotation matrices of the orientations (qd_rotation_matrix with transposeR = true),
+// in column-major order.
 template <typename dtype>
 void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_theta_im,       // e-theta field, real / imaginary part, [n_elevation, n_azimuth, n_elements]
                                      const dtype *e_phi_re, const dtype *e_phi_im,           // e-phi field, real / imaginary part, [n_elevation, n_azimuth, n_elements]

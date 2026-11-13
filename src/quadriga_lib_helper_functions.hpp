@@ -111,7 +111,6 @@ template <typename dtype>
 static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientation vectors (Euler rotations)
                                       dtype *rotation_matrix_9xN,    // Rotation matrix in column-major ordering
                                       size_t N = 1,                  // Number of elements
-                                      bool invert_y_axis = false,    // Inverts the y-axis
                                       bool transposeR = false)       // Returns the transpose of R
 {
     for (size_t i = 0; i < 3 * N; i += 3)
@@ -123,7 +122,6 @@ static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientat
         double cb = (double)O[1], sb = std::sin(cb);
         double ca = (double)O[2], sa = std::sin(ca);
         ca = std::cos(ca), cb = std::cos(cb), cc = std::cos(cc);
-        sb = invert_y_axis ? -sb : sb;
 
         if (transposeR)
         {

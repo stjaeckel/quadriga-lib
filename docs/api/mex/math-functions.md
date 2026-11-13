@@ -23,13 +23,11 @@ Also in: [C++](../cpp/math-functions.md#calc_rotation_matrix) · Not in: Python
 
 ### Usage:
 ```matlab
-rotation = quadriga_lib.calc_rotation_matrix( orientation, invert_y_axis, transpose );
+rotation = quadriga_lib.calc_rotation_matrix( orientation, transpose );
 ```
 
 ### Inputs:
 - **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`invert_y_axis`** — Flips the sign of the tilt angle, i.e. applies `-tilt` instead of
-  `tilt`; use when the input convention defines positive tilt as downward; logical; default: false
 - **`transpose`** — Returns the transpose of the rotation matrix; logical; default: false
 
 ### Outputs:

@@ -15,7 +15,8 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-array-
 | [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Interpolate a multi-frequency array antenna at given angles and frequencies |
 | [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Validate a vector of arrayant objects for multi-frequency consistency |
 | [arrayant_remove_zeros](#arrayant_remove_zeros) | Remove zero-valued entries from antenna pattern data, reducing its size |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Apply Euler rotations to all entries in a multi-frequency arrayant vector |
+| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Rotate antenna radiation patterns using Euler rotations, in place |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Apply Euler rotations to all entries in a multi-frequency arrayant vector, in place |
 | [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Set element positions for all entries in a multi-frequency arrayant vector |
 | [generate_arrayant_3GPP](#generate_arrayant_3GPP) | Generate a 3GPP-NR compliant antenna array model |
 | [generate_arrayant_custom](#generate_arrayant_custom) | Generate an antenna with custom 3dB beamwidth |
@@ -66,7 +67,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(
 ### See also:
 - [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) (multi-freq counterpart)
 - [arrayant_interpolate](#arrayant_interpolate) (used internally to compute effective radiation patterns)
-- [.rotate_pattern](array-antenna-class.md#.rotate_pattern) (useful for orienting array antenna patterns)
+- [arrayant_rotate_pattern](#arrayant_rotate_pattern) (useful for orienting array antenna patterns)
 
 ---
 <a id="arrayant_combine_pattern_multi"></a>
@@ -493,37 +494,82 @@ void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant);
 - **`ant`** — Valid arrayant; updated in-place
 
 ---
-<a id="arrayant_rotate_pattern_multi"></a>
-## arrayant_rotate_pattern_multi
-Apply Euler rotations to all entries in a multi-frequency arrayant vector
+<a id="arrayant_rotate_pattern"></a>
+## arrayant_rotate_pattern
+Rotate antenna radiation patterns using Euler rotations, in place
 
 Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_rotate_pattern) · [Python](../python/array-antenna-functions.md#rotate_pattern)
 
-- Calls [.rotate_pattern](array-antenna-class.md#.rotate_pattern) on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
-- If `i_element` is empty, all elements are rotated; otherwise only the specified indices are affected.
-- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects.
+- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
+  [arrayant_interpolate](#arrayant_interpolate) returns for the unrotated pattern with the same `orientation`
+- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_frequency` and `name` are kept
+- Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
+  in `i_element` throws when the grid must be adjusted
+- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_rotate_pattern(
+    arrayant<dtype> &ant,
+    const arma::Mat<dtype> &orientation,
+    unsigned usage = 0,
+    const arma::uvec *i_element = nullptr);
+```
+
+### Inputs:
+- **`ant`** — Valid arrayant; updated in place
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
+- **`usage`** *(optional)* — Rotation mode:
+   | Mode | Pattern | Polarization | Grid adjustment |
+   | ---- | ------- | ------------ | --------------- |
+   | 0    | Yes     | Yes          | Yes             |
+   | 1    | Yes     | No           | Yes             |
+   | 2    | No      | Yes          | No              |
+   | 3    | Yes     | Yes          | No              |
+   | 4    | Yes     | No           | No              |
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
+
+### Example:
+```cpp
+auto ant = quadriga_lib::generate_arrayant_3GPP<double>(4, 1);
+arma::vec downtilt = {0.0, 10.0 * arma::datum::pi / 180.0, 0.0}; // 10 degree mechanical downtilt
+quadriga_lib::arrayant_rotate_pattern(ant, downtilt);
+```
+
+### See also:
+- [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) (multi-freq counterpart)
+- [arrayant_interpolate](#arrayant_interpolate) (same orientation convention)
+- [calc_rotation_matrix](math-functions.md#calc_rotation_matrix) (rotation matrix of the orientation)
+
+---
+<a id="arrayant_rotate_pattern_multi"></a>
+## arrayant_rotate_pattern_multi
+Apply Euler rotations to all entries in a multi-frequency arrayant vector, in place
+
+Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_rotate_pattern) · [Python](../python/array-antenna-functions.md#rotate_pattern)
+
+- Calls [arrayant_rotate_pattern](#arrayant_rotate_pattern) on every entry with grid adjustment always disabled (required for uniform-grid
+  consistency across frequencies); orientation convention as there (a positive tilt is a downtilt)
+- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
 
 ### Declaration:
 ```cpp
 void quadriga_lib::arrayant_rotate_pattern_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        dtype x_deg = 0.0,
-        dtype y_deg = 0.0,
-        dtype z_deg = 0.0,
+        const arma::Mat<dtype> &orientation,
         unsigned usage = 0,
-        arma::uvec i_element = arma::uvec())
+        const arma::uvec *i_element = nullptr)
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
-- **`x_deg`** *(optional)* — Bank angle in degrees
-- **`y_deg`** *(optional)* — Tilt angle in degrees
-- **`z_deg`** *(optional)* — Heading angle in degrees
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
 - **`usage`** *(optional)* — Rotation mode: `0` = pattern + polarization, `1` = pattern only, `2` = polarization only
-- **`i_element`** *(optional)* — Indices of elements to rotate; if empty, all elements are rotated
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
 
 ### See also:
-- [.rotate_pattern](array-antenna-class.md#.rotate_pattern) (per-entry operation called internally)
+- [arrayant_rotate_pattern](#arrayant_rotate_pattern) (per-entry operation called internally)
 - [arrayant_concat_multi](#arrayant_concat_multi) (combine multi-frequency vectors before rotating)
 - [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) (set element positions in multi-frequency vectors)
 

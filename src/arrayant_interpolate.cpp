@@ -84,10 +84,10 @@ void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant,
     if (n_ang == 0)
         return;
 
-    // Transposed rotation matrices with inverted tilt, 9 values per orientation column and slice
+    // Transposed rotation matrices, 9 values per orientation column and slice
     const arma::uword n_rot = orientation.n_cols * orientation.n_slices;
     arma::Col<dtype> rotation(9 * n_rot, arma::fill::none);
-    qd_rotation_matrix(orientation.memptr(), rotation.memptr(), n_rot, true, true);
+    qd_rotation_matrix(orientation.memptr(), rotation.memptr(), n_rot, true);
 
     dtype *p_dist = dist == nullptr ? nullptr : dist->memptr();
     dtype *p_azimuth_loc = azimuth_loc == nullptr ? nullptr : azimuth_loc->memptr();

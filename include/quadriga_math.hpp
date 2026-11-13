@@ -18,14 +18,13 @@ namespace quadriga_lib
     // Rotation matrix from Euler angles
     template <typename dtype>
     arma::Cube<dtype> calc_rotation_matrix(const arma::Cube<dtype> &orientation, // Orientation vectors (Euler rotations) in [rad], Size [3, n_row, n_col]
-                                           bool invert_y_axis = false,           // Inverts the y-axis
                                            bool transposeR = false);             // Returns the transpose of R instead of R
 
     template <typename dtype>
-    arma::Mat<dtype> calc_rotation_matrix(const arma::Mat<dtype> &orientation, bool invert_y_axis = false, bool transposeR = false);
+    arma::Mat<dtype> calc_rotation_matrix(const arma::Mat<dtype> &orientation, bool transposeR = false);
 
     template <typename dtype>
-    arma::Col<dtype> calc_rotation_matrix(const arma::Col<dtype> &orientation, bool invert_y_axis = false, bool transposeR = false);
+    arma::Col<dtype> calc_rotation_matrix(const arma::Col<dtype> &orientation, bool transposeR = false);
 
     // Fast, approximate sine/cosine for single-precision vectors
     template <typename dtype>

@@ -22,29 +22,26 @@ Calculate rotation matrices from Euler angles
 Also in: [MATLAB](../mex/math-functions.md#calc_rotation_matrix) · Not in: Python
 
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
+- R = Rz(heading)·Ry(tilt)·Rx(bank), right-handed as in 3GPP TR 38.901; a positive tilt turns the x-axis down
 - Internally uses double precision regardless of `dtype`
 
 ### Declaration:
 ```cpp
 arma::Cube<dtype> quadriga_lib::calc_rotation_matrix(
     const arma::Cube<dtype> &orientation,
-    bool invert_y_axis = false, 
     bool transposeR = false);
 
 arma::Mat<dtype> quadriga_lib::calc_rotation_matrix(
     const arma::Mat<dtype> &orientation,
-    bool invert_y_axis = false, 
     bool transposeR = false);
 
 arma::Col<dtype> quadriga_lib::calc_rotation_matrix(
     const arma::Col<dtype> &orientation,
-    bool invert_y_axis = false, 
     bool transposeR = false);
 ```
 
 ### Inputs:
 - **`orientation`** — Euler angles (bank, tilt, head); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`invert_y_axis`** *(optional)* — Flips the sign of the tilt angle, i.e. applies `-tilt` instead of `tilt`; use when the input convention defines positive tilt as downward
 - **`transposeR`** *(optional)* — Returns the transpose of the rotation matrix
 
 ### Returns:

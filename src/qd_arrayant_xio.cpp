@@ -600,41 +600,37 @@ template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_
 
 /*!MD
 # arrayant_rotate_pattern_multi
-Apply Euler rotations to all entries in a multi-frequency arrayant vector
+Apply Euler rotations to all entries in a multi-frequency arrayant vector, in place
 
-- Calls .[[rotate_pattern]] on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
-- If `i_element` is empty, all elements are rotated; otherwise only the specified indices are affected.
-- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects.
+- Calls [[arrayant_rotate_pattern]] on every entry with grid adjustment always disabled (required for uniform-grid
+  consistency across frequencies); orientation convention as there (a positive tilt is a downtilt)
+- For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
 
 ## Declaration:
 ```
 void quadriga_lib::arrayant_rotate_pattern_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        dtype x_deg = 0.0,
-        dtype y_deg = 0.0,
-        dtype z_deg = 0.0,
+        const arma::Mat<dtype> &orientation,
         unsigned usage = 0,
-        arma::uvec i_element = arma::uvec())
+        const arma::uvec *i_element = nullptr)
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
-- **`x_deg`** *(optional)* — Bank angle in degrees
-- **`y_deg`** *(optional)* — Tilt angle in degrees
-- **`z_deg`** *(optional)* — Heading angle in degrees
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
 - **`usage`** *(optional)* — Rotation mode: `0` = pattern + polarization, `1` = pattern only, `2` = polarization only
-- **`i_element`** *(optional)* — Indices of elements to rotate; if empty, all elements are rotated
+- **`i_element`** *(optional)* — Element indices to rotate, 0-based, no duplicates; `nullptr` or empty: all elements
 
 ## See also:
-- .[[rotate_pattern]] (per-entry operation called internally)
+- [[arrayant_rotate_pattern]] (per-entry operation called internally)
 - [[arrayant_concat_multi]] (combine multi-frequency vectors before rotating)
 - [[arrayant_set_element_pos_multi]] (set element positions in multi-frequency vectors)
 MD!*/
 
 template <typename dtype>
 void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-                                                 dtype x_deg, dtype y_deg, dtype z_deg,
-                                                 unsigned usage, arma::uvec i_element)
+                                                 const arma::Mat<dtype> &orientation, unsigned usage,
+                                                 const arma::uvec *i_element)
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("arrayant_rotate_pattern_multi: Input vector is empty.");
@@ -642,50 +638,20 @@ void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::array
     if (usage > 2)
         throw std::invalid_argument("arrayant_rotate_pattern_multi: Usage must be 0, 1, or 2.");
 
-    if (!std::isfinite(x_deg) || !std::isfinite(y_deg) || !std::isfinite(z_deg))
-        throw std::invalid_argument("arrayant_rotate_pattern_multi: Rotation angles must be finite.");
-
-    // Validate input vector before modifying any entries
+    // Validate input vector before modifying any entries; the entries share the element count, so orientation and
+    // index errors surface at entry 0 before anything is changed
     std::string err = qd_arrayant_is_valid_multi_quick(arrayant_vec);
     if (!err.empty())
         throw std::invalid_argument("arrayant_rotate_pattern_multi: Input validation failed: " + err);
 
     // Map usage to no-grid-adjustment modes: 0→3, 1→4, 2→2
-    unsigned internal_usage = usage;
-    if (usage == 0)
-        internal_usage = 3;
-    else if (usage == 1)
-        internal_usage = 4;
-
-    // Determine element list
-    bool rotate_all = i_element.is_empty();
-
-    // Validate element indices against the first entry
-    if (!rotate_all)
-    {
-        arma::uword n_elements_ref = arrayant_vec[0].n_elements();
-        for (arma::uword k = 0; k < i_element.n_elem; ++k)
-            if (i_element[k] >= n_elements_ref)
-                throw std::invalid_argument("arrayant_rotate_pattern_multi: Element index " +
-                                            std::to_string(i_element[k]) + " is out of range (n_elements = " +
-                                            std::to_string(n_elements_ref) + ").");
-    }
+    const unsigned internal_usage = usage == 0 ? 3 : (usage == 1 ? 4 : usage);
 
     for (size_t i = 0; i < arrayant_vec.size(); ++i)
     {
         try
         {
-            if (rotate_all)
-            {
-                // rotate_pattern with element = -1 rotates all elements
-                arrayant_vec[i].rotate_pattern(x_deg, y_deg, z_deg, internal_usage);
-            }
-            else
-            {
-                // Rotate each specified element individually
-                for (arma::uword k = 0; k < i_element.n_elem; ++k)
-                    arrayant_vec[i].rotate_pattern(x_deg, y_deg, z_deg, internal_usage, (unsigned)i_element[k]);
-            }
+            quadriga_lib::arrayant_rotate_pattern(arrayant_vec[i], orientation, internal_usage, i_element);
         }
         catch (const std::invalid_argument &e)
         {
@@ -695,8 +661,8 @@ void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::array
     }
 }
 
-template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<float>> &, float, float, float, unsigned, arma::uvec);
-template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<double>> &, double, double, double, unsigned, arma::uvec);
+template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, unsigned, const arma::uvec *);
+template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, unsigned, const arma::uvec *);
 
 /*!MD
 # arrayant_concat_multi

@@ -310,14 +310,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     if (tx_array->element_pos.n_elem != 0)
         std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     if (tx_orientation_not_zero) // Apply TX antenna orientation
-        qd_rotate_inplace(Tb, -Tt, Th, p_tx, n_tx);
+        qd_rotate_inplace(Tb, Tt, Th, p_tx, n_tx);
     for (arma::uword t = 0ULL; t < 3ULL * n_tx; t += 3ULL) // Add TX position
         p_tx[t] += Tx, p_tx[t + 1ULL] += Ty, p_tx[t + 2ULL] += Tz;
 
     if (rx_array->element_pos.n_elem != 0)
         std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
     if (rx_orientation_not_zero) // Apply RX antenna orientation
-        qd_rotate_inplace(Rb, -Rt, Rh, p_rx, n_rx);
+        qd_rotate_inplace(Rb, Rt, Rh, p_rx, n_rx);
     for (arma::uword r = 0ULL; r < 3ULL * n_rx; r += 3ULL) // Add RX position
         p_rx[r] += Rx, p_rx[r + 1ULL] += Ry, p_rx[r + 2ULL] += Rz;
 

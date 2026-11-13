@@ -361,3 +361,12 @@ TEST_CASE("Generate Arrayant - Invalid resolution")
     CHECK(quadriga_lib::generate_arrayant_omni<double>(0.0).n_azimuth() == 361);
     CHECK(quadriga_lib::generate_arrayant_omni<double>(-5.0).n_azimuth() == 361);
 }
+
+TEST_CASE("generate_arrayant_3GPP - a positive electrical tilt points the beam down")
+{
+    // A positive electrical tilt is a downtilt (TR 38.901): 8 vertical elements combined with tilt 10 degree (pol 4),
+    // the main beam at elevation -10 degree
+    const auto ant = quadriga_lib::generate_arrayant_3GPP<double>(8, 1, 3.5e9, 4, 10.0);
+    const arma::uword i = arma::index_max(arma::vectorise(arma::square(ant.e_theta_re.slice(0)) + arma::square(ant.e_theta_im.slice(0))));
+    CHECK(std::abs(ant.elevation_grid(i % ant.n_elevation()) * 180.0 / arma::datum::pi + 10.0) < 1.01);
+}

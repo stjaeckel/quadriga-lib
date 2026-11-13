@@ -392,14 +392,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     if (!tx_array[0].element_pos.is_empty())
         std::memcpy(p_tx, tx_array[0].element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     if (tx_orientation_not_zero)
-        qd_rotate_inplace(Tb, -Tt, Th, p_tx, n_tx);
+        qd_rotate_inplace(Tb, Tt, Th, p_tx, n_tx);
     for (arma::uword t = 0; t < 3 * n_tx; t += 3)
         p_tx[t] += Tx, p_tx[t + 1] += Ty, p_tx[t + 2] += Tz;
 
     if (!rx_array[0].element_pos.is_empty())
         std::memcpy(p_rx, rx_array[0].element_pos.memptr(), 3 * n_rx * sizeof(dtype));
     if (rx_orientation_not_zero)
-        qd_rotate_inplace(Rb, -Rt, Rh, p_rx, n_rx);
+        qd_rotate_inplace(Rb, Rt, Rh, p_rx, n_rx);
     for (arma::uword r = 0; r < 3 * n_rx; r += 3)
         p_rx[r] += Rx, p_rx[r + 1] += Ry, p_rx[r + 2] += Rz;
 

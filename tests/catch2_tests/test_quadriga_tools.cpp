@@ -727,3 +727,15 @@ TEST_CASE("icosphere - outputs that alias inputs")
     CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, &length, &vert, &vert), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, nullptr, nullptr, &center), std::invalid_argument);
 }
+
+TEST_CASE("calc_rotation_matrix - heading, tilt and bank are right-handed (3GPP TR 38.901)")
+{
+    // Right-handed rotations as in TR 38.901 (bearing, downtilt, slant): heading turns x toward y, a positive tilt
+    // turns x down, bank turns y toward z
+    const double a = 0.3, c = std::cos(a), s = std::sin(a);
+    auto R = [](double b, double t, double h)
+    { return arma::mat(arma::reshape(quadriga_lib::calc_rotation_matrix(arma::vec{b, t, h}), 3, 3)); };
+    CHECK(arma::approx_equal(R(0.0, 0.0, a).col(0), arma::vec{c, s, 0.0}, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(R(0.0, a, 0.0).col(0), arma::vec{c, 0.0, -s}, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(R(a, 0.0, 0.0).col(1), arma::vec{0.0, c, s}, "absdiff", 1e-14));
+}

@@ -8,7 +8,6 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-array-
 | [.calc_beamwidth_deg](#.calc_beamwidth_deg) | Calculate the beamwidth and pointing angles of array antenna elements in degrees |
 | [.calc_directivity_dBi](#.calc_directivity_dBi) | Calculate the directivity in dBi of a single array element |
 | [.is_valid](#.is_valid) | Validate the integrity of an arrayant object |
-| [.rotate_pattern](#.rotate_pattern) | Rotate antenna radiation patterns around the principal axes using Euler rotations |
 | [.set_size](#.set_size) | Resize an arrayant object to new dimensions |
 
 ---
@@ -59,12 +58,12 @@ Not in: MATLAB, Python
 | ------------------------- | ---------------------------------------------------------- |
 | [.calc_beamwidth_deg](#.calc_beamwidth_deg)   | Calculate the beam width of an antenna element in degree   |
 | [.calc_directivity_dBi](#.calc_directivity_dBi) | Calculate the directivity in dBi of a single array element |
-| [.rotate_pattern](#.rotate_pattern)       | Rotate pattern and/or polarization via Euler angles        |
 | [.set_size](#.set_size)             | Resize the arrayant to new dimensions                      |
 | [.is_valid](#.is_valid)             | Validate arrayant integrity                                |
 
 Computations and file I/O on an arrayant are free functions, see section "Array antenna functions"
-(e.g. [arrayant_concat](array-antenna-functions.md#arrayant_concat), [arrayant_combine_pattern](array-antenna-functions.md#arrayant_combine_pattern), [arrayant_copy_element](array-antenna-functions.md#arrayant_copy_element), [qdant_write](array-antenna-functions.md#qdant_write)).
+(e.g. [arrayant_concat](array-antenna-functions.md#arrayant_concat), [arrayant_combine_pattern](array-antenna-functions.md#arrayant_combine_pattern), [arrayant_copy_element](array-antenna-functions.md#arrayant_copy_element), [arrayant_rotate_pattern](array-antenna-functions.md#arrayant_rotate_pattern),
+[qdant_write](array-antenna-functions.md#qdant_write)).
 
 ---
 <a id=".calc_beamwidth_deg"></a>
@@ -156,47 +155,6 @@ std::string quadriga_lib::arrayant<dtype>::is_valid() const;
 
 ### See also:
 - [arrayant_is_valid_multi](array-antenna-functions.md#arrayant_is_valid_multi) (multi-freq counterpart)
-
----
-<a id=".rotate_pattern"></a>
-## .rotate_pattern
-Rotate antenna radiation patterns around the principal axes using Euler rotations
-
-Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_rotate_pattern) · [Python](../python/array-antenna-functions.md#rotate_pattern)
-
-- Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes in degrees
-- Modifies in-place when `output = nullptr`; otherwise writes to `*output`
-- Coupling, `center_frequency` and `name` are kept (also in `*output`); when a single `element` is written to
-  `*output`, the output holds only that element and its coupling is identity
-
-### Declaration:
-```cpp
-void quadriga_lib::arrayant<dtype>::rotate_pattern(
-    dtype x_deg = 0.0,
-    dtype y_deg = 0.0,
-    dtype z_deg = 0.0,
-    unsigned usage = 0,
-    unsigned element = -1,
-    arrayant<dtype> *output = nullptr);
-```
-
-### Inputs:
-- **`x_deg`** *(optional)* — Rotation around x-axis (bank) in degrees
-- **`y_deg`** *(optional)* — Rotation around y-axis (tilt) in degrees
-- **`z_deg`** *(optional)* — Rotation around z-axis (heading) in degrees
-- **`usage`** *(optional)* — Rotation mode:
-   | Mode | Pattern | Polarization | Grid adjustment |
-   | ---- | ------- | ------------ | --------------- |
-   | 0    | Yes     | Yes          | Yes             |
-   | 1    | Yes     | No           | Yes             |
-   | 2    | No      | Yes          | No              |
-   | 3    | Yes     | Yes          | No              |
-   | 4    | Yes     | No           | No              |
-- **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements (implemented as wrap-around to UINT_MAX)
-- **`output`** *(optional)* — Target arrayant; `nullptr` modifies in-place
-
-### See also:
-- [arrayant_rotate_pattern_multi](array-antenna-functions.md#arrayant_rotate_pattern_multi) (multi-freq counterpart)
 
 ---
 <a id=".set_size"></a>

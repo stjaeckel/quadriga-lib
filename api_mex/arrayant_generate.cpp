@@ -140,6 +140,8 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    const arma::uvec el_0 = {0}, el_1 = {1}; // Elements turned by the polarization rotations of custom patterns
+
     if (nrhs < 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Arrayant type name missing.");
 
@@ -208,8 +210,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             {
                 CALL_QD(custom_array = quadriga_lib::generate_arrayant_omni(res));
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
-                custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
             }
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array));
         }
@@ -232,13 +234,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             if (pol == 2 || pol == 5)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                custom_array.rotate_pattern(90.0, 0.0, 0.0, 2, 1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, &el_1);
             }
             else if (pol == 3 || pol == 6)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
-                custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
             }
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array));
         }

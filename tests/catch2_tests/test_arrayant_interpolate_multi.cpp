@@ -515,3 +515,23 @@ TEST_CASE("arrayant_interpolate_multi - input validation")
     CHECK(V_re.memptr() == V_re_ptr);
     CHECK(arma::all(arma::vectorise(V_re) == 7.0));
 }
+
+TEST_CASE("arrayant_interpolate_multi - a positive tilt points down (3GPP TR 38.901)")
+{
+    // A beam along x, tilted by +10 degree, has its largest gain 10 degree below the horizon at every frequency
+    auto beam = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0, 0.0, 5.0);
+    std::vector<quadriga_lib::arrayant<double>> vec = {beam, beam};
+    vec[1].center_frequency = 2.0 * beam.center_frequency;
+    const arma::mat el = arma::regspace<arma::rowvec>(-30.0, 1.0, 30.0) * arma::datum::pi / 180.0;
+    const arma::mat az(1, el.n_elem, arma::fill::zeros);
+    arma::cube O(3, 1, 1, arma::fill::zeros), Vr, Vi, Hr, Hi;
+    O(1) = 10.0 * arma::datum::pi / 180.0;
+    const arma::vec *freq = nullptr;
+    const arma::uvec *i_el = nullptr;
+    quadriga_lib::arrayant_interpolate_multi(vec, az, el, Vr, Vi, Hr, Hi, freq, i_el, &O);
+    for (arma::uword f = 0; f < 2; ++f)
+    {
+        const arma::rowvec P = Vr.slice(f) % Vr.slice(f) + Vi.slice(f) % Vi.slice(f);
+        CHECK(std::abs(el(P.index_max()) * 180.0 / arma::datum::pi + 10.0) < 1e-9);
+    }
+}

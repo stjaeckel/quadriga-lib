@@ -15,6 +15,7 @@ lang: en-US
 - Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Several outputs are returned as a tuple in the order of the Usage line.
 - Index conventions: 0-based unless the field is explicitly called "1-based".
 - Units: angles in radians (degrees only where stated, e.g. `*_deg`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
+- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation as in 3GPP TR 38.901 (bearing, downtilt, slant): a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down, a positive bank turns the y-axis toward z.
 - Errors: invalid inputs (shape/domain) raise `ValueError`, I/O failures `RuntimeError`, an index out of range `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument, in some functions by its C++ name (e.g. `center_frequency` for `center_freq`).
 
 # Function Index
@@ -32,7 +33,7 @@ lang: en-US
 | [interpolate](#interpolate) | Array antenna functions | Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles |
 | [qdant_read](#qdant_read) | Array antenna functions | Reads array antenna data from QDANT files |
 | [qdant_write](#qdant_write) | Array antenna functions | Writes array antenna data to QDANT files |
-| [rotate_pattern](#rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns around the principal axes using Euler rotations |
+| [rotate_pattern](#rotate_pattern) | Array antenna functions | Rotate antenna radiation patterns using Euler rotations |
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
 | [channel_export_obj_file](#channel_export_obj_file) | Channel functions | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 | [hdf5_create_file](#hdf5_create_file) | Channel functions | Create a new HDF5 channel file with a custom storage layout |
@@ -711,36 +712,33 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
 ---
 <a id="rotate_pattern"></a>
 ## rotate_pattern
-Rotate antenna radiation patterns around the principal axes using Euler rotations
+Rotate antenna radiation patterns using Euler rotations
 
-Also in: [C++](quadriga_lib_api_cpp.md#.rotate_pattern) · [MATLAB](quadriga_lib_api_mex.md#arrayant_rotate_pattern)
+Also in: [C++](quadriga_lib_api_cpp.md#arrayant_rotate_pattern) · [MATLAB](quadriga_lib_api_mex.md#arrayant_rotate_pattern)
 
-- Rotates the pattern and/or polarization of array antenna elements around the x (bank), y (tilt), and z (heading) axes
-- Rotations are applied in the order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
-- Single-frequency input (3D pattern fields): `usage` 0 and 1 adjust the sampling grid for non-uniformly sampled antennas
-- Coupling, `center_freq` and `name` are kept, also when the sampling grid is adjusted
+- Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
+  [interpolate](#interpolate) returns for the unrotated pattern with the same `orientation`
+- A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_freq` and `name` are kept
+- Single-frequency input (3D pattern fields): `usage` 0 and 1 adjust the sampling grid for non-uniformly sampled
+  antennas; this needs all elements, so a subset in `i_element` raises an error when the grid must be adjusted
 - Frequency-dependent input (4D pattern fields): the rotation is applied to every entry and the grid is never adjusted,
   since all entries must share one grid
 - For scalar acoustic fields (pressure stored in `e_theta_re` only) use `usage = 1` to avoid spurious polarization effects
 
 ### Usage:
 ```python
-# Rotate all elements by 45 deg bank
-arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, x_deg=45.0 )
+# 10 degree mechanical downtilt (0.1745 rad) of all elements
+arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.1745, 0.0])
 
-# Rotate only elements 0 and 1 by 90 deg heading
-arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, z_deg=90.0, element=[0, 1] )
-
-# Frequency-dependent input (4D patterns) — same interface
-arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, y_deg=10.0 )
+# Elements 0 and 1 only, 90 degree heading (1.5708 rad)
+arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.0, 1.5708], i_element=[0, 1])
 ```
 
 ### Inputs:
 - **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may
   be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`x_deg`** — Rotation around the x-axis (bank) in degrees; default: 0.0
-- **`y_deg`** — Rotation around the y-axis (tilt) in degrees; default: 0.0
-- **`z_deg`** — Rotation around the z-axis (heading) in degrees; default: 0.0
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad; 3 elements
 - **`usage`** — Rotation mode; default: 0
    | Mode | Pattern | Polarization | Grid adj. |
    | :--: | :-----: | :----------: | :-------: |
@@ -751,8 +749,8 @@ arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, y_deg=10.0 )
    | 4    | Yes     | No           | No        |
 
    for 4D input the grid is never adjusted, so `0`/`3` and `1`/`4` are equivalent
-- **`element`** — Element indices to rotate; 1D list or array of int; `None` or empty rotates all
-  elements; default: `None`
+- **`i_element`** — Element indices to rotate, 0-based, no duplicates; `None` or empty rotates all elements;
+  default: `None`
 
 ### Outputs:
 - **`arrayant_out`** — Dict with the rotated array antenna data; same keys and layout as
@@ -1841,8 +1839,9 @@ azimuth_spread, elevation_spread, orientation, phi, theta = \
 ### Outputs:
 - **`azimuth_spread`** — RMS azimuth angular spread; `(n_cir,)`
 - **`elevation_spread`** — RMS elevation angular spread; `(n_cir,)`
-- **`orientation`** — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `(3, n_cir)`
-- **`phi`** — Rotated azimuth angles; list of length `n_cir`
+- **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
+  direction (a positive tilt points down); `(3, n_cir)`
+- **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; list of length `n_cir`
 - **`theta`** — Rotated elevation angles; list of length `n_cir`
 
 ---

@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
+#include "quadriga_arrayant.hpp"
 
 #include <cmath>
 
@@ -24,7 +25,7 @@ TEST_CASE("calc_angular_spreads_sphere - Single path returns zero spread")
     CHECK(as(0) < 1e-10);
     CHECK(es(0) < 1e-10);
     CHECK(std::abs(orient(2, 0) - 0.5) < 1e-10);  // heading ~ azimuth
-    CHECK(std::abs(orient(1, 0) - 0.3) < 1e-10);  // tilt ~ elevation
+    CHECK(std::abs(orient(1, 0) + 0.3) < 1e-10);  // tilt = -elevation (a positive tilt points down)
 }
 
 TEST_CASE("calc_angular_spreads_sphere - Two symmetric azimuth paths")
@@ -354,4 +355,32 @@ TEST_CASE("calc_angular_spreads_sphere - outputs that alias inputs")
 
     arma::vec view(orient.memptr(), 1, false, true);
     CHECK_THROWS_AS(quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &view, (arma::vec *)nullptr, &orient), std::invalid_argument);
+}
+
+TEST_CASE("calc_angular_spreads_sphere - phi and theta are the local angles of the output orientation")
+{
+    // An antenna with the output orientation points at the mean direction; the rotated angles equal the local angles
+    // that arrayant_interpolate returns for this orientation, with and without the bank angle. A mean direction 20
+    // degree above the horizon gives tilt -20 degree (a positive tilt points down).
+    const double d = arma::datum::pi / 180.0;
+    const std::vector<arma::vec> az = {arma::vec{28.0 * d, 32.0 * d, 30.0 * d, 35.0 * d}};
+    const std::vector<arma::vec> el = {arma::vec{18.0 * d, 22.0 * d, 20.0 * d, 19.0 * d}};
+    const std::vector<arma::vec> pw = {arma::vec{1.0, 1.0, 1.0, 2.0}};
+    const auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    for (bool bank : {false, true})
+    {
+        arma::mat ori;
+        std::vector<arma::vec> phi, theta;
+        quadriga_lib::calc_angular_spreads_sphere<double>(az, el, pw, nullptr, nullptr, &ori, &phi, &theta, false, bank);
+        CHECK(std::abs(ori(1, 0) + 19.6 * d) < 0.1 * d);
+        const arma::mat A = az[0].t(), E = el[0].t();
+        const arma::cube O(ori.memptr(), 3, 1, 1);
+        arma::mat Vr, Vi, Hr, Hi, az_loc, el_loc;
+        const arma::uvec *i_el = nullptr;
+        const arma::mat *pos = nullptr;
+        arma::mat *dist = nullptr;
+        quadriga_lib::arrayant_interpolate(omni, A, E, Vr, Vi, Hr, Hi, i_el, &O, pos, dist, &az_loc, &el_loc);
+        CHECK(arma::approx_equal(phi[0], arma::vec(az_loc.t()), "absdiff", 1e-6));
+        CHECK(arma::approx_equal(theta[0], arma::vec(el_loc.t()), "absdiff", 1e-6));
+    }
 }

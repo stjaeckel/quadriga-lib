@@ -87,8 +87,9 @@ azimuth_spread, elevation_spread, orientation, phi, theta = \
 ### Outputs:
 - **`azimuth_spread`** — RMS azimuth angular spread; `(n_cir,)`
 - **`elevation_spread`** — RMS elevation angular spread; `(n_cir,)`
-- **`orientation`** — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `(3, n_cir)`
-- **`phi`** — Rotated azimuth angles; list of length `n_cir`
+- **`orientation`** — Euler angles [bank; tilt; heading] of an antenna pointing at the power-weighted mean
+  direction (a positive tilt points down); `(3, n_cir)`
+- **`phi`** — Rotated azimuth angles, the path azimuths in the local frame of that antenna; list of length `n_cir`
 - **`theta`** — Rotated elevation angles; list of length `n_cir`
 
 ---

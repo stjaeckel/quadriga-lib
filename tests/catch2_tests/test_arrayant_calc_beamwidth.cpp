@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_test_arrayant.hpp"
 
 #include <cmath>
 
@@ -40,7 +41,7 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Threshold dependence")
 TEST_CASE("Arrayant calc_beamwidth_deg - Rotated antenna (heading)")
 {
     auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
-    ant.rotate_pattern(0.0f, 0.0f, 45.0f); // heading +45° around z
+    qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0); // heading +45° around z
 
     float bw_az = 0.0f, bw_el = 0.0f, az_pt = 0.0f, el_pt = 0.0f;
     ant.calc_beamwidth_deg(0, 3.0f, &bw_az, &bw_el, &az_pt, &el_pt);
@@ -53,11 +54,9 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Rotated antenna (heading)")
 
 TEST_CASE("Arrayant calc_beamwidth_deg - Tilted antenna (elevation pointing)")
 {
-    // rotate_pattern(0, -30, 0) tilts the main beam to elevation +30°
-    // (matches the convention used in test_arrayant_combine_pattern.cpp:
-    //  rotate_pattern(0, -45) -> max moves to elevation index 135 = +45°)
+    // A tilt of -pi/6 (an uptilt, 3GPP TR 38.901) moves the main beam to elevation +30°
     auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
-    ant.rotate_pattern(0.0f, -30.0f, 0.0f);
+    qd_rotate(ant, 0.0, -arma::datum::pi / 6.0, 0.0);
 
     float az_pt = 999.0f, el_pt = 999.0f;
     ant.calc_beamwidth_deg(0, 3.0f, nullptr, nullptr, &az_pt, &el_pt);
@@ -71,8 +70,8 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Multi-element selection")
     // Three elements pointing at -60°, 0°, +60° respectively
     auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
     quadriga_lib::arrayant_copy_element(ant, 0, arma::uvec({1, 2}));
-    ant.rotate_pattern(0.0f, 0.0f,  60.0f, 0, 1);
-    ant.rotate_pattern(0.0f, 0.0f, -60.0f, 0, 2);
+    qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 3.0, 0, 1);
+    qd_rotate(ant, 0.0, 0.0, -arma::datum::pi / 3.0, 0, 2);
 
     float az_pt = 0.0f;
 
@@ -137,7 +136,7 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Main lobe across +-180 deg azimuth and 
     for (double heading : {150.0, 180.0, -170.0})
     {
         auto b = a.copy();
-        b.rotate_pattern(0.0, 0.0, heading, 3);
+        qd_rotate(b, 0.0, 0.0, heading * arma::datum::pi / 180.0, 3); // calc_beamwidth_deg compares in degrees
         double bw_az = 0.0, bw_el = 0.0;
         b.calc_beamwidth_deg(0, 3.0, &bw_az, &bw_el, &paz, &pel);
         CHECK(std::abs(bw_az - bw_az0) < 1.0);
@@ -149,7 +148,7 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Main lobe across +-180 deg azimuth and 
     for (double tilt : {-90.0, 90.0, -80.0})
     {
         auto u = a.copy();
-        u.rotate_pattern(0.0, tilt, 0.0, 3); // -90: zenith, +90: nadir
+        qd_rotate(u, 0.0, tilt * arma::datum::pi / 180.0, 0.0, 3); // -90: zenith, +90: nadir
         double bw_el = 0.0;
         u.calc_beamwidth_deg(0, 3.0, nullptr, &bw_el, nullptr, &pel);
         CHECK(std::abs(bw_el - bw_el0) < 2.0);
@@ -159,7 +158,7 @@ TEST_CASE("Arrayant calc_beamwidth_deg - Main lobe across +-180 deg azimuth and 
     // Side lobes above the threshold are not part of the main lobe: two separate lobes at az = 0 and az = 90 deg
     auto c = quadriga_lib::generate_arrayant_custom<double>(20.0, 20.0, 0.0, 1.0);
     auto c2 = c.copy();
-    c2.rotate_pattern(0.0, 0.0, 90.0, 3);
+    qd_rotate(c2, 0.0, 0.0, arma::datum::pi / 2.0, 3);
     c.e_theta_re.slice(0) += 0.9 * c2.e_theta_re.slice(0);
     double bw_az = 0.0;
     c.calc_beamwidth_deg(0, 3.0, &bw_az, nullptr, &paz, nullptr);

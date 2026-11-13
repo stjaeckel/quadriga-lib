@@ -128,6 +128,8 @@ py::dict arrayant_generate(const std::string &type,
                            bool apply_weights,
                            const py::dict &pattern)
 {
+    const arma::uvec el_0 = {0}, el_1 = {1}; // Elements turned by the polarization rotations of custom patterns
+
     // Set default resolution by type when res == 0
     if (res == 0.0)
         res = (type == "omni" || type == "xpol") ? 10.0 : 1.0;
@@ -164,8 +166,8 @@ py::dict arrayant_generate(const std::string &type,
             {
                 custom_array = quadriga_lib::generate_arrayant_omni<double>(res);
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
-                custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
             }
             arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array);
         }
@@ -187,13 +189,13 @@ py::dict arrayant_generate(const std::string &type,
             if (pol == 2 || pol == 5)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                custom_array.rotate_pattern(90.0, 0.0, 0.0, 2, 1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 2.0, 0.0, 0.0}, 2, &el_1);
             }
             else if (pol == 3 || pol == 6)
             {
                 quadriga_lib::arrayant_copy_element(custom_array, 0, {1});
-                custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
-                custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_0);
+                quadriga_lib::arrayant_rotate_pattern(custom_array, arma::vec{-arma::datum::pi / 4.0, 0.0, 0.0}, 2, &el_1);
             }
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
                                                                     Mg, Ng, dgv, dgh, &custom_array);
