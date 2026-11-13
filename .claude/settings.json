@@ -1,4 +1,8 @@
 {
+    "attribution": {
+        "commit": "",
+        "pr": ""
+    },
     "permissions": {
         "allow": [
             "mcp__github__issue_write",
