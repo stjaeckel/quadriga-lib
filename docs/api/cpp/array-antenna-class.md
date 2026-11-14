@@ -47,7 +47,6 @@ Not in: MATLAB, Python
 | `.n_azimuth()`   | Number of azimuth angles                                               |
 | `.n_elements()`  | Number of antenna elements                                             |
 | `.n_ports()`     | Number of ports (columns of coupling matrix)                           |
-| `.copy()`        | Returns a deep copy; a copy of a valid arrayant is marked as validated |
 | `.reset()`       | Clears all data, resetting size to zero                                |
 | `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 

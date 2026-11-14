@@ -35,7 +35,7 @@ TEST_CASE("Arrayant OBJ Export")
     // Non-finite field values
     for (float v : {nan, inf})
     {
-        auto b = ant.copy();
+        auto b = ant;
         b.e_phi_re(b.n_elevation() / 2, b.n_azimuth() / 2, 0) = v; // A grid point the export samples
         REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", b), std::invalid_argument);
     }

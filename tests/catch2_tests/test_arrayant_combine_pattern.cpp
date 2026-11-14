@@ -75,14 +75,9 @@ TEST_CASE("Arrayant rotation - Full sphere, inplace")
     quadriga_lib::arrayant_copy_element(ant, 0, {1});
     ant.e_theta_re.slice(1) = ant.e_theta_re.slice(0) * 2.0f;
     ant.element_pos.col(1) = 10.0 * T.t();
-    ant.read_only = true;
 
     arma::uword n_elem = ant.e_theta_re.n_elem;
     float val = ant.e_theta_re.at(90, 180, 0);
-
-    // Check error message
-    REQUIRE_THROWS_AS(qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 2.0), std::invalid_argument);
-    ant.read_only = false;
 
     // First element
     T = {{-2.0, 10.0}, {1, 20.0}, {3.0, 30.0}};

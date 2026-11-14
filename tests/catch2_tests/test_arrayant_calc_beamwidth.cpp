@@ -135,7 +135,7 @@ TEST_CASE("Arrayant calc_beamwidth - Main lobe across +-180 deg azimuth and at t
 
     for (double heading : {150.0, 180.0, -170.0})
     {
-        auto b = a.copy();
+        auto b = a;
         qd_rotate(b, 0.0, 0.0, heading * arma::datum::pi / 180.0, 3); // arrayant_calc_beamwidth returns degrees
         double bw_az = 0.0, bw_el = 0.0;
         qd_beamwidth(b, 0, 3.0, &bw_az, &bw_el, &paz, &pel);
@@ -147,7 +147,7 @@ TEST_CASE("Arrayant calc_beamwidth - Main lobe across +-180 deg azimuth and at t
 
     for (double tilt : {-90.0, 90.0, -80.0})
     {
-        auto u = a.copy();
+        auto u = a;
         qd_rotate(u, 0.0, tilt * arma::datum::pi / 180.0, 0.0, 3); // -90: zenith, +90: nadir
         double bw_el = 0.0;
         qd_beamwidth(u, 0, 3.0, nullptr, &bw_el, nullptr, &pel);
@@ -157,7 +157,7 @@ TEST_CASE("Arrayant calc_beamwidth - Main lobe across +-180 deg azimuth and at t
 
     // Side lobes above the threshold are not part of the main lobe: two separate lobes at az = 0 and az = 90 deg
     auto c = quadriga_lib::generate_arrayant_custom<double>(20.0, 20.0, 0.0, 1.0);
-    auto c2 = c.copy();
+    auto c2 = c;
     qd_rotate(c2, 0.0, 0.0, arma::datum::pi / 2.0, 3);
     c.e_theta_re.slice(0) += 0.9 * c2.e_theta_re.slice(0);
     double bw_az = 0.0;

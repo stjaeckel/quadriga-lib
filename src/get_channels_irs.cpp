@@ -192,7 +192,6 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
 
     if (center_frequency > dtype(1.0e-5))
         irs.center_frequency = center_frequency;
-    irs.read_only = true;
 
     // Calculate the channel coefficients of the first segment from the TX to the IRS
     arma::Cube<dtype> coeff_re_1, coeff_im_1, delay_1, aod_1, eod_1;

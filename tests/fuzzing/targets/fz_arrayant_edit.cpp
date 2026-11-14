@@ -19,7 +19,7 @@ static std::vector<quadriga_lib::arrayant<T>> fuzzed_vector(fz::input &in, const
     arma::uword n = in.size(3);
     for (arma::uword f = 0; f < n; ++f)
     {
-        vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? fz::arrayant<T>(in) : a.copy());
+        vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? fz::arrayant<T>(in) : a);
         vec.back().center_frequency = in.value<T>();
     }
     return vec;
@@ -47,7 +47,7 @@ static void run(fz::input &in)
             break;
         case 2:
         {
-            quadriga_lib::arrayant<T> b = in.ConsumeBool() ? a.copy() : fz::arrayant<T>(in);
+            quadriga_lib::arrayant<T> b = in.ConsumeBool() ? a : fz::arrayant<T>(in);
             if (n_e <= 16) // keeps repeated appends small
                 fz::clean([&] { a = quadriga_lib::arrayant_concat(a, b); });
             break;
@@ -145,7 +145,7 @@ static void run(fz::input &in)
             if (in.ConsumeBool())
                 fz::clean([&] { quadriga_lib::arrayant_remove_zeros(a); });
             else
-                fz::clean([&] { quadriga_lib::arrayant<T> out = a.copy(); quadriga_lib::arrayant_remove_zeros(out); a = out; });
+                fz::clean([&] { quadriga_lib::arrayant<T> out = a; quadriga_lib::arrayant_remove_zeros(out); a = out; });
             break;
         case 11:
         {

@@ -159,6 +159,16 @@ static inline double qd_inverse_max_field(const dtype *a, const dtype *b, const 
     return 1.0 / m;
 }
 
+// Access to the private validity cache of an arrayant (member check_ptr) for the library and its tests
+namespace quadriga_lib
+{
+    struct qd_arrayant_access
+    {
+        template <typename dtype>
+        static auto &check_ptr(const arrayant<dtype> &ant) { return ant.check_ptr; }
+    };
+}
+
 // Validity cache of an arrayant (member check_ptr): the data pointers of the members at the last passed check.
 // The cache matches when all pointers are unchanged and the member sizes still fit together (Armadillo can keep a
 // data pointer when a member is resized); empty element_pos (zeros) and coupling (identity) fit.
@@ -169,7 +179,7 @@ inline bool qd_arrayant_cache_matches(const quadriga_lib::arrayant<dtype> &ant)
     // Relaxed atomic loads: is_valid may mark the object in another thread at the same time
     const dtype *p[9];
     for (int i = 0; i < 9; ++i)
-        p[i] = ant.check_ptr[i].load(std::memory_order_relaxed);
+        p[i] = quadriga_lib::qd_arrayant_access::check_ptr(ant)[i].load(std::memory_order_relaxed);
     return arma::size(ant.e_theta_im) == arma::size(ant.e_theta_re) &&
            arma::size(ant.e_phi_re) == arma::size(ant.e_theta_re) &&
            arma::size(ant.e_phi_im) == arma::size(ant.e_theta_re) &&
@@ -194,14 +204,14 @@ inline void qd_arrayant_mark_valid(const quadriga_lib::arrayant<dtype> &ant)
                          ant.azimuth_grid.memptr(), ant.elevation_grid.memptr(), ant.element_pos.memptr(),
                          ant.coupling_re.memptr(), ant.coupling_im.memptr()};
     for (int i = 0; i < 9; ++i)
-        ant.check_ptr[i].store(p[i], std::memory_order_relaxed);
+        quadriga_lib::qd_arrayant_access::check_ptr(ant)[i].store(p[i], std::memory_order_relaxed);
 }
 
 // Removes the mark of an arrayant
 template <typename dtype>
 inline void qd_arrayant_clear_mark(const quadriga_lib::arrayant<dtype> &ant)
 {
-    for (auto &p : ant.check_ptr)
+    for (auto &p : quadriga_lib::qd_arrayant_access::check_ptr(ant))
         p.store(nullptr, std::memory_order_relaxed);
 }
 

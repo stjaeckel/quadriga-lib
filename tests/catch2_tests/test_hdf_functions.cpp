@@ -19,6 +19,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_any_type_id.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -189,8 +190,8 @@ namespace
     bool same_any(const std::any &a, const std::any &b)
     {
         unsigned long long da[3], db[3];
-        void *pa = nullptr, *pb = nullptr;
-        int ta = quadriga_lib::any_type_id(&a, da, &pa), tb = quadriga_lib::any_type_id(&b, db, &pb);
+        const void *pa = nullptr, *pb = nullptr;
+        int ta = qd_any_type_id(&a, da, &pa), tb = qd_any_type_id(&b, db, &pb);
         if (ta >= 50)
             ta -= 10;
         if (ta < 0 || ta != tb)

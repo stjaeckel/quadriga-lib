@@ -52,7 +52,6 @@ Class for storing and manipulating array antenna models
 | `.n_azimuth()`   | Number of azimuth angles                                               |
 | `.n_elements()`  | Number of antenna elements                                             |
 | `.n_ports()`     | Number of ports (columns of coupling matrix)                           |
-| `.copy()`        | Returns a deep copy; a copy of a valid arrayant is marked as validated |
 | `.reset()`       | Clears all data, resetting size to zero                                |
 | `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
@@ -93,25 +92,10 @@ arma::uword quadriga_lib::arrayant<dtype>::n_ports() const
         return coupling_re.n_cols;
 }
 
-// Creates a copy of the array antenna object
-template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
-{
-    quadriga_lib::arrayant<dtype> ant(*this); // The copy of a valid arrayant is marked as validated
-    ant.read_only = false;
-    return ant;
-}
-
 // ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::reset()
 {
-    if (read_only)
-    {
-        std::string error_message = "Cannot change size of read-only array antenna object.";
-        throw std::invalid_argument(error_message.c_str());
-    }
-
     if (azimuth_grid.n_elem != 0)
         azimuth_grid.reset();
 
@@ -170,12 +154,6 @@ template <typename dtype>
 void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uword n_azimuth,
                                              arma::uword n_elements, arma::uword n_ports)
 {
-    if (read_only)
-    {
-        std::string error_message = "Cannot change size of read-only array antenna object.";
-        throw std::invalid_argument(error_message.c_str());
-    }
-
     if (azimuth_grid.n_elem != n_azimuth)
         azimuth_grid.set_size(n_azimuth);
 
@@ -337,7 +315,7 @@ quadriga_lib::arrayant<dtype> &quadriga_lib::arrayant<dtype>::operator=(const ar
     e_theta_re = other.e_theta_re, e_theta_im = other.e_theta_im, e_phi_re = other.e_phi_re, e_phi_im = other.e_phi_im;
     azimuth_grid = other.azimuth_grid, elevation_grid = other.elevation_grid;
     element_pos = other.element_pos, coupling_re = other.coupling_re, coupling_im = other.coupling_im;
-    center_frequency = other.center_frequency, read_only = other.read_only;
+    center_frequency = other.center_frequency;
     if (qd_arrayant_check(other).empty())
         qd_arrayant_mark_valid(*this);
     return *this;
@@ -365,7 +343,7 @@ quadriga_lib::arrayant<dtype> &quadriga_lib::arrayant<dtype>::operator=(arrayant
     azimuth_grid = std::move(other.azimuth_grid), elevation_grid = std::move(other.elevation_grid);
     element_pos = std::move(other.element_pos), coupling_re = std::move(other.coupling_re);
     coupling_im = std::move(other.coupling_im);
-    center_frequency = other.center_frequency, read_only = other.read_only;
+    center_frequency = other.center_frequency;
     if (marked)
         qd_arrayant_mark_valid(*this);
     return *this;

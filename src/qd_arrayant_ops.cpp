@@ -657,8 +657,8 @@ Copy a single antenna element to one or more destination slots
 - Added elements get their own port with identity coupling; positions of added elements that are not copied are zero
 - When the array grows, an empty `element_pos` and an empty coupling are written out first (zeros, identity), so
   that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for a read-only object, an empty `destination`, a source index out of bound, or a
-  destination index equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
+- Throws `std::invalid_argument` for an empty `destination`, a source index out of bound, or a destination index
+  equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
 
 ## Declaration:
 ```
@@ -687,9 +687,6 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword source, const arma::uvec &destination)
 {
-    if (ant.read_only)
-        throw std::invalid_argument("Cannot copy elements of a read-only array antenna object.");
-
     if (destination.n_elem == 0)
         throw std::invalid_argument("Input 'destination' is empty.");
 
@@ -1159,7 +1156,7 @@ Remove zero-valued entries from antenna pattern data, reducing its size
   1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
   depend on the scale of the pattern; an all-zero pattern is left unchanged
 - Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
-- To keep the original, call it on a `.copy()`
+- To keep the original, call it on a copy (`auto b = ant;`)
 
 ## Declaration:
 ```
@@ -1177,9 +1174,6 @@ void quadriga_lib::arrayant_remove_zeros(arrayant<dtype> &ant)
     std::string error_message = qd_arrayant_check(ant); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
-
-    if (ant.read_only)
-        throw std::invalid_argument("Cannot update read-only array antenna object inplace.");
 
     unsigned long long n_el = ant.e_theta_re.n_rows;
     unsigned long long n_az = ant.e_theta_re.n_cols;
@@ -1346,9 +1340,6 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
         throw std::invalid_argument("Input 'orientation' must be finite.");
     if (usage > 4)
         throw std::invalid_argument("Input parameter 'usage' must be 0, 1, 2, 3 or 4.");
-    if (ant.read_only)
-        throw std::invalid_argument("Cannot update read-only array antenna object inplace.");
-
     // Set element indices; a subset without duplicates that holds every element counts as all elements
     const arma::uword n_elements = ant.e_theta_re.n_slices;
     arma::uvec i_out;

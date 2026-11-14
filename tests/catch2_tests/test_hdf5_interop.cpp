@@ -33,6 +33,7 @@
 #include <catch2/matchers/catch_matchers_exception.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_any_type_id.hpp"
 
 #include <hdf5.h>
 
@@ -97,8 +98,8 @@ namespace
     value par_value(const std::any &x)
     {
         unsigned long long d[3];
-        void *ptr = nullptr;
-        const int id = quadriga_lib::any_type_id(&x, d, &ptr);
+        const void *ptr = nullptr;
+        const int id = qd_any_type_id(&x, d, &ptr);
         if (id == 9)
             return fixed_string(std::any_cast<std::string>(x), std::max((size_t)d[0], (size_t)1));
         const hid_t types[6] = {H5T_IEEE_F32LE, H5T_IEEE_F64LE, H5T_STD_U64LE, H5T_STD_I64LE, H5T_STD_U32LE, H5T_STD_I32LE};

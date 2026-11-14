@@ -22,6 +22,31 @@
 #include <type_traits>
 #include <utility>
 
+// OpenMP-safe exception handling
+// Declare `bool` + `std::string` before the parallel region, pass them in,
+// and rethrow a runtime_error after the region if the flag was set.
+#define OMP_SAFE_CALL(error_flag, error_msg, ...)                 \
+    try                                                           \
+    {                                                             \
+        __VA_ARGS__;                                              \
+    }                                                             \
+    catch (const std::exception &e)                               \
+    {                                                             \
+        _Pragma("omp critical") if (!(error_flag))                \
+        {                                                         \
+            (error_msg) = e.what();                               \
+            (error_flag) = true;                                  \
+        }                                                         \
+    }                                                             \
+    catch (...)                                                   \
+    {                                                             \
+        _Pragma("omp critical") if (!(error_flag))                \
+        {                                                         \
+            (error_msg) = "Unknown exception in parallel region"; \
+            (error_flag) = true;                                  \
+        }                                                         \
+    }
+
 // Calculate length
 template <typename dtype>
 static inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)

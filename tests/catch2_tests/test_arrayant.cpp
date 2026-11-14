@@ -139,15 +139,15 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0); // 37 x 73
     const double d_ref = qd_directivity(a, 0);
     quadriga_lib::arrayant<double> o_ref;
-    o_ref = a.copy(), quadriga_lib::arrayant_remove_zeros(o_ref);
+    o_ref = a, quadriga_lib::arrayant_remove_zeros(o_ref);
 
     for (double s : {1e-6, 1e-8, 1e-12, 1e-30, 1e160, 1e300}) // power above the double range at 1e160
     {
-        auto b = a.copy();
+        auto b = a;
         b.e_theta_re *= s;
         CHECK(std::abs(qd_directivity(b, 0) - d_ref) < 1e-9);
         quadriga_lib::arrayant<double> o;
-        o = b.copy(), quadriga_lib::arrayant_remove_zeros(o);
+        o = b, quadriga_lib::arrayant_remove_zeros(o);
         CHECK(o.n_elevation() == o_ref.n_elevation());
         CHECK(o.n_azimuth() == o_ref.n_azimuth());
         CHECK(arma::approx_equal(o.e_theta_re, o_ref.e_theta_re * s, "reldiff", 1e-12));
@@ -157,11 +157,11 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
     auto af = quadriga_lib::generate_arrayant_custom<float>(90.0f, 90.0f, 0.0f, 5.0f);
     const float df_ref = qd_directivity(af, 0);
     quadriga_lib::arrayant<float> of_ref;
-    of_ref = af.copy(), quadriga_lib::arrayant_remove_zeros(of_ref);
+    of_ref = af, quadriga_lib::arrayant_remove_zeros(of_ref);
     af.e_theta_re *= 1e-8f;
     CHECK(std::abs(qd_directivity(af, 0) - df_ref) < 1e-4f);
     quadriga_lib::arrayant<float> of;
-    of = af.copy(), quadriga_lib::arrayant_remove_zeros(of);
+    of = af, quadriga_lib::arrayant_remove_zeros(of);
     CHECK(of.n_elevation() == of_ref.n_elevation());
     CHECK(of.n_azimuth() == of_ref.n_azimuth());
 
@@ -170,7 +170,7 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
     z.e_theta_re.zeros();
     CHECK(qd_directivity(z, 0) == 0.0);
     quadriga_lib::arrayant<double> oz;
-    oz = z.copy(), quadriga_lib::arrayant_remove_zeros(oz);
+    oz = z, quadriga_lib::arrayant_remove_zeros(oz);
     CHECK(oz.n_elevation() == z.n_elevation());
     CHECK(oz.n_azimuth() == z.n_azimuth());
     CHECK(arma::approx_equal(oz.azimuth_grid, z.azimuth_grid, "absdiff", 0.0));
@@ -199,7 +199,7 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
     a.center_frequency = 1.0e9;
     REQUIRE(a.is_valid().empty());
 
-    quadriga_lib::arrayant<double> o = a.copy();
+    quadriga_lib::arrayant<double> o = a;
     quadriga_lib::arrayant_remove_zeros(o);
     CHECK(o.name == "sector");
     CHECK(arma::approx_equal(o.azimuth_grid, arma::vec({-30.0, -20.0}) * d2r, "absdiff", 1e-14));
@@ -209,7 +209,7 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
     // Power only at 30 deg: the previous neighbour (20 deg) is kept, the next one across the gap (-30 deg) is not
     a.e_theta_re.zeros();
     a.e_theta_re.slice(0).col(6).fill(1.0);
-    o = a.copy(), quadriga_lib::arrayant_remove_zeros(o);
+    o = a, quadriga_lib::arrayant_remove_zeros(o);
     CHECK(arma::approx_equal(o.azimuth_grid, arma::vec({20.0, 30.0}) * d2r, "absdiff", 1e-14));
 
     // In place: the name is kept
@@ -218,14 +218,10 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
     CHECK(a.n_azimuth() == 2);
 }
 
-// Copy_element must respect read_only and reject an empty destination with a clear message.
-TEST_CASE("Arrayant copy_element - Read-only object and empty destination")
+// Copy_element must reject an empty destination with a clear message.
+TEST_CASE("Arrayant copy_element - Empty destination")
 {
     auto a = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    a.read_only = true;
-    CHECK_THROWS_AS(quadriga_lib::arrayant_copy_element(a, 0, {3}), std::invalid_argument);
-    CHECK(a.n_elements() == 1);
-    a.read_only = false;
 
     try
     {

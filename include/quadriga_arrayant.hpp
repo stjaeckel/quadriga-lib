@@ -29,8 +29,6 @@ namespace quadriga_lib
         arma::Mat<dtype> coupling_re;                // Coupling matrix, real part; [n_elements, n_ports]
         arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part; [n_elements, n_ports]
         dtype center_frequency = dtype(299792458.0); // Center frequency
-        bool read_only = false;                      // Prevent member functions from writing to the properties
-        mutable std::atomic<const dtype *> check_ptr[9] = {}; // Data pointers of the last passed validity check (cache of the quick check)
         arrayant() {};                               // Default constructor
 
         // Copy: the target is marked as validated when the source passes the full check; move: the target takes over
@@ -46,9 +44,6 @@ namespace quadriga_lib
         arma::uword n_elements() const;  // Number of antenna elements
         arma::uword n_ports() const;     // Number of ports (after coupling of elements)
 
-        // Creates a copy of the array antenna object; a copy of a valid arrayant is marked as validated
-        arrayant<dtype> copy() const;
-
         // Reset the size to zero (the arrayant object will contain no data)
         void reset();
 
@@ -60,6 +55,10 @@ namespace quadriga_lib
 
         // Validate integrity (full check); returns an empty string if valid or an error message otherwise
         std::string is_valid() const;
+
+    private:
+        mutable std::atomic<const dtype *> check_ptr[9] = {}; // Data pointers of the last passed validity check (cache of the quick check)
+        friend struct qd_arrayant_access;                     // Library-internal access to the cache
     };
 
     // ---- Array antenna functions ----

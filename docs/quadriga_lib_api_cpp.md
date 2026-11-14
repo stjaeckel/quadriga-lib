@@ -67,7 +67,7 @@ lang: en-US
 | [.add_paths](#.add_paths) | Channel class | Append new propagation paths to an existing channel snapshot |
 | [.calc_effective_path_gain](#.calc_effective_path_gain) | Channel class | Calculate the effective path gain per snapshot in linear scale |
 | [.write_paths_to_obj_file](#.write_paths_to_obj_file) | Channel class | Export propagation paths to a Wavefront OBJ file for 3D visualization |
-| [any_type_id](#any_type_id) | Channel functions | Get type ID and raw access from a `std::any` object |
+| [any_type_id](#any_type_id) | Channel functions | Get the type ID and the shape of the value in a `std::any` object |
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | Compute the baseband frequency response of multiple MIMO channels |
@@ -218,7 +218,6 @@ Not in: MATLAB, Python
 | `.n_azimuth()`   | Number of azimuth angles                                               |
 | `.n_elements()`  | Number of antenna elements                                             |
 | `.n_ports()`     | Number of ports (columns of coupling matrix)                           |
-| `.copy()`        | Returns a deep copy; a copy of a valid arrayant is marked as validated |
 | `.reset()`       | Clears all data, resetting size to zero                                |
 | `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
@@ -602,8 +601,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_copy_element) · [Python](qua
 - Added elements get their own port with identity coupling; positions of added elements that are not copied are zero
 - When the array grows, an empty `element_pos` and an empty coupling are written out first (zeros, identity), so
   that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for a read-only object, an empty `destination`, a source index out of bound, or a
-  destination index equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
+- Throws `std::invalid_argument` for an empty `destination`, a source index out of bound, or a destination index
+  equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
 
 ### Declaration:
 ```cpp
@@ -897,7 +896,7 @@ Not in: MATLAB, Python
   1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
   depend on the scale of the pattern; an all-zero pattern is left unchanged
 - Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
-- To keep the original, call it on a `.copy()`
+- To keep the original, call it on a copy (`auto b = ant;`)
 
 ### Declaration:
 ```cpp
@@ -1648,20 +1647,19 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 ---
 <a id="any_type_id"></a>
 ## any_type_id
-Get type ID and raw access from a `std::any` object
+Get the type ID and the shape of the value in a `std::any` object
 
 Not in: MATLAB, Python
 
 - Inspects a `std::any` object and returns an integer type identifier for its contents
 - Optionally retrieves dimensions (rows, columns, slices) for Armadillo matrix/cube/vector types; for `std::string`, `dims[0]` is the string length, `dims[1]`/`dims[2]` are zero
-- Optionally retrieves a raw `void*` to the internal data — not type-safe, bypasses `const` protection; use with caution
+- To access the data, cast the object with `std::any_cast` to the type given by the ID
 
 ### Declaration:
 ```cpp
 int quadriga_lib::any_type_id(
     const std::any *data,
-    unsigned long long *dims = nullptr,
-    void **dataptr = nullptr);
+    unsigned long long *dims = nullptr);
 ```
 
 ### Inputs:
@@ -1669,7 +1667,6 @@ int quadriga_lib::any_type_id(
 
 ### Outputs:
 - **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
-- **`dataptr`** *(optional)* — Receives a raw pointer to the object's internal data
 
 ### Returns:
 - Integer type ID of the contained value:
@@ -1928,7 +1925,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset) · [Python](quadriga_l
 
 - Reads a user-defined dataset stored under `prefix + par_name` (e.g., `"par_carrier_frequency"`).
 - Returns an empty `std::any` if the dataset does not exist at the specified slot or name.
-- Use [any_type_id](#any_type_id) to determine the contained type and obtain a raw pointer.
+- Use [any_type_id](#any_type_id) to determine the contained type and shape, then `std::any_cast` to that type.
 - Returned types: a scalar dataset gives a scalar; a 1D dataset an `arma::Col`, also when it has a single element;
   a 2D dataset an `arma::Mat`; a 3D dataset an `arma::Cube`. An `arma::Row` written with [hdf5_write_dset](#hdf5_write_dset)
   therefore comes back as an `arma::Col`.

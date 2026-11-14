@@ -388,7 +388,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
     constexpr dtype zero = dtype(0.0);
 
     // Initialize pattern
-    quadriga_lib::arrayant<dtype> ant = (pattern == nullptr) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : pattern->copy();
+    quadriga_lib::arrayant<dtype> ant = (pattern == nullptr) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : *pattern;
 
     if (pattern != nullptr)
     {
@@ -508,7 +508,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
     constexpr dtype zero = dtype(0.0);
 
     // Initialize pattern
-    quadriga_lib::arrayant<dtype> ant = (pattern == nullptr) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : pattern->copy();
+    quadriga_lib::arrayant<dtype> ant = (pattern == nullptr) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : *pattern;
 
     if (pattern != nullptr)
     {

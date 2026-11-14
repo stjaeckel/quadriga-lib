@@ -636,9 +636,7 @@ static py::object qd_python_any2numpy(const std::any &dset)
     if (!dset.has_value())
         return py::none();
 
-    unsigned long long dims[3];
-    void *dataptr = nullptr;
-    int type_id = quadriga_lib::any_type_id(&dset, dims, &dataptr);
+    int type_id = quadriga_lib::any_type_id(&dset);
 
 #define QD_PY_ANY_ARR(id, T) \
     case id:                 \
@@ -651,17 +649,17 @@ static py::object qd_python_any2numpy(const std::any &dset)
 
     // Scalars -> Python numbers
     case 10:
-        return py::cast(*(float *)dataptr);
+        return py::cast(std::any_cast<float>(dset));
     case 11:
-        return py::cast(*(double *)dataptr);
+        return py::cast(std::any_cast<double>(dset));
     case 12:
-        return py::cast(*(unsigned long long *)dataptr);
+        return py::cast(std::any_cast<unsigned long long>(dset));
     case 13:
-        return py::cast(*(long long *)dataptr);
+        return py::cast(std::any_cast<long long>(dset));
     case 14:
-        return py::cast(*(unsigned *)dataptr);
+        return py::cast(std::any_cast<unsigned>(dset));
     case 15:
-        return py::cast(*(int *)dataptr);
+        return py::cast(std::any_cast<int>(dset));
 
         // Matrices
         QD_PY_ANY_ARR(20, arma::Mat<float>)

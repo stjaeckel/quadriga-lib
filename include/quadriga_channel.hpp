@@ -185,11 +185,9 @@ namespace quadriga_lib
     };
     static_assert(sizeof(path) == 56, "path must be exactly 56 bytes");
 
-    // Returns type ID of a std::any field and allows low-level data access
+    // Returns type ID of a std::any field
     // - Optional parameter dims = Pointer to 3-element array to store the size of each dimension
     // - For strings, dims[0] contains the length of the string
-    // - Optional parameter dataptr = Raw pointer to the internal data array
-    // - WARNING: Use  dataptr with caution. It allows full RW-access to the internal data, ignores const and is not typesafe!
     // - Type-codes:
     //      -2  no value,                 -1  unsupported type,          9  std::string,
     //      10  float,                    11  double,                   12  unsigned long long int,
@@ -202,7 +200,7 @@ namespace quadriga_lib
     //      43  arma::Col<arma::sword>,   44  arma::Col<unsigned>,      45  arma::Col<int>,
     //      50  arma::Row<float>,         51  arma::Row<double>,        52  arma::Row<arma::uword>,
     //      53  arma::Row<arma::sword>,   54  arma::Row<unsigned>,      55  arma::Row<int>
-    int any_type_id(const std::any *data, unsigned long long *dims = nullptr, void **dataptr = nullptr);
+    int any_type_id(const std::any *data, unsigned long long *dims = nullptr);
 
     // Create a new channel HDF file and set the index to given storage layout
     // - Channels can be structured in a multi-dimensional array (up to 4D)

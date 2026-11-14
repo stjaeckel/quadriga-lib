@@ -4,7 +4,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 
 | Function | Summary |
 | --- | --- |
-| [any_type_id](#any_type_id) | Get type ID and raw access from a `std::any` object |
+| [any_type_id](#any_type_id) | Get the type ID and the shape of the value in a `std::any` object |
 | [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
@@ -29,20 +29,19 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 ---
 <a id="any_type_id"></a>
 ## any_type_id
-Get type ID and raw access from a `std::any` object
+Get the type ID and the shape of the value in a `std::any` object
 
 Not in: MATLAB, Python
 
 - Inspects a `std::any` object and returns an integer type identifier for its contents
 - Optionally retrieves dimensions (rows, columns, slices) for Armadillo matrix/cube/vector types; for `std::string`, `dims[0]` is the string length, `dims[1]`/`dims[2]` are zero
-- Optionally retrieves a raw `void*` to the internal data — not type-safe, bypasses `const` protection; use with caution
+- To access the data, cast the object with `std::any_cast` to the type given by the ID
 
 ### Declaration:
 ```cpp
 int quadriga_lib::any_type_id(
     const std::any *data,
-    unsigned long long *dims = nullptr,
-    void **dataptr = nullptr);
+    unsigned long long *dims = nullptr);
 ```
 
 ### Inputs:
@@ -50,7 +49,6 @@ int quadriga_lib::any_type_id(
 
 ### Outputs:
 - **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
-- **`dataptr`** *(optional)* — Receives a raw pointer to the object's internal data
 
 ### Returns:
 - Integer type ID of the contained value:
@@ -309,7 +307,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_dset) · [Python](../pyt
 
 - Reads a user-defined dataset stored under `prefix + par_name` (e.g., `"par_carrier_frequency"`).
 - Returns an empty `std::any` if the dataset does not exist at the specified slot or name.
-- Use [any_type_id](#any_type_id) to determine the contained type and obtain a raw pointer.
+- Use [any_type_id](#any_type_id) to determine the contained type and shape, then `std::any_cast` to that type.
 - Returned types: a scalar dataset gives a scalar; a 1D dataset an `arma::Col`, also when it has a single element;
   a 2D dataset an `arma::Mat`; a 3D dataset an `arma::Cube`. An `arma::Row` written with [hdf5_write_dset](#hdf5_write_dset)
   therefore comes back as an `arma::Col`.

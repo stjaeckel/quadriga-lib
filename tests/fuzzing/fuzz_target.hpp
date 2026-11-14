@@ -237,7 +237,6 @@ namespace fz
             break;
         }
         a.center_frequency = in.value<T>();
-        a.read_only = in.ConsumeIntegralInRange<int>(0, 7) == 0;
 
         // Validated, then grid values changed in place (keeps the data pointers of the quick check)
         if (in.ConsumeBool())

@@ -89,7 +89,7 @@ TEST_CASE("Get Channels IRS - Minimal test")
     ant.coupling_im.reset();
 
     // Gain in broadside direction: 4.77 dBi, factor 3
-    auto irs = ant.copy();
+    auto irs = ant;
     irs.coupling_re.ones(3, 2);
     irs.coupling_re.col(1).zeros();
 
@@ -579,7 +579,7 @@ TEST_CASE("Get Channels IRS - Delay is the sum of both segment path lengths")
     // TX-FBS-LBS-IRS (IRS-FBS-LBS-RX) polyline. The IRS has one element and a single unit codebook entry.
     const double C = 299792458.0, fc = 3.0e9, k = 2.0 * arma::datum::pi * fc / C;
     auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    auto irs = ant.copy();
+    auto irs = ant;
     irs.coupling_re.ones(1, 1);
     irs.coupling_im.reset();
 

@@ -500,9 +500,7 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
         return mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL);
 
     // Dispatch on the std::any contents
-    unsigned long long dims[3];
-    void *dataptr = nullptr;
-    int type_id = quadriga_lib::any_type_id(&dset, dims, &dataptr);
+    int type_id = quadriga_lib::any_type_id(&dset);
 
 #define CASE_ARMA(id, ARMA_TYPE)                    \
     case id:                                        \
@@ -523,22 +521,22 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
 
     // Scalars
     case 10:
-        output = qd_mex_copy2matlab((float *)dataptr);
+        output = qd_mex_copy2matlab(std::any_cast<float>(&dset));
         break;
     case 11:
-        output = qd_mex_copy2matlab((double *)dataptr);
+        output = qd_mex_copy2matlab(std::any_cast<double>(&dset));
         break;
     case 12:
-        output = qd_mex_copy2matlab((unsigned long long *)dataptr);
+        output = qd_mex_copy2matlab(std::any_cast<unsigned long long>(&dset));
         break;
     case 13:
-        output = qd_mex_copy2matlab((long long *)dataptr);
+        output = qd_mex_copy2matlab(std::any_cast<long long>(&dset));
         break;
     case 14:
-        output = qd_mex_copy2matlab((unsigned *)dataptr);
+        output = qd_mex_copy2matlab(std::any_cast<unsigned>(&dset));
         break;
     case 15:
-        output = qd_mex_copy2matlab((int *)dataptr);
+        output = qd_mex_copy2matlab(std::any_cast<int>(&dset));
         break;
 
         // Matrices

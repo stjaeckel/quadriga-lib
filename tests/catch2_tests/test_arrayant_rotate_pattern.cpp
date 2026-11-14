@@ -88,14 +88,6 @@ TEST_CASE("Rotate Pattern - Element index out of bounds throws")
     REQUIRE_THROWS_AS(qd_rotate(ant, arma::datum::pi / 18.0, 0.0, 0.0, 0, 99), std::invalid_argument);
 }
 
-TEST_CASE("Rotate Pattern - Read-only inplace throws")
-{
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    ant.read_only = true;
-
-    REQUIRE_THROWS_AS(qd_rotate(ant, arma::datum::pi / 18.0, 0.0, 0.0, 3), std::invalid_argument);
-}
-
 TEST_CASE("Rotate Pattern - Valid usage values accepted")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
@@ -110,7 +102,7 @@ TEST_CASE("Rotate Pattern - Valid usage values accepted")
 TEST_CASE("Rotate Pattern - Zero rotation is identity (omni, double)")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // Rotate by (0,0,0) with usage 3 (no grid adjustment) - should be exact identity
     qd_rotate(ant, 0.0, 0.0, 0.0, 3);
@@ -126,7 +118,7 @@ TEST_CASE("Rotate Pattern - Zero rotation is identity (omni, double)")
 TEST_CASE("Rotate Pattern - Zero rotation is identity (omni, float)")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<float>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 0.0, 0.0, 3);
 
@@ -137,7 +129,7 @@ TEST_CASE("Rotate Pattern - Zero rotation is identity (omni, float)")
 TEST_CASE("Rotate Pattern - Zero rotation is identity (dipole)")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 0.0, 0.0, 3);
 
@@ -148,7 +140,7 @@ TEST_CASE("Rotate Pattern - Zero rotation is identity (dipole)")
 TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 3, omni)")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // Usage 3 = rotate both pattern+polarization, no grid adjustment
     qd_rotate(ant, 0.0, 0.0, 2.0 * arma::datum::pi, 3);
@@ -161,7 +153,7 @@ TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 3
 TEST_CASE("Rotate Pattern - 360 degree x-rotation approximates identity (usage 3)")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 2.0 * arma::datum::pi, 0.0, 0.0, 3);
 
@@ -172,7 +164,7 @@ TEST_CASE("Rotate Pattern - 360 degree x-rotation approximates identity (usage 3
 TEST_CASE("Rotate Pattern - 360 degree y-rotation approximates identity (usage 3)")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 2.0 * arma::datum::pi, 0.0, 3);
 
@@ -183,7 +175,7 @@ TEST_CASE("Rotate Pattern - 360 degree y-rotation approximates identity (usage 3
 TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 3, dipole)")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 0.0, 2.0 * arma::datum::pi, 3);
 
@@ -194,7 +186,7 @@ TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 3
 TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 3, xpol)")
 {
     auto ant = quadriga_lib::generate_arrayant_xpol<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 0.0, 2.0 * arma::datum::pi, 3);
 
@@ -205,7 +197,7 @@ TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 3
 TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 4, dipole)")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // Usage 4 = rotate only pattern, no grid adjustment
     qd_rotate(ant, 0.0, 0.0, 2.0 * arma::datum::pi, 4);
@@ -221,7 +213,7 @@ TEST_CASE("Rotate Pattern - 360 degree z-rotation approximates identity (usage 4
 TEST_CASE("Rotate Pattern - 90 + 270 = 360 z-rotation (usage 3)")
 {
     auto ant_360 = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant_comp = ant_360.copy();
+    auto ant_comp = ant_360;
 
     qd_rotate(ant_360, 0.0, 0.0, 2.0 * arma::datum::pi, 3);
     qd_rotate(ant_comp, 0.0, 0.0, arma::datum::pi / 2.0, 3);
@@ -235,7 +227,7 @@ TEST_CASE("Rotate Pattern - 90 + 270 = 360 z-rotation (usage 3)")
 TEST_CASE("Rotate Pattern - 180 + 180 = 360 z-rotation (usage 3)")
 {
     auto ant_360 = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0);
-    auto ant_comp = ant_360.copy();
+    auto ant_comp = ant_360;
 
     qd_rotate(ant_360, 0.0, 0.0, 2.0 * arma::datum::pi, 3);
     qd_rotate(ant_comp, 0.0, 0.0, arma::datum::pi, 3);
@@ -252,7 +244,7 @@ TEST_CASE("Rotate Pattern - 180 + 180 = 360 z-rotation (usage 3)")
 TEST_CASE("Rotate Pattern - Omni pattern invariant under z-rotation (usage 3)")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // An isotropic radiator with vertical polarization should have constant e_theta_re = 1.0
     // After z-rotation with usage 3 (pattern+pol, no grid adj), it should remain constant
@@ -278,7 +270,7 @@ TEST_CASE("Rotate Pattern - Omni pattern invariant under z-rotation (usage 3)")
 TEST_CASE("Rotate Pattern - Omni pattern invariant under z-rotation (usage 4, pattern only)")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // Usage 4 = only pattern rotation, no grid adjustment
     // For omni, any rotation should not change the magnitude pattern
@@ -332,7 +324,7 @@ TEST_CASE("Rotate Pattern - Directivity preserved after rotation (custom beam)")
 TEST_CASE("Rotate Pattern - Usage 2 only changes polarization, not power pattern")
 {
     auto ant = quadriga_lib::generate_arrayant_xpol<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // Usage 2 = rotate only polarization
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0, 2);
@@ -361,7 +353,7 @@ TEST_CASE("Rotate Pattern - Usage 2 only changes polarization, not power pattern
 TEST_CASE("Rotate Pattern - Usage 2 preserves grid")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, arma::datum::pi / 6.0, arma::datum::pi / 9.0, arma::datum::pi / 18.0, 2);
 
@@ -373,7 +365,7 @@ TEST_CASE("Rotate Pattern - Usage 2 preserves grid")
 TEST_CASE("Rotate Pattern - Usage 3 and 4 preserve grid size")
 {
     auto ant3 = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant4 = ant3.copy();
+    auto ant4 = ant3;
     arma::uword n_el = ant3.n_elevation(), n_az = ant3.n_azimuth();
 
     // Usage 3 = rotate both, no grid adjustment
@@ -398,7 +390,7 @@ TEST_CASE("Rotate Pattern - Single element rotation only affects that element")
     // 1.0 across all angles), so rotation just samples the same constant and appears unchanged.
     auto ant = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3e8, 2); // H/V polarized, 2 elements
     REQUIRE(ant.n_elements() == 2);
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // Rotate only element 0 with usage 3 (pattern+pol, no grid adjust)
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0, 3, 0);
@@ -476,7 +468,7 @@ TEST_CASE("Rotate Pattern - Dipole 90 deg x-rotation flips pattern to horizontal
 TEST_CASE("Rotate Pattern - Float precision (custom beam, usage 3)")
 {
     auto ant = quadriga_lib::generate_arrayant_custom<float>(20.0f, 20.0f);
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 0.0, 2.0 * arma::datum::pi, 3);
 
@@ -537,7 +529,7 @@ TEST_CASE("Rotate Pattern - Usage 0 preserves directivity for non-uniform grid")
 TEST_CASE("Rotate Pattern - Usage 0 and 3 give same result for uniform grid")
 {
     auto ant0 = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant3 = ant0.copy();
+    auto ant3 = ant0;
 
     // For a 1-degree uniform grid, update_grid should be false, so usage 0 and 3 should be identical
     qd_rotate(ant0, arma::datum::pi / 12.0, arma::datum::pi / 9.0, 5.0 * arma::datum::pi / 36.0, 0);
@@ -554,7 +546,7 @@ TEST_CASE("Rotate Pattern - Usage 0 and 3 give same result for uniform grid")
 TEST_CASE("Rotate Pattern - Usage 1 and 4 give same result for uniform grid")
 {
     auto ant1 = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant4 = ant1.copy();
+    auto ant4 = ant1;
 
     qd_rotate(ant1, arma::datum::pi / 18.0, arma::datum::pi / 12.0, arma::datum::pi / 9.0, 1);
     qd_rotate(ant4, arma::datum::pi / 18.0, arma::datum::pi / 12.0, arma::datum::pi / 9.0, 4);
@@ -573,7 +565,7 @@ TEST_CASE("Rotate Pattern - Usage 1 and 4 give same result for uniform grid")
 TEST_CASE("Rotate Pattern - Forward and inverse rotation recovers original (usage 3)")
 {
     auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 60.0);
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // Rotate forward then backward
     // Note: Euler rotation composition is NOT simply negating angles due to non-commutativity
@@ -588,7 +580,7 @@ TEST_CASE("Rotate Pattern - Forward and inverse rotation recovers original (usag
 TEST_CASE("Rotate Pattern - Multiple small rotations accumulate correctly (usage 3)")
 {
     auto ant_single = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0);
-    auto ant_multi = ant_single.copy();
+    auto ant_multi = ant_single;
 
     // Single 90° rotation
     qd_rotate(ant_single, 0.0, 0.0, arma::datum::pi / 2.0, 3);
@@ -610,7 +602,7 @@ TEST_CASE("Rotate Pattern - Multiple small rotations accumulate correctly (usage
 TEST_CASE("Rotate Pattern - Very small rotation angle")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 0.0, 1.74533e-12, 3);
 
@@ -621,7 +613,7 @@ TEST_CASE("Rotate Pattern - Very small rotation angle")
 TEST_CASE("Rotate Pattern - Large rotation angle (720 degrees)")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     qd_rotate(ant, 0.0, 0.0, 4.0 * arma::datum::pi, 3);
 
@@ -632,7 +624,7 @@ TEST_CASE("Rotate Pattern - Large rotation angle (720 degrees)")
 TEST_CASE("Rotate Pattern - Negative rotation angles")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     // -360° should also be near-identity
     qd_rotate(ant, 0.0, 0.0, -2.0 * arma::datum::pi, 3);
@@ -660,7 +652,7 @@ TEST_CASE("Rotate Pattern - All three axes simultaneously (usage 3)")
 TEST_CASE("Rotate Pattern - Result is always valid (multiple usage modes)")
 {
     auto ant0 = quadriga_lib::generate_arrayant_3GPP<double>();
-    auto ant1 = ant0.copy(), ant2 = ant0.copy(), ant3 = ant0.copy(), ant4 = ant0.copy();
+    auto ant1 = ant0, ant2 = ant0, ant3 = ant0, ant4 = ant0;
 
     qd_rotate(ant0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 2.0 * arma::datum::pi / 9.0, 0);
     CHECK(ant0.is_valid().empty());
@@ -687,7 +679,7 @@ TEST_CASE("Rotate Pattern - 3GPP 2x2 array rotation preserves all elements")
     auto ant = quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3e9, 1);
     REQUIRE(ant.n_elements() == 4);
 
-    auto ref = ant.copy();
+    auto ref = ant;
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0, 3);
 
     // All elements should have been rotated
@@ -702,7 +694,7 @@ TEST_CASE("Rotate Pattern - 3GPP 2x2 array rotation preserves all elements")
 TEST_CASE("Rotate Pattern - Rotating all elements individually matches rotating all at once")
 {
     auto ant_all = quadriga_lib::generate_arrayant_xpol<double>();
-    auto ant_ind = ant_all.copy();
+    auto ant_ind = ant_all;
     REQUIRE(ant_all.n_elements() == 2);
 
     // Rotate all at once (usage 3)
@@ -751,7 +743,7 @@ TEST_CASE("Rotate Pattern Multi - Element index out of range throws")
 TEST_CASE("Rotate Pattern Multi - Single entry behaves like single rotate_pattern")
 {
     auto ant_single = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant_multi = ant_single.copy();
+    auto ant_multi = ant_single;
 
     // Single: use internal usage 3 (which is what multi maps usage 0 to)
     qd_rotate(ant_single, arma::datum::pi / 18.0, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 3);
@@ -770,8 +762,8 @@ TEST_CASE("Rotate Pattern Multi - All entries in vector are rotated")
     // so we use same-resolution antennas with different directivities
     auto ant1 = quadriga_lib::generate_arrayant_dipole<double>();
     auto ant2 = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0); // Same 1° grid, different pattern
-    auto ref1 = ant1.copy();
-    auto ref2 = ant2.copy();
+    auto ref1 = ant1;
+    auto ref2 = ant2;
 
     REQUIRE(ant1.n_elevation() == ant2.n_elevation());
     REQUIRE(ant1.n_azimuth() == ant2.n_azimuth());
@@ -795,7 +787,7 @@ TEST_CASE("Rotate Pattern Multi - All entries in vector are rotated")
 TEST_CASE("Rotate Pattern Multi - 360 degree rotation approximates identity")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     std::vector<quadriga_lib::arrayant<double>> vec = {ant};
     qd_rotate_multi(vec, 0.0, 0.0, 2.0 * arma::datum::pi, 0);
@@ -808,7 +800,7 @@ TEST_CASE("Rotate Pattern Multi - Usage mapping: 0->3, 1->4, 2->2")
 {
     // Verify that multi usage 0 behaves like single usage 3
     auto ant_u0 = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant_u3 = ant_u0.copy();
+    auto ant_u3 = ant_u0;
 
     std::vector<quadriga_lib::arrayant<double>> vec0 = {ant_u0};
     qd_rotate_multi(vec0, arma::datum::pi / 12.0, 5.0 * arma::datum::pi / 36.0, 7.0 * arma::datum::pi / 36.0, 0);
@@ -819,7 +811,7 @@ TEST_CASE("Rotate Pattern Multi - Usage mapping: 0->3, 1->4, 2->2")
 
     // Verify that multi usage 1 behaves like single usage 4
     auto ant_u1 = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant_u4 = ant_u1.copy();
+    auto ant_u4 = ant_u1;
 
     std::vector<quadriga_lib::arrayant<double>> vec1 = {ant_u1};
     qd_rotate_multi(vec1, arma::datum::pi / 12.0, 5.0 * arma::datum::pi / 36.0, 7.0 * arma::datum::pi / 36.0, 1);
@@ -830,7 +822,7 @@ TEST_CASE("Rotate Pattern Multi - Usage mapping: 0->3, 1->4, 2->2")
 
     // Verify that multi usage 2 behaves like single usage 2
     auto ant_u2m = quadriga_lib::generate_arrayant_dipole<double>();
-    auto ant_u2s = ant_u2m.copy();
+    auto ant_u2s = ant_u2m;
 
     std::vector<quadriga_lib::arrayant<double>> vec2 = {ant_u2m};
     qd_rotate_multi(vec2, arma::datum::pi / 12.0, 5.0 * arma::datum::pi / 36.0, 7.0 * arma::datum::pi / 36.0, 2);
@@ -843,7 +835,7 @@ TEST_CASE("Rotate Pattern Multi - Usage mapping: 0->3, 1->4, 2->2")
 TEST_CASE("Rotate Pattern Multi - Per-element rotation")
 {
     auto ant = quadriga_lib::generate_arrayant_xpol<double>(); // 2 elements
-    auto ref = ant.copy();
+    auto ref = ant;
 
     arma::uvec elem = {0}; // Only rotate element 0
     std::vector<quadriga_lib::arrayant<double>> vec = {ant};
@@ -873,7 +865,7 @@ TEST_CASE("Rotate Pattern Multi - Directivity preserved across all entries")
 TEST_CASE("Rotate Pattern Multi - Float precision")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<float>();
-    auto ref = ant.copy();
+    auto ref = ant;
 
     std::vector<quadriga_lib::arrayant<float>> vec = {ant};
     qd_rotate_multi(vec, 0.0, 0.0, 2.0 * arma::datum::pi, 0);
@@ -932,7 +924,7 @@ TEST_CASE("Rotate Pattern - Keeps coupling, centre frequency and name")
     auto a = rotate_pattern_two_element_one_port();
     for (unsigned usage : {0u, 1u, 2u, 3u, 4u})
     {
-        auto out = a.copy();
+        auto out = a;
         qd_rotate(out, 0.0, 0.0, arma::datum::pi / 4.0, usage);
         CHECK(out.n_elements() == 2);
         CHECK(out.n_ports() == 1);
@@ -948,7 +940,7 @@ TEST_CASE("Rotate Pattern - In place with a grid update keeps the coupling")
 {
     auto a = rotate_pattern_two_element_one_port();
     a.azimuth_grid(5) += 0.01; // non-uniform grid -> grid update in rotate_pattern
-    auto c = a.copy();
+    auto c = a;
     qd_rotate(c, 0.0, 0.0, arma::datum::pi / 4.0, 0);
     CHECK(c.n_azimuth() != a.n_azimuth());
     CHECK(c.n_elements() == 2);
@@ -1006,7 +998,7 @@ TEST_CASE("arrayant_rotate_pattern - the rotated pattern equals arrayant_interpo
     quadriga_lib::arrayant_interpolate(ant, az, el, Vr, Vi, Hr, Hi, i_el, &O);
     for (unsigned usage : {0u, 3u})
     {
-        auto rot = ant.copy();
+        auto rot = ant;
         quadriga_lib::arrayant_rotate_pattern(rot, o, usage);
         REQUIRE(rot.n_azimuth() == ant.n_azimuth()); // Uniform grid: no grid adjustment
         for (arma::uword s = 0; s < 2; ++s)
@@ -1025,7 +1017,7 @@ TEST_CASE("arrayant_rotate_pattern - an element subset is rotated in one call")
     quadriga_lib::arrayant_copy_element(ant, 0, {2});
     ant.element_pos = {{0.0, 0.1, 0.2}, {0.3, 0.4, 0.5}, {0.6, 0.7, 0.8}};
     const arma::vec o = {0.1, 0.2, 0.3};
-    auto all = ant.copy(), sub = ant.copy();
+    auto all = ant, sub = ant;
     quadriga_lib::arrayant_rotate_pattern(all, o, 3);
     const arma::uvec i_element = {2, 0};
     quadriga_lib::arrayant_rotate_pattern(sub, o, 3, &i_element);
@@ -1039,9 +1031,9 @@ TEST_CASE("arrayant_rotate_pattern - an element subset is rotated in one call")
     CHECK(arma::approx_equal(sub.element_pos.col(1), ant.element_pos.col(1), "absdiff", 0.0));
 
     // All elements in any order count as all elements, also when the grid is adjusted
-    auto nonuniform = ant.copy();
+    auto nonuniform = ant;
     nonuniform.azimuth_grid(5) += 0.01;
-    auto a = nonuniform.copy(), b = nonuniform.copy();
+    auto a = nonuniform, b = nonuniform;
     const arma::uvec perm = {1, 2, 0}, part = {1, 2};
     quadriga_lib::arrayant_rotate_pattern(a, o, 0);
     quadriga_lib::arrayant_rotate_pattern(b, o, 0, &perm);
@@ -1052,13 +1044,13 @@ TEST_CASE("arrayant_rotate_pattern - an element subset is rotated in one call")
 TEST_CASE("arrayant_rotate_pattern - invalid orientation and element indices throw")
 {
     auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0); // 2 elements
-    const auto ref = ant.copy();
+    const auto ref = ant;
     const arma::uvec dup = {1, 1}, out = {2};
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::mat(1, 3, arma::fill::zeros)), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(4, arma::fill::zeros)), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, &dup), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, &out), std::invalid_argument);
-    std::vector<quadriga_lib::arrayant<double>> vec = {ant.copy(), ant.copy()};
+    std::vector<quadriga_lib::arrayant<double>> vec = {ant, ant};
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(vec, arma::vec(3, arma::fill::zeros), 0, &dup), std::invalid_argument);
     CHECK(arma::approx_equal(ant.e_theta_re, ref.e_theta_re, "absdiff", 0.0));
     CHECK(arma::approx_equal(vec[0].e_theta_re, ref.e_theta_re, "absdiff", 0.0));

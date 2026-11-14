@@ -351,8 +351,8 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_copy_element) · [P
 - Added elements get their own port with identity coupling; positions of added elements that are not copied are zero
 - When the array grows, an empty `element_pos` and an empty coupling are written out first (zeros, identity), so
   that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for a read-only object, an empty `destination`, a source index out of bound, or a
-  destination index equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
+- Throws `std::invalid_argument` for an empty `destination`, a source index out of bound, or a destination index
+  equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
 
 ### Declaration:
 ```cpp
@@ -646,7 +646,7 @@ Not in: MATLAB, Python
   1e-12 times the peak power of a single sample (summed over field components and elements); the result does not
   depend on the scale of the pattern; an all-zero pattern is left unchanged
 - Immediate neighbors of retained entries are also kept unless the local grid spacing is strongly asymmetric (factor > 1.5)
-- To keep the original, call it on a `.copy()`
+- To keep the original, call it on a copy (`auto b = ant;`)
 
 ### Declaration:
 ```cpp

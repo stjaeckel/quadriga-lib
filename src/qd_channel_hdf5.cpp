@@ -4,6 +4,7 @@
 
 #include "quadriga_channel.hpp"
 #include "qd_hdf5.hpp"
+#include "qd_any_type_id.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -394,8 +395,8 @@ static uint64_t qHDF_emit_data_group(h5::output &out, h5::header &hdr, const qHD
 static uint64_t qHDF_emit_par(h5::output &out, const std::any *par_data)
 {
     unsigned long long d[3];
-    void *ptr = nullptr;
-    const int datatype_id = quadriga_lib::any_type_id(par_data, d, &ptr);
+    const void *ptr = nullptr;
+    const int datatype_id = qd_any_type_id(par_data, d, &ptr);
     if (datatype_id == 9)
     {
         const std::string *str = std::any_cast<std::string>(par_data);
@@ -1235,7 +1236,7 @@ Read an unstructured dataset from an HDF5 file at a specified 4D index
 
 - Reads a user-defined dataset stored under `prefix + par_name` (e.g., `"par_carrier_frequency"`).
 - Returns an empty `std::any` if the dataset does not exist at the specified slot or name.
-- Use [[any_type_id]] to determine the contained type and obtain a raw pointer.
+- Use [[any_type_id]] to determine the contained type and shape, then `std::any_cast` to that type.
 - Returned types: a scalar dataset gives a scalar; a 1D dataset an `arma::Col`, also when it has a single element;
   a 2D dataset an `arma::Mat`; a 3D dataset an `arma::Cube`. An `arma::Row` written with [[hdf5_write_dset]]
   therefore comes back as an `arma::Col`.
