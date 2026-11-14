@@ -420,6 +420,7 @@ auto cdf_avg_py     = qd_python_init_output(n_bins_out, &cdf_avg);
 ```
 - The size arguments are `arma::uword`; cast literals and other integer types where the overload would be ambiguous, e.g. `(arma::uword)3`.
 - The output size must be known before the C++ call — typically derived from the input dimensions stated in the C++ documentation.
+- Use it for outputs that grow with the data (angles, paths, snapshots, pattern samples). Small per-element or per-frequency results may be copied instead (see "Unknown output size"), which keeps the wrapper from repeating the size rules of the C++ function.
 - The size must match exactly what the C++ function produces: if C++ resizes the container, it detaches from the numpy buffer and the returned array is never written.
 - The memory is NOT zero-initialized (unlike the MEX helper). If the C++ call is skipped or does not write every element, fill the output explicitly (e.g. `.zeros()`).
 - For 4D outputs, each Cube in the vector aliases its slab of the numpy-owned 4D buffer (zero-copy). Do not resize the vector or any of its cubes after this call.

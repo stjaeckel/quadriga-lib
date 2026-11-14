@@ -5,8 +5,6 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-array-
 | Function | Summary |
 | --- | --- |
 | [arrayant](#arrayant) | Class for storing and manipulating array antenna models |
-| [.calc_beamwidth_deg](#.calc_beamwidth_deg) | Calculate the beamwidth and pointing angles of array antenna elements in degrees |
-| [.calc_directivity_dBi](#.calc_directivity_dBi) | Calculate the directivity in dBi of a single array element |
 | [.is_valid](#.is_valid) | Validate the integrity of an arrayant object |
 | [.set_size](#.set_size) | Resize an arrayant object to new dimensions |
 
@@ -54,82 +52,14 @@ Not in: MATLAB, Python
 | `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
 ### Complex member functions:
-| Function                  | Description                                                |
-| ------------------------- | ---------------------------------------------------------- |
-| [.calc_beamwidth_deg](#.calc_beamwidth_deg)   | Calculate the beam width of an antenna element in degree   |
-| [.calc_directivity_dBi](#.calc_directivity_dBi) | Calculate the directivity in dBi of a single array element |
-| [.set_size](#.set_size)             | Resize the arrayant to new dimensions                      |
-| [.is_valid](#.is_valid)             | Validate arrayant integrity                                |
+| Function      | Description                           |
+| ------------- | ------------------------------------- |
+| [.set_size](#.set_size) | Resize the arrayant to new dimensions |
+| [.is_valid](#.is_valid) | Validate arrayant integrity           |
 
 Computations and file I/O on an arrayant are free functions, see section "Array antenna functions"
-(e.g. [arrayant_concat](array-antenna-functions.md#arrayant_concat), [arrayant_combine_pattern](array-antenna-functions.md#arrayant_combine_pattern), [arrayant_copy_element](array-antenna-functions.md#arrayant_copy_element), [arrayant_rotate_pattern](array-antenna-functions.md#arrayant_rotate_pattern),
-[qdant_write](array-antenna-functions.md#qdant_write)).
-
----
-<a id=".calc_beamwidth_deg"></a>
-## .calc_beamwidth_deg
-Calculate the beamwidth and pointing angles of array antenna elements in degrees
-
-Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_beamwidth) · [Python](../python/array-antenna-functions.md#calc_beamwidth)
-
-- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
-- Also returns the azimuth and elevation pointing angles of the main beam
-- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
-- The width is that of the main lobe: starting at the maximum, the search goes outwards until the power drops below the
-  threshold; side lobes above the threshold are not included
-- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when
-  the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
-- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles (requires samples
-  at ±90°); the result is at most 180°
-- Ignores element coupling
-
-### Declaration:
-```cpp
-void calc_beamwidth_deg(arma::uword i_element,
-    dtype threshold_dB = 3.0,
-    dtype *beamwidth_az = nullptr,
-    dtype *beamwidth_el = nullptr,
-    dtype *az_point_ang = nullptr,
-    dtype *el_point_ang = nullptr) const;
-```
-
-### Inputs:
-- **`i_element`** — Element index; 0-based
-- **`threshold_dB`** — Threshold in dB; 3 dB = FWHM
-
-### Outputs:
-- **`beamwidth_az`** — Azimuth beamwidth in degree
-- **`beamwidth_el`** — Elevation beamwidth in degree
-- **`az_point_ang`** — Azimuth pointing angle for the main beam in degree
-- **`el_point_ang`** — Elevation pointing angle for the main beam in degree
-
-### See also:
-- [.calc_directivity_dBi](#.calc_directivity_dBi) (directivity in dBi of a single array element)
-
----
-<a id=".calc_directivity_dBi"></a>
-## .calc_directivity_dBi
-Calculate the directivity in dBi of a single array element
-
-Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_directivity) · [Python](../python/array-antenna-functions.md#calc_directivity)
-
-- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Independent of the scale of the pattern; an element whose pattern is zero everywhere returns 0 dBi
-- Ignores element coupling
-
-### Declaration:
-```cpp
-dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const;
-```
-
-### Inputs:
-- **`i_element`** — Element index, 0-based
-
-### Returns:
-- Directivity of the specified element in dBi
-
-### See also:
-- [arrayant_combine_pattern](array-antenna-functions.md#arrayant_combine_pattern) (the per-port directivity is a typical follow-up)
+(e.g. [arrayant_calc_beamwidth](array-antenna-functions.md#arrayant_calc_beamwidth), [arrayant_calc_directivity](array-antenna-functions.md#arrayant_calc_directivity), [arrayant_concat](array-antenna-functions.md#arrayant_concat), [arrayant_combine_pattern](array-antenna-functions.md#arrayant_combine_pattern),
+[arrayant_copy_element](array-antenna-functions.md#arrayant_copy_element), [arrayant_rotate_pattern](array-antenna-functions.md#arrayant_rotate_pattern), [qdant_write](array-antenna-functions.md#qdant_write)).
 
 ---
 <a id=".is_valid"></a>

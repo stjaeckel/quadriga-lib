@@ -4,8 +4,8 @@
 # A family listed here does not use the name match.
 
 [families]
-arrayant_calc_beamwidth = [".calc_beamwidth_deg"]
-arrayant_calc_directivity = [".calc_directivity_dBi"]
+arrayant_calc_beamwidth = ["arrayant_calc_beamwidth", "arrayant_calc_beamwidth_multi"]
+arrayant_calc_directivity = ["arrayant_calc_directivity", "arrayant_calc_directivity_multi"]
 arrayant_combine_pattern = ["arrayant_combine_pattern", "arrayant_combine_pattern_multi"]
 arrayant_concat = ["arrayant_concat", "arrayant_concat_multi"]
 arrayant_copy_element = ["arrayant_copy_element", "arrayant_copy_element_multi"]

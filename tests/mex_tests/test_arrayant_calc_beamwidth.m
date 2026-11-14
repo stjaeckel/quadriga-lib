@@ -44,29 +44,14 @@ assertElementsAlmostEqual( az_pt, [45; -45], 'absolute', 0.5 );
 [~, ~, az_pt] = quadriga_lib.arrayant_calc_beamwidth(ant2, 2);
 assertElementsAlmostEqual( az_pt, -45, 'absolute', 0.5 );
 
-% --- Split mode (separate inputs) ---
-[A,B,C,D,E,F,~,~,~,~,~] = quadriga_lib.arrayant_generate('custom', [], [], 30, 20, 0);
-[bw_az, bw_el] = quadriga_lib.arrayant_calc_beamwidth(A,B,C,D,E,F);
-assertElementsAlmostEqual( bw_az, 30.0, 'absolute', 0.5 );
-assertElementsAlmostEqual( bw_el, 20.0, 'absolute', 0.5 );
-
-% Split mode with i_element and threshold
-bw_az = quadriga_lib.arrayant_calc_beamwidth(A,B,C,D,E,F, 1, 3);
-assertElementsAlmostEqual( bw_az, 30.0, 'absolute', 0.5 );
-
 % --- xpol: 2 cross-polarized isotropic elements -> full grid for both ---
 ant_xp = quadriga_lib.arrayant_generate('xpol');
 [bw_az, bw_el] = quadriga_lib.arrayant_calc_beamwidth(ant_xp);
 assertElementsAlmostEqual( bw_az, [360; 360], 'absolute', 0.05 );
 assertElementsAlmostEqual( bw_el, [180; 180], 'absolute', 0.05 );
 
-% Empty i_element -> all elements (struct mode)
+% Empty i_element -> all elements
 bw_az = quadriga_lib.arrayant_calc_beamwidth(ant_xp, []);
-assertElementsAlmostEqual( bw_az, [360; 360], 'absolute', 0.05 );
-
-% Empty i_element -> all elements (split mode)
-[A2,B2,C2,D2,E2,F2,~,~,~,~,~] = quadriga_lib.arrayant_generate('xpol');
-bw_az = quadriga_lib.arrayant_calc_beamwidth(A2,B2,C2,D2,E2,F2, []);
 assertElementsAlmostEqual( bw_az, [360; 360], 'absolute', 0.05 );
 
 % --- Multi-frequency struct array (n_freq = 2) ---
@@ -88,23 +73,25 @@ assertElementsAlmostEqual( el_pt_only, 0.0, 'absolute', 0.5 );
 
 % --- Errors ---
 
-% Non-struct input with too few args for split mode
+% Split mode (the arrayant fields as separate inputs) is not supported
+A = ant_c.e_theta_re; B = ant_c.e_theta_im; C = ant_c.e_phi_re;
+D = ant_c.e_phi_im; E = ant_c.azimuth_grid; F = ant_c.elevation_grid;
 try
-    quadriga_lib.arrayant_calc_beamwidth( A, B );
+    quadriga_lib.arrayant_calc_beamwidth( A, B, C, D, E, F );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input must be a struct.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% Wrong number of input arguments (nrhs = 5 invalid)
+% Non-struct input
 try
-    quadriga_lib.arrayant_calc_beamwidth( A, B, C, D, E );
+    quadriga_lib.arrayant_calc_beamwidth( A, B );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Wrong number of input arguments.';
+    expectedErrorMessage = 'Input ''arrayant'' must be an arrayant struct or struct array.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -115,7 +102,7 @@ try
     [~] = quadriga_lib.arrayant_calc_beamwidth( ant_c, 2 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Element index out of bound.';
+    expectedErrorMessage = 'Input ''i_element'' contains indices that exceed the number of elements.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -143,15 +130,22 @@ catch ME
     end
 end
 
-% Struct input mixed with split-mode extras
-try
-    [~] = quadriga_lib.arrayant_calc_beamwidth( ant_c, B, C, D, E, F );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Cannot mix struct input with separate arrayant inputs.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+% Threshold not positive and finite
+for t = [NaN, Inf, 0, -3]
+    try
+        [~] = quadriga_lib.arrayant_calc_beamwidth( ant_c, [], t );
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    catch ME
+        expectedErrorMessage = 'Input ''threshold_dB'' must be positive and finite.';
+        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+            error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+        end
     end
 end
+
+% Without output argument, the first output goes to ans
+quadriga_lib.arrayant_calc_beamwidth( ant_c );
+assertTrue( exist('ans', 'var') == 1 );
+assertElementsAlmostEqual( ans, 30.0, 'absolute', 0.5 );
 
 end

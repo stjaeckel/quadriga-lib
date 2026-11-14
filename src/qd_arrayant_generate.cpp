@@ -333,8 +333,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     qd_arrayant_mark_valid(ant);
 
     // Normalize to Gain
-    dtype directivity = ant.calc_directivity_dBi(0);
-    directivity = dtype(std::pow(10.0, 0.1 * double(directivity)));
+    arma::Col<dtype> directivity_dBi;
+    quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi);
+    dtype directivity = dtype(std::pow(10.0, 0.1 * double(directivity_dBi[0])));
     dtype p_max = ant.e_theta_re.max();
     p_max *= p_max;
     ant.e_theta_re *= std::sqrt(directivity / p_max);

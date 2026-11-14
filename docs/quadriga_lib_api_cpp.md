@@ -30,10 +30,12 @@ lang: en-US
 | Function | Section | Summary |
 | --- | --- | --- |
 | [arrayant](#arrayant) | Array antenna class | Class for storing and manipulating array antenna models |
-| [.calc_beamwidth_deg](#.calc_beamwidth_deg) | Array antenna class | Calculate the beamwidth and pointing angles of array antenna elements in degrees |
-| [.calc_directivity_dBi](#.calc_directivity_dBi) | Array antenna class | Calculate the directivity in dBi of a single array element |
 | [.is_valid](#.is_valid) | Array antenna class | Validate the integrity of an arrayant object |
 | [.set_size](#.set_size) | Array antenna class | Resize an arrayant object to new dimensions |
+| [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) | Array antenna functions | Calculate the beamwidth and pointing angles of array antenna elements in degrees |
+| [arrayant_calc_beamwidth_multi](#arrayant_calc_beamwidth_multi) | Array antenna functions | Calculate the beamwidth and pointing angles in degrees for each entry of a multi-frequency arrayant vector |
+| [arrayant_calc_directivity](#arrayant_calc_directivity) | Array antenna functions | Calculate the directivity in dBi of array antenna elements |
+| [arrayant_calc_directivity_multi](#arrayant_calc_directivity_multi) | Array antenna functions | Calculate the directivity in dBi for each entry of a multi-frequency arrayant vector |
 | [arrayant_combine_pattern](#arrayant_combine_pattern) | Array antenna functions | Combine element patterns, positions, and coupling weights into effective radiation patterns |
 | [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency) |
 | [arrayant_concat](#arrayant_concat) | Array antenna functions | Concatenate the elements of two arrayants into a new arrayant |
@@ -221,82 +223,14 @@ Not in: MATLAB, Python
 | `.is_valid()`    | Returns `""` if valid, or an error message string                      |
 
 ### Complex member functions:
-| Function                  | Description                                                |
-| ------------------------- | ---------------------------------------------------------- |
-| [.calc_beamwidth_deg](#.calc_beamwidth_deg)   | Calculate the beam width of an antenna element in degree   |
-| [.calc_directivity_dBi](#.calc_directivity_dBi) | Calculate the directivity in dBi of a single array element |
-| [.set_size](#.set_size)             | Resize the arrayant to new dimensions                      |
-| [.is_valid](#.is_valid)             | Validate arrayant integrity                                |
+| Function      | Description                           |
+| ------------- | ------------------------------------- |
+| [.set_size](#.set_size) | Resize the arrayant to new dimensions |
+| [.is_valid](#.is_valid) | Validate arrayant integrity           |
 
 Computations and file I/O on an arrayant are free functions, see section "Array antenna functions"
-(e.g. [arrayant_concat](#arrayant_concat), [arrayant_combine_pattern](#arrayant_combine_pattern), [arrayant_copy_element](#arrayant_copy_element), [arrayant_rotate_pattern](#arrayant_rotate_pattern),
-[qdant_write](#qdant_write)).
-
----
-<a id=".calc_beamwidth_deg"></a>
-## .calc_beamwidth_deg
-Calculate the beamwidth and pointing angles of array antenna elements in degrees
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_beamwidth) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
-
-- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
-- Also returns the azimuth and elevation pointing angles of the main beam
-- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
-- The width is that of the main lobe: starting at the maximum, the search goes outwards until the power drops below the
-  threshold; side lobes above the threshold are not included
-- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when
-  the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
-- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles (requires samples
-  at ±90°); the result is at most 180°
-- Ignores element coupling
-
-### Declaration:
-```cpp
-void calc_beamwidth_deg(arma::uword i_element,
-    dtype threshold_dB = 3.0,
-    dtype *beamwidth_az = nullptr,
-    dtype *beamwidth_el = nullptr,
-    dtype *az_point_ang = nullptr,
-    dtype *el_point_ang = nullptr) const;
-```
-
-### Inputs:
-- **`i_element`** — Element index; 0-based
-- **`threshold_dB`** — Threshold in dB; 3 dB = FWHM
-
-### Outputs:
-- **`beamwidth_az`** — Azimuth beamwidth in degree
-- **`beamwidth_el`** — Elevation beamwidth in degree
-- **`az_point_ang`** — Azimuth pointing angle for the main beam in degree
-- **`el_point_ang`** — Elevation pointing angle for the main beam in degree
-
-### See also:
-- [.calc_directivity_dBi](#.calc_directivity_dBi) (directivity in dBi of a single array element)
-
----
-<a id=".calc_directivity_dBi"></a>
-## .calc_directivity_dBi
-Calculate the directivity in dBi of a single array element
-
-Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_directivity) · [Python](quadriga_lib_api_python.md#calc_directivity)
-
-- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Independent of the scale of the pattern; an element whose pattern is zero everywhere returns 0 dBi
-- Ignores element coupling
-
-### Declaration:
-```cpp
-dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const;
-```
-
-### Inputs:
-- **`i_element`** — Element index, 0-based
-
-### Returns:
-- Directivity of the specified element in dBi
-
-### See also:
-- [arrayant_combine_pattern](#arrayant_combine_pattern) (the per-port directivity is a typical follow-up)
+(e.g. [arrayant_calc_beamwidth](#arrayant_calc_beamwidth), [arrayant_calc_directivity](#arrayant_calc_directivity), [arrayant_concat](#arrayant_concat), [arrayant_combine_pattern](#arrayant_combine_pattern),
+[arrayant_copy_element](#arrayant_copy_element), [arrayant_rotate_pattern](#arrayant_rotate_pattern), [qdant_write](#qdant_write)).
 
 ---
 <a id=".is_valid"></a>
@@ -352,6 +286,165 @@ void quadriga_lib::arrayant<dtype>::set_size(
 
 <a id="sec-array-antenna-functions"></a>
 # Array antenna functions
+
+---
+<a id="arrayant_calc_beamwidth"></a>
+## arrayant_calc_beamwidth
+Calculate the beamwidth and pointing angles of array antenna elements in degrees
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_beamwidth) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
+
+- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
+- Also returns the azimuth and elevation pointing angles of the main beam
+- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
+- The width is that of the main lobe: starting at the maximum, the search goes outwards until the power drops below the
+  threshold; side lobes above the threshold are not included
+- Azimuth: cut at the elevation of the maximum, circular across ±180° when the grid covers the full circle; 360° when
+  the whole cut is above the threshold (e.g. omni patterns or a beam pointing to a pole, where the cut is a point)
+- Elevation: cut along the great circle through the maximum, so a lobe can extend across the poles (requires samples
+  at ±90°); the result is at most 180°
+- Calculated per element, not per port; ignores element coupling
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_calc_beamwidth(
+    const arrayant<dtype> &ant,
+    const arma::uvec *i_element = nullptr,
+    dtype threshold_dB = 3.0,
+    arma::Col<dtype> *beamwidth_az_deg = nullptr,
+    arma::Col<dtype> *beamwidth_el_deg = nullptr,
+    arma::Col<dtype> *az_point_ang_deg = nullptr,
+    arma::Col<dtype> *el_point_ang_deg = nullptr);
+```
+
+### Inputs:
+- **`ant`** — Valid arrayant
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
+
+### Outputs:
+- **`beamwidth_az_deg`** *(optional)* — Azimuth beamwidth in degree; `[n_out]`
+- **`beamwidth_el_deg`** *(optional)* — Elevation beamwidth in degree; `[n_out]`
+- **`az_point_ang_deg`** *(optional)* — Azimuth pointing angle of the main beam in degree; `[n_out]`
+- **`el_point_ang_deg`** *(optional)* — Elevation pointing angle of the main beam in degree; `[n_out]`
+
+### Example:
+```cpp
+auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 20.0);
+arma::vec bw_az, bw_el;
+quadriga_lib::arrayant_calc_beamwidth(ant, nullptr, 3.0, &bw_az, &bw_el); // bw_az(0) = 30, bw_el(0) = 20
+```
+
+### See also:
+- [arrayant_calc_beamwidth_multi](#arrayant_calc_beamwidth_multi) (multi-freq counterpart)
+- [arrayant_calc_directivity](#arrayant_calc_directivity) (directivity in dBi of array antenna elements)
+- [arrayant_combine_pattern](#arrayant_combine_pattern) (apply element coupling before calculating the beamwidth)
+
+---
+<a id="arrayant_calc_beamwidth_multi"></a>
+## arrayant_calc_beamwidth_multi
+Calculate the beamwidth and pointing angles in degrees for each entry of a multi-frequency arrayant vector
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_beamwidth) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
+
+- Same computation as [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) on every entry; column `i_freq` of each output holds the results
+  of `arrayant_vec[i_freq]`
+- Calculated per element, not per port; ignores element coupling
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_calc_beamwidth_multi(
+        const std::vector<arrayant<dtype>> &arrayant_vec,
+        const arma::uvec *i_element = nullptr,
+        dtype threshold_dB = 3.0,
+        arma::Mat<dtype> *beamwidth_az_deg = nullptr,
+        arma::Mat<dtype> *beamwidth_el_deg = nullptr,
+        arma::Mat<dtype> *az_point_ang_deg = nullptr,
+        arma::Mat<dtype> *el_point_ang_deg = nullptr);
+```
+
+### Inputs:
+- **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
+
+### Outputs:
+- **`beamwidth_az_deg`** *(optional)* — Azimuth beamwidth in degree; `[n_out, n_freq]`
+- **`beamwidth_el_deg`** *(optional)* — Elevation beamwidth in degree; `[n_out, n_freq]`
+- **`az_point_ang_deg`** *(optional)* — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`
+- **`el_point_ang_deg`** *(optional)* — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
+
+### See also:
+- [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) (single-frequency counterpart)
+- [arrayant_calc_directivity_multi](#arrayant_calc_directivity_multi) (directivity of multi-frequency arrayant vectors)
+
+---
+<a id="arrayant_calc_directivity"></a>
+## arrayant_calc_directivity
+Calculate the directivity in dBi of array antenna elements
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_directivity) · [Python](quadriga_lib_api_python.md#calc_directivity)
+
+- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
+- Independent of the scale of the pattern; an element whose pattern is zero everywhere gives 0 dBi
+- Calculated per element, not per port; ignores element coupling
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_calc_directivity(
+    const arrayant<dtype> &ant,
+    arma::Col<dtype> &directivity_dBi,
+    const arma::uvec *i_element = nullptr);
+```
+
+### Inputs:
+- **`ant`** — Valid arrayant
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+
+### Outputs:
+- **`directivity_dBi`** — Directivity in dBi; `[n_out]`
+
+### Example:
+```cpp
+auto ant = quadriga_lib::generate_arrayant_dipole<double>();
+arma::vec directivity_dBi;
+quadriga_lib::arrayant_calc_directivity(ant, directivity_dBi); // about 1.76 dBi
+```
+
+### See also:
+- [arrayant_calc_directivity_multi](#arrayant_calc_directivity_multi) (multi-freq counterpart)
+- [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) (beamwidth and pointing angles of array antenna elements)
+- [arrayant_combine_pattern](#arrayant_combine_pattern) (apply element coupling before calculating the directivity)
+
+---
+<a id="arrayant_calc_directivity_multi"></a>
+## arrayant_calc_directivity_multi
+Calculate the directivity in dBi for each entry of a multi-frequency arrayant vector
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_calc_directivity) · [Python](quadriga_lib_api_python.md#calc_directivity)
+
+- Same computation as [arrayant_calc_directivity](#arrayant_calc_directivity) on every entry; column `i_freq` of the output holds the results
+  of `arrayant_vec[i_freq]`
+- Calculated per element, not per port; ignores element coupling
+
+### Declaration:
+```cpp
+void quadriga_lib::arrayant_calc_directivity_multi(
+        const std::vector<arrayant<dtype>> &arrayant_vec,
+        arma::Mat<dtype> &directivity_dBi,
+        const arma::uvec *i_element = nullptr);
+```
+
+### Inputs:
+- **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [arrayant_is_valid_multi](#arrayant_is_valid_multi)
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+
+### Outputs:
+- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
+
+### See also:
+- [arrayant_calc_directivity](#arrayant_calc_directivity) (single-frequency counterpart)
+- [arrayant_calc_beamwidth_multi](#arrayant_calc_beamwidth_multi) (beamwidth of multi-frequency arrayant vectors)
 
 ---
 <a id="arrayant_combine_pattern"></a>

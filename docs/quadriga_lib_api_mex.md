@@ -127,7 +127,7 @@ lang: en-US
 ## arrayant_calc_beamwidth
 Calculate the beamwidth and pointing angles of array antenna elements in degrees
 
-Also in: [C++](quadriga_lib_api_cpp.md#.calc_beamwidth_deg) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
+Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_beamwidth) · [Python](quadriga_lib_api_python.md#calc_beamwidth)
 
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam
@@ -143,47 +143,24 @@ Also in: [C++](quadriga_lib_api_cpp.md#.calc_beamwidth_deg) · [Python](quadriga
 
 ### Usage:
 ```matlab
-% Input as struct (struct mode)
-[ beamwidth_az, beamwidth_el, az_point_ang, ...
-    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant );
-
-[ beamwidth_az, beamwidth_el, az_point_ang, ...
-    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
-
-% Separate inputs (split mode)
-[ beamwidth_az, beamwidth_el, az_point_ang, ...
-    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid );
-
-[ beamwidth_az, beamwidth_el, az_point_ang, ...
-    el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid, i_element, threshold_dB );
+[ beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg ] = ...
+    quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
 ```
 
-### Inputs (struct mode):
+### Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
-- **`threshold_dB`** — Threshold in dB; default: 3 (equivalent to FWHM)
-
-### Inputs (split mode):
-- **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
-- **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
-- **`threshold_dB`** — Threshold in dB; default: 3 (equivalent to FWHM)
+- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
+- **`threshold_dB`** — Threshold in dB, positive and finite; default: 3 (equivalent to FWHM)
 
 ### Outputs:
-- **`beamwidth_az`** — Azimuth beamwidth in degree; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
-- **`beamwidth_el`** — Elevation beamwidth in degree; `[n_out, n_freq]`
-- **`az_point_ang`** — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`
-- **`el_point_ang`** — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
+- **`beamwidth_az_deg`** — Azimuth beamwidth in degree; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
+- **`beamwidth_el_deg`** — Elevation beamwidth in degree; `[n_out, n_freq]`
+- **`az_point_ang_deg`** — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`
+- **`el_point_ang_deg`** — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
 
 ### See also:
-- [arrayant_combine_pattern](#arrayant_combine_pattern) (to apply element coupling before calculating directivity)
+- [arrayant_combine_pattern](#arrayant_combine_pattern) (to apply element coupling before calculating the beamwidth)
 - [arrayant_calc_directivity](#arrayant_calc_directivity) (directivity in dBi of array antenna elements)
 
 ---
@@ -191,7 +168,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#.calc_beamwidth_deg) · [Python](quadriga
 ## arrayant_calc_directivity
 Calculates the directivity in dBi of array antenna elements
 
-Also in: [C++](quadriga_lib_api_cpp.md#.calc_directivity_dBi) · [Python](quadriga_lib_api_python.md#calc_directivity)
+Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_directivity) · [Python](quadriga_lib_api_python.md#calc_directivity)
 
 - Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
 - Calculated per element, not per port; ignores element coupling
@@ -199,30 +176,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#.calc_directivity_dBi) · [Python](quadri
 
 ### Usage:
 ```matlab
-% Input as struct (struct mode)
-directivity = quadriga_lib.arrayant_calc_directivity(arrayant);
-directivity = quadriga_lib.arrayant_calc_directivity(arrayant, i_element);
-
-% Separate inputs (split mode)
-directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid);
-
-directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid, i_element);
+directivity_dBi = quadriga_lib.arrayant_calc_directivity( arrayant, i_element );
 ```
 
-### Inputs (struct mode):
+### Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
-
-### Inputs (split mode):
-- split mode accepts `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`
-  in place of arrayant; see [arrayant_calc_beamwidth](#arrayant_calc_beamwidth)
+- **`i_element`** — Element indices, 1-based, duplicates allowed; uint64; `[n_out]`; default: all elements
 
 ### Output:
-- **`directivity`** - Directivity of the antenna pattern in dBi; `[n_out, n_freq]`;
-  with `n_out = n_elements` when `i_element` is omitted/empty.
+- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
 
 ### See also:
 - [arrayant_combine_pattern](#arrayant_combine_pattern) (to apply element coupling before calculating directivity)

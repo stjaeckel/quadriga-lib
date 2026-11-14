@@ -3,9 +3,10 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Array antenna member functions in a fuzzed order on a fuzzed arrayant: is_valid, copy and move, validate, append,
-// calc_beamwidth_deg, calc_directivity_dBi, combine_pattern, copy_element, export_obj_file, qdant_write / qdant_read,
-// remove_zeros, set_size, reset; arrayant_rotate_pattern; and the multi-frequency functions arrayant_is_valid_multi,
-// arrayant_concat_multi, arrayant_copy_element_multi, arrayant_rotate_pattern_multi, arrayant_set_element_pos_multi,
+// combine_pattern, copy_element, export_obj_file, qdant_write / qdant_read, remove_zeros, set_size, reset;
+// arrayant_calc_beamwidth, arrayant_calc_directivity, arrayant_rotate_pattern; and the multi-frequency functions
+// arrayant_is_valid_multi, arrayant_calc_beamwidth_multi, arrayant_calc_directivity_multi, arrayant_concat_multi,
+// arrayant_copy_element_multi, arrayant_rotate_pattern_multi, arrayant_set_element_pos_multi,
 // arrayant_combine_pattern_multi, qdant_write_multi / qdant_read_multi
 
 #include "fuzz_target.hpp"
@@ -53,17 +54,42 @@ static void run(fz::input &in)
         }
         case 3:
         {
-            T bw_az, bw_el, p_az, p_el;
-            arma::uword i = in.index(n_e);
+            arma::uvec i_el(in.size(3));
+            for (auto &i : i_el)
+                i = in.index(n_e);
             T threshold = in.value<T>();
             bool all = in.ConsumeBool();
-            fz::clean([&] { a.calc_beamwidth_deg(i, threshold, &bw_az, all ? &bw_el : nullptr, all ? &p_az : nullptr, &p_el); });
+            if (in.ConsumeBool())
+            {
+                arma::Col<T> bw_az, bw_el, p_az, p_el;
+                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth(a, &i_el, threshold, &bw_az, all ? &bw_el : nullptr,
+                                                                      all ? &p_az : nullptr, &p_el); });
+            }
+            else
+            {
+                auto vec = fuzzed_vector<T>(in, a);
+                arma::Mat<T> bw_az, bw_el, p_az, p_el;
+                fz::clean([&] { quadriga_lib::arrayant_calc_beamwidth_multi(vec, &i_el, threshold, &bw_az, all ? &bw_el : nullptr,
+                                                                            all ? &p_az : nullptr, &p_el); });
+            }
             break;
         }
         case 4:
         {
-            arma::uword i = in.index(n_e);
-            fz::clean([&] { a.calc_directivity_dBi(i); });
+            arma::uvec i_el(in.size(3));
+            for (auto &i : i_el)
+                i = in.index(n_e);
+            if (in.ConsumeBool())
+            {
+                arma::Col<T> d;
+                fz::clean([&] { quadriga_lib::arrayant_calc_directivity(a, d, &i_el); });
+            }
+            else
+            {
+                auto vec = fuzzed_vector<T>(in, a);
+                arma::Mat<T> d;
+                fz::clean([&] { quadriga_lib::arrayant_calc_directivity_multi(vec, d, &i_el); });
+            }
             break;
         }
         case 5:

@@ -46,17 +46,6 @@ namespace quadriga_lib
         arma::uword n_elements() const;  // Number of antenna elements
         arma::uword n_ports() const;     // Number of ports (after coupling of elements)
 
-        // Calculate the beam width of an antenna element in degree
-        void calc_beamwidth_deg(arma::uword i_element,                // Element index, 0-based
-                                dtype threshold_dB = 3.0,             // Threshold in dB
-                                dtype *beamwidth_az = nullptr,        // Azimuth beamwidth in degree
-                                dtype *beamwidth_el = nullptr,        // Elevation beamwidth in degree
-                                dtype *az_point_ang = nullptr,        // Azimuth pointing angle for the main beam in degree
-                                dtype *el_point_ang = nullptr) const; // Elevation pointing angle for the main beam in degree
-
-        // Calculate the directivity in dBi of a single array element
-        dtype calc_directivity_dBi(arma::uword i_element) const;
-
         // Creates a copy of the array antenna object; a copy of a valid arrayant is marked as validated
         arrayant<dtype> copy() const;
 
@@ -74,6 +63,22 @@ namespace quadriga_lib
     };
 
     // ---- Array antenna functions ----
+
+    // Calculate the beamwidth and the pointing angles of the main beam of array antenna elements in degree
+    template <typename dtype>
+    void arrayant_calc_beamwidth(const arrayant<dtype> &ant,                      // Valid arrayant
+                                 const arma::uvec *i_element = nullptr,           // Optional: 0-based element indices, duplicates allowed; nullptr or empty = all; [n_out]
+                                 dtype threshold_dB = 3.0,                        // Threshold in dB, positive and finite; 3 dB = FWHM
+                                 arma::Col<dtype> *beamwidth_az_deg = nullptr,    // Optional output: azimuth beamwidth in degree; [n_out]
+                                 arma::Col<dtype> *beamwidth_el_deg = nullptr,    // Optional output: elevation beamwidth in degree; [n_out]
+                                 arma::Col<dtype> *az_point_ang_deg = nullptr,    // Optional output: azimuth pointing angle of the main beam in degree; [n_out]
+                                 arma::Col<dtype> *el_point_ang_deg = nullptr);   // Optional output: elevation pointing angle of the main beam in degree; [n_out]
+
+    // Calculate the directivity of array antenna elements in dBi
+    template <typename dtype>
+    void arrayant_calc_directivity(const arrayant<dtype> &ant,             // Valid arrayant
+                                   arma::Col<dtype> &directivity_dBi,      // Output: directivity in dBi; [n_out]
+                                   const arma::uvec *i_element = nullptr); // Optional: 0-based element indices, duplicates allowed; nullptr or empty = all; [n_out]
 
     // Combine element patterns, positions, and coupling weights into effective radiation patterns
     // Returns new arrayant with n_ports elements (= number of columns in coupling_re/im), each holding the combined effective pattern for that port
@@ -125,6 +130,22 @@ namespace quadriga_lib
                          const arma::u32_mat *layout = nullptr); // Optional: matrix of the antenna IDs in the file; must reference only IDs present in the file
 
     // ---- Multi-frequency array antenna functions ----
+
+    // Calculate the beamwidth and the pointing angles of the main beam in degree for each entry of a multi-frequency vector
+    template <typename dtype>
+    void arrayant_calc_beamwidth_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector that passes arrayant_is_valid_multi
+                                       const arma::uvec *i_element = nullptr,            // Optional: 0-based element indices, duplicates allowed; nullptr or empty = all; [n_out]
+                                       dtype threshold_dB = 3.0,                         // Threshold in dB, positive and finite; 3 dB = FWHM
+                                       arma::Mat<dtype> *beamwidth_az_deg = nullptr,     // Optional output: azimuth beamwidth in degree; [n_out, n_freq]
+                                       arma::Mat<dtype> *beamwidth_el_deg = nullptr,     // Optional output: elevation beamwidth in degree; [n_out, n_freq]
+                                       arma::Mat<dtype> *az_point_ang_deg = nullptr,     // Optional output: azimuth pointing angle in degree; [n_out, n_freq]
+                                       arma::Mat<dtype> *el_point_ang_deg = nullptr);    // Optional output: elevation pointing angle in degree; [n_out, n_freq]
+
+    // Calculate the directivity in dBi for each entry of a multi-frequency vector
+    template <typename dtype>
+    void arrayant_calc_directivity_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector that passes arrayant_is_valid_multi
+                                         arma::Mat<dtype> &directivity_dBi,                // Output: directivity in dBi; [n_out, n_freq]
+                                         const arma::uvec *i_element = nullptr);           // Optional: 0-based element indices, duplicates allowed; nullptr or empty = all; [n_out]
 
     // Combine element patterns, positions, and coupling weights into effective radiation patterns
     template <typename dtype>

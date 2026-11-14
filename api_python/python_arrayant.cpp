@@ -28,12 +28,12 @@ void quadriga_lib_arrayant(py::module_ &m)
 {
     m.def("calc_beamwidth", &arrayant_calc_beamwidth,
           py::arg("arrayant"),
-          py::arg("element") = py::none(),
+          py::arg("i_element") = py::none(),
           py::arg("threshold_dB") = 3.0);
 
     m.def("calc_directivity", &arrayant_calc_directivity,
           py::arg("arrayant"),
-          py::arg("element") = py::none());
+          py::arg("i_element") = py::none());
 
     m.def("combine_pattern", &arrayant_combine_pattern,
           py::arg("arrayant"),

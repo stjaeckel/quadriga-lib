@@ -99,12 +99,14 @@ class test_arrayant_calc_beamwidth(unittest.TestCase):
             npt.assert_allclose(bw, expected_az, atol=0.05, rtol=0)
 
     def test_element_kwarg(self):
-        # Keyword-argument form
-        ant_xp = quadriga_lib.arrayant.generate('xpol')
-        bw_az, _, _, _ = quadriga_lib.arrayant.calc_beamwidth(ant_xp, element=np.array([1, 0]))
+        # Keyword-argument form; element 1 is rotated by 90 deg heading, which shows the order
+        ant = quadriga_lib.arrayant.generate('custom', az_3dB=30.0, el_3dB=20.0, res=2.0)
+        ant = quadriga_lib.arrayant.concat(ant, ant)
+        ant = quadriga_lib.arrayant.rotate_pattern(ant, np.array([0.0, 0.0, np.pi / 2]), 3, i_element=np.array([1]))
+        _, _, az_pt, _ = quadriga_lib.arrayant.calc_beamwidth(ant, i_element=np.array([1, 0]))
 
-        self.assertEqual(bw_az.shape, (2,))
-        npt.assert_allclose(bw_az, [360.0, 360.0], atol=0.05, rtol=0)
+        self.assertEqual(az_pt.shape, (2,))
+        npt.assert_allclose(az_pt, [90.0, 0.0], atol=0.5, rtol=0)
 
     def test_multi_freq_basic(self):
         # Multi-frequency: stack a custom (30°, 20°) pattern across 2 frequencies
@@ -154,6 +156,12 @@ class test_arrayant_calc_beamwidth(unittest.TestCase):
         ant_c = quadriga_lib.arrayant.generate('custom', az_3dB=30.0, el_3dB=20.0)
         with self.assertRaises(Exception):
             quadriga_lib.arrayant.calc_beamwidth(ant_c, np.array([1]))
+
+    def test_error_threshold_not_positive_finite(self):
+        ant_c = quadriga_lib.arrayant.generate('custom', az_3dB=30.0, el_3dB=20.0)
+        for v in (np.nan, np.inf, -np.inf, 0.0, -3.0):
+            with self.assertRaises(ValueError):
+                quadriga_lib.arrayant.calc_beamwidth(ant_c, None, v)
 
     def test_error_missing_field(self):
         # arrayant dict missing a required pattern field

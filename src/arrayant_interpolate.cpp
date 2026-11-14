@@ -21,17 +21,6 @@
 #include <string>
 #include <vector>
 
-// Throws std::invalid_argument if one of the outputs out[0 .. N-1] is a data member of 'ant' or shares memory with
-// one; nullptr outputs are skipped
-template <typename T, std::size_t N, typename dtype>
-static inline void qd_check_alias_arrayant(const T *const (&out)[N], const char *const (&name)[N],
-                                           const quadriga_lib::arrayant<dtype> &ant)
-{
-    for (std::size_t i = 0; i < N; ++i)
-        qd_check_alias(out[i], name[i], &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im, &ant.azimuth_grid,
-                       &ant.elevation_grid, &ant.element_pos, &ant.coupling_re, &ant.coupling_im);
-}
-
 // Checks the shapes of the angles and of the optional inputs of the interpolation functions (nullptr or empty
 // optional inputs pass); n_out and n_ang as in arrayant_interpolate
 template <typename dtype>

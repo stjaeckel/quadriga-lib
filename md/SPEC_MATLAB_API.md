@@ -347,7 +347,7 @@ const auto n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "
 if (nlhs > 0)
     plhs[0] = qd_mex_init_output(&az, n_rows, n_cols);
 ```
-- **Unknown size** (determined by the C++ call, or a return value): pass the empty object and copy after the call with `qd_mex_copy2matlab`, or `qd_mex_vector2matlab` for a `std::vector` of Armadillo objects (zero-padded to a regular ND array). Prefer `qd_mex_init_output` whenever the wrapper knows the size.
+- **Unknown size** (determined by the C++ call, or a return value): pass the empty object and copy after the call with `qd_mex_copy2matlab`, or `qd_mex_vector2matlab` for a `std::vector` of Armadillo objects (zero-padded to a regular ND array). Prefer `qd_mex_init_output` whenever the wrapper knows the size of an output that grows with the data (angles, paths, snapshots, pattern samples); small per-element or per-frequency results may be copied instead, which keeps the wrapper from repeating the size rules of the C++ function.
 
 ## Optional and mandatory C++ arguments
 - Optional C++ outputs (pointers) get `(nlhs > k) ? &obj : nullptr`, so that an output nobody requested is neither allocated nor computed.
