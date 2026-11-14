@@ -6,6 +6,7 @@
 #define qd_arrayant_qdant_H
 
 #include "quadriga_arrayant.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <armadillo>
 #include <atomic>
@@ -217,6 +218,36 @@ inline std::string qd_arrayant_is_valid_quick(const quadriga_lib::arrayant<dtype
 {
     return qd_arrayant_cache_matches(ant) ? std::string() : qd_arrayant_check(ant);
 }
+
+// Throws std::invalid_argument if one of the outputs out[0 .. N-1] is a data member of 'ant' or shares memory with
+// one; nullptr outputs are skipped
+template <typename T, std::size_t N, typename dtype>
+static inline void qd_check_alias_arrayant(const T *const (&out)[N], const char *const (&name)[N],
+                                           const quadriga_lib::arrayant<dtype> &ant)
+{
+    for (std::size_t i = 0; i < N; ++i)
+        qd_check_alias(out[i], name[i], &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im, &ant.azimuth_grid,
+                       &ant.elevation_grid, &ant.element_pos, &ant.coupling_re, &ant.coupling_im);
+}
+
+// Element indices of the calc functions: nullptr or empty = all elements, duplicates allowed, out of range throws
+static inline arma::uvec qd_arrayant_calc_element_list(const arma::uvec *i_element, arma::uword n_elements)
+{
+    if (i_element == nullptr || i_element->n_elem == 0) // A valid arrayant has at least one element
+        return arma::regspace<arma::uvec>(0, n_elements - 1);
+    if (arma::any(*i_element >= n_elements))
+        throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
+    return *i_element;
+}
+
+// Per-element kernels of arrayant_calc_beamwidth / arrayant_calc_directivity (src/qd_arrayant_ops.cpp); no checks:
+// valid arrayant, element index in range; beamwidth outputs in degree, computed only when not nullptr
+template <typename dtype>
+void qd_arrayant_calc_beamwidth_element(const quadriga_lib::arrayant<dtype> &ant, arma::uword i_element,
+                                        dtype threshold_dB, dtype *beamwidth_az, dtype *beamwidth_el,
+                                        dtype *az_point_ang, dtype *el_point_ang);
+template <typename dtype>
+dtype qd_arrayant_calc_directivity_element(const quadriga_lib::arrayant<dtype> &ant, arma::uword i_element);
 
 // arrayant_is_valid_multi with the per-entry check of qd_arrayant_is_valid_quick (read only)
 template <typename dtype>

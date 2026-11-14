@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_test_arrayant.hpp"
 
 #include <iostream>
 #include <limits>
@@ -58,40 +59,40 @@ TEST_CASE("Generate Arrayant - Minimal test xpol")
 TEST_CASE("Generate Arrayant - Minimal test dipole")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<float>();
-    float directivity = ant.calc_directivity_dBi(0);
+    float directivity = qd_directivity(ant, 0);
     CHECK(std::abs(directivity - 1.760964f) < 0.0001f);
-    REQUIRE_THROWS_AS(ant.calc_directivity_dBi(1), std::invalid_argument);
+    REQUIRE_THROWS_AS(qd_directivity(ant, 1), std::invalid_argument);
 
     auto ant2 = quadriga_lib::generate_arrayant_dipole<double>(5.0);
     CHECK(ant2.n_elevation() == 37);
     CHECK(ant2.n_azimuth() == 73);
-    double directivity2 = ant2.calc_directivity_dBi(0);
+    double directivity2 = qd_directivity(ant2, 0);
     CHECK(std::abs(directivity2 - 1.760964) < 0.01f);
 }
 
 TEST_CASE("Generate Arrayant - Minimal test Half-wave dipole")
 {
     auto ant = quadriga_lib::generate_arrayant_half_wave_dipole<float>();
-    float directivity = ant.calc_directivity_dBi(0);
+    float directivity = qd_directivity(ant, 0);
     CHECK(std::abs(directivity - 2.15f) < 0.001f);
 
     auto ant2 = quadriga_lib::generate_arrayant_half_wave_dipole<double>(5.0);
     CHECK(ant2.n_elevation() == 37);
     CHECK(ant2.n_azimuth() == 73);
-    double directivity2 = ant2.calc_directivity_dBi(0);
+    double directivity2 = qd_directivity(ant2, 0);
     CHECK(std::abs(directivity2 - 2.15) < 0.01f);
 }
 
 TEST_CASE("Generate Arrayant - Custom")
 {
     auto ant = quadriga_lib::generate_arrayant_custom<float>(10.0, 10.0);
-    float directivity = ant.calc_directivity_dBi(0);
+    float directivity = qd_directivity(ant, 0);
     CHECK(std::abs(directivity - 25.627f) < 0.001f);
 
     auto ant2 = quadriga_lib::generate_arrayant_custom<double>(10.0, 10.0, 0.0, 5.0);
     CHECK(ant2.n_elevation() == 37);
     CHECK(ant2.n_azimuth() == 73);
-    double directivity2 = ant2.calc_directivity_dBi(0);
+    double directivity2 = qd_directivity(ant2, 0);
     CHECK(std::abs(directivity2 - 25.62) < 0.01f);
 }
 

@@ -22,7 +22,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-arr
 ## calc_beamwidth
 Calculate the beamwidth and pointing angles of array antenna elements in degrees
 
-Also in: [C++](../cpp/array-antenna-class.md#.calc_beamwidth_deg) · [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_beamwidth)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_calc_beamwidth) · [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_beamwidth)
 
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam
@@ -40,23 +40,23 @@ Also in: [C++](../cpp/array-antenna-class.md#.calc_beamwidth_deg) · [MATLAB](..
 
 ### Usage:
 ```python
-bw_az, bw_el, az_pt, el_pt = quadriga_lib.arrayant.calc_beamwidth( arrayant )
-bw_az, bw_el, az_pt, el_pt = quadriga_lib.arrayant.calc_beamwidth( arrayant, element, threshold_dB )
+beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg = \
+    quadriga_lib.arrayant.calc_beamwidth( arrayant, i_element, threshold_dB )
 ```
 
 ### Inputs:
 - **`arrayant`** — Arrayant dict; single-frequency or multi-frequency (4th pattern dim is frequency);
   only `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are used;
   see [generate](#generate) for the field layout
-- **`element`** — Element indices; if None or empty, all elements are used; `(n_out,)` or None; default: None
-- **`threshold_dB`** — Threshold in dB (3 = FWHM); default: 3.0
+- **`i_element`** — Element indices, 0-based, duplicates allowed; empty: all elements; `(n_out,)`; default: None (all elements)
+- **`threshold_dB`** — Threshold in dB, positive and finite (3 = FWHM); default: 3.0
 
 ### Outputs:
-- **`bw_az`** — Azimuth beamwidth in degrees; `(n_out,)` for single-frequency input,
-  `(n_out, n_freq)` for multi-frequency input; `n_out = n_elements` when `element` is None
-- **`bw_el`** — Elevation beamwidth in degrees; same shape as `bw_az`
-- **`az_pt`** — Azimuth pointing angle of the main beam in degrees; same shape as `bw_az`
-- **`el_pt`** — Elevation pointing angle of the main beam in degrees; same shape as `bw_az`
+- **`beamwidth_az_deg`** — Azimuth beamwidth in degrees; `(n_out,)` for single-frequency input,
+  `(n_out, n_freq)` for multi-frequency input; `n_out = n_elements` when `i_element` is None
+- **`beamwidth_el_deg`** — Elevation beamwidth in degrees; same shape as `beamwidth_az_deg`
+- **`az_point_ang_deg`** — Azimuth pointing angle of the main beam in degrees; same shape as `beamwidth_az_deg`
+- **`el_point_ang_deg`** — Elevation pointing angle of the main beam in degrees; same shape as `beamwidth_az_deg`
 
 ### See also:
 - [combine_pattern](#combine_pattern) (apply element coupling before calculating beamwidth)
@@ -67,7 +67,7 @@ bw_az, bw_el, az_pt, el_pt = quadriga_lib.arrayant.calc_beamwidth( arrayant, ele
 ## calc_directivity
 Calculates the directivity in dBi of array antenna elements
 
-Also in: [C++](../cpp/array-antenna-class.md#.calc_directivity_dBi) · [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_directivity)
+Also in: [C++](../cpp/array-antenna-functions.md#arrayant_calc_directivity) · [MATLAB](../mex/array-antenna-functions.md#arrayant_calc_directivity)
 
 - Directivity = 10·log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
 - Calculated per element, not per port; ignores element coupling
@@ -77,19 +77,18 @@ Also in: [C++](../cpp/array-antenna-class.md#.calc_directivity_dBi) · [MATLAB](
 
 ### Usage:
 ```python
-directivity = quadriga_lib.arrayant.calc_directivity( arrayant )
-directivity = quadriga_lib.arrayant.calc_directivity( arrayant, element )
+directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, i_element )
 ```
 
 ### Inputs:
 - **`arrayant`** — Arrayant dict; single-frequency or multi-frequency (4th pattern dim is frequency);
   only `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are used;
   see [generate](#generate) for the field layout
-- **`element`** — Element indices; if None or empty, all elements are used; `(n_out,)` or None; default: None
+- **`i_element`** — Element indices, 0-based, duplicates allowed; empty: all elements; `(n_out,)`; default: None (all elements)
 
 ### Outputs:
-- **`directivity`** — Directivity in dBi; `(n_out,)` for a single-frequency input,
-  `(n_out, n_freq)` for a multi-frequency input; `n_out = n_elements` when `element` is None
+- **`directivity_dBi`** — Directivity in dBi; `(n_out,)` for a single-frequency input,
+  `(n_out, n_freq)` for a multi-frequency input; `n_out = n_elements` when `i_element` is None
 
 ### See also:
 - [combine_pattern](#combine_pattern) (apply element coupling before calculating directivity)

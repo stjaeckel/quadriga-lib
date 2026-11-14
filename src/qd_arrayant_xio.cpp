@@ -1077,3 +1077,134 @@ template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::arrayant_combi
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::arrayant_combine_pattern_multi(
     const std::vector<quadriga_lib::arrayant<double>> &,
     const arma::Col<double> *, const arma::Col<double> *, const arma::Col<double> *, double);
+
+/*!MD
+# arrayant_calc_beamwidth_multi
+Calculate the beamwidth and pointing angles in degrees for each entry of a multi-frequency arrayant vector
+
+- Same computation as [[arrayant_calc_beamwidth]] on every entry; column `i_freq` of each output holds the results
+  of `arrayant_vec[i_freq]`
+- Calculated per element, not per port; ignores element coupling
+
+## Declaration:
+```
+void quadriga_lib::arrayant_calc_beamwidth_multi(
+        const std::vector<arrayant<dtype>> &arrayant_vec,
+        const arma::uvec *i_element = nullptr,
+        dtype threshold_dB = 3.0,
+        arma::Mat<dtype> *beamwidth_az_deg = nullptr,
+        arma::Mat<dtype> *beamwidth_el_deg = nullptr,
+        arma::Mat<dtype> *az_point_ang_deg = nullptr,
+        arma::Mat<dtype> *el_point_ang_deg = nullptr);
+```
+
+## Inputs:
+- **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [[arrayant_is_valid_multi]]
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+- **`threshold_dB`** *(optional)* — Threshold in dB, positive and finite; 3 dB = FWHM
+
+## Outputs:
+- **`beamwidth_az_deg`** *(optional)* — Azimuth beamwidth in degree; `[n_out, n_freq]`
+- **`beamwidth_el_deg`** *(optional)* — Elevation beamwidth in degree; `[n_out, n_freq]`
+- **`az_point_ang_deg`** *(optional)* — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`
+- **`el_point_ang_deg`** *(optional)* — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
+
+## See also:
+- [[arrayant_calc_beamwidth]] (single-frequency counterpart)
+- [[arrayant_calc_directivity_multi]] (directivity of multi-frequency arrayant vectors)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<dtype>> &arrayant_vec,
+                                                 const arma::uvec *i_element, dtype threshold_dB,
+                                                 arma::Mat<dtype> *beamwidth_az_deg, arma::Mat<dtype> *beamwidth_el_deg,
+                                                 arma::Mat<dtype> *az_point_ang_deg, arma::Mat<dtype> *el_point_ang_deg)
+{
+    if (arrayant_vec.empty())
+        throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
+    const std::string error_message = qd_arrayant_is_valid_multi_quick(arrayant_vec);
+    if (!error_message.empty())
+        throw std::invalid_argument("Input 'arrayant_vec' is not valid: " + error_message);
+
+    arma::Mat<dtype> *const outs[] = {beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg};
+    const arma::Mat<dtype> *outs_c[] = {beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg};
+    const char *names[] = {"beamwidth_az_deg", "beamwidth_el_deg", "az_point_ang_deg", "el_point_ang_deg"};
+    qd_check_alias_list(outs_c, names, i_element);
+    for (const auto &a : arrayant_vec)
+        qd_check_alias_arrayant(outs_c, names, a);
+
+    if (!std::isfinite(threshold_dB) || threshold_dB <= dtype(0.0))
+        throw std::invalid_argument("Input 'threshold_dB' must be positive and finite.");
+    const arma::uvec i_out = qd_arrayant_calc_element_list(i_element, arrayant_vec[0].e_theta_re.n_slices);
+
+    // The entries share the element count (checked above)
+    const arma::uword n_out = i_out.n_elem, n_freq = (arma::uword)arrayant_vec.size();
+    for (arma::Mat<dtype> *out : outs)
+        if (out != nullptr)
+            out->set_size(n_out, n_freq);
+    auto at = [&](int k, arma::uword i, arma::uword f) { return outs[k] == nullptr ? nullptr : &outs[k]->at(i, f); };
+    for (arma::uword f = 0; f < n_freq; ++f)
+        for (arma::uword i = 0; i < n_out; ++i)
+            qd_arrayant_calc_beamwidth_element(arrayant_vec[f], i_out[i], threshold_dB, at(0, i, f), at(1, i, f),
+                                               at(2, i, f), at(3, i, f));
+}
+
+template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<float>> &, const arma::uvec *, float,
+                                                          arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *, arma::Mat<float> *);
+template void quadriga_lib::arrayant_calc_beamwidth_multi(const std::vector<arrayant<double>> &, const arma::uvec *, double,
+                                                          arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *, arma::Mat<double> *);
+
+/*!MD
+# arrayant_calc_directivity_multi
+Calculate the directivity in dBi for each entry of a multi-frequency arrayant vector
+
+- Same computation as [[arrayant_calc_directivity]] on every entry; column `i_freq` of the output holds the results
+  of `arrayant_vec[i_freq]`
+- Calculated per element, not per port; ignores element coupling
+
+## Declaration:
+```
+void quadriga_lib::arrayant_calc_directivity_multi(
+        const std::vector<arrayant<dtype>> &arrayant_vec,
+        arma::Mat<dtype> &directivity_dBi,
+        const arma::uvec *i_element = nullptr);
+```
+
+## Inputs:
+- **`arrayant_vec`** — Non-empty vector of `n_freq` arrayant objects that passes [[arrayant_is_valid_multi]]
+- **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements; `[n_out]`
+
+## Outputs:
+- **`directivity_dBi`** — Directivity in dBi; `[n_out, n_freq]`
+
+## See also:
+- [[arrayant_calc_directivity]] (single-frequency counterpart)
+- [[arrayant_calc_beamwidth_multi]] (beamwidth of multi-frequency arrayant vectors)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<dtype>> &arrayant_vec,
+                                                   arma::Mat<dtype> &directivity_dBi, const arma::uvec *i_element)
+{
+    if (arrayant_vec.empty())
+        throw std::invalid_argument("Input 'arrayant_vec' cannot be empty.");
+    const std::string error_message = qd_arrayant_is_valid_multi_quick(arrayant_vec);
+    if (!error_message.empty())
+        throw std::invalid_argument("Input 'arrayant_vec' is not valid: " + error_message);
+
+    const arma::Mat<dtype> *outs[] = {&directivity_dBi};
+    const char *names[] = {"directivity_dBi"};
+    qd_check_alias_list(outs, names, i_element);
+    for (const auto &a : arrayant_vec)
+        qd_check_alias_arrayant(outs, names, a);
+
+    const arma::uvec i_out = qd_arrayant_calc_element_list(i_element, arrayant_vec[0].e_theta_re.n_slices);
+    const arma::uword n_out = i_out.n_elem, n_freq = (arma::uword)arrayant_vec.size();
+    directivity_dBi.set_size(n_out, n_freq);
+    for (arma::uword f = 0; f < n_freq; ++f)
+        for (arma::uword i = 0; i < n_out; ++i)
+            directivity_dBi.at(i, f) = qd_arrayant_calc_directivity_element(arrayant_vec[f], i_out[i]);
+}
+
+template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<float>> &, arma::Mat<float> &, const arma::uvec *);
+template void quadriga_lib::arrayant_calc_directivity_multi(const std::vector<arrayant<double>> &, arma::Mat<double> &, const arma::uvec *);

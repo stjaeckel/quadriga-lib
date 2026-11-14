@@ -295,33 +295,33 @@ TEST_CASE("Rotate Pattern - Omni pattern invariant under z-rotation (usage 4, pa
 TEST_CASE("Rotate Pattern - Directivity preserved after rotation (dipole)")
 {
     auto ant = quadriga_lib::generate_arrayant_dipole<double>();
-    double dir_before = ant.calc_directivity_dBi(0);
+    double dir_before = qd_directivity(ant, 0);
 
     qd_rotate(ant, arma::datum::pi / 6.0, arma::datum::pi / 4.0, arma::datum::pi / 3.0, 0); // Full rotation with grid adjustment
 
-    double dir_after = ant.calc_directivity_dBi(0);
+    double dir_after = qd_directivity(ant, 0);
     CHECK(std::abs(dir_before - dir_after) < 0.1);
 }
 
 TEST_CASE("Rotate Pattern - Directivity preserved after rotation (3GPP)")
 {
     auto ant = quadriga_lib::generate_arrayant_3GPP<double>();
-    double dir_before = ant.calc_directivity_dBi(0);
+    double dir_before = qd_directivity(ant, 0);
 
     qd_rotate(ant, arma::datum::pi / 12.0, 0.0, arma::datum::pi / 4.0, 0);
 
-    double dir_after = ant.calc_directivity_dBi(0);
+    double dir_after = qd_directivity(ant, 0);
     CHECK(std::abs(dir_before - dir_after) < 0.3); // Grid resampling may cause small change
 }
 
 TEST_CASE("Rotate Pattern - Directivity preserved after rotation (custom beam)")
 {
     auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0);
-    double dir_before = ant.calc_directivity_dBi(0);
+    double dir_before = qd_directivity(ant, 0);
 
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 2.0, 0);
 
-    double dir_after = ant.calc_directivity_dBi(0);
+    double dir_after = qd_directivity(ant, 0);
     CHECK(std::abs(dir_before - dir_after) < 0.2);
 }
 
@@ -465,10 +465,10 @@ TEST_CASE("Rotate Pattern - Dipole 90 deg x-rotation flips pattern to horizontal
 
     // A vertical dipole has e_theta pattern ~ cos(elevation), e_phi = 0
     // 90° x-rotation (bank) tilts it - the peak should shift
-    double dir_before = ant.calc_directivity_dBi(0);
+    double dir_before = qd_directivity(ant, 0);
     qd_rotate(ant, arma::datum::pi / 2.0, 0.0, 0.0, 0); // Full rotation with grid adjustment
 
-    double dir_after = ant.calc_directivity_dBi(0);
+    double dir_after = qd_directivity(ant, 0);
     // Directivity should be preserved
     CHECK(std::abs(dir_before - dir_after) < 0.2);
 }
@@ -523,9 +523,9 @@ TEST_CASE("Rotate Pattern - Usage 0 preserves directivity for non-uniform grid")
     ant.e_phi_im.zeros(n_el, n_az, 1);
     ant.is_valid();
 
-    double dir_before = ant.calc_directivity_dBi(0);
+    double dir_before = qd_directivity(ant, 0);
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 4.0, 0);
-    double dir_after = ant.calc_directivity_dBi(0);
+    double dir_after = qd_directivity(ant, 0);
 
     CHECK(std::abs(dir_before - dir_after) < 1.0); // Grid resampling can cause some deviation
 }
@@ -598,8 +598,8 @@ TEST_CASE("Rotate Pattern - Multiple small rotations accumulate correctly (usage
         qd_rotate(ant_multi, 0.0, 0.0, arma::datum::pi / 20.0, 3);
 
     // Should give similar results, but multi-step accumulates interpolation error
-    double dir_single = ant_single.calc_directivity_dBi(0);
-    double dir_multi = ant_multi.calc_directivity_dBi(0);
+    double dir_single = qd_directivity(ant_single, 0);
+    double dir_multi = qd_directivity(ant_multi, 0);
     CHECK(std::abs(dir_single - dir_multi) < 0.5);
 }
 
@@ -644,11 +644,11 @@ TEST_CASE("Rotate Pattern - Negative rotation angles")
 TEST_CASE("Rotate Pattern - All three axes simultaneously (usage 3)")
 {
     auto ant = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0);
-    double dir_before = ant.calc_directivity_dBi(0);
+    double dir_before = qd_directivity(ant, 0);
 
     qd_rotate(ant, arma::datum::pi / 6.0, arma::datum::pi / 4.0, arma::datum::pi / 3.0, 3);
 
-    double dir_after = ant.calc_directivity_dBi(0);
+    double dir_after = qd_directivity(ant, 0);
     CHECK(std::abs(dir_before - dir_after) < 0.3);
     CHECK(ant.is_valid().empty());
 }
@@ -858,14 +858,14 @@ TEST_CASE("Rotate Pattern Multi - Directivity preserved across all entries")
 {
     auto ant1 = quadriga_lib::generate_arrayant_dipole<double>();
     auto ant2 = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0);
-    double dir1_before = ant1.calc_directivity_dBi(0);
-    double dir2_before = ant2.calc_directivity_dBi(0);
+    double dir1_before = qd_directivity(ant1, 0);
+    double dir2_before = qd_directivity(ant2, 0);
 
     std::vector<quadriga_lib::arrayant<double>> vec = {ant1, ant2};
     qd_rotate_multi(vec, arma::datum::pi / 9.0, arma::datum::pi / 6.0, 2.0 * arma::datum::pi / 9.0, 0);
 
-    double dir1_after = vec[0].calc_directivity_dBi(0);
-    double dir2_after = vec[1].calc_directivity_dBi(0);
+    double dir1_after = qd_directivity(vec[0], 0);
+    double dir2_after = qd_directivity(vec[1], 0);
     CHECK(std::abs(dir1_before - dir1_after) < 0.3);
     CHECK(std::abs(dir2_before - dir2_after) < 0.3);
 }
@@ -889,12 +889,12 @@ TEST_CASE("Rotate Pattern Multi - Float precision")
 TEST_CASE("Rotate Pattern - Half-wave dipole directivity preserved through rotation")
 {
     auto ant = quadriga_lib::generate_arrayant_half_wave_dipole<double>();
-    double dir_before = ant.calc_directivity_dBi(0);
+    double dir_before = qd_directivity(ant, 0);
     CHECK(std::abs(dir_before - 2.15) < 0.01);
 
     qd_rotate(ant, arma::datum::pi / 4.0, arma::datum::pi / 6.0, arma::datum::pi / 3.0, 0);
 
-    double dir_after = ant.calc_directivity_dBi(0);
+    double dir_after = qd_directivity(ant, 0);
     CHECK(std::abs(dir_after - 2.15) < 0.3);
 }
 
@@ -903,10 +903,10 @@ TEST_CASE("Rotate Pattern - ULA antenna rotation")
     auto ant = quadriga_lib::generate_arrayant_ula<double>(4, 3e9);
     REQUIRE(ant.n_elements() == 4);
 
-    double dir0 = ant.calc_directivity_dBi(0);
+    double dir0 = qd_directivity(ant, 0);
     qd_rotate(ant, 0.0, 0.0, arma::datum::pi / 2.0, 0);
 
-    double dir0_after = ant.calc_directivity_dBi(0);
+    double dir0_after = qd_directivity(ant, 0);
     CHECK(std::abs(dir0 - dir0_after) < 0.3);
     CHECK(ant.is_valid().empty());
 }

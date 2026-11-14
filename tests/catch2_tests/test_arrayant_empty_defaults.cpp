@@ -207,13 +207,13 @@ TEST_CASE("Arrayant functions - Empty element_pos and coupling equal zeros and i
         check_same(f, e);
     }
 
-    SECTION("calc_beamwidth_deg and calc_directivity_dBi")
+    SECTION("arrayant_calc_beamwidth and arrayant_calc_directivity")
     {
         double bf = 0.0, be = 0.0;
-        F.calc_beamwidth_deg(1, 3.0, &bf);
-        E.calc_beamwidth_deg(1, 3.0, &be);
+        qd_beamwidth(F, 1, 3.0, &bf);
+        qd_beamwidth(E, 1, 3.0, &be);
         CHECK(bf == be);
-        CHECK(F.calc_directivity_dBi(2) == E.calc_directivity_dBi(2));
+        CHECK(qd_directivity(F, 2) == qd_directivity(E, 2));
     }
 }
 

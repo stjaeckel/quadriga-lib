@@ -257,7 +257,7 @@ MD!*/
 
 - `/*!SECTION`: exactly one per file that has blocks; it holds one non-empty line, the section title. Files with the same title form one section. Sections are sorted by title on the page; a new title makes a new section.
 - `/*!SECTION_DESC`: optional, any number per section; on the page they follow each other in file-name order below the section heading.
-- `/*!MD`: one function. Line 1 is the name line, `# name` with nothing else: the name matches `\.?[A-Za-z_][A-Za-z0-9_.]*`, a leading `.` marks a member function (`# .calc_directivity_dBi`), a trailing `<++>` is accepted and ignored. Line 2 is the one-line summary (the brief): it appears in the function tables of the Markdown files and below the function heading. The description follows up to the first sub-block heading. Functions are sorted by name within a section, member functions after the free functions.
+- `/*!MD`: one function. Line 1 is the name line, `# name` with nothing else: the name matches `\.?[A-Za-z_][A-Za-z0-9_.]*`, a leading `.` marks a member function (`# .is_valid`), a trailing `<++>` is accepted and ignored. Line 2 is the one-line summary (the brief): it appears in the function tables of the Markdown files and below the function heading. The description follows up to the first sub-block heading. Functions are sorted by name within a section, member functions after the free functions.
 
 ### Sub-blocks
 
@@ -302,7 +302,7 @@ The Markdown files keep every item as written; only the website splits it into n
 
 ### Anchors
 
-The id of a function is its name on the page, exactly: `arrayant_interpolate_multi`, `.calc_directivity_dBi`, `arrayant_generate` (MATLAB, lower case), `sos.acf_2d`. A section's id is `sec-<slug>`, the slug of its title: "Miscellaneous / Tools" gives `sec-miscellaneous-tools` and the file `api/<lang>/miscellaneous-tools.md`. Headings on content pages get the slug of their text unless `{#id}` sets another one (see [File format](#file-format)); there are no other ids. Renaming a section or a function changes its ids and breaks links to it from outside. Two equal ids on one page stop the build (`E-anchor`).
+The id of a function is its name on the page, exactly: `arrayant_interpolate_multi`, `.is_valid`, `arrayant_generate` (MATLAB, lower case), `sos.acf_2d`. A section's id is `sec-<slug>`, the slug of its title: "Miscellaneous / Tools" gives `sec-miscellaneous-tools` and the file `api/<lang>/miscellaneous-tools.md`. Headings on content pages get the slug of their text unless `{#id}` sets another one (see [File format](#file-format)); there are no other ids. Renaming a section or a function changes its ids and breaks links to it from outside. Two equal ids on one page stop the build (`E-anchor`).
 
 ### Cross-language buttons
 
@@ -314,8 +314,8 @@ Each function entry shows buttons "C++", "MATLAB", "Python" (on the website) and
 
 ```toml
 [families]
-arrayant_calc_directivity = [".calc_directivity_dBi"]
 arrayant_combine_pattern = ["arrayant_combine_pattern", "arrayant_combine_pattern_multi"]
+channel_export_obj_file = [".write_paths_to_obj_file"]
 ```
 
 Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the single-frequency function before the `_multi` variant. All listed C++ functions link back to the family. An unknown stem, an unknown C++ name or a C++ function in two families stops the build.
@@ -413,7 +413,7 @@ Every page of the website that has a Markdown version (a twin) links to it in th
 
 - Each twin starts with `# title`, then `Quadriga-Lib <version> · Web page: <URL>`, then an index table of its `##` headings when it has at least two (with a column of `###` links on content pages), then the lead and the body.
 - The text is copied line by line. Only these change: sub-block headings move one level down; `{...}` after headings is removed; fences without info string get the page language; `[[name]]`, raw `<a href>` links and trailing `<br>` become Markdown; link URLs are rewritten for the twin's location; gap markers are removed. Formulas, tables, note boxes and parameter items stay as written.
-- Anchors: every function, section and heading gets an explicit `<a id="..."></a>` line before it, with the same ids as the HTML page (for a section `<a id="sec-<slug>"></a>`). So `#arrayant_generate`, `#sec-channel-functions` and `faq.md#cite` work in both formats, and links between twins use these ids. When you change how anchors are written, check on GitHub that a function link with a `.` (such as `#.calc_directivity_dBi`) still resolves.
+- Anchors: every function, section and heading gets an explicit `<a id="..."></a>` line before it, with the same ids as the HTML page (for a section `<a id="sec-<slug>"></a>`). So `#arrayant_generate`, `#sec-channel-functions` and `faq.md#cite` work in both formats, and links between twins use these ids. When you change how anchors are written, check on GitHub that a function link with a `.` (such as `#.is_valid`) still resolves.
 - Every function has the line "Also in: [C++](...) · [Python](...)" or "Not in: C++, Python" with the same information as the buttons on the website. "Not in" names a language without a counterpart; the line is never left out.
 - `quadriga_lib_api_<lang>.md` has YAML front matter (title with the version, author, language), the general usage notes, a "Function Index" table (Function, Section, Summary) and then every section and function. Agents should read the index and then fetch only the section file `api/<lang>/<slug>.md`.
 - Links to website pages without a twin (the landing page, the Impressum) and to site files outside `docs/` (publications, the skill, the material model, the tutorials) are absolute `http://quadriga-lib.org/...` links in `docs/`.

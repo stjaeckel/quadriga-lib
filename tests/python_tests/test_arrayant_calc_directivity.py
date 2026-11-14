@@ -78,12 +78,13 @@ class test_arrayant_calc_directivity(unittest.TestCase):
             npt.assert_allclose(d, expected, atol=1e-6, rtol=0)
 
     def test_element_kwarg(self):
-        # Keyword-argument form
-        ant = quadriga_lib.arrayant.generate('xpol')
-        directivity = quadriga_lib.arrayant.calc_directivity(ant, element=np.array([1, 0]))
+        # Keyword-argument form; two different elements (omni 0 dBi, dipole 1.76 dBi) show the order
+        ant = quadriga_lib.arrayant.concat(quadriga_lib.arrayant.generate('omni', res=10.0),
+                                           quadriga_lib.arrayant.generate('dipole', res=10.0))
+        directivity = quadriga_lib.arrayant.calc_directivity(ant, i_element=np.array([1, 0]))
 
         self.assertEqual(directivity.shape, (2,))
-        npt.assert_allclose(directivity, [0.0, 0.0], atol=1e-6, rtol=0)
+        npt.assert_allclose(directivity, [1.76, 0.0], atol=0.02, rtol=0)
 
     def test_multi_freq_dipole(self):
         # Multi-frequency: stack the dipole pattern across 2 frequencies

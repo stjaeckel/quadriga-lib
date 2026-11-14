@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_test_arrayant.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -28,8 +29,8 @@ TEST_CASE("Arrayant append")
     T = {{2.0, 0.0}, {0.0, 3.0}};
     CHECK(arma::approx_equal(ant.coupling_re, T, "absdiff", 1.0e-6f));
 
-    float g0 = ant.calc_directivity_dBi(0);
-    float g1 = ant.calc_directivity_dBi(1);
+    float g0 = qd_directivity(ant, 0);
+    float g1 = qd_directivity(ant, 1);
 
     CHECK(std::abs(g0 - 1.760964f) < 0.0001f);
     CHECK(std::abs(g1 - 25.627f) < 0.001f);
@@ -131,12 +132,12 @@ TEST_CASE("Arrayant append - Empty coupling_im is treated as zeros")
     CHECK(arma::all(arma::vectorise(fm[0].coupling_im) == 0.0));
 }
 
-// Remove_zeros and calc_directivity_dBi must not depend on the absolute scale of the pattern; an all-zero
+// Remove_zeros and arrayant_calc_directivity must not depend on the absolute scale of the pattern; an all-zero
 // pattern is left unchanged.
-TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns")
+TEST_CASE("Arrayant remove_zeros and calc_directivity - Low-level patterns")
 {
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0); // 37 x 73
-    const double d_ref = a.calc_directivity_dBi(0);
+    const double d_ref = qd_directivity(a, 0);
     quadriga_lib::arrayant<double> o_ref;
     o_ref = a.copy(), quadriga_lib::arrayant_remove_zeros(o_ref);
 
@@ -144,7 +145,7 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns")
     {
         auto b = a.copy();
         b.e_theta_re *= s;
-        CHECK(std::abs(b.calc_directivity_dBi(0) - d_ref) < 1e-9);
+        CHECK(std::abs(qd_directivity(b, 0) - d_ref) < 1e-9);
         quadriga_lib::arrayant<double> o;
         o = b.copy(), quadriga_lib::arrayant_remove_zeros(o);
         CHECK(o.n_elevation() == o_ref.n_elevation());
@@ -154,11 +155,11 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns")
 
     // Float pattern scaled by 1e-8 (power 1e-16, below the old absolute limits)
     auto af = quadriga_lib::generate_arrayant_custom<float>(90.0f, 90.0f, 0.0f, 5.0f);
-    const float df_ref = af.calc_directivity_dBi(0);
+    const float df_ref = qd_directivity(af, 0);
     quadriga_lib::arrayant<float> of_ref;
     of_ref = af.copy(), quadriga_lib::arrayant_remove_zeros(of_ref);
     af.e_theta_re *= 1e-8f;
-    CHECK(std::abs(af.calc_directivity_dBi(0) - df_ref) < 1e-4f);
+    CHECK(std::abs(qd_directivity(af, 0) - df_ref) < 1e-4f);
     quadriga_lib::arrayant<float> of;
     of = af.copy(), quadriga_lib::arrayant_remove_zeros(of);
     CHECK(of.n_elevation() == of_ref.n_elevation());
@@ -167,7 +168,7 @@ TEST_CASE("Arrayant remove_zeros and calc_directivity_dBi - Low-level patterns")
     // All-zero pattern: unchanged (in place and into an output), directivity 0
     auto z = quadriga_lib::generate_arrayant_omni<double>(10.0);
     z.e_theta_re.zeros();
-    CHECK(z.calc_directivity_dBi(0) == 0.0);
+    CHECK(qd_directivity(z, 0) == 0.0);
     quadriga_lib::arrayant<double> oz;
     oz = z.copy(), quadriga_lib::arrayant_remove_zeros(oz);
     CHECK(oz.n_elevation() == z.n_elevation());
@@ -358,11 +359,19 @@ TEST_CASE("Arrayant remove_zeros - non-finite field values")
     }
 }
 
-TEST_CASE("Arrayant calc_beamwidth_deg - outputs that are the same variable")
+TEST_CASE("Arrayant calc_beamwidth - outputs that are the same variable")
 {
     auto a = quadriga_lib::generate_arrayant_custom<double>(90.0, 60.0, 0.0, 10.0);
-    double bw_az = 0.0, bw_el = 0.0, p_az = 0.0, p_el = 0.0;
-    CHECK_NOTHROW(a.calc_beamwidth_deg(0, 3.0, &bw_az, &bw_el, &p_az, &p_el));
-    CHECK_THROWS_AS(a.calc_beamwidth_deg(0, 3.0, &bw_az, &bw_az), std::invalid_argument);
-    CHECK_THROWS_AS(a.calc_beamwidth_deg(0, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
+    arma::vec bw_az, bw_el, p_az, p_el, d;
+    CHECK_NOTHROW(quadriga_lib::arrayant_calc_beamwidth(a, nullptr, 3.0, &bw_az, &bw_el, &p_az, &p_el));
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, nullptr, 3.0, &bw_az, &bw_az), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth<double>(a, nullptr, 3.0, &bw_az, nullptr, nullptr, &bw_az), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth(a, nullptr, 3.0, &a.azimuth_grid), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity(a, a.elevation_grid), std::invalid_argument);
+
+    std::vector<quadriga_lib::arrayant<double>> v = {a, a};
+    arma::mat m1, m2;
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi(v, nullptr, 3.0, &m1, &m1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_beamwidth_multi<double>(v, nullptr, 3.0, nullptr, &v[1].element_pos), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_calc_directivity_multi(v, v[0].coupling_re), std::invalid_argument);
 }
