@@ -52,6 +52,7 @@ def test_tabs_and_menu(site):
 def test_api_page(site):
     cpp = site("cpp_api.html")
     assert 'id="sec-array-antenna-class"' in cpp and 'id="sec-general-usage-notes"' in cpp
+    assert '<h3 id="glossary">Glossary</h3>' in cpp  # notes headings sit below the h2 "General usage notes"
     assert 'id=".interpolate"' in cpp
     assert 'href="mex_api.html#arrayant_interpolate">MATLAB</a>' in cpp
     assert 'href="python_api.html#interpolate">Python</a>' in cpp

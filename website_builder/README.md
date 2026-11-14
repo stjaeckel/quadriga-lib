@@ -64,7 +64,7 @@ Exit codes, the diagnostics format and the build-in-memory rule are those of the
 | `templates/_footer.html` | Four link columns, version line, Impressum and Privacy; "This page as Markdown" on pages with a twin. | — |
 | `templates/_logo.svg` | The logo, inline (`fill="currentColor"`). | — |
 | `templates/landing.html` | The landing page with its text. | `index.html` |
-| `templates/api.html`, `_api_index.html`, `_fn_entry.html` | API page, its index (sidebar and "Sections and functions"), one function entry. | `cpp_api.html`, `mex_api.html`, `python_api.html` |
+| `templates/api.html`, `_api_index.html`, `_fn_entry.html` | API page, its index (sidebar and "Sections and functions"), one function entry. The headings of the general usage notes move down one level (`##` becomes `h3`), as on the formats page. | `cpp_api.html`, `mex_api.html`, `python_api.html` |
 | `templates/text.html`, `_text_index.html` | Content page and its index (sidebar). | `download.html`, `faq.html`, `ai_agents.html` |
 | `templates/formats.html`, `_formats_index.html` | The formats page: intro, one section per format file, and its index. | `formats.html` |
 | `templates/publications.html`, `_publications_index.html` | Publications and its index (one link per group). | `publications.html` |

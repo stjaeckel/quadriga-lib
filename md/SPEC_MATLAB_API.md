@@ -1,7 +1,7 @@
 quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Python APIs. This document gives the conventions for the MATLAB / Octave MEX wrapper of a C++ function: the wrapper in `api_mex/` and its test in `tests/mex_tests/`. The wrapper converts arguments, shifts indices, allocates outputs and calls the C++ function; it should be user-friendly for MATLAB users while keeping the performance of the C++ library. Like `md/SPEC_CPP_API.md`, it is persistent and used at every stage of the work; the MATLAB interface is worked out in the plan or the spec, and the workflow (reviews, stops) is set in the plan. Where this document says "ask", "on request" or "unless requested", the point belongs in the plan or the spec; an implementer who finds it unsettled stops and reports it. The Python wrappers are covered by `md/SPEC_PYTHON_API.md`.
 
 # C++ CONVENTIONS
-- `md/SPEC_CPP_API.md` applies to wrappers and tests as well and is not repeated here: "GENERAL CONVENTIONS" (types, shapes, index bases, units, citations, lean code, MSVC), "Input validation" (exceptions), "File-local helpers" (helper scoping), "License statement" and "Documentation block".
+- `md/SPEC_CPP_API.md` applies to wrappers and tests as well and is not repeated here: "GENERAL CONVENTIONS" (types, citations, lean code, MSVC), "Names, units and layouts" (the glossary), "Input validation" (exceptions), "File-local helpers" (helper scoping), "License statement" and "Documentation block".
 
 # REPOSITORY LAYOUT AND BUILD
 - `api_mex/<function_name>.cpp` — MEX wrappers, one file per MATLAB function. CMake globs `api_mex/*.cpp`, so a new file needs no registration in the build system.

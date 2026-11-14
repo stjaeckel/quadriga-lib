@@ -2,14 +2,10 @@ quadriga-lib is a C++ radio channel modelling library and the numerical core beh
 
 # GENERAL CONVENTIONS
 - All functions and classes live in the `quadriga_lib` namespace. Language standard is C++17.
-- Armadillo is used for all array data. Armadillo types are column-major. Shape notation `[a, b, c]` means `[rows, cols, slices]` for `arma::Cube`; `[rows, cols]` for `arma::Mat`; `[n]` for `arma::Col`/`arma::Row`.
-- Template parameter `dtype` is `float` or `double` unless stated. Templates are explicitly instantiated in the source file; nothing is implemented in the public headers.
+- Armadillo is used for all array data. `arma::cx_*` types are not used in interfaces (see "Complex data" in the glossary).
+- Templates are explicitly instantiated in the source file; nothing is implemented in the public headers.
 - `arma::uword`, `size_t` and `unsigned long long` are the same 64-bit type (enforced by `static_assert` in the headers) and can be used interchangeably.
-- Complex data is passed as separate real and imaginary arrays (`_re` / `_im`), or interleaved along the rows where documented (e.g. the polarization transfer matrix with 8 rows). `arma::cx_*` types are not used in interfaces.
-- Index conventions: 0-based unless the field is explicitly called "1-based" (typically indices where 0 means "none", e.g. `mtl_ind`, `fbs_ind`, `sbs_ind`, QDANT `id`).
-- Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
-- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
-- Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
+- Shared conventions and names are defined once, in the glossary of the API reference; see "Names, units and layouts" (under "PUBLIC HEADER").
 - Sources, headers and tests stand on their own. They may cite published material (papers, standards, the pages of quadriga-lib.org) and the persistent `md/SPEC_*.md`, but never temporary documents in `md/` (plans, notes, briefs) or internal labels (tracking ids, item numbers, review remarks). Those labels belong in the project plan, the spec or other internal documents.
 - Code is lean: reuse existing library functions and helpers before writing new ones, no layers or generality that nothing uses. Someone given only the source files should understand what each part is for and how it works. Names of variables and functions are clear and say what the thing is; their scope is as narrow as possible (see "File-local helpers").
 - The project has grown over several years. Older files deviate from this document in naming, documentation layout and style. For new code follow this document and the recent files named as examples; do not copy older conventions, and do not restyle existing files unless asked.
@@ -96,7 +92,16 @@ The conventions a declaration follows, for writing one in the plan or the spec a
 - Results are returned through output arguments; the return value is used for a single natural result (a count, a mesh, a status vector) and documented under "Returns".
 - Default values exist only in the header, never in the definition.
 - Functions that are not templates use fixed types (e.g. the `float`-only ray-tracing pipeline).
-- A new function fits the existing API (`docs/quadriga_lib_api_cpp.md`): the same argument names, types and patterns as its neighbours, and no new public function or argument for what is an implementation detail. Expose only what a caller needs.
+- A new function fits the existing API (`docs/quadriga_lib_api_cpp.md`): the names, units and layouts of the glossary (see "Names, units and layouts"), the same argument types and patterns as its neighbours, and no new public function or argument for what is an implementation detail. Expose only what a caller needs.
+
+## Names, units and layouts
+The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, rendered into `docs/quadriga_lib_api_cpp.md`) states the conventions and the shared quantities for users. This section gives the rules for authors.
+- One name per quantity, in all functions and in all three APIs. Users move between functions and between C++, MATLAB / Octave and Python, and the API pages link each function across the languages; a second name for the same quantity has to be learned and documented.
+- Strength: the glossary names, units and layouts are the default for every public signature, in C++ and in the wrappers. A deviation is proposed with its reason in the plan or the spec and needs the maintainer's explicit confirmation; the implementer does not decide it.
+- Not bound by the glossary: local variables, file-local helpers, internal headers and their layouts, comments.
+- A new quantity used by more than one function or API gets its glossary entry in the commit that introduces it; a changed quantity gets its entry changed in the same commit.
+- Entry format: one bullet under the fitting bold group label of the glossary (a new label where none fits). A quantity starts with its name in backticks, then meaning, unit, index base and shape in this order (as in the argument comments), leaving out what does not apply. A convention starts with a short label and goes under "General conventions". An entry gives its reason in a short clause only where the reason helps a user judge a deviation.
+- After 1.0, released names stay. A rename in a minor release needs a justification that its benefit clearly outweighs the breakage for users.
 
 # IMPLEMENTATION GUIDELINES
 

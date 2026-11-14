@@ -99,7 +99,7 @@ def test_cross_language_lines(docs):
     for path, text in docs.items():
         if not (path.startswith("quadriga_lib_api_") or path.startswith("api/")):
             continue
-        functions = text.count('\n## ')
+        functions = len(re.findall(r'\n---\n<a id="[^"]+"></a>\n## ', text))  # not the headings of the notes
         lines = [ln for ln in text.split("\n") if ln.startswith(("Also in: ", "Not in: "))]
         assert len(lines) == functions, path
         for target in re.findall(r"\[(?:C\+\+|MATLAB|Python)\]\(([^)#]+)#", "\n".join(lines)):

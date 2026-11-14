@@ -278,7 +278,7 @@ def api_page(ctx, page):
                          "functions": [_function(ctx, f, sec) for f in sec.functions]})
     return {"lang": lang, "display": config.LANG_TITLE[lang], "title": intro.title, "description": intro.description,
             "lead": ctx.inline(intro.lead, intro.path, lang), "others": [x for x in config.LANGS if x != lang],
-            "notes": ctx.fragment(intro.body, "prose", intro.path, intro.body_line, lang, intro.headings),
+            "notes": ctx.fragment(intro.body, "prose", intro.path, intro.body_line, lang, intro.headings, shift=1),
             "sections": sections}
 
 
