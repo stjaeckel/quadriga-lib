@@ -52,9 +52,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    (void)plhs; // No outputs
+
     if (nrhs < 15 || nrhs > 16)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 1)
+    if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
@@ -111,9 +113,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Call quadriga-lib function
     CALL_QD(c.write_paths_to_obj_file(fn, max_no_paths, gain_max, gain_min, colormap,
                                       i_snap, radius_max, radius_min, n_edges));
-
-    // Dummy output for backward compatibility
-    double out = 1.0;
-    if (nlhs == 1)
-        plhs[0] = qd_mex_copy2matlab(&out);
 }

@@ -55,10 +55,6 @@ ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr
     spacing);
 ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, ...
     dir, spacing);
-
-% Separate outputs (2 to 11 outputs)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_generate( ... );
 ```
 
 ## Mapping table with defaults:<br>
@@ -148,7 +144,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs > 16)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 11)
+    if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     std::string array_type = qd_mex_get_string(prhs[0]);
@@ -275,29 +271,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Set center frequency for all types
     arrayant.center_frequency = freq;
 
-    if (nlhs == 1) // Output as struct
-        plhs[0] = qd_mex_arrayant2struct(arrayant);
-    else if (nlhs > 1) // Separate outputs
-    {
-        plhs[0] = qd_mex_copy2matlab(&arrayant.e_theta_re);
-        plhs[1] = qd_mex_copy2matlab(&arrayant.e_theta_im);
-        if (nlhs > 2)
-            plhs[2] = qd_mex_copy2matlab(&arrayant.e_phi_re);
-        if (nlhs > 3)
-            plhs[3] = qd_mex_copy2matlab(&arrayant.e_phi_im);
-        if (nlhs > 4)
-            plhs[4] = qd_mex_copy2matlab(&arrayant.azimuth_grid, true);
-        if (nlhs > 5)
-            plhs[5] = qd_mex_copy2matlab(&arrayant.elevation_grid, true);
-        if (nlhs > 6)
-            plhs[6] = qd_mex_copy2matlab(&arrayant.element_pos);
-        if (nlhs > 7)
-            plhs[7] = qd_mex_copy2matlab(&arrayant.coupling_re);
-        if (nlhs > 8)
-            plhs[8] = qd_mex_copy2matlab(&arrayant.coupling_im);
-        if (nlhs > 9)
-            plhs[9] = qd_mex_copy2matlab(&arrayant.center_frequency);
-        if (nlhs > 10)
-            plhs[10] = mxCreateString(arrayant.name.c_str());
-    }
+    plhs[0] = qd_mex_arrayant2struct(arrayant); // Also without output argument: the struct goes to ans
 }

@@ -258,7 +258,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 - Writing: `plhs[0] = qd_mex_arrayant2struct(ant);` or `qd_mex_arrayant2struct_multi(ant_vec);`
 - C++ functions that take `const arrayant<dtype> *` get the address of the local object, e.g. `&ant_tx`.
 - In the documentation, describe arrayant arguments as: "Struct containing the arrayant data; field layout as documented in [[arrayant_generate]]" and add "; a struct array may contain a frequency-dependent model" where multi-frequency input is supported. Do not repeat the field table.
-- Some existing arrayant wrappers additionally accept the fields as separate inputs or return them as separate outputs. This is legacy behavior; new wrappers use the struct only.
+- Arrayants are passed and returned as structs only, never as separate field inputs or outputs.
 
 ## Channel struct
 - A `quadriga_lib::channel<double>` is represented in MATLAB as a struct with the fields below; a `std::vector` of channels is a 1xN struct array. Requires `mex_quadriga_lib_functions.hpp`.

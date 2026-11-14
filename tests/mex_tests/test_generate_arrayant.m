@@ -1,6 +1,9 @@
 function test_generate_arrayant
 
+% Without output argument, the struct goes to ans
 quadriga_lib.arrayant_generate('omni', 10);
+assertTrue( exist('ans', 'var') == 1 && isstruct(ans) );
+assertEqual( size(ans.e_theta_re), [19, 37] );
 
 % Omni antenna, 10 deg
 data = quadriga_lib.arrayant_generate('omni', 10);
@@ -42,19 +45,6 @@ assertElementsAlmostEqual( data.e_theta_re(1,1,1), 0.0794328, 'absolute', 1e-7 )
 assertElementsAlmostEqual( data.e_theta_re(91,181,1), 2.51188, 'absolute', 1e-5 );
 assertTrue( strcmp(data.name, '3gpp') );
 
-[A,B,C,D,E,F,G,H,I,J,K] = quadriga_lib.arrayant_generate('3gpp');
-assertElementsAlmostEqual( data.e_theta_re, A, 'absolute', 1e-14 );
-assertElementsAlmostEqual( data.e_theta_im, B, 'absolute', 1e-14 );
-assertElementsAlmostEqual( data.e_phi_re, C, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.e_phi_im, D, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.azimuth_grid, E, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.elevation_grid, F, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.element_pos, G, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.coupling_re, H, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.coupling_im, I, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.center_freq, J, 'absolute', 1e-14)
-assertTrue( strcmp(K, '3gpp') );
-
 data = quadriga_lib.arrayant_generate('3gpp', [], [], [], [], [], [], [], 2);
 assertElementsAlmostEqual( data.e_theta_re(1,1,1), 0.0794328, 'absolute', 1e-7 );
 assertElementsAlmostEqual( data.e_theta_re(91,181,1), 2.51188, 'absolute', 1e-5 );
@@ -89,8 +79,8 @@ assertElementsAlmostEqual( data.e_theta_re(:,:,2), pat.e_theta_re, 'absolute', 1
 assertElementsAlmostEqual( data.element_pos, [0,0 ; 0,0 ; -0.25,0.25], 'absolute', 1e-14 );
 
 % Errors
-try 
-    [~,~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_generate('omni');
+try % Separate field outputs (split mode) are not supported
+    [~,~] = quadriga_lib.arrayant_generate('omni');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';

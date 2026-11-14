@@ -17,13 +17,15 @@ coupling_im     = 0.1;
 center_freq     = 2e9;
 name            = 'name';
 
-id_file = quadriga_lib.qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
+id_file = quadriga_lib.qdant_write( 'testm.qdant', mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name ) );
 
 assert( id_file == 1 );
 
-[e_theta_reI, e_theta_imI, e_phi_reI, e_phi_imI, azimuth_gridI, elevation_gridI, element_posI, ...
-    coupling_reI, coupling_imI, center_frequencyI, nameI, layout] = quadriga_lib.qdant_read('testm.qdant');
+[antI, layout] = quadriga_lib.qdant_read('testm.qdant');
+e_theta_reI = antI.e_theta_re; e_theta_imI = antI.e_theta_im; e_phi_reI = antI.e_phi_re; e_phi_imI = antI.e_phi_im;
+azimuth_gridI = antI.azimuth_grid; elevation_gridI = antI.elevation_grid; element_posI = antI.element_pos;
+coupling_reI = antI.coupling_re; coupling_imI = antI.coupling_im; center_frequencyI = antI.center_freq; nameI = antI.name;
 
 assertElementsAlmostEqual( azimuth_grid, azimuth_gridI, 'absolute', 1e-6 );
 assertElementsAlmostEqual( elevation_grid, elevation_gridI, 'absolute', 1e-6 );
@@ -68,7 +70,9 @@ id_file = quadriga_lib.qdant_write( 'testm.qdant', ant );
 
 assertEqual( id_file, uint32(2) );
 
-[A,B,C,D,E,F,G,H,I,J, nameI, layout] = quadriga_lib.qdant_read('testm.qdant',2);
+[r, layout] = quadriga_lib.qdant_read('testm.qdant',2);
+A = r.e_theta_re; B = r.e_theta_im; C = r.e_phi_re; D = r.e_phi_im; E = r.azimuth_grid; F = r.elevation_grid;
+G = r.element_pos; H = r.coupling_re; I = r.coupling_im; J = r.center_freq; nameI = r.name;
 
 assertElementsAlmostEqual( A, ant.e_theta_re, 'absolute', 1e-4 );
 assertElementsAlmostEqual( B, ant.e_theta_im, 'absolute', 1e-4 );
@@ -83,12 +87,17 @@ assertElementsAlmostEqual( J, ant.center_freq, 'absolute', 1e-4 );
 assertTrue( strcmp(nameI,ant.name) );
 assertEqual(layout, uint32([1,2]));
 
-[~,~,~,~,~,~,~,~,~,~, nameI] = quadriga_lib.qdant_read('testm.qdant',1);
-assertTrue( strcmp(nameI,'bla') );
+r = quadriga_lib.qdant_read('testm.qdant',1);
+assertTrue( strcmp(r.name,'bla') );
 
 id_file = quadriga_lib.qdant_write('testm.qdant', ant, 112);
 
 assertEqual( id_file, uint32(112) );
+
+% Without output argument, the ID goes to ans
+quadriga_lib.qdant_write('testm.qdant', ant, 113);
+assertTrue( exist('ans', 'var') == 1 );
+assertEqual( ans, uint32(113) );
 
 layout = uint32([1,2,112 ; 112, 112, 6]);
 
@@ -136,7 +145,7 @@ catch ME
     end
 end
 
-try
+try % Split mode (the arrayant fields as separate inputs) is not supported
     quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -148,8 +157,8 @@ end
 
 % Test error: elevation_grid mismatch
 try
-    id_file = quadriga_lib.qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid(1:end-1));
+    id_file = quadriga_lib.qdant_write('testm.qdant', mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid(1:end-1)) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Number of elements in ''elevation_grid'' does not match number of rows in pattern data.';
@@ -160,8 +169,8 @@ end
 
 % Test error: azimuth_grid mismatch
 try
-    quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid(1:end-1), elevation_grid);
+    quadriga_lib.qdant_write('testm.qdant', mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid(1:end-1), elevation_grid) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Number of elements in ''azimuth_grid'' does not match number of columns in pattern data.';
@@ -172,8 +181,8 @@ end
 
 % Test error: pattern mismatch
 try
-    quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im(:,:,[1 1]), e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid);
+    quadriga_lib.qdant_write('testm.qdant', mk_ant( e_theta_re, e_theta_im(:,:,[1 1]), e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sizes of ''e_theta_re'' and ''e_theta_im'' do not match.';
@@ -182,7 +191,7 @@ catch ME
     end
 end
 
-quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, single(e_theta_im), e_phi_re, e_phi_im, azimuth_grid, elevation_grid);
+quadriga_lib.qdant_write('testm.qdant', mk_ant( e_theta_re, single(e_theta_im), e_phi_re, e_phi_im, azimuth_grid, elevation_grid) );
 
 %% Multi-frequency write & read-back
 if exist('testm.qdant','file'), delete('testm.qdant'); end
@@ -250,10 +259,22 @@ end
 
 delete('testm.qdant');
 
-%% Separate inputs with center_freq = [] write the default 299792458
+%% An empty center_freq field writes the default 299792458
 ant = quadriga_lib.arrayant_generate('omni');
-quadriga_lib.qdant_write('testm.qdant', [], [], [], ant.e_theta_re, ant.e_theta_im, ant.e_phi_re, ant.e_phi_im, ...
-    ant.azimuth_grid, ant.elevation_grid, [], [], [], [], 'x');
+quadriga_lib.qdant_write('testm.qdant', mk_ant( ant.e_theta_re, ant.e_theta_im, ant.e_phi_re, ant.e_phi_im, ...
+    ant.azimuth_grid, ant.elevation_grid, [], [], [], [], 'x') );
 a2 = quadriga_lib.qdant_read('testm.qdant', 1);
 assertEqual(a2.center_freq, 299792458);
 delete('testm.qdant');
+
+end
+
+% Arrayant struct from the fields; omitted trailing fields are left out of the struct
+function ant = mk_ant(e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, varargin)
+ant = struct('e_theta_re', e_theta_re, 'e_theta_im', e_theta_im, 'e_phi_re', e_phi_re, 'e_phi_im', e_phi_im, ...
+    'azimuth_grid', azimuth_grid, 'elevation_grid', elevation_grid);
+names = {'element_pos', 'coupling_re', 'coupling_im', 'center_freq', 'name'};
+for k = 1:numel(varargin)
+    ant.(names{k}) = varargin{k};
+end
+end

@@ -10,8 +10,10 @@ fprintf(f,'%s\n',['<EthetaMag>',num2str(1:15),'</EthetaMag>']);
 fprintf(f,'%s\n','</arrayant></qdant>');
 fclose(f);
 
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.qdant_read('test.qdant');
+[ant, layout] = quadriga_lib.qdant_read('test.qdant');
+e_theta_re = ant.e_theta_re; e_theta_im = ant.e_theta_im; e_phi_re = ant.e_phi_re; e_phi_im = ant.e_phi_im;
+azimuth_grid = ant.azimuth_grid; elevation_grid = ant.elevation_grid; element_pos = ant.element_pos;
+coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_frequency = ant.center_freq; name = ant.name;
 
 assertTrue( isa(e_theta_re,'double') );
 assertTrue( isa(e_theta_im,'double') );
@@ -60,8 +62,10 @@ fprintf(f,'%s\n','<xx:CenterFrequency>3e9</xx:CenterFrequency>');
 fprintf(f,'%s\n','</xx:arrayant></qdant>');
 fclose(f);
 
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.qdant_read('test.qdant',1);
+[ant, layout] = quadriga_lib.qdant_read('test.qdant',1);
+e_theta_re = ant.e_theta_re; e_theta_im = ant.e_theta_im; e_phi_re = ant.e_phi_re; e_phi_im = ant.e_phi_im;
+azimuth_grid = ant.azimuth_grid; elevation_grid = ant.elevation_grid; element_pos = ant.element_pos;
+coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_frequency = ant.center_freq; name = ant.name;
 
 assertElementsAlmostEqual( azimuth_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute', 1e-12 );
 assertElementsAlmostEqual( elevation_grid, [-pi/2,0,pi/2], 'absolute', 1e-12 );
@@ -134,12 +138,12 @@ for id_arg = {{}, {[]}}   % [] as id behaves like omitting it
     assertTrue(failed);
 end
 
-% Error: separate-fields output not allowed when no id and file has multiple entries
+% Error: separate field outputs (split mode) are not supported
 try
-    [~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.qdant_read('test.qdant');
+    [~,~,~] = quadriga_lib.qdant_read('test.qdant', 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Separate-fields output only available in single-frequency mode.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -147,7 +151,7 @@ end
 
 %% Check error parsing
 try
-    [~,~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.qdant_read('test.qdant',3);
+    [~,~,~] = quadriga_lib.qdant_read('test.qdant',3);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -164,7 +168,7 @@ fprintf(f,'</arrayant></qdant>');
 fclose(f);
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.qdant_read('test.qdant');
+    [~] = quadriga_lib.qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Array antenna object must have an ''AzimuthGrid''.';
@@ -182,7 +186,7 @@ fprintf(f,'</arrayant></qdant>');
 fclose(f);
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.qdant_read('test.qdant',1);
+    [~] = quadriga_lib.qdant_read('test.qdant',1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Start-end tags mismatch';
@@ -328,31 +332,18 @@ assertTrue( failed );
 delete(fn);
 
 
-% Every number of outputs from 0 to 12 works; 0 behaves as 1, 3 to 12 are separate fields
+% 0 to 2 outputs work, 0 behaves as 1; more outputs are an error
 fn = [tempname, '.qdant'];
 a1 = quadriga_lib.arrayant_generate('xpol');
 quadriga_lib.qdant_write(fn, a1, 1);
 ref = quadriga_lib.qdant_read(fn, 1);
-fields = {'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im', 'azimuth_grid', 'elevation_grid', ...
-    'element_pos', 'coupling_re', 'coupling_im', 'center_freq', 'name'};
 quadriga_lib.qdant_read(fn, 1);
 assertEqual( ans, ref );
-for n = 1 : 12
-    out = cell(1, n);
-    [out{:}] = quadriga_lib.qdant_read(fn, 1);
-    if n <= 2
-        assertEqual( out{1}, ref );
-    else
-        for k = 1 : min(n, 11)
-            assertEqual( out{k}, ref.(fields{k}) );
-        end
-    end
-    if n == 2 || n == 12
-        assertEqual( out{end}, uint32(1) );
-    end
-end
+[out1, out2] = quadriga_lib.qdant_read(fn, 1);
+assertEqual( out1, ref );
+assertEqual( out2, uint32(1) );
 
-% Multi-entry file without 'id': 0 outputs behave as 1, separate fields are an error
+% Multi-entry file without 'id': 0 outputs behave as 1
 a2 = a1; a2.center_freq = 2e9;
 quadriga_lib.qdant_write(fn, a2, 2);
 r = quadriga_lib.qdant_read(fn);
@@ -363,7 +354,7 @@ failed = false;
 try
     [~, ~, ~] = quadriga_lib.qdant_read(fn);
 catch ME
-    failed = ~isempty(strfind(ME.message, 'Separate-fields output only available in single-frequency mode.'));
+    failed = ~isempty(strfind(ME.message, 'Wrong number of output arguments.'));
 end
 assertTrue( failed );
 delete(fn);

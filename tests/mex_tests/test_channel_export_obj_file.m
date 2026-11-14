@@ -28,6 +28,21 @@ quadriga_lib.channel_export_obj_file( fn, 1, [], [], [] ,[], [], [], ...
 quadriga_lib.channel_export_obj_file( fn, [], 10, 6, [] ,[], [], [], ...
     rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, coeff_im  );
 
+% The function returns no output; an output request is an error and writes no file
+if exist( fn,'file' ), delete(fn); end
+if exist( 'test.mtl','file' ), delete('test.mtl'); end
+try
+    x = quadriga_lib.channel_export_obj_file( fn, [], [], [], [] ,[], [], [], ...
+        rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, coeff_im  );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Wrong number of output arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+assertFalse( exist(fn, 'file') == 2 );
+
 % Test ill-formatted file name
 try
     quadriga_lib.channel_export_obj_file( '', [], [], [], [] ,[], [], [], ...

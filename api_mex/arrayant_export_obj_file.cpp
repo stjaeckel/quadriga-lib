@@ -40,10 +40,12 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    (void)plhs; // No outputs
+
     // Validate argument counts
     if (nrhs < 2 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 1)
+    if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     if (!mxIsStruct(prhs[1]))
@@ -82,8 +84,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant = qd_mex_struct2arrayant(prhs[1], true);
 
     CALL_QD(quadriga_lib::arrayant_export_obj_file(fn, ant, directivity_range, colormap, object_radius, icosphere_n_div, &element_ind));
-
-    double out = 1.0;
-    if (nlhs == 1)
-        plhs[0] = qd_mex_copy2matlab(&out);
 }

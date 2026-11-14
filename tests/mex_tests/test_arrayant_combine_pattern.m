@@ -17,9 +17,9 @@ ant_in = struct('e_theta_re', e_theta_re, 'e_theta_im', e_theta_im, 'e_phi_re', 
    'azimuth_grid', azimuth_grid, 'elevation_grid', elevation_grid, 'element_pos', element_pos, ...
    'coupling_re', coupling_re, 'coupling_im', coupling_im);
 
-% Separate inputs, combined output
-ant = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, 'bla');
+% Struct with center frequency and name
+ant = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, 'bla') );
 
 assertElementsAlmostEqual( ant.e_theta_re, ones(3,4)*2, 'absolute', 1e-14 );
 assertElementsAlmostEqual( ant.e_theta_im, ones(3,4)*4, 'absolute', 1e-14 );
@@ -36,14 +36,6 @@ assertElementsAlmostEqual( ant.e_phi_re, ones(3,4)*6, 'absolute', 1e-14 );
 assertElementsAlmostEqual( ant.e_phi_im, ones(3,4)*8, 'absolute', 1e-14 );
 assertEqual( ant.center_freq, 3e9 );
 
-% Combined inputs, separate output
-[A,B,C,D,E,F,G,H,I,J,K] = quadriga_lib.arrayant_combine_pattern( ant_in, 3e9 );
-assertElementsAlmostEqual( A, ones(3,4)*2, 'absolute', 1e-14 );
-assertElementsAlmostEqual( B, ones(3,4)*4, 'absolute', 1e-14 );
-assertElementsAlmostEqual( C, ones(3,4)*6, 'absolute', 1e-14 );
-assertElementsAlmostEqual( D, ones(3,4)*8, 'absolute', 1e-14 );
-assertEqual( J, 3e9 );
-
 e_theta_re      = ones(3,4);
 e_theta_im      = zeros(3,4);
 e_phi_re        = ones(3,4);
@@ -53,21 +45,21 @@ coupling_re     = 1;
 coupling_im     = 0;
 center_freq     = 2e9;
 
-[A,B,C,D,E,F,G,H,I,J,K] = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq);
+out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq) );
 
-assertTrue( A(1,1) ~= 0 );
-assertTrue( B(1,1) ~= 0 );
-assertTrue( C(1,1) ~= 0 );
-assertTrue( D(1,1) ~= 0 );
+assertTrue( out.e_theta_re(1,1) ~= 0 );
+assertTrue( out.e_theta_im(1,1) ~= 0 );
+assertTrue( out.e_phi_re(1,1) ~= 0 );
+assertTrue( out.e_phi_im(1,1) ~= 0 );
 
-[A,B,C,D,E,F,G,H,I,J,K] = quadriga_lib.arrayant_combine_pattern( [], [], [], [],  e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, [0;0;0], 1, 0);
+out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    azimuth_grid, elevation_grid, [0;0;0], 1, 0) );
 
-assertElementsAlmostEqual( A, e_theta_re, 'absolute', 1e-14 );
-assertElementsAlmostEqual( B, e_theta_im, 'absolute', 1e-14 );
-assertElementsAlmostEqual( C, e_phi_re, 'absolute', 1e-14 );
-assertElementsAlmostEqual( D, e_phi_im, 'absolute', 1e-14 );
+assertElementsAlmostEqual( out.e_theta_re, e_theta_re, 'absolute', 1e-14 );
+assertElementsAlmostEqual( out.e_theta_im, e_theta_im, 'absolute', 1e-14 );
+assertElementsAlmostEqual( out.e_phi_re, e_phi_re, 'absolute', 1e-14 );
+assertElementsAlmostEqual( out.e_phi_im, e_phi_im, 'absolute', 1e-14 );
 
 % Grid inerpolation
 ant = quadriga_lib.arrayant_generate('3gpp', 10, [], [], [], [], 2, [], [], [], 0.0);
@@ -76,6 +68,8 @@ ant.coupling_re = [1;1];
 ant.coupling_im = [0;0];
 
 out = quadriga_lib.arrayant_combine_pattern(ant);
+quadriga_lib.arrayant_combine_pattern(ant); % Without output argument, the struct goes to ans
+assertTrue( exist('ans', 'var') == 1 && isequal(ans, out) );
 assertElementsAlmostEqual( out.e_theta_re, 3*ant.e_theta_re(:,:,1), 'absolute', 1e-14 );
 
 az_grid = linspace(-pi, pi, 73);
@@ -107,7 +101,7 @@ catch ME
 end
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_combine_pattern( ant );
+    [~,~] = quadriga_lib.arrayant_combine_pattern( ant );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -117,8 +111,8 @@ catch ME
 end
 
 try
-    out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re(:,2:end), e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im);
+    out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re(:,2:end), e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sizes of ''e_theta_re'' and ''e_theta_im'' do not match.';
@@ -128,8 +122,8 @@ catch ME
 end
 
 try
-    out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid(1:2), elevation_grid, element_pos, coupling_re, coupling_im);
+    out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid(1:2), elevation_grid, element_pos, coupling_re, coupling_im) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Number of elements in ''azimuth_grid'' does not match number of columns in pattern data.';
@@ -139,8 +133,8 @@ catch ME
 end
 
 try
-    out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, 1, coupling_re, coupling_im);
+    out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid, 1, coupling_re, coupling_im) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Size of ''element_pos'' must be either empty or match [3, n_elements]';
@@ -150,8 +144,8 @@ catch ME
 end
 
 try
-    out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, element_pos, [1;1], [0;0]);
+    out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid, element_pos, [1;1], [0;0]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = '''Coupling'' must be a matrix with rows equal to number of elements';
@@ -161,8 +155,8 @@ catch ME
 end
 
 try
-    out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, element_pos, [], 1);
+    out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid, element_pos, [], 1) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
@@ -172,8 +166,8 @@ catch ME
 end
 
 try
-    out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, element_pos, 1, [1,1]);
+    out = quadriga_lib.arrayant_combine_pattern( mk_ant( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid, element_pos, 1, [1,1]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = '''coupling_im'' must be empty or its size must match ''coupling_re''';
@@ -367,40 +361,32 @@ assertTrue( d2 > d0 + 1.2 );
 
 % ==== Multi-frequency error tests ====
 
-% Multi-freq output cannot be returned through 11 separate outputs
+% Only the struct output: a second output is an error, also for multi-frequency results
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_combine_pattern(ant_mf);
+    [~,~] = quadriga_lib.arrayant_combine_pattern(ant_mf);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Multi-frequency output supports only struct output';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% Same error path triggered by single-struct + vector freq + 11 LHS
+% Split mode (the arrayant fields as separate inputs) is not supported
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_combine_pattern(ant_mf(1), [1e9, 2e9]);
+    out = quadriga_lib.arrayant_combine_pattern( [], [1e9, 2e9], [], [], ones(3,4), zeros(3,4) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Multi-frequency output supports only struct output';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
-
-% Separate inputs + vector freq is rejected
-e_theta_re_se = ones(3,4);
-e_theta_im_se = zeros(3,4);
-e_phi_re_se   = ones(3,4);
-e_phi_im_se   = zeros(3,4);
 try
-    out = quadriga_lib.arrayant_combine_pattern( [], [1e9, 2e9], [], [], ...
-        e_theta_re_se, e_theta_im_se, e_phi_re_se, e_phi_im_se, ...
-        azimuth_grid, elevation_grid, [0;0;0], 1, 0);
+    out = quadriga_lib.arrayant_combine_pattern( [], [1e9, 2e9] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Multi-frequency mode (vector freq) requires struct input';
+    expectedErrorMessage = 'Input ''arrayant_in'' must be an arrayant struct or struct array.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -460,12 +446,6 @@ assertElementsAlmostEqual( abs(complex(out.e_theta_re(ie,ia0), out.e_theta_im(ie
 assertElementsAlmostEqual( abs(complex(out.e_theta_re(ie,ia90), out.e_theta_im(ie,ia90))), expected, 'absolute', 1e-6 );
 assertElementsAlmostEqual( expected, 0.506, 'absolute', 1e-3 );
 
-% Separate inputs, 16th input
-out = quadriga_lib.arrayant_combine_pattern( [], [], [], [], ant_ac.e_theta_re, ant_ac.e_theta_im, ...
-    ant_ac.e_phi_re, ant_ac.e_phi_im, ant_ac.azimuth_grid, ant_ac.elevation_grid, ant_ac.element_pos, ...
-    ant_ac.coupling_re, ant_ac.coupling_im, ant_ac.center_freq, 'ac', 344 );
-assertElementsAlmostEqual( abs(complex(out.e_theta_re(ie,ia90), out.e_theta_im(ie,ia90))), expected, 'absolute', 1e-6 );
-
 % Multi-frequency branch (vector frequency)
 out = quadriga_lib.arrayant_combine_pattern( ant_ac, [500, 1000], [], [], 344 );
 assertEqual( numel(out), 2 );
@@ -487,4 +467,14 @@ for v = [0, -344, NaN, Inf]
     end
 end
 
+end
+
+% Arrayant struct from the fields; omitted trailing fields are left out of the struct
+function ant = mk_ant(e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, varargin)
+ant = struct('e_theta_re', e_theta_re, 'e_theta_im', e_theta_im, 'e_phi_re', e_phi_re, 'e_phi_im', e_phi_im, ...
+    'azimuth_grid', azimuth_grid, 'elevation_grid', elevation_grid);
+names = {'element_pos', 'coupling_re', 'coupling_im', 'center_freq', 'name'};
+for k = 1:numel(varargin)
+    ant.(names{k}) = varargin{k};
+end
 end
