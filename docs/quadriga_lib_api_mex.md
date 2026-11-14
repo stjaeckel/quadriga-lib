@@ -13,7 +13,6 @@ lang: en-US
 - Numeric inputs accept any numeric type and are cast internally; default is `double` unless stated otherwise (e.g. `uint64` for some index arguments).
 - MATLAB arrays are column-major. Shape notation `[a, b, c]` means `[rows, cols, slices]` for 3-D arrays; `[rows, cols]` for 2-D matrices; `[n]` for vectors.
 - Inputs with a stated default, or marked *(optional)*, can be omitted or passed as `[]`; all others are required. Output arguments are optional via `nargout`; outputs after the first are computed only when requested.
-- Functions operating on arrayant data accept either a single struct (*struct mode*) or the individual fields as separate positional arguments (*split mode*). Split-mode signatures are single-frequency only; multi-frequency input requires struct mode.
 - Invalid inputs (shape/domain) and I/O failures raise a MATLAB error with the identifier `quadriga_lib:CPPerror`.
 - Index conventions: 1-based unless the field is explicitly called 0-based.
 - Units: angles in radians (degrees only where stated, e.g. `*_deg`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
@@ -208,19 +207,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_combine_pattern) · [Python](qua
 
 ### Usage:
 ```matlab
-% Input as struct (struct mode)
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, ...
     elevation_grid_new, propagation_speed );
-
-% Separate outputs, struct input (single-freq only)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
-    coupling_im, center_freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
-
-% Separate inputs (split-mode, single-freq only); propagation_speed is the 16th input
-arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, ...
-    elevation_grid_new, e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
-    element_pos, coupling_re, coupling_im, center_freq, name, propagation_speed );
 ```
 
 ### Inputs:
@@ -232,17 +220,13 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 - **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
 - **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; defaults to input grid
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
-  5th input in struct mode, 16th input with separate inputs; default: 299792458
-- **`e_theta_re`** ... **`elevation_grid`** — Required inputs for split mode
-- **`element_pos`** ... **`name`** — Optional inputs for split mode
+  default: 299792458
 
 ### Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when both input and
-  `freq` describe a single frequency; struct array of size `numel(freq)` (or `numel(arrayant_in)`
-  when `freq` is omitted) otherwise.
-- **`e_theta_re`, ..., `name`** — Separate-field outputs; **only available for single-frequency
-  results** (single-struct input with scalar/omitted `freq`, or separate-input mode).
+  `center_freq_new` describe a single frequency; struct array of size `numel(center_freq_new)` (or
+  `numel(arrayant_in)` when `center_freq_new` is omitted) otherwise.
 
 ### See also:
 - [arrayant_generate](#arrayant_generate) (for field layout in the arrayant struct)
@@ -396,10 +380,6 @@ ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, bfr
     spacing);
 ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, bfr, M, N, pol, ...
     dir, spacing);
-
-% Separate outputs (2 to 11 outputs)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_generate( ... );
 ```
 
 ### Mapping table with defaults:
@@ -656,8 +636,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_read) · [Python](quadriga_lib_api_
   an error asks to pass `id`
 - Differs from Python, where `qdant_read(fn)` reads ID 1 only
 - With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
-- Separate-fields output (3 to 12 outputs) is only available when the result is a single entry 
-  (i.e. `id` was provided, or the file contains exactly one entry)
 - An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
 - Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;
   elements without pattern data read as zeros (at most 2^24 zero values per entry)
@@ -669,10 +647,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_read) · [Python](quadriga_lib_api_
 
 % Single-frequency read (struct output)
 [ ant, layout ] = quadriga_lib.qdant_read( fn, id );
-
-% Single-frequency read (separate fields)
-[ e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name, layout ] = quadriga_lib.qdant_read( fn, id );
 ```
 
 ### Inputs:
@@ -682,9 +656,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_read) · [Python](quadriga_lib_api_
 ### Outputs:
 - **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout as documented in [arrayant_generate](#arrayant_generate)
 - **`layout`** — Matrix of element IDs describing how entries are arranged in the file; datatype: uint32
-- **`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`, `element_pos`, 
-  `coupling_re`, `coupling_im`, `center_freq`, `name`** — Separate-field outputs with contents and sizes as 
-  in [arrayant_generate](#arrayant_generate); only available when the result is a single entry
 
 ### See also:
 - [qdant_write](#qdant_write) (for writing QDANT data)
@@ -716,36 +687,17 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_write) · [Python](quadriga_lib_api
 
 ### Usage:
 ```matlab
-% Arrayant as struct
 id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
-
-% Arrayant as separate inputs
-id_in_file = quadriga_lib.qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
 ```
 
 ### Inputs:
 - **`fn`** — Output QDANT filename; string; must not be empty
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate); 
-  pass `[]` to provide the data via separate inputs instead; a struct array writes a frequency-dependent 
-  model and requires `id` and `layout` to be omitted
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
+  a struct array writes a frequency-dependent model and requires `id` and `layout` to be omitted
 - **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
-  ignored for multi-frequency model
+  must be omitted for a multi-frequency model
 - **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
   default: a row of all IDs in the file (replaces a layout written before)
-
-### Inputs (separate arrayant data, required when `arrayant` is `[]`):
-- **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
-- **`element_pos`** — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
-- **`coupling_re`** — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
-- **`coupling_im`** — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros
-- **`center_freq`** — Center frequency in Hz; default: 299792458
-- **`name`** — Name of the array antenna object; string
 
 ### Outputs:
 - **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode

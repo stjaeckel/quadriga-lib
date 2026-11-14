@@ -30,36 +30,17 @@ Writes array antenna data to QDANT files
 
 ## Usage:
 ```
-% Arrayant as struct
 id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
-
-% Arrayant as separate inputs
-id_in_file = quadriga_lib.qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
 ```
 
 ## Inputs:
 - **`fn`** — Output QDANT filename; string; must not be empty
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]]; 
-  pass `[]` to provide the data via separate inputs instead; a struct array writes a frequency-dependent 
-  model and requires `id` and `layout` to be omitted
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
+  a struct array writes a frequency-dependent model and requires `id` and `layout` to be omitted
 - **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
-  ignored for multi-frequency model
+  must be omitted for a multi-frequency model
 - **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32;
   default: a row of all IDs in the file (replaces a layout written before)
-
-## Inputs (separate arrayant data, required when `arrayant` is `[]`):
-- **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, strictly increasing; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, strictly increasing; `[n_elevation]`
-- **`element_pos`** — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
-- **`coupling_re`** — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
-- **`coupling_im`** — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros
-- **`center_freq`** — Center frequency in Hz; default: 299792458
-- **`name`** — Name of the array antenna object; string
 
 ## Outputs:
 - **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
@@ -72,7 +53,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 2 || nrhs > 15)
+    if (nrhs < 2 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
@@ -84,53 +65,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (fn.empty())
          mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File name cannot be empty.");
+    if (!mxIsStruct(prhs[1]) || mxGetNumberOfElements(prhs[1]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be an arrayant struct or struct array.");
 
     // Assemble array antenna object
     auto ant = quadriga_lib::arrayant<double>();
     auto ant_multi = std::vector<quadriga_lib::arrayant<double>>();
-    bool is_multi = false;
-
-    if (nrhs <= 4 && mxIsStruct(prhs[1])) // Struct input
+    const bool is_multi = mxGetNumberOfElements(prhs[1]) > 1;
+    if (is_multi)
     {
-        is_multi = mxGetNumberOfElements(prhs[1]) > 1;
-        if (is_multi)
-        {
-            ant_multi = qd_mex_struct2arrayant_multi(prhs[1], true);
-            if (id != 0 || !layout.empty())
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'id' and 'layout' are not allowed for multi-frequency arrays.");
-        }
-        else
-            ant = qd_mex_struct2arrayant(prhs[1], true);
-    }
-    else if (nrhs >= 10) // Separate inputs
-    {
-        if (mxIsStruct(prhs[1]))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Cannot mix struct input with separate arrayant inputs.");
-
-        ant.e_theta_re = qd_mex_get_Cube<double>(prhs[4]);
-        ant.e_theta_im = qd_mex_get_Cube<double>(prhs[5]);
-        ant.e_phi_re = qd_mex_get_Cube<double>(prhs[6]);
-        ant.e_phi_im = qd_mex_get_Cube<double>(prhs[7]);
-        ant.azimuth_grid = qd_mex_get_Col<double>(prhs[8]);
-        ant.elevation_grid = qd_mex_get_Col<double>(prhs[9]);
-
-        if (nrhs > 10)
-            ant.element_pos = qd_mex_get_Mat<double>(prhs[10]);
-
-        if (nrhs > 11)
-            ant.coupling_re = qd_mex_get_Mat<double>(prhs[11]);
-
-        if (nrhs > 12)
-            ant.coupling_im = qd_mex_get_Mat<double>(prhs[12]);
-
-        if (nrhs > 13)
-            ant.center_frequency = qd_mex_get_scalar<double>(prhs[13], "center_freq", 299792458.0);
-
-        if (nrhs > 14)
-            ant.name = qd_mex_get_string(prhs[14]);
+        ant_multi = qd_mex_struct2arrayant_multi(prhs[1], true);
+        if (id != 0 || !layout.empty())
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'id' and 'layout' are not allowed for multi-frequency arrays.");
     }
     else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+        ant = qd_mex_struct2arrayant(prhs[1], true);
 
     // Check if files exists in multi-freq mode and throw error if yes
     if (is_multi && std::filesystem::exists(fn))
@@ -142,6 +91,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         CALL_QD(id = quadriga_lib::qdant_write(fn, ant, id, &layout));
 
-    if (nlhs == 1)
-        plhs[0] = qd_mex_copy2matlab(&id);
+    plhs[0] = qd_mex_copy2matlab(&id); // Also without output argument: the ID goes to ans
 }

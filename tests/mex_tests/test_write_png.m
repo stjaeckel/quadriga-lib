@@ -19,11 +19,17 @@ function test_write_png
     assertTrue(exist(outFile, 'file') == 2);
     delete_if_exists(outFile);
 
-    % --- 2) With one (dummy) output ---
-    t = quadriga_lib.write_png(outFile, gradient, 'jet', 0.0, max_val, false);
-    assertEqual(t, 1.0);
-    assertTrue(exist(outFile, 'file') == 2);
-    delete_if_exists(outFile);
+    % --- 2) Error: the function returns no output ---
+    try
+        t = quadriga_lib.write_png(outFile, gradient, 'jet', 0.0, max_val, false);
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    catch ME
+        expectedErrorMessage = 'Wrong number of output arguments.';
+        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+            error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+        end
+    end
+    assertFalse(exist(outFile, 'file') == 2);
 
     % --- 3) Minimal args (defaults are applied inside MEX) ---
     quadriga_lib.write_png(outFile, gradient);

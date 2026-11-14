@@ -38,10 +38,12 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    (void)plhs; // No outputs
+
     // Validate argument counts
     if (nrhs < 2 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 1)
+    if (nlhs > 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
@@ -54,9 +56,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call library function
     CALL_QD(quadriga_lib::write_png<double>(data, fn, colormap, min_val, max_val, log_transform));
-
-    // Dummy output for backward compatibility
-    double out = 1.0;
-    if (nlhs == 1)
-        plhs[0] = qd_mex_copy2matlab(&out);
 }

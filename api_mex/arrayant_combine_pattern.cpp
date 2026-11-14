@@ -22,19 +22,8 @@ Combine element patterns, positions, and coupling weights into effective radiati
 
 ## Usage:
 ```
-% Input as struct (struct mode)
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, ...
     elevation_grid_new, propagation_speed );
-
-% Separate outputs, struct input (single-freq only)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
-    coupling_im, center_freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
-
-% Separate inputs (split-mode, single-freq only); propagation_speed is the 16th input
-arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, ...
-    elevation_grid_new, e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
-    element_pos, coupling_re, coupling_im, center_freq, name, propagation_speed );
 ```
 
 ## Inputs:
@@ -46,17 +35,13 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 - **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
 - **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; strictly increasing; defaults to input grid
 - **`propagation_speed`** — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics;
-  5th input in struct mode, 16th input with separate inputs; default: 299792458
-- **`e_theta_re`** ... **`elevation_grid`** — Required inputs for split mode
-- **`element_pos`** ... **`name`** — Optional inputs for split mode
+  default: 299792458
 
 ## Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [[arrayant_generate]]. Single struct when both input and
-  `freq` describe a single frequency; struct array of size `numel(freq)` (or `numel(arrayant_in)`
-  when `freq` is omitted) otherwise.
-- **`e_theta_re`, ..., `name`** — Separate-field outputs; **only available for single-frequency
-  results** (single-struct input with scalar/omitted `freq`, or separate-input mode).
+  `center_freq_new` describe a single frequency; struct array of size `numel(center_freq_new)` (or
+  `numel(arrayant_in)` when `center_freq_new` is omitted) otherwise.
 
 ## See also:
 - [[arrayant_generate]] (for field layout in the arrayant struct)
@@ -67,115 +52,33 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || (nrhs > 5 && nrhs < 10) || nrhs > 16)
+    if (nrhs < 1 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-
-    if (nlhs > 11)
+    if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
+    if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in' must be an arrayant struct or struct array.");
 
-    // Common optional inputs
     const arma::vec freq = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
     const arma::vec az = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2]);
     const arma::vec el = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3]);
+    const double propagation_speed = (nrhs < 5) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[4], "propagation_speed", 299792458.0);
 
-    // Dispatch
-    const bool arrayant_is_struct = mxIsStruct(prhs[0]) && mxGetNumberOfElements(prhs[0]) > 0;
-    const bool separate_inputs = !arrayant_is_struct && nrhs >= 10;
-
-    if (!arrayant_is_struct && !separate_inputs)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "First input must be an arrayant struct/struct array, or [] with separate inputs (>=10 args).");
-
-    // Propagation speed: 5th input in struct mode, 16th input with separate inputs
-    double propagation_speed = 299792458.0;
-    if (arrayant_is_struct && nrhs == 5)
-        propagation_speed = qd_mex_get_scalar<double>(prhs[4], "propagation_speed", 299792458.0);
-    else if (separate_inputs && nrhs == 16)
-        propagation_speed = qd_mex_get_scalar<double>(prhs[15], "propagation_speed", 299792458.0);
-
-    if (separate_inputs && freq.n_elem > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency mode (vector freq) requires struct input.");
-
-    bool multifreq = false;
-    if (arrayant_is_struct && freq.n_elem > 1)
-        multifreq = true;
-    else if (arrayant_is_struct && mxGetNumberOfElements(prhs[0]) > 1)
-        multifreq = true;
-
-    // Multi-frequency branch
-    if (multifreq)
+    // The output is also set without output argument (it goes to ans)
+    if (freq.n_elem > 1 || mxGetNumberOfElements(prhs[0]) > 1) // Multi-frequency
     {
-        if (nlhs > 1)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency output supports only struct output (1 lhs).");
-
-        // Helper validates internally; arrayant_combine_pattern_multi validates again — cheap.
-        const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]);
-
+        const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]); // Validated by the C++ function
         std::vector<quadriga_lib::arrayant<double>> out;
         CALL_QD(out = quadriga_lib::arrayant_combine_pattern_multi(ant_multi, &az, &el, &freq, propagation_speed));
-
-        if (out.size() == 1)
-            plhs[0] = qd_mex_arrayant2struct(out[0]);
-        else
-            plhs[0] = qd_mex_arrayant2struct_multi(out);
+        plhs[0] = (out.size() == 1) ? qd_mex_arrayant2struct(out[0]) : qd_mex_arrayant2struct_multi(out);
         return;
     }
 
-    // Single-frequency branch
-    auto ant = quadriga_lib::arrayant<double>();
-    if (arrayant_is_struct)
-        ant = qd_mex_struct2arrayant(prhs[0]);
-    else // separate_inputs (nrhs >= 10)
-    {
-        ant.e_theta_re = qd_mex_get_Cube<double>(prhs[4]);
-        ant.e_theta_im = qd_mex_get_Cube<double>(prhs[5]);
-        ant.e_phi_re = qd_mex_get_Cube<double>(prhs[6]);
-        ant.e_phi_im = qd_mex_get_Cube<double>(prhs[7]);
-        ant.azimuth_grid = qd_mex_get_Col<double>(prhs[8]);
-        ant.elevation_grid = qd_mex_get_Col<double>(prhs[9]);
-        if (nrhs > 10)
-            ant.element_pos = qd_mex_get_Mat<double>(prhs[10]);
-        if (nrhs > 11)
-            ant.coupling_re = qd_mex_get_Mat<double>(prhs[11]);
-        if (nrhs > 12)
-            ant.coupling_im = qd_mex_get_Mat<double>(prhs[12]);
-        if (nrhs > 13)
-            ant.center_frequency = qd_mex_get_scalar<double>(prhs[13], "center_freq", 299792458.0);
-        if (nrhs > 14)
-            ant.name = qd_mex_get_string(prhs[14]);
-    }
-
-    // Optional scalar freq override (single-freq path only)
-    if (freq.n_elem == 1)
+    auto ant = qd_mex_struct2arrayant(prhs[0]); // Validated by the C++ function
+    if (freq.n_elem == 1) // Scalar frequency override
         ant.center_frequency = freq[0];
 
-    // Call library function
-    auto arrayant_out = quadriga_lib::arrayant<double>();
+    quadriga_lib::arrayant<double> arrayant_out;
     CALL_QD(arrayant_out = quadriga_lib::arrayant_combine_pattern(ant, &az, &el, propagation_speed));
-
-    // Return to MATLAB
-    if (nlhs == 1)
-        plhs[0] = qd_mex_arrayant2struct(arrayant_out);
-    else if (nlhs > 1)
-    {
-        plhs[0] = qd_mex_copy2matlab(&arrayant_out.e_theta_re);
-        plhs[1] = qd_mex_copy2matlab(&arrayant_out.e_theta_im);
-        if (nlhs > 2)
-            plhs[2] = qd_mex_copy2matlab(&arrayant_out.e_phi_re);
-        if (nlhs > 3)
-            plhs[3] = qd_mex_copy2matlab(&arrayant_out.e_phi_im);
-        if (nlhs > 4)
-            plhs[4] = qd_mex_copy2matlab(&arrayant_out.azimuth_grid, true);
-        if (nlhs > 5)
-            plhs[5] = qd_mex_copy2matlab(&arrayant_out.elevation_grid, true);
-        if (nlhs > 6)
-            plhs[6] = qd_mex_copy2matlab(&arrayant_out.element_pos);
-        if (nlhs > 7)
-            plhs[7] = qd_mex_copy2matlab(&arrayant_out.coupling_re);
-        if (nlhs > 8)
-            plhs[8] = qd_mex_copy2matlab(&arrayant_out.coupling_im);
-        if (nlhs > 9)
-            plhs[9] = qd_mex_copy2matlab(&arrayant_out.center_frequency);
-        if (nlhs > 10)
-            plhs[10] = mxCreateString(arrayant_out.name.c_str());
-    }
+    plhs[0] = qd_mex_arrayant2struct(arrayant_out);
 }

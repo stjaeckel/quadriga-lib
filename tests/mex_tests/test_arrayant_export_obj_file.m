@@ -83,10 +83,17 @@ for drange = [10, 30, 50]
     delete('test_mex.obj'); delete('test_mex.mtl');
 end
 
-% --- Return value: optional success indicator (= 1) ---
-ok = quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c);
-assertElementsAlmostEqual( ok, 1.0, 'absolute', 1e-12 );
-delete('test_mex.obj'); delete('test_mex.mtl');
+% --- No return value: an output request is an error and writes no file ---
+try
+    ok = quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Wrong number of output arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+assertFalse( exist('test_mex.obj', 'file') == 2 );
 
 % --- Multi-frequency dispatch via 'freq' input ---
 ant_a = quadriga_lib.arrayant_generate('custom', [], [], 30, 20, 0);
