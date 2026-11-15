@@ -82,12 +82,3 @@ py::tuple calc_angular_spread(py::list az,
 
     return py::make_tuple(azimuth_spread_py, elevation_spread_py, orientation_py, phi_py, theta_py);
 }
-
-// pybind11 declaration:
-// m.def("calc_angular_spread", &calc_angular_spread,
-//       py::arg("az"),
-//       py::arg("el"),
-//       py::arg("powers"),
-//       py::arg("wrapping") = false,
-//       py::arg("calc_bank_angle") = false,
-//       py::arg("quantize") = 0.0);

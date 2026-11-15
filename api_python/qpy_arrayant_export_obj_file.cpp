@@ -54,14 +54,3 @@ void arrayant_export_obj_file(const std::string &fn,
 
     quadriga_lib::arrayant_export_obj_file(fn, ant[freq_ind], directivity_range, colormap, object_radius, icosphere_n_div, &element_a);
 }
-
-// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("export_obj_file", &arrayant_export_obj_file,
-//       py::arg("fn"),
-//       py::arg("arrayant"),
-//       py::arg("directivity_range") = 30.0,
-//       py::arg("colormap") = "jet",
-//       py::arg("object_radius") = 1.0,
-//       py::arg("icosphere_n_div") = 4,
-//       py::arg("element") = py::none(),
-//       py::arg("freq_ind") = 0);

@@ -54,10 +54,3 @@ py::array_t<double> cube(py::handle scale,
     // Copy to numpy
     return qd_python_copy2numpy(&mesh);
 }
-
-// pybind11 declaration:
-// m.def("cube", &cube,
-//       py::arg("scale") = py::none(),
-//       py::arg("rotation") = py::none(),
-//       py::arg("location") = py::none(),
-//       py::arg("n_div") = 1);

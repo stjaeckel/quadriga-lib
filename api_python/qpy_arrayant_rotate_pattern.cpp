@@ -78,10 +78,3 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
 
     return qd_python_arrayant2dict_multi(ant_vec);
 }
-
-// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("rotate_pattern", &arrayant_rotate_pattern,
-//       py::arg("arrayant"),
-//       py::arg("orientation"),
-//       py::arg("usage") = 0,
-//       py::arg("i_element") = py::none());

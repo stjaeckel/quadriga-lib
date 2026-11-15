@@ -141,15 +141,3 @@ py::tuple lsp_generate(py::handle scenpar,
     return py::make_tuple(lsp_py, abs_toa_py, gr_eps_re_py, gr_eps_im_py, eod_offset_deg_py, lsp_mu_py,
                           lsp_sigma_py);
 }
-
-// pybind11 declaration:
-// m.def("lsp_generate", &lsp_generate,
-//       py::arg("scenpar"),
-//       py::arg("center_freq").none(false),
-//       py::arg("tx_pos").none(false),
-//       py::arg("rx_pos").none(false),
-//       py::arg("rnd").none(false),
-//       py::arg("sf_sigma") = py::none(),
-//       py::arg("cholesky") = true,
-//       py::arg("clip_spreads") = true,
-//       py::arg("complex") = true);

@@ -505,24 +505,3 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     else
         return py::make_tuple(coeff_re_p, coeff_im_p, delay_py);
 }
-
-// pybind11 declaration:
-// m.def("get_channels_spherical", &get_channels_spherical,
-//       py::arg("ant_tx"),
-//       py::arg("ant_rx"),
-//       py::arg("fbs_pos"),
-//       py::arg("lbs_pos"),
-//       py::arg("path_gain"),
-//       py::arg("path_length"),
-//       py::arg("M"),
-//       py::arg("tx_pos"),
-//       py::arg("tx_orientation"),
-//       py::arg("rx_pos"),
-//       py::arg("rx_orientation"),
-//       py::arg("center_freq") = py::none(),
-//       py::arg("use_absolute_delays") = false,
-//       py::arg("add_fake_los_path") = false,
-//       py::arg("angles") = false,
-//       py::arg("complex") = true,
-//       py::arg("i_freq") = 0,
-//       py::arg("use_kernel") = 0);

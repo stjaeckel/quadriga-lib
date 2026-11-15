@@ -130,11 +130,3 @@ py::object geo2cart(const py::array_t<double> &az,
 
     return py::make_tuple(x_py, y_py, z_py);
 }
-
-// pybind11 declaration:
-// m.def("geo2cart", &geo2cart,
-//       py::arg("az"),
-//       py::arg("el") = py::none(),
-//       py::arg("len") = py::none(),
-//       py::arg("combine") = true,
-//       py::arg("use_kernel") = 1);

@@ -59,8 +59,3 @@ py::tuple sos_acf_2d(const py::array_t<double> &acf,
 
     return py::make_tuple(acf_2d_py, dist_2d_py);
 }
-
-// pybind11 declaration:
-// m.def("acf_2d", &sos_acf_2d,
-//       py::arg("acf").none(false),
-//       py::arg("dist").none(false));

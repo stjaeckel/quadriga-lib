@@ -128,14 +128,3 @@ py::tuple sos_remove_bias(const py::array_t<double> &spatial_freq,
 
     return py::make_tuple(phase_out_py, phase_b_out_py, offset_py, mean_before_py);
 }
-
-// pybind11 declaration:
-// m.def("remove_bias", &sos_remove_bias,
-//       py::arg("spatial_freq").none(false),
-//       py::arg("phase_in").none(false),
-//       py::arg("pos").none(false),
-//       py::arg("pos_b") = py::none(),
-//       py::arg("phase_b_in") = py::none(),
-//       py::arg("acf") = py::none(),
-//       py::arg("dist") = py::none(),
-//       py::arg("spatial_freq_scale_b") = 1.0);

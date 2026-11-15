@@ -112,15 +112,3 @@ py::tuple los_probability(const std::string &model,
 
     return py::make_tuple(p_los_py, los_soft_py);
 }
-
-// pybind11 declaration:
-// m.def("los_probability", &los_probability,
-//       py::arg("model"),
-//       py::arg("d2d_out").none(false),
-//       py::arg("h_bs").none(false),
-//       py::arg("h_ut").none(false),
-//       py::arg("d_clutter") = py::none(),
-//       py::arg("r_clutter") = py::none(),
-//       py::arg("h_clutter") = py::none(),
-//       py::arg("rnd_g") = py::none(),
-//       py::arg("center_freq") = py::none());

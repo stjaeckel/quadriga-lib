@@ -46,9 +46,9 @@ Existing wrappers that show the patterns:
 
 # IMPLEMENTATION ORDER
 Unlike the C++ work, the wrapper is written first and the test second: the physics is already verified by the Catch2 suite, and the Python test exercises the wrapper.
-1. **Wrapper and registration.** Write `api_python/qpy_<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES". Register it in the dispatcher of its submodule AND add the identical registration as a comment block at the end of the wrapper file. It must compile without warnings.
+1. **Wrapper and registration.** Write `api_python/qpy_<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES". Register it in the dispatcher of its submodule. It must compile without warnings.
 2. **Test.** Write `tests/python_tests/test_<function_name>.py` (see "TESTS") and run it. It is expected to pass. If it fails, the cause is in the wrapper, the registration or the test's expectation; find out which before changing anything. If the failure points to the C++ function itself, stop and report it; do not work around it in the wrapper.
-3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature, the dispatcher entry and the comment block name the same arguments in the same order. If the C++ function has another name than the wrapper, add the pair to `docs_builder/content/api_matching.toml` (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
+3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature and the dispatcher entry name the same arguments in the same order. If the C++ function has another name than the wrapper, add the pair to `docs_builder/content/api_matching.toml` (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
 
 # HAND-OVER REPORT
 - the Python usage line and the submodule
@@ -349,7 +349,7 @@ const auto data_a = qd_python_numpy2arma_Mat<double>(data, true);
 ```
 const auto tx_pos_a = qd_python_numpy2arma_Col(tx_pos, true, false, "tx_pos", 3);
 ```
-- In the pybind11 declaration, mandatory array inputs have no default and refuse `None`: `py::arg("data").none(false)`. Without it, `None` is converted into an array instead of raising `TypeError`.
+- In the registration, mandatory array inputs have no default and refuse `None`: `py::arg("data").none(false)`. Without it, `None` is converted into an array instead of raising `TypeError`.
 
 ### Optional numeric arrays
 - Optional array inputs use `py::handle` (NOT `py::array_t<>`) with default `py::none()`:
@@ -358,7 +358,7 @@ py::handle bins  // in the function signature
 const auto bins_in_a = qd_python_numpy2arma_Col<double>(bins, true);
 ```
 - The handle overloads of `qd_python_numpy2arma_*` return an empty Armadillo object when the handle is `None`, which can then be checked via `.empty()`.
-- In the pybind11 declaration: `py::arg("bins") = py::none()`.
+- In the registration: `py::arg("bins") = py::none()`.
 - Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object` for new wrappers (some older wrappers do).
 
 ### Optional inputs and `nullptr`
@@ -378,11 +378,11 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
 
 ### Scalars
 - Scalars use native C++ types directly in the wrapper signature: `arma::uword n_bins`, `double power`, `int count`, etc. Flags (bool options) follow "Flags" below.
-- Defaults are set in the pybind11 declaration only: `py::arg("n_bins") = 201`. Do not repeat the default in the C++ function signature.
+- Defaults are set in the registration only: `py::arg("n_bins") = 201`. Do not repeat the default in the C++ function signature.
 
 ### Flags
 - A flag is taken as `py::handle` and read with `qd_python_flag(handle, default_value, "name")` (`python_quadriga_adapter.hpp`): `None` selects the default, a Python `bool` or `numpy.bool_` gives its value, any other type (float, int, str, array) raises `TypeError` with `Input '<name>' must be a bool or None.`. A plain `bool` parameter is not used: pybind11 would turn `None` into `False` (silently not the default) and accept other types.
-- The default stays in the pybind11 declaration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
+- The default stays in the registration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
 - The `## Inputs:` line states the default; one bullet of the description states the rule once for all flags of the function ("take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`"). Where the section description states this rule for all functions of the section (as the `gbsm` submodule does in its conventions), the blocks only state the defaults.
 - Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError`.
 - The `gbsm` submodule follows this rule for all its flags; older wrappers with plain `bool` flags predate it.
@@ -472,15 +472,7 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
 - Register the wrapper in the dispatcher file of its submodule (`python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`, `python_sos.cpp`, `python_gbsm.cpp`; `python_main.cpp` for top-level functions):
   1. Add `#include "qpy_function_name.cpp"` to the include list at the top of the dispatcher.
   2. Add the `m.def(...)` call inside the `quadriga_lib_<submodule>(py::module_ &m)` function.
-- In addition, repeat the same registration as a comment block at the end of the wrapper file, so that the wrapper file documents its own Python signature:
-```
-// pybind11 declaration:
-// m.def("function_name", &function_name,
-//       py::arg("input1"),
-//       py::arg("input2") = py::none(),
-//       py::arg("n_bins") = 201);
-```
-- The comment block and the dispatcher entry must be identical. When changing the arguments of an existing wrapper, update the function signature, the dispatcher, the comment block and the Usage line together.
+- The dispatcher entry is the only copy of the Python signature. When changing the arguments of an existing wrapper, update the function signature, the dispatcher entry and the Usage line together.
 - The kwarg names in `py::arg(...)` must match the C++ parameter names of the wrapper AND the names in the `## Usage:` line. These are what the user types as keyword arguments from Python.
 - One `py::arg(...)` line per parameter, in the order of the wrapper signature. Include defaults for all optional parameters; mandatory parameters have no default and come first.
 

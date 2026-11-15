@@ -173,16 +173,3 @@ py::tuple quantize_delays(const py::object &coeff_re,
     }
     return py::make_tuple(coeff_re_q_py, coeff_im_q_py, delay_q_py);
 }
-
-// pybind11 declaration (channel submodule):
-// m.def("quantize_delays", &quantize_delays,
-//       py::arg("coeff_re") = py::none(),
-//       py::arg("coeff_im") = py::none(),
-//       py::arg("delay") = py::none(),
-//       py::arg("tap_spacing") = 5e-9,
-//       py::arg("max_no_taps") = 48,
-//       py::arg("power_exponent") = 1.0,
-//       py::arg("fix_taps") = 0,
-//       py::arg("stack") = false,
-//       py::arg("complex") = true,
-//       py::arg("coeff") = py::none());

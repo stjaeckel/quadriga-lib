@@ -102,13 +102,3 @@ py::tuple sos_acf_estimate(const py::array_t<double> &spatial_freq,
 
     return py::make_tuple(acf_est_py, dist_est_py, acf_est_dual_py);
 }
-
-// pybind11 declaration:
-// m.def("acf_estimate", &sos_acf_estimate,
-//       py::arg("spatial_freq").none(false),
-//       py::arg("phase").none(false),
-//       py::arg("bins").none(false),
-//       py::arg("n_pos"),
-//       py::arg("acf") = py::none(),
-//       py::arg("dist") = py::none(),
-//       py::arg("seed") = -1);

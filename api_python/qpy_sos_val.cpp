@@ -262,16 +262,3 @@ py::array_t<double> sos_val(const py::array_t<double> &spatial_freq,
 
     return val_py;
 }
-
-// pybind11 declaration:
-// m.def("val", &sos_val,
-//       py::arg("spatial_freq").none(false),
-//       py::arg("phase").none(false),
-//       py::arg("pos").none(false),
-//       py::arg("pos_b") = py::none(),
-//       py::arg("phase_b") = py::none(),
-//       py::arg("acf") = py::none(),
-//       py::arg("dist") = py::none(),
-//       py::arg("spatial_freq_scale_b") = 1.0,
-//       py::arg("uniform") = false,
-//       py::arg("use_kernel") = 0);

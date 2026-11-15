@@ -78,13 +78,3 @@ py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
 
     return map_py;
 }
-
-// pybind11 declaration:
-// m.def("map", &sos_map,
-//       py::arg("spatial_freq").none(false),
-//       py::arg("phase").none(false),
-//       py::arg("x").none(false),
-//       py::arg("y") = py::none(),
-//       py::arg("z") = py::none(),
-//       py::arg("uniform") = false,
-//       py::arg("use_kernel") = 0);

@@ -96,9 +96,3 @@ py::tuple obj_file_read(const std::string &fn,
         qd_python_copy2list(csv_names),
         qd_python_map2dict(csv_prop, order));
 }
-
-// pybind11 declaration:
-// m.def("obj_file_read", &obj_file_read,
-//       py::arg("fn"),
-//       py::arg("fn_csv") = std::string(""),
-//       py::arg("csv_strict") = false);

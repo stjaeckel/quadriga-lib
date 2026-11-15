@@ -101,13 +101,3 @@ py::tuple calc_cross_polarization_ratio(py::list powers,
 
     return py::make_tuple(xpr_py, pg_py);
 }
-
-// pybind11 declaration:
-// m.def("calc_cross_polarization_ratio", &calc_cross_polarization_ratio,
-//       py::arg("powers"),
-//       py::arg("M"),
-//       py::arg("path_length"),
-//       py::arg("tx_pos"),
-//       py::arg("rx_pos"),
-//       py::arg("include_los") = false,
-//       py::arg("window_size") = 0.01);

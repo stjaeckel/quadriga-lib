@@ -132,21 +132,3 @@ py::tuple gbsm_single_link_channel(const py::dict &tx_array,
         par[chan.par_names[k].c_str()] = qd_python_any2numpy(chan.par_data[k]);
     return py::make_tuple(qd_python_channel2dict(chan, arma::uvec(), false, stack_b), par);
 }
-
-// pybind11 declaration:
-// m.def("single_link_channel", &gbsm_single_link_channel,
-//       py::arg("tx_array"),
-//       py::arg("rx_array"),
-//       py::arg("rays"),
-//       py::arg("link_gain_dB").none(false),
-//       py::arg("mobility") = "auto",
-//       py::arg("output") = "taps",
-//       py::arg("i_freq") = 0,
-//       py::arg("tx_pos") = py::none(),
-//       py::arg("rx_pos") = py::none(),
-//       py::arg("tx_orientation") = py::none(),
-//       py::arg("rx_orientation") = py::none(),
-//       py::arg("kf_ratio") = py::none(),
-//       py::arg("oxygen") = false,
-//       py::arg("use_absolute_delays") = false,
-//       py::arg("stack") = false);

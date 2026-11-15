@@ -104,18 +104,3 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
         rays_out["gr_eps"] = qd_python_copy2numpy<double, std::complex<double>>(&rays[0].gr_eps_re, &rays[0].gr_eps_im);
     return rays_out;
 }
-
-// pybind11 declaration:
-// m.def("rays_from_paths", &gbsm_rays_from_paths,
-//       py::arg("center_freq").none(false),
-//       py::arg("tx_pos").none(false),
-//       py::arg("rx_pos").none(false),
-//       py::arg("fbs_pos").none(false),
-//       py::arg("lbs_pos").none(false),
-//       py::arg("path_gain").none(false),
-//       py::arg("path_length").none(false),
-//       py::arg("M").none(false),
-//       py::arg("method") = "quadriga",
-//       py::arg("path_type") = py::none(),
-//       py::arg("tap") = py::none(),
-//       py::arg("gr_eps") = py::none());

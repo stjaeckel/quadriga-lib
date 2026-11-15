@@ -52,9 +52,3 @@ py::array_t<double> sos_acfi(const py::array_t<double> &acf,
 
     return val_py;
 }
-
-// pybind11 declaration:
-// m.def("acfi", &sos_acfi,
-//       py::arg("acf").none(false),
-//       py::arg("dist").none(false),
-//       py::arg("d").none(false));

@@ -78,9 +78,3 @@ py::tuple acdf(const py::array_t<double> &data,
     // Return tuple
     return py::make_tuple(cdf_per_set_py, bins_out_py, cdf_avg_py, mu_py, sig_py);
 }
-
-// pybind11 declaration:
-// m.def("acdf", &acdf,
-//       py::arg("data"),
-//       py::arg("bins") = py::none(),
-//       py::arg("n_bins") = 201);

@@ -85,8 +85,3 @@ py::dict qdant_read(const std::string &fn,
     output["layout"] = qd_python_copy2numpy<unsigned, py::ssize_t>(&layout);
     return output;
 }
-
-// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("qdant_read", &qdant_read,
-//       py::arg("fn"),
-//       py::arg("id") = 1);

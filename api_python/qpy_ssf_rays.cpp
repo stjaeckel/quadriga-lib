@@ -203,27 +203,3 @@ py::list ssf_rays(py::handle scenpar,
     }
     return rays_py;
 }
-
-// pybind11 declaration:
-// m.def("ssf_rays", &ssf_rays,
-//       py::arg("scenpar"),
-//       py::arg("tx_pos").none(false),
-//       py::arg("rx_pos").none(false),
-//       py::arg("center_freq").none(false),
-//       py::arg("lsp").none(false),
-//       py::arg("lsp_mu").none(false),
-//       py::arg("lsp_sigma").none(false),
-//       py::arg("delay").none(false),
-//       py::arg("power").none(false),
-//       py::arg("aod").none(false),
-//       py::arg("eod").none(false),
-//       py::arg("aoa").none(false),
-//       py::arg("eoa").none(false),
-//       py::arg("rnd_ray").none(false),
-//       py::arg("method") = "38.901",
-//       py::arg("i_freq") = 0,
-//       py::arg("angle_model") = "additive",
-//       py::arg("pol_model") = "38.901",
-//       py::arg("gr_eps") = py::none(),
-//       py::arg("pol_variability") = false,
-//       py::arg("random_phase") = true);

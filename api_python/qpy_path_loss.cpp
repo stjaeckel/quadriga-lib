@@ -117,13 +117,3 @@ py::tuple path_loss(py::handle plpar,
 
     return py::make_tuple(pl_py, sf_sigma_py);
 }
-
-// pybind11 declaration:
-// m.def("path_loss", &path_loss,
-//       py::arg("plpar"),
-//       py::arg("scenpar"),
-//       py::arg("center_freq").none(false),
-//       py::arg("tx_pos").none(false),
-//       py::arg("rx_pos").none(false),
-//       py::arg("d2d_in") = py::none(),
-//       py::arg("rnd_he") = py::none());

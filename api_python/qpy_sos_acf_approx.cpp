@@ -64,8 +64,3 @@ py::tuple sos_acf_approx(const py::array_t<double> &spatial_freq,
 
     return py::make_tuple(acf_approx_py, dist_2d_py);
 }
-
-// pybind11 declaration:
-// m.def("acf_approx", &sos_acf_approx,
-//       py::arg("spatial_freq").none(false),
-//       py::arg("dist").none(false));

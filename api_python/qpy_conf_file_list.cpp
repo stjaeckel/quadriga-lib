@@ -76,8 +76,3 @@ py::tuple conf_file_list(py::handle dirs,
 
     return py::make_tuple(scenarios_py, file_names_py, file_dirs_py);
 }
-
-// pybind11 declaration:
-// m.def("conf_file_list", &conf_file_list,
-//       py::arg("dirs"),
-//       py::arg("parse_shortnames") = true);

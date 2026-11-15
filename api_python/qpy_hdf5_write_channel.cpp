@@ -172,13 +172,3 @@ py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
     // Return the storage layout (copied integer output: int64)
     return qd_python_copy2numpy<unsigned, py::ssize_t>(&storage_space);
 }
-
-// pybind11 declaration:
-// m.def("hdf5_write_channel", &hdf5_write_channel,
-//       py::arg("fn"),
-//       py::arg("chan"),
-//       py::arg("par") = py::none(),
-//       py::arg("ix") = py::none(),
-//       py::arg("iy") = py::none(),
-//       py::arg("iz") = py::none(),
-//       py::arg("iw") = py::none());

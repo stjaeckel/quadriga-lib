@@ -113,17 +113,3 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
 
     return rnd_py;
 }
-
-// pybind11 declaration:
-// m.def("draw", &gbsm_draw,
-//       py::arg("scenpar"),
-//       py::arg("set_type"),
-//       py::arg("phase").none(false),
-//       py::arg("tx_pos").none(false),
-//       py::arg("rx_pos").none(false),
-//       py::arg("set_id") = -1,
-//       py::arg("preset") = "Comb256",
-//       py::arg("floor_id") = py::none(),
-//       py::arg("center_freq") = py::none(),
-//       py::arg("dual_mobility") = false,
-//       py::arg("horizontal") = true);

@@ -55,13 +55,3 @@ py::object hdf5_read_dset(const std::string &fn,
     // Convert to numpy array / scalar / str; None if the dataset is missing
     return qd_python_any2numpy(dset);
 }
-
-// pybind11 declaration:
-// m.def("hdf5_read_dset", &hdf5_read_dset,
-//       py::arg("fn"),
-//       py::arg("ix") = 0,
-//       py::arg("iy") = 0,
-//       py::arg("iz") = 0,
-//       py::arg("iw") = 0,
-//       py::arg("name"),
-//       py::arg("prefix") = "par_");

@@ -62,11 +62,3 @@ py::array_t<py::ssize_t> hdf5_create_file(const std::string &fn, unsigned nx, un
     arma::u32_vec storage_space = {nx, ny, nz, nw};
     return qd_python_copy2numpy<unsigned, py::ssize_t>(&storage_space);
 }
-
-// pybind11 declaration:
-// m.def("hdf5_create_file", &hdf5_create_file,
-//       py::arg("fn"),
-//       py::arg("nx") = 65536,
-//       py::arg("ny") = 1,
-//       py::arg("nz") = 1,
-//       py::arg("nw") = 1);

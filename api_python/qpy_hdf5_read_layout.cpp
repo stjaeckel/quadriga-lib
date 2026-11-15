@@ -65,7 +65,3 @@ py::tuple hdf5_read_layout(const std::string &fn)
 
     return py::make_tuple(storage_dims, has_data);
 }
-
-// pybind11 declaration:
-// m.def("hdf5_read_layout", &hdf5_read_layout,
-//       py::arg("fn"));

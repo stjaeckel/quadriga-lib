@@ -63,8 +63,3 @@ py::dict arrayant_concat(const py::dict &arrayant1,
     auto out = quadriga_lib::arrayant_concat(ant1[0], ant2[0]);
     return qd_python_arrayant2dict(out);
 }
-
-// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("concat", &arrayant_concat,
-//       py::arg("arrayant1"),
-//       py::arg("arrayant2"));

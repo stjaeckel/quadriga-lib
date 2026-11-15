@@ -58,9 +58,3 @@ py::array_t<py::ssize_t> point_inside_mesh(const py::array_t<double> &points,
 
     return qd_python_copy2numpy<arma::uword, py::ssize_t>(&res);
 }
-
-// m.def("point_inside_mesh", &point_inside_mesh,
-//       py::arg("points"),
-//       py::arg("mesh"),
-//       py::arg("obj_ind") = py::none(),
-//       py::arg("distance") = 0.0);

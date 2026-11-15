@@ -72,10 +72,3 @@ py::tuple triangle_mesh_segmentation(const py::array_t<double> &triangles,
         qd_python_copy2numpy<unsigned, py::ssize_t>(&mesh_index),
         qd_python_copy2numpy<arma::uword, py::ssize_t>(&mtl_ind_out));
 }
-
-// pybind11 declaration:
-// m.def("triangle_mesh_segmentation", &triangle_mesh_segmentation,
-//       py::arg("triangles"),
-//       py::arg("target_size") = 1024,
-//       py::arg("vec_size") = 1,
-//       py::arg("mtl_ind") = py::none());

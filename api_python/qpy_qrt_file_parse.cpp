@@ -73,7 +73,3 @@ py::tuple qrt_file_parse(const std::string &fn)
                           dest_names_py, version, center_freq_py, cir_pos_py, cir_orientation_py,
                           orig_pos_py, orig_orientation_py);
 }
-
-// pybind11 declaration:
-// m.def("qrt_file_parse", &qrt_file_parse,
-//       py::arg("fn"));

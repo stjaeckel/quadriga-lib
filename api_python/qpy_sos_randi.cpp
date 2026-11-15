@@ -98,13 +98,3 @@ py::array_t<double> sos_randi(const py::array_t<double> &dist_decorr,
 
     return val_py;
 }
-
-// pybind11 declaration:
-// m.def("randi", &sos_randi,
-//       py::arg("dist_decorr").none(false),
-//       py::arg("pos").none(false),
-//       py::arg("imax"),
-//       py::arg("pos_b") = py::none(),
-//       py::arg("dist_decorr_b") = py::none(),
-//       py::arg("preset") = "Comb256",
-//       py::arg("seed") = -1);

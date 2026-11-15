@@ -90,11 +90,3 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
     auto arrayant_out = quadriga_lib::arrayant_combine_pattern(ant[0], &azimuth_grid_a, &elevation_grid_a, propagation_speed);
     return qd_python_arrayant2dict(arrayant_out);
 }
-
-// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("combine_pattern", &arrayant_combine_pattern,
-//       py::arg("arrayant"),
-//       py::arg("freq_new") = py::none(),
-//       py::arg("azimuth_grid") = py::none(),
-//       py::arg("elevation_grid") = py::none(),
-//       py::arg("propagation_speed") = 299792458.0);

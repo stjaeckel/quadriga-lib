@@ -85,10 +85,3 @@ py::ssize_t qdant_write(const std::string &fn,
     const auto layout_a = qd_python_numpy2arma_Mat<unsigned>(layout, true);
     return (py::ssize_t)quadriga_lib::qdant_write(fn, ant_vec[0], id, &layout_a);
 }
-
-// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
-// m.def("qdant_write", &qdant_write,
-//       py::arg("fn"),
-//       py::arg("arrayant"),
-//       py::arg("id") = 0,
-//       py::arg("layout") = py::none());

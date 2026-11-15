@@ -57,9 +57,3 @@ py::array_t<double> sos_init_phases(arma::uword n_coeff,
 
     return phase_py;
 }
-
-// pybind11 declaration:
-// m.def("init_phases", &sos_init_phases,
-//       py::arg("n_coeff"),
-//       py::arg("n_gen") = 1,
-//       py::arg("seed") = -1);

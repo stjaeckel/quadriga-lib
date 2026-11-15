@@ -63,11 +63,3 @@ py::tuple calc_rician_k_factor(py::list powers,
 
     return py::make_tuple(kf_py, pg_py);
 }
-
-// pybind11 declaration:
-// m.def("calc_rician_k_factor", &calc_rician_k_factor,
-//       py::arg("powers"),
-//       py::arg("path_length"),
-//       py::arg("tx_pos"),
-//       py::arg("rx_pos"),
-//       py::arg("window_size") = 0.01);

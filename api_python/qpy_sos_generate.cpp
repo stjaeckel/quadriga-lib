@@ -107,16 +107,3 @@ py::tuple sos_generate(const py::array_t<double> &acf,
 
     return py::make_tuple(freq_py, ase_py, test_dir_py);
 }
-
-// pybind11 declaration:
-// m.def("generate", &sos_generate,
-//       py::arg("acf").none(false),
-//       py::arg("dist").none(false),
-//       py::arg("n_coeff"),
-//       py::arg("n_dim") = 3,
-//       py::arg("uniform_smp") = true,
-//       py::arg("n_dir") = 10,
-//       py::arg("random_init") = true,
-//       py::arg("spatial_freq_min") = 0.0,
-//       py::arg("spatial_freq_max") = 0.0,
-//       py::arg("seed") = -1);

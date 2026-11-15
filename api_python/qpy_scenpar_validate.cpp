@@ -80,8 +80,3 @@ py::tuple scenpar_validate(py::handle scenpar_in,
 
     return py::make_tuple(scenpar_out_py, lsp_xcorr_py, lsp_xcorr_chk);
 }
-
-// pybind11 declaration:
-// m.def("scenpar_validate", &scenpar_validate,
-//       py::arg("scenpar_in") = py::none(),
-//       py::arg("validate") = true);

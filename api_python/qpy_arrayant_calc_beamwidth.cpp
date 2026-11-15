@@ -73,9 +73,3 @@ py::tuple arrayant_calc_beamwidth(const py::dict &arrayant,
     return py::make_tuple(qd_python_copy2numpy(&bw_az), qd_python_copy2numpy(&bw_el),
                           qd_python_copy2numpy(&az_pt), qd_python_copy2numpy(&el_pt));
 }
-
-// pybind11 declaration:
-// m.def("calc_beamwidth", &arrayant_calc_beamwidth,
-//       py::arg("arrayant"),
-//       py::arg("i_element") = py::none(),
-//       py::arg("threshold_dB") = 3.0);

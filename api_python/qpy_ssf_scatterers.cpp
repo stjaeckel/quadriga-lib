@@ -91,8 +91,3 @@ py::tuple ssf_scatterers(const py::dict &rays, double d_min)
     }
     return py::make_tuple(rays_out, b_med_py, b_eff_py);
 }
-
-// pybind11 declaration:
-// m.def("ssf_scatterers", &ssf_scatterers,
-//       py::arg("rays"),
-//       py::arg("d_min") = 2.0);

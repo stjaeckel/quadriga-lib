@@ -122,21 +122,3 @@ py::dict arrayant_generate_speaker(const std::string &driver_type,
 
     return qd_python_arrayant2dict_multi(speaker);
 }
-
-// pybind11 declaration:
-// m.def("generate_speaker", &arrayant_generate_speaker,
-//       py::arg("driver_type") = "piston",
-//       py::arg("radius") = 0.05,
-//       py::arg("lower_cutoff") = 80.0,
-//       py::arg("upper_cutoff") = 12000.0,
-//       py::arg("lower_rolloff_slope") = 12.0,
-//       py::arg("upper_rolloff_slope") = 12.0,
-//       py::arg("sensitivity") = 85.0,
-//       py::arg("radiation_type") = "hemisphere",
-//       py::arg("hor_coverage") = 0.0,
-//       py::arg("ver_coverage") = 0.0,
-//       py::arg("horn_control_freq") = 0.0,
-//       py::arg("baffle_width") = 0.15,
-//       py::arg("baffle_height") = 0.25,
-//       py::arg("center_freq") = py::none(),
-//       py::arg("angular_resolution") = 5.0);

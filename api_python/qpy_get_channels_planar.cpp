@@ -183,24 +183,3 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
 
     return py::make_tuple(coeff_re_p, coeff_im_p, delay_p, rx_Doppler_p);
 }
-
-// pybind11 declaration:
-// m.def("get_channels_planar", &get_channels_planar,
-//       py::arg("ant_tx"),
-//       py::arg("ant_rx"),
-//       py::arg("aod"),
-//       py::arg("eod"),
-//       py::arg("aoa"),
-//       py::arg("eoa"),
-//       py::arg("path_gain"),
-//       py::arg("path_length"),
-//       py::arg("M"),
-//       py::arg("tx_pos"),
-//       py::arg("tx_orientation"),
-//       py::arg("rx_pos"),
-//       py::arg("rx_orientation"),
-//       py::arg("center_freq") = py::none(),
-//       py::arg("use_absolute_delays") = false,
-//       py::arg("add_fake_los_path") = false,
-//       py::arg("complex") = true,
-//       py::arg("i_freq") = 0);

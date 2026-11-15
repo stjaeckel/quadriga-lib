@@ -97,14 +97,3 @@ void conf_file_write(py::object fn,
     quadriga_lib::conf_file_write(fn_s, scenpar_m, pl_model, &plpar_m, &pl_order, &short_names_v,
                                   ref_s, &ref_sec_v, &valid_range_a, write_defaults_b);
 }
-
-// pybind11 declaration:
-// m.def("conf_file_write", &conf_file_write,
-//       py::arg("fn"),
-//       py::arg("scenpar"),
-//       py::arg("plpar") = py::none(),
-//       py::arg("short_names") = py::none(),
-//       py::arg("ref") = py::none(),
-//       py::arg("ref_sec") = py::none(),
-//       py::arg("valid_range") = py::none(),
-//       py::arg("write_defaults") = false);

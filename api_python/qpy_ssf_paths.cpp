@@ -106,13 +106,3 @@ py::tuple ssf_paths(const py::dict &rays,
                           qd_python_copy2numpy(&lbs_pos), qd_python_copy2numpy<unsigned, py::ssize_t>(&path_type),
                           qd_python_copy2numpy<arma::uword, py::ssize_t>(&ray_ind));
 }
-
-// pybind11 declaration:
-// m.def("ssf_paths", &ssf_paths,
-//       py::arg("rays"),
-//       py::arg("link_gain_dB").none(false),
-//       py::arg("mobility") = "auto",
-//       py::arg("tx_pos") = py::none(),
-//       py::arg("rx_pos") = py::none(),
-//       py::arg("kf_ratio") = py::none(),
-//       py::arg("oxygen") = false);

@@ -60,10 +60,3 @@ py::tuple calc_delay_spread(py::list delays,
 
     return py::make_tuple(ds_py, mean_delay_py);
 }
-
-// pybind11 declaration:
-// m.def("calc_delay_spread", &calc_delay_spread,
-//       py::arg("delays"),
-//       py::arg("powers"),
-//       py::arg("threshold") = 100.0,
-//       py::arg("granularity") = 0.0);

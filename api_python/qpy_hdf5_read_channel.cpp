@@ -168,12 +168,3 @@ py::tuple hdf5_read_channel(const std::string &fn,
 
     return py::make_tuple(chan, par_out);
 }
-
-// m.def("hdf5_read_channel", &hdf5_read_channel,
-//       py::arg("fn"),
-//       py::arg("ix") = py::none(),
-//       py::arg("iy") = py::none(),
-//       py::arg("iz") = py::none(),
-//       py::arg("iw") = py::none(),
-//       py::arg("snap") = py::none(),
-//       py::arg("stack") = false);

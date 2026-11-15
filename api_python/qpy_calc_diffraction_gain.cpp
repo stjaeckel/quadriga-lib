@@ -131,21 +131,3 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
 
     return py::make_tuple(gain_p, xprmat_p, qd_python_copy2numpy(&coord));
 }
-
-// pybind11 declaration:
-// m.def("calc_diffraction_gain", &calc_diffraction_gain,
-//       py::arg("orig"),
-//       py::arg("dest"),
-//       py::arg("mesh"),
-//       py::arg("mtl_ind"),
-//       py::arg("mtl_prop"),
-//       py::arg("center_freq"),
-//       py::arg("lod") = 2,
-//       py::arg("verbose") = 0,
-//       py::arg("sub_mesh_index") = py::none(),
-//       py::arg("use_kernel") = 0,
-//       py::arg("gpu_id") = 0,
-//       py::arg("scalar_mode") = false,
-//       py::arg("thin_slab_threshold") = 0.0,
-//       py::arg("apply_fspl") = false,
-//       py::arg("apply_phase") = false);

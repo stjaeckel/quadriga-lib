@@ -232,27 +232,3 @@ py::dict arrayant_generate(const std::string &type,
     arrayant.center_freq = freq;
     return qd_python_arrayant2dict(arrayant);
 }
-
-// pybind11 declaration:
-// m.def("generate", &arrayant_generate,
-//       py::arg("type"),
-//       py::arg("res") = 0.0,
-//       py::arg("freq") = 299792458.0,
-//       py::arg("az_3dB") = 0.0,
-//       py::arg("el_3dB") = 0.0,
-//       py::arg("rear_gain_lin") = 0.0,
-//       py::arg("M") = 1,
-//       py::arg("N") = 1,
-//       py::arg("pol") = 1,
-//       py::arg("tilt") = 0.0,
-//       py::arg("spacing") = 0.5,
-//       py::arg("Mg") = 1,
-//       py::arg("Ng") = 1,
-//       py::arg("dgv") = 0.5,
-//       py::arg("dgh") = 0.5,
-//       py::arg("beam_az") = py::none(),
-//       py::arg("beam_el") = py::none(),
-//       py::arg("beam_weight") = py::none(),
-//       py::arg("separate_beams") = false,
-//       py::arg("apply_weights") = false,
-//       py::arg("pattern") = py::dict());

@@ -176,23 +176,3 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
 
     return py::make_tuple(coeff_re_py, coeff_im_py, delay_py);
 }
-
-// pybind11 declaration:
-// m.def("get_channels_multifreq", &get_channels_multifreq,
-//       py::arg("ant_tx"),
-//       py::arg("ant_rx"),
-//       py::arg("fbs_pos"),
-//       py::arg("lbs_pos"),
-//       py::arg("path_gain"),
-//       py::arg("path_length"),
-//       py::arg("M"),
-//       py::arg("tx_pos"),
-//       py::arg("tx_orientation"),
-//       py::arg("rx_pos"),
-//       py::arg("rx_orientation"),
-//       py::arg("freq"),
-//       py::arg("freq_new"),
-//       py::arg("use_absolute_delays") = false,
-//       py::arg("add_fake_los_path") = false,
-//       py::arg("propagation_speed") = 299792458.0,
-//       py::arg("complex") = true);

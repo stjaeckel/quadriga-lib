@@ -263,11 +263,3 @@ py::tuple qrt_file_read(const std::string &fn,
                           aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py,
                           interact_type_py);
 }
-
-// pybind11 declaration:
-// m.def("qrt_file_read", &qrt_file_read,
-//       py::arg("fn"),
-//       py::arg("i_cir") = py::none(),
-//       py::arg("i_orig") = 0,
-//       py::arg("downlink") = true,
-//       py::arg("normalize_M") = 1);

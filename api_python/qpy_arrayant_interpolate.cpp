@@ -208,18 +208,3 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     }
     return py::tuple(out);
 }
-
-// pybind11 declaration:
-// m.def("interpolate", &arrayant_interpolate,
-//       py::arg("arrayant"),
-//       py::arg("azimuth").none(false),
-//       py::arg("elevation").none(false),
-//       py::arg("element") = py::none(),
-//       py::arg("orientation") = py::none(),
-//       py::arg("element_pos") = py::none(),
-//       py::arg("freq_new") = py::none(),
-//       py::arg("dist") = false,
-//       py::arg("local_angles") = false,
-//       py::arg("fast_access") = false,
-//       py::arg("use_kernel") = 0,
-//       py::arg("complex") = true);

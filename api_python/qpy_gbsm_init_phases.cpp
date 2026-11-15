@@ -103,16 +103,3 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
 
     return phase_py;
 }
-
-// pybind11 declaration:
-// m.def("init_phases", &gbsm_init_phases,
-//       py::arg("scenpar"),
-//       py::arg("set_type"),
-//       py::arg("seed") = -1,
-//       py::arg("set_id") = -1,
-//       py::arg("preset") = "Comb256",
-//       py::arg("tx_pos") = py::none(),
-//       py::arg("rx_pos") = py::none(),
-//       py::arg("dual_mobility") = false,
-//       py::arg("remove_bias") = true,
-//       py::arg("horizontal") = true);

@@ -187,19 +187,3 @@ py::tuple ssf_clusters(py::handle scenpar,
 
     return py::make_tuple(delay_py, power_py, aod_py, eod_py, aoa_py, eoa_py, n_active_py);
 }
-
-// pybind11 declaration:
-// m.def("ssf_clusters", &ssf_clusters,
-//       py::arg("scenpar"),
-//       py::arg("tx_pos").none(false),
-//       py::arg("rx_pos").none(false),
-//       py::arg("lsp").none(false),
-//       py::arg("rnd").none(false),
-//       py::arg("method") = "38.901",
-//       py::arg("rnd_freq") = py::none(),
-//       py::arg("lsp_anchor") = py::none(),
-//       py::arg("eod_offset_deg") = py::none(),
-//       py::arg("abs_toa") = py::none(),
-//       py::arg("gr_eps") = py::none(),
-//       py::arg("o2i") = py::none(),
-//       py::arg("n_cluster") = py::none());

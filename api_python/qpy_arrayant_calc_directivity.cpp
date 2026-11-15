@@ -57,8 +57,3 @@ py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,
     quadriga_lib::arrayant_calc_directivity_multi(ant_multi, directivity_dBi, &i_el);
     return qd_python_copy2numpy(&directivity_dBi);
 }
-
-// pybind11 declaration:
-// m.def("calc_directivity", &arrayant_calc_directivity,
-//       py::arg("arrayant"),
-//       py::arg("i_element") = py::none());

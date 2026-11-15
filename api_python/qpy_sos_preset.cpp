@@ -66,8 +66,3 @@ py::tuple sos_preset(const std::string &name,
 
     return py::make_tuple(freq_py, acf_py, dist_py);
 }
-
-// pybind11 declaration:
-// m.def("preset", &sos_preset,
-//       py::arg("name"),
-//       py::arg("dist_decorr") = 10.0);

@@ -130,21 +130,3 @@ py::tuple obj_file_write(const std::string &fn,
 
     return py::make_tuple(vert_list_out_py, face_ind_out_py);
 }
-
-// pybind11 declaration:
-// m.def("obj_file_write", &obj_file_write,
-//       py::arg("fn") = "",
-//       py::arg("mesh") = py::none(),
-//       py::arg("obj_ind") = py::none(),
-//       py::arg("mtl_ind") = py::none(),
-//       py::arg("obj_names") = py::none(),
-//       py::arg("mtl_names") = py::none(),
-//       py::arg("vert_list") = py::none(),
-//       py::arg("face_ind") = py::none(),
-//       py::arg("bsdf") = py::none(),
-//       py::arg("threshold") = 0.001,
-//       py::arg("csv_ind") = py::none(),
-//       py::arg("csv_names") = py::none(),
-//       py::arg("csv_prop") = py::none(),
-//       py::arg("csv_write_defaults") = false,
-//       py::arg("split_loose_parts") = false);

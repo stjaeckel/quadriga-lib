@@ -84,10 +84,3 @@ py::tuple sos_calc_mse(const py::array_t<double> &spatial_freq,
 
     return py::make_tuple(mse, mse_core, mse_all, acf_tail_py, test_dir_py);
 }
-
-// pybind11 declaration:
-// m.def("calc_mse", &sos_calc_mse,
-//       py::arg("spatial_freq").none(false),
-//       py::arg("acf").none(false),
-//       py::arg("dist").none(false),
-//       py::arg("n_dir") = 10);

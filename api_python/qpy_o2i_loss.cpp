@@ -77,11 +77,3 @@ py::tuple o2i_loss(const py::array_t<double> &center_freq,
 
     return py::make_tuple(loss_py, d2d_in_py, model_index_py);
 }
-
-// pybind11 declaration:
-// m.def("o2i_loss", &o2i_loss,
-//       py::arg("center_freq").none(false),
-//       py::arg("rnd").none(false),
-//       py::arg("models"),
-//       py::arg("weights").none(false),
-//       py::arg("d2d_in_max") = 25.0);

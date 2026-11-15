@@ -202,8 +202,3 @@ py::tuple conf_file_read(py::object fn,
 
     return py::make_tuple(scenpar_py, plpar_py, lsp_xcorr_py, lsp_xcorr_chk, short_names_py, ignored_keys_py);
 }
-
-// pybind11 declaration:
-// m.def("conf_file_read", &conf_file_read,
-//       py::arg("fn"),
-//       py::arg("validate") = true);
