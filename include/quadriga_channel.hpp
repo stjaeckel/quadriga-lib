@@ -422,8 +422,8 @@ namespace quadriga_lib
     template <typename dtype>
     size_t qrt_file_append(const std::string &fn,                                      // Path to the QRT file
                            const std::vector<quadriga_lib::path> &path_data,           // Path data
-                           const arma::Col<dtype> &orig_pos,                           // Transmitter position, Size [3, 1]
-                           const arma::Col<dtype> &orig_orientation = {0.0, 0.0, 0.0}, // Transmitter orientation (bank, tilt, head) in [rad], Size [3, 1]
+                           const arma::Mat<dtype> &orig_pos,                           // Transmitter position in [m], [3, 1] or [1, 3]
+                           const arma::Mat<dtype> *orig_orientation = nullptr,         // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]; nullptr = zeros
                            const std::string &orig_name = "TX");                       // Transmitter name
 
     // Read metadata from a QRT file
@@ -453,10 +453,10 @@ namespace quadriga_lib
                        arma::uword i_orig = 0,                              // Origin index (for downlink Origin = TX)
                        bool downlink = true,                                // Switch for uplink / downlink direction
                        arma::Col<dtype> *center_freq = nullptr,             // Center frequency in [Hz], Size [n_freq]
-                       arma::Col<dtype> *tx_pos = nullptr,                  // Transmitter position in Cartesian coordinates, Size [3, 1]
-                       arma::Col<dtype> *tx_orientation = nullptr,          // Transmitter orientation (bank, tilt, head) in [rad], Size [3, 1]
-                       arma::Col<dtype> *rx_pos = nullptr,                  // Receiver position in Cartesian coordinates, Size [3, 1]
-                       arma::Col<dtype> *rx_orientation = nullptr,          // Receiver orientation (bank, tilt, head) in [rad], Size [3, 1]
+                       arma::Mat<dtype> *tx_pos = nullptr,                  // Transmitter position in Cartesian coordinates in [m], [3, 1]
+                       arma::Mat<dtype> *tx_orientation = nullptr,          // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1]
+                       arma::Mat<dtype> *rx_pos = nullptr,                  // Receiver position in Cartesian coordinates in [m], [3, 1]
+                       arma::Mat<dtype> *rx_orientation = nullptr,          // Receiver orientation (bank, tilt, heading) in [rad], [3, 1]
                        arma::Mat<dtype> *fbs_pos = nullptr,                 // First-bounce scatterer positions, matrix of size [3, n_path]
                        arma::Mat<dtype> *lbs_pos = nullptr,                 // Last-bounce scatterer positions, matrix of size [3, n_path]
                        arma::Mat<dtype> *path_gain = nullptr,               // Path gain (linear scale), vector of length [n_path, n_freq]
@@ -485,8 +485,8 @@ namespace quadriga_lib
     // - LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
     // - Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
     std::vector<path> qrt_paths_from_scatterers(const arma::vec &center_freq,      // Frequencies in [Hz], [n_freq], 1 to 127 entries
-                                                const arma::vec &tx_pos,           // Tx (origin) position in [m], [3]
-                                                const arma::vec &rx_pos,           // Rx position of the CIR in [m], [3]
+                                                const arma::mat &tx_pos,           // Tx (origin) position in [m], [3, 1] or [1, 3]
+                                                const arma::mat &rx_pos,           // Rx position of the CIR in [m], [3, 1] or [1, 3]
                                                 const arma::mat &fbs_pos,          // First-bounce scatterer positions in [m], [3, n_path]
                                                 const arma::mat &lbs_pos,          // Last-bounce scatterer positions in [m], [3, n_path]
                                                 const arma::mat &path_gain,        // Path gains (linear), [n_path, n_freq]

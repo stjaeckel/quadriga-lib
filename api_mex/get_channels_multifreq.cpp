@@ -114,12 +114,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool add_fake_los_path = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "add_fake_los_path", false);
     double propagation_speed = (nrhs < 16) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[15], "propagation_speed", 299792458.0);
 
-    // Extract scalar values
-    double Tx = tx_pos.at(0), Ty = tx_pos.at(1), Tz = tx_pos.at(2);
-    double Tb = tx_orientation.at(0), Tt = tx_orientation.at(1), Th = tx_orientation.at(2);
-    double Rx = rx_pos.at(0), Ry = rx_pos.at(1), Rz = rx_pos.at(2);
-    double Rb = rx_orientation.at(0), Rt = rx_orientation.at(1), Rh = rx_orientation.at(2);
-
     // Derived sizes
     arma::uword n_ports_tx = ant_tx[0].n_ports();
     arma::uword n_ports_rx = ant_rx[0].n_ports();
@@ -139,8 +133,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Call the C++ function
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_multifreq<double>(ant_tx, ant_rx,
-                                                         Tx, Ty, Tz, Tb, Tt, Th,
-                                                         Rx, Ry, Rz, Rb, Rt, Rh,
+                                                         tx_pos, tx_orientation, rx_pos, rx_orientation,
                                                          fbs_pos, lbs_pos, path_gain, path_length, M,
                                                          freq, freq_new,
                                                          coeff_re, coeff_im, delay,

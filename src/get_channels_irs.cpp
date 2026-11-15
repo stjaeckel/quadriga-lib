@@ -41,28 +41,28 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 ## Declaration:
 ```
 std::vector<bool> quadriga_lib::get_channels_irs(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    const quadriga_lib::arrayant<dtype> *irs_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    dtype Ix, dtype Iy, dtype Iz,
-    dtype Ib, dtype It, dtype Ih,
-    const arma::Mat<dtype> *fbs_pos_1,
-    const arma::Mat<dtype> *lbs_pos_1,
-    const arma::Col<dtype> *path_gain_1,
-    const arma::Col<dtype> *path_length_1,
-    const arma::Mat<dtype> *M_1,
-    const arma::Mat<dtype> *fbs_pos_2,
-    const arma::Mat<dtype> *lbs_pos_2,
-    const arma::Col<dtype> *path_gain_2,
-    const arma::Col<dtype> *path_length_2,
-    const arma::Mat<dtype> *M_2,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const quadriga_lib::arrayant<dtype> &irs_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Mat<dtype> &irs_pos,
+    const arma::Mat<dtype> &irs_orientation,
+    const arma::Mat<dtype> &fbs_pos_1,
+    const arma::Mat<dtype> &lbs_pos_1,
+    const arma::Col<dtype> &path_gain_1,
+    const arma::Col<dtype> &path_length_1,
+    const arma::Mat<dtype> &M_1,
+    const arma::Mat<dtype> &fbs_pos_2,
+    const arma::Mat<dtype> &lbs_pos_2,
+    const arma::Col<dtype> &path_gain_2,
+    const arma::Col<dtype> &path_length_2,
+    const arma::Mat<dtype> &M_2,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     arma::uword i_irs = 0,
     dtype threshold_dB = -140.0,
     dtype center_freq = 0.0,
@@ -79,12 +79,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [[arrayant]]
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [[arrayant]]
 - **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [[arrayant]]
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading)
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading)
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
-- **`Ib, It, Ih`** — IRS orientation as Euler angles (bank, tilt, heading)
+- **`tx_pos`** — Transmitter position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`irs_pos`** — IRS position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1]`
@@ -125,70 +125,70 @@ MD!*/
 
 // Calculate channels for Intelligent Reflective Surfaces (IRS)
 template <typename dtype>
-std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array, const arrayant<dtype> *rx_array, const arrayant<dtype> *irs_array,
-                                                 dtype Tx, dtype Ty, dtype Tz, dtype Tb, dtype Tt, dtype Th,
-                                                 dtype Rx, dtype Ry, dtype Rz, dtype Rb, dtype Rt, dtype Rh,
-                                                 dtype Ix, dtype Iy, dtype Iz, dtype Ib, dtype It, dtype Ih,
-                                                 const arma::Mat<dtype> *fbs_pos_1, const arma::Mat<dtype> *lbs_pos_1,
-                                                 const arma::Col<dtype> *path_gain_1, const arma::Col<dtype> *path_length_1, const arma::Mat<dtype> *M_1,
-                                                 const arma::Mat<dtype> *fbs_pos_2, const arma::Mat<dtype> *lbs_pos_2,
-                                                 const arma::Col<dtype> *path_gain_2, const arma::Col<dtype> *path_length_2, const arma::Mat<dtype> *M_2,
-                                                 arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
+std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const arrayant<dtype> &rx_array, const arrayant<dtype> &irs_array,
+                                                 const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
+                                                 const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
+                                                 const arma::Mat<dtype> &irs_pos, const arma::Mat<dtype> &irs_orientation,
+                                                 const arma::Mat<dtype> &fbs_pos_1, const arma::Mat<dtype> &lbs_pos_1,
+                                                 const arma::Col<dtype> &path_gain_1, const arma::Col<dtype> &path_length_1, const arma::Mat<dtype> &M_1,
+                                                 const arma::Mat<dtype> &fbs_pos_2, const arma::Mat<dtype> &lbs_pos_2,
+                                                 const arma::Col<dtype> &path_gain_2, const arma::Col<dtype> &path_length_2, const arma::Mat<dtype> &M_2,
+                                                 arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
                                                  arma::uword i_irs, dtype threshold_dB, dtype center_freq, bool use_absolute_delays,
                                                  arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                                  const arrayant<dtype> *irs_array_2, const std::vector<bool> *active_path)
 {
+    // Positions and orientations, checked here so that an error names the argument (the segment calls of
+    // get_channels_spherical would report 'irs_pos' as 'rx_pos' or 'tx_pos')
+    const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_rp = qd_xyz(rx_pos, "rx_pos");
+    qd_xyz(tx_orientation, "tx_orientation"), qd_xyz(rx_orientation, "rx_orientation");
+    qd_xyz(irs_pos, "irs_pos"), qd_xyz(irs_orientation, "irs_orientation");
+
+    qd_check_alias_list({&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa},
+                        {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
+                        &fbs_pos_1, &lbs_pos_1, &path_gain_1, &path_length_1, &M_1,
+                        &fbs_pos_2, &lbs_pos_2, &path_gain_2, &path_length_2, &M_2);
 
     // Check if IRS array is valid
-    if (irs_array == nullptr)
-        throw std::invalid_argument("IRS array cannot be NULL");
-    if (coeff_re == nullptr || coeff_im == nullptr || delay == nullptr)
-        throw std::invalid_argument("Outputs 'coeff_re', 'coeff_im' and 'delay' cannot be NULL");
-
-    qd_check_alias_list({coeff_re, coeff_im, delay, aod, eod, aoa, eoa},
-                        {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
-                        fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                        fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2);
-
-    std::string error_message = qd_arrayant_is_valid_quick(*irs_array);
+    std::string error_message = qd_arrayant_is_valid_quick(irs_array);
     if (error_message.length() != 0)
     {
         error_message = "IRS array: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
 
-    if (irs_array->coupling_re.n_cols == 0ULL)
+    if (irs_array.coupling_re.n_cols == 0ULL)
         throw std::invalid_argument("IRS must have a Coupling matrix containing the IRS weights (phase shifts) for each element.");
 
-    if (i_irs >= irs_array->coupling_re.n_cols)
+    if (i_irs >= irs_array.coupling_re.n_cols)
         throw std::invalid_argument("IRS codebook index out of bound.");
 
     // Do we need to calculate the angles?
     bool calc_angles = aod != nullptr || eod != nullptr || aoa != nullptr || eoa != nullptr;
 
     // Construst IRS array with only the desired weight vector
-    arma::uword n_azimuth_irs = irs_array->e_theta_re.n_cols;
-    arma::uword n_elevation_irs = irs_array->e_theta_re.n_rows;
-    arma::uword n_elements_irs = irs_array->e_theta_re.n_slices;
+    arma::uword n_azimuth_irs = irs_array.e_theta_re.n_cols;
+    arma::uword n_elevation_irs = irs_array.e_theta_re.n_rows;
+    arma::uword n_elements_irs = irs_array.e_theta_re.n_slices;
 
     quadriga_lib::arrayant<dtype> irs;
-    irs.e_theta_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array->e_theta_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.e_theta_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array->e_theta_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.e_phi_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array->e_phi_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.e_phi_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array->e_phi_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.azimuth_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array->azimuth_grid.memptr()), n_azimuth_irs, false, true);
-    irs.elevation_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array->elevation_grid.memptr()), n_elevation_irs, false, true);
+    irs.e_theta_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_theta_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
+    irs.e_theta_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_theta_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
+    irs.e_phi_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_phi_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
+    irs.e_phi_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_phi_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
+    irs.azimuth_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array.azimuth_grid.memptr()), n_azimuth_irs, false, true);
+    irs.elevation_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array.elevation_grid.memptr()), n_elevation_irs, false, true);
 
-    if (irs_array->element_pos.n_cols != n_elements_irs)
+    if (irs_array.element_pos.n_cols != n_elements_irs)
         irs.element_pos.zeros(3ULL, n_elements_irs);
     else
-        irs.element_pos = arma::Mat<dtype>(const_cast<dtype *>(irs_array->element_pos.memptr()), 3ULL, n_elements_irs, false, true);
+        irs.element_pos = arma::Mat<dtype>(const_cast<dtype *>(irs_array.element_pos.memptr()), 3ULL, n_elements_irs, false, true);
 
-    irs.coupling_re = arma::Mat<dtype>(const_cast<dtype *>(irs_array->coupling_re.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
-    if (irs_array->coupling_im.n_rows != n_elements_irs)
+    irs.coupling_re = arma::Mat<dtype>(const_cast<dtype *>(irs_array.coupling_re.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
+    if (irs_array.coupling_im.n_rows != n_elements_irs)
         irs.coupling_im.zeros(n_elements_irs, 1ULL);
     else
-        irs.coupling_im = arma::Mat<dtype>(const_cast<dtype *>(irs_array->coupling_im.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
+        irs.coupling_im = arma::Mat<dtype>(const_cast<dtype *>(irs_array.coupling_im.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
 
     if (center_freq > dtype(1.0e-5))
         irs.center_freq = center_freq;
@@ -197,13 +197,13 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     arma::Cube<dtype> coeff_re_1, coeff_im_1, delay_1, aod_1, eod_1;
     if (calc_angles)
     {
-        quadriga_lib::get_channels_spherical<dtype>(tx_array, &irs, Tx, Ty, Tz, Tb, Tt, Th, Ix, Iy, Iz, Ib, It, Ih, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_freq, true, false, &aod_1, &eod_1, nullptr, nullptr, 1);
+        quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
+                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, &aod_1, &eod_1, nullptr, nullptr, 1);
     }
     else
     {
-        quadriga_lib::get_channels_spherical<dtype>(tx_array, &irs, Tx, Ty, Tz, Tb, Tt, Th, Ix, Iy, Iz, Ib, It, Ih, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
+        quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
+                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 
     // Update the IRS array for the second segment
@@ -219,7 +219,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
         if (irs_array_2->e_theta_re.n_slices != n_elements_irs)
             throw std::invalid_argument("IRS 2 must have the same number of elements as IRS 1");
 
-        if (irs_array_2->coupling_re.n_cols != irs_array->coupling_re.n_cols)
+        if (irs_array_2->coupling_re.n_cols != irs_array.coupling_re.n_cols)
             throw std::invalid_argument("IRS 2 must have a Coupling matrix of the same size as of IRS 1.");
 
         n_azimuth_irs = irs_array_2->e_theta_re.n_cols;
@@ -248,20 +248,20 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     arma::Cube<dtype> coeff_re_2, coeff_im_2, delay_2, aoa_2, eoa_2;
     if (calc_angles)
     {
-        quadriga_lib::get_channels_spherical<dtype>(&irs, rx_array, Ix, Iy, Iz, Ib, It, Ih, Rx, Ry, Rz, Rb, Rt, Rh, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_freq, true, false, nullptr, nullptr, &aoa_2, &eoa_2, 1);
+        quadriga_lib::get_channels_spherical<dtype>(irs, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
+                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, &aoa_2, &eoa_2, 1);
     }
     else
     {
-        quadriga_lib::get_channels_spherical<dtype>(&irs, rx_array, Ix, Iy, Iz, Ib, It, Ih, Rx, Ry, Rz, Rb, Rt, Rh, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
+        quadriga_lib::get_channels_spherical<dtype>(irs, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
+                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 
     // Calculate the LOS delay between TX and RX
     dtype los_delay = dtype(0.0);
     if (!use_absolute_delays)
     {
-        dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
+        dtype x = p_rp[0] - p_tp[0], y = p_rp[1] - p_tp[1], z = p_rp[2] - p_tp[2];
         los_delay = std::sqrt(x * x + y * y + z * z);
         los_delay *= dtype(3.335640951981520e-09); // 1/C
     }
@@ -354,16 +354,16 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     }
 
     // Write to output
-    coeff_re->set_size(n_rx, n_tx, i_path);
-    coeff_im->set_size(n_rx, n_tx, i_path);
-    delay->set_size(n_rx, n_tx, i_path);
+    coeff_re.set_size(n_rx, n_tx, i_path);
+    coeff_im.set_size(n_rx, n_tx, i_path);
+    delay.set_size(n_rx, n_tx, i_path);
 
     arma::uword n_bytes = n_rx * n_tx * i_path * sizeof(dtype);
     if (n_bytes) // No memcpy for empty outputs (null data pointer)
     {
-        std::memcpy(coeff_re->memptr(), coeff_re_local.memptr(), n_bytes);
-        std::memcpy(coeff_im->memptr(), coeff_im_local.memptr(), n_bytes);
-        std::memcpy(delay->memptr(), delay_local.memptr(), n_bytes);
+        std::memcpy(coeff_re.memptr(), coeff_re_local.memptr(), n_bytes);
+        std::memcpy(coeff_im.memptr(), coeff_im_local.memptr(), n_bytes);
+        std::memcpy(delay.memptr(), delay_local.memptr(), n_bytes);
     }
 
     if (aod != nullptr)
@@ -397,28 +397,28 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     return keep_path;
 }
 
-template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<float> *tx_array, const arrayant<float> *rx_array, const arrayant<float> *irs_array,
-                                                          float Tx, float Ty, float Tz, float Tb, float Tt, float Th,
-                                                          float Rx, float Ry, float Rz, float Rb, float Rt, float Rh,
-                                                          float Ix, float Iy, float Iz, float Ib, float It, float Ih,
-                                                          const arma::Mat<float> *fbs_pos_1, const arma::Mat<float> *lbs_pos_1,
-                                                          const arma::Col<float> *path_gain_1, const arma::Col<float> *path_length_1, const arma::Mat<float> *M_1,
-                                                          const arma::Mat<float> *fbs_pos_2, const arma::Mat<float> *lbs_pos_2,
-                                                          const arma::Col<float> *path_gain_2, const arma::Col<float> *path_length_2, const arma::Mat<float> *M_2,
-                                                          arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
+template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<float> &tx_array, const arrayant<float> &rx_array, const arrayant<float> &irs_array,
+                                                          const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
+                                                          const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
+                                                          const arma::Mat<float> &irs_pos, const arma::Mat<float> &irs_orientation,
+                                                          const arma::Mat<float> &fbs_pos_1, const arma::Mat<float> &lbs_pos_1,
+                                                          const arma::Col<float> &path_gain_1, const arma::Col<float> &path_length_1, const arma::Mat<float> &M_1,
+                                                          const arma::Mat<float> &fbs_pos_2, const arma::Mat<float> &lbs_pos_2,
+                                                          const arma::Col<float> &path_gain_2, const arma::Col<float> &path_length_2, const arma::Mat<float> &M_2,
+                                                          arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
                                                           arma::uword i_irs, float threshold_dB, float center_freq, bool use_absolute_delays,
                                                           arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
                                                           const arrayant<float> *irs_array_2, const std::vector<bool> *active_path);
 
-template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double> *tx_array, const arrayant<double> *rx_array, const arrayant<double> *irs_array,
-                                                          double Tx, double Ty, double Tz, double Tb, double Tt, double Th,
-                                                          double Rx, double Ry, double Rz, double Rb, double Rt, double Rh,
-                                                          double Ix, double Iy, double Iz, double Ib, double It, double Ih,
-                                                          const arma::Mat<double> *fbs_pos_1, const arma::Mat<double> *lbs_pos_1,
-                                                          const arma::Col<double> *path_gain_1, const arma::Col<double> *path_length_1, const arma::Mat<double> *M_1,
-                                                          const arma::Mat<double> *fbs_pos_2, const arma::Mat<double> *lbs_pos_2,
-                                                          const arma::Col<double> *path_gain_2, const arma::Col<double> *path_length_2, const arma::Mat<double> *M_2,
-                                                          arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
+template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double> &tx_array, const arrayant<double> &rx_array, const arrayant<double> &irs_array,
+                                                          const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
+                                                          const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
+                                                          const arma::Mat<double> &irs_pos, const arma::Mat<double> &irs_orientation,
+                                                          const arma::Mat<double> &fbs_pos_1, const arma::Mat<double> &lbs_pos_1,
+                                                          const arma::Col<double> &path_gain_1, const arma::Col<double> &path_length_1, const arma::Mat<double> &M_1,
+                                                          const arma::Mat<double> &fbs_pos_2, const arma::Mat<double> &lbs_pos_2,
+                                                          const arma::Col<double> &path_gain_2, const arma::Col<double> &path_length_2, const arma::Mat<double> &M_2,
+                                                          arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
                                                           arma::uword i_irs, double threshold_dB, double center_freq, bool use_absolute_delays,
                                                           arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
                                                           const arrayant<double> *irs_array_2, const std::vector<bool> *active_path);

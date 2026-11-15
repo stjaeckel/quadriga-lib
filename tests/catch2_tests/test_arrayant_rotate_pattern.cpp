@@ -1046,7 +1046,8 @@ TEST_CASE("arrayant_rotate_pattern - invalid orientation and element indices thr
     auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0); // 2 elements
     const auto ref = ant;
     const arma::uvec dup = {1, 1}, out = {2};
-    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::mat(1, 3, arma::fill::zeros)), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(2, arma::fill::zeros)), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec{0.0, arma::datum::nan, 0.0}), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(4, arma::fill::zeros)), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, &dup), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern(ant, arma::vec(3, arma::fill::zeros), 0, &out), std::invalid_argument);
@@ -1054,4 +1055,20 @@ TEST_CASE("arrayant_rotate_pattern - invalid orientation and element indices thr
     CHECK_THROWS_AS(quadriga_lib::arrayant_rotate_pattern_multi(vec, arma::vec(3, arma::fill::zeros), 0, &dup), std::invalid_argument);
     CHECK(arma::approx_equal(ant.e_theta_re, ref.e_theta_re, "absdiff", 0.0));
     CHECK(arma::approx_equal(vec[0].e_theta_re, ref.e_theta_re, "absdiff", 0.0));
+}
+
+TEST_CASE("arrayant_rotate_pattern - orientation as [1, 3]")
+{
+    // [3, 1] and [1, 3] give the same pattern, also in the multi-frequency form
+    const auto ant = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    const arma::vec o = {0.3, -0.2, 1.1};
+    auto a = ant, b = ant;
+    quadriga_lib::arrayant_rotate_pattern(a, o);
+    quadriga_lib::arrayant_rotate_pattern(b, arma::mat(o.t()));
+    CHECK(arma::approx_equal(a.e_theta_re, b.e_theta_re, "absdiff", 0.0));
+    CHECK(arma::approx_equal(a.e_phi_im, b.e_phi_im, "absdiff", 0.0));
+    std::vector<quadriga_lib::arrayant<double>> va = {ant, ant}, vb = va;
+    quadriga_lib::arrayant_rotate_pattern_multi(va, o);
+    quadriga_lib::arrayant_rotate_pattern_multi(vb, arma::mat(o.t()));
+    CHECK(arma::approx_equal(va[1].e_theta_re, vb[1].e_theta_re, "absdiff", 0.0));
 }

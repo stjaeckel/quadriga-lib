@@ -170,7 +170,7 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 void quadriga_lib::combine_irs_coord(
-    dtype Ix, dtype Iy, dtype Iz,
+    const arma::Mat<dtype> &irs_pos,
     const arma::u32_vec *no_interact_1,
     const arma::Mat<dtype> *interact_coord_1,
     const arma::u32_vec *no_interact_2,
@@ -183,7 +183,7 @@ void quadriga_lib::combine_irs_coord(
 ```
 
 ### Inputs:
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
+- **`irs_pos`** — IRS position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
 - **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`; any other size throws
   `std::invalid_argument` (an empty matrix is accepted when `sum(no_interact_1)` is 0)
@@ -217,8 +217,8 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 void quadriga_lib::coord2path(
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Rx, dtype Ry, dtype Rz,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &rx_pos,
     const arma::u32_vec *no_interact,
     const arma::Mat<dtype> *interact_coord,
     arma::Col<dtype> *path_length = nullptr,
@@ -230,8 +230,8 @@ void quadriga_lib::coord2path(
 ```
 
 ### Inputs:
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`no_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
 - **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(no_interact)]`
 - **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
@@ -1045,7 +1045,7 @@ Not in: MATLAB, Python
 arma::uword ray_init(
     arma::uword n_ray_target,
     arma::uword n_freq,
-    float Ox, float Oy, float Oz,
+    const arma::fmat &orig_pos,
     float max_path_length,
     arma::fmat *orig = nullptr,
     arma::fmat *dest = nullptr,
@@ -1068,7 +1068,7 @@ arma::uword ray_init(
 - **`n_ray_target`** — Desired ray count; quantized to the nearest icosphere grid (see above)
 - **`n_freq`** — Number of frequency bins allocated per path in `paths`; must be ≥ 1 (throws if 0; the
   [path](channel-functions.md#path) layout supports 1-127)
-- **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]
+- **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
   the launch sphere `r0`. NULL → the mesh does not bound `r0`.
@@ -1364,7 +1364,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
     const arma::fvec &center_freq,
-    float Ox, float Oy, float Oz,
+    const arma::fmat &orig_pos,
     arma::fmat &orig,
     arma::fmat &dest,
     arma::Col<short> &mtl_ind_prev,
@@ -1397,7 +1397,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`. 0 = air
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl` (max 16383)
 - **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
-- **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins
+- **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
 - **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.

@@ -150,10 +150,10 @@ Compute channel coefficients for spherical waves across multiple frequencies
 void quadriga_lib::get_channels_multifreq(
     const std::vector<arrayant<dtype>> &tx_array,
     const std::vector<arrayant<dtype>> &rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
     const arma::Mat<dtype> &fbs_pos,
     const arma::Mat<dtype> &lbs_pos,
     const arma::Mat<dtype> &path_gain,
@@ -173,10 +173,10 @@ void quadriga_lib::get_channels_multifreq(
 ## Inputs:
 - **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
 - **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
-- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates, finite
-- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading), finite
-- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates, finite
-- **`Rb, Rt, Rh`** — RX orientation, Euler angles (bank, tilt, heading), finite
+- **`tx_pos`** — TX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — TX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — RX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — RX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains; `[n_path, n_freq]`
@@ -208,8 +208,8 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arrayant<dtype>> &tx_array,
                                           const std::vector<quadriga_lib::arrayant<dtype>> &rx_array,
-                                          dtype Tx, dtype Ty, dtype Tz, dtype Tb, dtype Tt, dtype Th,
-                                          dtype Rx, dtype Ry, dtype Rz, dtype Rb, dtype Rt, dtype Rh,
+                                          const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
+                                          const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
                                           const arma::Mat<dtype> &fbs_pos, const arma::Mat<dtype> &lbs_pos,
                                           const arma::Mat<dtype> &path_gain, const arma::Col<dtype> &path_length,
                                           const arma::Cube<dtype> &M,
@@ -230,9 +230,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         throw std::invalid_argument("get_channels_multifreq: TX array vector is empty.");
     if (rx_array.empty())
         throw std::invalid_argument("get_channels_multifreq: RX array vector is empty.");
-    for (dtype v : {Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh})
-        if (!std::isfinite(v))
-            throw std::invalid_argument("get_channels_multifreq: TX and RX positions and orientations must be finite.");
+    const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_to = qd_xyz(tx_orientation, "tx_orientation");
+    const dtype *p_rp = qd_xyz(rx_pos, "rx_pos"), *p_ro = qd_xyz(rx_orientation, "rx_orientation");
+    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
+    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2], Rb = p_ro[0], Rt = p_ro[1], Rh = p_ro[2];
 
     // Outputs: no cube may share memory with an input or with any other output cube
     const std::vector<arma::Cube<dtype>> *outs[] = {&coeff_re, &coeff_im, &delay};
@@ -306,7 +307,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
         std::vector<arma::Cube<dtype>> cr, ci, dl;
         std::vector<arma::Cube<std::complex<dtype>>> cx;
-        quadriga_lib::get_channels_multifreq<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
+        quadriga_lib::get_channels_multifreq<dtype>(tx_array, rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation,
                                                     fbs_d, fbs_d, gain_d, length_d, M_d, freq, freq_new,
                                                     cr, ci, dl, use_absolute_delays, true, propagation_speed,
                                                     coeff ? &cx : nullptr);
@@ -400,21 +401,21 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
     // Phase 1: Geometry computation (frequency-independent, sequential)
     // Transmitter and receiver orientation
-    arma::Cube<dtype> tx_orientation(3, 1, 1, arma::fill::zeros);
-    arma::Cube<dtype> rx_orientation(3, 1, 1, arma::fill::zeros);
+    arma::Cube<dtype> tx_ori(3, 1, 1, arma::fill::zeros);
+    arma::Cube<dtype> rx_ori(3, 1, 1, arma::fill::zeros);
     bool tx_orientation_not_zero = (Tb != zero || Tt != zero || Th != zero);
     bool rx_orientation_not_zero = (Rb != zero || Rt != zero || Rh != zero);
 
     if (tx_orientation_not_zero)
     {
-        dtype *ptr = tx_orientation.memptr();
+        dtype *ptr = tx_ori.memptr();
         ptr[0] = Tb;
         ptr[1] = Tt;
         ptr[2] = Th;
     }
     if (rx_orientation_not_zero)
     {
-        dtype *ptr = rx_orientation.memptr();
+        dtype *ptr = rx_ori.memptr();
         ptr[0] = Rb;
         ptr[1] = Rt;
         ptr[2] = Rh;
@@ -837,7 +838,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             {
                 const auto &ta = tx_array[tx_lo];
                 OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ta, AOD_j, EOD_j, i_tx_element, tx_orientation, tx_element_pos_interp,
+                              qd_arrayant_interpolate_dispatch<dtype>(ta, AOD_j, EOD_j, i_tx_element, tx_ori, tx_element_pos_interp,
                                                                       Vt_re, Vt_im, Ht_re, Ht_im, nullptr, nullptr, nullptr, nullptr, 1));
             }
             else
@@ -849,12 +850,12 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
                 const auto &ta_lo = tx_array[tx_lo];
                 OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ta_lo, AOD_j, EOD_j, i_tx_element, tx_orientation, tx_element_pos_interp,
+                              qd_arrayant_interpolate_dispatch<dtype>(ta_lo, AOD_j, EOD_j, i_tx_element, tx_ori, tx_element_pos_interp,
                                                                       Vt_re_lo, Vt_im_lo, Ht_re_lo, Ht_im_lo, nullptr, nullptr, nullptr, nullptr, 1));
 
                 const auto &ta_hi = tx_array[tx_hi];
                 OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ta_hi, AOD_j, EOD_j, i_tx_element, tx_orientation, tx_element_pos_interp,
+                              qd_arrayant_interpolate_dispatch<dtype>(ta_hi, AOD_j, EOD_j, i_tx_element, tx_ori, tx_element_pos_interp,
                                                                       Vt_re_hi, Vt_im_hi, Ht_re_hi, Ht_im_hi, nullptr, nullptr, nullptr, nullptr, 1));
 
                 // SLERP blend between bracket entries
@@ -882,7 +883,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             {
                 const auto &ra = rx_array[rx_lo];
                 OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ra, AOA_j, EOA_j, i_rx_element, rx_orientation, rx_element_pos_interp,
+                              qd_arrayant_interpolate_dispatch<dtype>(ra, AOA_j, EOA_j, i_rx_element, rx_ori, rx_element_pos_interp,
                                                                       Vr_re, Vr_im, Hr_re, Hr_im, nullptr, nullptr, nullptr, nullptr, 1));
             }
             else
@@ -895,13 +896,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 const auto &ra_lo = rx_array[rx_lo];
 
                 OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ra_lo, AOA_j, EOA_j, i_rx_element, rx_orientation, rx_element_pos_interp,
+                              qd_arrayant_interpolate_dispatch<dtype>(ra_lo, AOA_j, EOA_j, i_rx_element, rx_ori, rx_element_pos_interp,
                                                                       Vr_re_lo, Vr_im_lo, Hr_re_lo, Hr_im_lo, nullptr, nullptr, nullptr, nullptr, 1));
 
                 const auto &ra_hi = rx_array[rx_hi];
 
                 OMP_SAFE_CALL(omp_failed, omp_error,
-                              qd_arrayant_interpolate_dispatch<dtype>(ra_hi, AOA_j, EOA_j, i_rx_element, rx_orientation, rx_element_pos_interp,
+                              qd_arrayant_interpolate_dispatch<dtype>(ra_hi, AOA_j, EOA_j, i_rx_element, rx_ori, rx_element_pos_interp,
                                                                       Vr_re_hi, Vr_im_hi, Hr_re_hi, Hr_im_hi, nullptr, nullptr, nullptr, nullptr, 1));
 
                 dtype *vrr = Vr_re.memptr(), *vri = Vr_im.memptr();
@@ -1055,7 +1056,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 // Explicit template instantiations
 template void quadriga_lib::get_channels_multifreq(
     const std::vector<quadriga_lib::arrayant<float>> &, const std::vector<quadriga_lib::arrayant<float>> &,
-    float, float, float, float, float, float, float, float, float, float, float, float,
+    const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &,
     const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &,
     const arma::Col<float> &, const arma::Cube<float> &, const arma::Col<float> &, const arma::Col<float> &,
     std::vector<arma::Cube<float>> &, std::vector<arma::Cube<float>> &, std::vector<arma::Cube<float>> &,
@@ -1063,7 +1064,7 @@ template void quadriga_lib::get_channels_multifreq(
 
 template void quadriga_lib::get_channels_multifreq(
     const std::vector<quadriga_lib::arrayant<double>> &, const std::vector<quadriga_lib::arrayant<double>> &,
-    double, double, double, double, double, double, double, double, double, double, double, double,
+    const arma::Mat<double> &, const arma::Mat<double> &, const arma::Mat<double> &, const arma::Mat<double> &,
     const arma::Mat<double> &, const arma::Mat<double> &, const arma::Mat<double> &,
     const arma::Col<double> &, const arma::Cube<double> &, const arma::Col<double> &, const arma::Col<double> &,
     std::vector<arma::Cube<double>> &, std::vector<arma::Cube<double>> &, std::vector<arma::Cube<double>> &,

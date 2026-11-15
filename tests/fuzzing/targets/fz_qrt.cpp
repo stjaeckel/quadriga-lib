@@ -51,7 +51,7 @@ void fuzz_seeds(const fz::seeds &s)
         {
             std::vector<quadriga_lib::path> paths = two_paths(0, 2, scalar), more = two_paths(1, 2, scalar);
             paths.insert(paths.end(), more.begin(), more.end());
-            quadriga_lib::qrt_file_append<float>(fn, paths, {0.0f, (float)i_orig, 10.0f}, {0.0f, 0.0f, 0.0f},
+            quadriga_lib::qrt_file_append<float>(fn, paths, {0.0f, (float)i_orig, 10.0f}, nullptr,
                                                  "TX" + std::to_string(i_orig));
         }
     }

@@ -448,7 +448,7 @@ Not in: MATLAB, Python
 | Attribute | Type, size | Meaning | Set by |
 | --- | --- | --- | --- |
 | `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
-| `tx_pos`, `rx_pos` | `arma::vec`, `[3]` | Tx and Rx position the ray data refer to in [m] | all |
+| `tx_pos`, `rx_pos` | `arma::mat`, 3 elements; `[3, 1]` as written by the library | Tx and Rx position the ray data refer to in [m] | all |
 | `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
@@ -502,8 +502,8 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths
 ```cpp
 void quadriga_lib::gbsm_rays_from_paths(
     const arma::vec &center_freq,
-    const arma::vec &tx_pos,
-    const arma::vec &rx_pos,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
@@ -519,7 +519,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 
 ### Inputs:
 - **`center_freq`** — Frequencies in [Hz]; `[n_freq]`
-- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3]`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
@@ -1133,8 +1133,8 @@ void quadriga_lib::ssf_paths(
     arma::vec &path_length,
     arma::cube &M,
     const std::string &mobility = "auto",
-    const arma::vec *tx_pos = nullptr,
-    const arma::vec *rx_pos = nullptr,
+    const arma::mat *tx_pos = nullptr,
+    const arma::mat *rx_pos = nullptr,
     const arma::vec *kf_ratio = nullptr,
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
@@ -1151,7 +1151,7 @@ void quadriga_lib::ssf_paths(
 - **`rays`** — Ray data of the link
 - **`link_gain_dB`** — Link gain (see Terms) at the position in [dB], per frequency; 0 for data from paths; `[n_freq]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
-- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
+- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3, 1]` or `[1, 3]`
 - **`kf_ratio`** *(optional)* — KF(position) / KF(drop), >= 0, per frequency; omitted: 1; `[n_freq]`
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
 

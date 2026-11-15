@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 
@@ -42,11 +43,11 @@ TEST_CASE("Get Channels Spherical - Minimal test")
     // Shortest path length is automatically obtained from FBS / LBS
     arma::fcube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
-    quadriga_lib::get_channels_spherical<float>(&ant, &ant,
-                                                0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                &coeff_re, &coeff_im, &delay, 2997924580.0, true, false,
+    quadriga_lib::get_channels_spherical<float>(ant, ant,
+                                                {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                coeff_re, coeff_im, delay, 2997924580.0, true, false,
                                                 &aod, &eod, &aoa, &eoa);
 
     aod *= 180.0f / pi;
@@ -169,11 +170,11 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
     // Shortest path length is automatically obtained from FBS / LBS
     arma::cube coeff_re, coeff_im, delay;
 
-    quadriga_lib::get_channels_spherical<double>(&ant, &probe,
-                                                 0.0, 0.0, 1.0, -pi / 2.0, 0.0, 0.0,
-                                                 20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                 &coeff_re, &coeff_im, &delay, 2997924580.0, false);
+    quadriga_lib::get_channels_spherical<double>(ant, probe,
+                                                 {0.0, 0.0, 1.0}, {-pi / 2.0, 0.0, 0.0},
+                                                 {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                 coeff_re, coeff_im, delay, 2997924580.0, false);
 
     double C = 299792458.0;
     double d0 = std::sqrt(20.0 * 20.0 + 15.0 * 15.0) - 20.0; // relative to LOS-Delay
@@ -193,11 +194,11 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
     CHECK(std::abs(coeff_im.at(1, 1, 0) - 0.0) < 1.0e-6);
 
     // Bank -pi/2 turns element 0 (y = +15) to z = -15; tilt -pi/2 (an uptilt) turns it to x = +15, toward the RX
-    quadriga_lib::get_channels_spherical<double>(&ant, &probe,
-                                                 0.0, 0.0, 1.0, -pi / 2.0, -pi / 2.0, 0.0,
-                                                 20.0, 0.0, 1.0, pi / 2.0, 0.0, 0.0,
-                                                 &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                 &coeff_re, &coeff_im, &delay, 2997924580.0, false);
+    quadriga_lib::get_channels_spherical<double>(ant, probe,
+                                                 {0.0, 0.0, 1.0}, {-pi / 2.0, -pi / 2.0, 0.0},
+                                                 {20.0, 0.0, 1.0}, {pi / 2.0, 0.0, 0.0},
+                                                 fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                 coeff_re, coeff_im, delay, 2997924580.0, false);
 
     CHECK(std::abs(delay.at(0, 0, 0) + 15.0 / C) < 1.0e-16f);
     CHECK(std::abs(delay.at(1, 0, 0) + 15.0 / C) < 1.0e-16f);
@@ -214,11 +215,11 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
     CHECK(std::abs(coeff_im.at(0, 1, 0) - 0.0) < 1.0e-6f);
     CHECK(std::abs(coeff_im.at(1, 1, 0) - 0.0) < 1.0e-6f);
 
-    quadriga_lib::get_channels_spherical<double>(&ant, &probe,
-                                                 0.0, 0.0, 1.0, 0.0, 0.0, pi / 2.0,
-                                                 20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                 &coeff_re, &coeff_im, &delay, 2997924580.0, false);
+    quadriga_lib::get_channels_spherical<double>(ant, probe,
+                                                 {0.0, 0.0, 1.0}, {0.0, 0.0, pi / 2.0},
+                                                 {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                 coeff_re, coeff_im, delay, 2997924580.0, false);
 
     CHECK(std::abs(delay.at(0, 0, 0) - 15.0 / C) < 1.0e-16f);
     CHECK(std::abs(delay.at(1, 0, 0) - 15.0 / C) < 1.0e-16f);
@@ -264,11 +265,11 @@ TEST_CASE("Get Channels Spherical - Fake LOS")
     // Shortest path length is automatically obtained from FBS / LBS
     arma::fcube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
-    quadriga_lib::get_channels_spherical<float>(&ant, &ant,
-                                                0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                &coeff_re, &coeff_im, &delay, 2997924580.0, true, true,
+    quadriga_lib::get_channels_spherical<float>(ant, ant,
+                                                {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                coeff_re, coeff_im, delay, 2997924580.0, true, true,
                                                 &aod, &eod, &aoa, &eoa);
 
     aod *= 180.0f / pi;
@@ -343,11 +344,11 @@ TEST_CASE("Get Channels Spherical - Coupling")
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     // Case 1 : No coupling (identity matrix)
-    quadriga_lib::get_channels_spherical<double>(&ant, &ant,
-                                                 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                 &coeff_re, &coeff_im, &delay, 0.0, false, true);
+    quadriga_lib::get_channels_spherical<double>(ant, ant,
+                                                 {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                 coeff_re, coeff_im, delay, 0.0, false, true);
 
     REQUIRE(coeff_re.n_slices == 2);
     REQUIRE(coeff_im.n_slices == 2);
@@ -379,11 +380,11 @@ TEST_CASE("Get Channels Spherical - Coupling")
     ant.coupling_re.col(0).ones();
     ant.coupling_im.reset();
 
-    quadriga_lib::get_channels_spherical<double>(&ant, &ant,
-                                                 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                 &coeff_re, &coeff_im, &delay, 0.0, true, false,
+    quadriga_lib::get_channels_spherical<double>(ant, ant,
+                                                 {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                 coeff_re, coeff_im, delay, 0.0, true, false,
                                                  &aod, &eod, &aoa, &eoa);
     CHECK(coeff_re.n_slices == 1);
     CHECK(coeff_im.n_slices == 1);
@@ -410,11 +411,11 @@ TEST_CASE("Get Channels Spherical - Coupling")
     ant.coupling_re.ones(3, 1);
     ant.coupling_re *= 2.0;
 
-    quadriga_lib::get_channels_spherical<double>(&ant, &ant,
-                                                 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                 &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-                                                 &coeff_re, &coeff_im, &delay, 0.0, true, false,
+    quadriga_lib::get_channels_spherical<double>(ant, ant,
+                                                 {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                 fbs_pos, fbs_pos, path_gain, path_length, M,
+                                                 coeff_re, coeff_im, delay, 0.0, true, false,
                                                  &aod, &eod, &aoa);
 
     CHECK(coeff_re.n_elem == 1);
@@ -436,120 +437,6 @@ TEST_CASE("Get Channels Spherical - Coupling")
 // New tests below
 // ================================================================================================
 
-TEST_CASE("Get Channels Spherical - Error handling: NULL pointers")
-{
-    auto ant = quadriga_lib::generate_arrayant_omni<double>();
-
-    arma::mat fbs_pos(3, 1, arma::fill::zeros);
-    fbs_pos(0, 0) = 10.0;
-    arma::vec path_gain(1, arma::fill::ones);
-    arma::vec path_length(1, arma::fill::zeros);
-    arma::mat M(8, 1, arma::fill::zeros);
-    M(0, 0) = 1.0;
-    M(6, 0) = -1.0;
-    arma::cube coeff_re, coeff_im, delay;
-
-    // NULL tx_array
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            (quadriga_lib::arrayant<double> *)nullptr, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL rx_array
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, (quadriga_lib::arrayant<double> *)nullptr,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL fbs_pos
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            (arma::mat *)nullptr, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL lbs_pos
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, (arma::mat *)nullptr, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL path_gain
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, (arma::Col<double> *)nullptr, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL path_length
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, (arma::Col<double> *)nullptr, &M,
-            &coeff_re, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL M
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, (arma::mat *)nullptr,
-            &coeff_re, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL coeff_re
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            (arma::cube *)nullptr, &coeff_im, &delay),
-        std::invalid_argument);
-
-    // NULL coeff_im
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, (arma::cube *)nullptr, &delay),
-        std::invalid_argument);
-
-    // NULL delay
-    CHECK_THROWS_AS(
-        quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, (arma::cube *)nullptr),
-        std::invalid_argument);
-}
-
 TEST_CASE("Get Channels Spherical - Error handling: Dimension mismatches")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>();
@@ -569,11 +456,11 @@ TEST_CASE("Get Channels Spherical - Error handling: Dimension mismatches")
     // n_path mismatch between fbs_pos (2 cols) and lbs_pos (1 col)
     CHECK_THROWS_AS(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            fbs_pos, lbs_pos, path_gain, path_length, M,
+            coeff_re, coeff_im, delay),
         std::invalid_argument);
 
     // Wrong number of rows in fbs_pos
@@ -581,44 +468,44 @@ TEST_CASE("Get Channels Spherical - Error handling: Dimension mismatches")
     arma::mat lbs_ok(3, 2, arma::fill::zeros);
     CHECK_THROWS_AS(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_bad, &lbs_ok, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            fbs_bad, lbs_ok, path_gain, path_length, M,
+            coeff_re, coeff_im, delay),
         std::invalid_argument);
 
     // Wrong number of rows in M (should be 8)
     arma::mat M_bad(4, 2, arma::fill::zeros);
     CHECK_THROWS_AS(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M_bad,
-            &coeff_re, &coeff_im, &delay),
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            fbs_pos, fbs_pos, path_gain, path_length, M_bad,
+            coeff_re, coeff_im, delay),
         std::invalid_argument);
 
     // Empty inputs
     arma::mat empty_fbs;
     CHECK_THROWS_AS(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &empty_fbs, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            empty_fbs, fbs_pos, path_gain, path_length, M,
+            coeff_re, coeff_im, delay),
         std::invalid_argument);
 
     // n_path mismatch for path_gain
     arma::vec pg_bad(3, arma::fill::ones); // 3 elements vs 2 paths
     CHECK_THROWS_AS(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &pg_bad, &path_length, &M,
-            &coeff_re, &coeff_im, &delay),
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            fbs_pos, fbs_pos, pg_bad, path_length, M,
+            coeff_re, coeff_im, delay),
         std::invalid_argument);
 }
 
@@ -646,11 +533,11 @@ TEST_CASE("Get Channels Spherical - SISO single path LOS")
 
     // No frequency → no phase rotation, absolute delays
     quadriga_lib::get_channels_spherical<double>(
-        &tx, &rx,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        dist, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        tx, rx,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // Output shape: [1, 1, 1]
@@ -702,11 +589,11 @@ TEST_CASE("Get Channels Spherical - Zero center frequency disables phase")
 
     // center_freq = 0 → phase calculation disabled
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false);
 
     // With zero frequency, coeff_im should be near-zero (no phase rotation)
     CHECK(std::abs(coeff_im.at(0, 0, 0)) < 1.0e-6);
@@ -739,19 +626,19 @@ TEST_CASE("Get Channels Spherical - Absolute vs relative delays")
 
     // use_absolute_delays = true
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        dist, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re_abs, &coeff_im_abs, &delay_abs, 0.0, true, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re_abs, coeff_im_abs, delay_abs, 0.0, true, false);
 
     // use_absolute_delays = false
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        dist, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re_rel, &coeff_im_rel, &delay_rel, 0.0, false, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re_rel, coeff_im_rel, delay_rel, 0.0, false, false);
 
     // Absolute delay for LOS = dist / C
     CHECK(std::abs(delay_abs.at(0, 0, 0) - dist / C) < 1.0e-14);
@@ -783,11 +670,11 @@ TEST_CASE("Get Channels Spherical - Optional angle outputs as nullptr")
     // No angle outputs at all (default nullptr)
     CHECK_NOTHROW(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay, 0.0, true, false));
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            fbs_pos, fbs_pos, path_gain, path_length, M,
+            coeff_re, coeff_im, delay, 0.0, true, false));
 
     REQUIRE(coeff_re.n_rows == 1);
     REQUIRE(coeff_re.n_cols == 1);
@@ -797,11 +684,11 @@ TEST_CASE("Get Channels Spherical - Optional angle outputs as nullptr")
     arma::cube aod, eoa;
     CHECK_NOTHROW(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay, 0.0, true, false,
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            fbs_pos, fbs_pos, path_gain, path_length, M,
+            coeff_re, coeff_im, delay, 0.0, true, false,
             &aod, (arma::Cube<double> *)nullptr, (arma::Cube<double> *)nullptr, &eoa));
 
     REQUIRE(aod.n_rows == 1);
@@ -847,11 +734,11 @@ TEST_CASE("Get Channels Spherical - Multiple NLOS paths, relative delays")
 
     // Relative delays (use_absolute_delays = false)
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        dist, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, false, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, false, false);
 
     REQUIRE(coeff_re.n_slices == 3);
 
@@ -902,11 +789,11 @@ TEST_CASE("Get Channels Spherical - Path gain zero produces zero coefficients")
     arma::cube coeff_re, coeff_im, delay;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false);
 
     REQUIRE(coeff_re.n_slices == 2);
 
@@ -943,11 +830,11 @@ TEST_CASE("Get Channels Spherical - Double precision SISO")
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<double>(
-        &tx, &rx,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        dist, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        tx, rx,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // Double precision — coefficient tolerance relaxed for AVX2 float interpolation
@@ -982,11 +869,11 @@ TEST_CASE("Get Channels Spherical - Float precision SISO")
     arma::fcube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<float>(
-        &tx, &rx,
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        dist, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0f, true, false,
+        tx, rx,
+        {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+        {dist, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0f, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // Float precision is looser
@@ -1019,11 +906,11 @@ TEST_CASE("Get Channels Spherical - Fake LOS with single path")
     arma::cube coeff_re, coeff_im, delay;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, true);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, true);
 
     // Should have 2 slices: fake LOS + 1 real path
     REQUIRE(coeff_re.n_slices == 2);
@@ -1061,11 +948,11 @@ TEST_CASE("Get Channels Spherical - Vertical path (elevation angles)")
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, height, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {0.0, 0.0, height}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // Departure elevation should be +90 deg (pi/2)
@@ -1102,11 +989,11 @@ TEST_CASE("Get Channels Spherical - Diagonal path (non-trivial azimuth + elevati
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        d, d, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {d, d, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // AOD should be 45 deg = pi/4
@@ -1150,11 +1037,11 @@ TEST_CASE("Get Channels Spherical - Complex polarization transfer matrix M")
 
     // Zero frequency: no additional phase from propagation
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false);
 
     // Amplitude should be 1.0 (|M_VV| = 1.0, omni antenna)
     double amp = std::sqrt(coeff_re.at(0, 0, 0) * coeff_re.at(0, 0, 0) +
@@ -1188,19 +1075,19 @@ TEST_CASE("Get Channels Spherical - RX rotation")
 
     // No RX rotation
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &probe,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re_0, &coeff_im_0, &delay_0, 0.0, false, false);
+        ant, probe,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re_0, coeff_im_0, delay_0, 0.0, false, false);
 
     // RX rotated by 90 degrees bank
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &probe,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, pi / 2.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re_r, &coeff_im_r, &delay_r, 0.0, false, false);
+        ant, probe,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {pi / 2.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re_r, coeff_im_r, delay_r, 0.0, false, false);
 
     // Delays should be the same (rotation doesn't change path length for point antenna)
     CHECK(std::abs(delay_0.at(0, 0, 0) - delay_r.at(0, 0, 0)) < 1.0e-14);
@@ -1242,11 +1129,11 @@ TEST_CASE("Get Channels Spherical - TX along negative x-axis")
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        -50.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {-50.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // AOD should be pi (or -pi), pointing toward -x
@@ -1288,11 +1175,11 @@ TEST_CASE("Get Channels Spherical - FBS and LBS at different positions")
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, lbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // The NLOS delay follows path_length when it is longer than TX→FBS + FBS→LBS + LBS→RX: the extra
@@ -1334,19 +1221,19 @@ TEST_CASE("Get Channels Spherical - Phase with center frequency")
 
     // With center frequency
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        dist, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re_f, &coeff_im_f, &delay_f, fc, true, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re_f, coeff_im_f, delay_f, fc, true, false);
 
     // Without center frequency
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        dist, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re_0, &coeff_im_0, &delay_0, 0.0, true, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re_0, coeff_im_0, delay_0, 0.0, true, false);
 
     // Amplitudes should match
     double amp_f = std::sqrt(coeff_re_f.at(0, 0, 0) * coeff_re_f.at(0, 0, 0) +
@@ -1408,11 +1295,11 @@ TEST_CASE("Get Channels Spherical - Output size with MIMO and multiple paths")
 
     // Without fake LOS
     quadriga_lib::get_channels_spherical<double>(
-        &tx, &rx,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        tx, rx,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // n_rx=2, n_tx=3, n_path=4
@@ -1440,11 +1327,11 @@ TEST_CASE("Get Channels Spherical - Output size with MIMO and multiple paths")
 
     // With fake LOS
     quadriga_lib::get_channels_spherical<double>(
-        &tx, &rx,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, true,
+        tx, rx,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, true,
         &aod, &eod, &aoa, &eoa);
 
     // n_path + 1 slices with fake LOS
@@ -1477,11 +1364,11 @@ TEST_CASE("Get Channels Spherical - Physical consistency: delays positive and mo
 
     // Absolute delays
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false);
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false);
 
     // All delays must be positive
     for (arma::uword s = 0; s < delay.n_slices; ++s)
@@ -1514,11 +1401,11 @@ TEST_CASE("Get Channels Spherical - TX/RX at same height, path along y-axis")
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, dist, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        ant, ant,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {0.0, dist, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // AOD should be 90 degrees (pi/2) — pointing along +y
@@ -1555,11 +1442,11 @@ TEST_CASE("Get Channels Spherical - Asymmetric TX/RX antennas")
     arma::cube coeff_re, coeff_im, delay;
 
     quadriga_lib::get_channels_spherical<double>(
-        &tx, &rx,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false);
+        tx, rx,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false);
 
     REQUIRE(coeff_re.n_rows == 1);
     REQUIRE(coeff_re.n_cols == 2);
@@ -1595,11 +1482,11 @@ TEST_CASE("Get Channels Spherical - Offset TX/RX positions")
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
     quadriga_lib::get_channels_spherical<double>(
-        &ant, &ant,
-        Tx, Ty, Tz, 0.0, 0.0, 0.0,
-        Rx, Ry, Rz, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0, true, false,
+        ant, ant,
+        {Tx, Ty, Tz}, {0.0, 0.0, 0.0},
+        {Rx, Ry, Rz}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0, true, false,
         &aod, &eod, &aoa, &eoa);
 
     // Delay should be dist / C
@@ -1634,11 +1521,11 @@ TEST_CASE("Get Channels Spherical - Cross-polarization transfer via M matrix")
     arma::cube coeff_re_vh, coeff_im_vh, delay_vh;
 
     quadriga_lib::get_channels_spherical<double>(
-        &probe, &probe,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M_vh,
-        &coeff_re_vh, &coeff_im_vh, &delay_vh, 0.0, true, false);
+        probe, probe,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M_vh,
+        coeff_re_vh, coeff_im_vh, delay_vh, 0.0, true, false);
 
     REQUIRE(coeff_re_vh.n_rows == 2);
     REQUIRE(coeff_re_vh.n_cols == 2);
@@ -1650,11 +1537,11 @@ TEST_CASE("Get Channels Spherical - Cross-polarization transfer via M matrix")
     arma::cube coeff_re_vv, coeff_im_vv, delay_vv;
 
     quadriga_lib::get_channels_spherical<double>(
-        &probe, &probe,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M_vv,
-        &coeff_re_vv, &coeff_im_vv, &delay_vv, 0.0, true, false);
+        probe, probe,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M_vv,
+        coeff_re_vv, coeff_im_vv, delay_vv, 0.0, true, false);
 
     // Compute total power across all MIMO links for each case
     double total_power_vh = arma::accu(coeff_re_vh % coeff_re_vh + coeff_im_vh % coeff_im_vh);
@@ -1674,11 +1561,11 @@ TEST_CASE("Get Channels Spherical - Cross-polarization transfer via M matrix")
     arma::cube coeff_re_z, coeff_im_z, delay_z;
 
     quadriga_lib::get_channels_spherical<double>(
-        &probe, &probe,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M_zero,
-        &coeff_re_z, &coeff_im_z, &delay_z, 0.0, true, false);
+        probe, probe,
+        {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+        fbs_pos, fbs_pos, path_gain, path_length, M_zero,
+        coeff_re_z, coeff_im_z, delay_z, 0.0, true, false);
 
     double total_power_zero = arma::accu(coeff_re_z % coeff_re_z + coeff_im_z % coeff_im_z);
     CHECK(total_power_zero < 1.0e-14);
@@ -1714,11 +1601,11 @@ TEST_CASE("Get Channels Spherical - Large number of paths")
 
     CHECK_NOTHROW(
         quadriga_lib::get_channels_spherical<double>(
-            &ant, &ant,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            100.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-            &coeff_re, &coeff_im, &delay, 1.0e9, true, false));
+            ant, ant,
+            {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            {100.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+            fbs_pos, fbs_pos, path_gain, path_length, M,
+            coeff_re, coeff_im, delay, 1.0e9, true, false));
 
     REQUIRE(coeff_re.n_slices == n_path);
     REQUIRE(delay.n_slices == n_path);
@@ -1753,11 +1640,11 @@ TEST_CASE("Get Channels Spherical - Fake LOS swaps true LOS to first slice")
     arma::fcube coeff_re, coeff_im, delay;
 
     quadriga_lib::get_channels_spherical<float>(
-        &ant, &ant,
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        &fbs_pos, &fbs_pos, &path_gain, &path_length, &M,
-        &coeff_re, &coeff_im, &delay, 0.0f, true, true);
+        ant, ant,
+        {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+        {100.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+        fbs_pos, fbs_pos, path_gain, path_length, M,
+        coeff_re, coeff_im, delay, 0.0f, true, true);
 
     // 3 slices: fake LOS (0) + 2 real paths
     REQUIRE(coeff_re.n_slices == 3);
@@ -1787,7 +1674,7 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
     arma::mat coord = {{30.0, 50.0, 70.0}, {40.0, 60.0, 40.0}, {0.0, 0.0, 0.0}};
     arma::vec len;
     arma::mat fbs, lbs;
-    quadriga_lib::coord2path<double>(0, 0, 0, 100, 0, 0, &no_int, &coord, &len, &fbs, &lbs);
+    quadriga_lib::coord2path<double>({0, 0, 0}, {100, 0, 0}, &no_int, &coord, &len, &fbs, &lbs);
     const double L_true = 100.0 + 40.0 * std::sqrt(2.0);
     REQUIRE(std::abs(len(0) - L_true) < 1e-9);
 
@@ -1799,15 +1686,15 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
     for (double L : {L_true, 300.0})
     {
         arma::vec pl = {L};
-        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
-                                                     &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, true, false);
+        quadriga_lib::get_channels_spherical<double>(ant, ant, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0},
+                                                     fbs, lbs, gain, pl, M, cr, ci, dl, fc, true, false);
         CHECK(std::abs(dl(0) * C - L) < 1e-6);
         CHECK(std::abs(cr(0) - std::cos(k * L)) < 1e-6);
         CHECK(std::abs(ci(0) + std::sin(k * L)) < 1e-6);
 
         // Relative delays subtract the TX-RX distance (100 m)
-        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
-                                                     &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, false, false);
+        quadriga_lib::get_channels_spherical<double>(ant, ant, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0},
+                                                     fbs, lbs, gain, pl, M, cr, ci, dl, fc, false, false);
         CHECK(std::abs(dl(0) * C - (L - 100.0)) < 1e-6);
     }
 
@@ -1815,8 +1702,8 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
     for (double L : {0.0, 120.0, 140.0})
     {
         arma::vec pl = {L};
-        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
-                                                     &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, true, false);
+        quadriga_lib::get_channels_spherical<double>(ant, ant, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0},
+                                                     fbs, lbs, gain, pl, M, cr, ci, dl, fc, true, false);
         CHECK(std::abs(dl(0) * C - 140.0) < 1e-6);
         CHECK(std::abs(cr(0) - std::cos(k * 140.0)) < 1e-6);
         CHECK(std::abs(ci(0) + std::sin(k * 140.0)) < 1e-6);
@@ -1836,8 +1723,8 @@ TEST_CASE("Get Channels Spherical - NLOS delay and phase follow path_length")
     rx.coupling_re.eye(3, 3), rx.coupling_im.reset();
 
     arma::vec pl = {L_true};
-    quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
-                                                 &fbs, &lbs, &gain, &pl, &M, &cr, &ci, &dl, fc, true, false);
+    quadriga_lib::get_channels_spherical<double>(tx, rx, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0},
+                                                 fbs, lbs, gain, pl, M, cr, ci, dl, fc, true, false);
     REQUIRE(dl.n_rows == 3);
     REQUIRE(dl.n_cols == 2);
     const arma::vec F = fbs.col(0), B = lbs.col(0), T0 = {0.0, 0.0, 0.0}, R0 = {100.0, 0.0, 0.0};
@@ -1868,8 +1755,8 @@ TEST_CASE("Get Channels Spherical - add_fake_los_path layout")
     // Case 1: LOS path at input index 1 (FBS on the TX-RX line, path_length = 50)
     F.col(1) = arma::vec({25, 0, 0});
     arma::vec PL = {0.0, 50.0, 0.0};
-    quadriga_lib::get_channels_spherical<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, &F, &F, &G, &PL, &M,
-                                                 &cr, &ci, &dl, 1e9, true, true);
+    quadriga_lib::get_channels_spherical<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0}, F, F, G, PL, M,
+                                                 cr, ci, dl, 1e9, true, true);
     REQUIRE(cr.n_slices == 4);
     arma::vec p = arma::vectorise(arma::square(cr) + arma::square(ci));
     CHECK(std::abs(p(0) - 1.0) < 1e-9);  // LOS moved to slot 0
@@ -1881,8 +1768,8 @@ TEST_CASE("Get Channels Spherical - add_fake_los_path layout")
 
     // Case 2: no LOS path (input path 1 is NLOS)
     F.col(1) = arma::vec({25, 10, 0});
-    quadriga_lib::get_channels_spherical<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, &F, &F, &G, &PL, &M,
-                                                 &cr, &ci, &dl, 1e9, true, true);
+    quadriga_lib::get_channels_spherical<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0}, F, F, G, PL, M,
+                                                 cr, ci, dl, 1e9, true, true);
     REQUIRE(cr.n_slices == 4);
     p = arma::vectorise(arma::square(cr) + arma::square(ci));
     CHECK(p(0) == 0.0); // zero-power LOS path
@@ -1908,8 +1795,8 @@ TEST_CASE("Get Channels Spherical - Rows of M follow the Jones convention rx by 
         arma::mat M(8, 1, arma::fill::zeros);
         M(row) = 1.0;
         arma::cube cr, ci, dl;
-        quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, &F, &F, &g, &L, &M,
-                                                     &cr, &ci, &dl, 0.0);
+        quadriga_lib::get_channels_spherical<double>(tx, rx, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0}, F, F, g, L, M,
+                                                     cr, ci, dl, 0.0);
         return std::hypot(cr(0), ci(0));
     };
 
@@ -1945,11 +1832,11 @@ TEST_CASE("Get Channels Spherical - AVX2 interpolation of a low-amplitude patter
     M.row(0).fill(1.0), M.row(6).fill(-1.0);
 
     arma::cube cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
-    quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 30.0, 5.0, 1.5, 0.0, 0.0, 0.0,
-                                                 &fbs, &fbs, &gain, &len, &M, &cr_g, &ci_g, &dl_g, 3.5e9, true, false,
+    quadriga_lib::get_channels_spherical<double>(tx, rx, {0.0, 0.0, 10.0}, {0.0, 0.0, 0.0}, {30.0, 5.0, 1.5}, {0.0, 0.0, 0.0},
+                                                 fbs, fbs, gain, len, M, cr_g, ci_g, dl_g, 3.5e9, true, false,
                                                  nullptr, nullptr, nullptr, nullptr, 1);
-    quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 30.0, 5.0, 1.5, 0.0, 0.0, 0.0,
-                                                 &fbs, &fbs, &gain, &len, &M, &cr_v, &ci_v, &dl_v, 3.5e9, true, false,
+    quadriga_lib::get_channels_spherical<double>(tx, rx, {0.0, 0.0, 10.0}, {0.0, 0.0, 0.0}, {30.0, 5.0, 1.5}, {0.0, 0.0, 0.0},
+                                                 fbs, fbs, gain, len, M, cr_v, ci_v, dl_v, 3.5e9, true, false,
                                                  nullptr, nullptr, nullptr, nullptr, 2);
 
     arma::vec amp_g = arma::sqrt(arma::vectorise(arma::square(cr_g) + arma::square(ci_g)));
@@ -1984,11 +1871,11 @@ static void get_channels_spherical_avx2_tail_check()
     M.row(0).ones(), M.row(6).fill(-1.0);
 
     arma::Cube<dtype> cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
-    quadriga_lib::get_channels_spherical<dtype>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                &fbs, &fbs, &gain, &len, &M, &cr_g, &ci_g, &dl_g, dtype(3e9),
+    quadriga_lib::get_channels_spherical<dtype>(tx, rx, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                fbs, fbs, gain, len, M, cr_g, ci_g, dl_g, dtype(3e9),
                                                 false, false, nullptr, nullptr, nullptr, nullptr, 1);
-    quadriga_lib::get_channels_spherical<dtype>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                &fbs, &fbs, &gain, &len, &M, &cr_v, &ci_v, &dl_v, dtype(3e9),
+    quadriga_lib::get_channels_spherical<dtype>(tx, rx, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                fbs, fbs, gain, len, M, cr_v, ci_v, dl_v, dtype(3e9),
                                                 false, false, nullptr, nullptr, nullptr, nullptr, 2);
     REQUIRE(cr_v.n_elem == cr_g.n_elem);
     REQUIRE(cr_v.n_elem == 2 * n_path);
@@ -2024,10 +1911,10 @@ static void get_channels_spherical_vertical_link_check()
     M(0) = dtype(1.0), M(6) = dtype(1.0);
 
     arma::Cube<dtype> cr_g, ci_g, dl_g, cr_v, ci_v, dl_v;
-    quadriga_lib::get_channels_spherical<dtype>(&ant, &ant, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, &fbs, &fbs, &gain, &len, &M,
-                                                &cr_g, &ci_g, &dl_g, dtype(0), false, false, nullptr, nullptr, nullptr, nullptr, 1);
-    quadriga_lib::get_channels_spherical<dtype>(&ant, &ant, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, &fbs, &fbs, &gain, &len, &M,
-                                                &cr_v, &ci_v, &dl_v, dtype(0), false, false, nullptr, nullptr, nullptr, nullptr, 2);
+    quadriga_lib::get_channels_spherical<dtype>(ant, ant, {0, 0, 0}, {0, 0, 0}, {0, 0, 10}, {0, 0, 0}, fbs, fbs, gain, len, M,
+                                                cr_g, ci_g, dl_g, dtype(0), false, false, nullptr, nullptr, nullptr, nullptr, 1);
+    quadriga_lib::get_channels_spherical<dtype>(ant, ant, {0, 0, 0}, {0, 0, 0}, {0, 0, 10}, {0, 0, 0}, fbs, fbs, gain, len, M,
+                                                cr_v, ci_v, dl_v, dtype(0), false, false, nullptr, nullptr, nullptr, nullptr, 2);
     REQUIRE(cr_v.n_elem == cr_g.n_elem);
     double p_g = 0.0, p_v = 0.0, dmax = 0.0;
     for (arma::uword i = 0; i < cr_g.n_elem; ++i)
@@ -2072,11 +1959,11 @@ TEST_CASE("Get Channels Spherical - 0 paths with add_fake_los_path")
     for (bool abs_delays : {true, false})
     {
         arma::cube cr, ci, dl, ad, ed, aa, ea, crL, ciL, dlL, adL, edL, aaL, eaL;
-        quadriga_lib::get_channels_spherical<double>(&tx, &rx, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
-                                                     &f0, &f0, &e, &e, &M0, &cr, &ci, &dl, 3e9, abs_delays, true,
+        quadriga_lib::get_channels_spherical<double>(tx, rx, {Tx, Ty, Tz}, {0, 0, 0.3}, {Rx, Ry, Rz}, {0, 0, -0.2},
+                                                     f0, f0, e, e, M0, cr, ci, dl, 3e9, abs_delays, true,
                                                      &ad, &ed, &aa, &ea);
-        quadriga_lib::get_channels_spherical<double>(&tx, &rx, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
-                                                     &fL, &fL, &gain, &len, &M, &crL, &ciL, &dlL, 3e9, abs_delays, true,
+        quadriga_lib::get_channels_spherical<double>(tx, rx, {Tx, Ty, Tz}, {0, 0, 0.3}, {Rx, Ry, Rz}, {0, 0, -0.2},
+                                                     fL, fL, gain, len, M, crL, ciL, dlL, 3e9, abs_delays, true,
                                                      &adL, &edL, &aaL, &eaL);
         REQUIRE(cr.n_rows == 1);
         REQUIRE(cr.n_cols == 2);
@@ -2098,17 +1985,17 @@ TEST_CASE("Get Channels Spherical - 0 paths with add_fake_los_path")
     // Single-element antennas: delay = TX-RX distance / c, or 0 for relative delays
     auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
     arma::cube cr, ci, dl;
-    quadriga_lib::get_channels_spherical<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                 &f0, &f0, &e, &e, &M0, &cr, &ci, &dl, 1e9, true, true);
+    quadriga_lib::get_channels_spherical<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                 f0, f0, e, e, M0, cr, ci, dl, 1e9, true, true);
     REQUIRE(dl.n_elem == 1);
     CHECK(std::abs(dl(0) - 10.0 / C) < 1e-20);
     CHECK(cr(0) == 0.0);
     CHECK(ci(0) == 0.0);
-    quadriga_lib::get_channels_spherical<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                 &f0, &f0, &e, &e, &M0, &cr, &ci, &dl, 1e9, false, true);
+    quadriga_lib::get_channels_spherical<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                 f0, f0, e, e, M0, cr, ci, dl, 1e9, false, true);
     CHECK(dl(0) == 0.0);
-    quadriga_lib::get_channels_spherical<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                 &f0, &f0, &e, &e, &M0, &cr, &ci, &dl, 1e9, true, false);
+    quadriga_lib::get_channels_spherical<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                 f0, f0, e, e, M0, cr, ci, dl, 1e9, true, false);
     CHECK(dl.n_slices == 0); // without add_fake_los_path: empty outputs
 }
 
@@ -2126,8 +2013,8 @@ TEST_CASE("Get Channels Spherical - 0 paths without add_fake_los_path")
     for (int k = 0; k < 2; ++k)
     {
         const arma::mat *F = (k == 0) ? &f0 : &fx, *M = (k == 0) ? &M0 : &Mx;
-        quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                     F, F, &e, &e, M, &cr, &ci, &dl, 1e9, true, false, &ad, &ed, &aa, &ea);
+        quadriga_lib::get_channels_spherical<double>(tx, rx, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                     *F, *F, e, e, *M, cr, ci, dl, 1e9, true, false, &ad, &ed, &aa, &ea);
         for (const arma::cube *c : {&cr, &ci, &dl, &ad, &ed, &aa, &ea})
         {
             CHECK(c->n_rows == 1);
@@ -2137,8 +2024,8 @@ TEST_CASE("Get Channels Spherical - 0 paths without add_fake_los_path")
     }
     // Partly missing path data remains an error
     arma::vec one = {1.0};
-    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                                 &f0, &f0, &one, &e, &M0, &cr, &ci, &dl, 1e9, true, false),
+    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical<double>(tx, rx, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                                 f0, f0, one, e, M0, cr, ci, dl, 1e9, true, false),
                     std::invalid_argument);
 }
 
@@ -2151,8 +2038,8 @@ TEST_CASE("Get Channels Spherical - outputs that alias inputs")
     auto call = [&](arma::cube *c_re, arma::cube *c_im, arma::cube *d, arma::cube *a1, arma::cube *a2,
                     const arma::mat *M_in)
     {
-        quadriga_lib::get_channels_spherical<double>(&ant, &ant, 0, 0, 1, 0, 0, 0, 20, 0, 1, 0, 0, 0,
-                                                     &fbs, &fbs, &gain, &length, M_in, c_re, c_im, d, 1e9, false, false,
+        quadriga_lib::get_channels_spherical<double>(ant, ant, {0, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
+                                                     fbs, fbs, gain, length, *M_in, *c_re, *c_im, *d, 1e9, false, false,
                                                      a1, &eod, &aoa, a2);
     };
     CHECK_NOTHROW(call(&cr, &ci, &dl, &aod, &eoa, &M));
@@ -2183,11 +2070,11 @@ TEST_CASE("Get Channels Spherical - non-finite TX or RX position or orientation 
     // Pose values Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh; the baseline is a valid link
     auto call = [&](const arma::vec &v, bool no_paths)
     {
-        quadriga_lib::get_channels_spherical<double>(&ant, &ant, v(0), v(1), v(2), v(3), v(4), v(5),
-                                                     v(6), v(7), v(8), v(9), v(10), v(11),
-                                                     no_paths ? &fbs_0 : &fbs, no_paths ? &fbs_0 : &fbs,
-                                                     no_paths ? &gain_0 : &gain, no_paths ? &length_0 : &length,
-                                                     no_paths ? &M_0 : &M, &cr, &ci, &dl, 3.5e9, true, true);
+        quadriga_lib::get_channels_spherical<double>(ant, ant, {v(0), v(1), v(2)}, {v(3), v(4), v(5)},
+                                                     {v(6), v(7), v(8)}, {v(9), v(10), v(11)},
+                                                     *(no_paths ? &fbs_0 : &fbs), *(no_paths ? &fbs_0 : &fbs),
+                                                     *(no_paths ? &gain_0 : &gain), *(no_paths ? &length_0 : &length),
+                                                     *(no_paths ? &M_0 : &M), cr, ci, dl, 3.5e9, true, true);
     };
     const arma::vec base = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     CHECK_NOTHROW(call(base, false));
@@ -2216,8 +2103,8 @@ static void check_fake_los_slot_far_rx(dtype ry)
     arma::Mat<dtype> M = arma::repmat(arma::Mat<dtype>({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t(), 1, n);
     arma::Col<dtype> gain(n, arma::fill::ones), length(n, arma::fill::value(15.0));
     arma::Cube<dtype> cr, ci, dl, aod, eod, aoa, eoa;
-    quadriga_lib::get_channels_spherical<dtype>(&ant, &ant, 0, 0, 0, 0, 0, 0, 0, ry, 0, 0, 0, 0,
-                                                &fbs, &fbs, &gain, &length, &M, &cr, &ci, &dl,
+    quadriga_lib::get_channels_spherical<dtype>(ant, ant, {0, 0, 0}, {0, 0, 0}, {0, ry, 0}, {0, 0, 0},
+                                                fbs, fbs, gain, length, M, cr, ci, dl,
                                                 (dtype)3.5e9, true, true, &aod, &eod, &aoa, &eoa);
     REQUIRE(aod.n_slices == n + 1);
     const double half_pi = 1.5707963267948966;
@@ -2248,10 +2135,42 @@ TEST_CASE("get_channels_spherical - a positive tilt points down (3GPP TR 38.901)
     auto power = [&](const quadriga_lib::arrayant<double> &tx, const quadriga_lib::arrayant<double> &rx, double Tt, double Rt)
     {
         arma::cube cr, ci, dl;
-        quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, Tt, 0.0, 10.0, 0.0, 0.0, 0.0, Rt, arma::datum::pi,
-                                                     &pos, &pos, &gain, &length, &M, &cr, &ci, &dl);
+        quadriga_lib::get_channels_spherical<double>(tx, rx, {0.0, 0.0, 10.0}, {0.0, Tt, 0.0}, {10.0, 0.0, 0.0}, {0.0, Rt, arma::datum::pi},
+                                                     pos, pos, gain, length, M, cr, ci, dl);
         return arma::accu(cr % cr + ci % ci);
     };
     CHECK(power(beam, omni, q, 0.0) > 100.0 * power(beam, omni, -q, 0.0));
     CHECK(power(omni, beam, 0.0, -q) > 100.0 * power(omni, beam, 0.0, q));
+}
+
+TEST_CASE("Get Channels Spherical - Position and orientation shapes")
+{
+    // Positions and orientations: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
+    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    const arma::mat fbs = arma::mat({10.0, 5.0, 1.0}).t(), M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    const arma::vec gain = {1.0}, length = {0.0};
+    const arma::mat col[4] = {arma::vec{0.0, 0.0, 1.0}, arma::vec{0.1, 0.2, 0.3}, arma::vec{20.0, 0.0, 1.0}, arma::vec{0.0, -0.1, 0.5}};
+    const char *name[4] = {"tx_pos", "tx_orientation", "rx_pos", "rx_orientation"};
+    auto run = [&](const arma::mat *p, arma::cube &cr, arma::cube &ci, arma::cube &dl)
+    { quadriga_lib::get_channels_spherical(ant, ant, p[0], p[1], p[2], p[3], fbs, fbs, gain, length, M, cr, ci, dl, 1e9); };
+
+    arma::cube cr, ci, dl, cr_row, ci_row, dl_row;
+    const arma::mat row[4] = {col[0].t(), col[1].t(), col[2].t(), col[3].t()};
+    run(col, cr, ci, dl), run(row, cr_row, ci_row, dl_row);
+    CHECK(arma::approx_equal(cr, cr_row, "absdiff", 0.0));
+    CHECK(arma::approx_equal(ci, ci_row, "absdiff", 0.0));
+    CHECK(arma::approx_equal(dl, dl_row, "absdiff", 0.0));
+
+    const arma::mat bad[] = {arma::mat(2, 1, arma::fill::zeros), arma::mat(4, 1, arma::fill::zeros), arma::mat(),
+                             arma::mat(3, 3, arma::fill::zeros)};
+    for (int k = 0; k < 4; ++k)
+        for (const arma::mat &b : bad)
+        {
+            arma::mat p[4] = {col[0], col[1], col[2], col[3]};
+            p[k] = b;
+            arma::cube c_re = cr, c_im = ci, d = dl;
+            CHECK_THROWS_WITH(run(p, c_re, c_im, d), Catch::Matchers::ContainsSubstring("Input '" + std::string(name[k]) + "' must have 3 elements"));
+            CHECK(arma::approx_equal(c_re, cr, "absdiff", 0.0));
+            CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
+        }
 }

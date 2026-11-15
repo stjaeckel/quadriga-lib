@@ -103,7 +103,7 @@ int main()
         long rays = 0;
         for (int g = 0; g < 4000; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
                                        (uint8_t)maxint, 255, 255, 0, (float)floor_dB, 3.0f, (float)thr, itype == 5, true, nullptr, nullptr, nullptr, nullptr);
             if (orig.n_rows == 0)
                 break;

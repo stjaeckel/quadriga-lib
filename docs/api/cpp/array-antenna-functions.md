@@ -690,7 +690,7 @@ void quadriga_lib::arrayant_rotate_pattern(
 
 ### Inputs:
 - **`ant`** — Valid arrayant; updated in place
-- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]` or `[1, 3]`
 - **`usage`** *(optional)* — Rotation mode:
    | Mode | Pattern | Polarization | Grid adjustment |
    | ---- | ------- | ------------ | --------------- |

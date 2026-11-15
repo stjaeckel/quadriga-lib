@@ -178,12 +178,6 @@ static void qd_keep_dict_values(const py::dict &dict, std::vector<py::object> &k
         keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
 }
 
-// Select the column of a (3, n_out) matrix belonging to a snapshot, a single column applies to all snapshots
-static const double *qd_snapshot_col(const arma::Mat<double> &mat, arma::uword i_snap)
-{
-    return mat.colptr(mat.n_cols == 1ULL ? 0ULL : i_snap);
-}
-
 py::tuple get_channels_spherical(const py::dict &ant_tx,
                                  const py::dict &ant_rx,
                                  py::handle fbs_pos,
@@ -351,16 +345,14 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                     const arma::Mat<double> M_f(const_cast<double *>(M_a[j].slice_memptr(i_freq)),
                                                 M_a[j].n_rows, M_a[j].n_cols, false, true);
 
-                    const double *T = qd_snapshot_col(tx_pos_a, j);
-                    const double *To = qd_snapshot_col(tx_orientation_a, j);
-                    const double *R = qd_snapshot_col(rx_pos_a, j);
-                    const double *Ro = qd_snapshot_col(rx_orientation_a, j);
+                    // Positions and orientations of the snapshot; a single column applies to all snapshots
+                    auto xyz = [j](const arma::mat &m) { return arma::mat(m.col(m.n_cols == 1ULL ? 0ULL : j)); };
+                    const arma::mat T = xyz(tx_pos_a), To = xyz(tx_orientation_a);
+                    const arma::mat R = xyz(rx_pos_a), Ro = xyz(rx_orientation_a);
 
-                    quadriga_lib::get_channels_spherical<double>(&ant_tx_a, &ant_rx_a,
-                                                                 T[0], T[1], T[2], To[0], To[1], To[2],
-                                                                 R[0], R[1], R[2], Ro[0], Ro[1], Ro[2],
-                                                                 &fbs_pos_a[j], &lbs_pos_a[j], &path_gain_f, &path_length_a[j], &M_f,
-                                                                 &coeff_re[j], &coeff_im[j], &delay[j],
+                    quadriga_lib::get_channels_spherical<double>(ant_tx_a, ant_rx_a, T, To, R, Ro,
+                                                                 fbs_pos_a[j], lbs_pos_a[j], path_gain_f, path_length_a[j], M_f,
+                                                                 coeff_re[j], coeff_im[j], delay[j],
                                                                  center_freq_sel, use_absolute_delays, add_fake_los_path,
                                                                  angles ? &aod[j] : nullptr,
                                                                  angles ? &eod[j] : nullptr,
@@ -418,12 +410,6 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     const auto rx_pos_a = qd_python_numpy2arma_Col(rx_pos_arr, true, false, "rx_pos", 3);
     const auto rx_orientation_a = qd_python_numpy2arma_Col(rx_orientation_arr, true, false, "rx_orientation", 3);
 
-    // Extract scalar values
-    double Tx = tx_pos_a.at(0), Ty = tx_pos_a.at(1), Tz = tx_pos_a.at(2);
-    double Tb = tx_orientation_a.at(0), Tt = tx_orientation_a.at(1), Th = tx_orientation_a.at(2);
-    double Rx = rx_pos_a.at(0), Ry = rx_pos_a.at(1), Rz = rx_pos_a.at(2);
-    double Rb = rx_orientation_a.at(0), Rt = rx_orientation_a.at(1), Rh = rx_orientation_a.at(2);
-
     // Derived inputs
     arma::uword n_path_in = fbs_pos_a.n_cols;
     arma::uword n_freq = path_gain_a.n_cols;
@@ -468,11 +454,10 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     {
         {
             py::gil_scoped_release release;
-            quadriga_lib::get_channels_spherical<double>(&ant_tx_a, &ant_rx_a,
-                                                         Tx, Ty, Tz, Tb, Tt, Th,
-                                                         Rx, Ry, Rz, Rb, Rt, Rh,
-                                                         &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
-                                                         &coeff_re, &coeff_im, &delay,
+            quadriga_lib::get_channels_spherical<double>(ant_tx_a, ant_rx_a,
+                                                         tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
+                                                         fbs_pos_a, lbs_pos_a, path_gain_f, path_length_a, M_f,
+                                                         coeff_re, coeff_im, delay,
                                                          center_freq_sel, use_absolute_delays, add_fake_los_path,
                                                          p_aod, p_eod, p_aoa, p_eoa, use_kernel);
         }
@@ -491,11 +476,10 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
 
     {
         py::gil_scoped_release release;
-        quadriga_lib::get_channels_spherical<double>(&ant_tx_a, &ant_rx_a,
-                                                     Tx, Ty, Tz, Tb, Tt, Th,
-                                                     Rx, Ry, Rz, Rb, Rt, Rh,
-                                                     &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
-                                                     &coeff_re, &coeff_im, &delay,
+        quadriga_lib::get_channels_spherical<double>(ant_tx_a, ant_rx_a,
+                                                     tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
+                                                     fbs_pos_a, lbs_pos_a, path_gain_f, path_length_a, M_f,
+                                                     coeff_re, coeff_im, delay,
                                                      center_freq_sel, use_absolute_delays, add_fake_los_path,
                                                      p_aod, p_eod, p_aoa, p_eoa, use_kernel);
     }

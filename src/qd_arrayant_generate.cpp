@@ -806,6 +806,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
     const arma::Col<dtype> path_gain = {1.0};
     const arma::Col<dtype> path_length = {1000.0};
     const arma::Col<dtype> path_angle = {0.0};
+    const arma::Col<dtype> zero_3(3, arma::fill::zeros); // TX position and orientations
     const arma::Col<dtype> pilot_grid = {0.0};
     arma::Mat<dtype> path_pol = {1.0, zero, zero, zero, zero, zero, -1.0, zero};
     path_pol = path_pol.t();
@@ -851,10 +852,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
             qd_geo2cart_interleaved<dtype>(1, R, aod.memptr(), eod.memptr(), nullptr);
             qd_multiply_scalar(dist, R, 3);
 
-            quadriga_lib::get_channels_planar(&ant, &probe, zero, zero, zero, zero, zero, zero,
-                                              R[0], R[1], R[2], zero, zero, zero, &aod, &eod,
-                                              &path_angle, &path_angle, &path_gain, &path_length, &path_pol,
-                                              &coeff_re_tmp, &coeff_im_tmp, &delay_tmp, center_freq);
+            const arma::Col<dtype> r_pos = {R[0], R[1], R[2]};
+            quadriga_lib::get_channels_planar(ant, probe, zero_3, zero_3, r_pos, zero_3, aod, eod,
+                                              path_angle, path_angle, path_gain, path_length, path_pol,
+                                              coeff_re_tmp, coeff_im_tmp, delay_tmp, center_freq);
 
             for (arma::uword i_elem = 0; i_elem < n_elements; ++i_elem)
             {
@@ -916,10 +917,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
             dtype Ry = cart.at(1, i_beam) * dist;
             dtype Rz = cart.at(2, i_beam) * dist;
 
-            quadriga_lib::get_channels_planar(&ant, &probe, zero, zero, zero, zero, zero, zero,
-                                              Rx, Ry, Rz, zero, zero, zero, &aod, &eod,
-                                              &path_angle, &path_angle, &path_gain, &path_length, &path_pol,
-                                              &coeff_re_tmp, &coeff_im_tmp, &delay_tmp, center_freq);
+            const arma::Col<dtype> r_pos = {Rx, Ry, Rz};
+            quadriga_lib::get_channels_planar(ant, probe, zero_3, zero_3, r_pos, zero_3, aod, eod,
+                                              path_angle, path_angle, path_gain, path_length, path_pol,
+                                              coeff_re_tmp, coeff_im_tmp, delay_tmp, center_freq);
 
             dtype a = separate_beams ? coeff_re_tmp[i_beam] : coeff_re_tmp[0];
             dtype b = separate_beams ? coeff_im_tmp[i_beam] : coeff_im_tmp[0];

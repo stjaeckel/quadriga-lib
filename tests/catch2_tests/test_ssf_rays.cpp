@@ -557,11 +557,13 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
     unsigned *u = ubuf.data();
     auto vec = [&](arma::vec &x, arma::uword n)
     { x.~Col(), new (&x) arma::vec(p, n, false, true), ptr.push_back(p), p += n; };
+    auto pos = [&](arma::mat &x)
+    { x.~Mat(), new (&x) arma::mat(p, 3, 1, false, true), ptr.push_back(p), p += 3; };
     auto u32 = [&](arma::u32_vec &x, arma::uword n)
     { x.~Col(), new (&x) arma::u32_vec(u, n, false, true), ptr.push_back(u), u += n; };
     for (auto &r : rays)
     {
-        vec(r.tx_pos, 3), vec(r.rx_pos, 3), vec(r.center_freq, 1), vec(r.delay, n_ray);
+        pos(r.tx_pos), pos(r.rx_pos), vec(r.center_freq, 1), vec(r.delay, n_ray);
         r.power.~Mat(), new (&r.power) arma::mat(p, n_ray, 1, false, true), ptr.push_back(p), p += n_ray;
         vec(r.aod, n_ray), vec(r.eod, n_ray), vec(r.aoa, n_ray), vec(r.eoa, n_ray);
         r.M.~Cube(), new (&r.M) arma::cube(p, 8, n_ray, 1, false, true), ptr.push_back(p), p += 8 * n_ray;

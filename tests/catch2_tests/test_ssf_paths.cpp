@@ -156,13 +156,13 @@ namespace
         const arma::mat M = o.M.slice(k);
         const double f = r.center_freq(k);
         if (spherical)
-            quadriga_lib::get_channels_spherical<double>(&a, &a, T(0), T(1), T(2), 0.0, 0.0, 0.0, R(0), R(1), R(2),
-                                                         0.0, 0.0, 0.0, &o.fbs, &o.lbs, &g, &o.len, &M, &cr, &ci,
-                                                         &dl, f);
+            quadriga_lib::get_channels_spherical<double>(a, a, {T(0), T(1), T(2)}, {0.0, 0.0, 0.0}, {R(0), R(1), R(2)},
+                                                         {0.0, 0.0, 0.0}, o.fbs, o.lbs, g, o.len, M, cr, ci,
+                                                         dl, f);
         else
-            quadriga_lib::get_channels_planar<double>(&a, &a, T(0), T(1), T(2), 0.0, 0.0, 0.0, R(0), R(1), R(2),
-                                                      0.0, 0.0, 0.0, &o.aod, &o.eod, &o.aoa, &o.eoa, &g, &o.len, &M,
-                                                      &cr, &ci, &dl, f);
+            quadriga_lib::get_channels_planar<double>(a, a, {T(0), T(1), T(2)}, {0.0, 0.0, 0.0}, {R(0), R(1), R(2)},
+                                                      {0.0, 0.0, 0.0}, o.aod, o.eod, o.aoa, o.eoa, g, o.len, M,
+                                                      cr, ci, dl, f);
         arma::cx_vec c(cr.n_slices);
         for (arma::uword p = 0; p < cr.n_slices; ++p)
             c(p) = cx(cr(0, 0, p), ci(0, 0, p));
@@ -322,7 +322,7 @@ TEST_CASE("ssf_paths - drift at the ray-data positions reproduces the drop geome
     // LOS and GR with the Tx on the ground: GR angles towards the image points (the GR point equals the Tx, where a
     // rule "towards the next point" would flip the sign of the departure elevation)
     rays_t g = make_rays(14, true, true, 0, 1, "38.901");
-    g.tx_pos = {0.0, 0.0, 0.0}, g.rx_pos = {80.0, -30.0, 1.5};
+    g.tx_pos = arma::vec{0.0, 0.0, 0.0}, g.rx_pos = arma::vec{80.0, -30.0, 1.5};
     g.solve_scatterers();
     const po_t og = pth(g, "drift");
     REQUIRE(og.ind.n_elem == 2);
@@ -898,7 +898,11 @@ TEST_CASE("ssf_paths - outputs that alias inputs")
     CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, x.delay, M), std::invalid_argument); // path_length is 'rays.delay'
     CHECK(arma::approx_equal(x.delay, keep.delay, "absdiff", 0.0));
     x = keep;
-    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, nullptr, nullptr, nullptr, &x.rx_pos), std::invalid_argument); // aod is 'rays.rx_pos'
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, nullptr, nullptr, nullptr, &x.center_freq), std::invalid_argument); // aod is 'rays.center_freq'
+    CHECK(arma::approx_equal(x.center_freq, keep.center_freq, "absdiff", 0.0));
+    x = keep;
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &x.rx_pos),
+                    std::invalid_argument); // fbs_pos is 'rays.rx_pos'
     CHECK(arma::approx_equal(x.rx_pos, keep.rx_pos, "absdiff", 0.0));
     x = keep;
     CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, M, ph, &T, nullptr, nullptr, &a, &a), std::invalid_argument); // eod is 'aod'

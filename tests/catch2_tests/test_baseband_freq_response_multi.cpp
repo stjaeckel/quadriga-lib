@@ -1065,8 +1065,8 @@ TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with abs
     mk(fin.n_elem, pg, M), mk(fout.n_elem, pgo, Mo);
 
     std::vector<arma::cube> cr, ci, dl, tr, ti, td;
-    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 2, 0, 0, 0, 30, 0, 1.5, 0, 0, 0, fbs, fbs, pg, len, M, fin, fin, cr, ci, dl, true);
-    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 2, 0, 0, 0, 30, 0, 1.5, 0, 0, 0, fbs, fbs, pgo, len, Mo, fout, fout, tr, ti, td, true);
+    quadriga_lib::get_channels_multifreq<double>(va, va, {0, 0, 2}, {0, 0, 0}, {30, 0, 1.5}, {0, 0, 0}, fbs, fbs, pg, len, M, fin, fin, cr, ci, dl, true);
+    quadriga_lib::get_channels_multifreq<double>(va, va, {0, 0, 2}, {0, 0, 0}, {30, 0, 1.5}, {0, 0, 0}, fbs, fbs, pgo, len, Mo, fout, fout, tr, ti, td, true);
     arma::cx_cube h;
     quadriga_lib::baseband_freq_response_multi<double>(cr, ci, dl, fin, fout, nullptr, nullptr, &h, true);
     REQUIRE(h.n_slices == fout.n_elem);

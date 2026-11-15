@@ -213,7 +213,7 @@ namespace mt
             arma::Col<short> prev(n, arma::fill::zeros), cur(n, arma::fill::zeros), buf(n, arma::fill::zeros);
             for (int g = 0; g < cap && orig.n_rows; ++g)
             {
-                quadriga_lib::ray_progress(S.mesh, S.mi, S.pal, cf, -1.0f, 0.37f, 0.0f, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr,
+                quadriga_lib::ray_progress(S.mesh, S.mi, S.pal, cf, {-1.0f, 0.37f, 0.0f}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr,
                                            nullptr, nullptr, 60, 255, 255, 0, -120.0f, 3.0f, 0.0f, false, true);
                 ++calls, rays += (long)orig.n_rows;
                 for (arma::uword i = 0; i < orig.n_rows; ++i)
@@ -672,7 +672,7 @@ namespace mt
                 quadriga_lib::ray_triangle_intersect<float>(&orig, &dest, &mesh, nullptr, nullptr, &noi, &fbs, &sbs);
                 for (size_t q = 0; q < nf; ++q)
                     miss[q] = power(q, true);
-                quadriga_lib::ray_progress(mesh, mi, pal, cf, 0.0f, 0.0f, 0.0f, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr, 10, 3, 255, 0,
+                quadriga_lib::ray_progress(mesh, mi, pal, cf, {0.0f, 0.0f, 0.0f}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr, 10, 3, 255, 0,
                                            -60.0f, 3.0f, 0.0f, false, true, &noi, &fbs, &sbs);
                 for (size_t q = 0; q < nf; ++q)
                     R.A[q] += dx * dx * (pin[q] - miss[q] - power(q, false)) * 2.0 / n_dir, pin[q] = power(q, false);

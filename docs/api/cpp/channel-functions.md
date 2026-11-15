@@ -684,16 +684,16 @@ template <typename dtype>
 size_t quadriga_lib::qrt_file_append(
     const std::string &fn,
     const std::vector<quadriga_lib::path> &path_data,
-    const arma::Col<dtype> &orig_pos,
-    const arma::Col<dtype> &orig_orientation = {0.0, 0.0, 0.0},
+    const arma::Mat<dtype> &orig_pos,
+    const arma::Mat<dtype> *orig_orientation = nullptr,
     const std::string &orig_name = "TX");
 ```
 
 ### Inputs:
 - **`fn`** — Path to an existing QRT file created by [qrt_file_init](#qrt_file_init)
 - **`path_data`** — Paths to write; each carries its CIR index in `iC` and must match the file's frequency count and layout mode
-- **`orig_pos`** — Transmitter position; `[3]`
-- **`orig_orientation`** — Transmitter orientation (bank, tilt, head) in rad; `[3]`
+- **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
+- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; `nullptr` = zeros
 - **`orig_name`** — Transmitter name; at most 255 characters
 
 ### Returns:
@@ -825,10 +825,10 @@ void quadriga_lib::qrt_file_read(
     arma::uword i_orig = 0,
     bool downlink = true,
     arma::Col<dtype> *center_freq = nullptr,
-    arma::Col<dtype> *tx_pos = nullptr,
-    arma::Col<dtype> *tx_orientation = nullptr,
-    arma::Col<dtype> *rx_pos = nullptr,
-    arma::Col<dtype> *rx_orientation = nullptr,
+    arma::Mat<dtype> *tx_pos = nullptr,
+    arma::Mat<dtype> *tx_orientation = nullptr,
+    arma::Mat<dtype> *rx_pos = nullptr,
+    arma::Mat<dtype> *rx_orientation = nullptr,
     arma::Mat<dtype> *fbs_pos = nullptr,
     arma::Mat<dtype> *lbs_pos = nullptr,
     arma::Mat<dtype> *path_gain = nullptr,
@@ -867,10 +867,10 @@ void quadriga_lib::qrt_file_read(
 
 ### Outputs:
 - **`center_freq`** — Center frequency in Hz; `[n_freq]`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3]`
-- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3]`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3]`
-- **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3]`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]`
+- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, 1]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]`
+- **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3, 1]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gain on linear scale; `[n_path, n_freq]`
@@ -973,8 +973,8 @@ Not in: MATLAB, Python
 ```cpp
 std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
     const arma::vec &center_freq,
-    const arma::vec &tx_pos,
-    const arma::vec &rx_pos,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
@@ -985,8 +985,8 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 
 ### Inputs:
 - **`center_freq`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
-- **`tx_pos`** — Tx (origin) position in [m]; `[3]`
-- **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
+- **`tx_pos`** — Tx (origin) position in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Rx position of the CIR in [m]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`M`** — Polarization transfer matrices, row order of [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_path, n_freq]`

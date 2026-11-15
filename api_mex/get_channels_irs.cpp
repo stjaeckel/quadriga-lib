@@ -150,14 +150,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     i_irs -= 1;
 
-    // Extract scalar values
-    double Tx = tx_pos.at(0), Ty = tx_pos.at(1), Tz = tx_pos.at(2);
-    double Tb = tx_orientation.at(0), Tt = tx_orientation.at(1), Th = tx_orientation.at(2);
-    double Rx = rx_pos.at(0), Ry = rx_pos.at(1), Rz = rx_pos.at(2);
-    double Rb = rx_orientation.at(0), Rt = rx_orientation.at(1), Rh = rx_orientation.at(2);
-    double Ix = irs_pos.at(0), Iy = irs_pos.at(1), Iz = irs_pos.at(2);
-    double Ib = irs_orientation.at(0), It = irs_orientation.at(1), Ih = irs_orientation.at(2);
-
     // Output containers — size is runtime-dependent (filtered by threshold_dB / active_path_in)
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
     arma::cube *p_aod = (nlhs > 4) ? &aod : nullptr;
@@ -169,13 +161,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call library function
     std::vector<bool> active_path_out;
-    CALL_QD(active_path_out = quadriga_lib::get_channels_irs<double>(&ant_tx, &ant_rx, &ant_irs,
-                                                                     Tx, Ty, Tz, Tb, Tt, Th,
-                                                                     Rx, Ry, Rz, Rb, Rt, Rh,
-                                                                     Ix, Iy, Iz, Ib, It, Ih,
-                                                                     &fbs_pos_1, &lbs_pos_1, &path_gain_1, &path_length_1, &M_1,
-                                                                     &fbs_pos_2, &lbs_pos_2, &path_gain_2, &path_length_2, &M_2,
-                                                                     &coeff_re, &coeff_im, &delay,
+    CALL_QD(active_path_out = quadriga_lib::get_channels_irs<double>(ant_tx, ant_rx, ant_irs,
+                                                                     tx_pos, tx_orientation, rx_pos, rx_orientation,
+                                                                     irs_pos, irs_orientation,
+                                                                     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
+                                                                     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
+                                                                     coeff_re, coeff_im, delay,
                                                                      i_irs, threshold_dB, center_freq, use_absolute_delays,
                                                                      p_aod, p_eod, p_aoa, p_eoa, p_irs_array_2, p_active_path));
 

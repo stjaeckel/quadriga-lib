@@ -209,7 +209,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
     const arma::fvec &center_freq,
-    float Ox, float Oy, float Oz,
+    const arma::fmat &orig_pos,
     arma::fmat &orig,
     arma::fmat &dest,
     arma::Col<short> &mtl_ind_prev,
@@ -242,7 +242,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`. 0 = air
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl` (max 16383)
 - **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
-- **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins
+- **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
 - **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [[ray_triangle_intersect]]; `[n_sub]`. NULL → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
@@ -313,7 +313,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    const arma::uvec &mtl_ind,
                                                    const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
                                                    const arma::fvec &center_freq,
-                                                   float Ox, float Oy, float Oz,
+                                                   const arma::fmat &orig_pos,
                                                    arma::fmat &orig,
                                                    arma::fmat &dest,
                                                    arma::Col<short> &mtl_ind_prev,
@@ -340,6 +340,9 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    const arma::u32_vec *sbs_ind_in,
                                                    const std::vector<bool> *subdiv_flag_in)
 {
+    const float *p_orig_pos = qd_xyz(orig_pos, "orig_pos");
+    const float Ox = p_orig_pos[0], Oy = p_orig_pos[1], Oz = p_orig_pos[2];
+
     // The in/out arguments must be distinct and must not share memory with an input
     qd_check_alias_list({&orig, &dest, &acc_dist, trivec, tridir}, {"orig", "dest", "acc_dist", "trivec", "tridir"},
                         &mesh, &center_freq, aabb);

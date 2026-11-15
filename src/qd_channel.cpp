@@ -920,7 +920,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
         // Calculate path coordinates
         arma::Col<dtype> path_length;
         std::vector<arma::Mat<dtype>> path_coord;
-        quadriga_lib::coord2path<dtype>(tx, ty, tz, rx, ry, rz, &this->no_interact[i_snap_in], &this->interact_coord[i_snap_in],
+        quadriga_lib::coord2path<dtype>(arma::Col<dtype>{tx, ty, tz}, arma::Col<dtype>{rx, ry, rz}, &this->no_interact[i_snap_in], &this->interact_coord[i_snap_in],
                                         &path_length, nullptr, nullptr, nullptr, &path_coord);
 
         // Calculate path power

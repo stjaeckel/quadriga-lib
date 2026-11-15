@@ -61,8 +61,8 @@ void quadriga_lib::ssf_paths(
     arma::vec &path_length,
     arma::cube &M,
     const std::string &mobility = "auto",
-    const arma::vec *tx_pos = nullptr,
-    const arma::vec *rx_pos = nullptr,
+    const arma::mat *tx_pos = nullptr,
+    const arma::mat *rx_pos = nullptr,
     const arma::vec *kf_ratio = nullptr,
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
@@ -79,7 +79,7 @@ void quadriga_lib::ssf_paths(
 - **`rays`** — Ray data of the link
 - **`link_gain_dB`** — Link gain (see Terms) at the position in [dB], per frequency; 0 for data from paths; `[n_freq]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
-- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
+- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3, 1]` or `[1, 3]`
 - **`kf_ratio`** *(optional)* — KF(position) / KF(drop), >= 0, per frequency; omitted: 1; `[n_freq]`
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
 
@@ -105,8 +105,8 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
                              arma::vec &path_length,
                              arma::cube &M,
                              const std::string &mobility,
-                             const arma::vec *tx_pos,
-                             const arma::vec *rx_pos,
+                             const arma::mat *tx_pos,
+                             const arma::mat *rx_pos,
                              const arma::vec *kf_ratio,
                              arma::vec *aod,
                              arma::vec *eod,
@@ -129,12 +129,10 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         throw std::invalid_argument("Input 'link_gain_dB' must have n_freq elements.");
     if (!link_gain_dB.is_finite())
         throw std::invalid_argument("Input 'link_gain_dB' must be finite.");
-    const std::pair<std::string, const arma::vec *> pos[2] = {{"tx_pos", tx_pos}, {"rx_pos", rx_pos}};
-    for (const auto &p : pos)
-        if (p.second != nullptr && p.second->n_elem != 3)
-            throw std::invalid_argument("Input '" + p.first + "' must have 3 elements.");
-        else if (p.second != nullptr && !p.second->is_finite())
-            throw std::invalid_argument("Input '" + p.first + "' must be finite.");
+    if (tx_pos != nullptr)
+        qd_xyz(*tx_pos, "tx_pos");
+    if (rx_pos != nullptr)
+        qd_xyz(*rx_pos, "rx_pos");
     if (kf_ratio != nullptr && kf_ratio->n_elem != n_freq)
         throw std::invalid_argument("Input 'kf_ratio' must have n_freq elements.");
     if (kf_ratio != nullptr && (!kf_ratio->is_finite() || arma::any(*kf_ratio < 0.0)))

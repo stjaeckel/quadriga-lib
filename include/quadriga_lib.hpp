@@ -95,7 +95,7 @@ namespace quadriga_lib
     arma::uword ray_init(
         arma::uword n_ray_target,                         // Target number of rays
         arma::uword n_freq,                               // Number of frequencies
-        float Ox, float Oy, float Oz,                     // Origin position
+        const arma::fmat &orig_pos,                       // Origin position in [m], [3, 1] or [1, 3]
         float max_path_length,                            // Maximum path length
         arma::fmat *orig = nullptr,                       // Ray origins in GCS, [n_ray, 3]
         arma::fmat *dest = nullptr,                       // Ray destinations in GCS, [n_ray, 3]
@@ -137,7 +137,7 @@ namespace quadriga_lib
         const arma::uvec &mtl_ind,                                           // 1-based material index per face, [n_mesh]
         const std::unordered_map<std::string, std::vector<float>> &mtl_prop, // Material properties
         const arma::fvec &center_freq,                                       // Center frequencies in Hz, [n_freq]
-        float Ox, float Oy, float Oz,                                        // Global origin position
+        const arma::fmat &orig_pos,                                          // Global origin position in [m], [3, 1] or [1, 3]
         arma::fmat &orig,                                                    // Ray origins in GCS, updated in-place, [n_ray, 3]
         arma::fmat &dest,                                                    // Ray destinations in GCS, updated in-place, [n_ray, 3]
         arma::Col<short> &mtl_ind_prev,                                      // Previous medium (0 = outside), updated in-place, [n_ray]

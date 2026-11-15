@@ -32,8 +32,8 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 ```
 void quadriga_lib::gbsm_rays_from_paths(
     const arma::vec &center_freq,
-    const arma::vec &tx_pos,
-    const arma::vec &rx_pos,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
@@ -49,7 +49,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 
 ## Inputs:
 - **`center_freq`** — Frequencies in [Hz]; `[n_freq]`
-- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3]`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
@@ -71,8 +71,8 @@ void quadriga_lib::gbsm_rays_from_paths(
 MD!*/
 
 void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
-                                        const arma::vec &tx_pos,
-                                        const arma::vec &rx_pos,
+                                        const arma::mat &tx_pos,
+                                        const arma::mat &rx_pos,
                                         const arma::mat &fbs_pos,
                                         const arma::mat &lbs_pos,
                                         const arma::mat &path_gain,
@@ -90,14 +90,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
         throw std::invalid_argument("Input 'center_freq' cannot be empty.");
     if (!center_freq.is_finite() || arma::any(center_freq <= 0.0))
         throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
-    auto check_pos = [](const arma::vec &x, const std::string &name)
-    {
-        if (x.n_elem != 3)
-            throw std::invalid_argument("Input '" + name + "' must have 3 elements.");
-        if (!x.is_finite())
-            throw std::invalid_argument("Input '" + name + "' must be finite.");
-    };
-    check_pos(tx_pos, "tx_pos"), check_pos(rx_pos, "rx_pos");
+    qd_xyz(tx_pos, "tx_pos"), qd_xyz(rx_pos, "rx_pos");
     if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || lbs_pos.n_cols != n_path)
         throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have size [3, n_path].");
     if (!fbs_pos.is_finite() || !lbs_pos.is_finite())
@@ -184,7 +177,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
     }
 
     rays.method = method;
-    rays.center_freq = center_freq, rays.tx_pos = tx_pos, rays.rx_pos = rx_pos;
+    rays.center_freq = center_freq, rays.tx_pos = arma::mat(tx_pos.memptr(), 3, 1), rays.rx_pos = arma::mat(rx_pos.memptr(), 3, 1);
     rays.power = path_gain, rays.M = M, rays.fbs_pos = fbs_pos, rays.lbs_pos = lbs_pos;
     rays.path_type = type;
     if (tap)

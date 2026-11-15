@@ -960,8 +960,8 @@ static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, 
         auto &r = rays[l];
         py::dict d;
         d["method"] = "";
-        d["tx_pos"] = qd_python_init_output(n3, &r.tx_pos);
-        d["rx_pos"] = qd_python_init_output(n3, &r.rx_pos);
+        d["tx_pos"] = qd_python_init_output(n3, 1, &r.tx_pos).reshape({n3}); // (3,) view of the [3, 1] member
+        d["rx_pos"] = qd_python_init_output(n3, 1, &r.rx_pos).reshape({n3});
         d["center_freq"] = qd_python_init_output(n_freq, &r.center_freq);
         d["delay"] = qd_python_init_output(n_ray, &r.delay);
         d["power"] = qd_python_init_output(n_ray, n_freq, &r.power);

@@ -81,24 +81,24 @@ TEST_CASE("Channel - Effective Path Gain")
     auto ant = quadriga_lib::generate_arrayant_xpol<double>();
 
     l = {0.0}; // Angles
-    quadriga_lib::get_channels_planar(&ant, &ant,
-                                      0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                                      c.rx_pos(0, 0), c.rx_pos(1, 0), c.rx_pos(2, 0),
-                                      0.0, 0.0, 0.0, &l, &l, &l, &l,
-                                      &c.path_gain[0], &c.path_length[0], &c.path_polarization[0],
-                                      &coeff_re, &coeff_im, &delay);
+    quadriga_lib::get_channels_planar(ant, ant,
+                                      {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0},
+                                      {c.rx_pos(0, 0), c.rx_pos(1, 0), c.rx_pos(2, 0)},
+                                      {0.0, 0.0, 0.0}, l, l, l, l,
+                                      c.path_gain[0], c.path_length[0], c.path_polarization[0],
+                                      coeff_re, coeff_im, delay);
 
     c.coeff_re.push_back(coeff_re);
     c.coeff_im.push_back(coeff_im);
     c.delay.push_back(delay);
 
     l = {0.1}; // Angles
-    quadriga_lib::get_channels_planar(&ant, &ant,
-                                      0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                                      c.rx_pos(0, 1), c.rx_pos(1,1), c.rx_pos(2, 1),
-                                      0.0, 0.0, 0.0, &l, &l, &l, &l,
-                                      &c.path_gain[1], &c.path_length[1], &c.path_polarization[1],
-                                      &coeff_re, &coeff_im, &delay);
+    quadriga_lib::get_channels_planar(ant, ant,
+                                      {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0},
+                                      {c.rx_pos(0, 1), c.rx_pos(1,1), c.rx_pos(2, 1)},
+                                      {0.0, 0.0, 0.0}, l, l, l, l,
+                                      c.path_gain[1], c.path_length[1], c.path_polarization[1],
+                                      coeff_re, coeff_im, delay);
 
     c.coeff_re.push_back(coeff_re);
     c.coeff_im.push_back(coeff_im);

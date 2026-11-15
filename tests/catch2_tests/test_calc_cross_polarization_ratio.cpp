@@ -584,8 +584,8 @@ TEST_CASE("calc_cross_polarization_ratio - Circular columns are per receive pola
     auto p2 = [&](const quadriga_lib::arrayant<double> &tx_ant, const quadriga_lib::arrayant<double> &rx_ant)
     {
         arma::cube cr, ci, dl;
-        quadriga_lib::get_channels_spherical<double>(&tx_ant, &rx_ant, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, &F, &F, &g,
-                                                     &len, &M, &cr, &ci, &dl, 0.0);
+        quadriga_lib::get_channels_spherical<double>(tx_ant, rx_ant, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0}, F, F, g,
+                                                     len, M, cr, ci, dl, 0.0);
         return cr(0) * cr(0) + ci(0) * ci(0);
     };
     double LL = p2(L, L), LR = p2(R, L), RL = p2(L, R), RR = p2(R, R); // <rx><tx>

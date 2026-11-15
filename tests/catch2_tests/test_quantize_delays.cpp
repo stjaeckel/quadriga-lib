@@ -693,8 +693,8 @@ TEST_CASE("quantize_delays - Relative delays of get_channels_spherical")
     arma::mat M(8, 2, arma::fill::zeros);
     M.row(0).fill(1.0), M.row(6).fill(-1.0);
     std::vector<arma::cube> cre(1), cim(1), dl(1), cre_q, cim_q, dl_q;
-    quadriga_lib::get_channels_spherical<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 100.0, 0.0, 10.0, 0.0, 0.0, 0.3,
-                                                 &fbs, &lbs, &gain, &len, &M, &cre[0], &cim[0], &dl[0], 3.5e9);
+    quadriga_lib::get_channels_spherical<double>(tx, rx, {0.0, 0.0, 10.0}, {0.0, 0.0, 0.0}, {100.0, 0.0, 10.0}, {0.0, 0.0, 0.3},
+                                                 fbs, lbs, gain, len, M, cre[0], cim[0], dl[0], 3.5e9);
     REQUIRE(dl[0].min() < 0.0);
     REQUIRE(arma::accu(dl[0] < 0.0) > 0);
 
@@ -959,7 +959,7 @@ TEST_CASE("quantize_delays - Relative delays of an acoustic array")
     for (bool absolute : {false, true})
     {
         std::vector<arma::cube> cre, cim, dl, cre_q, cim_q, dl_q;
-        quadriga_lib::get_channels_multifreq<double>(tx, rx, 0.0, 0.0, 1.5, 0.0, 0.0, 0.0, 5.0, 0.0, 1.5, 0.0, 0.0, 0.3,
+        quadriga_lib::get_channels_multifreq<double>(tx, rx, {0.0, 0.0, 1.5}, {0.0, 0.0, 0.0}, {5.0, 0.0, 1.5}, {0.0, 0.0, 0.3},
                                                      fbs, fbs, pg, len, M, fin, fout, cre, cim, dl, absolute, false, c);
         REQUIRE(dl.size() == 1);
         if (!absolute)

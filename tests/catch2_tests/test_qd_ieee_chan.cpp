@@ -1002,13 +1002,13 @@ TEST_CASE("IEEE Chan - Doppler sign of a moving station matches get_channels_sph
             arma::vec pg = {1.0}, pl = {std::sqrt(p(0) * p(0) + p(1) * p(1) + p(2) * p(2))};
             arma::cube cr, ci, dly;
             if (uplink)
-                quadriga_lib::get_channels_spherical<double>(&sta, &ap, p(0), p(1), p(2), o_sta(0), o_sta(1), o_sta(2),
-                                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &sc, &sc, &pg, &pl, &M_los,
-                                                             &cr, &ci, &dly, fc);
+                quadriga_lib::get_channels_spherical<double>(sta, ap, {p(0), p(1), p(2)}, {o_sta(0), o_sta(1), o_sta(2)},
+                                                             {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, sc, sc, pg, pl, M_los,
+                                                             cr, ci, dly, fc);
             else
-                quadriga_lib::get_channels_spherical<double>(&ap, &sta, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                             p(0), p(1), p(2), o_sta(0), o_sta(1), o_sta(2),
-                                                             &sc, &sc, &pg, &pl, &M_los, &cr, &ci, &dly, fc);
+                quadriga_lib::get_channels_spherical<double>(ap, sta, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                                             {p(0), p(1), p(2)}, {o_sta(0), o_sta(1), o_sta(2)},
+                                                             sc, sc, pg, pl, M_los, cr, ci, dly, fc);
             H_sph.push_back(arma::cx_mat(cr.slice(0), ci.slice(0)));
             H_ieee.push_back(arma::cx_mat(c.coeff_re[s].slice(0), c.coeff_im[s].slice(0)));
         }

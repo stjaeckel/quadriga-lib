@@ -222,7 +222,7 @@ TEST_CASE("Arrayant quick check - Library functions do not mark their inputs")
     M(0, 0, 0) = 1.0, M(6, 0, 0) = -1.0;
     std::vector<arma::cube> cr, ci, dl;
     qd_arrayant_clear_mark(vec[0]); // Each call starts from an unmarked input
-    quadriga_lib::get_channels_multifreq<double>(vec, vec, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 10.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq<double>(vec, vec, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {10.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
                                                  fbs, lbs, pg, plen, M, freq, freq, cr, ci, dl);
     REQUIRE(cr.size() == 1);
     CHECK(!qd_arrayant_cache_matches(vec[0]));

@@ -437,7 +437,7 @@ TEST_CASE("QRT Reader - angles with 0 paths")
         m[k] = (k == 0 || k == 6) ? 0.5f : 0.0f;
     p.set_interaction_type_codes({10});
     std::vector<quadriga_lib::path> paths = {p};
-    quadriga_lib::qrt_file_append<float>(fn, paths, arma::fvec{1.0f, 1.0f, 1.0f}, arma::fvec{0.0f, 0.0f, 0.0f}, "TX0");
+    quadriga_lib::qrt_file_append<float>(fn, paths, arma::fvec{1.0f, 1.0f, 1.0f}, nullptr, "TX0");
 
     // CIR 1 has one path
     arma::vec aod1;

@@ -128,28 +128,28 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · No
 ### Declaration:
 ```cpp
 std::vector<bool> quadriga_lib::get_channels_irs(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    const quadriga_lib::arrayant<dtype> *irs_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    dtype Ix, dtype Iy, dtype Iz,
-    dtype Ib, dtype It, dtype Ih,
-    const arma::Mat<dtype> *fbs_pos_1,
-    const arma::Mat<dtype> *lbs_pos_1,
-    const arma::Col<dtype> *path_gain_1,
-    const arma::Col<dtype> *path_length_1,
-    const arma::Mat<dtype> *M_1,
-    const arma::Mat<dtype> *fbs_pos_2,
-    const arma::Mat<dtype> *lbs_pos_2,
-    const arma::Col<dtype> *path_gain_2,
-    const arma::Col<dtype> *path_length_2,
-    const arma::Mat<dtype> *M_2,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const quadriga_lib::arrayant<dtype> &irs_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Mat<dtype> &irs_pos,
+    const arma::Mat<dtype> &irs_orientation,
+    const arma::Mat<dtype> &fbs_pos_1,
+    const arma::Mat<dtype> &lbs_pos_1,
+    const arma::Col<dtype> &path_gain_1,
+    const arma::Col<dtype> &path_length_1,
+    const arma::Mat<dtype> &M_1,
+    const arma::Mat<dtype> &fbs_pos_2,
+    const arma::Mat<dtype> &lbs_pos_2,
+    const arma::Col<dtype> &path_gain_2,
+    const arma::Col<dtype> &path_length_2,
+    const arma::Mat<dtype> &M_2,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     arma::uword i_irs = 0,
     dtype threshold_dB = -140.0,
     dtype center_freq = 0.0,
@@ -166,12 +166,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](array-antenna-class.md#arrayant)
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](array-antenna-class.md#arrayant)
 - **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [arrayant](array-antenna-class.md#arrayant)
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading)
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading)
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
-- **`Ib, It, Ih`** — IRS orientation as Euler angles (bank, tilt, heading)
+- **`tx_pos`** — Transmitter position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`irs_pos`** — IRS position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1]`
@@ -253,10 +253,10 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_multifreq)
 void quadriga_lib::get_channels_multifreq(
     const std::vector<arrayant<dtype>> &tx_array,
     const std::vector<arrayant<dtype>> &rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
     const arma::Mat<dtype> &fbs_pos,
     const arma::Mat<dtype> &lbs_pos,
     const arma::Mat<dtype> &path_gain,
@@ -276,10 +276,10 @@ void quadriga_lib::get_channels_multifreq(
 ### Inputs:
 - **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [arrayant_is_valid_multi](array-antenna-functions.md#arrayant_is_valid_multi)
 - **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [arrayant_is_valid_multi](array-antenna-functions.md#arrayant_is_valid_multi)
-- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates, finite
-- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading), finite
-- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates, finite
-- **`Rb, Rt, Rh`** — RX orientation, Euler angles (bank, tilt, heading), finite
+- **`tx_pos`** — TX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — TX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — RX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — RX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains; `[n_path, n_freq]`
@@ -338,22 +338,22 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_planar) ·
 ### Declaration:
 ```cpp
 void quadriga_lib::get_channels_planar(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    const arma::Col<dtype> *aod,
-    const arma::Col<dtype> *eod,
-    const arma::Col<dtype> *aoa,
-    const arma::Col<dtype> *eoa,
-    const arma::Col<dtype> *path_gain,
-    const arma::Col<dtype> *path_length,
-    const arma::Mat<dtype> *M,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Col<dtype> &aod,
+    const arma::Col<dtype> &eod,
+    const arma::Col<dtype> &aoa,
+    const arma::Col<dtype> &eoa,
+    const arma::Col<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Mat<dtype> &M,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
@@ -363,10 +363,10 @@ void quadriga_lib::get_channels_planar(
 ### Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` elements
 - **`rx_array`** — Receive antenna array; `n_rx` elements
-- **`Tx, Ty, Tz`** — Transmitter position
-- **`Tb, Tt, Th`** — Transmitter orientation: bank, tilt, heading
-- **`Rx, Ry, Rz`** — Receiver position
-- **`Rb, Rt, Rh`** — Receiver orientation: bank, tilt, heading
+- **`tx_pos`** — Transmitter position in [m]; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
 - **`aod`** — Departure azimuth angles; `[n_path]`
 - **`eod`** — Departure elevation angles; `[n_path]`
 - **`aoa`** — Arrival azimuth angles; `[n_path]`
@@ -424,20 +424,20 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_spherical)
 ### Declaration:
 ```cpp
 void quadriga_lib::get_channels_spherical(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    const arma::Mat<dtype> *fbs_pos,
-    const arma::Mat<dtype> *lbs_pos,
-    const arma::Col<dtype> *path_gain,
-    const arma::Col<dtype> *path_length,
-    const arma::Mat<dtype> *M,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Mat<dtype> &fbs_pos,
+    const arma::Mat<dtype> &lbs_pos,
+    const arma::Col<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Mat<dtype> &M,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
@@ -451,10 +451,10 @@ void quadriga_lib::get_channels_spherical(
 ### Inputs:
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](array-antenna-class.md#arrayant)
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](array-antenna-class.md#arrayant)
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, finite
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, finite
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), finite
+- **`tx_pos`** — Transmitter position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`

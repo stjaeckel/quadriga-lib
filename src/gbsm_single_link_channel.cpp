@@ -211,7 +211,8 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                                                               {&c.rx_orientation, rx_orientation}};
     for (int j = 0; j < 4; ++j)
     {
-        const arma::vec d = (j == 0) ? rays.tx_pos : (j == 1) ? rays.rx_pos : arma::vec(3, arma::fill::zeros);
+        const arma::vec d = (j < 2) ? arma::vec((j == 0 ? rays.tx_pos : rays.rx_pos).memptr(), 3) // [3, 1] or [1, 3]
+                                    : arma::vec(3, arma::fill::zeros);
         *col[j].first = (col[j].second == nullptr)       ? arma::repmat(d, 1, n_snap)
                         : (col[j].second->n_rows == 1) ? arma::repmat(col[j].second->t(), 1, n_snap)
                                                        : arma::mat(col[j].second->t());
@@ -306,13 +307,11 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         }
         const arma::vec ones(n_kept, arma::fill::ones);
         const arma::mat &M0 = rr.M.slice(0);
-        const double *T0 = rays.tx_pos.memptr(), *R0 = rays.rx_pos.memptr();
         auto unit = [&](arma::uword t)
         {
-            const double *To = c.tx_orientation.colptr(t), *Ro = c.rx_orientation.colptr(t);
-            get_channels_planar(&tx_array, &rx_array, T0[0], T0[1], T0[2], To[0], To[1], To[2], R0[0], R0[1], R0[2],
-                                Ro[0], Ro[1], Ro[2], &rr.aod, &rr.eod, &rr.aoa, &rr.eoa, &ones, &L_ph, &M0, &u_re[t],
-                                &u_im[t], &u_dl[t], fc, use_absolute_delays);
+            const arma::vec To = c.tx_orientation.col(t), Ro = c.rx_orientation.col(t);
+            get_channels_planar(tx_array, rx_array, rays.tx_pos, To, rays.rx_pos, Ro, rr.aod, rr.eod, rr.aoa, rr.eoa,
+                                ones, L_ph, M0, u_re[t], u_im[t], u_dl[t], fc, use_absolute_delays);
         };
         const int n_o = (int)o_start.size();
         loop(n_o, n_o > 1 && (arma::uword)n_o * n_kept * n_rx * n_tx >= L_chan,
@@ -374,9 +373,8 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                       &fbs, &lbs, nullptr, nullptr, oxygen);
             M = arma::mat(pM.slice_memptr(0), 8, n_kept);
             const arma::vec g = (n_kept > 0) ? arma::vec(pg.col(0)) : arma::vec();
-            const double *To = c.tx_orientation.colptr(t), *Ro = c.rx_orientation.colptr(t);
-            get_channels_spherical<double>(&tx_array, &rx_array, T(0), T(1), T(2), To[0], To[1], To[2], R(0), R(1), R(2),
-                                           Ro[0], Ro[1], Ro[2], &fbs, &lbs, &g, &pl, &M, &cr, &ci, &dl, fc,
+            const arma::vec To = c.tx_orientation.col(t), Ro = c.rx_orientation.col(t);
+            get_channels_spherical<double>(tx_array, rx_array, T, To, R, Ro, fbs, lbs, g, pl, M, cr, ci, dl, fc,
                                            use_absolute_delays, false, nullptr, nullptr, nullptr, nullptr, 1);
             if (with_gr)
                 gr_pos.col(t) = fbs.col(i_gr(0));
@@ -426,10 +424,10 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         const double l = drift ? 0.2 * b_med(e) : std::sqrt(c0 / fc * b_eff(e) / 8.0);
         limit(e) = std::isnan(l) ? arma::datum::inf : l;
         const arma::mat &P = (e == 0) ? c.tx_pos : c.rx_pos;
-        const arma::vec &P0 = (e == 0) ? rays.tx_pos : rays.rx_pos;
+        const double *P0 = ((e == 0) ? rays.tx_pos : rays.rx_pos).memptr(); // [3, 1] or [1, 3]
         for (arma::uword t = 0; t < n_snap; ++t)
         {
-            const double d = std::hypot(std::hypot(P(0, t) - P0(0), P(1, t) - P0(1)), P(2, t) - P0(2));
+            const double d = std::hypot(std::hypot(P(0, t) - P0[0], P(1, t) - P0[1]), P(2, t) - P0[2]);
             ratio(e) = (d > 0.0) ? std::max(ratio(e), d / limit(e)) : ratio(e);
         }
     }

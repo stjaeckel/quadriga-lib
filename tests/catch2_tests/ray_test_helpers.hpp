@@ -2744,7 +2744,7 @@ namespace
         std::array<unsigned, 4> step(const Scene &S, const Opt &o = Opt())
         {
             return quadriga_lib::ray_progress(S.mesh, S.mtl_ind, S.mtl_prop, freq,
-                                              Ox, Oy, Oz,
+                                              {Ox, Oy, Oz},
                                               orig, dest, prev, cur, buf, path_dir, acc_dist, paths,
                                               beam ? &trivec : nullptr,
                                               beam ? &tridir : nullptr,
@@ -3145,7 +3145,7 @@ namespace rp
         int n = 0;
         for (int g = 0; g < o.calls; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr,
+            quadriga_lib::ray_progress(mesh, mi, pal, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr,
                                        nullptr, o.max_int, o.max_refl, o.max_trans, 0, o.min_gain, 3.0f, o.slab, o.refr, o.scalar);
             if (orig.n_rows == 0)
                 break;

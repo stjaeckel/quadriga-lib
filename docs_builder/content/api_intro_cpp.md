@@ -34,6 +34,10 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - `freq`: short name for a frequency in Hz; a value that must stay in GHz is named `freq_GHz`. For a frequency grid, `freq` holds the sample frequencies and `freq_new` the target frequencies.
 - `spatial_freq`: spatial frequencies of a sum-of-sinusoids generator in 1/m, `[n_coeff, n_dim]`; limits `spatial_freq_min`, `spatial_freq_max`.
 
+**Positions and orientations**
+
+- `tx_pos`, `rx_pos`, `irs_pos`, `orig_pos`: positions in GCS in meters; `tx_orientation`, `rx_orientation`, `irs_orientation`, `orig_orientation`: Euler angles (bank, tilt, heading) in rad. C++: `arma::Mat`, `[3, 1]` for one item (inputs also take `[1, 3]`), `[3, n]` for many (e.g. one per snapshot); MATLAB / Octave and Python: a 3-element vector for one item. Exceptions with one row per item, `[n, 3]`: the ray-tracing state, meshes, point clouds, QRT CIR and origin position lists (`qrt_file_init`, `qrt_file_parse`), sum-of-sinusoids positions and the GBSM batch inputs.
+
 **Polarization**
 
 - `M`: polarization transfer matrix; 8 rows per path, interleaved real/imaginary, order `[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]`. A 2-row form `[ReVV, ImVV]` is used for scalar (acoustic) fields.

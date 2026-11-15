@@ -1301,7 +1301,7 @@ void quadriga_lib::arrayant_rotate_pattern(
 
 ## Inputs:
 - **`ant`** — Valid arrayant; updated in place
-- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]` or `[1, 3]`
 - **`usage`** *(optional)* — Rotation mode:<br><br>
    | Mode | Pattern | Polarization | Grid adjustment |
    | ---- | ------- | ------------ | --------------- |
@@ -1334,10 +1334,7 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    if (orientation.n_rows != 3 || orientation.n_cols != 1)
-        throw std::invalid_argument("Input 'orientation' must have size [3, 1].");
-    if (!orientation.is_finite())
-        throw std::invalid_argument("Input 'orientation' must be finite.");
+    qd_xyz(orientation, "orientation");
     if (usage > 4)
         throw std::invalid_argument("Input parameter 'usage' must be 0, 1, 2, 3 or 4.");
     // Set element indices; a subset without duplicates that holds every element counts as all elements

@@ -38,6 +38,10 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - `freq`: short name for a frequency in Hz; a value that must stay in GHz is named `freq_GHz`. For a frequency grid, `freq` holds the sample frequencies and `freq_new` the target frequencies.
 - `spatial_freq`: spatial frequencies of a sum-of-sinusoids generator in 1/m, `[n_coeff, n_dim]`; limits `spatial_freq_min`, `spatial_freq_max`.
 
+**Positions and orientations**
+
+- `tx_pos`, `rx_pos`, `irs_pos`, `orig_pos`: positions in GCS in meters; `tx_orientation`, `rx_orientation`, `irs_orientation`, `orig_orientation`: Euler angles (bank, tilt, heading) in rad. C++: `arma::Mat`, `[3, 1]` for one item (inputs also take `[1, 3]`), `[3, n]` for many (e.g. one per snapshot); MATLAB / Octave and Python: a 3-element vector for one item. Exceptions with one row per item, `[n, 3]`: the ray-tracing state, meshes, point clouds, QRT CIR and origin position lists (`qrt_file_init`, `qrt_file_parse`), sum-of-sinusoids positions and the GBSM batch inputs.
+
 **Polarization**
 
 - `M`: polarization transfer matrix; 8 rows per path, interleaved real/imaginary, order `[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]`. A 2-row form `[ReVV, ImVV]` is used for scalar (acoustic) fields.
@@ -962,7 +966,7 @@ void quadriga_lib::arrayant_rotate_pattern(
 
 ### Inputs:
 - **`ant`** — Valid arrayant; updated in place
-- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]`
+- **`orientation`** — Euler angles (bank, tilt, heading) in rad, finite; `[3, 1]` or `[1, 3]`
 - **`usage`** *(optional)* — Rotation mode:
    | Mode | Pattern | Polarization | Grid adjustment |
    | ---- | ------- | ------------ | --------------- |
@@ -2332,16 +2336,16 @@ template <typename dtype>
 size_t quadriga_lib::qrt_file_append(
     const std::string &fn,
     const std::vector<quadriga_lib::path> &path_data,
-    const arma::Col<dtype> &orig_pos,
-    const arma::Col<dtype> &orig_orientation = {0.0, 0.0, 0.0},
+    const arma::Mat<dtype> &orig_pos,
+    const arma::Mat<dtype> *orig_orientation = nullptr,
     const std::string &orig_name = "TX");
 ```
 
 ### Inputs:
 - **`fn`** — Path to an existing QRT file created by [qrt_file_init](#qrt_file_init)
 - **`path_data`** — Paths to write; each carries its CIR index in `iC` and must match the file's frequency count and layout mode
-- **`orig_pos`** — Transmitter position; `[3]`
-- **`orig_orientation`** — Transmitter orientation (bank, tilt, head) in rad; `[3]`
+- **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
+- **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; `nullptr` = zeros
 - **`orig_name`** — Transmitter name; at most 255 characters
 
 ### Returns:
@@ -2473,10 +2477,10 @@ void quadriga_lib::qrt_file_read(
     arma::uword i_orig = 0,
     bool downlink = true,
     arma::Col<dtype> *center_freq = nullptr,
-    arma::Col<dtype> *tx_pos = nullptr,
-    arma::Col<dtype> *tx_orientation = nullptr,
-    arma::Col<dtype> *rx_pos = nullptr,
-    arma::Col<dtype> *rx_orientation = nullptr,
+    arma::Mat<dtype> *tx_pos = nullptr,
+    arma::Mat<dtype> *tx_orientation = nullptr,
+    arma::Mat<dtype> *rx_pos = nullptr,
+    arma::Mat<dtype> *rx_orientation = nullptr,
     arma::Mat<dtype> *fbs_pos = nullptr,
     arma::Mat<dtype> *lbs_pos = nullptr,
     arma::Mat<dtype> *path_gain = nullptr,
@@ -2515,10 +2519,10 @@ void quadriga_lib::qrt_file_read(
 
 ### Outputs:
 - **`center_freq`** — Center frequency in Hz; `[n_freq]`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3]`
-- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3]`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3]`
-- **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3]`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]`
+- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, 1]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]`
+- **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3, 1]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gain on linear scale; `[n_path, n_freq]`
@@ -2621,8 +2625,8 @@ Not in: MATLAB, Python
 ```cpp
 std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
     const arma::vec &center_freq,
-    const arma::vec &tx_pos,
-    const arma::vec &rx_pos,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
@@ -2633,8 +2637,8 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 
 ### Inputs:
 - **`center_freq`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
-- **`tx_pos`** — Tx (origin) position in [m]; `[3]`
-- **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
+- **`tx_pos`** — Tx (origin) position in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Rx position of the CIR in [m]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`M`** — Polarization transfer matrices, row order of [get_channels_spherical](#get_channels_spherical); `[8, n_path, n_freq]`
@@ -2890,28 +2894,28 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_irs) · Not in: Python
 ### Declaration:
 ```cpp
 std::vector<bool> quadriga_lib::get_channels_irs(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    const quadriga_lib::arrayant<dtype> *irs_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    dtype Ix, dtype Iy, dtype Iz,
-    dtype Ib, dtype It, dtype Ih,
-    const arma::Mat<dtype> *fbs_pos_1,
-    const arma::Mat<dtype> *lbs_pos_1,
-    const arma::Col<dtype> *path_gain_1,
-    const arma::Col<dtype> *path_length_1,
-    const arma::Mat<dtype> *M_1,
-    const arma::Mat<dtype> *fbs_pos_2,
-    const arma::Mat<dtype> *lbs_pos_2,
-    const arma::Col<dtype> *path_gain_2,
-    const arma::Col<dtype> *path_length_2,
-    const arma::Mat<dtype> *M_2,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const quadriga_lib::arrayant<dtype> &irs_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Mat<dtype> &irs_pos,
+    const arma::Mat<dtype> &irs_orientation,
+    const arma::Mat<dtype> &fbs_pos_1,
+    const arma::Mat<dtype> &lbs_pos_1,
+    const arma::Col<dtype> &path_gain_1,
+    const arma::Col<dtype> &path_length_1,
+    const arma::Mat<dtype> &M_1,
+    const arma::Mat<dtype> &fbs_pos_2,
+    const arma::Mat<dtype> &lbs_pos_2,
+    const arma::Col<dtype> &path_gain_2,
+    const arma::Col<dtype> &path_length_2,
+    const arma::Mat<dtype> &M_2,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     arma::uword i_irs = 0,
     dtype threshold_dB = -140.0,
     dtype center_freq = 0.0,
@@ -2928,12 +2932,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](#arrayant)
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](#arrayant)
 - **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [arrayant](#arrayant)
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading)
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading)
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
-- **`Ib, It, Ih`** — IRS orientation as Euler angles (bank, tilt, heading)
+- **`tx_pos`** — Transmitter position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`irs_pos`** — IRS position in Cartesian coordinates in [m]; `[3, 1]` or `[1, 3]`
+- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1]`
@@ -3015,10 +3019,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_multifreq) · [Python](qu
 void quadriga_lib::get_channels_multifreq(
     const std::vector<arrayant<dtype>> &tx_array,
     const std::vector<arrayant<dtype>> &rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
     const arma::Mat<dtype> &fbs_pos,
     const arma::Mat<dtype> &lbs_pos,
     const arma::Mat<dtype> &path_gain,
@@ -3038,10 +3042,10 @@ void quadriga_lib::get_channels_multifreq(
 ### Inputs:
 - **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi)
 - **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi)
-- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates, finite
-- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading), finite
-- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates, finite
-- **`Rb, Rt, Rh`** — RX orientation, Euler angles (bank, tilt, heading), finite
+- **`tx_pos`** — TX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — TX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — RX position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — RX orientation, Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains; `[n_path, n_freq]`
@@ -3100,22 +3104,22 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_planar) · [Python](quadr
 ### Declaration:
 ```cpp
 void quadriga_lib::get_channels_planar(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    const arma::Col<dtype> *aod,
-    const arma::Col<dtype> *eod,
-    const arma::Col<dtype> *aoa,
-    const arma::Col<dtype> *eoa,
-    const arma::Col<dtype> *path_gain,
-    const arma::Col<dtype> *path_length,
-    const arma::Mat<dtype> *M,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Col<dtype> &aod,
+    const arma::Col<dtype> &eod,
+    const arma::Col<dtype> &aoa,
+    const arma::Col<dtype> &eoa,
+    const arma::Col<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Mat<dtype> &M,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
@@ -3125,10 +3129,10 @@ void quadriga_lib::get_channels_planar(
 ### Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` elements
 - **`rx_array`** — Receive antenna array; `n_rx` elements
-- **`Tx, Ty, Tz`** — Transmitter position
-- **`Tb, Tt, Th`** — Transmitter orientation: bank, tilt, heading
-- **`Rx, Ry, Rz`** — Receiver position
-- **`Rb, Rt, Rh`** — Receiver orientation: bank, tilt, heading
+- **`tx_pos`** — Transmitter position in [m]; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
 - **`aod`** — Departure azimuth angles; `[n_path]`
 - **`eod`** — Departure elevation angles; `[n_path]`
 - **`aoa`** — Arrival azimuth angles; `[n_path]`
@@ -3186,20 +3190,20 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_spherical) · [Python](qu
 ### Declaration:
 ```cpp
 void quadriga_lib::get_channels_spherical(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    const arma::Mat<dtype> *fbs_pos,
-    const arma::Mat<dtype> *lbs_pos,
-    const arma::Col<dtype> *path_gain,
-    const arma::Col<dtype> *path_length,
-    const arma::Mat<dtype> *M,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Mat<dtype> &fbs_pos,
+    const arma::Mat<dtype> &lbs_pos,
+    const arma::Col<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Mat<dtype> &M,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
@@ -3213,10 +3217,10 @@ void quadriga_lib::get_channels_spherical(
 ### Inputs:
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](#arrayant)
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](#arrayant)
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, finite
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, finite
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), finite
+- **`tx_pos`** — Transmitter position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
@@ -3921,7 +3925,7 @@ Not in: MATLAB, Python
 | Attribute | Type, size | Meaning | Set by |
 | --- | --- | --- | --- |
 | `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
-| `tx_pos`, `rx_pos` | `arma::vec`, `[3]` | Tx and Rx position the ray data refer to in [m] | all |
+| `tx_pos`, `rx_pos` | `arma::mat`, 3 elements; `[3, 1]` as written by the library | Tx and Rx position the ray data refer to in [m] | all |
 | `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
@@ -3975,8 +3979,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quad
 ```cpp
 void quadriga_lib::gbsm_rays_from_paths(
     const arma::vec &center_freq,
-    const arma::vec &tx_pos,
-    const arma::vec &rx_pos,
+    const arma::mat &tx_pos,
+    const arma::mat &rx_pos,
     const arma::mat &fbs_pos,
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
@@ -3992,7 +3996,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 
 ### Inputs:
 - **`center_freq`** — Frequencies in [Hz]; `[n_freq]`
-- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3]`
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
@@ -4606,8 +4610,8 @@ void quadriga_lib::ssf_paths(
     arma::vec &path_length,
     arma::cube &M,
     const std::string &mobility = "auto",
-    const arma::vec *tx_pos = nullptr,
-    const arma::vec *rx_pos = nullptr,
+    const arma::mat *tx_pos = nullptr,
+    const arma::mat *rx_pos = nullptr,
     const arma::vec *kf_ratio = nullptr,
     arma::vec *aod = nullptr,
     arma::vec *eod = nullptr,
@@ -4624,7 +4628,7 @@ void quadriga_lib::ssf_paths(
 - **`rays`** — Ray data of the link
 - **`link_gain_dB`** — Link gain (see Terms) at the position in [dB], per frequency; 0 for data from paths; `[n_freq]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
-- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3]`
+- **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx position in [m]; omitted: the positions of `rays`; `[3, 1]` or `[1, 3]`
 - **`kf_ratio`** *(optional)* — KF(position) / KF(drop), >= 0, per frequency; omitted: 1; `[n_freq]`
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1
 
@@ -5242,7 +5246,7 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 void quadriga_lib::combine_irs_coord(
-    dtype Ix, dtype Iy, dtype Iz,
+    const arma::Mat<dtype> &irs_pos,
     const arma::u32_vec *no_interact_1,
     const arma::Mat<dtype> *interact_coord_1,
     const arma::u32_vec *no_interact_2,
@@ -5255,7 +5259,7 @@ void quadriga_lib::combine_irs_coord(
 ```
 
 ### Inputs:
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
+- **`irs_pos`** — IRS position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
 - **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`; any other size throws
   `std::invalid_argument` (an empty matrix is accepted when `sum(no_interact_1)` is 0)
@@ -5289,8 +5293,8 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 void quadriga_lib::coord2path(
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Rx, dtype Ry, dtype Rz,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &rx_pos,
     const arma::u32_vec *no_interact,
     const arma::Mat<dtype> *interact_coord,
     arma::Col<dtype> *path_length = nullptr,
@@ -5302,8 +5306,8 @@ void quadriga_lib::coord2path(
 ```
 
 ### Inputs:
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`no_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
 - **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(no_interact)]`
 - **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
@@ -6117,7 +6121,7 @@ Not in: MATLAB, Python
 arma::uword ray_init(
     arma::uword n_ray_target,
     arma::uword n_freq,
-    float Ox, float Oy, float Oz,
+    const arma::fmat &orig_pos,
     float max_path_length,
     arma::fmat *orig = nullptr,
     arma::fmat *dest = nullptr,
@@ -6140,7 +6144,7 @@ arma::uword ray_init(
 - **`n_ray_target`** — Desired ray count; quantized to the nearest icosphere grid (see above)
 - **`n_freq`** — Number of frequency bins allocated per path in `paths`; must be ≥ 1 (throws if 0; the
   [path](#path) layout supports 1-127)
-- **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]
+- **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
   the launch sphere `r0`. NULL → the mesh does not bound `r0`.
@@ -6436,7 +6440,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
     const arma::fvec &center_freq,
-    float Ox, float Oy, float Oz,
+    const arma::fmat &orig_pos,
     arma::fmat &orig,
     arma::fmat &dest,
     arma::Col<short> &mtl_ind_prev,
@@ -6469,7 +6473,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`. 0 = air
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl` (max 16383)
 - **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
-- **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins
+- **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
 - **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
 - **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.

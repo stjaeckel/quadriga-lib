@@ -24,7 +24,7 @@ Combine path interaction coordinates for IRS-assisted TX → RX channels
 ## Declaration:
 ```
 void quadriga_lib::combine_irs_coord(
-    dtype Ix, dtype Iy, dtype Iz,
+    const arma::Mat<dtype> &irs_pos,
     const arma::u32_vec *no_interact_1,
     const arma::Mat<dtype> *interact_coord_1,
     const arma::u32_vec *no_interact_2,
@@ -37,7 +37,7 @@ void quadriga_lib::combine_irs_coord(
 ```
 
 ## Inputs:
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
+- **`irs_pos`** — IRS position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
 - **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`; any other size throws
   `std::invalid_argument` (an empty matrix is accepted when `sum(no_interact_1)` is 0)
@@ -59,12 +59,15 @@ MD!*/
 
 // Combine path interaction coordinates for Intelligent Reflective Surfaces (IRS)
 template <typename dtype>
-void quadriga_lib::combine_irs_coord(dtype Ix, dtype Iy, dtype Iz,
+void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
                                      const arma::u32_vec *no_interact_1, const arma::Mat<dtype> *interact_coord_1,
                                      const arma::u32_vec *no_interact_2, const arma::Mat<dtype> *interact_coord_2,
                                      arma::u32_vec *no_interact, arma::Mat<dtype> *interact_coord,
                                      bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path)
 {
+    const dtype *p_irs = qd_xyz(irs_pos, "irs_pos");
+    const dtype Ix = p_irs[0], Iy = p_irs[1], Iz = p_irs[2];
+
     if (no_interact_1 == nullptr)
         throw std::invalid_argument("Input 'no_interact_1' cannot be NULL.");
     if (interact_coord_1 == nullptr)
@@ -207,13 +210,13 @@ void quadriga_lib::combine_irs_coord(dtype Ix, dtype Iy, dtype Iz,
     }
 }
 
-template void quadriga_lib::combine_irs_coord(float Ix, float Iy, float Iz,
+template void quadriga_lib::combine_irs_coord(const arma::Mat<float> &irs_pos,
                                               const arma::u32_vec *no_interact_1, const arma::Mat<float> *interact_coord_1,
                                               const arma::u32_vec *no_interact_2, const arma::Mat<float> *interact_coord_2,
                                               arma::u32_vec *no_interact, arma::Mat<float> *interact_coord,
                                               bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path);
 
-template void quadriga_lib::combine_irs_coord(double Ix, double Iy, double Iz,
+template void quadriga_lib::combine_irs_coord(const arma::Mat<double> &irs_pos,
                                               const arma::u32_vec *no_interact_1, const arma::Mat<double> *interact_coord_1,
                                               const arma::u32_vec *no_interact_2, const arma::Mat<double> *interact_coord_2,
                                               arma::u32_vec *no_interact, arma::Mat<double> *interact_coord,

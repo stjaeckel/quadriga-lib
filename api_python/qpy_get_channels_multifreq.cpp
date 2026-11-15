@@ -129,12 +129,6 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
     const auto freq_a = qd_python_numpy2arma_Col(freq, true);
     const auto freq_new_a = qd_python_numpy2arma_Col(freq_new, true);
 
-    // Extract scalar values
-    double Tx = tx_pos_a.at(0), Ty = tx_pos_a.at(1), Tz = tx_pos_a.at(2);
-    double Tb = tx_orientation_a.at(0), Tt = tx_orientation_a.at(1), Th = tx_orientation_a.at(2);
-    double Rx = rx_pos_a.at(0), Ry = rx_pos_a.at(1), Rz = rx_pos_a.at(2);
-    double Rb = rx_orientation_a.at(0), Rt = rx_orientation_a.at(1), Rh = rx_orientation_a.at(2);
-
     // Derived output sizes
     arma::uword n_ports_tx = ant_tx_vec[0].n_ports();
     arma::uword n_ports_rx = ant_rx_vec[0].n_ports();
@@ -151,8 +145,7 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
         auto coeff_py = qd_python_init_output(n_ports_rx, n_ports_tx, n_path, n_freq_new, &coeff);
         auto delay_py = qd_python_init_output(n_ports_rx, n_ports_tx, n_path, n_freq_new, &delay);
         quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
-                                                     Tx, Ty, Tz, Tb, Tt, Th,
-                                                     Rx, Ry, Rz, Rb, Rt, Rh,
+                                                     tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
                                                      fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
                                                      freq_a, freq_new_a,
                                                      coeff_re, coeff_im, delay,
@@ -167,8 +160,7 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
 
     // Call C++ library function (0 paths: the zero-power LOS path with add_fake_los_path, else empty outputs)
     quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
-                                                 Tx, Ty, Tz, Tb, Tt, Th,
-                                                 Rx, Ry, Rz, Rb, Rt, Rh,
+                                                 tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
                                                  fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
                                                  freq_a, freq_new_a,
                                                  coeff_re, coeff_im, delay,

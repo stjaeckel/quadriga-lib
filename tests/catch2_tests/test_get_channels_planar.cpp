@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 
@@ -57,11 +58,11 @@ TEST_CASE("Get Channels Planar - Minimal test")
     arma::fcube coeff_re, coeff_im, delay;
     arma::fvec rx_Doppler;
 
-    quadriga_lib::get_channels_planar<float>(&ant, &ant,
-                                             0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                             20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                             &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M,
-                                             &coeff_re, &coeff_im, &delay, 2997924580.0, true, false,
+    quadriga_lib::get_channels_planar<float>(ant, ant,
+                                             {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                             {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                             aod, eod, aoa, eoa, path_gain, path_length, M,
+                                             coeff_re, coeff_im, delay, 2997924580.0, true, false,
                                              &rx_Doppler);
 
     // Check amplitude
@@ -135,11 +136,11 @@ TEST_CASE("Get Channels Planar - Fake LOS")
     // Shortest path length is automatically obtained from FBS / LBS
     arma::fcube coeff_re, coeff_im, delay;
 
-    quadriga_lib::get_channels_planar<float>(&ant, &ant,
-                                             0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                             20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                             &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M,
-                                             &coeff_re, &coeff_im, &delay, 2997924580.0, true, true);
+    quadriga_lib::get_channels_planar<float>(ant, ant,
+                                             {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                             {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                             aod, eod, aoa, eoa, path_gain, path_length, M,
+                                             coeff_re, coeff_im, delay, 2997924580.0, true, true);
 
     REQUIRE(coeff_re.n_slices == 3);
     REQUIRE(coeff_im.n_slices == 3);
@@ -182,11 +183,11 @@ TEST_CASE("Get Channels Planar - Coupling")
     arma::cube coeff_re, coeff_im, delay;
 
     // Case 1 : No coupling (identity matrix)
-    quadriga_lib::get_channels_planar<double>(&ant, &ant,
-                                              0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                              20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                              &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M,
-                                              &coeff_re, &coeff_im, &delay, 0.0, false, true);
+    quadriga_lib::get_channels_planar<double>(ant, ant,
+                                              {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                              {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                              aod, eod, aoa, eoa, path_gain, path_length, M,
+                                              coeff_re, coeff_im, delay, 0.0, false, true);
 
     REQUIRE(coeff_re.n_slices == 2);
     REQUIRE(coeff_im.n_slices == 2);
@@ -217,11 +218,11 @@ TEST_CASE("Get Channels Planar - Coupling")
     ant.coupling_re.col(0).ones();
     ant.coupling_im.reset();
 
-    quadriga_lib::get_channels_planar<double>(&ant, &ant,
-                                              0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                              20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                              &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M,
-                                              &coeff_re, &coeff_im, &delay, 0.0, true, false);
+    quadriga_lib::get_channels_planar<double>(ant, ant,
+                                              {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                              {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                              aod, eod, aoa, eoa, path_gain, path_length, M,
+                                              coeff_re, coeff_im, delay, 0.0, true, false);
     CHECK(coeff_re.n_slices == 1);
     CHECK(coeff_im.n_slices == 1);
     CHECK(delay.n_slices == 1);
@@ -242,11 +243,11 @@ TEST_CASE("Get Channels Planar - Coupling")
     ant.coupling_re.ones(3, 1);
     ant.coupling_re *= 2.0;
 
-    quadriga_lib::get_channels_planar<double>(&ant, &ant,
-                                              0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                              20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                              &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M,
-                                              &coeff_re, &coeff_im, &delay, 0.0, true, false);
+    quadriga_lib::get_channels_planar<double>(ant, ant,
+                                              {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                              {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                              aod, eod, aoa, eoa, path_gain, path_length, M,
+                                              coeff_re, coeff_im, delay, 0.0, true, false);
 
     CHECK(coeff_re.n_elem == 1);
     CHECK(coeff_im.n_elem == 1);
@@ -274,8 +275,8 @@ TEST_CASE("Get Channels Planar - add_fake_los_path layout")
 
     // Case 1: LOS path at input index 1 (path_length = TX-RX distance 50 m)
     arma::vec PL = {60.0, 50.0, 70.0};
-    quadriga_lib::get_channels_planar<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0,
-                                              &aod, &eod, &aoa, &eoa, &G, &PL, &M, &cr, &ci, &dl, 1e9, true, true);
+    quadriga_lib::get_channels_planar<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0},
+                                              aod, eod, aoa, eoa, G, PL, M, cr, ci, dl, 1e9, true, true);
     REQUIRE(cr.n_slices == 4);
     arma::vec p = arma::vectorise(arma::square(cr) + arma::square(ci));
     CHECK(std::abs(p(0) - 1.0) < 1e-9);
@@ -287,8 +288,8 @@ TEST_CASE("Get Channels Planar - add_fake_los_path layout")
 
     // Case 2: no LOS path
     PL(1) = 55.0;
-    quadriga_lib::get_channels_planar<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0,
-                                              &aod, &eod, &aoa, &eoa, &G, &PL, &M, &cr, &ci, &dl, 1e9, true, true);
+    quadriga_lib::get_channels_planar<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0},
+                                              aod, eod, aoa, eoa, G, PL, M, cr, ci, dl, 1e9, true, true);
     REQUIRE(cr.n_slices == 4);
     p = arma::vectorise(arma::square(cr) + arma::square(ci));
     CHECK(p(0) == 0.0);
@@ -322,10 +323,10 @@ TEST_CASE("Get Channels Planar - 0 paths with add_fake_los_path")
     {
         arma::cube cr, ci, dl, crL, ciL, dlL;
         arma::vec dop, dopL;
-        quadriga_lib::get_channels_planar<double>(&tx, &rx, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
-                                                  &e, &e, &e, &e, &e, &e, &M0, &cr, &ci, &dl, 3e9, abs_delays, true, &dop);
-        quadriga_lib::get_channels_planar<double>(&tx, &rx, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
-                                                  &aod, &eod, &aoa, &eoa, &gain, &len, &M, &crL, &ciL, &dlL, 3e9, abs_delays, true, &dopL);
+        quadriga_lib::get_channels_planar<double>(tx, rx, {Tx, Ty, Tz}, {0, 0, 0.3}, {Rx, Ry, Rz}, {0, 0, -0.2},
+                                                  e, e, e, e, e, e, M0, cr, ci, dl, 3e9, abs_delays, true, &dop);
+        quadriga_lib::get_channels_planar<double>(tx, rx, {Tx, Ty, Tz}, {0, 0, 0.3}, {Rx, Ry, Rz}, {0, 0, -0.2},
+                                                  aod, eod, aoa, eoa, gain, len, M, crL, ciL, dlL, 3e9, abs_delays, true, &dopL);
         REQUIRE(cr.n_rows == 1);
         REQUIRE(cr.n_cols == 2);
         REQUIRE(cr.n_slices == 1);
@@ -344,17 +345,17 @@ TEST_CASE("Get Channels Planar - 0 paths with add_fake_los_path")
     // Single-element antennas: delay = TX-RX distance / c, or 0 for relative delays
     auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
     arma::cube cr, ci, dl;
-    quadriga_lib::get_channels_planar<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                              &e, &e, &e, &e, &e, &e, &M0, &cr, &ci, &dl, 1e9, true, true);
+    quadriga_lib::get_channels_planar<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                              e, e, e, e, e, e, M0, cr, ci, dl, 1e9, true, true);
     REQUIRE(dl.n_elem == 1);
     CHECK(std::abs(dl(0) - 10.0 / C) < 1e-20);
     CHECK(cr(0) == 0.0);
     CHECK(ci(0) == 0.0);
-    quadriga_lib::get_channels_planar<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                              &e, &e, &e, &e, &e, &e, &M0, &cr, &ci, &dl, 1e9, false, true);
+    quadriga_lib::get_channels_planar<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                              e, e, e, e, e, e, M0, cr, ci, dl, 1e9, false, true);
     CHECK(dl(0) == 0.0);
-    quadriga_lib::get_channels_planar<double>(&omni, &omni, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                              &e, &e, &e, &e, &e, &e, &M0, &cr, &ci, &dl, 1e9, true, false);
+    quadriga_lib::get_channels_planar<double>(omni, omni, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                              e, e, e, e, e, e, M0, cr, ci, dl, 1e9, true, false);
     CHECK(dl.n_slices == 0); // without add_fake_los_path: empty outputs
 }
 
@@ -371,8 +372,8 @@ TEST_CASE("Get Channels Planar - 0 paths without add_fake_los_path")
     arma::cube cr(2, 2, 5, arma::fill::ones), ci, dl;
     for (const arma::mat *M : {&M0, &Mx})
     {
-        quadriga_lib::get_channels_planar<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                  &e, &e, &e, &e, &e, &e, M, &cr, &ci, &dl, 1e9, true, false, &dop);
+        quadriga_lib::get_channels_planar<double>(tx, rx, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                  e, e, e, e, e, e, *M, cr, ci, dl, 1e9, true, false, &dop);
         for (const arma::cube *c : {&cr, &ci, &dl})
         {
             CHECK(c->n_rows == 1);
@@ -383,8 +384,8 @@ TEST_CASE("Get Channels Planar - 0 paths without add_fake_los_path")
     }
     // Inconsistent path counts remain an error
     arma::vec one = {1.0};
-    CHECK_THROWS_AS(quadriga_lib::get_channels_planar<double>(&tx, &rx, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
-                                                              &one, &e, &e, &e, &e, &e, &M0, &cr, &ci, &dl, 1e9, true, false),
+    CHECK_THROWS_AS(quadriga_lib::get_channels_planar<double>(tx, rx, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
+                                                              one, e, e, e, e, e, M0, cr, ci, dl, 1e9, true, false),
                     std::invalid_argument);
 }
 
@@ -397,8 +398,8 @@ TEST_CASE("Get Channels Planar - outputs that alias inputs")
     arma::vec doppler;
     auto call = [&](arma::cube *c_re, arma::cube *d, arma::vec *dop, const arma::vec *g, bool fake_los)
     {
-        quadriga_lib::get_channels_planar<double>(&ant, &ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0,
-                                                  &aod, &eod, &aoa, &eoa, g, &length, &M, c_re, &ci, d,
+        quadriga_lib::get_channels_planar<double>(ant, ant, {0, 0, 0}, {0, 0, 0}, {20, 0, 0}, {0, 0, 0},
+                                                  aod, eod, aoa, eoa, *g, length, M, *c_re, ci, *d,
                                                   1e9, false, fake_los, dop);
     };
     CHECK_NOTHROW(call(&cr, &dl, &doppler, &gain, true));
@@ -432,10 +433,42 @@ TEST_CASE("get_channels_planar - a positive tilt points down (3GPP TR 38.901)")
     auto power = [&](const quadriga_lib::arrayant<double> &tx, const quadriga_lib::arrayant<double> &rx, double Tt, double Rt)
     {
         arma::cube cr, ci, dl;
-        quadriga_lib::get_channels_planar<double>(&tx, &rx, 0.0, 0.0, 10.0, 0.0, Tt, 0.0, 10.0, 0.0, 0.0, 0.0, Rt, arma::datum::pi,
-                                                  &aod, &eod, &aoa, &eoa, &gain, &length, &M, &cr, &ci, &dl);
+        quadriga_lib::get_channels_planar<double>(tx, rx, {0.0, 0.0, 10.0}, {0.0, Tt, 0.0}, {10.0, 0.0, 0.0}, {0.0, Rt, arma::datum::pi},
+                                                  aod, eod, aoa, eoa, gain, length, M, cr, ci, dl);
         return arma::accu(cr % cr + ci % ci);
     };
     CHECK(power(beam, omni, q, 0.0) > 100.0 * power(beam, omni, -q, 0.0));
     CHECK(power(omni, beam, 0.0, -q) > 100.0 * power(omni, beam, 0.0, q));
+}
+
+TEST_CASE("Get Channels Planar - Position and orientation shapes")
+{
+    // Positions and orientations: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
+    auto ant = quadriga_lib::generate_arrayant_omni<double>();
+    const arma::vec aod = {0.0}, eod = {0.0}, aoa = {arma::datum::pi}, eoa = {0.0}, gain = {1.0}, length = {30.0};
+    const arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    const arma::mat col[4] = {arma::vec{0.0, 0.0, 1.0}, arma::vec{0.1, 0.2, 0.3}, arma::vec{20.0, 0.0, 1.0}, arma::vec{0.0, -0.1, 0.5}};
+    const char *name[4] = {"tx_pos", "tx_orientation", "rx_pos", "rx_orientation"};
+    auto run = [&](const arma::mat *p, arma::cube &cr, arma::cube &ci, arma::cube &dl)
+    { quadriga_lib::get_channels_planar(ant, ant, p[0], p[1], p[2], p[3], aod, eod, aoa, eoa, gain, length, M, cr, ci, dl, 1e9); };
+
+    arma::cube cr, ci, dl, cr_row, ci_row, dl_row;
+    const arma::mat row[4] = {col[0].t(), col[1].t(), col[2].t(), col[3].t()};
+    run(col, cr, ci, dl), run(row, cr_row, ci_row, dl_row);
+    CHECK(arma::approx_equal(cr, cr_row, "absdiff", 0.0));
+    CHECK(arma::approx_equal(ci, ci_row, "absdiff", 0.0));
+    CHECK(arma::approx_equal(dl, dl_row, "absdiff", 0.0));
+
+    const arma::mat bad[] = {arma::mat(2, 1, arma::fill::zeros), arma::mat(4, 1, arma::fill::zeros), arma::mat(),
+                             arma::mat(3, 3, arma::fill::zeros)};
+    for (int k = 0; k < 4; ++k)
+        for (const arma::mat &b : bad)
+        {
+            arma::mat p[4] = {col[0], col[1], col[2], col[3]};
+            p[k] = b;
+            arma::cube c_re = cr, c_im = ci, d = dl;
+            CHECK_THROWS_WITH(run(p, c_re, c_im, d), Catch::Matchers::ContainsSubstring("Input '" + std::string(name[k]) + "' must have 3 elements"));
+            CHECK(arma::approx_equal(c_re, cr, "absdiff", 0.0));
+            CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
+        }
 }

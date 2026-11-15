@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_lib.hpp"
 
 #include <cmath>
@@ -42,7 +43,7 @@ namespace
                         const arma::fmat *aabb = nullptr)
     {
         arma::fmat orig;
-        arma::uword n = quadriga_lib::ray_init(n_ray_target, 1, 0.0f, 0.0f, 0.0f, max_path_length,
+        arma::uword n = quadriga_lib::ray_init(n_ray_target, 1, {0.0f, 0.0f, 0.0f}, max_path_length,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
                                                nullptr, mesh, sub_mesh_index, aabb, points, false);
@@ -78,7 +79,7 @@ TEST_CASE("ray_init - Ray count quantization")
     for (const auto &c : cases)
     {
         arma::fmat orig;
-        arma::uword n = quadriga_lib::ray_init(c.target, 1, 0.0f, 0.0f, 0.0f, 5.0f,
+        arma::uword n = quadriga_lib::ray_init(c.target, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr, false);
@@ -96,7 +97,7 @@ TEST_CASE("ray_init - Output shapes")
     arma::Col<short> mtl_prev, mtl_current, mtl_buffer;
     std::vector<quadriga_lib::path> paths;
 
-    arma::uword n = quadriga_lib::ray_init(500, n_freq, 0.0f, 0.0f, 0.0f, 5.0f,
+    arma::uword n = quadriga_lib::ray_init(500, n_freq, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
                                            &paths, nullptr, nullptr, nullptr, nullptr, false);
@@ -140,7 +141,7 @@ TEST_CASE("ray_init - Geometry invariants (no mesh)")
 
     arma::fmat orig, dest;
     arma::fcube path_dir;
-    arma::uword n = quadriga_lib::ray_init(500, 1, O(0), O(1), O(2), maxpath,
+    arma::uword n = quadriga_lib::ray_init(500, 1, {O(0), O(1), O(2)}, maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr, false);
@@ -176,7 +177,7 @@ TEST_CASE("ray_init - max_path_length floor")
 {
     // A non-positive path length is floored to 0.01 m
     arma::fmat orig, dest;
-    arma::uword n = quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 0.0f,
+    arma::uword n = quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 0.0f,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr, false);
@@ -199,7 +200,7 @@ TEST_CASE("ray_init - Path initialization")
     {
         arma::fmat orig;
         std::vector<quadriga_lib::path> paths;
-        arma::uword n = quadriga_lib::ray_init(80, n_freq, 0.0f, 0.0f, 0.0f, 5.0f,
+        arma::uword n = quadriga_lib::ray_init(80, n_freq, {0.0f, 0.0f, 0.0f}, 5.0f,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
                                                &paths, nullptr, nullptr, nullptr, nullptr, scalar_mode);
@@ -225,7 +226,7 @@ TEST_CASE("ray_init - Optional (NULL) outputs")
 {
     // Request only the origin
     arma::fmat orig;
-    arma::uword n = quadriga_lib::ray_init(80, 4, 1.0f, 2.0f, 3.0f, 5.0f,
+    arma::uword n = quadriga_lib::ray_init(80, 4, {1.0f, 2.0f, 3.0f}, 5.0f,
                                            &orig, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr, false);
@@ -233,7 +234,7 @@ TEST_CASE("ray_init - Optional (NULL) outputs")
     REQUIRE((orig.n_rows == 80 && orig.n_cols == 3));
 
     // Request nothing but the ray count
-    arma::uword m = quadriga_lib::ray_init(80, 4, 0.0f, 0.0f, 0.0f, 5.0f,
+    arma::uword m = quadriga_lib::ray_init(80, 4, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr, false);
@@ -243,7 +244,7 @@ TEST_CASE("ray_init - Optional (NULL) outputs")
 TEST_CASE("ray_init - Error cases")
 {
     // Zero frequencies
-    CHECK_THROWS_AS(quadriga_lib::ray_init(80, 0, 0.0f, 0.0f, 0.0f, 5.0f,
+    CHECK_THROWS_AS(quadriga_lib::ray_init(80, 0, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr, false),
@@ -251,7 +252,7 @@ TEST_CASE("ray_init - Error cases")
 
     // Mesh with the wrong number of columns
     arma::fmat bad_mesh(5, 8, arma::fill::zeros);
-    CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 5.0f,
+    CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
                                            nullptr, &bad_mesh, nullptr, nullptr, nullptr, false),
@@ -259,7 +260,7 @@ TEST_CASE("ray_init - Error cases")
 
     // Points with the wrong number of columns
     arma::fmat bad_points(4, 2, arma::fill::zeros);
-    CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 5.0f,
+    CHECK_THROWS_AS(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                            nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, nullptr, &bad_points, false),
@@ -267,7 +268,7 @@ TEST_CASE("ray_init - Error cases")
 
     // An empty point matrix is treated as absent, not as an error
     arma::fmat empty_points(0, 3, arma::fill::zeros);
-    CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 5.0f,
+    CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 5.0f,
                                          nullptr, nullptr, nullptr, nullptr,
                                          nullptr, nullptr, nullptr, nullptr, nullptr,
                                          nullptr, nullptr, nullptr, nullptr, &empty_points, false));
@@ -281,7 +282,7 @@ TEST_CASE("ray_init - Launch sphere sizing with mesh")
 
     arma::fmat orig, dest;
     arma::fcube path_dir;
-    arma::uword n = quadriga_lib::ray_init(180, 1, 0.0f, 0.0f, 0.0f, maxpath,
+    arma::uword n = quadriga_lib::ray_init(180, 1, {0.0f, 0.0f, 0.0f}, maxpath,
                                            &orig, &dest, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &path_dir, nullptr, nullptr,
                                            &mesh, nullptr, nullptr, nullptr, false);
@@ -383,7 +384,7 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
     arma::Col<short> mtl_prev, mtl_current, mtl_buffer;
     std::vector<quadriga_lib::path> paths;
 
-    arma::uword n = quadriga_lib::ray_init(180, n_freq, O(0), O(1), O(2), maxpath,
+    arma::uword n = quadriga_lib::ray_init(180, n_freq, {O(0), O(1), O(2)}, maxpath,
                                            &orig, &dest, &trivec, &tridir,
                                            &mtl_prev, &mtl_current, &mtl_buffer, &path_dir, &acc_dist,
                                            &paths, nullptr, nullptr, nullptr, &P, false);
@@ -466,7 +467,7 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
 
     auto call = [&](const arma::u32_vec *smi, const arma::fmat *box)
     {
-        return quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 10.0f,
+        return quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 10.0f,
                                       nullptr, nullptr, nullptr, nullptr,
                                       nullptr, nullptr, nullptr, nullptr, nullptr,
                                       nullptr, &mesh, smi, box, nullptr, false);
@@ -525,7 +526,7 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
         // Nothing to probe, so the acceleration inputs are dropped rather than validated
         arma::u32_vec bad = {7u, 3u};
         arma::fmat box(9, 4, arma::fill::zeros);
-        CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 10.0f,
+        CHECK_NOTHROW(quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 10.0f,
                                              nullptr, nullptr, nullptr, nullptr,
                                              nullptr, nullptr, nullptr, nullptr, nullptr,
                                              nullptr, nullptr, &bad, &box, nullptr, false));
@@ -540,7 +541,7 @@ TEST_CASE("ray_init - Outputs that alias inputs")
 
     auto call = [&](arma::fmat *o, arma::fmat *d, arma::fmat *tv, arma::fmat *td, arma::Col<short> *p, arma::Col<short> *c)
     {
-        return quadriga_lib::ray_init(80, 1, 0.0f, 0.0f, 0.0f, 10.0f, o, d, tv, td, p, c, &buf, nullptr, &acc_dist,
+        return quadriga_lib::ray_init(80, 1, {0.0f, 0.0f, 0.0f}, 10.0f, o, d, tv, td, p, c, &buf, nullptr, &acc_dist,
                                       nullptr, &mesh, nullptr, nullptr, nullptr, false);
     };
     CHECK_NOTHROW(call(&orig, &dest, &trivec, &tridir, &prev, &cur));
@@ -552,4 +553,36 @@ TEST_CASE("ray_init - Outputs that alias inputs")
 
     // An output is the mesh
     CHECK_THROWS_AS(call(&orig, &mesh, &trivec, &tridir, &prev, &cur), std::invalid_argument);
+}
+
+TEST_CASE("ray_init and ray_progress - Origin position shape")
+{
+    // orig_pos: [3, 1] and [1, 3] give the same rays; other sizes throw before any output is written
+    const arma::fmat bad[] = {arma::fmat(2, 1, arma::fill::zeros), arma::fmat(4, 1, arma::fill::zeros), arma::fmat(),
+                              arma::fmat(3, 3, arma::fill::zeros)};
+    const arma::fmat o = arma::fvec{1.0f, 2.0f, 3.0f};
+    arma::fmat orig, dest, orig_row, dest_row;
+    const arma::uword n = quadriga_lib::ray_init(100, 1, o, 5.0f, &orig, &dest);
+    const arma::uword n_row = quadriga_lib::ray_init(100, 1, arma::fmat(o.t()), 5.0f, &orig_row, &dest_row);
+    CHECK(n == n_row);
+    CHECK(arma::approx_equal(orig, orig_row, "absdiff", 0.0f));
+    CHECK(arma::approx_equal(dest, dest_row, "absdiff", 0.0f));
+
+    const arma::fmat mesh;
+    const arma::uvec mtl_ind;
+    const std::unordered_map<std::string, std::vector<float>> mtl_prop;
+    const arma::fvec center_freq = {1.0e9f};
+    arma::Col<short> prev, cur, buf;
+    arma::fcube path_dir;
+    arma::fmat acc_dist;
+    std::vector<quadriga_lib::path> paths;
+    for (const arma::fmat &b : bad)
+    {
+        arma::fmat d = dest;
+        CHECK_THROWS_WITH(quadriga_lib::ray_init(100, 1, b, 5.0f, &orig, &d), Catch::Matchers::ContainsSubstring("Input 'orig_pos' must have 3 elements"));
+        CHECK(arma::approx_equal(d, dest, "absdiff", 0.0f));
+        CHECK_THROWS_WITH(quadriga_lib::ray_progress(mesh, mtl_ind, mtl_prop, center_freq, b, orig, d, prev, cur, buf, path_dir, acc_dist, paths),
+                          Catch::Matchers::ContainsSubstring("Input 'orig_pos' must have 3 elements"));
+        CHECK(arma::approx_equal(d, dest, "absdiff", 0.0f));
+    }
 }

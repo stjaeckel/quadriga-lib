@@ -160,8 +160,8 @@ TEST_CASE("gbsm_rays::solve_scatterers - the closed form agrees with a bisection
     {
         INFO("geometry " << g);
         rays_t r = make_rays(100 + (unsigned)g, false, false, 30, 1, "38.901");
-        r.tx_pos = {U(-200, 200), U(-200, 200), U(0, 50)};
-        r.rx_pos = (g % 10 == 9) ? arma::vec(r.tx_pos) : arma::vec{U(-200, 200), U(-200, 200), U(0, 50)};
+        r.tx_pos = arma::vec{U(-200, 200), U(-200, 200), U(0, 50)};
+        r.rx_pos = (g % 10 == 9) ? r.tx_pos : arma::mat(arma::vec{U(-200, 200), U(-200, 200), U(0, 50)});
         for (arma::uword i = 0; i < r.n_ray(); ++i)
         {
             r.aod(i) = U(-pi, pi), r.eod(i) = U(-1.5, 1.5);

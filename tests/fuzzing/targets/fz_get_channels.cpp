@@ -69,6 +69,12 @@ static void run(fz::input &in)
     const uint8_t outs = in.ConsumeIntegral<uint8_t>();
     arma::Cube<T> c_re, c_im, dl, aod, eod, aoa, eoa;
     auto opt = [&](arma::Cube<T> &x, int bit) { return (outs >> bit) & 1 ? &x : nullptr; };
+    // Positions and orientations from p[i], p[i + 1], p[i + 2]; bit 7 of 'outs' selects [1, 3] instead of [3, 1]
+    auto pos = [&](int i)
+    {
+        arma::Mat<T> m = {p[i], p[i + 1], p[i + 2]};
+        return (outs & 128) ? m : arma::Mat<T>(m.t());
+    };
 
     switch (in.ConsumeIntegralInRange<int>(0, 3))
     {
@@ -76,9 +82,8 @@ static void run(fz::input &in)
     {
         paths<T> q(in, in.size(8));
         const int use_kernel = in.ConsumeIntegralInRange<int>(0, quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1);
-        fz::clean([&] { quadriga_lib::get_channels_spherical(&tx, &rx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9],
-                                                             p[10], p[11], &q.fbs, &q.lbs, &q.gain, &q.length, &q.M, opt(c_re, 0),
-                                                             opt(c_im, 1), opt(dl, 2), fc, absolute, fake_los, opt(aod, 3),
+        fz::clean([&] { quadriga_lib::get_channels_spherical(tx, rx, pos(0), pos(3), pos(6), pos(9), q.fbs, q.lbs, q.gain, q.length,
+                                                             q.M, c_re, c_im, dl, fc, absolute, fake_los, opt(aod, 3),
                                                              opt(eod, 4), opt(aoa, 5), opt(eoa, 6), use_kernel); });
         break;
     }
@@ -88,9 +93,8 @@ static void run(fz::input &in)
         paths<T> q(in, n_path);
         arma::Col<T> a1 = in.col<T>(n_path), a2 = in.col<T>(n_path), a3 = in.col<T>(in.ConsumeBool() ? n_path : in.size(9)),
                      a4 = in.col<T>(n_path), doppler;
-        fz::clean([&] { quadriga_lib::get_channels_planar(&tx, &rx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10],
-                                                          p[11], &a1, &a2, &a3, &a4, &q.gain, &q.length, &q.M, opt(c_re, 0),
-                                                          opt(c_im, 1), opt(dl, 2), fc, absolute, fake_los,
+        fz::clean([&] { quadriga_lib::get_channels_planar(tx, rx, pos(0), pos(3), pos(6), pos(9), a1, a2, a3, a4, q.gain, q.length,
+                                                          q.M, c_re, c_im, dl, fc, absolute, fake_los,
                                                           (outs & 8) ? &doppler : nullptr); });
         break;
     }
@@ -108,10 +112,10 @@ static void run(fz::input &in)
         for (size_t i = 0; i < active.size(); ++i)
             active[i] = in.ConsumeBool();
         const bool use_irs2 = in.ConsumeBool(), use_active = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::get_channels_irs(&tx, &rx, &irs, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10],
-                                                       p[11], ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], &q1.fbs, &q1.lbs, &q1.gain,
-                                                       &q1.length, &q1.M, &q2.fbs, &q2.lbs, &q2.gain, &q2.length, &q2.M,
-                                                       opt(c_re, 0), opt(c_im, 1), opt(dl, 2), i_irs, threshold, fc, absolute,
+        const arma::Mat<T> irs_pos = {ip[0], ip[1], ip[2]}, irs_orientation = {ip[3], ip[4], ip[5]};
+        fz::clean([&] { quadriga_lib::get_channels_irs(tx, rx, irs, pos(0), pos(3), pos(6), pos(9), irs_pos, irs_orientation,
+                                                       q1.fbs, q1.lbs, q1.gain, q1.length, q1.M, q2.fbs, q2.lbs, q2.gain, q2.length,
+                                                       q2.M, c_re, c_im, dl, i_irs, threshold, fc, absolute,
                                                        opt(aod, 3), opt(eod, 4), opt(aoa, 5), opt(eoa, 6),
                                                        use_irs2 ? &irs2 : nullptr, use_active ? &active : nullptr); });
         break;
@@ -135,14 +139,13 @@ static void run(fz::input &in)
             f_in = arma::sort(f_in);
         const T speed = in.ConsumeBool() ? T(299792458.0) : (in.ConsumeBool() ? T(343) : in.value<T>());
         std::vector<arma::Cube<T>> v_re, v_im, v_dl;
-        fz::clean([&] { quadriga_lib::get_channels_multifreq(tx_vec, rx_vec, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9],
-                                                             p[10], p[11], q.fbs, q.lbs, gain, q.length, M, f_in, f_out, v_re, v_im,
-                                                             v_dl, absolute, fake_los, speed); });
+        fz::clean([&] { quadriga_lib::get_channels_multifreq(tx_vec, rx_vec, pos(0), pos(3), pos(6), pos(9), q.fbs, q.lbs, gain,
+                                                             q.length, M, f_in, f_out, v_re, v_im, v_dl, absolute, fake_los, speed); });
         std::vector<arma::Cube<std::complex<T>>> v_cx; // Complex output, read last
         if (in.ConsumeBool())
-            fz::clean([&] { quadriga_lib::get_channels_multifreq(tx_vec, rx_vec, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8],
-                                                                 p[9], p[10], p[11], q.fbs, q.lbs, gain, q.length, M, f_in, f_out,
-                                                                 v_re, v_im, v_dl, absolute, fake_los, speed, &v_cx); });
+            fz::clean([&] { quadriga_lib::get_channels_multifreq(tx_vec, rx_vec, pos(0), pos(3), pos(6), pos(9), q.fbs, q.lbs, gain,
+                                                                 q.length, M, f_in, f_out, v_re, v_im, v_dl, absolute, fake_los,
+                                                                 speed, &v_cx); });
     }
     }
 }

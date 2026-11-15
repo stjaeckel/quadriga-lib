@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 
@@ -34,8 +35,8 @@ TEST_CASE("Multifreq - Empty TX array throws")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
     REQUIRE_THROWS_AS(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                              10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                              {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl),
         std::invalid_argument);
 }
@@ -51,8 +52,8 @@ TEST_CASE("Multifreq - fbs_pos with columns but no rows throws")
     std::vector<arma::cube> cr, ci, dl;
     for (bool fake_los : {false, true})
         REQUIRE_THROWS_AS(
-            quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                  10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                                  {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                                   fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, false, fake_los),
             std::invalid_argument);
 }
@@ -68,8 +69,8 @@ TEST_CASE("Multifreq - Empty RX array throws")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
     REQUIRE_THROWS_AS(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                              10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                              {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl),
         std::invalid_argument);
 }
@@ -85,8 +86,8 @@ TEST_CASE("Multifreq - Empty freq throws")
     arma::vec fi, fo = {1e9}; // fi empty
     std::vector<arma::cube> cr, ci, dl;
     REQUIRE_THROWS_AS(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                              10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                              {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl),
         std::invalid_argument);
 }
@@ -102,8 +103,8 @@ TEST_CASE("Multifreq - Empty freq_new throws")
     arma::vec fi = {1e9}, fo; // fo empty
     std::vector<arma::cube> cr, ci, dl;
     REQUIRE_THROWS_AS(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                              10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                              {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl),
         std::invalid_argument);
 }
@@ -121,8 +122,8 @@ TEST_CASE("Multifreq - Mismatched path_gain size throws")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
     REQUIRE_THROWS_AS(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                              10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                              {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl),
         std::invalid_argument);
 }
@@ -139,8 +140,8 @@ TEST_CASE("Multifreq - M with wrong row count throws")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
     REQUIRE_THROWS_AS(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                              10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                              {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl),
         std::invalid_argument);
 }
@@ -157,8 +158,8 @@ TEST_CASE("Multifreq - Non-positive propagation speed throws")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
     REQUIRE_THROWS_AS(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                              10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                              {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                               false, false, -1.0),
         std::invalid_argument);
@@ -181,8 +182,8 @@ TEST_CASE("Multifreq - Non-finite TX or RX position or orientation throws")
     // Pose values Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh; the baseline is a valid link
     auto call = [&](const arma::vec &v, bool no_paths)
     {
-        quadriga_lib::get_channels_multifreq<double>(ant, ant, v(0), v(1), v(2), v(3), v(4), v(5),
-                                                     v(6), v(7), v(8), v(9), v(10), v(11),
+        quadriga_lib::get_channels_multifreq<double>(ant, ant, {v(0), v(1), v(2)}, {v(3), v(4), v(5)},
+                                                     {v(6), v(7), v(8)}, {v(9), v(10), v(11)},
                                                      no_paths ? fbs_0 : fbs, no_paths ? fbs_0 : fbs,
                                                      no_paths ? pg_0 : pg, no_paths ? pl_0 : pl,
                                                      no_paths ? M_0 : M, fi, fo, cr, ci, dl, true, true);
@@ -221,8 +222,8 @@ TEST_CASE("Multifreq - Output vector and cube dimensions")
     arma::vec fi = {1e9, 2e9}, fo = {1e9, 1.5e9, 2e9, 3e9};
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
     REQUIRE(cr.size() == 4); // n_freq_new = 4
@@ -249,8 +250,8 @@ TEST_CASE("Multifreq - Fake LOS adds extra path slice")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           false, true); // add_fake_los_path = true
 
@@ -294,17 +295,17 @@ TEST_CASE("Multifreq - Matches get_channels_spherical for single freq, single en
 
     // Single-frequency reference
     arma::cube cr_ref, ci_ref, dl_ref;
-    quadriga_lib::get_channels_spherical(&ant_single, &ant_single,
-                                          0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                          20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                          &fbs, &fbs, &pg_vec, &pl_vec, &M_single,
-                                          &cr_ref, &ci_ref, &dl_ref, fc, true);
+    quadriga_lib::get_channels_spherical(ant_single, ant_single,
+                                          {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                          {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                          fbs, fbs, pg_vec, pl_vec, M_single,
+                                          cr_ref, ci_ref, dl_ref, fc, true);
 
     // Multi-frequency version
     std::vector<arma::cube> cr, ci, dl;
     quadriga_lib::get_channels_multifreq(ant_vec, ant_vec,
-                                          0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                          20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+                                          {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                          {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
                                           fbs, fbs, pg_mat, pl_vec, M_multi,
                                           fi, fo, cr, ci, dl, true);
 
@@ -335,8 +336,8 @@ TEST_CASE("Multifreq - Speed of sound produces correct acoustic delays")
     std::vector<arma::cube> cr, ci, dl;
 
     // Absolute delays
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          5.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {5.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           true, false, c_sound);
 
@@ -344,8 +345,8 @@ TEST_CASE("Multifreq - Speed of sound produces correct acoustic delays")
     CHECK(std::abs(dl[0](0, 0, 0) - expected_delay) < 1e-12);
 
     // Relative delays (LOS delay subtracted)
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          5.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {5.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           false, false, c_sound);
 
@@ -368,13 +369,13 @@ TEST_CASE("Multifreq - Radio vs acoustic delays differ by speed ratio")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr_r, ci_r, dl_r, cr_a, ci_a, dl_a;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          dist, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr_r, ci_r, dl_r,
                                           true, false, c_radio);
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          dist, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr_a, ci_a, dl_a,
                                           true, false, c_sound);
 
@@ -408,12 +409,12 @@ TEST_CASE("Multifreq - Scalar M (2 rows) produces same VV result as full M (8 ro
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr_f, ci_f, dl_f, cr_s, ci_s, dl_s;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M_full, fi, fo, cr_f, ci_f, dl_f);
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M_scalar, fi, fo, cr_s, ci_s, dl_s);
 
     CHECK(arma::approx_equal(cr_f[0], cr_s[0], "absdiff", 1e-12));
@@ -442,8 +443,8 @@ TEST_CASE("Multifreq - Path gain linearly interpolated across frequency")
     // Query at midpoint → path_gain should be 2.5 → amplitude = sqrt(2.5)
     arma::vec fo = {1.5e9};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           true, false, 299792458.0);
 
@@ -468,8 +469,8 @@ TEST_CASE("Multifreq - M interpolated with SLERP (phase rotation)")
 
     arma::vec fi = {1e9, 2e9}, fo = {1.5e9}; // midpoint
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           true, false, 299792458.0);
 
@@ -498,15 +499,15 @@ TEST_CASE("Multifreq - Extrapolation clamps path gain and M")
     // Query below range → clamp to first
     arma::vec fo_lo = {100.0};
     std::vector<arma::cube> cr_lo, ci_lo, dl_lo;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo_lo, cr_lo, ci_lo, dl_lo);
 
     // Query at exact first entry
     arma::vec fo_ex = {1e9};
     std::vector<arma::cube> cr_ex, ci_ex, dl_ex;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo_ex, cr_ex, ci_ex, dl_ex);
 
     // Clamped below should use gain=1.0 (first entry), same as exact first entry
@@ -533,8 +534,8 @@ TEST_CASE("Multifreq - Multiple output frequencies produce correct count and fin
 
     arma::vec fo = arma::linspace(500e6, 3e9, 20);
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
     REQUIRE(cr.size() == 20);
@@ -573,8 +574,8 @@ TEST_CASE("Multifreq - GHz antenna with frequency-dependent pattern")
     arma::vec fi = {1e9}, fo = {1e9, 2e9, 3e9};
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx_vec, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx_vec, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
     REQUIRE(cr.size() == 3);
@@ -620,8 +621,8 @@ TEST_CASE("Multifreq - Acoustic 2-way speaker with omni microphone (documentatio
     std::vector<arma::cube> coeff_re, coeff_im, delays;
 
     quadriga_lib::get_channels_multifreq(tx, rx,
-                                          0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                          {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {1.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, path_gain_mat, path_length, M_cube,
                                           freq, freq_new, coeff_re, coeff_im, delays,
                                           false, false, 343.0);
@@ -668,8 +669,8 @@ TEST_CASE("Multifreq - Acoustic woofer dominates at low freq, tweeter at high fr
     // Query at low and high frequency
     arma::vec fo = {200.0, 8000.0};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          2.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {2.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           true, false, 343.0);
 
@@ -710,8 +711,8 @@ TEST_CASE("Multifreq - Full polarimetric Jones with cross-pol coupling")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
     // RX probe has 2 elements (V+H) → output should be [2, 1, 1]
@@ -755,8 +756,8 @@ TEST_CASE("Multifreq - TX orientation rotates pattern")
     // With -90° bank rotation
     std::vector<arma::cube> cr, ci, dl;
     quadriga_lib::get_channels_multifreq(tx, rx,
-                                          0.0, 0.0, 1.0, -pi / 2.0, 0.0, 0.0,
-                                          20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+                                          {0.0, 0.0, 1.0}, {-pi / 2.0, 0.0, 0.0},
+                                          {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, false);
 
     REQUIRE(cr.size() == 1);
@@ -783,8 +784,8 @@ TEST_CASE("Multifreq - Different frequencies produce different phases")
     // Two different frequencies
     arma::vec fo = {1.0e9, 1.5e9};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true);
 
     // Amplitudes should be the same (same gain, same antenna)
@@ -827,8 +828,8 @@ TEST_CASE("Multifreq - LOS and NLOS paths have different delays")
     arma::vec fi = {1e9}, fo = {1e9};
 
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true);
 
     double delay_los = dl[0](0, 0, 0);
@@ -865,8 +866,8 @@ TEST_CASE("Multifreq - 2x2 MIMO output dimensions and element scaling")
     arma::vec fi = {1e9}, fo = {1e9};
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {20.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
     REQUIRE(cr[0].n_rows == 2);  // 2 RX elements
@@ -896,8 +897,8 @@ TEST_CASE("Multifreq - Float template compiles and runs")
     std::vector<arma::fcube> cr, ci, dl;
 
     REQUIRE_NOTHROW(
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                                              10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+                                              {10.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
                                               fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl));
     REQUIRE(cr.size() == 2);
     CHECK(cr[0].is_finite());
@@ -921,8 +922,8 @@ TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
     // freq_new = 0 should disable phase (wave_number = 0)
     arma::vec fi = {1e9}, fo = {0.0};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true);
 
     // With zero wave number: phase = 0, so coeff_im should be zero
@@ -951,8 +952,8 @@ TEST_CASE("Multifreq - Multiple freq entries with varying path gain")
 
     arma::vec fo = {1e9, 2e9, 3e9};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true);
 
     // At exact freq entries: amplitude = sqrt(gain)
@@ -984,12 +985,12 @@ TEST_CASE("Multifreq - Absolute delay includes LOS, relative subtracts it")
     std::vector<arma::cube> cr_a, ci_a, dl_a, cr_r, ci_r, dl_r;
 
     // Absolute
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          dist, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr_a, ci_a, dl_a, true);
     // Relative
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          dist, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {dist, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr_r, ci_r, dl_r, false);
 
     CHECK(std::abs(dl_a[0](0, 0, 0) - dist / C) < 1e-12);
@@ -1013,8 +1014,8 @@ TEST_CASE("Multifreq - Sweep: amplitude stable, phase varies with frequency")
 
     arma::vec fo = arma::linspace(1e9, 3e9, 10);
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true);
 
     // All amplitudes should be identical (same antenna, same gain)
@@ -1054,8 +1055,8 @@ TEST_CASE("Multifreq - Pre-allocated output vectors are reused")
     double *p0 = cr[0].memptr();
     double *p1 = cr[1].memptr();
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
     // Memory should not have been reallocated (same pointers)
@@ -1088,8 +1089,8 @@ TEST_CASE("Multifreq - Acoustic single-bounce produces NLOS delay > LOS")
     arma::vec fi = {500.0}, fo = {500.0};
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          3.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {3.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           true, false, c_sound);
 
@@ -1120,8 +1121,8 @@ TEST_CASE("Multifreq - Air absorption increases with frequency (acoustic)")
 
     arma::vec fo = {200.0, 5000.0, 10000.0};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          5.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {5.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           true, false, c_sound);
 
@@ -1169,8 +1170,8 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
     arma::vec fi = {1e9}, fo = {1e9, 2e9};
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx_vec, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx_vec, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
     REQUIRE(cr.size() == 2);
@@ -1200,11 +1201,11 @@ TEST_CASE("Multifreq - Reversed freq_new order gives consistent results")
     arma::vec fo_rev = {1.8e9, 1.2e9};
     std::vector<arma::cube> cr_f, ci_f, dl_f, cr_r, ci_r, dl_r;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo_fwd, cr_f, ci_f, dl_f, true);
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo_rev, cr_r, ci_r, dl_r, true);
 
     // Forward[0] = Reverse[1] and vice versa
@@ -1247,8 +1248,8 @@ TEST_CASE("Multifreq - Unsorted freq is not clamped to first entry")
     arma::vec fo = fi;
     std::vector<arma::cube> cr, ci, dl;
 
-    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                                          {10.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
                                           true, false, 343.0);
 
@@ -1289,7 +1290,7 @@ TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
     arma::mat coord = {{30.0, 50.0, 70.0}, {40.0, 60.0, 40.0}, {0.0, 0.0, 0.0}};
     arma::vec len;
     arma::mat fbs, lbs;
-    quadriga_lib::coord2path<double>(0, 0, 0, 100, 0, 0, &no_int, &coord, &len, &fbs, &lbs);
+    quadriga_lib::coord2path<double>({0, 0, 0}, {100, 0, 0}, &no_int, &coord, &len, &fbs, &lbs);
     const double L_true = 100.0 + 40.0 * std::sqrt(2.0);
     REQUIRE(std::abs(len(0) - L_true) < 1e-9);
 
@@ -1303,7 +1304,7 @@ TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
         const double L_exp = (L < 140.0) ? 140.0 : L;
         arma::vec pl = {L};
         std::vector<arma::cube> cr, ci, dl;
-        quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+        quadriga_lib::get_channels_multifreq<double>(va, va, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0},
                                                      fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true, false);
         for (arma::uword f = 0; f < fo.n_elem; ++f)
         {
@@ -1314,7 +1315,7 @@ TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
         }
 
         // Relative delays subtract the TX-RX distance (100 m)
-        quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+        quadriga_lib::get_channels_multifreq<double>(va, va, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0},
                                                      fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, false, false);
         CHECK(std::abs(dl[0](0) * C - (L_exp - 100.0)) < 1e-6);
     }
@@ -1322,7 +1323,7 @@ TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
     // Acoustic propagation speed: the same lengths, delay = length / 343
     arma::vec pl = {L_true};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0,
+    quadriga_lib::get_channels_multifreq<double>(va, va, {0, 0, 0}, {0, 0, 0}, {100, 0, 0}, {0, 0, 0},
                                                  fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true, false, 343.0);
     CHECK(std::abs(dl[0](0) * 343.0 - L_true) < 1e-6);
 }
@@ -1343,7 +1344,7 @@ TEST_CASE("Multifreq - add_fake_los_path layout")
 
     // Case 1: LOS path at input index 1
     F.col(1) = arma::vec({25, 0, 0});
-    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, F, F, pg, PL, M, fi, fo,
+    quadriga_lib::get_channels_multifreq<double>(va, va, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0}, F, F, pg, PL, M, fi, fo,
                                                  cr, ci, dl, true, true);
     REQUIRE(cr[0].n_slices == 4);
     arma::vec p = arma::vectorise(arma::square(cr[0]) + arma::square(ci[0]));
@@ -1355,7 +1356,7 @@ TEST_CASE("Multifreq - add_fake_los_path layout")
 
     // Case 2: no LOS path
     F.col(1) = arma::vec({25, 10, 0});
-    quadriga_lib::get_channels_multifreq<double>(va, va, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, F, F, pg, PL, M, fi, fo,
+    quadriga_lib::get_channels_multifreq<double>(va, va, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0}, F, F, pg, PL, M, fi, fo,
                                                  cr, ci, dl, true, true);
     REQUIRE(cr[0].n_slices == 4);
     p = arma::vectorise(arma::square(cr[0]) + arma::square(ci[0]));
@@ -1391,9 +1392,9 @@ TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
     for (bool abs_delays : {true, false})
     {
         std::vector<arma::cube> cr, ci, dl, crL, ciL, dlL;
-        quadriga_lib::get_channels_multifreq<double>(txv, rxv, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
+        quadriga_lib::get_channels_multifreq<double>(txv, rxv, {Tx, Ty, Tz}, {0, 0, 0.3}, {Rx, Ry, Rz}, {0, 0, -0.2},
                                                      f0, f0, g0, e, M0, fin, fout, cr, ci, dl, abs_delays, true);
-        quadriga_lib::get_channels_multifreq<double>(txv, rxv, Tx, Ty, Tz, 0, 0, 0.3, Rx, Ry, Rz, 0, 0, -0.2,
+        quadriga_lib::get_channels_multifreq<double>(txv, rxv, {Tx, Ty, Tz}, {0, 0, 0.3}, {Rx, Ry, Rz}, {0, 0, -0.2},
                                                      fL, fL, gL, len, ML, fin, fout, crL, ciL, dlL, abs_delays, true);
         REQUIRE(cr.size() == 2);
         for (size_t f = 0; f < 2; ++f)
@@ -1415,13 +1416,13 @@ TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
     auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
     std::vector<quadriga_lib::arrayant<double>> ov = {omni};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq<double>(ov, ov, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+    quadriga_lib::get_channels_multifreq<double>(ov, ov, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
                                                  f0, f0, g0, e, M0, fin, fin, cr, ci, dl, true, true);
     REQUIRE(dl.size() == 1);
     REQUIRE(dl[0].n_elem == 1);
     CHECK(std::abs(dl[0](0) - 10.0 / C) < 1e-20);
     CHECK(cr[0](0) == 0.0);
-    quadriga_lib::get_channels_multifreq<double>(ov, ov, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+    quadriga_lib::get_channels_multifreq<double>(ov, ov, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
                                                  f0, f0, g0, e, M0, fin, fin, cr, ci, dl, true, false);
     CHECK(dl[0].n_slices == 0); // without add_fake_los_path: empty outputs
 }
@@ -1442,7 +1443,7 @@ TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
     for (int k = 0; k < 2; ++k)
     {
         std::vector<arma::cube> cr(3, arma::cube(2, 2, 2, arma::fill::ones)), ci, dl;
-        quadriga_lib::get_channels_multifreq<double>(txv, rxv, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+        quadriga_lib::get_channels_multifreq<double>(txv, rxv, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
                                                      k == 0 ? f0 : fx, k == 0 ? f0 : fx, k == 0 ? g0 : gx, e,
                                                      k == 0 ? M0 : Mx, fin, fout, cr, ci, dl, true, false);
         REQUIRE(cr.size() == 2);
@@ -1458,7 +1459,7 @@ TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
     }
     // The frequency inputs are still checked
     std::vector<arma::cube> cr, ci, dl;
-    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(txv, rxv, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(txv, rxv, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0},
                                                                  f0, f0, g0, e, M0, fin, arma::vec(), cr, ci, dl, true, false),
                     std::invalid_argument);
 }
@@ -1471,27 +1472,27 @@ TEST_CASE("Multifreq - outputs that alias inputs")
     arma::cube M(8, 1, 1, arma::fill::zeros);
     M(0, 0, 0) = 1.0, M(6, 0, 0) = -1.0;
     std::vector<arma::cube> cr, ci, dl;
-    CHECK_NOTHROW(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    CHECK_NOTHROW(quadriga_lib::get_channels_multifreq(tx, tx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {20.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                                         fbs, fbs, pg, pl, M, fi, fo, cr, ci, dl));
     REQUIRE(cr.size() == 2);
 
     SECTION("Output is an input")
     {
         std::vector<arma::cube> c_in = {M};
-        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {20.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                                               fbs, fbs, pg, pl, c_in[0], fi, fo, c_in, ci, dl),
                         std::invalid_argument);
     }
     SECTION("Two outputs are the same object")
     {
-        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {20.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                                               fbs, fbs, pg, pl, M, fi, fo, cr, cr, dl),
                         std::invalid_argument);
     }
     SECTION("Output shares memory with an input")
     {
         arma::mat pg_on_ci(ci[1].memptr(), 1, 1, false, true); // ci[1] is [1, 1, 1] from the baseline call
-        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq(tx, tx, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {20.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
                                                               fbs, fbs, pg_on_ci, pl, M, fi, fo, cr, ci, dl),
                         std::invalid_argument);
     }
@@ -1512,7 +1513,7 @@ TEST_CASE("get_channels_multifreq - a positive tilt points down (3GPP TR 38.901)
                      double Tt, double Rt)
     {
         std::vector<arma::cube> cr, ci, dl;
-        quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 10.0, 0.0, Tt, 0.0, 10.0, 0.0, 0.0, 0.0, Rt, arma::datum::pi,
+        quadriga_lib::get_channels_multifreq(tx, rx, {0.0, 0.0, 10.0}, {0.0, Tt, 0.0}, {10.0, 0.0, 0.0}, {0.0, Rt, arma::datum::pi},
                                              pos, pos, gain, length, M, freq, freq, cr, ci, dl);
         return arma::accu(cr[0] % cr[0] + ci[0] % ci[0]);
     };
@@ -1524,13 +1525,13 @@ TEST_CASE("get_channels_multifreq - a positive tilt points down (3GPP TR 38.901)
     quadriga_lib::arrayant_copy_element(pair, 0, {1});
     pair.element_pos = {{0.0, 0.0}, {1.0, -1.0}, {0.0, 0.0}};
     std::vector<arma::cube> cr, ci, dl;
-    quadriga_lib::get_channels_multifreq(wrap_single(pair), wrap_single(pair), 0.0, 0.0, 10.0, -q, 0.5, 0.2, 10.0, 0.0, 0.0,
-                                         0.3, -0.4, arma::datum::pi, pos, pos, gain, length, M, freq, freq, cr, ci, dl);
+    quadriga_lib::get_channels_multifreq(wrap_single(pair), wrap_single(pair), {0.0, 0.0, 10.0}, {-q, 0.5, 0.2}, {10.0, 0.0, 0.0},
+                                         {0.3, -0.4, arma::datum::pi}, pos, pos, gain, length, M, freq, freq, cr, ci, dl);
     arma::cube sr, si, sd;
     const arma::vec g = {1.0};
     const arma::mat M1 = M.slice(0);
-    quadriga_lib::get_channels_spherical<double>(&pair, &pair, 0.0, 0.0, 10.0, -q, 0.5, 0.2, 10.0, 0.0, 0.0, 0.3, -0.4,
-                                                 arma::datum::pi, &pos, &pos, &g, &length, &M1, &sr, &si, &sd, freq(0));
+    quadriga_lib::get_channels_spherical<double>(pair, pair, {0.0, 0.0, 10.0}, {-q, 0.5, 0.2}, {10.0, 0.0, 0.0},
+                                                 {0.3, -0.4, arma::datum::pi}, pos, pos, g, length, M1, sr, si, sd, freq(0));
     CHECK(arma::approx_equal(dl[0], sd, "absdiff", 1e-15));
     CHECK(arma::approx_equal(cr[0], sr, "absdiff", 1e-9));
     CHECK(arma::approx_equal(ci[0], si, "absdiff", 1e-9));
@@ -1572,9 +1573,9 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
         std::vector<arma::Cube<dtype>> cr, ci, dl, cr2(2), ci2(1), dl2;
         cr2[0].ones(2, 2, 2); // Stale content
         std::vector<arma::Cube<std::complex<dtype>>> cx;
-        quadriga_lib::get_channels_multifreq<dtype>(tx, rx, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, fbs, fbs, pg, pl, M, fi, fo,
+        quadriga_lib::get_channels_multifreq<dtype>(tx, rx, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0}, fbs, fbs, pg, pl, M, fi, fo,
                                                     cr, ci, dl, true, fake_los);
-        quadriga_lib::get_channels_multifreq<dtype>(tx, rx, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, fbs, fbs, pg, pl, M, fi, fo,
+        quadriga_lib::get_channels_multifreq<dtype>(tx, rx, {0, 0, 0}, {0, 0, 0}, {50, 0, 0}, {0, 0, 0}, fbs, fbs, pg, pl, M, fi, fo,
                                                     cr2, ci2, dl2, true, fake_los, dtype(299792458.0), &cx);
         CHECK((cr2.empty() && ci2.empty()));
         REQUIRE(cx.size() == fo.n_elem);
@@ -1602,7 +1603,7 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
     std::vector<arma::cube> cr, ci, dl;
     std::vector<arma::cx_cube> alias;
     alias.emplace_back((std::complex<double> *)M.memptr(), 4, 1, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, fbs, fbs, pg, pl,
+    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, {0, 0, 0}, {0, 0, 0}, {20, 0, 0}, {0, 0, 0}, fbs, fbs, pg, pl,
                                                                  M, fi, fi, cr, ci, dl, false, false, 299792458.0, &alias),
                     std::invalid_argument);
 
@@ -1614,12 +1615,50 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
     c_on_cr.emplace_back((std::complex<double> *)cr[1].memptr(), 1, 1, 1, false, true);
     c_on_dl.emplace_back((std::complex<double> *)dl[0].memptr(), 1, 1, 1, false, true);
     for (auto *c : {&c_on_cr, &c_on_dl})
-        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, fbs, fbs, pg,
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, {0, 0, 0}, {0, 0, 0}, {20, 0, 0}, {0, 0, 0}, fbs, fbs, pg,
                                                                      pl, M, fi, fo, cr, ci, dl, false, false, 299792458.0, c),
                         std::invalid_argument);
     std::vector<arma::cube> cr_on_dl;
     cr_on_dl.emplace_back(dl[1].memptr(), 1, 1, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, fbs, fbs, pg, pl,
+    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, {0, 0, 0}, {0, 0, 0}, {20, 0, 0}, {0, 0, 0}, fbs, fbs, pg, pl,
                                                                  M, fi, fo, cr_on_dl, ci, dl),
                     std::invalid_argument);
+}
+
+TEST_CASE("Get Channels Multifreq - Position and orientation shapes")
+{
+    // Positions and orientations: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
+    const std::vector<quadriga_lib::arrayant<double>> ant = {quadriga_lib::generate_arrayant_omni<double>()};
+    const arma::mat fbs = arma::mat({10.0, 5.0, 1.0}).t(), gain = {1.0};
+    const arma::vec length = {0.0}, freq = {1.0e9};
+    arma::cube M(8, 1, 1, arma::fill::zeros);
+    M(0, 0, 0) = 1.0, M(6, 0, 0) = -1.0;
+    const arma::mat col[4] = {arma::vec{0.0, 0.0, 1.0}, arma::vec{0.1, 0.2, 0.3}, arma::vec{20.0, 0.0, 1.0}, arma::vec{0.0, -0.1, 0.5}};
+    const char *name[4] = {"tx_pos", "tx_orientation", "rx_pos", "rx_orientation"};
+    using cubes = std::vector<arma::cube>;
+    auto run = [&](const arma::mat *p, cubes &cr, cubes &ci, cubes &dl)
+    { quadriga_lib::get_channels_multifreq(ant, ant, p[0], p[1], p[2], p[3], fbs, fbs, gain, length, M, freq, freq, cr, ci, dl); };
+
+    cubes cr, ci, dl, cr_row, ci_row, dl_row;
+    const arma::mat row[4] = {col[0].t(), col[1].t(), col[2].t(), col[3].t()};
+    run(col, cr, ci, dl), run(row, cr_row, ci_row, dl_row);
+    REQUIRE(cr.size() == 1);
+    REQUIRE(cr_row.size() == 1);
+    CHECK(arma::approx_equal(cr[0], cr_row[0], "absdiff", 0.0));
+    CHECK(arma::approx_equal(ci[0], ci_row[0], "absdiff", 0.0));
+    CHECK(arma::approx_equal(dl[0], dl_row[0], "absdiff", 0.0));
+
+    const arma::mat bad[] = {arma::mat(2, 1, arma::fill::zeros), arma::mat(4, 1, arma::fill::zeros), arma::mat(),
+                             arma::mat(3, 3, arma::fill::zeros)};
+    for (int k = 0; k < 4; ++k)
+        for (const arma::mat &b : bad)
+        {
+            arma::mat p[4] = {col[0], col[1], col[2], col[3]};
+            p[k] = b;
+            cubes c_re = cr, c_im = ci, d = dl;
+            CHECK_THROWS_WITH(run(p, c_re, c_im, d), Catch::Matchers::ContainsSubstring("Input '" + std::string(name[k]) + "' must have 3 elements"));
+            REQUIRE(c_re.size() == 1);
+            CHECK(arma::approx_equal(c_re[0], cr[0], "absdiff", 0.0));
+            CHECK(arma::approx_equal(d[0], dl[0], "absdiff", 0.0));
+        }
 }

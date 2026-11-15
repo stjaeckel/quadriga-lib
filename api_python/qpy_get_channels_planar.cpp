@@ -123,12 +123,6 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
     const auto rx_pos_a = qd_python_numpy2arma_Col(rx_pos, true, false, "rx_pos", 3);
     const auto rx_orientation_a = qd_python_numpy2arma_Col(rx_orientation, true, false, "rx_orientation", 3);
 
-    // Extract scalar values
-    double Tx = tx_pos_a.at(0), Ty = tx_pos_a.at(1), Tz = tx_pos_a.at(2);
-    double Tb = tx_orientation_a.at(0), Tt = tx_orientation_a.at(1), Th = tx_orientation_a.at(2);
-    double Rx = rx_pos_a.at(0), Ry = rx_pos_a.at(1), Rz = rx_pos_a.at(2);
-    double Rb = rx_orientation_a.at(0), Rt = rx_orientation_a.at(1), Rh = rx_orientation_a.at(2);
-
     // Derived inputs
     arma::uword n_ports_tx = ant_tx_a.n_ports();
     arma::uword n_ports_rx = ant_rx_a.n_ports();
@@ -159,10 +153,10 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
 
     if (want_complex)
     {
-        quadriga_lib::get_channels_planar<double>(&ant_tx_a, &ant_rx_a,
-                                                  Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                                  &aod_a, &eod_a, &aoa_a, &eoa_a, &path_gain_f, &path_length_a, &M_f,
-                                                  &coeff_re, &coeff_im, &delay,
+        quadriga_lib::get_channels_planar<double>(ant_tx_a, ant_rx_a,
+                                                  tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
+                                                  aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, M_f,
+                                                  coeff_re, coeff_im, delay,
                                                   center_freq_sel, use_absolute_delays, add_fake_los_path,
                                                   &rx_Doppler);
 
@@ -174,10 +168,10 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
     auto coeff_re_p = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_re);
     auto coeff_im_p = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_im);
 
-    quadriga_lib::get_channels_planar<double>(&ant_tx_a, &ant_rx_a,
-                                              Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                              &aod_a, &eod_a, &aoa_a, &eoa_a, &path_gain_f, &path_length_a, &M_f,
-                                              &coeff_re, &coeff_im, &delay,
+    quadriga_lib::get_channels_planar<double>(ant_tx_a, ant_rx_a,
+                                              tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
+                                              aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, M_f,
+                                              coeff_re, coeff_im, delay,
                                               center_freq_sel, use_absolute_delays, add_fake_los_path,
                                               &rx_Doppler);
 

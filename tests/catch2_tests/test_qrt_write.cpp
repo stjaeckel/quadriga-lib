@@ -6,6 +6,7 @@
 // and reserved-but-unwritten origin reads. Intended to be appended to test_qrt_reader.cpp.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_channel.hpp"
 
 #include <cstdio>
@@ -230,7 +231,7 @@ TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
 
     arma::fvec tx_pos = {1.0f, 2.0f, 3.0f};
     arma::fvec tx_orient = {0.1f, 0.2f, 0.3f};
-    size_t n_written = quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, tx_orient, "TX0");
+    size_t n_written = quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, &tx_orient, "TX0");
     CHECK(n_written == 3);
 
     // Read origin 0 back.
@@ -347,7 +348,7 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     // Write only origin 0 (fills the first free slot); origins 1 and 2 stay reserved.
     std::vector<path> paths = {make_em_path(0, 1, 1, {10})};
     arma::fvec tx_pos = {1.0f, 1.0f, 1.0f};
-    quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, arma::fvec{0.0f, 0.0f, 0.0f}, "TX0");
+    quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, nullptr, "TX0");
 
     // read_raw on the unwritten origin 1 returns empty, does not throw.
     std::vector<path> empty = quadriga_lib::qrt_file_read_raw(fn, 1);
@@ -390,10 +391,10 @@ TEST_CASE("QRT Write - append throws when all slots are full")
     std::vector<path> paths = {make_em_path(0, 1, 1, {5})};
     arma::fvec tx_pos = {0.0f, 0.0f, 0.0f};
 
-    CHECK(quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, arma::fvec{0, 0, 0}, "A") == 1);
-    CHECK(quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, arma::fvec{0, 0, 0}, "B") == 1);
+    CHECK(quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, nullptr, "A") == 1);
+    CHECK(quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, nullptr, "B") == 1);
     // Third append exceeds the 2 reserved slots.
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, arma::fvec{0, 0, 0}, "C"),
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, nullptr, "C"),
                     std::runtime_error);
 
     std::remove(fn.c_str());
@@ -446,8 +447,8 @@ TEST_CASE("QRT Write - read_raw with shared stream and cache")
 
     std::vector<path> p0 = {make_em_path(0, 2, 1, {1, 2}), make_em_path(1, 1, 1, {3})};
     std::vector<path> p1 = {make_em_path(0, 1, 1, {9})};
-    quadriga_lib::qrt_file_append<float>(fn, p0, arma::fvec{0, 0, 0}, arma::fvec{0, 0, 0}, "TX0");
-    quadriga_lib::qrt_file_append<float>(fn, p1, arma::fvec{5, 5, 5}, arma::fvec{0, 0, 0}, "TX1");
+    quadriga_lib::qrt_file_append<float>(fn, p0, arma::fvec{0, 0, 0}, nullptr, "TX0");
+    quadriga_lib::qrt_file_append<float>(fn, p1, arma::fvec{5, 5, 5}, nullptr, "TX1");
 
     std::ifstream stream(fn, std::ios::in | std::ios::binary);
     auto cache = quadriga_lib::qrt_read_cache_init(fn, &stream);
@@ -485,8 +486,11 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
         tx[0] = {mk(0, 0, {}), mk(2, 3, {1, 2, 3}), mk(0, 1, {4})};
         tx[2] = {mk(1, 2, {5, 6})}; // tx[1] has no paths
         for (unsigned t = 0; t < 3; ++t)
+        {
+            const arma::vec orientation = {0.0, 0.0, 0.5 * t};
             CHECK(quadriga_lib::qrt_file_append<double>(fn, tx[t], arma::vec{100.0 + t, 200.0, 30.0},
-                                                        arma::vec{0.0, 0.0, 0.5 * t}, "TX" + std::to_string(t)) == tx[t].size());
+                                                        &orientation, "TX" + std::to_string(t)) == tx[t].size());
+        }
 
         auto cache = quadriga_lib::qrt_read_cache_init(fn);
         REQUIRE(cache.no_orig == 3);
@@ -554,8 +558,7 @@ TEST_CASE("QRT Write - uplink read returns the transposed M")
         auto mk = [&](unsigned nSEG, std::vector<uint8_t> t)
         { return scalar ? make_scalar_path(0, nSEG, 2, t) : make_em_path(0, nSEG, 2, t); };
         std::vector<path> paths = {mk(0, {}), mk(2, {1, 2})};
-        REQUIRE(quadriga_lib::qrt_file_append<double>(fn, paths, arma::vec{100.0, 200.0, 30.0},
-                                                      arma::vec{0.0, 0.0, 0.0}, "TX") == 2);
+        REQUIRE(quadriga_lib::qrt_file_append<double>(fn, paths, arma::vec{100.0, 200.0, 30.0}, nullptr, "TX") == 2);
 
         for (int normalize_M : {0, 1})
         {
@@ -598,5 +601,43 @@ TEST_CASE("QRT Write - append to a v4 file is rejected")
     std::vector<char> after((std::istreambuf_iterator<char>(i)), std::istreambuf_iterator<char>());
     CHECK(after == before);
     i.close();
+    std::remove(fn.c_str());
+}
+
+TEST_CASE("QRT Write - origin position and orientation shapes")
+{
+    // orig_pos, orig_orientation: [3, 1] or [1, 3]; nullptr orientation = zeros; other sizes throw before the file is
+    // written. qrt_file_read writes the positions and orientations as [3, 1], also into arma::Mat outputs.
+    std::string fn = "tests/data/test_write_shapes.qrt";
+    arma::fvec freq = {3.75e9f};
+    arma::fmat cir_pos(1, 3, arma::fill::zeros), cir_orient;
+    std::vector<std::string> dest_names = {"RX"};
+    arma::u32_vec cir_offset = {0u};
+    quadriga_lib::qrt_file_init<float>(fn, freq, cir_pos, cir_orient, dest_names, cir_offset, 3, false);
+    std::vector<path> paths = {make_em_path(0, 0, 1, {})};
+
+    const arma::fmat row_pos = {1.0f, 2.0f, 3.0f}, row_ori = {0.1f, 0.2f, 0.3f};
+    const arma::fmat col_pos = row_pos.t(), col_ori = row_ori.t();
+    const arma::fmat bad[] = {arma::fmat(2, 1, arma::fill::zeros), arma::fmat(4, 1, arma::fill::zeros), arma::fmat()};
+    for (const arma::fmat &b : bad)
+    {
+        CHECK_THROWS_WITH(quadriga_lib::qrt_file_append<float>(fn, paths, b, &col_ori),
+                          Catch::Matchers::ContainsSubstring("Input 'orig_pos' must have 3 elements"));
+        CHECK_THROWS_WITH(quadriga_lib::qrt_file_append<float>(fn, paths, col_pos, &b),
+                          Catch::Matchers::ContainsSubstring("Input 'orig_orientation' must have 3 elements"));
+    }
+    CHECK(quadriga_lib::qrt_file_append<float>(fn, paths, col_pos, &col_ori) == 1); // slot 0: nothing was written before
+    CHECK(quadriga_lib::qrt_file_append<float>(fn, paths, row_pos, &row_ori) == 1);
+    CHECK(quadriga_lib::qrt_file_append<float>(fn, paths, row_pos) == 1);
+
+    const arma::fmat zeros(3, 1, arma::fill::zeros);
+    for (arma::uword i_orig = 0; i_orig < 3; ++i_orig)
+    {
+        INFO("origin " << i_orig);
+        arma::fmat tx_pos(1, 7), tx_ori(1, 7); // any previous size: outputs are set to [3, 1]
+        quadriga_lib::qrt_file_read<float>(fn, 0, i_orig, true, nullptr, &tx_pos, &tx_ori);
+        CHECK(arma::approx_equal(tx_pos, col_pos, "absdiff", 0.0f));
+        CHECK(arma::approx_equal(tx_ori, i_orig < 2 ? col_ori : zeros, "absdiff", 0.0f));
+    }
     std::remove(fn.c_str());
 }

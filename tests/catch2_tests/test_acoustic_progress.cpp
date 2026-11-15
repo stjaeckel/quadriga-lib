@@ -409,7 +409,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
         int n_gen = 0;
         for (int g = 0; g < 2; ++g, ++n_gen)
         {
-            quadriga_lib::ray_progress(mesh, mi, rig, cf, Ox, Oy, Oz, orig, dest, prev, cur, buf, pd, acc, paths,
+            quadriga_lib::ray_progress(mesh, mi, rig, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
                                        nullptr, nullptr, nullptr, nullptr,
                                        20, (uint8_t)0, 10, (uint8_t)0, -300.0f, 3.0f, 0.15f, refr, true,
                                        nullptr, nullptr, nullptr, nullptr);

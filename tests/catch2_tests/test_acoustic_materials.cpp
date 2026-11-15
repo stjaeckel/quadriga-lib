@@ -312,7 +312,7 @@ TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing 
     QD_DIAG("# diag: ENGINE LIMIT (grazing relaunch), one grazing ray on the hard box\ncall,rays,power\n");
     for (int g = 0; g < 10 && orig.n_rows; ++g)
     {
-        quadriga_lib::ray_progress(mesh, arma::join_cols(arma::uvec(12, arma::fill::value(1)), arma::uvec(12, arma::fill::value(2))), pal, cf, 0.0f, 0.0f, 0.0f, orig, dest, prev, cur, buf,
+        quadriga_lib::ray_progress(mesh, arma::join_cols(arma::uvec(12, arma::fill::value(1)), arma::uvec(12, arma::fill::value(2))), pal, cf, {0.0f, 0.0f, 0.0f}, orig, dest, prev, cur, buf,
                                    pd, acc, paths, nullptr, nullptr, nullptr, nullptr, 10, 255, 255, 0, -60.0f, 3.0f, 0.0f, false, true);
         double p = 0.0;
         for (arma::uword i = 0; i < orig.n_rows; ++i)

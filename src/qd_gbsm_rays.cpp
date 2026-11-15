@@ -60,7 +60,7 @@ Class for the ray data of one link (geometry-based stochastic model)
 | Attribute | Type, size | Meaning | Set by |
 | --- | --- | --- | --- |
 | `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
-| `tx_pos`, `rx_pos` | `arma::vec`, `[3]` | Tx and Rx position the ray data refer to in [m] | all |
+| `tx_pos`, `rx_pos` | `arma::mat`, 3 elements; `[3, 1]` as written by the library | Tx and Rx position the ray data refer to in [m] | all |
 | `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
@@ -114,7 +114,7 @@ std::string quadriga_lib::gbsm_rays::is_valid() const
 
     if (method != "38.901" && method != "38.901_MF" && method != "quadriga")
         return "Input 'rays.method' must be '38.901', '38.901_MF' or 'quadriga'.";
-    const std::pair<std::string, const arma::vec *> pos[2] = {{"tx_pos", &tx_pos}, {"rx_pos", &rx_pos}};
+    const std::pair<std::string, const arma::mat *> pos[2] = {{"tx_pos", &tx_pos}, {"rx_pos", &rx_pos}};
     for (const auto &p : pos)
     {
         if (p.second->n_elem != 3)

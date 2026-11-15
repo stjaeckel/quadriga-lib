@@ -211,8 +211,8 @@ namespace quadriga_lib
     {
     public:
         std::string method = "38.901"; // Method of the ray data: "38.901", "38.901_MF" or "quadriga"; sets the GR power law and the default mobility
-        arma::vec tx_pos;               // Tx position the ray data refer to in [m], [3]
-        arma::vec rx_pos;               // Rx position the ray data refer to in [m], [3]
+        arma::mat tx_pos;               // Tx position the ray data refer to in [m], 3 elements, [3, 1] as written by the library
+        arma::mat rx_pos;               // Rx position the ray data refer to in [m], 3 elements, [3, 1] as written by the library
         arma::vec center_freq;          // Carrier frequencies in [Hz], [n_freq]
         arma::vec delay;                // Delays in [s] relative to the LOS delay |rx_pos - tx_pos| / c, [n_ray]
         arma::mat power;                // Coefficient powers (linear), without link gain; data from paths: path gain, [n_ray, n_freq]
@@ -279,8 +279,8 @@ namespace quadriga_lib
                    arma::vec &path_length,               // Output: Path lengths in [m], [n_path]
                    arma::cube &M,                        // Output: Polarization transfer matrices, [8, n_path, n_freq]
                    const std::string &mobility = "auto", // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
-                   const arma::vec *tx_pos = nullptr,    // Optional: Tx position in [m], [3]; nullptr = rays.tx_pos
-                   const arma::vec *rx_pos = nullptr,    // Optional: Rx position in [m], [3]; nullptr = rays.rx_pos
+                   const arma::mat *tx_pos = nullptr,    // Optional: Tx position in [m], [3, 1] or [1, 3]; nullptr = rays.tx_pos
+                   const arma::mat *rx_pos = nullptr,    // Optional: Rx position in [m], [3, 1] or [1, 3]; nullptr = rays.rx_pos
                    const arma::vec *kf_ratio = nullptr,  // Optional: K(position) / K(drop), [n_freq]; nullptr = 1
                    arma::vec *aod = nullptr,             // Optional output: Azimuth of departure in [rad], [n_path]
                    arma::vec *eod = nullptr,             // Optional output: Elevation of departure in [rad], [n_path]
@@ -296,8 +296,8 @@ namespace quadriga_lib
     // - Delays from the path lengths, angles from the scatterer positions, power = path gain
     // - Fills a pre-initialised object; members of the right size keep their memory
     void gbsm_rays_from_paths(const arma::vec &center_freq,             // Frequencies in [Hz], [n_freq]
-                              const arma::vec &tx_pos,                  // Tx position in [m], [3]
-                              const arma::vec &rx_pos,                  // Rx position in [m], [3]
+                              const arma::mat &tx_pos,                  // Tx position in [m], [3, 1] or [1, 3]
+                              const arma::mat &rx_pos,                  // Rx position in [m], [3, 1] or [1, 3]
                               const arma::mat &fbs_pos,                 // First-bounce scatterer positions in [m], [3, n_path]
                               const arma::mat &lbs_pos,                 // Last-bounce scatterer positions in [m], [3, n_path]
                               const arma::mat &path_gain,               // Path gains (linear), [n_path, n_freq]

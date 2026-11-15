@@ -77,7 +77,7 @@ static inline void write_los_qrt(const std::string &fn, const arma::vec &freq,
     }
 
     arma::vec tx_orientation(3, arma::fill::zeros);
-    size_t written = quadriga_lib::qrt_file_append<double>(fn, paths, tx_pos, tx_orientation, "TX");
+    size_t written = quadriga_lib::qrt_file_append<double>(fn, paths, tx_pos, &tx_orientation, "TX");
     REQUIRE(written == (size_t)n_cir);
 }
 
@@ -299,18 +299,18 @@ TEST_CASE("Gains - Phase matches get_channels_spherical, EM mode")
             arma::cube crA, ciA, dlA, crB, ciB, dlB;
 
             // A: phase supplied by the generator
-            quadriga_lib::get_channels_spherical<double>(&tx_ant, &rx_ant,
-                                                         cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
-                                                         cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
-                                                         &fbs, &lbs, &pg, &plen, &M_plain,
-                                                         &crA, &ciA, &dlA, freq, false, false);
+            quadriga_lib::get_channels_spherical<double>(tx_ant, rx_ant,
+                                                         {cs.T(0), cs.T(1), cs.T(2)}, {0.0, 0.0, 0.0},
+                                                         {cs.R(0), cs.R(1), cs.R(2)}, {0.0, 0.0, 0.0},
+                                                         fbs, lbs, pg, plen, M_plain,
+                                                         crA, ciA, dlA, freq, false, false);
 
             // B: phase already in M, generator phase disabled
-            quadriga_lib::get_channels_spherical<double>(&tx_ant, &rx_ant,
-                                                         cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
-                                                         cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
-                                                         &fbs, &lbs, &pg, &plen, &M_phase,
-                                                         &crB, &ciB, &dlB, 0.0, false, false);
+            quadriga_lib::get_channels_spherical<double>(tx_ant, rx_ant,
+                                                         {cs.T(0), cs.T(1), cs.T(2)}, {0.0, 0.0, 0.0},
+                                                         {cs.R(0), cs.R(1), cs.R(2)}, {0.0, 0.0, 0.0},
+                                                         fbs, lbs, pg, plen, M_phase,
+                                                         crB, ciB, dlB, 0.0, false, false);
 
             REQUIRE(crA.n_elem == crB.n_elem);
             CHECK(arma::abs(crA - crB).max() < 1e-10);
@@ -319,11 +319,11 @@ TEST_CASE("Gains - Phase matches get_channels_spherical, EM mode")
             // The phase is not trivially zero: with phase disabled and no phase in M the
             // coefficient would be real, so the imaginary part proves rotation happened.
             arma::cube crC, ciC, dlC;
-            quadriga_lib::get_channels_spherical<double>(&tx_ant, &rx_ant,
-                                                         cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
-                                                         cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
-                                                         &fbs, &lbs, &pg, &plen, &M_plain,
-                                                         &crC, &ciC, &dlC, 0.0, false, false);
+            quadriga_lib::get_channels_spherical<double>(tx_ant, rx_ant,
+                                                         {cs.T(0), cs.T(1), cs.T(2)}, {0.0, 0.0, 0.0},
+                                                         {cs.R(0), cs.R(1), cs.R(2)}, {0.0, 0.0, 0.0},
+                                                         fbs, lbs, pg, plen, M_plain,
+                                                         crC, ciC, dlC, 0.0, false, false);
             CHECK(arma::abs(ciA - ciC).max() > 1e-6);
 
             // Rotation preserves magnitude
@@ -418,8 +418,8 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
             // A: phase supplied by the generator, at the acoustic propagation speed
             arma::vec freq_new_on = {freq};
             quadriga_lib::get_channels_multifreq<double>(tx_v, rx_v,
-                                                         cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
-                                                         cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
+                                                         {cs.T(0), cs.T(1), cs.T(2)}, {0.0, 0.0, 0.0},
+                                                         {cs.R(0), cs.R(1), cs.R(2)}, {0.0, 0.0, 0.0},
                                                          fbs, lbs, pg, plen, M_plain,
                                                          freq_grid, freq_new_on, crA, ciA, dlA,
                                                          false, false, SPEED_OF_SOUND);
@@ -427,8 +427,8 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
             // B: phase already in M; freq_new = 0 disables the generator's rotation
             arma::vec freq_new_off = {0.0};
             quadriga_lib::get_channels_multifreq<double>(tx_v, rx_v,
-                                                         cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
-                                                         cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
+                                                         {cs.T(0), cs.T(1), cs.T(2)}, {0.0, 0.0, 0.0},
+                                                         {cs.R(0), cs.R(1), cs.R(2)}, {0.0, 0.0, 0.0},
                                                          fbs, lbs, pg, plen, M_phase,
                                                          freq_grid, freq_new_off, crB, ciB, dlB,
                                                          false, false, SPEED_OF_SOUND);
@@ -444,8 +444,8 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
             // that it preserves magnitude.
             std::vector<arma::cube> crC, ciC, dlC;
             quadriga_lib::get_channels_multifreq<double>(tx_v, rx_v,
-                                                         cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
-                                                         cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
+                                                         {cs.T(0), cs.T(1), cs.T(2)}, {0.0, 0.0, 0.0},
+                                                         {cs.R(0), cs.R(1), cs.R(2)}, {0.0, 0.0, 0.0},
                                                          fbs, lbs, pg, plen, M_plain,
                                                          freq_grid, freq_new_off, crC, ciC, dlC,
                                                          false, false, SPEED_OF_SOUND);

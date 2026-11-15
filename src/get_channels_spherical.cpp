@@ -49,20 +49,20 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## Declaration:
 ```
 void quadriga_lib::get_channels_spherical(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    const arma::Mat<dtype> *fbs_pos,
-    const arma::Mat<dtype> *lbs_pos,
-    const arma::Col<dtype> *path_gain,
-    const arma::Col<dtype> *path_length,
-    const arma::Mat<dtype> *M,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Mat<dtype> &fbs_pos,
+    const arma::Mat<dtype> &lbs_pos,
+    const arma::Col<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Mat<dtype> &M,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
@@ -76,10 +76,10 @@ void quadriga_lib::get_channels_spherical(
 ## Inputs:
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [[arrayant]]
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [[arrayant]]
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, finite
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, finite
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), finite
+- **`tx_pos`** — Transmitter position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates in [m], finite; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading) in [rad], finite; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
@@ -115,12 +115,12 @@ MD!*/
 
 // Calculate channel coefficients for spherical waves
 template <typename dtype>
-void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *tx_array, const quadriga_lib::arrayant<dtype> *rx_array,
-                                          dtype Tx, dtype Ty, dtype Tz, dtype Tb, dtype Tt, dtype Th,
-                                          dtype Rx, dtype Ry, dtype Rz, dtype Rb, dtype Rt, dtype Rh,
-                                          const arma::Mat<dtype> *fbs_pos, const arma::Mat<dtype> *lbs_pos,
-                                          const arma::Col<dtype> *path_gain, const arma::Col<dtype> *path_length, const arma::Mat<dtype> *M,
-                                          arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
+void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
+                                          const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
+                                          const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
+                                          const arma::Mat<dtype> &fbs_pos, const arma::Mat<dtype> &lbs_pos,
+                                          const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &M,
+                                          arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
                                           dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                           int use_kernel)
@@ -132,32 +132,26 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     dtype wavelength = (center_freq > zero) ? (dtype)299792458.0 / center_freq : (dtype)1.0;
     dtype wave_number = (dtype)2.095845021951682e-08 * center_freq; // 2 * pi / C
 
-    // Catch NULL-Pointers
-    std::string error_message;
-    if (tx_array == nullptr || rx_array == nullptr ||
-        fbs_pos == nullptr || lbs_pos == nullptr || path_gain == nullptr || path_length == nullptr || M == nullptr ||
-        coeff_re == nullptr || coeff_im == nullptr || delay == nullptr)
-    {
-        error_message = "Mandatory inputs and outputs cannot be NULL";
-        throw std::invalid_argument(error_message.c_str());
-    }
+    // Positions and orientations
+    const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_to = qd_xyz(tx_orientation, "tx_orientation");
+    const dtype *p_rp = qd_xyz(rx_pos, "rx_pos"), *p_ro = qd_xyz(rx_orientation, "rx_orientation");
+    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
+    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2], Rb = p_ro[0], Rt = p_ro[1], Rh = p_ro[2];
 
-    for (dtype v : {Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh})
-        if (!std::isfinite(v))
-            throw std::invalid_argument("TX and RX positions and orientations must be finite.");
+    std::string error_message;
 
     // Kernel of the antenna interpolation and the coefficient computation, checked before any early return
-    const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array->e_theta_re.n_elem, rx_array->e_theta_re.n_elem));
+    const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
 
-    qd_check_alias_list({coeff_re, coeff_im, delay, aod, eod, aoa, eoa},
+    qd_check_alias_list({&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa},
                         {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
-                        fbs_pos, lbs_pos, path_gain, path_length, M);
+                        &fbs_pos, &lbs_pos, &path_gain, &path_length, &M);
 
     // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot (delays and angles from
     // the TX-RX geometry) does not depend on the path data, so a dummy NLOS path (1 m longer than the LOS path, never
     // detected as LOS) fills the input; its own slot is dropped.
-    if (add_fake_los_path && fbs_pos->n_elem == 0 && lbs_pos->n_elem == 0 && path_gain->n_elem == 0 &&
-        path_length->n_elem == 0 && M->n_elem == 0)
+    if (add_fake_los_path && fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
+        path_length.n_elem == 0 && M.n_elem == 0)
     {
         const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
         const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
@@ -167,8 +161,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         M_d.at(0) = (dtype)1.0, M_d.at(6) = (dtype)-1.0;
 
         arma::Cube<dtype> cr, ci, dl, ad, ed, aa, ea;
-        quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                                    &fbs_d, &fbs_d, &gain_d, &length_d, &M_d, &cr, &ci, &dl,
+        quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation,
+                                                    fbs_d, fbs_d, gain_d, length_d, M_d, cr, ci, dl,
                                                     center_freq, use_absolute_delays, true,
                                                     aod == nullptr ? nullptr : &ad, eod == nullptr ? nullptr : &ed,
                                                     aoa == nullptr ? nullptr : &aa, eoa == nullptr ? nullptr : &ea,
@@ -183,19 +177,19 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                 dst->set_size(src.n_rows, src.n_cols, 1ULL);
             std::memcpy(dst->memptr(), src.memptr(), src.n_rows * src.n_cols * sizeof(dtype));
         };
-        copy_slot(cr, coeff_re), copy_slot(ci, coeff_im), copy_slot(dl, delay);
+        copy_slot(cr, &coeff_re), copy_slot(ci, &coeff_im), copy_slot(dl, &delay);
         copy_slot(ad, aod), copy_slot(ed, eod), copy_slot(aa, aoa), copy_slot(ea, eoa);
         return;
     }
 
     // Check if the antennas are valid
-    error_message = qd_arrayant_is_valid_quick(*tx_array);
+    error_message = qd_arrayant_is_valid_quick(tx_array);
     if (error_message.length() != 0)
     {
         error_message = "Transmit antenna: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
-    error_message = qd_arrayant_is_valid_quick(*rx_array);
+    error_message = qd_arrayant_is_valid_quick(rx_array);
     if (error_message.length() != 0)
     {
         error_message = "Receive antenna: " + error_message;
@@ -203,50 +197,50 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     }
 
     // 0 paths without add_fake_los_path: empty outputs of size [n_rx_ports, n_tx_ports, 0]
-    if (fbs_pos->n_elem == 0 && lbs_pos->n_elem == 0 && path_gain->n_elem == 0 && path_length->n_elem == 0 && M->n_elem == 0)
+    if (fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 && path_length.n_elem == 0 && M.n_elem == 0)
     {
-        const arma::uword n_tx_ports = tx_array->n_ports(), n_rx_ports = rx_array->n_ports();
-        for (arma::Cube<dtype> *out : {coeff_re, coeff_im, delay, aod, eod, aoa, eoa})
+        const arma::uword n_tx_ports = tx_array.n_ports(), n_rx_ports = rx_array.n_ports();
+        for (arma::Cube<dtype> *out : {&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa})
             if (out != nullptr && (out->n_rows != n_rx_ports || out->n_cols != n_tx_ports || out->n_slices != 0ULL))
                 out->set_size(n_rx_ports, n_tx_ports, 0ULL);
         return;
     }
 
     // Check if the number of paths is consistent in all inputs
-    if (fbs_pos->n_elem == 0 || lbs_pos->n_elem == 0 || path_gain->n_elem == 0 || path_length->n_elem == 0 || M->n_elem == 0)
+    if (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 || path_length.n_elem == 0 || M.n_elem == 0)
     {
         error_message = "Missing data for any of: fbs_pos, lbs_pos, path_gain, path_length, M";
         throw std::invalid_argument(error_message.c_str());
     }
-    if (fbs_pos->n_rows != 3 || lbs_pos->n_rows != 3 || M->n_rows != 8)
+    if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || M.n_rows != 8)
     {
         error_message = "Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows; 'M' must have 8 rows.";
         throw std::invalid_argument(error_message.c_str());
     }
 
     // 64-bit integers used by Armadillo
-    const arma::uword n_path = fbs_pos->n_cols;                        // Number of paths
+    const arma::uword n_path = fbs_pos.n_cols;                        // Number of paths
     const arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
-    const arma::uword n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
-    const arma::uword n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
+    const arma::uword n_tx = tx_array.e_theta_re.n_slices;            // Number of TX antenna elements before coupling
+    const arma::uword n_rx = rx_array.e_theta_re.n_slices;            // Number of RX antenna elements before coupling
     const arma::uword n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    const arma::uword n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
-    const arma::uword n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
+    const arma::uword n_tx_ports = tx_array.n_ports();                // Number of TX antenna elements after coupling
+    const arma::uword n_rx_ports = rx_array.n_ports();                // Number of RX antenna elements after coupling
     const arma::uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
 
-    if (lbs_pos->n_cols != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
+    if (lbs_pos.n_cols != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || M.n_cols != n_path)
     {
         error_message = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'M' must have the same number of columns (n_paths).";
         throw std::invalid_argument(error_message.c_str());
     }
 
     // Set the output size
-    if (coeff_re->n_rows != n_rx_ports || coeff_re->n_cols != n_tx_ports || coeff_re->n_slices != n_out)
-        coeff_re->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (coeff_im->n_rows != n_rx_ports || coeff_im->n_cols != n_tx_ports || coeff_im->n_slices != n_out)
-        coeff_im->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (delay->n_rows != n_rx_ports || delay->n_cols != n_tx_ports || delay->n_slices != n_out)
-        delay->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (coeff_re.n_rows != n_rx_ports || coeff_re.n_cols != n_tx_ports || coeff_re.n_slices != n_out)
+        coeff_re.set_size(n_rx_ports, n_tx_ports, n_out);
+    if (coeff_im.n_rows != n_rx_ports || coeff_im.n_cols != n_tx_ports || coeff_im.n_slices != n_out)
+        coeff_im.set_size(n_rx_ports, n_tx_ports, n_out);
+    if (delay.n_rows != n_rx_ports || delay.n_cols != n_tx_ports || delay.n_slices != n_out)
+        delay.set_size(n_rx_ports, n_tx_ports, n_out);
     if (aod != nullptr && (aod->n_rows != n_rx_ports || aod->n_cols != n_tx_ports || aod->n_slices != n_out))
         aod->set_size(n_rx_ports, n_tx_ports, n_out);
     if (eod != nullptr && (eod->n_rows != n_rx_ports || eod->n_cols != n_tx_ports || eod->n_slices != n_out))
@@ -276,46 +270,46 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     if (different_output_size || eoa == nullptr)
         EOA.set_size(n_links, n_out);
 
-    dtype *p_coeff_re = different_output_size ? CR.memptr() : coeff_re->memptr();
-    dtype *p_coeff_im = different_output_size ? CI.memptr() : coeff_im->memptr();
-    dtype *p_delays = different_output_size ? DL.memptr() : delay->memptr();
+    dtype *p_coeff_re = different_output_size ? CR.memptr() : coeff_re.memptr();
+    dtype *p_coeff_im = different_output_size ? CI.memptr() : coeff_im.memptr();
+    dtype *p_delays = different_output_size ? DL.memptr() : delay.memptr();
     dtype *p_aod = (different_output_size || aod == nullptr) ? AOD.memptr() : aod->memptr();
     dtype *p_eod = (different_output_size || eod == nullptr) ? EOD.memptr() : eod->memptr();
     dtype *p_aoa = (different_output_size || aoa == nullptr) ? AOA.memptr() : aoa->memptr();
     dtype *p_eoa = (different_output_size || eoa == nullptr) ? EOA.memptr() : eoa->memptr();
 
     // Get pointers
-    const dtype *p_fbs = fbs_pos->memptr();
-    const dtype *p_lbs = lbs_pos->memptr();
-    const dtype *p_gain = path_gain->memptr();
-    const dtype *p_length = path_length->memptr();
+    const dtype *p_fbs = fbs_pos.memptr();
+    const dtype *p_lbs = lbs_pos.memptr();
+    const dtype *p_gain = path_gain.memptr();
+    const dtype *p_length = path_length.memptr();
 
     // Convert inputs to orientation vector
     dtype *ptr;
-    arma::Cube<dtype> tx_orientation(3, 1, 1);
-    arma::Cube<dtype> rx_orientation(3, 1, 1);
+    arma::Cube<dtype> tx_ori(3, 1, 1);
+    arma::Cube<dtype> rx_ori(3, 1, 1);
     bool tx_orientation_not_zero = (Tb != zero || Tt != zero || Th != zero);
     bool rx_orientation_not_zero = (Rb != zero || Rt != zero || Rh != zero);
 
     if (tx_orientation_not_zero)
-        ptr = tx_orientation.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
+        ptr = tx_ori.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
 
     if (rx_orientation_not_zero)
-        ptr = rx_orientation.memptr(), ptr[0] = Rb, ptr[1] = Rt, ptr[2] = Rh;
+        ptr = rx_ori.memptr(), ptr[0] = Rb, ptr[1] = Rt, ptr[2] = Rh;
 
     // Calculate the antenna element positions in GCS
     arma::Mat<dtype> tx_element_pos(3, n_tx), rx_element_pos(3, n_rx);
     dtype *p_tx = tx_element_pos.memptr(), *p_rx = rx_element_pos.memptr();
 
-    if (tx_array->element_pos.n_elem != 0)
-        std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
+    if (tx_array.element_pos.n_elem != 0)
+        std::memcpy(p_tx, tx_array.element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     if (tx_orientation_not_zero) // Apply TX antenna orientation
         qd_rotate_inplace(Tb, Tt, Th, p_tx, n_tx);
     for (arma::uword t = 0ULL; t < 3ULL * n_tx; t += 3ULL) // Add TX position
         p_tx[t] += Tx, p_tx[t + 1ULL] += Ty, p_tx[t + 2ULL] += Tz;
 
-    if (rx_array->element_pos.n_elem != 0)
-        std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
+    if (rx_array.element_pos.n_elem != 0)
+        std::memcpy(p_rx, rx_array.element_pos.memptr(), 3 * n_rx * sizeof(dtype));
     if (rx_orientation_not_zero) // Apply RX antenna orientation
         qd_rotate_inplace(Rb, Rt, Rh, p_rx, n_rx);
     for (arma::uword r = 0ULL; r < 3ULL * n_rx; r += 3ULL) // Add RX position
@@ -427,8 +421,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     arma::uword *p_element = i_tx_element.memptr();
     arma::Mat<dtype> tx_element_pos_interp(3, n_links, arma::fill::none);
     ptr = tx_element_pos_interp.memptr();
-    if (tx_array->element_pos.n_elem != 0)
-        std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
+    if (tx_array.element_pos.n_elem != 0)
+        std::memcpy(p_tx, tx_array.element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     else
         tx_element_pos.zeros();
     for (arma::uword t = 0; t < n_tx; ++t)
@@ -440,8 +434,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     p_element = i_rx_element.memptr();
     arma::Mat<dtype> rx_element_pos_interp(3, n_links, arma::fill::none);
     ptr = rx_element_pos_interp.memptr();
-    if (rx_array->element_pos.n_elem != 0)
-        std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
+    if (rx_array.element_pos.n_elem != 0)
+        std::memcpy(p_rx, rx_array.element_pos.memptr(), 3 * n_rx * sizeof(dtype));
     else
         rx_element_pos.zeros();
     for (arma::uword t = 0; t < n_tx; ++t)
@@ -450,16 +444,16 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
 
     // Determine if we need to apply antenna-element coupling
     bool apply_element_coupling = false;
-    if (rx_array->coupling_re.n_elem != 0 || rx_array->coupling_im.n_elem != 0 ||
-        tx_array->coupling_re.n_elem != 0 || tx_array->coupling_im.n_elem != 0)
+    if (rx_array.coupling_re.n_elem != 0 || rx_array.coupling_im.n_elem != 0 ||
+        tx_array.coupling_re.n_elem != 0 || tx_array.coupling_im.n_elem != 0)
     {
         if (n_rx_ports != n_rx || n_tx_ports != n_tx)
             apply_element_coupling = true;
 
         // Check if TX coupling real part is identity matrix
-        if (!apply_element_coupling && tx_array->coupling_re.n_rows == n_tx && tx_array->coupling_re.n_cols == n_tx)
+        if (!apply_element_coupling && tx_array.coupling_re.n_rows == n_tx && tx_array.coupling_re.n_cols == n_tx)
         {
-            const dtype *p = tx_array->coupling_re.memptr();
+            const dtype *p = tx_array.coupling_re.memptr();
             for (arma::uword r = 0ULL; r < n_tx; ++r)
                 for (arma::uword c = 0ULL; c < n_tx; ++c)
                 {
@@ -471,17 +465,17 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         }
 
         // If TX coupling has imaginary part, check if there is any element not 0
-        if (!apply_element_coupling && tx_array->coupling_im.n_elem != 0)
+        if (!apply_element_coupling && tx_array.coupling_im.n_elem != 0)
         {
-            for (const dtype *p = tx_array->coupling_im.begin(); p < tx_array->coupling_im.end(); ++p)
+            for (const dtype *p = tx_array.coupling_im.begin(); p < tx_array.coupling_im.end(); ++p)
                 if (std::abs(*p) > (dtype)1.0e-6)
                     apply_element_coupling = true;
         }
 
         // Check if RX coupling real part is identity matrix
-        if (!apply_element_coupling && rx_array->coupling_re.n_rows == n_rx && rx_array->coupling_re.n_cols == n_rx)
+        if (!apply_element_coupling && rx_array.coupling_re.n_rows == n_rx && rx_array.coupling_re.n_cols == n_rx)
         {
-            const dtype *p = rx_array->coupling_re.memptr();
+            const dtype *p = rx_array.coupling_re.memptr();
             for (arma::uword r = 0ULL; r < n_rx; ++r)
                 for (arma::uword c = 0ULL; c < n_rx; ++c)
                 {
@@ -493,9 +487,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         }
 
         // If RX coupling has imaginary part, check if there is any element not 0
-        if (!apply_element_coupling && rx_array->coupling_im.n_elem != 0)
+        if (!apply_element_coupling && rx_array.coupling_im.n_elem != 0)
         {
-            for (const dtype *p = rx_array->coupling_im.begin(); p < rx_array->coupling_im.end(); ++p)
+            for (const dtype *p = rx_array.coupling_im.begin(); p < rx_array.coupling_im.end(); ++p)
                 if (std::abs(*p) > (dtype)1.0e-6)
                     apply_element_coupling = true;
         }
@@ -506,8 +500,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     arma::Mat<dtype> rx_coupling_pwr(n_rx, n_rx_ports, arma::fill::none);
     if (apply_element_coupling)
     {
-        qd_power_mat(n_tx, n_tx_ports, tx_coupling_pwr.memptr(), true, tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr());
-        qd_power_mat(n_rx, n_rx_ports, rx_coupling_pwr.memptr(), true, rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr());
+        qd_power_mat(n_tx, n_tx_ports, tx_coupling_pwr.memptr(), true, tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr());
+        qd_power_mat(n_rx, n_rx_ports, rx_coupling_pwr.memptr(), true, rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr());
     }
 
     // Batch-interpolate antenna responses for all paths at once
@@ -523,9 +517,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     arma::Mat<dtype> Hr_re(n_links, n_out, arma::fill::none), Hr_im(n_links, n_out, arma::fill::none);
 
     // Interpolate antennas
-    qd_arrayant_interpolate_dispatch<dtype>(*tx_array, AOD_all, EOD_all, i_tx_element, tx_orientation, tx_element_pos_interp,
+    qd_arrayant_interpolate_dispatch<dtype>(tx_array, AOD_all, EOD_all, i_tx_element, tx_ori, tx_element_pos_interp,
                                             Vt_re, Vt_im, Ht_re, Ht_im, nullptr, nullptr, nullptr, nullptr, kernel);
-    qd_arrayant_interpolate_dispatch<dtype>(*rx_array, AOA_all, EOA_all, i_rx_element, rx_orientation, rx_element_pos_interp,
+    qd_arrayant_interpolate_dispatch<dtype>(rx_array, AOA_all, EOA_all, i_rx_element, rx_ori, rx_element_pos_interp,
                                             Vr_re, Vr_im, Hr_re, Hr_im, nullptr, nullptr, nullptr, nullptr, kernel);
 
     // Calculate the MIMO channel coefficients for each path
@@ -538,7 +532,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         const arma::uword o_slice = j * n_links; // Slice offset
 
         // Get column pointers into the precomputed interpolation results
-        const dtype *pM = M->colptr(i);
+        const dtype *pM = M.colptr(i);
         const dtype *pVrr = Vr_re.colptr(j), *pVri = Vr_im.colptr(j),
                     *pHrr = Hr_re.colptr(j), *pHri = Hr_im.colptr(j),
                     *pVtr = Vt_re.colptr(j), *pVti = Vt_im.colptr(j),
@@ -582,22 +576,22 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
             if (different_output_size) // Data is stored in internal memory, we can write directly to the output
             {
                 // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
                                           &p_coeff_re[o_slice], &p_coeff_im[o_slice],
-                                          tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
-                                          coeff_re->slice_memptr(j), coeff_im->slice_memptr(j),
+                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
+                                          coeff_re.slice_memptr(j), coeff_im.slice_memptr(j),
                                           n_rx, n_rx_ports, n_tx, n_tx_ports);
 
                 // Apply coupling to delays
-                qd_multiply_3_mat(rx_coupling_pwr.memptr(), &p_delays[o_slice], tx_coupling_pwr.memptr(), delay->slice_memptr(j),
+                qd_multiply_3_mat(rx_coupling_pwr.memptr(), &p_delays[o_slice], tx_coupling_pwr.memptr(), delay.slice_memptr(j),
                                   n_rx, n_rx_ports, n_tx, n_tx_ports);
             }
             else // Data has been written to external memory
             {
                 // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
                                           &p_coeff_re[o_slice], &p_coeff_im[o_slice],
-                                          tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
+                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
                                           tempX, tempY,
                                           n_rx, n_rx_ports, n_tx, n_tx_ports);
 
@@ -664,33 +658,33 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     // Set the true LOS path as the first path
     if (add_fake_los_path && true_los_path != 0ULL)
     {
-        dtype *ptrR = coeff_re->slice_memptr(true_los_path);
-        dtype *ptrI = coeff_im->slice_memptr(true_los_path);
+        dtype *ptrR = coeff_re.slice_memptr(true_los_path);
+        dtype *ptrI = coeff_im.slice_memptr(true_los_path);
 
-        std::memcpy(coeff_re->slice_memptr(0), ptrR, n_ports * sizeof(dtype));
-        std::memcpy(coeff_im->slice_memptr(0), ptrI, n_ports * sizeof(dtype));
+        std::memcpy(coeff_re.slice_memptr(0), ptrR, n_ports * sizeof(dtype));
+        std::memcpy(coeff_im.slice_memptr(0), ptrI, n_ports * sizeof(dtype));
 
         for (arma::uword i = 0ULL; i < n_ports; ++i)
             ptrR[i] = zero, ptrI[i] = zero;
     }
 }
 
-template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<float> *tx_array, const quadriga_lib::arrayant<float> *rx_array,
-                                                   float Tx, float Ty, float Tz, float Tb, float Tt, float Th,
-                                                   float Rx, float Ry, float Rz, float Rb, float Rt, float Rh,
-                                                   const arma::Mat<float> *fbs_pos, const arma::Mat<float> *lbs_pos,
-                                                   const arma::Col<float> *path_gain, const arma::Col<float> *path_length, const arma::Mat<float> *M,
-                                                   arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
+template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<float> &tx_array, const quadriga_lib::arrayant<float> &rx_array,
+                                                   const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
+                                                   const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
+                                                   const arma::Mat<float> &fbs_pos, const arma::Mat<float> &lbs_pos,
+                                                   const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &M,
+                                                   arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
                                                    float center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
                                                    int use_kernel);
 
-template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<double> *tx_array, const quadriga_lib::arrayant<double> *rx_array,
-                                                   double Tx, double Ty, double Tz, double Tb, double Tt, double Th,
-                                                   double Rx, double Ry, double Rz, double Rb, double Rt, double Rh,
-                                                   const arma::Mat<double> *fbs_pos, const arma::Mat<double> *lbs_pos,
-                                                   const arma::Col<double> *path_gain, const arma::Col<double> *path_length, const arma::Mat<double> *M,
-                                                   arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
+template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
+                                                   const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
+                                                   const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
+                                                   const arma::Mat<double> &fbs_pos, const arma::Mat<double> &lbs_pos,
+                                                   const arma::Col<double> &path_gain, const arma::Col<double> &path_length, const arma::Mat<double> &M,
+                                                   arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
                                                    double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
                                                    int use_kernel);

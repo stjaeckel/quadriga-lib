@@ -664,8 +664,8 @@ inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arm
         { mxSetField(s, (mwIndex)l, f, a); };
         auto empty = []()
         { return mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL); };
-        set("tx_pos", qd_mex_init_output(&r.tx_pos, 3));
-        set("rx_pos", qd_mex_init_output(&r.rx_pos, 3));
+        set("tx_pos", qd_mex_init_output(&r.tx_pos, 3, 1));
+        set("rx_pos", qd_mex_init_output(&r.rx_pos, 3, 1));
         set("center_freq", qd_mex_init_output(&r.center_freq, n_freq));
         set("delay", qd_mex_init_output(&r.delay, n_ray));
         set("power", qd_mex_init_output(&r.power, n_ray, n_freq));

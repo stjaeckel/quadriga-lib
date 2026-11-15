@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_tools.hpp"
 #include "quadriga_math.hpp"
@@ -403,7 +404,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
     std::vector<arma::mat> path_coord;
 
     // Forward LOS path
-    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &no_interact, &interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord);
 
     arma::mat M = {5.0, 5.0, 5.0};
@@ -422,7 +423,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
     CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
 
     // Reverse LOS path
-    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &no_interact, &interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord, true);
 
     M = {5.0, 5.0, 5.0};
@@ -443,7 +444,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
     M = {{10.0, 0.0}, {10.0, 0.0}, {10.0, 0.0}};
     CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
 
-    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &no_interact, &interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord);
 
     M = {2.0, 2.0, 2.0};
@@ -463,7 +464,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
 
     // Reverse path
 
-    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &no_interact, &interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord, true);
 
     M = {8.0, 2.0, 2.0};
@@ -491,7 +492,7 @@ TEST_CASE("Quadriga tools - coord2path interaction count sum does not wrap at 32
     arma::mat fbs_pos, lbs_pos, path_angles;
     std::vector<arma::mat> path_coord;
 
-    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &interact_coord,
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &no_interact, &interact_coord,
                                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord),
                     std::invalid_argument);
 }
@@ -523,8 +524,8 @@ TEST_CASE("Quadriga tools - coord2path example")
     std::vector<arma::mat> coords;
 
     quadriga_lib::coord2path<double>(
-        0.0, 0.0, 0.0,  // TX at origin
-        10.0, 0.0, 0.0, // RX at x = 10 m
+        {0.0, 0.0, 0.0},  {// TX at origin
+        10.0, 0.0, 0.0}, // RX at x = 10 m
         &no_int, &interact, &lengths, &fbs, &lbs, &angles, &coords, 1);
 
     arma::mat T = {{10, 0}, {0, 0}, {0, 0}};
@@ -678,21 +679,21 @@ TEST_CASE("coord2path - outputs that alias inputs")
     arma::vec path_length;
     arma::mat fbs, lbs, angles;
     std::vector<arma::mat> path_coord;
-    CHECK_NOTHROW(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &coord, &path_length, &fbs, &lbs, &angles, &path_coord));
+    CHECK_NOTHROW(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &no_interact, &coord, &path_length, &fbs, &lbs, &angles, &path_coord));
 
     c = coord;
-    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &path_length, &c), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &path_length, (arma::mat *)nullptr, (arma::mat *)nullptr, &c), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &path_length, &fbs, &fbs), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &no_interact, &c, &path_length, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &no_interact, &c, &path_length, (arma::mat *)nullptr, (arma::mat *)nullptr, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &no_interact, &c, &path_length, &fbs, &fbs), std::invalid_argument);
     CHECK(arma::approx_equal(c, coord, "absdiff", 0.0));
 
     // The input is an element of the output vector
     std::vector<arma::mat> pc(2);
     pc[0] = coord;
-    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &pc[0], (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, &pc), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &no_interact, &pc[0], (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, &pc), std::invalid_argument);
 
     arma::vec view(c.memptr(), 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::coord2path(0.0, 0.0, 0.0, 10.0, 0.0, 0.0, &no_interact, &c, &view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &no_interact, &c, &view), std::invalid_argument);
 }
 
 TEST_CASE("subdivide_rays - outputs that alias inputs")
@@ -738,4 +739,45 @@ TEST_CASE("calc_rotation_matrix - heading, tilt and bank are right-handed (3GPP 
     CHECK(arma::approx_equal(R(0.0, 0.0, a).col(0), arma::vec{c, s, 0.0}, "absdiff", 1e-14));
     CHECK(arma::approx_equal(R(0.0, a, 0.0).col(0), arma::vec{c, 0.0, -s}, "absdiff", 1e-14));
     CHECK(arma::approx_equal(R(a, 0.0, 0.0).col(1), arma::vec{0.0, c, s}, "absdiff", 1e-14));
+}
+
+TEST_CASE("Quadriga tools - coord2path and combine_irs_coord position shapes")
+{
+    // Positions: [3, 1] and [1, 3] give the same result; other sizes throw before any output is written
+    using Catch::Matchers::ContainsSubstring;
+    const arma::mat bad[] = {arma::mat(2, 1, arma::fill::zeros), arma::mat(4, 1, arma::fill::zeros), arma::mat(),
+                             arma::mat(3, 3, arma::fill::zeros)};
+    const arma::u32_vec no_interact = {1, 0};
+    const arma::mat coord = arma::mat({4.0, 3.0, 2.0}).t();
+    const arma::mat tx = arma::vec{0.0, 0.0, 1.0}, rx = arma::vec{10.0, 0.0, 1.0};
+
+    arma::vec len, len_row;
+    arma::mat fbs, fbs_row, ang, ang_row;
+    quadriga_lib::coord2path<double>(tx, rx, &no_interact, &coord, &len, &fbs, nullptr, &ang);
+    quadriga_lib::coord2path<double>(arma::mat(tx.t()), arma::mat(rx.t()), &no_interact, &coord, &len_row, &fbs_row, nullptr, &ang_row);
+    CHECK(arma::approx_equal(len, len_row, "absdiff", 0.0));
+    CHECK(arma::approx_equal(fbs, fbs_row, "absdiff", 0.0));
+    CHECK(arma::approx_equal(ang, ang_row, "absdiff", 0.0));
+    for (const arma::mat &b : bad)
+    {
+        arma::vec l = len;
+        CHECK_THROWS_WITH(quadriga_lib::coord2path(b, rx, &no_interact, &coord, &l), ContainsSubstring("Input 'tx_pos' must have 3 elements"));
+        CHECK_THROWS_WITH(quadriga_lib::coord2path(tx, b, &no_interact, &coord, &l), ContainsSubstring("Input 'rx_pos' must have 3 elements"));
+        CHECK(arma::approx_equal(l, len, "absdiff", 0.0));
+    }
+
+    const arma::u32_vec n1 = {1}, n2 = {0};
+    const arma::mat c1 = coord, c2(3, 0), irs = arma::vec{5.0, 5.0, 1.0};
+    arma::u32_vec n_out, n_out_row;
+    arma::mat c_out, c_out_row;
+    quadriga_lib::combine_irs_coord(irs, &n1, &c1, &n2, &c2, &n_out, &c_out);
+    quadriga_lib::combine_irs_coord(arma::mat(irs.t()), &n1, &c1, &n2, &c2, &n_out_row, &c_out_row);
+    CHECK(arma::all(n_out == n_out_row));
+    CHECK(arma::approx_equal(c_out, c_out_row, "absdiff", 0.0));
+    for (const arma::mat &b : bad)
+    {
+        arma::mat c = c_out;
+        CHECK_THROWS_WITH(quadriga_lib::combine_irs_coord(b, &n1, &c1, &n2, &c2, &n_out, &c), ContainsSubstring("Input 'irs_pos' must have 3 elements"));
+        CHECK(arma::approx_equal(c, c_out, "absdiff", 0.0));
+    }
 }

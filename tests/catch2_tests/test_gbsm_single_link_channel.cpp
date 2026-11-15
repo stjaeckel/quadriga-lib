@@ -131,17 +131,14 @@ namespace
             if (a.drift())
             {
                 s.fbs = fbs.cols(sel), s.lbs = lbs.cols(sel);
-                quadriga_lib::get_channels_spherical<double>(a.tx, a.rx, T(0), T(1), T(2), To(0), To(1), To(2), R(0),
-                                                             R(1), R(2), Ro(0), Ro(1), Ro(2), &s.fbs, &s.lbs, &s.gain,
-                                                             &s.len, &s.M, &s.cr, &s.ci, &s.dl, fc, a.abs);
+                quadriga_lib::get_channels_spherical<double>(*a.tx, *a.rx, T, To, R, Ro, s.fbs, s.lbs, s.gain, s.len, s.M,
+                                                             s.cr, s.ci, s.dl, fc, a.abs);
             }
             else
             {
-                const arma::vec &T0 = r.tx_pos, &R0 = r.rx_pos;
                 const arma::vec a0 = s.ang.col(0), a1 = s.ang.col(1), a2 = s.ang.col(2), a3 = s.ang.col(3);
-                quadriga_lib::get_channels_planar<double>(a.tx, a.rx, T0(0), T0(1), T0(2), To(0), To(1), To(2),
-                                                          R0(0), R0(1), R0(2), Ro(0), Ro(1), Ro(2), &a0, &a1, &a2,
-                                                          &a3, &s.gain, &s.len, &s.M, &s.cr, &s.ci, &s.dl, fc, a.abs);
+                quadriga_lib::get_channels_planar<double>(*a.tx, *a.rx, r.tx_pos, To, r.rx_pos, Ro, a0, a1, a2, a3, s.gain,
+                                                          s.len, s.M, s.cr, s.ci, s.dl, fc, a.abs);
             }
             out.push_back(s);
         }
@@ -586,7 +583,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
             {
                 INFO("end " << e << " below z = 0, GR ray " << gr);
                 rays_t u = make_rays(59, true, gr, 6, 1, "38.901");
-                arma::vec &P0 = (e == 0) ? u.tx_pos : u.rx_pos;
+                arma::mat &P0 = (e == 0) ? u.tx_pos : u.rx_pos;
                 const double dz = -1.0 - P0(2);
                 P0(2) = -1.0; // hand-made object: valid, but the GR ray has no specular point
                 REQUIRE(u.is_valid().empty());
@@ -918,4 +915,28 @@ TEST_CASE("gbsm_single_link_channel - a positive tilt points down (3GPP TR 38.90
         return arma::accu(c.coeff_re[0] % c.coeff_re[0] + c.coeff_im[0] % c.coeff_im[0]);
     };
     CHECK(power(e) > 10.0 * power(-e));
+}
+
+TEST_CASE("gbsm_single_link_channel - ray-data positions as [1, 3]")
+{
+    // rays.tx_pos = {x, y, z} stores a [1, 3] member; the channel equals the one of the [3, 1] member
+    const rays_t r = make_rays(58, true, true, 6, 1, "38.901", true);
+    rays_t r_row = r;
+    r_row.tx_pos = arma::mat(r.tx_pos.t()), r_row.rx_pos = arma::mat(r.rx_pos.t());
+    const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
+    args_t a{&tx, &rx, &r}, b{&tx, &rx, &r_row};
+    a.R = b.R = arma::mat{{120.5, 45.2, 1.5}, {121.0, 45.4, 1.5}};
+    for (const char *mob : {"phase", "drift"})
+    {
+        INFO("mobility " << mob);
+        a.mob = b.mob = mob;
+        const chan_t ca = a.run(), cb = b.run();
+        REQUIRE(ca.coeff_re.size() == cb.coeff_re.size());
+        for (size_t t = 0; t < ca.coeff_re.size(); ++t)
+        {
+            CHECK(arma::approx_equal(ca.coeff_re[t], cb.coeff_re[t], "absdiff", 0.0));
+            CHECK(arma::approx_equal(ca.delay[t], cb.delay[t], "absdiff", 0.0));
+        }
+        CHECK(arma::approx_equal(ca.tx_pos, cb.tx_pos, "absdiff", 0.0));
+    }
 }

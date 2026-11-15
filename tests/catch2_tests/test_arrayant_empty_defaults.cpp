@@ -322,9 +322,9 @@ TEST_CASE("Channel functions - Empty element_pos and coupling equal zeros and id
         // Spherical waves
         arma::cube re[2], im[2], dl[2];
         for (int k = 0; k < 2; ++k)
-            quadriga_lib::get_channels_spherical(k == 0 ? c.tx_a : c.tx_b, k == 0 ? c.rx_a : c.rx_b,
-                                                 0.0, 0.0, 1.0, 0.1, 0.0, 0.0, 20.0, 0.0, 1.0, 0.0, 0.0, 3.0,
-                                                 &fbs, &fbs, &gain, &len, &M, &re[k], &im[k], &dl[k], 3.0e9);
+            quadriga_lib::get_channels_spherical(*(k == 0 ? c.tx_a : c.tx_b), *(k == 0 ? c.rx_a : c.rx_b),
+                                                 {0.0, 0.0, 1.0}, {0.1, 0.0, 0.0}, {20.0, 0.0, 1.0}, {0.0, 0.0, 3.0},
+                                                 fbs, fbs, gain, len, M, re[k], im[k], dl[k], 3.0e9);
         REQUIRE(arma::abs(re[0]).max() > 0.01);
         CHECK(arma::approx_equal(re[0], re[1], "absdiff", 1e-12));
         CHECK(arma::approx_equal(im[0], im[1], "absdiff", 1e-12));
@@ -333,9 +333,9 @@ TEST_CASE("Channel functions - Empty element_pos and coupling equal zeros and id
         // Planar waves
         const arma::vec aod = {0.0, 0.6}, eod = {0.0, 0.1}, aoa = {3.0, -2.5}, eoa = {0.0, -0.1};
         for (int k = 0; k < 2; ++k)
-            quadriga_lib::get_channels_planar(k == 0 ? c.tx_a : c.tx_b, k == 0 ? c.rx_a : c.rx_b,
-                                              0.0, 0.0, 1.0, 0.1, 0.0, 0.0, 20.0, 0.0, 1.0, 0.0, 0.0, 3.0,
-                                              &aod, &eod, &aoa, &eoa, &gain, &len, &M, &re[k], &im[k], &dl[k], 3.0e9);
+            quadriga_lib::get_channels_planar(*(k == 0 ? c.tx_a : c.tx_b), *(k == 0 ? c.rx_a : c.rx_b),
+                                              {0.0, 0.0, 1.0}, {0.1, 0.0, 0.0}, {20.0, 0.0, 1.0}, {0.0, 0.0, 3.0},
+                                              aod, eod, aoa, eoa, gain, len, M, re[k], im[k], dl[k], 3.0e9);
         REQUIRE(arma::abs(re[0]).max() > 0.01);
         CHECK(arma::approx_equal(re[0], re[1], "absdiff", 1e-12));
         CHECK(arma::approx_equal(im[0], im[1], "absdiff", 1e-12));
@@ -352,7 +352,7 @@ TEST_CASE("Channel functions - Empty element_pos and coupling equal zeros and id
             auto tx2 = tx, rx2 = rx;
             tx.center_freq = rx.center_freq = 2.0e9, tx2.center_freq = rx2.center_freq = 4.0e9;
             quadriga_lib::get_channels_multifreq<double>({tx, tx2}, {rx, rx2},
-                                                         0.0, 0.0, 1.0, 0.1, 0.0, 0.0, 20.0, 0.0, 1.0, 0.0, 0.0, 3.0,
+                                                         {0.0, 0.0, 1.0}, {0.1, 0.0, 0.0}, {20.0, 0.0, 1.0}, {0.0, 0.0, 3.0},
                                                          fbs, fbs, gain_f, len, M_f, freq, freq_new, mre[k], mim[k], mdl[k]);
         }
         REQUIRE(arma::abs(mre[0][0]).max() > 0.01);
@@ -371,11 +371,11 @@ TEST_CASE("Channel functions - Empty element_pos and coupling equal zeros and id
         const arma::mat M1 = M.col(0), M2 = M.col(0);
         arma::cube re[2], im[2], dl[2];
         for (int k = 0; k < 2; ++k)
-            quadriga_lib::get_channels_irs<double>(k == 0 ? &P0 : &PE, k == 0 ? &F : &E, k == 0 ? &irs_a : &irs_b,
-                                                   0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 20.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                                                   10.0, 5.0, 1.0, 0.0, 0.0, -1.57,
-                                                   &fbs_1, &fbs_1, &g1, &l1, &M1, &fbs_2, &fbs_2, &g2, &l2, &M2,
-                                                   &re[k], &im[k], &dl[k], 1, -200.0, 3.0e9);
+            quadriga_lib::get_channels_irs<double>(*(k == 0 ? &P0 : &PE), *(k == 0 ? &F : &E), *(k == 0 ? &irs_a : &irs_b),
+                                                   {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                                   {10.0, 5.0, 1.0}, {0.0, 0.0, -1.57},
+                                                   fbs_1, fbs_1, g1, l1, M1, fbs_2, fbs_2, g2, l2, M2,
+                                                   re[k], im[k], dl[k], 1, -200.0, 3.0e9);
         REQUIRE(arma::abs(re[0]).max() > 1e-6);
         CHECK(arma::approx_equal(re[0], re[1], "absdiff", 1e-12));
         CHECK(arma::approx_equal(im[0], im[1], "absdiff", 1e-12));

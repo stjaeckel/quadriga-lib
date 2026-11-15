@@ -44,22 +44,22 @@ Calculate MIMO channel coefficients for planar wave paths
 ## Declaration:
 ```
 void quadriga_lib::get_channels_planar(
-    const quadriga_lib::arrayant<dtype> *tx_array,
-    const quadriga_lib::arrayant<dtype> *rx_array,
-    dtype Tx, dtype Ty, dtype Tz,
-    dtype Tb, dtype Tt, dtype Th,
-    dtype Rx, dtype Ry, dtype Rz,
-    dtype Rb, dtype Rt, dtype Rh,
-    const arma::Col<dtype> *aod,
-    const arma::Col<dtype> *eod,
-    const arma::Col<dtype> *aoa,
-    const arma::Col<dtype> *eoa,
-    const arma::Col<dtype> *path_gain,
-    const arma::Col<dtype> *path_length,
-    const arma::Mat<dtype> *M,
-    arma::Cube<dtype> *coeff_re,
-    arma::Cube<dtype> *coeff_im,
-    arma::Cube<dtype> *delay,
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const arma::Col<dtype> &aod,
+    const arma::Col<dtype> &eod,
+    const arma::Col<dtype> &aoa,
+    const arma::Col<dtype> &eoa,
+    const arma::Col<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Mat<dtype> &M,
+    arma::Cube<dtype> &coeff_re,
+    arma::Cube<dtype> &coeff_im,
+    arma::Cube<dtype> &delay,
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
@@ -69,10 +69,10 @@ void quadriga_lib::get_channels_planar(
 ## Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` elements
 - **`rx_array`** — Receive antenna array; `n_rx` elements
-- **`Tx, Ty, Tz`** — Transmitter position
-- **`Tb, Tt, Th`** — Transmitter orientation: bank, tilt, heading
-- **`Rx, Ry, Rz`** — Receiver position
-- **`Rb, Rt, Rh`** — Receiver orientation: bank, tilt, heading
+- **`tx_pos`** — Transmitter position in [m]; `[3, 1]` or `[1, 3]`
+- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
+- **`rx_pos`** — Receiver position in [m]; `[3, 1]` or `[1, 3]`
+- **`rx_orientation`** — Receiver orientation (bank, tilt, heading) in [rad]; `[3, 1]` or `[1, 3]`
 - **`aod`** — Departure azimuth angles; `[n_path]`
 - **`eod`** — Departure elevation angles; `[n_path]`
 - **`aoa`** — Arrival azimuth angles; `[n_path]`
@@ -101,12 +101,12 @@ MD!*/
 
 // Calculate channel coefficients for planar waves
 template <typename dtype>
-void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_array, const quadriga_lib::arrayant<dtype> *rx_array,
-                                       dtype Tx, dtype Ty, dtype Tz, dtype Tb, dtype Tt, dtype Th,
-                                       dtype Rx, dtype Ry, dtype Rz, dtype Rb, dtype Rt, dtype Rh,
-                                       const arma::Col<dtype> *aod, const arma::Col<dtype> *eod, const arma::Col<dtype> *aoa, const arma::Col<dtype> *eoa,
-                                       const arma::Col<dtype> *path_gain, const arma::Col<dtype> *path_length, const arma::Mat<dtype> *M,
-                                       arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
+void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
+                                       const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
+                                       const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
+                                       const arma::Col<dtype> &aod, const arma::Col<dtype> &eod, const arma::Col<dtype> &aoa, const arma::Col<dtype> &eoa,
+                                       const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &M,
+                                       arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
                                        dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                        arma::Col<dtype> *rx_Doppler)
 {
@@ -118,28 +118,25 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     dtype wavelength = center_freq > zero ? dtype(299792458.0) / center_freq : one;
     dtype wave_number = dtype(2.095845021951682e-08) * center_freq; // 2 * pi / C
 
-    // Catch NULL-Pointers
+    // Positions and orientations
+    const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_to = qd_xyz(tx_orientation, "tx_orientation");
+    const dtype *p_rp = qd_xyz(rx_pos, "rx_pos"), *p_ro = qd_xyz(rx_orientation, "rx_orientation");
+    const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
+    const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2], Rb = p_ro[0], Rt = p_ro[1], Rh = p_ro[2];
     std::string error_message;
-    if (tx_array == nullptr || rx_array == nullptr ||
-        aod == nullptr || eod == nullptr || aoa == nullptr || eoa == nullptr || path_gain == nullptr || path_length == nullptr || M == nullptr ||
-        coeff_re == nullptr || coeff_im == nullptr || delay == nullptr)
-    {
-        error_message = "Mandatory inputs and outputs cannot be NULL";
-        throw std::invalid_argument(error_message.c_str());
-    }
 
-    qd_check_alias(rx_Doppler, "rx_Doppler", aod, eod, aoa, eoa, path_gain, path_length, M);
-    qd_check_alias_list({coeff_re, coeff_im, delay}, {"coeff_re", "coeff_im", "delay"},
-                        aod, eod, aoa, eoa, path_gain, path_length, M);
-    qd_check_alias_outputs(coeff_re, "coeff_re", rx_Doppler, "rx_Doppler");
-    qd_check_alias_outputs(coeff_im, "coeff_im", rx_Doppler, "rx_Doppler");
-    qd_check_alias_outputs(delay, "delay", rx_Doppler, "rx_Doppler");
+    qd_check_alias(rx_Doppler, "rx_Doppler", &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M);
+    qd_check_alias_list({&coeff_re, &coeff_im, &delay}, {"coeff_re", "coeff_im", "delay"},
+                        &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M);
+    qd_check_alias_outputs(&coeff_re, "coeff_re", rx_Doppler, "rx_Doppler");
+    qd_check_alias_outputs(&coeff_im, "coeff_im", rx_Doppler, "rx_Doppler");
+    qd_check_alias_outputs(&delay, "delay", rx_Doppler, "rx_Doppler");
 
     // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot does not depend on the
     // path data, except that its delays use the antenna response in the direction of path 0: a dummy NLOS path in the
     // LOS direction (1 m longer, never detected as LOS) gives the delays of a LOS path; its own slot is dropped.
-    if (add_fake_los_path && aod->n_elem == 0 && eod->n_elem == 0 && aoa->n_elem == 0 && eoa->n_elem == 0 &&
-        path_gain->n_elem == 0 && path_length->n_elem == 0 && M->n_cols == 0)
+    if (add_fake_los_path && aod.n_elem == 0 && eod.n_elem == 0 && aoa.n_elem == 0 && eoa.n_elem == 0 &&
+        path_gain.n_elem == 0 && path_length.n_elem == 0 && M.n_cols == 0)
     {
         const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
         const dtype d_xy = std::sqrt(x * x + y * y);
@@ -151,21 +148,21 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
 
         arma::Cube<dtype> cr, ci, dl;
         arma::Col<dtype> doppler;
-        quadriga_lib::get_channels_planar<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                                 &aod_d, &eod_d, &aoa_d, &eoa_d, &gain_d, &length_d, &M_d,
-                                                 &cr, &ci, &dl, center_freq, use_absolute_delays, true,
+        quadriga_lib::get_channels_planar<dtype>(tx_array, rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation,
+                                                 aod_d, eod_d, aoa_d, eoa_d, gain_d, length_d, M_d,
+                                                 cr, ci, dl, center_freq, use_absolute_delays, true,
                                                  rx_Doppler == nullptr ? nullptr : &doppler);
 
         const arma::uword n_ports = cr.n_rows * cr.n_cols;
-        if (coeff_re->n_rows != cr.n_rows || coeff_re->n_cols != cr.n_cols || coeff_re->n_slices != 1ULL)
-            coeff_re->set_size(cr.n_rows, cr.n_cols, 1ULL);
-        if (coeff_im->n_rows != cr.n_rows || coeff_im->n_cols != cr.n_cols || coeff_im->n_slices != 1ULL)
-            coeff_im->set_size(cr.n_rows, cr.n_cols, 1ULL);
-        if (delay->n_rows != cr.n_rows || delay->n_cols != cr.n_cols || delay->n_slices != 1ULL)
-            delay->set_size(cr.n_rows, cr.n_cols, 1ULL);
-        std::memcpy(coeff_re->memptr(), cr.memptr(), n_ports * sizeof(dtype));
-        std::memcpy(coeff_im->memptr(), ci.memptr(), n_ports * sizeof(dtype));
-        std::memcpy(delay->memptr(), dl.memptr(), n_ports * sizeof(dtype));
+        if (coeff_re.n_rows != cr.n_rows || coeff_re.n_cols != cr.n_cols || coeff_re.n_slices != 1ULL)
+            coeff_re.set_size(cr.n_rows, cr.n_cols, 1ULL);
+        if (coeff_im.n_rows != cr.n_rows || coeff_im.n_cols != cr.n_cols || coeff_im.n_slices != 1ULL)
+            coeff_im.set_size(cr.n_rows, cr.n_cols, 1ULL);
+        if (delay.n_rows != cr.n_rows || delay.n_cols != cr.n_cols || delay.n_slices != 1ULL)
+            delay.set_size(cr.n_rows, cr.n_cols, 1ULL);
+        std::memcpy(coeff_re.memptr(), cr.memptr(), n_ports * sizeof(dtype));
+        std::memcpy(coeff_im.memptr(), ci.memptr(), n_ports * sizeof(dtype));
+        std::memcpy(delay.memptr(), dl.memptr(), n_ports * sizeof(dtype));
         if (rx_Doppler != nullptr)
         {
             if (rx_Doppler->n_elem != 1ULL)
@@ -176,47 +173,47 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     }
 
     // Check if the antennas are valid
-    error_message = qd_arrayant_is_valid_quick(*tx_array);
+    error_message = qd_arrayant_is_valid_quick(tx_array);
     if (error_message.length() != 0)
     {
         error_message = "Transmit antenna: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
-    error_message = qd_arrayant_is_valid_quick(*rx_array);
+    error_message = qd_arrayant_is_valid_quick(rx_array);
     if (error_message.length() != 0)
     {
         error_message = "Receive antenna: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
 
-    arma::uword n_path = aod->n_elem;                               // Number of paths
+    arma::uword n_path = aod.n_elem;                               // Number of paths
     arma::uword n_out = add_fake_los_path ? n_path + 1ULL : n_path; // Number of output paths
-    arma::uword n_tx = tx_array->e_theta_re.n_slices;               // Number of TX antenna elements before coupling
-    arma::uword n_rx = rx_array->e_theta_re.n_slices;               // Number of RX antenna elements before coupling
+    arma::uword n_tx = tx_array.e_theta_re.n_slices;               // Number of TX antenna elements before coupling
+    arma::uword n_rx = rx_array.e_theta_re.n_slices;               // Number of RX antenna elements before coupling
     arma::uword n_links = n_rx * n_tx;                              // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    arma::uword n_tx_ports = tx_array->n_ports();                   // Number of TX antenna elements after coupling
-    arma::uword n_rx_ports = rx_array->n_ports();                   // Number of RX antenna elements after coupling
+    arma::uword n_tx_ports = tx_array.n_ports();                   // Number of TX antenna elements after coupling
+    arma::uword n_rx_ports = rx_array.n_ports();                   // Number of RX antenna elements after coupling
     arma::uword n_ports = n_tx_ports * n_rx_ports;                  // Total number of ports
 
     // Check if the number of paths is consistent in all inputs
-    if (eod->n_elem != n_path || aoa->n_elem != n_path || eoa->n_elem != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
+    if (eod.n_elem != n_path || aoa.n_elem != n_path || eoa.n_elem != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || M.n_cols != n_path)
     {
         error_message = "Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'M' must have the same number of columns (n_paths).";
         throw std::invalid_argument(error_message.c_str());
     }
-    if (M->n_rows != 8ULL && n_path != 0ULL)
+    if (M.n_rows != 8ULL && n_path != 0ULL)
     {
         error_message = "Polarization transfer matrix 'M' must have 8 rows.";
         throw std::invalid_argument(error_message.c_str());
     }
 
     // Set the output size
-    if (coeff_re->n_rows != n_rx_ports || coeff_re->n_cols != n_tx_ports || coeff_re->n_slices != n_out)
-        coeff_re->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (coeff_im->n_rows != n_rx_ports || coeff_im->n_cols != n_tx_ports || coeff_im->n_slices != n_out)
-        coeff_im->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (delay->n_rows != n_rx_ports || delay->n_cols != n_tx_ports || delay->n_slices != n_out)
-        delay->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (coeff_re.n_rows != n_rx_ports || coeff_re.n_cols != n_tx_ports || coeff_re.n_slices != n_out)
+        coeff_re.set_size(n_rx_ports, n_tx_ports, n_out);
+    if (coeff_im.n_rows != n_rx_ports || coeff_im.n_cols != n_tx_ports || coeff_im.n_slices != n_out)
+        coeff_im.set_size(n_rx_ports, n_tx_ports, n_out);
+    if (delay.n_rows != n_rx_ports || delay.n_cols != n_tx_ports || delay.n_slices != n_out)
+        delay.set_size(n_rx_ports, n_tx_ports, n_out);
 
     // 0 paths without add_fake_los_path: empty outputs of size [n_rx_ports, n_tx_ports, 0]
     if (n_out == 0ULL)
@@ -237,27 +234,27 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         DL.set_size(n_rx, n_tx, n_out);
     }
 
-    dtype *p_coeff_re = different_output_size ? CR.memptr() : coeff_re->memptr();
-    dtype *p_coeff_im = different_output_size ? CI.memptr() : coeff_im->memptr();
-    dtype *p_delays = different_output_size ? DL.memptr() : delay->memptr();
+    dtype *p_coeff_re = different_output_size ? CR.memptr() : coeff_re.memptr();
+    dtype *p_coeff_im = different_output_size ? CI.memptr() : coeff_im.memptr();
+    dtype *p_delays = different_output_size ? DL.memptr() : delay.memptr();
 
     // Antenna interpolation requires matrix of size [1, n_ang], 1 angle per path
     // Angles are mapped to correct value ranges during antenna interpolation
-    const arma::Mat<dtype> AOD = arma::Mat<dtype>(const_cast<dtype *>(aod->memptr()), 1, n_path, false, true);
-    const arma::Mat<dtype> EOD = arma::Mat<dtype>(const_cast<dtype *>(eod->memptr()), 1, n_path, false, true);
-    const arma::Mat<dtype> AOA = arma::Mat<dtype>(const_cast<dtype *>(aoa->memptr()), 1, n_path, false, true);
-    const arma::Mat<dtype> EOA = arma::Mat<dtype>(const_cast<dtype *>(eoa->memptr()), 1, n_path, false, true);
+    const arma::Mat<dtype> AOD = arma::Mat<dtype>(const_cast<dtype *>(aod.memptr()), 1, n_path, false, true);
+    const arma::Mat<dtype> EOD = arma::Mat<dtype>(const_cast<dtype *>(eod.memptr()), 1, n_path, false, true);
+    const arma::Mat<dtype> AOA = arma::Mat<dtype>(const_cast<dtype *>(aoa.memptr()), 1, n_path, false, true);
+    const arma::Mat<dtype> EOA = arma::Mat<dtype>(const_cast<dtype *>(eoa.memptr()), 1, n_path, false, true);
 
     // Get pointers
-    const dtype *p_gain = path_gain->memptr();
-    const dtype *p_length = path_length->memptr();
+    const dtype *p_gain = path_gain.memptr();
+    const dtype *p_length = path_length.memptr();
 
     // Convert inputs to orientation vector
     dtype *ptr;
-    arma::Cube<dtype> tx_orientation(3, 1, 1);
-    arma::Cube<dtype> rx_orientation(3, 1, 1);
-    ptr = tx_orientation.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
-    ptr = rx_orientation.memptr(), ptr[0] = Rb, ptr[1] = Rt, ptr[2] = Rh;
+    arma::Cube<dtype> tx_ori(3, 1, 1);
+    arma::Cube<dtype> rx_ori(3, 1, 1);
+    ptr = tx_ori.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
+    ptr = rx_ori.memptr(), ptr[0] = Rb, ptr[1] = Rt, ptr[2] = Rh;
 
     // Calculate the Freespace distance
     dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
@@ -284,18 +281,18 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
 
     arma::uvec i_element = arma::regspace<arma::uvec>(0, n_tx - 1);
     arma::Mat<dtype> element_pos_interp(3ULL, n_tx, arma::fill::zeros);
-    if (tx_array->element_pos.n_elem != 0ULL)
-        std::memcpy(element_pos_interp.memptr(), tx_array->element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
+    if (tx_array.element_pos.n_elem != 0ULL)
+        std::memcpy(element_pos_interp.memptr(), tx_array.element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
 
-    qd_arrayant_interpolate_dispatch<dtype>(*tx_array, AOD, EOD, i_element, tx_orientation, element_pos_interp,
+    qd_arrayant_interpolate_dispatch<dtype>(tx_array, AOD, EOD, i_element, tx_ori, element_pos_interp,
                                             Vt_re, Vt_im, Ht_re, Ht_im, &Pt, nullptr, nullptr, nullptr, 1);
 
     i_element = arma::regspace<arma::uvec>(0, n_rx - 1);
     element_pos_interp.zeros(3ULL, n_rx);
-    if (rx_array->element_pos.n_elem != 0ULL)
-        std::memcpy(element_pos_interp.memptr(), rx_array->element_pos.memptr(), 3ULL * n_rx * sizeof(dtype));
+    if (rx_array.element_pos.n_elem != 0ULL)
+        std::memcpy(element_pos_interp.memptr(), rx_array.element_pos.memptr(), 3ULL * n_rx * sizeof(dtype));
 
-    qd_arrayant_interpolate_dispatch<dtype>(*rx_array, AOA, EOA, i_element, rx_orientation, element_pos_interp,
+    qd_arrayant_interpolate_dispatch<dtype>(rx_array, AOA, EOA, i_element, rx_ori, element_pos_interp,
                                             Vr_re, Vr_im, Hr_re, Hr_im, &Pr, rx_Doppler == nullptr ? nullptr : &AOA_loc,
                                             rx_Doppler == nullptr ? nullptr : &EOA_loc, nullptr, 1);
 
@@ -317,7 +314,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     {
         arma::uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
-        const dtype *pM = M->colptr(i);
+        const dtype *pM = M.colptr(i);
         dtype *pVrr = Vr_re.colptr(i), *pVri = Vr_im.colptr(i),
               *pHrr = Hr_re.colptr(i), *pHri = Hr_im.colptr(i),
               *pVtr = Vt_re.colptr(i), *pVti = Vt_im.colptr(i),
@@ -365,15 +362,15 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     if (add_fake_los_path && true_los_path != 0ULL)
     {
         // --- coefficient swap ---
-        dtype *ptrR = different_output_size ? CR.slice_memptr(true_los_path) : coeff_re->slice_memptr(true_los_path);
-        dtype *ptrI = different_output_size ? CI.slice_memptr(true_los_path) : coeff_im->slice_memptr(true_los_path);
+        dtype *ptrR = different_output_size ? CR.slice_memptr(true_los_path) : coeff_re.slice_memptr(true_los_path);
+        dtype *ptrI = different_output_size ? CI.slice_memptr(true_los_path) : coeff_im.slice_memptr(true_los_path);
         std::memcpy(p_coeff_re, ptrR, n_links * sizeof(dtype));
         std::memcpy(p_coeff_im, ptrI, n_links * sizeof(dtype));
         for (arma::uword i = 0ULL; i < n_links; ++i)
             ptrR[i] = zero, ptrI[i] = zero;
 
         // --- delay swap ---
-        dtype *ptrD = different_output_size ? DL.slice_memptr(true_los_path) : delay->slice_memptr(true_los_path);
+        dtype *ptrD = different_output_size ? DL.slice_memptr(true_los_path) : delay.slice_memptr(true_los_path);
         std::vector<dtype> tmp(p_delays, p_delays + n_links);   // save slot-0 delays
         std::memcpy(p_delays, ptrD, n_links * sizeof(dtype));   // copy true-LOS delays to slot 0
         std::memcpy(ptrD, tmp.data(), n_links * sizeof(dtype)); // put old slot-0 delays at true_los_path
@@ -384,14 +381,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     }
 
     // Apply antenna element coupling
-    if (rx_array->coupling_re.n_elem != 0ULL || rx_array->coupling_im.n_elem != 0ULL ||
-        tx_array->coupling_re.n_elem != 0ULL || tx_array->coupling_im.n_elem != 0ULL)
+    if (rx_array.coupling_re.n_elem != 0ULL || rx_array.coupling_im.n_elem != 0ULL ||
+        tx_array.coupling_re.n_elem != 0ULL || tx_array.coupling_im.n_elem != 0ULL)
     {
         // Calculate abs( cpl )^2 and normalize the row-sum to 1
         dtype *p_rx_cpl = new dtype[n_rx * n_rx_ports];
         dtype *p_tx_cpl = new dtype[n_tx * n_tx_ports];
-        qd_power_mat(n_rx, n_rx_ports, p_rx_cpl, true, rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr());
-        qd_power_mat(n_tx, n_tx_ports, p_tx_cpl, true, tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr());
+        qd_power_mat(n_rx, n_rx_ports, p_rx_cpl, true, rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr());
+        qd_power_mat(n_tx, n_tx_ports, p_tx_cpl, true, tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr());
 
         // Process coefficients and delays
         if (different_output_size) // Data is stored in internal memory, we can write directly to the output
@@ -401,14 +398,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
                 arma::uword o = j * n_links; // Slice offset
 
                 // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
                                           &p_coeff_re[o], &p_coeff_im[o],
-                                          tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
-                                          coeff_re->slice_memptr(j), coeff_im->slice_memptr(j),
+                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
+                                          coeff_re.slice_memptr(j), coeff_im.slice_memptr(j),
                                           n_rx, n_rx_ports, n_tx, n_tx_ports);
 
                 // Apply coupling to delays
-                qd_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay->slice_memptr(j), n_rx, n_rx_ports, n_tx, n_tx_ports);
+                qd_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay.slice_memptr(j), n_rx, n_rx_ports, n_tx, n_tx_ports);
             }
         }
         else // Data has been written to external memory
@@ -420,9 +417,9 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
             for (arma::uword o = 0ULL; o < n_links * n_out; o += n_links) // Loop over paths
             {
                 // Apply coupling to coefficients
-                qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                qd_multiply_3_complex_mat(rx_array.coupling_re.memptr(), rx_array.coupling_im.memptr(),
                                           &p_coeff_re[o], &p_coeff_im[o],
-                                          tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
+                                          tx_array.coupling_re.memptr(), tx_array.coupling_im.memptr(),
                                           tempX, tempY,
                                           n_rx, n_rx_ports, n_tx, n_tx_ports);
 
@@ -443,20 +440,20 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     }
 }
 
-template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<float> *tx_array, const quadriga_lib::arrayant<float> *rx_array,
-                                                float Tx, float Ty, float Tz, float Tb, float Tt, float Th,
-                                                float Rx, float Ry, float Rz, float Rb, float Rt, float Rh,
-                                                const arma::Col<float> *aod, const arma::Col<float> *eod, const arma::Col<float> *aoa, const arma::Col<float> *eoa,
-                                                const arma::Col<float> *path_gain, const arma::Col<float> *path_length, const arma::Mat<float> *M,
-                                                arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
+template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<float> &tx_array, const quadriga_lib::arrayant<float> &rx_array,
+                                                const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
+                                                const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
+                                                const arma::Col<float> &aod, const arma::Col<float> &eod, const arma::Col<float> &aoa, const arma::Col<float> &eoa,
+                                                const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &M,
+                                                arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
                                                 float center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<float> *rx_Doppler);
 
-template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<double> *tx_array, const quadriga_lib::arrayant<double> *rx_array,
-                                                double Tx, double Ty, double Tz, double Tb, double Tt, double Th,
-                                                double Rx, double Ry, double Rz, double Rb, double Rt, double Rh,
-                                                const arma::Col<double> *aod, const arma::Col<double> *eod, const arma::Col<double> *aoa, const arma::Col<double> *eoa,
-                                                const arma::Col<double> *path_gain, const arma::Col<double> *path_length, const arma::Mat<double> *M,
-                                                arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
+template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
+                                                const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
+                                                const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
+                                                const arma::Col<double> &aod, const arma::Col<double> &eod, const arma::Col<double> &aoa, const arma::Col<double> &eoa,
+                                                const arma::Col<double> &path_gain, const arma::Col<double> &path_length, const arma::Mat<double> &M,
+                                                arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
                                                 double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<double> *rx_Doppler);

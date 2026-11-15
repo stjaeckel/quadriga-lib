@@ -789,4 +789,16 @@ static inline void qd_check_alias_list(const T *const (&out)[N], const char *con
     }
 }
 
+// Single position or orientation: checks that it has 3 finite elements ([3, 1] or [1, 3]) and returns its data pointer
+template <typename dtype>
+static inline const dtype *qd_xyz(const arma::Mat<dtype> &xyz, const char *name)
+{
+    if (xyz.n_elem != 3ULL)
+        throw std::invalid_argument(std::string("Input '") + name + "' must have 3 elements.");
+    const dtype *p = xyz.memptr();
+    if (!std::isfinite(p[0]) || !std::isfinite(p[1]) || !std::isfinite(p[2]))
+        throw std::invalid_argument(std::string("Input '") + name + "' must be finite.");
+    return p;
+}
+
 #endif

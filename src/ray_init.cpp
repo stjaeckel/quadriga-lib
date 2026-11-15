@@ -35,7 +35,7 @@ Seed a sphere of rays from a point source
 arma::uword ray_init(
     arma::uword n_ray_target,
     arma::uword n_freq,
-    float Ox, float Oy, float Oz,
+    const arma::fmat &orig_pos,
     float max_path_length,
     arma::fmat *orig = nullptr,
     arma::fmat *dest = nullptr,
@@ -58,7 +58,7 @@ arma::uword ray_init(
 - **`n_ray_target`** — Desired ray count; quantized to the nearest icosphere grid (see above)
 - **`n_freq`** — Number of frequency bins allocated per path in `paths`; must be ≥ 1 (throws if 0; the
   [[path]] layout supports 1-127)
-- **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]
+- **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`. Used only to auto-size
   the launch sphere `r0`. NULL → the mesh does not bound `r0`.
@@ -105,7 +105,7 @@ MD!*/
 
 arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
                                    arma::uword n_freq,
-                                   float Ox, float Oy, float Oz,
+                                   const arma::fmat &orig_pos,
                                    float max_path_length,
                                    arma::fmat *orig,
                                    arma::fmat *dest,
@@ -123,6 +123,9 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
                                    const arma::fmat *rx_points,
                                    bool scalar_mode)
 {
+    const float *p_orig_pos = qd_xyz(orig_pos, "orig_pos");
+    const float Ox = p_orig_pos[0], Oy = p_orig_pos[1], Oz = p_orig_pos[2];
+
     qd_check_alias_list({orig, dest, trivec, tridir, acc_dist}, {"orig", "dest", "trivec", "tridir", "acc_dist"},
                         mesh, aabb, rx_points);
     qd_check_alias_list({mtl_ind_prev, mtl_ind_current, mtl_ind_buffer},

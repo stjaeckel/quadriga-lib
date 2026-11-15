@@ -482,9 +482,10 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         arma::vec Doppler_Jakes;                    // Length: [n_sub * n_path]
 
         // Compute coefficients for the first snapshot for the probe antenna
-        quadriga_lib::get_channels_planar(&probe_antenna, &probe_antenna, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                          &aod_user, &eox, &aoa_user, &eox, &path_gain_user, &path_length, &M_user,
-                                          &coeff_re, &coeff_im, &coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
+        quadriga_lib::get_channels_planar(probe_antenna, probe_antenna, arma::vec{Tx, Ty, Tz}, arma::vec{Tb, Tt, Th},
+                                          arma::vec{Rx, Ry, Rz}, arma::vec{Rb, Rt, Rh},
+                                          aod_user, eox, aoa_user, eox, path_gain_user, path_length, M_user,
+                                          coeff_re, coeff_im, coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
 
         // Combine and restructure coefficients
         arma::cx_cube coeff_cplx(
@@ -572,9 +573,10 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         }
 
         // Compute coefficients for the first snapshot for the actual antennas
-        quadriga_lib::get_channels_planar(&ap_array, &sta_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                          &aod_user, &eox, &aoa_user, &eox, &path_gain_user, &path_length, &M_user,
-                                          &coeff_re, &coeff_im, &coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
+        quadriga_lib::get_channels_planar(ap_array, sta_array, arma::vec{Tx, Ty, Tz}, arma::vec{Tb, Tt, Th},
+                                          arma::vec{Rx, Ry, Rz}, arma::vec{Rb, Rt, Rh},
+                                          aod_user, eox, aoa_user, eox, path_gain_user, path_length, M_user,
+                                          coeff_re, coeff_im, coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
 
         // Combine and restructure coefficients
         coeff_cplx = arma::cx_cube(
