@@ -17,7 +17,7 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
                                      const dtype *azimuth, const dtype *elevation, const size_t n_angle_rows, const size_t n_ang,
                                      const dtype *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
                                      const dtype *element_pos, const unsigned long long *i_element, const size_t n_out,
-                                     dtype *V_re, dtype *V_im, dtype *H_re, dtype *H_im,
+                                     dtype *V_re, dtype *V_im, dtype *H_re, dtype *H_im, const size_t V_step, const size_t H_step,
                                      dtype *dist, dtype *azimuth_loc, dtype *elevation_loc, dtype *gamma)
 {
     const size_t n_pattern_samples = n_azimuth * n_elevation; // Number of samples per element
@@ -295,10 +295,10 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
 
             // Compute and write output
             size_t ioa = a * n_out + o;
-            p_v_re[ioa] = cos_gamma * Vr - sin_gamma * Hr;
-            p_v_im[ioa] = cos_gamma * Vi - sin_gamma * Hi;
-            p_h_re[ioa] = sin_gamma * Vr + cos_gamma * Hr;
-            p_h_im[ioa] = sin_gamma * Vi + cos_gamma * Hi;
+            p_v_re[ioa * V_step] = cos_gamma * Vr - sin_gamma * Hr;
+            p_v_im[ioa * V_step] = cos_gamma * Vi - sin_gamma * Hi;
+            p_h_re[ioa * H_step] = sin_gamma * Vr + cos_gamma * Hr;
+            p_h_im[ioa * H_step] = sin_gamma * Vi + cos_gamma * Hi;
 
             // Write optional azimuth and elevation angles
             if (p_dist != nullptr)
@@ -319,7 +319,7 @@ template void qd_arrayant_interpolate_GENERIC(const float *e_theta_re, const flo
                                               const float *azimuth, const float *elevation, const size_t n_angle_rows, const size_t n_ang,
                                               const float *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
                                               const float *element_pos, const unsigned long long *i_element, const size_t n_out,
-                                              float *V_re, float *V_im, float *H_re, float *H_im,
+                                              float *V_re, float *V_im, float *H_re, float *H_im, const size_t V_step, const size_t H_step,
                                               float *dist, float *azimuth_loc, float *elevation_loc, float *gamma);
 
 template void qd_arrayant_interpolate_GENERIC(const double *e_theta_re, const double *e_theta_im, const double *e_phi_re, const double *e_phi_im,
@@ -328,5 +328,5 @@ template void qd_arrayant_interpolate_GENERIC(const double *e_theta_re, const do
                                               const double *azimuth, const double *elevation, const size_t n_angle_rows, const size_t n_ang,
                                               const double *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
                                               const double *element_pos, const unsigned long long *i_element, const size_t n_out,
-                                              double *V_re, double *V_im, double *H_re, double *H_im,
+                                              double *V_re, double *V_im, double *H_re, double *H_im, const size_t V_step, const size_t H_step,
                                               double *dist, double *azimuth_loc, double *elevation_loc, double *gamma);

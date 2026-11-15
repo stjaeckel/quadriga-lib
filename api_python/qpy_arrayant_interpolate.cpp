@@ -124,8 +124,15 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
 
         const arma::uword n_freq = frequency_a.is_empty() ? (arma::uword)ant.size() : frequency_a.n_elem;
         arma::cube V_re, V_im, H_re, H_im;
+        arma::cx_cube V, H;
         py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py;
-        if (!want_complex)
+        py::array_t<std::complex<double>> V_py, H_py;
+        if (want_complex)
+        {
+            V_py = qd_python_init_output(n_out, n_ang, n_freq, &V);
+            H_py = qd_python_init_output(n_out, n_ang, n_freq, &H);
+        }
+        else
         {
             V_re_py = qd_python_init_output(n_out, n_ang, n_freq, &V_re);
             V_im_py = qd_python_init_output(n_out, n_ang, n_freq, &V_im);
@@ -135,17 +142,24 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
 
         quadriga_lib::arrayant_interpolate_multi<double>(ant, azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
                                                          frequency_a.is_empty() ? nullptr : &frequency_a,
-                                                         p_element, p_orientation, p_element_pos, use_kernel);
+                                                         p_element, p_orientation, p_element_pos,
+                                                         want_complex ? &V : nullptr, want_complex ? &H : nullptr, use_kernel);
 
         if (want_complex)
-            return py::make_tuple(qd_python_copy2numpy<double, std::complex<double>>(&V_re, &V_im),
-                                  qd_python_copy2numpy<double, std::complex<double>>(&H_re, &H_im));
+            return py::make_tuple(V_py, H_py);
         return py::make_tuple(V_re_py, V_im_py, H_re_py, H_im_py);
     }
 
     arma::mat V_re, V_im, H_re, H_im, dist_a, azimuth_loc, elevation_loc, gamma;
+    arma::cx_mat V, H;
     py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py, dist_py, azimuth_loc_py, elevation_loc_py, gamma_py;
-    if (!want_complex) // With complex output, the C++ function sizes the outputs, which are then merged
+    py::array_t<std::complex<double>> V_py, H_py;
+    if (want_complex)
+    {
+        V_py = qd_python_init_output(n_out, n_ang, &V);
+        H_py = qd_python_init_output(n_out, n_ang, &H);
+    }
+    else
     {
         V_re_py = qd_python_init_output(n_out, n_ang, &V_re);
         V_im_py = qd_python_init_output(n_out, n_ang, &V_im);
@@ -166,14 +180,15 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
                                                want_dist ? &dist_a : nullptr,
                                                want_local_angles ? &azimuth_loc : nullptr,
                                                want_local_angles ? &elevation_loc : nullptr,
-                                               want_local_angles ? &gamma : nullptr, use_kernel);
+                                               want_local_angles ? &gamma : nullptr,
+                                               want_complex ? &V : nullptr, want_complex ? &H : nullptr, use_kernel);
 
     // Output tuple in the documented order
     py::list out;
     if (want_complex)
     {
-        out.append(qd_python_copy2numpy<double, std::complex<double>>(&V_re, &V_im));
-        out.append(qd_python_copy2numpy<double, std::complex<double>>(&H_re, &H_im));
+        out.append(V_py);
+        out.append(H_py);
     }
     else
     {

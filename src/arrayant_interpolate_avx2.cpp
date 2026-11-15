@@ -566,6 +566,61 @@ namespace
             *gamma8 = _fm256_atan2256_ps(sin_gamma8, cos_gamma8);
     }
 
+    // Stores the first n (1 to 8) lanes of the complex values re8 + i im8: split (step 1: re[j], im[j]) or interleaved
+    // (step 2: re[2 j], re[2 j + 1], im = re + 1); mask holds the first n lanes (used by the split float stores with n < 8)
+    template <typename dtype>
+    static inline void avx2_store_field(dtype *re, dtype *im, size_t step, size_t n, __m256i mask, __m256 re8, __m256 im8)
+    {
+        if (step == 1)
+        {
+            if constexpr (sizeof(dtype) == sizeof(float))
+            {
+                if (n == 8)
+                    _mm256_storeu_ps((float *)re, re8), _mm256_storeu_ps((float *)im, im8);
+                else
+                    _mm256_maskstore_ps((float *)re, mask, re8), _mm256_maskstore_ps((float *)im, mask, im8);
+            }
+            else if (n == 8)
+            {
+                _mm256_storeu_pd((double *)re, _mm256_cvtps_pd(_mm256_castps256_ps128(re8)));
+                _mm256_storeu_pd((double *)re + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(re8, 1)));
+                _mm256_storeu_pd((double *)im, _mm256_cvtps_pd(_mm256_castps256_ps128(im8)));
+                _mm256_storeu_pd((double *)im + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(im8, 1)));
+            }
+            else
+            {
+                alignas(32) float tmp_re[8], tmp_im[8];
+                _mm256_store_ps(tmp_re, re8), _mm256_store_ps(tmp_im, im8);
+                for (size_t j = 0; j < n; ++j)
+                    re[j] = (dtype)tmp_re[j], im[j] = (dtype)tmp_im[j];
+            }
+            return;
+        }
+
+        // Interleave: lo = (r0 i0 r1 i1 r2 i2 r3 i3), hi = (r4 i4 r5 i5 r6 i6 r7 i7)
+        const __m256 a = _mm256_unpacklo_ps(re8, im8), b = _mm256_unpackhi_ps(re8, im8);
+        const __m256 lo = _mm256_permute2f128_ps(a, b, 0x20), hi = _mm256_permute2f128_ps(a, b, 0x31);
+        if (n == 8)
+        {
+            if constexpr (sizeof(dtype) == sizeof(float))
+                _mm256_storeu_ps((float *)re, lo), _mm256_storeu_ps((float *)re + 8, hi);
+            else
+            {
+                _mm256_storeu_pd((double *)re, _mm256_cvtps_pd(_mm256_castps256_ps128(lo)));
+                _mm256_storeu_pd((double *)re + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(lo, 1)));
+                _mm256_storeu_pd((double *)re + 8, _mm256_cvtps_pd(_mm256_castps256_ps128(hi)));
+                _mm256_storeu_pd((double *)re + 12, _mm256_cvtps_pd(_mm256_extractf128_ps(hi, 1)));
+            }
+        }
+        else
+        {
+            alignas(32) float tmp[16];
+            _mm256_store_ps(tmp, lo), _mm256_store_ps(tmp + 8, hi);
+            for (size_t j = 0; j < 2 * n; ++j)
+                re[j] = (dtype)tmp[j];
+        }
+    }
+
     // Runs body(i) for i = 0 .. n - 1, as an OpenMP loop only if 'parallel' is true; entering an OpenMP region costs
     // about 0.5 us even when its if-clause makes it run serially, which dominates calls with few outputs and angles
     template <typename Body>
@@ -598,7 +653,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                                   const dtype *azimuth, const dtype *elevation, const size_t n_angle_rows, const size_t n_ang,
                                   const dtype *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
                                   const dtype *element_pos, const unsigned long long *i_element, const size_t n_out,
-                                  dtype *V_re, dtype *V_im, dtype *H_re, dtype *H_im,
+                                  dtype *V_re, dtype *V_im, dtype *H_re, dtype *H_im, const size_t V_step, const size_t H_step,
                                   dtype *dist, dtype *azimuth_loc, dtype *elevation_loc, dtype *gamma)
 {
     const size_t n_pattern_samples = n_azimuth * n_elevation; // Number of samples per element
@@ -754,10 +809,10 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
         avx2_for((long long)n_ang, n_ang >= 4 && n_ang * n_out >= 512, true, [&](long long a)
         {
             // Output base pointers for this angle's column (column-major: column a starts at offset a*n_out)
-            dtype *out_vr = p_v_re + a * n_out;
-            dtype *out_vi = p_v_im + a * n_out;
-            dtype *out_hr = p_h_re + a * n_out;
-            dtype *out_hi = p_h_im + a * n_out;
+            dtype *out_vr = p_v_re + a * n_out * V_step;
+            dtype *out_vi = p_v_im + a * n_out * V_step;
+            dtype *out_hr = p_h_re + a * n_out * H_step;
+            dtype *out_hi = p_h_im + a * n_out * H_step;
             dtype *out_dist = p_dist ? p_dist + a * n_out : nullptr;
             dtype *out_az = p_azimuth_loc ? p_azimuth_loc + a * n_out : nullptr;
             dtype *out_el = p_elevation_loc ? p_elevation_loc + a * n_out : nullptr;
@@ -819,17 +874,12 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     &v_re8, &v_im8, &h_re8, &h_im8, &gamma8);
 
                 // Stores (dtype-dependent)
+                avx2_store_field(out_vr + o_base * V_step, out_vi + o_base * V_step, V_step, n_valid, tail_mask, v_re8, v_im8);
+                avx2_store_field(out_hr + o_base * H_step, out_hi + o_base * H_step, H_step, n_valid, tail_mask, h_re8, h_im8);
                 if constexpr (sizeof(dtype) == sizeof(float))
                 {
-                    float *fvr = (float *)out_vr, *fvi = (float *)out_vi;
-                    float *fhr = (float *)out_hr, *fhi = (float *)out_hi;
-
                     if (is_tail_iter)
                     {
-                        _mm256_maskstore_ps(&fvr[o_base], tail_mask, v_re8);
-                        _mm256_maskstore_ps(&fvi[o_base], tail_mask, v_im8);
-                        _mm256_maskstore_ps(&fhr[o_base], tail_mask, h_re8);
-                        _mm256_maskstore_ps(&fhi[o_base], tail_mask, h_im8);
                         if (out_dist)
                             _mm256_maskstore_ps((float *)out_dist + o_base, tail_mask, dist8);
                         if (out_az)
@@ -841,10 +891,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     }
                     else
                     {
-                        _mm256_storeu_ps(&fvr[o_base], v_re8);
-                        _mm256_storeu_ps(&fvi[o_base], v_im8);
-                        _mm256_storeu_ps(&fhr[o_base], h_re8);
-                        _mm256_storeu_ps(&fhi[o_base], h_im8);
                         if (out_dist)
                             _mm256_storeu_ps((float *)out_dist + o_base, dist8);
                         if (out_az)
@@ -867,12 +913,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                     if (is_tail_iter)
                     {
-                        alignas(32) float tmp_vr[8], tmp_vi[8], tmp_hr[8], tmp_hi[8];
                         alignas(32) float tmp_dist[8], tmp_az[8], tmp_el[8], tmp_gam[8];
-                        _mm256_store_ps(tmp_vr, v_re8);
-                        _mm256_store_ps(tmp_vi, v_im8);
-                        _mm256_store_ps(tmp_hr, h_re8);
-                        _mm256_store_ps(tmp_hi, h_im8);
                         if (out_dist)
                             _mm256_store_ps(tmp_dist, dist8);
                         _mm256_store_ps(tmp_az, az8);
@@ -882,10 +923,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                         for (size_t j = 0; j < n_valid; ++j)
                         {
-                            out_vr[o_base + j] = (dtype)tmp_vr[j];
-                            out_vi[o_base + j] = (dtype)tmp_vi[j];
-                            out_hr[o_base + j] = (dtype)tmp_hr[j];
-                            out_hi[o_base + j] = (dtype)tmp_hi[j];
                             if (out_dist)
                                 out_dist[o_base + j] = (dtype)tmp_dist[j];
                             if (out_az)
@@ -898,10 +935,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     }
                     else
                     {
-                        STORE_F2D(out_vr, v_re8, o_base);
-                        STORE_F2D(out_vi, v_im8, o_base);
-                        STORE_F2D(out_hr, h_re8, o_base);
-                        STORE_F2D(out_hi, h_im8, o_base);
                         if (out_dist)
                             STORE_F2D(out_dist, dist8, o_base);
                         if (out_az)
@@ -1051,15 +1084,13 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                 if (n_out == 1)
                 {
+                    avx2_store_field(p_v_re + a_base * V_step, p_v_im + a_base * V_step, V_step, n_valid, ang_tail_mask, v_re8, v_im8);
+                    avx2_store_field(p_h_re + a_base * H_step, p_h_im + a_base * H_step, H_step, n_valid, ang_tail_mask, h_re8, h_im8);
                     // Contiguous stores (stride == 1)
                     if constexpr (sizeof(dtype) == sizeof(float))
                     {
                         if (is_ang_tail_iter)
                         {
-                            _mm256_maskstore_ps((float *)p_v_re + a_base, ang_tail_mask, v_re8);
-                            _mm256_maskstore_ps((float *)p_v_im + a_base, ang_tail_mask, v_im8);
-                            _mm256_maskstore_ps((float *)p_h_re + a_base, ang_tail_mask, h_re8);
-                            _mm256_maskstore_ps((float *)p_h_im + a_base, ang_tail_mask, h_im8);
                             if (p_dist)
                                 _mm256_maskstore_ps((float *)p_dist + a_base, ang_tail_mask, dist8);
                             if (p_azimuth_loc)
@@ -1071,10 +1102,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                         }
                         else
                         {
-                            _mm256_storeu_ps((float *)p_v_re + a_base, v_re8);
-                            _mm256_storeu_ps((float *)p_v_im + a_base, v_im8);
-                            _mm256_storeu_ps((float *)p_h_re + a_base, h_re8);
-                            _mm256_storeu_ps((float *)p_h_im + a_base, h_im8);
                             if (p_dist)
                                 _mm256_storeu_ps((float *)p_dist + a_base, dist8);
                             if (p_azimuth_loc)
@@ -1099,10 +1126,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                         {
                             for (size_t j = 0; j < n_valid; ++j)
                             {
-                                p_v_re[a_base + j] = (dtype)tmp_vr[j];
-                                p_v_im[a_base + j] = (dtype)tmp_vi[j];
-                                p_h_re[a_base + j] = (dtype)tmp_hr[j];
-                                p_h_im[a_base + j] = (dtype)tmp_hi[j];
                                 if (p_dist)
                                     p_dist[a_base + j] = (dtype)tmp_d[j];
                                 if (p_azimuth_loc)
@@ -1115,10 +1138,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                         }
                         else
                         {
-                            STORE_F2D_AV(p_v_re, v_re8, a_base);
-                            STORE_F2D_AV(p_v_im, v_im8, a_base);
-                            STORE_F2D_AV(p_h_re, h_re8, a_base);
-                            STORE_F2D_AV(p_h_im, h_im8, a_base);
                             if (p_dist)
                                 STORE_F2D_AV(p_dist, dist8, a_base);
                             if (p_azimuth_loc)
@@ -1139,10 +1158,10 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     for (size_t j = 0; j < n_store; ++j)
                     {
                         const size_t idx = o + (a_base + j) * n_out;
-                        p_v_re[idx] = (dtype)tmp_vr[j];
-                        p_v_im[idx] = (dtype)tmp_vi[j];
-                        p_h_re[idx] = (dtype)tmp_hr[j];
-                        p_h_im[idx] = (dtype)tmp_hi[j];
+                        p_v_re[idx * V_step] = (dtype)tmp_vr[j];
+                        p_v_im[idx * V_step] = (dtype)tmp_vi[j];
+                        p_h_re[idx * H_step] = (dtype)tmp_hr[j];
+                        p_h_im[idx * H_step] = (dtype)tmp_hi[j];
                         if (p_dist)
                             p_dist[idx] = (dtype)tmp_d[j];
                         if (p_azimuth_loc)
@@ -1164,10 +1183,10 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
         avx2_for((long long)n_ang, n_ang >= 4 && n_ang * n_out >= 512, true, [&](long long a)
         {
             // Output base pointers for this angle's column
-            dtype *out_vr = p_v_re + a * n_out;
-            dtype *out_vi = p_v_im + a * n_out;
-            dtype *out_hr = p_h_re + a * n_out;
-            dtype *out_hi = p_h_im + a * n_out;
+            dtype *out_vr = p_v_re + a * n_out * V_step;
+            dtype *out_vi = p_v_im + a * n_out * V_step;
+            dtype *out_hr = p_h_re + a * n_out * H_step;
+            dtype *out_hi = p_h_im + a * n_out * H_step;
             dtype *out_dist = p_dist ? p_dist + a * n_out : nullptr;
             dtype *out_az = p_azimuth_loc ? p_azimuth_loc + a * n_out : nullptr;
             dtype *out_el = p_elevation_loc ? p_elevation_loc + a * n_out : nullptr;
@@ -1301,17 +1320,12 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     &v_re8, &v_im8, &h_re8, &h_im8, &gamma8);
 
                 // Stores (dtype-dependent)
+                avx2_store_field(out_vr + o_base * V_step, out_vi + o_base * V_step, V_step, n_valid, tail_mask, v_re8, v_im8);
+                avx2_store_field(out_hr + o_base * H_step, out_hi + o_base * H_step, H_step, n_valid, tail_mask, h_re8, h_im8);
                 if constexpr (sizeof(dtype) == sizeof(float))
                 {
-                    float *fvr = (float *)out_vr, *fvi = (float *)out_vi;
-                    float *fhr = (float *)out_hr, *fhi = (float *)out_hi;
-
                     if (is_tail_iter)
                     {
-                        _mm256_maskstore_ps(&fvr[o_base], tail_mask, v_re8);
-                        _mm256_maskstore_ps(&fvi[o_base], tail_mask, v_im8);
-                        _mm256_maskstore_ps(&fhr[o_base], tail_mask, h_re8);
-                        _mm256_maskstore_ps(&fhi[o_base], tail_mask, h_im8);
                         if (out_dist)
                             _mm256_maskstore_ps((float *)out_dist + o_base, tail_mask, dist8);
                         if (out_az)
@@ -1323,10 +1337,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     }
                     else
                     {
-                        _mm256_storeu_ps(&fvr[o_base], v_re8);
-                        _mm256_storeu_ps(&fvi[o_base], v_im8);
-                        _mm256_storeu_ps(&fhr[o_base], h_re8);
-                        _mm256_storeu_ps(&fhi[o_base], h_im8);
                         if (out_dist)
                             _mm256_storeu_ps((float *)out_dist + o_base, dist8);
                         if (out_az)
@@ -1348,12 +1358,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                     if (is_tail_iter)
                     {
-                        alignas(32) float tmp_vr[8], tmp_vi[8], tmp_hr[8], tmp_hi[8];
                         alignas(32) float tmp_dist[8], tmp_az[8], tmp_el[8], tmp_gam[8];
-                        _mm256_store_ps(tmp_vr, v_re8);
-                        _mm256_store_ps(tmp_vi, v_im8);
-                        _mm256_store_ps(tmp_hr, h_re8);
-                        _mm256_store_ps(tmp_hi, h_im8);
                         if (out_dist)
                             _mm256_store_ps(tmp_dist, dist8);
                         _mm256_store_ps(tmp_az, az8);
@@ -1363,10 +1368,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
                         for (size_t j = 0; j < n_valid; ++j)
                         {
-                            out_vr[o_base + j] = (dtype)tmp_vr[j];
-                            out_vi[o_base + j] = (dtype)tmp_vi[j];
-                            out_hr[o_base + j] = (dtype)tmp_hr[j];
-                            out_hi[o_base + j] = (dtype)tmp_hi[j];
                             if (out_dist)
                                 out_dist[o_base + j] = (dtype)tmp_dist[j];
                             if (out_az)
@@ -1379,10 +1380,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                     }
                     else
                     {
-                        STORE_F2D(out_vr, v_re8, o_base);
-                        STORE_F2D(out_vi, v_im8, o_base);
-                        STORE_F2D(out_hr, h_re8, o_base);
-                        STORE_F2D(out_hi, h_im8, o_base);
                         if (out_dist)
                             STORE_F2D(out_dist, dist8, o_base);
                         if (out_az)
@@ -1406,7 +1403,7 @@ template void qd_arrayant_interpolate_AVX2(const float *e_theta_re, const float 
                                            const float *azimuth, const float *elevation, const size_t n_angle_rows, const size_t n_ang,
                                            const float *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
                                            const float *element_pos, const unsigned long long *i_element, const size_t n_out,
-                                           float *V_re, float *V_im, float *H_re, float *H_im,
+                                           float *V_re, float *V_im, float *H_re, float *H_im, const size_t V_step, const size_t H_step,
                                            float *dist, float *azimuth_loc, float *elevation_loc, float *gamma);
 
 template void qd_arrayant_interpolate_AVX2(const double *e_theta_re, const double *e_theta_im, const double *e_phi_re, const double *e_phi_im,
@@ -1415,5 +1412,5 @@ template void qd_arrayant_interpolate_AVX2(const double *e_theta_re, const doubl
                                            const double *azimuth, const double *elevation, const size_t n_angle_rows, const size_t n_ang,
                                            const double *rotation, const size_t n_rotation_cols, const size_t n_rotation_slices,
                                            const double *element_pos, const unsigned long long *i_element, const size_t n_out,
-                                           double *V_re, double *V_im, double *H_re, double *H_im,
+                                           double *V_re, double *V_im, double *H_re, double *H_im, const size_t V_step, const size_t H_step,
                                            double *dist, double *azimuth_loc, double *elevation_loc, double *gamma);

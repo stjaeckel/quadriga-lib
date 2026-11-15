@@ -493,6 +493,8 @@ void quadriga_lib::arrayant_interpolate(
     arma::Mat<dtype> *azimuth_loc = nullptr,
     arma::Mat<dtype> *elevation_loc = nullptr,
     arma::Mat<dtype> *gamma = nullptr,
+    arma::Mat<std::complex<dtype>> *V = nullptr,
+    arma::Mat<std::complex<dtype>> *H = nullptr,
     int use_kernel = 0);
 ```
 
@@ -518,6 +520,8 @@ void quadriga_lib::arrayant_interpolate(
 - **`azimuth_loc`** / **`elevation_loc`** *(optional)* — Azimuth and elevation in the local antenna frame;
   `[n_out, n_ang]`
 - **`gamma`** *(optional)* — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`
+- **`V`** / **`H`** *(optional)* — e-theta / e-phi field as complex values, replacing `V_re`, `V_im` / `H_re`, `H_im`
+  (then left empty); `[n_out, n_ang]`
 
 ### Example:
 ```cpp
@@ -547,8 +551,8 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_interpolate) · [Py
 - Consecutive target frequencies with the same bracketing entries reuse the spatial results; target frequencies in
   ascending or descending order are fastest
 - The entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi): same grids, number of elements and element positions
-- Angles, element indices, orientation and kernels as in [arrayant_interpolate](#arrayant_interpolate); `n_ang = 0` gives outputs of size
-  `[n_out, 0, n_freq]`
+- Angles, element indices, orientation, kernels and the complex outputs as in [arrayant_interpolate](#arrayant_interpolate); `n_ang = 0`
+  gives outputs of size `[n_out, 0, n_freq]`
 - Throws `std::invalid_argument` for an empty or invalid `arrayant_vec`, target frequencies that are not finite, and
   for the errors of [arrayant_interpolate](#arrayant_interpolate)
 
@@ -566,6 +570,8 @@ void quadriga_lib::arrayant_interpolate_multi(
     const arma::uvec *i_element = nullptr,
     const arma::Cube<dtype> *orientation = nullptr,
     const arma::Mat<dtype> *element_pos = nullptr,
+    arma::Cube<std::complex<dtype>> *V = nullptr,
+    arma::Cube<std::complex<dtype>> *H = nullptr,
     int use_kernel = 0);
 ```
 
@@ -587,6 +593,8 @@ void quadriga_lib::arrayant_interpolate_multi(
 ### Outputs:
 - **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang, n_freq]`
 - **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; `[n_out, n_ang, n_freq]`
+- **`V`** / **`H`** *(optional)* — e-theta / e-phi field as complex values, replacing `V_re`, `V_im` / `H_re`, `H_im`
+  (then left empty); `[n_out, n_ang, n_freq]`
 
 ### Example:
 ```cpp

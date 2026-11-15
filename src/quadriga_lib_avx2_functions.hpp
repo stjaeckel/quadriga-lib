@@ -148,6 +148,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                                   const unsigned long long *i_element,                    // Element indices, 0-based, < n_elements, [n_out]
                                   const size_t n_out,                                     // Number of outputs, >= 1
                                   dtype *V_re, dtype *V_im, dtype *H_re, dtype *H_im,     // Output: e-theta and e-phi field, [n_out, n_ang], allocated
+                                  const size_t V_step, const size_t H_step,               // Output stride of V and H: 1 split, 2 interleaved complex (V_im = V_re + 1)
                                   dtype *dist,                                            // Optional output: projected distance in m, [n_out, n_ang] or nullptr
                                   dtype *azimuth_loc, dtype *elevation_loc,               // Optional output: local angles in rad, [n_out, n_ang] or nullptr
                                   dtype *gamma);                                          // Optional output: polarization rotation angle in rad, [n_out, n_ang] or nullptr

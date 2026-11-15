@@ -1535,3 +1535,91 @@ TEST_CASE("get_channels_multifreq - a positive tilt points down (3GPP TR 38.901)
     CHECK(arma::approx_equal(cr[0], sr, "absdiff", 1e-9));
     CHECK(arma::approx_equal(ci[0], si, "absdiff", 1e-9));
 }
+
+TEST_CASE("Multifreq - complex output equals the split output bit for bit")
+{
+    // Element coupling with as many ports as elements (coupled in place) and with fewer ports (element-space scratch),
+    // a LOS path moved to slot 0 by add_fake_los_path, 0 paths with add_fake_los_path, 9 output frequencies (parallel
+    // loop) and float; coeff_re / coeff_im are left empty
+    auto check = [](auto dtype_tag, int coupling, bool fake_los, bool no_paths)
+    {
+        using dtype = decltype(dtype_tag);
+        std::vector<quadriga_lib::arrayant<dtype>> tx, rx;
+        for (dtype f : {dtype(1.0e9), dtype(2.0e9)})
+        {
+            auto a = quadriga_lib::generate_arrayant_3GPP<dtype>(1, 2, dtype(1.0e9), 3, 0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10);
+            a.center_frequency = f;
+            a.e_theta_re *= f / dtype(1.0e9);
+            if (coupling == 1)
+                a.coupling_re = {{1.0, 0.5, 0.0, 0.2}, {0.5, 1.0, 0.1, 0.0}, {0.0, 0.3, 1.0, 0.5}, {0.2, 0.0, 0.5, 1.0}},
+                a.coupling_im.zeros(4, 4), a.coupling_im(1, 0) = f / dtype(4.0e9);
+            if (coupling == 2)
+                a.coupling_re = {{1.0, 0.0}, {0.5, 0.0}, {0.0, 1.0}, {0.0, -0.5}}, a.coupling_im.zeros(4, 2);
+            tx.push_back(a);
+            rx.push_back(quadriga_lib::generate_arrayant_3GPP<dtype>(1, 1, dtype(1.0e9), 3, 0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10));
+            rx.back().center_frequency = f;
+        }
+        arma::Mat<dtype> fbs = {{20.0, 25.0, 30.0}, {20.0, 0.0, -25.0}, {0.0, 0.0, 5.0}}; // Path 1 is the LOS path
+        arma::Mat<dtype> pg = {{0.5, 0.4}, {1.0, 0.9}, {0.25, 0.3}};
+        arma::Col<dtype> pl = {0.0, 0.0, 0.0};
+        arma::Cube<dtype> M(8, 3, 2, arma::fill::zeros);
+        M.row(0).fill(1.0), M.row(6).fill(-1.0), M.row(3).fill(0.1);
+        if (no_paths)
+            fbs.reset(), pg.reset(), pl.reset(), M.reset();
+        const arma::Col<dtype> fi = {dtype(1.0e9), dtype(2.0e9)};
+        const arma::Col<dtype> fo = arma::linspace<arma::Col<dtype>>(0.8e9, 2.2e9, 9);
+
+        std::vector<arma::Cube<dtype>> cr, ci, dl, cr2(2), ci2(1), dl2;
+        cr2[0].ones(2, 2, 2); // Stale content
+        std::vector<arma::Cube<std::complex<dtype>>> cx;
+        quadriga_lib::get_channels_multifreq<dtype>(tx, rx, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, fbs, fbs, pg, pl, M, fi, fo,
+                                                    cr, ci, dl, true, fake_los);
+        quadriga_lib::get_channels_multifreq<dtype>(tx, rx, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, fbs, fbs, pg, pl, M, fi, fo,
+                                                    cr2, ci2, dl2, true, fake_los, dtype(299792458.0), &cx);
+        CHECK((cr2.empty() && ci2.empty()));
+        REQUIRE(cx.size() == fo.n_elem);
+        bool same = true;
+        for (arma::uword f = 0; f < fo.n_elem; ++f)
+        {
+            const arma::Cube<dtype> re = arma::real(cx[f]), im = arma::imag(cx[f]);
+            same = same && arma::size(re) == arma::size(cr[f]) && arma::all(arma::vectorise(re == cr[f])) &&
+                   arma::all(arma::vectorise(im == ci[f])) && arma::all(arma::vectorise(dl2[f] == dl[f]));
+        }
+        CHECK(same);
+        CHECK((no_paths || arma::accu(arma::abs(cr[0])) > 0.0)); // Not a trivial (zero) result
+    };
+    for (int coupling : {0, 1, 2})
+        for (bool fake_los : {false, true})
+            check(0.0, coupling, fake_los, false);
+    check(0.0f, 2, true, false);
+    check(0.0, 0, true, true), check(0.0, 2, true, true);
+
+    // A complex output that shares memory with an input throws
+    auto ant = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
+    arma::mat fbs = arma::vec({10.0, 5.0, 0.0}), pg(1, 1, arma::fill::ones);
+    arma::vec pl = {0.0}, fi = {1e9};
+    arma::cube M(8, 1, 1, arma::fill::zeros);
+    std::vector<arma::cube> cr, ci, dl;
+    std::vector<arma::cx_cube> alias;
+    alias.emplace_back((std::complex<double> *)M.memptr(), 4, 1, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, fbs, fbs, pg, pl,
+                                                                 M, fi, fi, cr, ci, dl, false, false, 299792458.0, &alias),
+                    std::invalid_argument);
+
+    // Output cubes that share memory with another output cube throw: the complex output viewing a split output (which
+    // it would clear) and a split output viewing the delays of another frequency
+    const arma::vec fo = {1e9, 2e9};
+    cr.assign(2, arma::cube(2, 1, 100)), dl.assign(2, arma::cube(2, 1, 100));
+    std::vector<arma::cx_cube> c_on_cr, c_on_dl;
+    c_on_cr.emplace_back((std::complex<double> *)cr[1].memptr(), 1, 1, 1, false, true);
+    c_on_dl.emplace_back((std::complex<double> *)dl[0].memptr(), 1, 1, 1, false, true);
+    for (auto *c : {&c_on_cr, &c_on_dl})
+        CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, fbs, fbs, pg,
+                                                                     pl, M, fi, fo, cr, ci, dl, false, false, 299792458.0, c),
+                        std::invalid_argument);
+    std::vector<arma::cube> cr_on_dl;
+    cr_on_dl.emplace_back(dl[1].memptr(), 1, 1, 1, false, true);
+    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(ant, ant, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, fbs, fbs, pg, pl,
+                                                                 M, fi, fo, cr_on_dl, ci, dl),
+                    std::invalid_argument);
+}

@@ -188,6 +188,8 @@ namespace quadriga_lib
                               arma::Mat<dtype> *azimuth_loc = nullptr,        // Optional output: azimuth in the local antenna frame in rad; [n_out, n_ang]
                               arma::Mat<dtype> *elevation_loc = nullptr,      // Optional output: elevation in the local antenna frame in rad; [n_out, n_ang]
                               arma::Mat<dtype> *gamma = nullptr,              // Optional output: polarization rotation angle in rad; [n_out, n_ang]
+                              arma::Mat<std::complex<dtype>> *V = nullptr,    // Optional output: complex e-theta field, replaces V_re / V_im (then left empty); [n_out, n_ang]
+                              arma::Mat<std::complex<dtype>> *H = nullptr,    // Optional output: complex e-phi field, replaces H_re / H_im (then left empty); [n_out, n_ang]
                               int use_kernel = 0);                            // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
     // Interpolate a multi-frequency array antenna at given angles and frequencies
@@ -206,6 +208,8 @@ namespace quadriga_lib
                                     const arma::uvec *i_element = nullptr,            // Optional: 0-based element indices; [n_out]
                                     const arma::Cube<dtype> *orientation = nullptr,   // Optional: Euler angles in rad, applied at all frequencies; shapes as in arrayant_interpolate
                                     const arma::Mat<dtype> *element_pos = nullptr,    // Optional: element positions in m; default: those of entry 0; [3, n_out]
+                                    arma::Cube<std::complex<dtype>> *V = nullptr,     // Optional output: complex e-theta field, replaces V_re / V_im (then left empty); [n_out, n_ang, n_freq]
+                                    arma::Cube<std::complex<dtype>> *H = nullptr,     // Optional output: complex e-phi field, replaces H_re / H_im (then left empty); [n_out, n_ang, n_freq]
                                     int use_kernel = 0);                              // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
     // Validate a vector of arrayant objects for multi-frequency consistency
@@ -441,7 +445,8 @@ namespace quadriga_lib
                                 std::vector<arma::Cube<dtype>> &delay,        // Output: delays [s], length [n_freq_out], each [n_rx, n_tx, n_path]
                                 bool use_absolute_delays = false,             // If true, include LOS delay in all paths
                                 bool add_fake_los_path = false,               // Add one path, slot 0 = LOS path (zero power if none was present)
-                                dtype propagation_speed = 299792458.0);       // Wave propagation speed [m/s]
+                                dtype propagation_speed = 299792458.0,        // Wave propagation speed [m/s]
+                                std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr); // Optional output: complex coeff_re / coeff_im (then left empty)
 
     // Calculate channels for Intelligent Reflective Surfaces (IRS)
     // - IRS is provided as a 3rd array antenna model comprised of 'n_irs' elements

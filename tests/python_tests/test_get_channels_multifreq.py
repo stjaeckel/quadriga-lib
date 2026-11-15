@@ -468,6 +468,20 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(ci)))
         self.assertTrue(np.all(np.isfinite(dl)))
 
+    def test_complex_equals_split(self):
+        """complex=True returns coeff_re + 1j * coeff_im and the same delays, also with a fake LOS path."""
+        tx = gen_xpol(); rx = gen_xpol()
+        fbs = np.array([[5.0, 20.0, 8.0], [0.0, 10.0, -6.0], [0.0, 2.0, 1.0]], order='F')
+        pg = np.array([[1.0, 0.8], [0.5, 0.4], [0.25, 0.3]], order='F'); pl = np.zeros(3)
+        M = np.zeros((8, 3, 2), order='F'); M[0] = 1.0; M[6] = -1.0; M[3] = 0.1
+        args = (tx, rx, fbs, fbs, pg, pl, M, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3),
+                np.array([1e9, 2e9]), np.linspace(0.8e9, 2.2e9, 11), True, True)
+        cr, ci, dl = quadriga_lib.arrayant.get_channels_multifreq(*args)
+        c, dl2 = quadriga_lib.arrayant.get_channels_multifreq(*args, complex=True)
+        self.assertEqual(c.dtype, np.complex128)
+        np.testing.assert_array_equal(c, cr + 1j * ci)
+        np.testing.assert_array_equal(dl2, dl)
+
     # ============================================================================
     # SECTION 9: GHz antenna with frequency-dependent pattern
     # ============================================================================

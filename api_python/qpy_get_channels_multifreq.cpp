@@ -45,7 +45,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
   relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
   grid and gives wrong phases
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
-  separate real `coeff_re` and `coeff_im` via a zero-copy fast path
+  separate real `coeff_re` and `coeff_im`
 
 ## Usage:
 ```
@@ -142,19 +142,18 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
 
     if (complex)
     {
-        // Complex path: C++ sizes plain owning cubes, then stack2numpy interleaves Re/Im into one
-        // complex array. init_output cannot back a complex buffer, so this path copies the result once.
-        // (0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs)
+        // Complex output written in place by C++ (0 paths: the zero-power LOS path with add_fake_los_path, else
+        // empty outputs)
+        std::vector<arma::cx_cube> coeff;
+        auto coeff_py = qd_python_init_output(n_ports_rx, n_ports_tx, n_path, n_freq_out, &coeff);
+        auto delay_py = qd_python_init_output(n_ports_rx, n_ports_tx, n_path, n_freq_out, &delay);
         quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
                                                      Tx, Ty, Tz, Tb, Tt, Th,
                                                      Rx, Ry, Rz, Rb, Rt, Rh,
                                                      fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
                                                      freq_in_a, freq_out_a,
                                                      coeff_re, coeff_im, delay,
-                                                     use_absolute_delays, add_fake_los_path, propagation_speed);
-
-        auto coeff_py = qd_python_stack2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
-        auto delay_py = qd_python_stack2numpy(&delay);
+                                                     use_absolute_delays, add_fake_los_path, propagation_speed, &coeff);
         return py::make_tuple(coeff_py, delay_py);
     }
 

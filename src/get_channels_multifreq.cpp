@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 #include <limits>
+#include <algorithm>
+#include <cstdint>
 
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_helper_functions.hpp"
@@ -164,7 +166,8 @@ void quadriga_lib::get_channels_multifreq(
     std::vector<arma::Cube<dtype>> &delay,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
-    dtype propagation_speed = dtype(299792458.0));
+    dtype propagation_speed = dtype(299792458.0),
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr);
 ```
 
 ## Inputs:
@@ -192,6 +195,8 @@ void quadriga_lib::get_channels_multifreq(
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
 - **`coeff_im`** — Imaginary part; same structure as `coeff_re`
 - **`delay`** — Propagation delays [s]; same structure as `coeff_re`
+- **`coeff`** *(optional)* — Coefficients as complex values, replacing `coeff_re` and `coeff_im` (then left empty);
+  same structure as `coeff_re`
 
 ## See also:
 - [[get_channels_spherical]] (single-frequency equivalent)
@@ -211,7 +216,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                                           const arma::Col<dtype> &freq_in, const arma::Col<dtype> &freq_out,
                                           std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                           std::vector<arma::Cube<dtype>> &delay,
-                                          bool use_absolute_delays, bool add_fake_los_path, dtype propagation_speed)
+                                          bool use_absolute_delays, bool add_fake_los_path, dtype propagation_speed,
+                                          std::vector<arma::Cube<std::complex<dtype>>> *coeff)
 {
     constexpr dtype los_limit = dtype(1.0e-4);
     constexpr dtype zero = dtype(0.0);
@@ -228,14 +234,42 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         if (!std::isfinite(v))
             throw std::invalid_argument("get_channels_multifreq: TX and RX positions and orientations must be finite.");
 
+    // Outputs: no cube may share memory with an input or with any other output cube
     const std::vector<arma::Cube<dtype>> *outs[] = {&coeff_re, &coeff_im, &delay};
     const char *names[] = {"coeff_re", "coeff_im", "delay"};
     for (int i = 0; i < 3; ++i)
-    {
-        for (const auto &c : *outs[i])
-            qd_check_alias(&c, names[i], &fbs_pos, &lbs_pos, &path_gain, &path_length, &M, &freq_in, &freq_out);
         for (int j = i + 1; j < 3; ++j)
             qd_check_alias_outputs(outs[i], names[i], outs[j], names[j]);
+    {
+        struct range
+        {
+            std::uintptr_t first, end; // Memory range [first, end) of one cube
+            int name;                  // Index into names_all
+        };
+        const char *names_all[] = {"coeff_re", "coeff_im", "delay", "coeff"};
+        std::vector<range> ranges;
+        ranges.reserve(coeff_re.size() + coeff_im.size() + delay.size() + (coeff ? coeff->size() : 0));
+        auto add = [&](const auto &vec, int name)
+        {
+            for (const auto &c : vec)
+            {
+                qd_check_alias(&c, names_all[name], &fbs_pos, &lbs_pos, &path_gain, &path_length, &M, &freq_in, &freq_out);
+                if (c.n_elem != 0)
+                    ranges.push_back({(std::uintptr_t)c.memptr(), (std::uintptr_t)(c.memptr() + c.n_elem), name});
+            }
+        };
+        add(coeff_re, 0), add(coeff_im, 1), add(delay, 2);
+        if (coeff != nullptr)
+            add(*coeff, 3);
+        std::sort(ranges.begin(), ranges.end(), [](const range &a, const range &b) { return a.first < b.first; });
+        for (size_t i = 1, i_max = 0; i < ranges.size(); ++i)
+        {
+            if (ranges[i].first < ranges[i_max].end)
+                throw std::invalid_argument(std::string("Outputs '") + names_all[ranges[i_max].name] + "' and '" +
+                                            names_all[ranges[i].name] + "' cannot be the same object or share memory.");
+            if (ranges[i].end > ranges[i_max].end)
+                i_max = i;
+        }
     }
 
     {
@@ -271,12 +305,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         }
 
         std::vector<arma::Cube<dtype>> cr, ci, dl;
+        std::vector<arma::Cube<std::complex<dtype>>> cx;
         quadriga_lib::get_channels_multifreq<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
                                                     fbs_d, fbs_d, gain_d, length_d, M_d, freq_in, freq_out,
-                                                    cr, ci, dl, use_absolute_delays, true, propagation_speed);
+                                                    cr, ci, dl, use_absolute_delays, true, propagation_speed,
+                                                    coeff ? &cx : nullptr);
 
         // Copy slot 0 to the outputs
-        auto copy_slot = [](const std::vector<arma::Cube<dtype>> &src, std::vector<arma::Cube<dtype>> &dst)
+        auto copy_slot = [](const auto &src, auto &dst)
         {
             if (dst.size() != src.size())
                 dst.resize(src.size());
@@ -284,10 +320,12 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             {
                 if (dst[f].n_rows != src[f].n_rows || dst[f].n_cols != src[f].n_cols || dst[f].n_slices != 1ULL)
                     dst[f].set_size(src[f].n_rows, src[f].n_cols, 1ULL);
-                std::memcpy(dst[f].memptr(), src[f].memptr(), src[f].n_rows * src[f].n_cols * sizeof(dtype));
+                std::memcpy(dst[f].memptr(), src[f].memptr(), src[f].n_rows * src[f].n_cols * sizeof(*src[f].memptr()));
             }
         };
         copy_slot(cr, coeff_re), copy_slot(ci, coeff_im), copy_slot(dl, delay);
+        if (coeff != nullptr)
+            copy_slot(cx, *coeff);
         return;
     }
 
@@ -333,22 +371,21 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     const arma::uword n_rx_ports = rx_array[0].n_ports();
     const arma::uword n_ports = n_tx_ports * n_rx_ports;
 
-    // Resize outputs (only if needed, preserves externally borrowed memory)
-    if (coeff_re.size() != n_freq_out)
-        coeff_re.resize(n_freq_out);
-    if (coeff_im.size() != n_freq_out)
-        coeff_im.resize(n_freq_out);
-    if (delay.size() != n_freq_out)
-        delay.resize(n_freq_out);
-    for (arma::uword f = 0; f < n_freq_out; ++f)
+    // Resize outputs (only if needed, preserves externally borrowed memory); a requested complex output replaces
+    // coeff_re / coeff_im, which are left empty
+    auto resize_output = [&](auto &out)
     {
-        if (coeff_re[f].n_rows != n_rx_ports || coeff_re[f].n_cols != n_tx_ports || coeff_re[f].n_slices != n_out)
-            coeff_re[f].set_size(n_rx_ports, n_tx_ports, n_out);
-        if (coeff_im[f].n_rows != n_rx_ports || coeff_im[f].n_cols != n_tx_ports || coeff_im[f].n_slices != n_out)
-            coeff_im[f].set_size(n_rx_ports, n_tx_ports, n_out);
-        if (delay[f].n_rows != n_rx_ports || delay[f].n_cols != n_tx_ports || delay[f].n_slices != n_out)
-            delay[f].set_size(n_rx_ports, n_tx_ports, n_out);
-    }
+        if (out.size() != n_freq_out)
+            out.resize(n_freq_out);
+        for (auto &c : out)
+            if (c.n_rows != n_rx_ports || c.n_cols != n_tx_ports || c.n_slices != n_out)
+                c.set_size(n_rx_ports, n_tx_ports, n_out);
+    };
+    if (coeff != nullptr)
+        coeff_re.clear(), coeff_im.clear(), resize_output(*coeff);
+    else
+        resize_output(coeff_re), resize_output(coeff_im);
+    resize_output(delay);
 
     if (n_out == 0) // 0 paths without add_fake_los_path: empty outputs
         return;
@@ -770,8 +807,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             DL.set_size(n_rx, n_tx, n_out);
         }
 
-        dtype *p_coeff_re = different_output_size ? CR.memptr() : coeff_re[f].memptr();
-        dtype *p_coeff_im = different_output_size ? CI.memptr() : coeff_im[f].memptr();
+        // Split coefficients in port space: the outputs, or scratch for the complex output
+        arma::Cube<dtype> PR, PI;
+        if (coeff != nullptr)
+            PR.set_size(n_rx_ports, n_tx_ports, n_out), PI.set_size(n_rx_ports, n_tx_ports, n_out);
+        arma::Cube<dtype> &out_re = coeff ? PR : coeff_re[f], &out_im = coeff ? PI : coeff_im[f];
+
+        dtype *p_coeff_re = different_output_size ? CR.memptr() : out_re.memptr();
+        dtype *p_coeff_im = different_output_size ? CI.memptr() : out_im.memptr();
         dtype *p_delays_f = different_output_size ? DL.memptr() : delay[f].memptr();
 
         // Copy geometric path delays (same for all frequencies, in meters)
@@ -945,7 +988,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                     qd_multiply_3_complex_mat(rx_cpl_re_ptr, rx_cpl_im_ptr,
                                               &p_coeff_re[o_slice], &p_coeff_im[o_slice],
                                               tx_cpl_re_ptr, tx_cpl_im_ptr,
-                                              coeff_re[f].slice_memptr(j), coeff_im[f].slice_memptr(j),
+                                              out_re.slice_memptr(j), out_im.slice_memptr(j),
                                               n_rx, n_rx_ports, n_tx, n_tx_ports);
 
                     qd_multiply_3_mat(rx_coupling_pwr_f.memptr(), &p_delays_f[o_slice],
@@ -978,10 +1021,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         // Move true LOS path to slot 0 if fake LOS was added
         if (add_fake_los_path && true_los_path != 0)
         {
-            dtype *ptrR = coeff_re[f].slice_memptr(true_los_path);
-            dtype *ptrI = coeff_im[f].slice_memptr(true_los_path);
-            dtype *dstR = coeff_re[f].slice_memptr(0);
-            dtype *dstI = coeff_im[f].slice_memptr(0);
+            dtype *ptrR = out_re.slice_memptr(true_los_path);
+            dtype *ptrI = out_im.slice_memptr(true_los_path);
+            dtype *dstR = out_re.slice_memptr(0);
+            dtype *dstI = out_im.slice_memptr(0);
 
             std::memcpy(dstR, ptrR, n_ports * sizeof(dtype));
             std::memcpy(dstI, ptrI, n_ports * sizeof(dtype));
@@ -992,6 +1035,15 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
             for (arma::uword k = 0; k < n_ports; ++k)
                 ptrR[k] = zero, ptrI[k] = zero;
+        }
+
+        // Interleave into the complex output
+        if (coeff != nullptr)
+        {
+            dtype *dst = (dtype *)(*coeff)[f].memptr();
+            const dtype *src_re = PR.memptr(), *src_im = PI.memptr();
+            for (arma::uword k = 0; k < PR.n_elem; ++k)
+                dst[2 * k] = src_re[k], dst[2 * k + 1] = src_im[k];
         }
 
     } // End frequency loop (OMP parallel)
@@ -1007,7 +1059,7 @@ template void quadriga_lib::get_channels_multifreq(
     const arma::Mat<float> &, const arma::Mat<float> &, const arma::Mat<float> &,
     const arma::Col<float> &, const arma::Cube<float> &, const arma::Col<float> &, const arma::Col<float> &,
     std::vector<arma::Cube<float>> &, std::vector<arma::Cube<float>> &, std::vector<arma::Cube<float>> &,
-    bool, bool, float);
+    bool, bool, float, std::vector<arma::Cube<std::complex<float>>> *);
 
 template void quadriga_lib::get_channels_multifreq(
     const std::vector<quadriga_lib::arrayant<double>> &, const std::vector<quadriga_lib::arrayant<double>> &,
@@ -1015,4 +1067,4 @@ template void quadriga_lib::get_channels_multifreq(
     const arma::Mat<double> &, const arma::Mat<double> &, const arma::Mat<double> &,
     const arma::Col<double> &, const arma::Cube<double> &, const arma::Col<double> &, const arma::Col<double> &,
     std::vector<arma::Cube<double>> &, std::vector<arma::Cube<double>> &, std::vector<arma::Cube<double>> &,
-    bool, bool, double);
+    bool, bool, double, std::vector<arma::Cube<std::complex<double>>> *);

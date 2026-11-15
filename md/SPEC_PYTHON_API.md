@@ -389,7 +389,7 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
 - The `gbsm` submodule follows this rule for all its flags; older wrappers with plain `bool` flags predate it.
 
 ### Complex arrays
-- The C++ library represents complex data as separate `arma::Mat<dtype>` (or `arma::Cube<dtype>`) for the real and imaginary parts — `arma::cx_*` types are not used. This is to avoid copy overhead in the C++ pipeline.
+- The C++ library represents complex data as separate `arma::Mat<dtype>` (or `arma::Cube<dtype>`) for the real and imaginary parts; `std::complex` appears only as an optional extra output of a few functions. The reason is compatibility with older Octave versions (see "Complex data" in the C++ glossary).
 - In Python, **complex numpy arrays are the default**: a C++ `X_re` / `X_im` pair is presented to the Python user as one complex array `X`, for inputs and for outputs.
 - Complex input → Re/Im Armadillo objects (copy):
   - single array: `qd_python_copy2arma(complex_pyarr, real_cube, imag_cube);` with the argument declared as `const py::array_t<std::complex<double>> &`
@@ -399,7 +399,7 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
   - `auto X_py = qd_python_copy2numpy<double, std::complex<double>>(&X_re, &X_im);`
   - `auto X_py = qd_python_stack2numpy<double, std::complex<double>>(&vec_re, &vec_im);`
   - `auto X_py = qd_python_copy2list<arma::Cube<double>, std::complex<double>>(&vec_re, &vec_im);`
-- Complex outputs always need one merge copy; the split form can be written zero-copy via `qd_python_init_output`. Where this matters, offer both through the `complex` flag (see "Standard flags").
+- A complex output needs one merge copy, unless the C++ function offers an optional `std::complex` output: then `qd_python_init_output<std::complex<double>>` provides it zero-copy. The split form can always be written zero-copy via `qd_python_init_output`. Where this matters, offer both through the `complex` flag (see "Standard flags").
 - Whether a wrapper should additionally accept split `X_re` / `X_im` inputs next to the complex `X` (as some existing wrappers do) is decided case by case; ask.
 - Exception: the arrayant dict keeps its split `_re` / `_im` keys.
 

@@ -1434,7 +1434,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadr
   relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
   grid and gives wrong phases
 - `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
-  separate real `coeff_re` and `coeff_im` via a zero-copy fast path
+  separate real `coeff_re` and `coeff_im`
 
 ### Usage:
 ```python

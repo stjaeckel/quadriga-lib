@@ -104,7 +104,7 @@ namespace
     {
         qd_result<dtype> r;
         quadriga_lib::arrayant_interpolate<dtype>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, i_element, orientation, element_pos,
-                                                  &r.dist, &r.az_loc, &r.el_loc, &r.gamma, kernel);
+                                                  &r.dist, &r.az_loc, &r.el_loc, &r.gamma, nullptr, nullptr, kernel);
         return r;
     }
 
@@ -675,7 +675,7 @@ TEST_CASE("arrayant_interpolate - empty angle input gives empty outputs")
             for (arma::mat *m : {&r.V_re, &r.V_im, &r.H_re, &r.H_im, &r.dist, &r.az_loc, &r.el_loc, &r.gamma})
                 m->ones(3, 3); // Stale content of another size
             quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, &i_element, nullptr, nullptr,
-                                               &r.dist, &r.az_loc, &r.el_loc, &r.gamma, kernel);
+                                               &r.dist, &r.az_loc, &r.el_loc, &r.gamma, nullptr, nullptr, kernel);
             for (arma::mat *m : {&r.V_re, &r.V_im, &r.H_re, &r.H_im, &r.dist, &r.az_loc, &r.el_loc, &r.gamma})
             {
                 CHECK(m->n_rows == 2);
@@ -700,16 +700,16 @@ TEST_CASE("arrayant_interpolate - optional outputs alone and together give the s
 
         arma::mat V_re, V_im, H_re, H_im, x;
         quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, kernel);
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
         CHECK((identical(V_re, all.V_re) && identical(V_im, all.V_im) && identical(H_re, all.H_re) && identical(H_im, all.H_im)));
 
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, &x, nullptr, nullptr, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, &x, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
         CHECK(identical(x, all.dist));
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, &x, nullptr, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, &x, nullptr, nullptr, nullptr, nullptr, kernel);
         CHECK(identical(x, all.az_loc));
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, nullptr, &x, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, nullptr, &x, nullptr, nullptr, nullptr, kernel);
         CHECK(identical(x, all.el_loc));
-        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, nullptr, nullptr, &x, kernel);
+        quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr, nullptr, nullptr, nullptr, &x, nullptr, nullptr, kernel);
         CHECK(identical(x, all.gamma));
         CHECK((identical(V_re, all.V_re) && identical(H_im, all.H_im)));
     }
@@ -734,7 +734,7 @@ TEST_CASE("arrayant_interpolate - pre-sized outputs are written in place, others
         for (arma::mat *m : outs)
             m->set_size(3, 6), m->fill(nan), ptr.push_back(m->memptr());
         quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, nullptr, nullptr, nullptr,
-                                           &r.dist, &r.az_loc, &r.el_loc, &r.gamma, kernel);
+                                           &r.dist, &r.az_loc, &r.el_loc, &r.gamma, nullptr, nullptr, kernel);
         for (size_t i = 0; i < outs.size(); ++i)
             CHECK(outs[i]->memptr() == ptr[i]);
         CHECK(identical(r, ref));
@@ -743,7 +743,7 @@ TEST_CASE("arrayant_interpolate - pre-sized outputs are written in place, others
         for (arma::mat *m : outs)
             m->set_size(2, 7), m->fill(nan);
         quadriga_lib::arrayant_interpolate<double>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, nullptr, nullptr, nullptr,
-                                           &r.dist, &r.az_loc, &r.el_loc, &r.gamma, kernel);
+                                           &r.dist, &r.az_loc, &r.el_loc, &r.gamma, nullptr, nullptr, kernel);
         CHECK(identical(r, ref));
     }
 }
@@ -1104,6 +1104,68 @@ TEST_CASE("arrayant_interpolate - use_kernel selects the kernel")
     }
 }
 
+TEST_CASE("arrayant_interpolate - complex outputs equal the split outputs bit for bit")
+{
+    // The complex outputs V and H hold the values of V_re + i V_im and H_re + i H_im and leave the split pairs empty.
+    // Sizes run every store of both kernels: 11 outputs (vectorized over elements, tail of 3), 1 and 3 outputs
+    // (vectorized over angles, contiguous and strided), per-element angles (per element and angle), 13 angles (tail of
+    // 5); V and H are also requested one at a time.
+    auto check = [](auto dtype_tag, int kernel, arma::uword n_out, arma::uword n_ang_rows)
+    {
+        using dtype = decltype(dtype_tag);
+        const auto ant = convert<dtype>(quadriga_lib::generate_arrayant_3GPP<double>(2, 2, 3.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0));
+        const arma::uvec i_element = arma::uvec({7, 0, 3, 3, 5, 1, 6, 2, 4, 0, 7}).head(n_out);
+        qd_uniform rnd(47);
+        const auto az = random_angles<dtype>(rnd, n_ang_rows, 13, -pi, pi);
+        const auto el = random_angles<dtype>(rnd, n_ang_rows, 13, -1.5, 1.5);
+        arma::Cube<dtype> ori(3, 1, 1);
+        ori(0) = dtype(0.3), ori(1) = dtype(-0.2), ori(2) = dtype(1.1);
+        const auto ref = run(ant, az, el, &i_element, &ori, nullptr, kernel);
+
+        for (int mode = 0; mode < 3; ++mode) // V and H, V only, H only
+        {
+            qd_result<dtype> r;
+            r.V_re.ones(2, 2), r.V_im.ones(2, 2), r.H_re.ones(2, 2), r.H_im.ones(2, 2); // Stale content
+            arma::Mat<std::complex<dtype>> V, H;
+            quadriga_lib::arrayant_interpolate<dtype>(ant, az, el, r.V_re, r.V_im, r.H_re, r.H_im, &i_element, &ori, nullptr,
+                                                      &r.dist, &r.az_loc, &r.el_loc, &r.gamma,
+                                                      mode != 2 ? &V : nullptr, mode != 1 ? &H : nullptr, kernel);
+            if (mode != 2)
+                CHECK((r.V_re.is_empty() && r.V_im.is_empty() && identical(arma::Mat<dtype>(arma::real(V)), ref.V_re) &&
+                       identical(arma::Mat<dtype>(arma::imag(V)), ref.V_im)));
+            else
+                CHECK((identical(r.V_re, ref.V_re) && identical(r.V_im, ref.V_im)));
+            if (mode != 1)
+                CHECK((r.H_re.is_empty() && r.H_im.is_empty() && identical(arma::Mat<dtype>(arma::real(H)), ref.H_re) &&
+                       identical(arma::Mat<dtype>(arma::imag(H)), ref.H_im)));
+            else
+                CHECK((identical(r.H_re, ref.H_re) && identical(r.H_im, ref.H_im)));
+            CHECK((identical(r.dist, ref.dist) && identical(r.az_loc, ref.az_loc) && identical(r.el_loc, ref.el_loc) &&
+                   identical(r.gamma, ref.gamma)));
+        }
+    };
+    for (int kernel : kernels())
+        for (auto [n_out, n_rows] : std::vector<std::pair<arma::uword, arma::uword>>{{11, 1}, {1, 1}, {3, 1}, {11, 11}})
+            check(0.0f, kernel, n_out, n_rows), check(0.0, kernel, n_out, n_rows);
+
+    // A complex output that shares memory with an input or with another output throws (views of the output size)
+    const auto ant = smooth_ant<double>();
+    const arma::uword n_out = ant.e_theta_re.n_slices;
+    arma::mat az(1, 4, arma::fill::zeros), el(1, 4, arma::fill::zeros), V_re, V_im, H_re, H_im(2 * n_out, 4);
+    arma::cube ori(3, n_out, 4, arma::fill::zeros); // 12 n_out values, more than [n_out, 4] complex
+    arma::cx_mat V, H, ori_alias((std::complex<double> *)ori.memptr(), n_out, 4, false, true);
+    arma::cx_mat H_alias((std::complex<double> *)H_im.memptr(), n_out, 4, false, true);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, &ori, nullptr,
+                                                               nullptr, nullptr, nullptr, nullptr, &ori_alias, &H),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr,
+                                                               nullptr, nullptr, nullptr, nullptr, &V, &V),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, nullptr, nullptr, nullptr,
+                                                               nullptr, nullptr, nullptr, nullptr, nullptr, &H_alias),
+                    std::invalid_argument);
+}
+
 TEST_CASE("arrayant_interpolate - input validation")
 {
     auto ant = smooth_ant<double>();
@@ -1114,7 +1176,7 @@ TEST_CASE("arrayant_interpolate - input validation")
     arma::mat V_re, V_im, H_re, H_im, dist, az_loc, el_loc, gamma;
 
     CHECK_NOTHROW(quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, &i_element, &ori, &pos,
-                                                     &dist, &az_loc, &el_loc, &gamma, 1));
+                                                     &dist, &az_loc, &el_loc, &gamma, nullptr, nullptr, 1));
 
     // An invalid call leaves the outputs untouched
     V_re.fill(7.0);
@@ -1122,7 +1184,7 @@ TEST_CASE("arrayant_interpolate - input validation")
     auto call = [&](const quadriga_lib::arrayant<double> &a, const arma::mat &azi, const arma::mat &ele,
                     const arma::uvec *ie, const arma::cube *o, const arma::mat *p, int k)
     {
-        quadriga_lib::arrayant_interpolate<double>(a, azi, ele, V_re, V_im, H_re, H_im, ie, o, p, &dist, &az_loc, &el_loc, &gamma, k);
+        quadriga_lib::arrayant_interpolate<double>(a, azi, ele, V_re, V_im, H_re, H_im, ie, o, p, &dist, &az_loc, &el_loc, &gamma, nullptr, nullptr, k);
     };
 
     SECTION("ant")

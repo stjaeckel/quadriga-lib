@@ -29,7 +29,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Index base: 0-based unless the field is explicitly called "1-based" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).
 - Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation as in 3GPP TR 38.901 (bearing, downtilt, slant), so that orientations from TR 38.901 are entered as published: a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down, a positive bank turns the y-axis toward z.
-- Complex data: separate real and imaginary arrays (`_re` / `_im`), or interleaved along the rows where documented (e.g. `M`), for compatibility with older Octave versions, whose MEX interface has no interleaved complex arrays.
+- Complex data: separate real and imaginary arrays (`_re` / `_im`), or interleaved along the rows where documented (e.g. `M`), for compatibility with older Octave versions, whose MEX interface has no interleaved complex arrays. Some functions also offer an optional `std::complex` output, which replaces the split pair (then left empty).
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
 
 **Polarization**
@@ -759,6 +759,8 @@ void quadriga_lib::arrayant_interpolate(
     arma::Mat<dtype> *azimuth_loc = nullptr,
     arma::Mat<dtype> *elevation_loc = nullptr,
     arma::Mat<dtype> *gamma = nullptr,
+    arma::Mat<std::complex<dtype>> *V = nullptr,
+    arma::Mat<std::complex<dtype>> *H = nullptr,
     int use_kernel = 0);
 ```
 
@@ -784,6 +786,8 @@ void quadriga_lib::arrayant_interpolate(
 - **`azimuth_loc`** / **`elevation_loc`** *(optional)* — Azimuth and elevation in the local antenna frame;
   `[n_out, n_ang]`
 - **`gamma`** *(optional)* — Polarization rotation angle from the global to the local frame; `[n_out, n_ang]`
+- **`V`** / **`H`** *(optional)* — e-theta / e-phi field as complex values, replacing `V_re`, `V_im` / `H_re`, `H_im`
+  (then left empty); `[n_out, n_ang]`
 
 ### Example:
 ```cpp
@@ -813,8 +817,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_interpolate) · [Python](quad
 - Consecutive target frequencies with the same bracketing entries reuse the spatial results; target frequencies in
   ascending or descending order are fastest
 - The entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi): same grids, number of elements and element positions
-- Angles, element indices, orientation and kernels as in [arrayant_interpolate](#arrayant_interpolate); `n_ang = 0` gives outputs of size
-  `[n_out, 0, n_freq]`
+- Angles, element indices, orientation, kernels and the complex outputs as in [arrayant_interpolate](#arrayant_interpolate); `n_ang = 0`
+  gives outputs of size `[n_out, 0, n_freq]`
 - Throws `std::invalid_argument` for an empty or invalid `arrayant_vec`, target frequencies that are not finite, and
   for the errors of [arrayant_interpolate](#arrayant_interpolate)
 
@@ -832,6 +836,8 @@ void quadriga_lib::arrayant_interpolate_multi(
     const arma::uvec *i_element = nullptr,
     const arma::Cube<dtype> *orientation = nullptr,
     const arma::Mat<dtype> *element_pos = nullptr,
+    arma::Cube<std::complex<dtype>> *V = nullptr,
+    arma::Cube<std::complex<dtype>> *H = nullptr,
     int use_kernel = 0);
 ```
 
@@ -853,6 +859,8 @@ void quadriga_lib::arrayant_interpolate_multi(
 ### Outputs:
 - **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `[n_out, n_ang, n_freq]`
 - **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; `[n_out, n_ang, n_freq]`
+- **`V`** / **`H`** *(optional)* — e-theta / e-phi field as complex values, replacing `V_re`, `V_im` / `H_re`, `H_im`
+  (then left empty); `[n_out, n_ang, n_freq]`
 
 ### Example:
 ```cpp
@@ -3017,7 +3025,8 @@ void quadriga_lib::get_channels_multifreq(
     std::vector<arma::Cube<dtype>> &delay,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
-    dtype propagation_speed = dtype(299792458.0));
+    dtype propagation_speed = dtype(299792458.0),
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr);
 ```
 
 ### Inputs:
@@ -3045,6 +3054,8 @@ void quadriga_lib::get_channels_multifreq(
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
 - **`coeff_im`** — Imaginary part; same structure as `coeff_re`
 - **`delay`** — Propagation delays [s]; same structure as `coeff_re`
+- **`coeff`** *(optional)* — Coefficients as complex values, replacing `coeff_re` and `coeff_im` (then left empty);
+  same structure as `coeff_re`
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)

@@ -63,7 +63,7 @@ namespace
                         const arma::uvec *i_element = nullptr, const arma::cube *ori = nullptr, int kernel = 1)
     {
         qd_multi_result r;
-        quadriga_lib::arrayant_interpolate_multi<double>(vec, az, el, r.V_re, r.V_im, r.H_re, r.H_im, freq, i_element, ori, nullptr, kernel);
+        quadriga_lib::arrayant_interpolate_multi<double>(vec, az, el, r.V_re, r.V_im, r.H_re, r.H_im, freq, i_element, ori, nullptr, nullptr, nullptr, kernel);
         return r;
     }
 
@@ -73,7 +73,7 @@ namespace
     {
         arma::mat V_re, V_im, H_re, H_im;
         quadriga_lib::arrayant_interpolate<double>(ant, az, el, V_re, V_im, H_re, H_im, i_element, ori, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr, kernel);
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, kernel);
         return arma::any(arma::vectorise(V_re) != 0.0) && // Not a trivial (zero) result
                identical(arma::mat(r.V_re.slice(s)), V_re) && identical(arma::mat(r.V_im.slice(s)), V_im) &&
                identical(arma::mat(r.H_re.slice(s)), H_re) && identical(arma::mat(r.H_im.slice(s)), H_im);
@@ -427,6 +427,53 @@ TEST_CASE("arrayant_interpolate_multi - two-way loudspeaker example")
     CHECK(mag(1, 3) > 2.0 * mag(0, 3));
 }
 
+TEST_CASE("arrayant_interpolate_multi - complex outputs equal the split outputs bit for bit")
+{
+    // Target frequencies on an entry (copied slices), between two entries (blended slices), descending and outside the
+    // entries; V and H also one at a time, the split pairs are left empty
+    ant_vec vec;
+    for (double f : {1.0e9, 2.0e9, 3.0e9})
+    {
+        vec.push_back(quadriga_lib::generate_arrayant_3GPP<double>(1, 2, 1.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0));
+        vec.back().center_frequency = f;
+        vec.back().e_theta_re *= f / 1.0e9; // Different patterns per entry
+        vec.back().e_phi_im += 0.1 * f / 1.0e9;
+    }
+    const arma::mat az = arma::linspace<arma::rowvec>(-3.0, 3.0, 13), el = arma::linspace<arma::rowvec>(-1.4, 1.4, 13);
+    const arma::vec freq = {3.5e9, 3.0e9, 2.7e9, 2.2e9, 2.0e9, 1.5e9, 0.5e9};
+    const arma::uvec i_element = {3, 0, 2};
+    for (int kernel : kernels())
+    {
+        const auto ref = run(vec, az, el, &freq, &i_element, nullptr, kernel);
+        for (int mode = 0; mode < 3; ++mode)
+        {
+            qd_multi_result r;
+            r.V_re.ones(1, 1, 1), r.H_im.ones(1, 1, 1); // Stale content
+            arma::cx_cube V, H;
+            quadriga_lib::arrayant_interpolate_multi<double>(vec, az, el, r.V_re, r.V_im, r.H_re, r.H_im, &freq, &i_element,
+                                                             nullptr, nullptr, mode != 2 ? &V : nullptr, mode != 1 ? &H : nullptr,
+                                                             kernel);
+            if (mode != 2)
+                CHECK((r.V_re.is_empty() && r.V_im.is_empty() && identical(arma::cube(arma::real(V)), ref.V_re) &&
+                       identical(arma::cube(arma::imag(V)), ref.V_im)));
+            else
+                CHECK((identical(r.V_re, ref.V_re) && identical(r.V_im, ref.V_im)));
+            if (mode != 1)
+                CHECK((r.H_re.is_empty() && r.H_im.is_empty() && identical(arma::cube(arma::real(H)), ref.H_re) &&
+                       identical(arma::cube(arma::imag(H)), ref.H_im)));
+            else
+                CHECK((identical(r.H_re, ref.H_re) && identical(r.H_im, ref.H_im)));
+        }
+    }
+
+    // A complex output that shares memory with a split output throws (a view of the output size)
+    arma::cube V_re, V_im, H_re, H_im(8, 13, 7);
+    arma::cx_cube H_alias((std::complex<double> *)H_im.memptr(), 4, 13, 7, false, true);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_interpolate_multi<double>(vec, az, el, V_re, V_im, H_re, H_im, &freq, nullptr,
+                                                                     nullptr, nullptr, nullptr, &H_alias),
+                    std::invalid_argument);
+}
+
 TEST_CASE("arrayant_interpolate_multi - input validation")
 {
     ant_vec vec = scaled_entries({1.0e9, 2.0e9}, {1.0, 2.0}); // 4 elements
@@ -437,7 +484,7 @@ TEST_CASE("arrayant_interpolate_multi - input validation")
     const arma::mat pos(3, 2, arma::fill::zeros);
     arma::cube V_re, V_im, H_re, H_im;
 
-    CHECK_NOTHROW(quadriga_lib::arrayant_interpolate_multi<double>(vec, az, el, V_re, V_im, H_re, H_im, &freq, &i_element, &ori, &pos, 1));
+    CHECK_NOTHROW(quadriga_lib::arrayant_interpolate_multi<double>(vec, az, el, V_re, V_im, H_re, H_im, &freq, &i_element, &ori, &pos, nullptr, nullptr, 1));
 
     // An invalid call leaves the outputs untouched
     V_re.fill(7.0);
@@ -445,7 +492,7 @@ TEST_CASE("arrayant_interpolate_multi - input validation")
     auto call = [&](const ant_vec &v, const arma::mat &a, const arma::mat &e, const arma::vec *f, const arma::uvec *ie,
                     const arma::cube *o, const arma::mat *p, int k)
     {
-        quadriga_lib::arrayant_interpolate_multi<double>(v, a, e, V_re, V_im, H_re, H_im, f, ie, o, p, k);
+        quadriga_lib::arrayant_interpolate_multi<double>(v, a, e, V_re, V_im, H_re, H_im, f, ie, o, p, nullptr, nullptr, k);
     };
 
     SECTION("arrayant_vec")

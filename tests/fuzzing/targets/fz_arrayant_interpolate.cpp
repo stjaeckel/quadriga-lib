@@ -82,7 +82,8 @@ static void run(fz::input &in)
     fz::clean([&]
               { quadriga_lib::arrayant_interpolate<T>(a, az, el, V_re, V_im, H_re, H_im, &i_element,
                                                       use_orientation ? &orientation : nullptr, use_pos ? &element_pos_i : nullptr,
-                                                      opt(dist, 4), opt(az_loc, 5), opt(el_loc, 6), opt(gamma, 7), use_kernel); });
+                                                      opt(dist, 4), opt(az_loc, 5), opt(el_loc, 6), opt(gamma, 7), nullptr, nullptr,
+                                                      use_kernel); });
 
     // Same arrayant at up to three frequencies (the copies may get a different grid size)
     std::vector<quadriga_lib::arrayant<T>> vec;
@@ -97,7 +98,21 @@ static void run(fz::input &in)
     fz::clean([&]
               { quadriga_lib::arrayant_interpolate_multi<T>(vec, az, el, CV_re, CV_im, CH_re, CH_im, &freq, &i_element,
                                                             use_orientation ? &orientation : nullptr,
-                                                            use_pos ? &element_pos_i : nullptr, use_kernel); });
+                                                            use_pos ? &element_pos_i : nullptr, nullptr, nullptr, use_kernel); });
+
+    // Complex outputs, each sometimes requested; read last, so that the bytes before keep their meaning
+    const uint8_t cx_mask = in.ConsumeIntegral<uint8_t>();
+    arma::Mat<std::complex<T>> V, H;
+    arma::Cube<std::complex<T>> CV, CH;
+    fz::clean([&]
+              { quadriga_lib::arrayant_interpolate<T>(a, az, el, V_re, V_im, H_re, H_im, &i_element,
+                                                      use_orientation ? &orientation : nullptr, use_pos ? &element_pos_i : nullptr,
+                                                      opt(dist, 4), opt(az_loc, 5), opt(el_loc, 6), opt(gamma, 7),
+                                                      cx_mask & 1 ? &V : nullptr, cx_mask & 2 ? &H : nullptr, use_kernel); });
+    fz::clean([&]
+              { quadriga_lib::arrayant_interpolate_multi<T>(vec, az, el, CV_re, CV_im, CH_re, CH_im, &freq, &i_element,
+                                                            use_orientation ? &orientation : nullptr, use_pos ? &element_pos_i : nullptr,
+                                                            cx_mask & 4 ? &CV : nullptr, cx_mask & 8 ? &CH : nullptr, use_kernel); });
 }
 
 void fuzz_seeds(const fz::seeds &) {}

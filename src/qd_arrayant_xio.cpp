@@ -921,7 +921,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     arma::Mat<dtype> zero_pos(3, n_elements, arma::fill::zeros);
     arma::Cube<dtype> V_re, V_im, H_re, H_im;
     quadriga_lib::arrayant_interpolate_multi<dtype>(arrayant_vec, azimuth, elevation, V_re, V_im, H_re, H_im,
-                                                    &freq_grid, nullptr, nullptr, &zero_pos, 1);
+                                                    &freq_grid, nullptr, nullptr, &zero_pos, nullptr, nullptr, 1);
 
     // Geometric dist matrix: dist(e, a) = element_pos[:,e] · wave_direction(az[a], el[a])
     arma::Mat<dtype> dist(n_elements, n_ang, arma::fill::none);

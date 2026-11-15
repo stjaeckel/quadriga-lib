@@ -138,6 +138,11 @@ static void run(fz::input &in)
         fz::clean([&] { quadriga_lib::get_channels_multifreq(tx_vec, rx_vec, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9],
                                                              p[10], p[11], q.fbs, q.lbs, gain, q.length, M, f_in, f_out, v_re, v_im,
                                                              v_dl, absolute, fake_los, speed); });
+        std::vector<arma::Cube<std::complex<T>>> v_cx; // Complex output, read last
+        if (in.ConsumeBool())
+            fz::clean([&] { quadriga_lib::get_channels_multifreq(tx_vec, rx_vec, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8],
+                                                                 p[9], p[10], p[11], q.fbs, q.lbs, gain, q.length, M, f_in, f_out,
+                                                                 v_re, v_im, v_dl, absolute, fake_los, speed, &v_cx); });
     }
     }
 }

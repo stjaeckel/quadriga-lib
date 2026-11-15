@@ -143,7 +143,9 @@ void qd_arrayant_interpolate_dispatch(const quadriga_lib::arrayant<dtype> &ant, 
                                       arma::Mat<dtype> *azimuth_loc,            // Optional output: local azimuth in rad; [n_out, n_ang] or nullptr
                                       arma::Mat<dtype> *elevation_loc,          // Optional output: local elevation in rad; [n_out, n_ang] or nullptr
                                       arma::Mat<dtype> *gamma,                  // Optional output: polarization rotation angle in rad; [n_out, n_ang] or nullptr
-                                      int kernel);                              // Kernel: 1 = GENERIC, 2 = AVX2
+                                      int kernel,                               // Kernel: 1 = GENERIC, 2 = AVX2
+                                      arma::Mat<std::complex<dtype>> *V = nullptr,  // Optional complex output replacing V_re / V_im (not written); [n_out, n_ang]
+                                      arma::Mat<std::complex<dtype>> *H = nullptr); // Optional complex output replacing H_re / H_im (not written); [n_out, n_ang]
 
 // Inverse of the largest absolute field value of n samples; scaling by it keeps the power of double patterns with
 // amplitudes above about 1e154 inside the double range (only called when the unscaled power overflowed)

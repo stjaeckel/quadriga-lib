@@ -269,7 +269,8 @@ void quadriga_lib::get_channels_multifreq(
     std::vector<arma::Cube<dtype>> &delay,
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
-    dtype propagation_speed = dtype(299792458.0));
+    dtype propagation_speed = dtype(299792458.0),
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr);
 ```
 
 ### Inputs:
@@ -297,6 +298,8 @@ void quadriga_lib::get_channels_multifreq(
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
 - **`coeff_im`** — Imaginary part; same structure as `coeff_re`
 - **`delay`** — Propagation delays [s]; same structure as `coeff_re`
+- **`coeff`** *(optional)* — Coefficients as complex values, replacing `coeff_re` and `coeff_im` (then left empty);
+  same structure as `coeff_re`
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)

@@ -2,7 +2,7 @@ quadriga-lib is a C++ radio channel modelling library and the numerical core beh
 
 # GENERAL CONVENTIONS
 - All functions and classes live in the `quadriga_lib` namespace. Language standard is C++17.
-- Armadillo is used for all array data. `arma::cx_*` types are not used in interfaces (see "Complex data" in the glossary).
+- Armadillo is used for all array data. Complex data is split into `_re` / `_im` arrays (see "Complex data" in the glossary); a function may additionally offer an optional `std::complex` output next to the split form where a measured gain exists.
 - Templates are explicitly instantiated in the source file; nothing is implemented in the public headers.
 - `arma::uword`, `size_t` and `unsigned long long` are the same 64-bit type (enforced by `static_assert` in the headers) and can be used interchangeably.
 - Shared conventions and names are defined once, in the glossary of the API reference; see "Names, units and layouts" (under "PUBLIC HEADER").

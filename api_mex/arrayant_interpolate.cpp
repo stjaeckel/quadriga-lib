@@ -116,7 +116,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         CALL_QD(quadriga_lib::arrayant_interpolate_multi<double>(ant, az, el, V_re, V_im, H_re, H_im,
                                                                  frequency.is_empty() ? nullptr : &frequency,
-                                                                 p_element, p_orientation, p_element_pos, use_kernel));
+                                                                 p_element, p_orientation, p_element_pos, nullptr, nullptr, use_kernel));
         return;
     }
 
@@ -141,5 +141,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::arrayant_interpolate<double>(ant[0], az, el, V_re, V_im, H_re, H_im, p_element, p_orientation, p_element_pos,
                                                        (nlhs > 4) ? &dist : nullptr, (nlhs > 5) ? &azimuth_loc : nullptr,
                                                        (nlhs > 6) ? &elevation_loc : nullptr, (nlhs > 7) ? &gamma : nullptr,
-                                                       use_kernel));
+                                                       nullptr, nullptr, use_kernel));
 }

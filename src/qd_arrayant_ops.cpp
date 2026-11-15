@@ -92,7 +92,7 @@ void qd_arrayant_calc_beamwidth_element(const quadriga_lib::arrayant<dtype> &ant
     {
         arma::Mat<dtype> V_re, V_im, H_re, H_im;
         quadriga_lib::arrayant_interpolate<dtype>(ant, az_q, el_q, V_re, V_im, H_re, H_im, &i_el_vec,
-                                                  nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
+                                                  nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
         P.set_size(az_q.n_elem);
         double P_max = 0.0;
         arma::uword iM = 0;
@@ -928,7 +928,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     // Interpolate antenna patterns (for all elements in the array)
     arma::Mat<dtype> V_re, V_im, H_re, H_im;
     quadriga_lib::arrayant_interpolate<dtype>(ant, azimuth, elevation, V_re, V_im, H_re, H_im, &i_element,
-                                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
+                                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1);
     dtype *vr = V_re.memptr(), *vi = V_im.memptr(), *hr = H_re.memptr(), *hi = H_im.memptr();
 
     // Calculate maximum Power in the Pattern
