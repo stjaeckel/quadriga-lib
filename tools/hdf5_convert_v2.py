@@ -175,7 +175,7 @@ def read_slot(group):
     empty = {'path_gain': np.zeros(0, np.float32), 'path_length': np.zeros(0, np.float32),
              'path_angles': np.zeros((0, 4), np.float32), 'fbs_pos': np.zeros((3, 0), np.float32),
              'lbs_pos': np.zeros((3, 0), np.float32), 'interact_coord': np.zeros((3, 0), np.float32),
-             'path_polarization': np.zeros((4, 0), np.complex64), 'no_interact': np.zeros(0, np.uint32),
+             'path_polarization': np.zeros((8, 0), np.float32), 'no_interact': np.zeros(0, np.uint32),
              'coeff_re': np.zeros((n_rx, n_tx, 0), np.float32), 'coeff_im': np.zeros((n_rx, n_tx, 0), np.float32)}
     for i, s in snaps:
         if 'coeff_re' in s:
@@ -189,12 +189,10 @@ def read_slot(group):
                 d = np.broadcast_to(d, (n_rx, n_tx, d.shape[2])).copy()
             put('delay', i, d, np.zeros((d.shape[0], d.shape[1], 0), np.float32))
         for v2, key in (('path_gain', 'path_gain'), ('path_length', 'path_length'), ('path_angles', 'path_angles'),
-                        ('path_fbs_pos', 'fbs_pos'), ('path_lbs_pos', 'lbs_pos')):
+                        ('path_polarization', 'path_polarization'), ('path_fbs_pos', 'fbs_pos'),
+                        ('path_lbs_pos', 'lbs_pos')):
             if v2 in s:
                 put(key, i, f32(s[v2][()]).T, empty[key])
-        if 'path_polarization' in s:  # interleaved re/im pairs; a view keeps every bit (-0, NaN, Inf)
-            pol = np.ascontiguousarray(s['path_polarization'][()], dtype=np.float32).view(np.complex64).T
-            put('path_polarization', i, pol, empty['path_polarization'])
         if 'no_interact' in s:
             no_interact = np.asarray(s['no_interact'][()], dtype=np.uint32)
             put('no_interact', i, no_interact, empty['no_interact'])

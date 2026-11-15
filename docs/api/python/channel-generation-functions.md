@@ -48,16 +48,17 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
   before it interpolates across `freq_in`, so it needs channels generated with `use_absolute_delays = True`; with
   relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
   grid and gives wrong phases
-- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im`
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Usage:
 ```python
-coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ant_tx, ant_rx, fbs_pos, \
+coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ant_tx, ant_rx, fbs_pos, \
     lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq_in, \
     freq_out, use_absolute_delays, add_fake_los_path, propagation_speed )
 
-coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
+coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=False )
 ```
 
 ### Inputs:
@@ -82,12 +83,12 @@ coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `False`
+  separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
-- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
 
 ### See also:
@@ -123,18 +124,19 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
   paths keep their order, shifted by one slot.
 - With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`.
 
 ### Usage:
 ```python
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ant_tx, ant_rx, \
+coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ant_tx, ant_rx, \
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
 
-coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=True )
+coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=False )
 
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
+coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
 ```
 
 ### Inputs:
@@ -157,14 +159,14 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `False`
+  separate `coeff_re` and `coeff_im`; default: `True`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
 
 ### Outputs:
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
-- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
@@ -206,8 +208,9 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 - With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
   hold only this zero-power LOS path, with the LOS delays and angles per antenna pair (also per snapshot in batch
   mode).
-- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Batch mode:
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_out` snapshots
@@ -225,18 +228,17 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 
 ### Usage:
 ```python
-coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_tx, ant_rx, \
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ant_tx, ant_rx, \
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
 
-coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=False )
 
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., \
-    angles=True )
+coeff, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
 
-coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
 
-coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
 ```
 
 ### Inputs:
@@ -259,7 +261,7 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `False`
+  separate `coeff_re` and `coeff_im`; default: `True`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
@@ -267,9 +269,9 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   `int`; default: 0
 
 ### Outputs:
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
-- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`aod`** — Azimuth of departure in rad; `(n_ports_rx, n_ports_tx, n_path)`; only when `angles=True`
 - **`eod`** — Elevation of departure in rad; same shape; only when `angles=True`

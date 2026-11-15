@@ -86,6 +86,13 @@ class test_case(unittest.TestCase):
                                % (quadriga_lib.__file__, version))
         with np.load(os.path.join(data_dir, 'hdf5_v2_expected.npz'), allow_pickle=False) as z:
             cls.oracle = {k: z[k] for k in z.files}
+        # 0.12.4 returned 'path_polarization' as complex (4, n); the channel dict now holds the real (8, n) form,
+        # rows re, im of each entry. Splitting keeps every bit (-0.0, NaN payloads).
+        for k, v in cls.oracle.items():
+            if '/chan/path_polarization' in k:
+                pol = np.empty((2 * v.shape[0],) + v.shape[1:], dtype=v.real.dtype)
+                pol[0::2], pol[1::2] = v.real, v.imag
+                cls.oracle[k] = pol
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

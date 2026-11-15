@@ -138,7 +138,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("power_exponent") = 1.0,
           py::arg("fix_taps") = 0,
           py::arg("stack") = false,
-          py::arg("complex") = false,
+          py::arg("complex") = true,
           py::arg("coeff") = py::none());
 
     m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));

@@ -34,18 +34,19 @@ Calculate MIMO channel coefficients for planar wave paths
   paths keep their order, shifted by one slot.
 - With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`.
 
 ## Usage:
 ```
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ant_tx, ant_rx, \
+coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ant_tx, ant_rx, \
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
 
-coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=True )
+coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=False )
 
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
+coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
 ```
 
 ## Inputs:
@@ -68,14 +69,14 @@ coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_plan
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `False`
+  separate `coeff_re` and `coeff_im`; default: `True`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
-- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
@@ -101,9 +102,11 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                               py::handle center_freq,
                               const bool use_absolute_delays,
                               const bool add_fake_los_path,
-                              const bool complex,
+                              py::handle complex,
                               const arma::uword freq)
 {
+    const bool want_complex = qd_python_flag(complex, true, "complex");
+
     // Parse input arguments
     const auto ant_tx_a = qd_python_dict2arrayant(ant_tx, true);
     const auto ant_rx_a = qd_python_dict2arrayant(ant_rx, true);
@@ -154,7 +157,7 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
     auto delay_p = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &delay);
     auto rx_Doppler_p = qd_python_init_output<double>(n_path, &rx_Doppler);
 
-    if (complex)
+    if (want_complex)
     {
         quadriga_lib::get_channels_planar<double>(&ant_tx_a, &ant_rx_a,
                                                   Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
@@ -199,5 +202,5 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
 //       py::arg("center_freq") = py::none(),
 //       py::arg("use_absolute_delays") = false,
 //       py::arg("add_fake_los_path") = false,
-//       py::arg("complex") = false,
+//       py::arg("complex") = true,
 //       py::arg("freq") = 0);

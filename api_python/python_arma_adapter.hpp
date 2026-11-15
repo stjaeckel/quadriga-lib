@@ -42,18 +42,15 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Col<dtype> *re,
     if (re == nullptr)
         throw std::invalid_argument("Input 're' must not be null.");
 
+    if constexpr (qd_is_complex<dtype_numpy>::value)
+        if (im == nullptr)
+            throw std::invalid_argument("Complex output requires the imaginary part 'im'.");
+
     if (im != nullptr && im->n_elem != re->n_elem)
         throw std::invalid_argument("Sizes of real and imaginary parts dont match.");
 
     const bool select = !i_elem.empty();
-
-    // Complex output without an explicit imag part: re is interpreted as interleaved pairs [re0, im0, re1, im1, ...]
-    const bool interleaved_re = qd_is_complex<dtype_numpy>::value && (im == nullptr);
-    if (interleaved_re && !select && (re->n_elem % 2 != 0))
-        throw std::invalid_argument("Interleaved-complex input requires an even element count.");
-
-    const size_t n_elements = select ? i_elem.n_elem : (interleaved_re ? re->n_elem / 2 : re->n_elem);
-    const size_t idx_limit = interleaved_re ? re->n_elem / 2 : re->n_elem;
+    const size_t n_elements = select ? i_elem.n_elem : re->n_elem;
 
     // Interleaved real case doubles the element count
     size_t out_elem = n_elements;
@@ -77,15 +74,13 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Col<dtype> *re,
     for (size_t k = 0; k < n_elements; ++k)
     {
         const size_t idx = select ? i_elem[k] : k;
-        if (select && idx >= idx_limit)
+        if (select && idx >= re->n_elem)
             throw std::out_of_range("Index out of bound.");
 
-        if constexpr (qd_is_complex<dtype_numpy>::value) // Case 3: complex output
+        if constexpr (qd_is_complex<dtype_numpy>::value) // Case 3: complex output from re / im
         {
             using real_t = typename dtype_numpy::value_type;
-            p_out[k] = (im != nullptr)
-                           ? dtype_numpy((real_t)p_re[idx], (real_t)p_im[idx])              // separate re / im
-                           : dtype_numpy((real_t)p_re[2 * idx], (real_t)p_re[2 * idx + 1]); // interleaved re
+            p_out[k] = dtype_numpy((real_t)p_re[idx], (real_t)p_im[idx]);
         }
         else if (im == nullptr)                // Case 1: real copy with cast
             p_out[k] = (dtype_numpy)p_re[idx]; // Case 2: interleaved re/im (out_elem == 2 * n_elements)
@@ -109,17 +104,16 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Mat<dtype> *re,
     if (re == nullptr)
         throw std::invalid_argument("Input 're' must not be null.");
 
+    if constexpr (qd_is_complex<dtype_numpy>::value)
+        if (im == nullptr)
+            throw std::invalid_argument("Complex output requires the imaginary part 'im'.");
+
     if (im != nullptr && (im->n_rows != re->n_rows || im->n_cols != re->n_cols))
         throw std::invalid_argument("Sizes of real and imaginary parts dont match.");
 
     const bool select = !i_col.empty();
     const size_t n_cols = select ? i_col.n_elem : re->n_cols;
-
-    // Complex output without an explicit imag part: re's rows are interpreted as interleaved pairs [re0, im0, re1, im1, ...]
-    const bool interleaved_re = qd_is_complex<dtype_numpy>::value && (im == nullptr);
-    if (interleaved_re && (re->n_rows % 2 != 0))
-        throw std::invalid_argument("Interleaved-complex input requires an even row count.");
-    const size_t n_rows = interleaved_re ? re->n_rows / 2 : re->n_rows;
+    const size_t n_rows = re->n_rows;
 
     // Interleaved real case doubles the row count
     size_t out_rows = n_rows;
@@ -142,16 +136,12 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Mat<dtype> *re,
         const dtype *p_re = re->colptr(src_col);
         const dtype *p_im = (im != nullptr) ? im->colptr(src_col) : nullptr;
 
-        if constexpr (qd_is_complex<dtype_numpy>::value) // Case 3: complex output (imag = 0 if im == nullptr)
+        if constexpr (qd_is_complex<dtype_numpy>::value) // Case 3: complex output from re / im
         {
             using real_t = typename dtype_numpy::value_type;
             dtype_numpy *dc = p_out + c * out_rows;
-            if (im == nullptr) // im interleaved within re
-                for (size_t i = 0; i < n_rows; ++i)
-                    dc[i] = dtype_numpy((real_t)p_re[2 * i], (real_t)p_re[2 * i + 1]);
-            else
-                for (size_t i = 0; i < n_rows; ++i)
-                    dc[i] = dtype_numpy((real_t)p_re[i], (real_t)p_im[i]);
+            for (size_t i = 0; i < n_rows; ++i)
+                dc[i] = dtype_numpy((real_t)p_re[i], (real_t)p_im[i]);
         }
         else
         {
@@ -181,18 +171,17 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Cube<dtype> *re
     if (re == nullptr)
         throw std::invalid_argument("Input 're' must not be null.");
 
+    if constexpr (qd_is_complex<dtype_numpy>::value)
+        if (im == nullptr)
+            throw std::invalid_argument("Complex output requires the imaginary part 'im'.");
+
     if (im != nullptr && (im->n_rows != re->n_rows || im->n_cols != re->n_cols || im->n_slices != re->n_slices))
         throw std::invalid_argument("Sizes of real and imaginary parts dont match.");
 
     const bool select = !i_slice.empty();
     const size_t n_cols = re->n_cols;
     const size_t n_slices = select ? i_slice.n_elem : re->n_slices;
-
-    // Complex output without an explicit imag part: re's rows are interpreted as interleaved pairs [re0, im0, re1, im1, ...]
-    const bool interleaved_re = qd_is_complex<dtype_numpy>::value && (im == nullptr);
-    if (interleaved_re && (re->n_rows % 2 != 0))
-        throw std::invalid_argument("Interleaved-complex input requires an even row count.");
-    const size_t n_rows = interleaved_re ? re->n_rows / 2 : re->n_rows;
+    const size_t n_rows = re->n_rows;
     const size_t slice_size = n_rows * n_cols;
 
     // Interleaved real case doubles the row count
@@ -217,21 +206,12 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Cube<dtype> *re
         const dtype *p_re = re->slice_memptr(src_slice);
         const dtype *p_im = (im != nullptr) ? im->slice_memptr(src_slice) : nullptr;
 
-        if constexpr (qd_is_complex<dtype_numpy>::value) // Case 3: complex output (imag = 0 if im == nullptr)
+        if constexpr (qd_is_complex<dtype_numpy>::value) // Case 3: complex output from re / im
         {
             using real_t = typename dtype_numpy::value_type;
             dtype_numpy *ds = p_out + s * out_slice;
-            if (im == nullptr) // im interleaved within re's rows
-                for (size_t j = 0; j < n_cols; ++j)
-                {
-                    dtype_numpy *dc = ds + j * n_rows;
-                    const dtype *sc = p_re + j * re->n_rows;
-                    for (size_t i = 0; i < n_rows; ++i)
-                        dc[i] = dtype_numpy((real_t)sc[2 * i], (real_t)sc[2 * i + 1]);
-                }
-            else
-                for (size_t e = 0; e < slice_size; ++e)
-                    ds[e] = dtype_numpy((real_t)p_re[e], (real_t)p_im[e]);
+            for (size_t e = 0; e < slice_size; ++e)
+                ds[e] = dtype_numpy((real_t)p_re[e], (real_t)p_im[e]);
         }
         else
         {
@@ -320,6 +300,10 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Co
 {
     static_assert(std::is_arithmetic_v<dtype_numpy> || qd_is_complex<dtype_numpy>::value, "dtype_numpy must be an arithmetic type or std::complex<...>");
 
+    if constexpr (qd_is_complex<dtype_numpy>::value)
+        if (im == nullptr)
+            throw std::invalid_argument("Complex output requires the imaginary part 'im'.");
+
     if (re == nullptr || re->empty())
         return py::array_t<dtype_numpy>();
 
@@ -332,9 +316,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Co
             if (i_vec[f] >= re->size())
                 throw std::out_of_range("Index out of bound.");
 
-    // Complex output without an explicit imag part: each re frame is interpreted as interleaved pairs [re0, im0, re1, im1, ...]
-    const bool interleaved_re = qd_is_complex<dtype_numpy>::value && (im == nullptr);
-
     // Ragged scan over the selected frames (re and, if present, im) -> rows = global max length
     bool ragged = false;
     size_t n_rows = (*re)[select ? i_vec[0] : 0].n_elem;
@@ -342,8 +323,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Co
     {
         const size_t src_f = select ? i_vec[f] : f;
         const size_t r = (*re)[src_f].n_elem;
-        if (interleaved_re && (r % 2 != 0))
-            throw std::invalid_argument("Interleaved-complex input requires an even element count.");
         if (r != n_rows)
         {
             ragged = true;
@@ -364,9 +343,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Co
                 ragged = true; // selected frame has no imaginary counterpart -> gap
         }
     }
-
-    if (interleaved_re)
-        n_rows /= 2; // re frames hold interleaved pairs -> half as many complex rows
 
     // Interleaved real case doubles the row count; complex/real cases keep n_rows
     size_t out_rows = n_rows;
@@ -413,16 +389,10 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Co
         {
             using real_t = typename dtype_numpy::value_type;
             dtype_numpy *dst = p_out + f * out_rows;
-            if (has_im)
-            {
-                const size_t r = std::max(r_re, r_im);
-                for (size_t i = 0; i < r; ++i)
-                    dst[i] = dtype_numpy(i < r_re ? (real_t)p_re[i] : real_t(0),
-                                         i < r_im ? (real_t)p_im[i] : real_t(0));
-            }
-            else // im interleaved within re
-                for (size_t i = 0; i < r_re / 2; ++i)
-                    dst[i] = dtype_numpy((real_t)p_re[2 * i], (real_t)p_re[2 * i + 1]);
+            const size_t r = std::max(r_re, r_im);
+            for (size_t i = 0; i < r; ++i)
+                dst[i] = dtype_numpy(i < r_re ? (real_t)p_re[i] : real_t(0),
+                                     i < r_im ? (real_t)p_im[i] : real_t(0));
         }
     }
     return output;
@@ -437,6 +407,10 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Ma
 {
     static_assert(std::is_arithmetic_v<dtype_numpy> || qd_is_complex<dtype_numpy>::value, "dtype_numpy must be an arithmetic type or std::complex<...>");
 
+    if constexpr (qd_is_complex<dtype_numpy>::value)
+        if (im == nullptr)
+            throw std::invalid_argument("Complex output requires the imaginary part 'im'.");
+
     if (re == nullptr || re->empty())
         return py::array_t<dtype_numpy>();
 
@@ -449,9 +423,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Ma
             if (i_vec[f] >= re->size())
                 throw std::out_of_range("Index out of bound.");
 
-    // Complex output without an explicit imag part: each re frame's rows are interpreted as interleaved pairs [re0, im0, re1, im1, ...]
-    const bool interleaved_re = qd_is_complex<dtype_numpy>::value && (im == nullptr);
-
     // Ragged scan over the selected frames (re and, if present, im)
     bool ragged = false;
     size_t n_rows = (*re)[select ? (size_t)i_vec[0] : 0].n_rows;
@@ -460,9 +431,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Ma
     {
         const size_t src_f = select ? (size_t)i_vec[f] : f;
         const arma::Mat<dtype> &c = (*re)[src_f];
-        if (interleaved_re && (c.n_rows % 2 != 0))
-            throw std::invalid_argument("Interleaved-complex input requires an even row count.");
-
         if (c.n_rows != n_rows || c.n_cols != n_cols)
         {
             ragged = true;
@@ -485,9 +453,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Ma
                 ragged = true; // selected frame has no imaginary counterpart -> gap
         }
     }
-
-    if (interleaved_re)
-        n_rows /= 2; // re frames hold interleaved pairs -> half as many complex rows
 
     // Interleaved real case doubles the row count
     size_t out_rows = n_rows;
@@ -551,29 +516,18 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Ma
         {
             using real_t = typename dtype_numpy::value_type;
             dtype_numpy *dst = p_out + f * out_frame;
-            if (has_im)
+            const size_t rr = std::max(r_re, r_im);
+            const size_t cc = std::max(c_re, c_im);
+            for (size_t j = 0; j < cc; ++j)
             {
-                const size_t rr = std::max(r_re, r_im);
-                const size_t cc = std::max(c_re, c_im);
-                for (size_t j = 0; j < cc; ++j)
+                dtype_numpy *dc = dst + j * n_rows;
+                for (size_t i = 0; i < rr; ++i)
                 {
-                    dtype_numpy *dc = dst + j * n_rows;
-                    for (size_t i = 0; i < rr; ++i)
-                    {
-                        const real_t vr = (i < r_re && j < c_re) ? (real_t)p_re[j * r_re + i] : real_t(0);
-                        const real_t vi = (i < r_im && j < c_im) ? (real_t)p_im[j * r_im + i] : real_t(0);
-                        dc[i] = dtype_numpy(vr, vi);
-                    }
+                    const real_t vr = (i < r_re && j < c_re) ? (real_t)p_re[j * r_re + i] : real_t(0);
+                    const real_t vi = (i < r_im && j < c_im) ? (real_t)p_im[j * r_im + i] : real_t(0);
+                    dc[i] = dtype_numpy(vr, vi);
                 }
             }
-            else // im interleaved within re's rows
-                for (size_t j = 0; j < c_re; ++j)
-                {
-                    dtype_numpy *dc = dst + j * n_rows;
-                    const dtype *sc = p_re + j * r_re;
-                    for (size_t i = 0; i < r_re / 2; ++i)
-                        dc[i] = dtype_numpy((real_t)sc[2 * i], (real_t)sc[2 * i + 1]);
-                }
         }
     }
     return output;
@@ -588,6 +542,10 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Cu
 {
     static_assert(std::is_arithmetic_v<dtype_numpy> || qd_is_complex<dtype_numpy>::value, "dtype_numpy must be an arithmetic type or std::complex<...>");
 
+    if constexpr (qd_is_complex<dtype_numpy>::value)
+        if (im == nullptr)
+            throw std::invalid_argument("Complex output requires the imaginary part 'im'.");
+
     if (re == nullptr || re->empty())
         return py::array_t<dtype_numpy>();
 
@@ -600,9 +558,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Cu
             if (i_vec[f] >= re->size())
                 throw std::out_of_range("Index out of bound.");
 
-    // Complex output without an explicit imag part: each re frame's rows are interpreted as interleaved pairs [re0, im0, re1, im1, ...]
-    const bool interleaved_re = qd_is_complex<dtype_numpy>::value && (im == nullptr);
-
     // Ragged scan over the selected frames (re and, if present, im)
     bool ragged = false;
     size_t n_rows = (*re)[select ? (size_t)i_vec[0] : 0].n_rows;
@@ -612,8 +567,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Cu
     {
         const size_t src_f = select ? (size_t)i_vec[f] : f;
         const arma::Cube<dtype> &c = (*re)[src_f];
-        if (interleaved_re && (c.n_rows % 2 != 0))
-            throw std::invalid_argument("Interleaved-complex input requires an even row count.");
         if (c.n_rows != n_rows || c.n_cols != n_cols || c.n_slices != n_slices)
         {
             ragged = true;
@@ -638,9 +591,6 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Cu
                 ragged = true; // selected frame has no imaginary counterpart -> gap
         }
     }
-
-    if (interleaved_re)
-        n_rows /= 2; // re frames hold interleaved pairs -> half as many complex rows
 
     // Interleaved real case doubles the row count
     size_t out_rows = n_rows;
@@ -723,43 +673,27 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Cu
         {
             using real_t = typename dtype_numpy::value_type;
             dtype_numpy *dst = p_out + f * out_frame;
-            if (has_im)
+            const size_t rr = std::max(r_re, r_im);
+            const size_t cc = std::max(c_re, c_im);
+            const size_t ss = std::max(s_re, s_im);
+            for (size_t k = 0; k < ss; ++k)
             {
-                const size_t rr = std::max(r_re, r_im);
-                const size_t cc = std::max(c_re, c_im);
-                const size_t ss = std::max(s_re, s_im);
-                for (size_t k = 0; k < ss; ++k)
+                dtype_numpy *dk = dst + k * out_slice;
+                for (size_t j = 0; j < cc; ++j)
                 {
-                    dtype_numpy *dk = dst + k * out_slice;
-                    for (size_t j = 0; j < cc; ++j)
+                    dtype_numpy *dc = dk + j * n_rows;
+                    for (size_t i = 0; i < rr; ++i)
                     {
-                        dtype_numpy *dc = dk + j * n_rows;
-                        for (size_t i = 0; i < rr; ++i)
-                        {
-                            const real_t vr = (i < r_re && j < c_re && k < s_re)
-                                                  ? (real_t)p_re[k * sl_re + j * r_re + i]
-                                                  : real_t(0);
-                            const real_t vi = (i < r_im && j < c_im && k < s_im)
-                                                  ? (real_t)p_im[k * sl_im + j * r_im + i]
-                                                  : real_t(0);
-                            dc[i] = dtype_numpy(vr, vi);
-                        }
+                        const real_t vr = (i < r_re && j < c_re && k < s_re)
+                                              ? (real_t)p_re[k * sl_re + j * r_re + i]
+                                              : real_t(0);
+                        const real_t vi = (i < r_im && j < c_im && k < s_im)
+                                              ? (real_t)p_im[k * sl_im + j * r_im + i]
+                                              : real_t(0);
+                        dc[i] = dtype_numpy(vr, vi);
                     }
                 }
             }
-            else // im interleaved within re's rows
-                for (size_t k = 0; k < s_re; ++k)
-                {
-                    dtype_numpy *dk = dst + k * out_slice;
-                    const dtype *sk = p_re + k * sl_re;
-                    for (size_t j = 0; j < c_re; ++j)
-                    {
-                        dtype_numpy *dc = dk + j * n_rows;
-                        const dtype *sc = sk + j * r_re;
-                        for (size_t i = 0; i < r_re / 2; ++i)
-                            dc[i] = dtype_numpy((real_t)sc[2 * i], (real_t)sc[2 * i + 1]);
-                    }
-                }
         }
     }
     return output;
@@ -1491,33 +1425,6 @@ static std::vector<std::string> qd_python_list2vector_Strings(const py::handle &
         output.emplace_back(py::cast<std::string>(obj));
     }
 
-    return output;
-}
-
-// -------------------------------- Imterleave complex --------------------------------
-
-template <typename dtype>
-static arma::Mat<dtype> qd_python_Complex2Interleaved(const arma::Mat<std::complex<dtype>> &input)
-{
-    auto output = arma::Mat<dtype>(2 * input.n_rows, input.n_cols, arma::fill::none);
-    dtype *p_out = output.memptr();
-    const std::complex<dtype> *p_in = input.memptr();
-
-    for (arma::uword i = 0; i < input.n_elem; ++i)
-    {
-        p_out[2 * i] = p_in[i].real();
-        p_out[2 * i + 1] = p_in[i].imag();
-    }
-    return output;
-}
-
-template <typename dtype>
-static std::vector<arma::Mat<dtype>> qd_python_Complex2Interleaved(const std::vector<arma::Mat<std::complex<dtype>>> &input)
-{
-    size_t n_input = input.size();
-    std::vector<arma::Mat<dtype>> output(n_input);
-    for (size_t i = 0; i < n_input; ++i)
-        output[i] = qd_python_Complex2Interleaved(input[i]);
     return output;
 }
 

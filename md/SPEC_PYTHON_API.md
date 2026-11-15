@@ -113,7 +113,7 @@ The `copy2numpy`, `stack2numpy` and `copy2list` converters take their Armadillo 
 | real (default) | `nullptr` | plain copy of `re`, cast to `dtype_numpy` if it differs from `dtype` |
 | real | given | real array with real and imaginary parts **interleaved along the rows**; the row count doubles |
 | `std::complex<...>` | given | genuine complex array built from `re` and `im` |
-| `std::complex<...>` | `nullptr` | `re` is interpreted as **interleaved** pairs `[re0, im0, re1, im1, ...]` along the rows; the row count halves (used e.g. for the polarization matrix `M`, 8 rows -> 4 complex rows). It is NOT "imaginary part = 0". |
+| `std::complex<...>` | `nullptr` | not allowed: throws `std::invalid_argument` (`ValueError`) |
 
 ```cpp
 // ---------- Outputs: Armadillo -> numpy (copy) ----------
@@ -278,7 +278,7 @@ py::object qd_python_any2numpy(const std::any &dset);
 | `delay` | `delay` | `(n_rx, n_tx, n_path)` | float |
 | `path_gain` | `path_gain` | `(n_path,)` | float |
 | `path_length` | `path_length` | `(n_path,)` | float |
-| `path_polarization` | `path_polarization` | `(4, n_path)`; stored interleaved with 8 rows in C++ | complex |
+| `path_polarization` | `path_polarization` | `(8, n_path)`; rows re, im of each entry, as in C++ and as the input `M` | float |
 | `path_angles` | `path_angles` | `(n_path, 4)` | float |
 | `fbs_pos` | `path_fbs_pos` | `(3, n_path)` | float |
 | `lbs_pos` | `path_lbs_pos` | `(3, n_path)` | float |
@@ -444,7 +444,6 @@ auto bins_out_py = qd_python_copy2numpy(&bins_out);
 - **`complex`** (`bool`, default: `true`) — applies when the C++ function outputs `X_re` / `X_im` pairs.
   - `complex=True`: each pair is returned as one complex array `X`.
   - `complex=False`: the pair is returned as two real arrays `X_re`, `X_im`, in place of `X` in the tuple; use `qd_python_init_output` for zero-copy where the size is known.
-  - Note: the existing wrappers that already have this flag default to `false`; do not change them unless requested.
 - **`stack`** (`bool`, default: `false`) — applies when the C++ function outputs a `std::vector` of Armadillo objects with possibly ragged sizes (typically one entry per snapshot).
   - `stack=False`: return a `list` of arrays (`qd_python_copy2list`).
   - `stack=True`: return one zero-padded array with the vector index on the last axis (`qd_python_stack2numpy`).

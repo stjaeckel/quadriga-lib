@@ -73,7 +73,7 @@ class test_quantize_delays(unittest.TestCase):
         cim = [np.array([[[3.0]]])]
         dl = [np.array([[[15.0e-9]]])]
 
-        cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(cre, cim, dl, tap_spacing=5e-9)
+        cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(cre, cim, dl, tap_spacing=5e-9, complex=False)
 
         self.assertIsInstance(cre_q, list)
         self.assertEqual(len(cre_q), 1)
@@ -95,7 +95,7 @@ class test_quantize_delays(unittest.TestCase):
         dl = [np.array([[[12.5e-9]]])]
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, power_exponent=1.0)
+            cre, cim, dl, tap_spacing=5e-9, power_exponent=1.0, complex=False)
 
         n_nonzero = 0
         sum_re = 0.0
@@ -116,7 +116,7 @@ class test_quantize_delays(unittest.TestCase):
         dl = [np.array([[[12.5e-9]]])]
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, power_exponent=0.5)
+            cre, cim, dl, tap_spacing=5e-9, power_exponent=0.5, complex=False)
 
         expected_coeff = np.sqrt(0.5) * 4.0
         sum_power = 0.0
@@ -142,7 +142,7 @@ class test_quantize_delays(unittest.TestCase):
         cre[0][0, 0, 2] = 0.5; cim[0][0, 0, 2] = 0.3; dl[0][0, 0, 2] = 20.0e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9)
+            cre, cim, dl, tap_spacing=5e-9, complex=False)
 
         for k in range(cre_q[0].shape[2]):
             d = dl_q[0][0, 0, k]
@@ -172,7 +172,7 @@ class test_quantize_delays(unittest.TestCase):
         cre[0][0, 0, 4] = 4.0; dl[0][0, 0, 4] = 20.0e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, max_no_taps=3)
+            cre, cim, dl, tap_spacing=5e-9, max_no_taps=3, complex=False)
 
         self.assertLessEqual(cre_q[0].shape[2], 3)
 
@@ -191,7 +191,7 @@ class test_quantize_delays(unittest.TestCase):
             dl[s][0, 0, 2] = 30.0e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, fix_taps=2)
+            cre, cim, dl, tap_spacing=5e-9, fix_taps=2, complex=False)
 
         self.assertEqual(len(dl_q), 2)
         self.assertEqual(dl_q[0].shape[0], 1)  # shared
@@ -208,7 +208,7 @@ class test_quantize_delays(unittest.TestCase):
         dl[0][0, 0, 1] = 17.5e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, fix_taps=0)
+            cre, cim, dl, tap_spacing=5e-9, fix_taps=0, complex=False)
 
         self.assertEqual(dl_q[0].shape[0], 2)
         self.assertEqual(dl_q[0].shape[1], 2)
@@ -224,7 +224,7 @@ class test_quantize_delays(unittest.TestCase):
             dl[s][0, 0, 1] = (s + 1) * 7.5e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9)
+            cre, cim, dl, tap_spacing=5e-9, complex=False)
 
         self.assertEqual(len(cre_q), n_snap)
 
@@ -245,7 +245,7 @@ class test_quantize_delays(unittest.TestCase):
         cre[2][0, 0, 1] = 0.8; dl[2][0, 0, 1] = 17.5e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9)
+            cre, cim, dl, tap_spacing=5e-9, complex=False)
 
         self.assertEqual(len(cre_q), 3)
         # All snapshots share same n_taps
@@ -279,7 +279,7 @@ class test_quantize_delays(unittest.TestCase):
         cre[1][0, 0, 0] = 2.0; dl[1][0, 0, 0] = 15.0e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, fix_taps=1)
+            cre, cim, dl, tap_spacing=5e-9, fix_taps=1, complex=False)
 
         n_taps = dl_q[0].shape[2]
         # Both snapshots should have identical delay grids
@@ -299,7 +299,7 @@ class test_quantize_delays(unittest.TestCase):
             dl[s][1, 0, 1] = 27.5e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, fix_taps=1)
+            cre, cim, dl, tap_spacing=5e-9, fix_taps=1, complex=False)
 
         n_taps = dl_q[0].shape[2]
         for k in range(n_taps):
@@ -315,7 +315,7 @@ class test_quantize_delays(unittest.TestCase):
         cre[0][0, 0, 1] = 2.0; dl[0][0, 0, 1] = 10.0e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9)
+            cre, cim, dl, tap_spacing=5e-9, complex=False)
 
         found = False
         for k in range(cre_q[0].shape[2]):
@@ -331,7 +331,7 @@ class test_quantize_delays(unittest.TestCase):
         dl = [np.array([[[0.0]]])]
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9)
+            cre, cim, dl, tap_spacing=5e-9, complex=False)
 
         npt.assert_allclose(cre_q[0][0, 0, 0], 1.0, atol=1e-12, rtol=0)
         npt.assert_allclose(cim_q[0][0, 0, 0], -1.0, atol=1e-12, rtol=0)
@@ -358,7 +358,7 @@ class test_quantize_delays(unittest.TestCase):
 
         # First pass: quantize
         cre_q1, cim_q1, dl_q1 = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
+            cre, cim, dl, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0, complex=False)
 
         # Verify output delays are on-grid (multiples of tap_spacing)
         for s in range(len(dl_q1)):
@@ -372,7 +372,7 @@ class test_quantize_delays(unittest.TestCase):
 
         # Second pass: feed quantized output back in
         cre_q2, cim_q2, dl_q2 = quadriga_lib.channel.quantize_delays(
-            cre_q1, cim_q1, dl_q1, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
+            cre_q1, cim_q1, dl_q1, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0, complex=False)
 
         # Output must be identical
         self.assertEqual(len(cre_q2), len(cre_q1))
@@ -387,9 +387,9 @@ class test_quantize_delays(unittest.TestCase):
         coeff = [cre[s] + 1j * cim[s] for s in range(len(cre))]
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9)
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, complex=False)
         cre_qc, cim_qc, dl_qc = quadriga_lib.channel.quantize_delays(
-            coeff=coeff, delay=dl, tap_spacing=5e-9)
+            coeff=coeff, delay=dl, tap_spacing=5e-9, complex=False)
 
         self.assertEqual(len(cre_qc), len(cre_q))
         for s in range(len(cre_q)):
@@ -398,13 +398,13 @@ class test_quantize_delays(unittest.TestCase):
             npt.assert_allclose(dl_qc[s], dl_q[s], atol=1e-20, rtol=0)
 
     def test_complex_output_matches_split_output(self):
-        """complex=True returns coeff == re + 1j*im of the split output (input form is independent)."""
+        """complex=True (default) returns coeff == re + 1j*im of the split output (input form is independent)."""
         cre, cim, dl = self._sample_input()
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
             coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, complex=False)
         coeff_q, dl_qc = quadriga_lib.channel.quantize_delays(
-            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, complex=True)
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9)
 
         self.assertEqual(len(coeff_q), len(cre_q))
         for s in range(len(cre_q)):
@@ -412,6 +412,14 @@ class test_quantize_delays(unittest.TestCase):
             npt.assert_allclose(coeff_q[s].real, cre_q[s], atol=1e-12, rtol=0)
             npt.assert_allclose(coeff_q[s].imag, cim_q[s], atol=1e-12, rtol=0)
             npt.assert_allclose(dl_qc[s], dl_q[s], atol=1e-20, rtol=0)
+
+        # 'complex' is a flag: None selects the default, other types raise TypeError
+        coeff_n, _ = quadriga_lib.channel.quantize_delays(coeff_re=cre, coeff_im=cim, delay=dl, complex=None)
+        for s in range(len(coeff_q)):
+            npt.assert_array_equal(coeff_n[s], coeff_q[s])
+        with self.assertRaises(TypeError) as ctx:
+            quadriga_lib.channel.quantize_delays(coeff_re=cre, coeff_im=cim, delay=dl, complex=2.5)
+        self.assertIn("Input 'complex' must be a bool or None.", str(ctx.exception))
 
     def test_complex_in_complex_out(self):
         """Complex input with complex output returns a list of complex arrays."""
@@ -431,9 +439,9 @@ class test_quantize_delays(unittest.TestCase):
         cre, cim, dl = self._sample_input()
 
         cre_l, cim_l, dl_l = quadriga_lib.channel.quantize_delays(
-            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=False)
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=False, complex=False)
         cre_s, cim_s, dl_s = quadriga_lib.channel.quantize_delays(
-            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=True)
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=True, complex=False)
 
         for arr in (cre_s, cim_s, dl_s):
             self.assertIsInstance(arr, np.ndarray)
@@ -471,7 +479,7 @@ class test_quantize_delays(unittest.TestCase):
             dl[s][0, 0, 1] = 12.5e-9
 
         cre_s, cim_s, dl_s = quadriga_lib.channel.quantize_delays(
-            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, fix_taps=1, stack=True)
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, fix_taps=1, stack=True, complex=False)
 
         self.assertEqual(dl_s.ndim, 4)
         self.assertEqual(dl_s.shape[0], 1)
@@ -511,8 +519,8 @@ class test_quantize_delays(unittest.TestCase):
         dl = [np.array([-1e-20, 12.5e-9, 33.4e-9]).reshape(1, 1, 3)]
         dl0 = [np.array([0.0, 12.5e-9, 33.4e-9]).reshape(1, 1, 3)]
 
-        cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(cre, cim, dl)
-        cre_r, cim_r, dl_r = quadriga_lib.channel.quantize_delays(cre, cim, dl0)
+        cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(cre, cim, dl, complex=False)
+        cre_r, cim_r, dl_r = quadriga_lib.channel.quantize_delays(cre, cim, dl0, complex=False)
         npt.assert_array_equal(cre_q[0], cre_r[0])
         npt.assert_array_equal(cim_q[0], cim_r[0])
         npt.assert_array_equal(dl_q[0], dl_r[0])

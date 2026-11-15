@@ -407,7 +407,7 @@ class TestRotatePatternConvention(unittest.TestCase):
         out = arrayant.rotate_pattern(ant, o, usage=3)
         el, az = np.meshgrid(ant['elevation_grid'], ant['azimuth_grid'], indexing='ij')
         V_re, V_im, H_re, H_im = arrayant.interpolate(ant, az.reshape(1, -1, order='F'), el.reshape(1, -1, order='F'),
-                                                       orientation=o.reshape(3, 1))
+                                                       orientation=o.reshape(3, 1), complex=False)
         npt.assert_allclose(out['e_theta_re'][:, :, 0].reshape(-1, order='F'), V_re[0], atol=1e-12)
         npt.assert_allclose(out['e_phi_re'][:, :, 0].reshape(-1, order='F'), H_re[0], atol=1e-12)
 

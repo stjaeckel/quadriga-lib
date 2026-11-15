@@ -42,8 +42,9 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
   hold only this zero-power LOS path, with the LOS delays and angles per antenna pair (also per snapshot in batch
   mode).
-- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Batch mode:
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_out` snapshots
@@ -61,18 +62,17 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 ## Usage:
 ```
-coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_tx, ant_rx, \
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ant_tx, ant_rx, \
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
 
-coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=False )
 
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., \
-    angles=True )
+coeff, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
 
-coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
 
-coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
 ```
 
 ## Inputs:
@@ -95,7 +95,7 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `False`
+  separate `coeff_re` and `coeff_im`; default: `True`
 - **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
@@ -103,9 +103,9 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
   `int`; default: 0
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
-- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`aod`** — Azimuth of departure in rad; `(n_ports_rx, n_ports_tx, n_path)`; only when `angles=True`
 - **`eod`** — Elevation of departure in rad; same shape; only when `angles=True`
@@ -199,10 +199,12 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                  const bool use_absolute_delays,
                                  const bool add_fake_los_path,
                                  const bool angles,
-                                 const bool complex,
+                                 py::handle complex,
                                  const arma::uword freq,
                                  const int use_kernel)
 {
+    const bool want_complex = qd_python_flag(complex, true, "complex");
+
     // References to every aliased Python array, held until the function returns (the GIL is released below)
     std::vector<py::object> keep_alive;
     qd_keep_dict_values(ant_tx, keep_alive);
@@ -304,7 +306,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                 eoa_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &eoa[i]));
             }
 
-            if (complex) // Coefficients are combined after the C++ call, no zero-copy mapping possible
+            if (want_complex) // Coefficients are combined after the C++ call, no zero-copy mapping possible
             {
                 coeff_re[i].zeros(n_ports_rx, n_ports_tx, n_path[i]);
                 coeff_im[i].zeros(n_ports_rx, n_ports_tx, n_path[i]);
@@ -377,7 +379,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         if (!error_message.empty())
             throw std::invalid_argument(error_message.c_str());
 
-        if (complex)
+        if (want_complex)
         {
             py::list coeff_py;
             for (arma::uword i = 0ULL; i < n_out; ++i)
@@ -462,7 +464,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     arma::cube coeff_re, coeff_im, delay;
     auto delay_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &delay);
 
-    if (complex)
+    if (want_complex)
     {
         {
             py::gil_scoped_release release;
@@ -521,6 +523,6 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
 //       py::arg("use_absolute_delays") = false,
 //       py::arg("add_fake_los_path") = false,
 //       py::arg("angles") = false,
-//       py::arg("complex") = false,
+//       py::arg("complex") = true,
 //       py::arg("freq") = 0,
 //       py::arg("use_kernel") = 0);

@@ -23,8 +23,9 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 - Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
 - Coefficients are given either as one complex list `coeff`, or as split `coeff_re` + `coeff_im`;
   supplying both forms is an error. The input and output forms are independent
-- `complex=True` returns one combined complex coefficient output; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient output; `complex=False` returns
   separate real `coeff_re_q` and `coeff_im_q`
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -42,11 +43,12 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 
 ## Usage:
 ```
-# Split real / imaginary output
-coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
+# Complex input and output (keyword)
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay )
 
-# Complex input and / or output (keyword)
-coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay, complex=True )
+# Split real / imaginary input and output
+coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay, \
+    complex=False )
 ```
 
 ## Inputs:
@@ -66,7 +68,7 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=dela
 - **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
 - **`complex`** — If `True`, return combined complex coefficients `coeff_q`; if `False`, return
-  separate `coeff_re_q` and `coeff_im_q`; default: `False`
+  separate `coeff_re_q` and `coeff_im_q`; default: `True`
 - **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
   mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
@@ -90,9 +92,11 @@ py::tuple quantize_delays(const py::object &coeff_re,
                           double power_exponent,
                           int fix_taps,
                           bool stack,
-                          const bool complex,
+                          py::handle complex,
                           const py::object &coeff)
 {
+    const bool want_complex = qd_python_flag(complex, true, "complex");
+
     // Coefficient input mode: complex 'coeff' or split 'coeff_re'/'coeff_im'
     bool have_coeff = !coeff.is_none();
     bool have_cre = !coeff_re.is_none();
@@ -146,7 +150,7 @@ py::tuple quantize_delays(const py::object &coeff_re,
         delay_q_py = qd_python_copy2list(&delay_q);
 
     // Coefficient output form set by 'complex', independent of the input form
-    if (complex)
+    if (want_complex)
     {
         py::object coeff_q_py;
         if (stack)
@@ -180,5 +184,5 @@ py::tuple quantize_delays(const py::object &coeff_re,
 //       py::arg("power_exponent") = 1.0,
 //       py::arg("fix_taps") = 0,
 //       py::arg("stack") = false,
-//       py::arg("complex") = false,
+//       py::arg("complex") = true,
 //       py::arg("coeff") = py::none());

@@ -52,7 +52,7 @@ class test_case(unittest.TestCase):
                            "center_freq": np.array([1e9, 2e9])})
 
     def test_basic_call(self):
-        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)
         self.assertIsInstance(res, tuple)
         self.assertEqual(len(res), 4)
         for x in res:
@@ -75,69 +75,79 @@ class test_case(unittest.TestCase):
             npt.assert_array_equal(a, b)
 
     def test_element(self):
-        V_re = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)[0]
+        V_re = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)[0]
         for e in (None, [], np.zeros(0)):
-            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e)[0], V_re)
+            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e,
+                                                                     complex=False)[0], V_re)
         # 0-based, permuted, repeated; integer and list input
         ref = V_re[[1, 0, 1], :]
         for e in ([1, 0, 1], np.array([1, 0, 1], dtype=np.uint32), np.array([1.0, 0.0, 1.0])):
-            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e)[0], ref)
-        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=[1])[0], V_re[[1], :])
+            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e,
+                                                                     complex=False)[0], ref)
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=[1],
+                                                                 complex=False)[0], V_re[[1], :])
 
     def test_orientation(self):
-        V_re = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)[0]
-        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=None)[0], V_re)
+        V_re = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)[0]
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=None,
+                                                                 complex=False)[0], V_re)
         # Heading -pi/8 adds pi/8 to the local azimuth
         res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=[[0.0], [0.0], [-np.pi / 8]],
-                                                local_angles=True)
+                                                local_angles=True, complex=False)
         npt.assert_allclose(res[4], np.vstack([self.az, self.az]) + np.pi / 8, atol=1e-14, rtol=0)
         npt.assert_allclose(res[0][1], np.cos(np.arange(3) * np.pi / 8 + np.pi / 16), atol=1e-14, rtol=0)
         # Per output and angle
         ori = np.zeros((3, 2, 3))
         ori[2, 1, :] = -np.pi / 8
-        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=ori, local_angles=True)
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, orientation=ori, local_angles=True,
+                                                complex=False)
         npt.assert_allclose(res[4], np.vstack([self.az, self.az + np.pi / 8]), atol=1e-14, rtol=0)
 
     def test_element_pos_and_dist(self):
         pos = np.array([[1.0, 0.0], [0.0, 2.0], [0.0, 0.0]])
         az, el = np.array([[0.0, np.pi / 2]]), np.zeros((1, 2))
-        res = quadriga_lib.arrayant.interpolate(self.ant, az, el, element_pos=pos, dist=True)
+        res = quadriga_lib.arrayant.interpolate(self.ant, az, el, element_pos=pos, dist=True, complex=False)
         self.assertEqual(len(res), 5)
         npt.assert_allclose(res[4], [[-1.0, 0.0], [0.0, -2.0]], atol=1e-14, rtol=0)
         # Default: the positions of the arrayant, zeros if it has none
         ant_p = dict(self.ant, element_pos=pos)
-        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(ant_p, az, el, dist=True)[4], res[4])
-        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, az, el, dist=True)[4], np.zeros((2, 2)))
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(ant_p, az, el, dist=True, complex=False)[4], res[4])
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, az, el, dist=True,
+                                                                 complex=False)[4], np.zeros((2, 2)))
 
     def test_local_angles(self):
-        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, local_angles=True)
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, local_angles=True, complex=False)
         self.assertEqual(len(res), 7)
         npt.assert_allclose(res[4], np.vstack([self.az, self.az]), atol=1e-14, rtol=0)
         npt.assert_allclose(res[5], np.vstack([self.el, self.el]), atol=1e-14, rtol=0)
         npt.assert_allclose(res[6], np.zeros((2, 3)), atol=1e-14, rtol=0)
-        res8 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True)
+        res8 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True,
+                                                 complex=False)
         self.assertEqual(len(res8), 8)
         for k in range(4):
             npt.assert_array_equal(res8[k], res[k])
         npt.assert_array_equal(res8[5], res[4])
 
     def test_multi_frequency(self):
-        V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
-        res = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, 1.5e9, 2e9])
+        V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)
+        res = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, 1.5e9, 2e9],
+                                                complex=False)
         self.assertEqual(len(res), 4)
         self.assertEqual(res[0].shape, (2, 3, 3))
         for x, ref in zip(res, (V_re, V_im, H_re, H_im)):
             npt.assert_allclose(x, np.stack([ref, 1.5 * ref, 2.0 * ref], axis=2), atol=1e-12, rtol=0)  # In phase: linear
         # Default: the center frequencies of the entries
-        res_d = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el)
+        res_d = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, complex=False)
         npt.assert_array_equal(res_d[0], res[0][:, :, [0, 2]])
-        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=None)[0], res_d[0])
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=None,
+                                                                 complex=False)[0], res_d[0])
         # A 3D pattern with target frequencies is the same at every frequency
-        r3 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, frequency=1e9)
+        r3 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, frequency=1e9, complex=False)
         self.assertEqual(r3[0].shape, (2, 3, 1))
         npt.assert_array_equal(r3[0][:, :, 0], V_re)
         # Element indices in the multi-frequency mode
-        r_e = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, element=[1, 0, 1], frequency=[1.5e9])
+        r_e = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, element=[1, 0, 1], frequency=[1.5e9],
+                                                complex=False)
         npt.assert_array_equal(r_e[0][:, :, 0], res[0][[1, 0, 1], :, 1])
         # Complex output
         V, H = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, 1.5e9, 2e9], complex=True)
@@ -146,13 +156,13 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(H.imag, res[3])
 
     def test_use_kernel(self):
-        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
+        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)
         for k in (0, 1):
-            res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=k)
+            res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=k, complex=False)
             for a, b in zip(res, ref):
                 npt.assert_array_equal(a, b)
         try:
-            res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=2)
+            res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=2, complex=False)
             for a, b in zip(res, ref):
                 npt.assert_allclose(a, b, atol=1e-5, rtol=0)  # Single precision, values up to 6
         except ValueError as e:
@@ -162,7 +172,7 @@ class test_case(unittest.TestCase):
         self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
 
     def test_complex_flag(self):
-        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True)
+        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True, complex=False)
         res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=True, local_angles=True, complex=True)
         self.assertEqual(len(res), 6)
         self.assertEqual(res[0].dtype, np.complex128)
@@ -174,13 +184,15 @@ class test_case(unittest.TestCase):
             npt.assert_array_equal(res[2 + k], ref[4 + k])
 
     def test_flags(self):
-        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)
+        ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el)  # complex by default
         res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=None, local_angles=None,
                                                 fast_access=None, complex=None)
-        self.assertEqual(len(res), 4)
+        self.assertEqual(len(res), 2)
+        self.assertEqual(res[0].dtype, np.complex128)
         for a, b in zip(res, ref):
             npt.assert_array_equal(a, b)
-        self.assertEqual(len(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=np.bool_(True))), 5)
+        self.assertEqual(len(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, dist=np.bool_(True),
+                                                               complex=False)), 5)
         for flag in ("dist", "local_angles", "fast_access", "complex"):
             for bad in (1, 2.5, "yes"):
                 with self.assertRaises(TypeError) as ctx:
@@ -194,7 +206,7 @@ class test_case(unittest.TestCase):
         az = rng.uniform(-3.0, 3.0, (n_out, 20)).astype(np.float32).astype(np.float64)
         el = rng.uniform(-1.5, 1.5, (n_out, 20)).astype(np.float32).astype(np.float64)
         ref = quadriga_lib.arrayant.interpolate(ant, np.asfortranarray(az), np.asfortranarray(el), dist=True,
-                                                fast_access=True)
+                                                fast_access=True, complex=False)
         big_az, big_el = np.zeros((n_out, 40)), np.zeros((n_out, 40))
         big_az[:, ::2], big_el[:, ::2] = az, el
         variants = {"C-order": (np.ascontiguousarray(az), np.ascontiguousarray(el)),
@@ -204,7 +216,7 @@ class test_case(unittest.TestCase):
         ant_c = {k: (np.ascontiguousarray(v) if isinstance(v, np.ndarray) else v) for k, v in ant.items()}
         for name, (a, e) in variants.items():
             for pattern in (ant, ant_c):
-                res = quadriga_lib.arrayant.interpolate(pattern, a, e, dist=True)
+                res = quadriga_lib.arrayant.interpolate(pattern, a, e, dist=True, complex=False)
                 for k in range(5):
                     npt.assert_array_equal(res[k], ref[k], err_msg=name)
         # fast_access requires Fortran-ordered float64 pattern arrays
@@ -225,15 +237,15 @@ class test_case(unittest.TestCase):
             npt.assert_array_equal(self.ant[k], ant_copy[k])
 
     def test_empty_and_nonfinite_angles(self):
-        res = quadriga_lib.arrayant.interpolate(self.ant, np.zeros((1, 0)), np.zeros((1, 0)), dist=True)
+        res = quadriga_lib.arrayant.interpolate(self.ant, np.zeros((1, 0)), np.zeros((1, 0)), dist=True, complex=False)
         for x in res:
             self.assertEqual(x.shape, (2, 0))
-        res = quadriga_lib.arrayant.interpolate(self.ant_m, np.zeros((2, 0)), np.zeros((2, 0)))
+        res = quadriga_lib.arrayant.interpolate(self.ant_m, np.zeros((2, 0)), np.zeros((2, 0)), complex=False)
         self.assertEqual(res[0].shape, (2, 0, 2))
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.arrayant.interpolate(self.ant, np.array([]), np.array([]))
         self.assertIn("'azimuth' must have 1 or n_out rows", str(ctx.exception))
-        res = quadriga_lib.arrayant.interpolate(self.ant, [[0.1, np.nan]], [[0.0, 0.0]])
+        res = quadriga_lib.arrayant.interpolate(self.ant, [[0.1, np.nan]], [[0.0, 0.0]], complex=False)
         self.assertTrue(np.all(np.isnan(res[0][:, 1])))
         self.assertTrue(np.all(np.isfinite(res[0][:, 0])))
 

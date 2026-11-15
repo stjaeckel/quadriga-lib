@@ -229,7 +229,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, st
   | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)`  | `(n_rx, n_tx, n_path, n_snap)`       |
   | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
   | `path_length`      | Path length in m                                                         | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
-  | `path_polarization`| Polarization transfer function, complex                                  | list of `(4, n_path_s)`           | `(4, n_path, n_snap)`                |
+  | `path_polarization`| Polarization transfer matrix, real, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar)   | list of `(8, n_path_s)`           | `(8, n_path, n_snap)`                |
   | `path_angles`      | Departure and arrival angles (AOD, EOD, AOA, EOA) in rad                 | list of `(n_path_s, 4)`           | `(n_path, 4, n_snap)`                |
   | `fbs_pos`          | First-bounce scatterer positions                                         | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
@@ -590,8 +590,9 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [MATLAB](../mex/c
 - Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
 - Coefficients are given either as one complex list `coeff`, or as split `coeff_re` + `coeff_im`;
   supplying both forms is an error. The input and output forms are independent
-- `complex=True` returns one combined complex coefficient output; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient output; `complex=False` returns
   separate real `coeff_re_q` and `coeff_im_q`
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -609,11 +610,12 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [MATLAB](../mex/c
 
 ### Usage:
 ```python
-# Split real / imaginary output
-coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
+# Complex input and output (keyword)
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay )
 
-# Complex input and / or output (keyword)
-coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay, complex=True )
+# Split real / imaginary input and output
+coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay, \
+    complex=False )
 ```
 
 ### Inputs:
@@ -633,7 +635,7 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=dela
 - **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
 - **`complex`** — If `True`, return combined complex coefficients `coeff_q`; if `False`, return
-  separate `coeff_re_q` and `coeff_im_q`; default: `False`
+  separate `coeff_re_q` and `coeff_im_q`; default: `True`
 - **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
   mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 

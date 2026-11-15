@@ -63,7 +63,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, False, angles=True)
+            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, False, angles=True, complex=False)
 
         aod_d = np.degrees(aod)
         eod_d = np.degrees(eod)
@@ -151,16 +151,25 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay_r = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], **kwargs)
+            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], complex=False, **kwargs)
 
-        coeff, delay_c = arrayant.get_channels_spherical(
+        coeff, delay_c = arrayant.get_channels_spherical(  # complex by default
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], complex=True, **kwargs)
+            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], **kwargs)
 
         self.assertTrue(np.iscomplexobj(coeff))
         npt.assert_array_equal(coeff.real, cr)
         npt.assert_array_equal(coeff.imag, ci)
         npt.assert_array_equal(delay_c, delay_r)
+
+        # 'complex' is a flag: None selects the default, other types raise TypeError
+        args = (ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0])
+        coeff_n, _ = arrayant.get_channels_spherical(*args, complex=None, **kwargs)
+        npt.assert_array_equal(coeff_n, coeff)
+        self.assertEqual(len(arrayant.get_channels_spherical(*args, complex=np.bool_(False), **kwargs)), 3)
+        with self.assertRaises(TypeError) as ctx:
+            arrayant.get_channels_spherical(*args, complex=2.5, **kwargs)
+        self.assertIn("Input 'complex' must be a bool or None.", str(ctx.exception))
 
     def test_complex_output_with_angles(self):
         ant = omni()
@@ -171,7 +180,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay_r, aod_r, eod_r, aoa_r, eoa_r = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         coeff, delay_c, aod_c, eod_c, aoa_c, eoa_c = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
@@ -210,7 +219,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         # Bank = -pi/2: elements should be vertical, delay symmetric
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, probe, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [-PI / 2, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, False)
+            [0, 0, 1], [-PI / 2, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, False, complex=False)
 
         npt.assert_almost_equal(delay[:, :, 0], [[d0, d0], [d0, d0]], decimal=11)
         npt.assert_almost_equal(cr[1, 0, 0], 1.0, decimal=5)
@@ -220,7 +229,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         # Bank -pi/2 turns element 0 (y = +15) to z = -15; tilt -pi/2 (an uptilt) turns it to x = +15, toward the RX
         cr2, ci2, delay2 = arrayant.get_channels_spherical(
             ant, probe, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [-PI / 2, -PI / 2, 0], [20, 0, 1], [PI / 2, 0, 0], 2997924580.0, False)
+            [0, 0, 1], [-PI / 2, -PI / 2, 0], [20, 0, 1], [PI / 2, 0, 0], 2997924580.0, False, complex=False)
 
         # Element 0 is 15 m closer to the RX, element 1 15 m farther: delays -15/C and +15/C
         d1 = 15.0 / C
@@ -248,7 +257,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, True,
-            angles=True)
+            angles=True, complex=False)
 
         self.assertEqual(cr.shape[2], 3)
         self.assertEqual(delay.shape[2], 3)
@@ -298,7 +307,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, True)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, True, complex=False)
 
         self.assertEqual(cr.shape[2], 2)
         # Fake LOS slice 0 must be zero
@@ -326,7 +335,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 0.0, False, True)
+            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 0.0, False, True, complex=False)
 
         self.assertEqual(cr.shape[2], 2)
         npt.assert_almost_equal(ci[:, :, 0], np.zeros((3, 3)), decimal=5)
@@ -356,7 +365,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         cr, ci, delay, aod, eod, aoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 0.0, True, False,
-            angles=True)[:6]
+            angles=True, complex=False)[:6]
 
         self.assertEqual(cr.shape, (1, 1, 1))
         npt.assert_almost_equal(cr[0, 0, 0], 36.0, decimal=4)
@@ -379,7 +388,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             tx, rx, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         self.assertEqual(cr.shape, (1, 1, 1))
         self.assertAlmostEqual(ci[0, 0, 0], 0.0, places=12)
@@ -400,7 +409,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [0, dist, 0], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [0, dist, 0], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         self.assertAlmostEqual(aod[0, 0, 0], PI / 2, places=5)
         self.assertAlmostEqual(aoa[0, 0, 0] + PI / 2, 0.0, places=5)
@@ -417,7 +426,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [0, 0, height], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [0, 0, height], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         self.assertAlmostEqual(eod[0, 0, 0], PI / 2, places=5)
         self.assertAlmostEqual(eoa[0, 0, 0] + PI / 2, 0.0, places=5)
@@ -433,7 +442,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [d, d, 0], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [d, d, 0], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         self.assertAlmostEqual(aod[0, 0, 0], PI / 4, places=5)
         self.assertAlmostEqual(eod[0, 0, 0], 0.0, places=5)
@@ -451,7 +460,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [-dist, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [-dist, 0, 0], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         # AOD toward -x: cos(aod) == -1
         self.assertAlmostEqual(math.cos(aod[0, 0, 0]) + 1.0, 0.0, places=5)
@@ -470,7 +479,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [Tx, Ty, Tz], [0, 0, 0], [Rx, Ry, Rz], [0, 0, 0], 0.0, True, False, angles=True)
+            [Tx, Ty, Tz], [0, 0, 0], [Rx, Ry, Rz], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         self.assertAlmostEqual(delay[0, 0, 0], dist / C, places=12)
         self.assertAlmostEqual(aod[0, 0, 0], 0.0, places=5)
@@ -495,7 +504,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, lbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         # path_length is longer than the TX-FBS-LBS-RX polyline: the delay follows path_length
         self.assertAlmostEqual(delay[0, 0, 0], path_length[0] / C, places=12)
@@ -512,7 +521,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         for L, L_exp in ((100.0 + 40.0 * math.sqrt(2.0), 100.0 + 40.0 * math.sqrt(2.0)), (0.0, 140.0)):
             cr, ci, delay = arrayant.get_channels_spherical(
                 ant, ant, fbs_pos, lbs_pos, np.array([1.0]), np.array([L]), make_M(1),
-                [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], fc, True, False)
+                [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], fc, True, False, complex=False)
             self.assertAlmostEqual(delay[0, 0, 0] * C, L_exp, places=6)
             k = 2.0 * PI * fc / C
             self.assertAlmostEqual(cr[0, 0, 0], math.cos(k * L_exp), places=6)
@@ -531,7 +540,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         self.assertAlmostEqual(ci[0, 0, 0], 0.0, places=5)
         self.assertGreater(cr[0, 0, 0], 0.0)
@@ -548,7 +557,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         path_gain = np.array([1.0])
         path_length = np.array([dist])
         M = make_M(1)
-        kwargs = dict(center_freq=0.0)
+        kwargs = dict(center_freq=0.0, complex=False)
 
         cr_abs, ci_abs, d_abs = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
@@ -579,11 +588,11 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr_f, ci_f, d_f = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], fc, True, False)
+            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], fc, True, False, complex=False)
 
         cr_0, ci_0, d_0 = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         # Amplitudes match
         self.assertAlmostEqual(amp2(cr_f, ci_f)[0, 0, 0], amp2(cr_0, ci_0)[0, 0, 0], places=8)
@@ -614,7 +623,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         # Amplitude = 1 (|M_VV| = 1)
         self.assertAlmostEqual(amp2(cr, ci)[0, 0, 0], 1.0, places=5)
@@ -637,15 +646,15 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr_vh, ci_vh, _ = arrayant.get_channels_spherical(
             probe, probe, fbs_pos, fbs_pos, path_gain, path_length, M_vh,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         cr_vv, ci_vv, _ = arrayant.get_channels_spherical(
             probe, probe, fbs_pos, fbs_pos, path_gain, path_length, M_vv,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         cr_z, ci_z, _ = arrayant.get_channels_spherical(
             probe, probe, fbs_pos, fbs_pos, path_gain, path_length, M_z,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         self.assertGreater(np.sum(amp2(cr_vh, ci_vh) ** 2), 1e-6)
         self.assertGreater(np.sum(amp2(cr_vv, ci_vv) ** 2), 1e-6)
@@ -666,11 +675,11 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr0, ci0, d0 = arrayant.get_channels_spherical(
             ant, probe, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, False, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, False, False, complex=False)
 
         cr_r, ci_r, d_r = arrayant.get_channels_spherical(
             ant, probe, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [PI / 2, 0, 0], 0.0, False, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [PI / 2, 0, 0], 0.0, False, False, complex=False)
 
         # Delays unchanged (point antenna, no element offset)
         self.assertAlmostEqual(d0[0, 0, 0], d_r[0, 0, 0], places=12)
@@ -712,7 +721,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical(
             tx, rx, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, angles=True, complex=False)
 
         for arr in [cr, ci, delay, aod, eod, aoa, eoa]:
             self.assertEqual(arr.shape, (2, 3, n_path))
@@ -720,7 +729,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
         # With fake LOS: n_path + 1 slices
         cr2, ci2, delay2, aod2, _, _, _ = arrayant.get_channels_spherical(
             tx, rx, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, True, angles=True)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, True, angles=True, complex=False)
 
         self.assertEqual(cr2.shape, (2, 3, n_path + 1))
         self.assertEqual(aod2.shape, (2, 3, n_path + 1))
@@ -740,7 +749,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             tx, rx, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         self.assertEqual(cr.shape, (1, 2, 1))
         self.assertEqual(delay.shape, (1, 2, 1))
@@ -763,7 +772,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], 0.0, False, False)
+            [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0], 0.0, False, False, complex=False)
 
         self.assertEqual(cr.shape[2], 3)
         self.assertAlmostEqual(delay[0, 0, 0], 0.0, places=12)
@@ -794,7 +803,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         self.assertGreater(amp2(cr, ci)[0, 0, 0], 0.0)
         self.assertAlmostEqual(cr[0, 0, 1], 0.0, places=12)
@@ -819,7 +828,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 1.0e9, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 1.0e9, True, False, complex=False)
 
         self.assertEqual(cr.shape[2], n_path)
         self.assertTrue(np.all(delay > 0.0))
@@ -841,7 +850,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         cr, ci, delay = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False)
+            [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
 
         self.assertTrue(np.all(delay > 0.0))
         self.assertLessEqual(delay[0, 0, 0], delay[0, 0, 1])
@@ -857,13 +866,13 @@ class TestGetChannelsSpherical(unittest.TestCase):
         fbs_pos = np.asfortranarray(rng.uniform(-30, 30, (3, 5)))
         args = (ant, xpol(), fbs_pos, fbs_pos, np.ones(5), np.zeros(5), make_M(5),
                 [0, 0, 10], [0.1, 0.2, 0.3], [40, 5, 1.5], [0, 0, 0], 3.5e9)
-        ref = arrayant.get_channels_spherical(*args)
+        ref = arrayant.get_channels_spherical(*args, complex=False)
         for k in (0, 1):
-            res = arrayant.get_channels_spherical(*args, use_kernel=k)
+            res = arrayant.get_channels_spherical(*args, use_kernel=k, complex=False)
             for a, b in zip(res, ref):
                 npt.assert_array_equal(a, b)
         try:
-            res = arrayant.get_channels_spherical(*args, use_kernel=2)
+            res = arrayant.get_channels_spherical(*args, use_kernel=2, complex=False)
             scale = np.abs(ref[0]).max()
             npt.assert_allclose(res[0], ref[0], atol=1e-5 * scale, rtol=0)  # Single precision
             npt.assert_allclose(res[2], ref[2], atol=1e-12, rtol=0)  # Delays do not depend on the kernel
@@ -953,7 +962,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
 
         result = arrayant.get_channels_spherical(
             ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M,
-            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True)
+            [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, complex=False)
         self.assertEqual(len(result), 3)
 
 
@@ -990,12 +999,12 @@ class TestGetChannelsSpherical(unittest.TestCase):
             return arrayant.get_channels_spherical(ant, ant, fbs, lbs, gain, plen, M,
                                                    conv(tx_pos[:, s].copy()), conv(tx_ori[:, s].copy()),
                                                    conv(rx_pos[:, s].copy()), conv(rx_ori[:, s].copy()),
-                                                   conv(cf), angles=True, freq=freq)
+                                                   conv(cf), angles=True, freq=freq, complex=False)
 
         def batch(conv, freq):
             lists = [[conv(snaps[s][k]) for s in range(n_out)] for k in range(5)]
             return arrayant.get_channels_spherical(ant, ant, *lists, conv(tx_pos), conv(tx_ori), conv(rx_pos),
-                                                   conv(rx_ori), conv(cf), angles=True, freq=freq)
+                                                   conv(rx_ori), conv(cf), angles=True, freq=freq, complex=False)
 
         def sliced(x):  # same values, every second element along the last axis of a larger array
             big = np.zeros(x.shape[:-1] + (2 * x.shape[-1],), order='F')
@@ -1016,7 +1025,8 @@ class TestGetChannelsSpherical(unittest.TestCase):
                         npt.assert_array_equal(r[k], ref[s][k], err_msg="single, %s, freq %d" % (name, freq))
                         npt.assert_array_equal(b[k][s], ref[s][k], err_msg="batch, %s, freq %d" % (name, freq))
             b = arrayant.get_channels_spherical(ant_c, ant_c, *[[snaps[s][k] for s in range(n_out)] for k in range(5)],
-                                                tx_pos, tx_ori, rx_pos, rx_ori, cf, angles=True, freq=freq)
+                                                tx_pos, tx_ori, rx_pos, rx_ori, cf, angles=True, freq=freq,
+                                                complex=False)
             for s in range(n_out):
                 for k in range(7):
                     npt.assert_array_equal(b[k][s], ref[s][k], err_msg="batch, C-order antenna, freq %d" % freq)
@@ -1046,13 +1056,13 @@ class test_zero_paths_fake_los(unittest.TestCase):
         e = np.zeros(0)
         cr, ci, dl = arrayant.get_channels_spherical(ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), e, e,
                                                      np.zeros((8, 0)), [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0],
-                                                     1e9, True, True)
+                                                     1e9, True, True, complex=False)
         self.assertEqual(dl.shape, (1, 1, 1))
         npt.assert_array_equal(np.concatenate([cr.ravel(), ci.ravel()]), [0, 0])
         npt.assert_allclose(dl.ravel(), [10 / 299792458.0], rtol=1e-15)
         cr, ci, dl = arrayant.get_channels_spherical(ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), e, e,
                                                      np.zeros((8, 0)), [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0],
-                                                     1e9, False, True)
+                                                     1e9, False, True, complex=False)
         npt.assert_array_equal(dl.ravel(), [0])
 
     # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0), as in C++ and MATLAB
@@ -1061,7 +1071,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
         e = np.zeros(0)
         out = arrayant.get_channels_spherical(ant, ant, np.zeros((3, 0)), np.zeros((3, 0)), e, e, np.zeros((8, 0)),
                                               [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False,
-                                              angles=True)
+                                              angles=True, complex=False)
         self.assertEqual(len(out), 7)
         for x in out:
             self.assertEqual(x.shape, (2, 2, 0))
@@ -1077,18 +1087,27 @@ class test_zero_paths_fake_los(unittest.TestCase):
         tx = np.zeros((3, 2)); rx = np.array([[10.0, 20.0], [0, 0], [0, 0]])
         o = np.zeros((3, 2))
         cr, ci, dl = arrayant.get_channels_spherical(ant, ant, fbs, fbs, gain, length, M, tx, o, rx, o,
-                                                     1e9, True, True)
+                                                     1e9, True, True, complex=False)
         self.assertEqual(dl[0].shape, (1, 1, 2))
         self.assertEqual(dl[1].shape, (1, 1, 1))
         npt.assert_allclose(dl[1].ravel(), [20.0 / C], rtol=1e-15)
         npt.assert_array_equal(np.concatenate([cr[1].ravel(), ci[1].ravel()]), [0, 0])
+        # Complex output (default) in batch mode: real and imaginary part equal the split output per snapshot
+        coeff, dl_c = arrayant.get_channels_spherical(ant, ant, fbs, fbs, gain, length, M, tx, o, rx, o,
+                                                      1e9, True, True)
+        for s in range(2):
+            self.assertEqual(coeff[s].dtype, np.complex128)
+            npt.assert_array_equal(coeff[s].real, cr[s])
+            npt.assert_array_equal(coeff[s].imag, ci[s])
+            npt.assert_array_equal(dl_c[s], dl[s])
         # Same as the single-snapshot call
         s_cr, s_ci, s_dl = arrayant.get_channels_spherical(ant, ant, fbs[1], fbs[1], gain[1], length[1], M[1],
-                                                           tx[:, 1], o[:, 1], rx[:, 1], o[:, 1], 1e9, True, True)
+                                                           tx[:, 1], o[:, 1], rx[:, 1], o[:, 1], 1e9, True, True,
+                                                           complex=False)
         npt.assert_array_equal(dl[1], s_dl)
         # Without add_fake_los_path the snapshot stays empty
         cr, ci, dl = arrayant.get_channels_spherical(ant, ant, fbs, fbs, gain, length, M, tx, o, rx, o,
-                                                     1e9, True, False)
+                                                     1e9, True, False, complex=False)
         self.assertEqual(dl[0].shape, (1, 1, 1))
         self.assertEqual(dl[1].shape, (1, 1, 0))
 

@@ -51,7 +51,7 @@ def full_channel(n_path=(3, 2)):
         'delay': [q(2, 3, n) for n in n_path],
         'path_gain': [q(n) for n in n_path],
         'path_length': [q(n) for n in n_path],
-        'path_polarization': [q(4, n) + 1j * q(4, n) for n in n_path],
+        'path_polarization': [q(8, n) for n in n_path],
         'path_angles': [q(n, 4) for n in n_path],
         'fbs_pos': [q(3, n) for n in n_path],
         'lbs_pos': [q(3, n) for n in n_path],
@@ -396,6 +396,13 @@ class test_case(unittest.TestCase):
             with self.assertRaises(ValueError, msg=msg) as ctx:
                 channel.hdf5_write_channel(fn, chan, **kwargs)
             self.assertIn(msg, str(ctx.exception))
+        # The complex (4, n_path) form of 'path_polarization' used before is rejected, not reinterpreted
+        old = dict(c, path_polarization=[np.ones((4, 1), complex)])
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', getattr(np, 'exceptions', np).ComplexWarning)  # numpy casts the complex input
+            with self.assertRaises(ValueError) as ctx:
+                channel.hdf5_write_channel(fn, old)
+        self.assertIn("Size mismatch in 'path_polarization[0]'", str(ctx.exception))
         self.assertEqual(channel.hdf5_read_layout(fn)[1].sum(), 0)  # nothing was written
 
         with self.assertRaises(TypeError):
@@ -428,7 +435,7 @@ class test_case(unittest.TestCase):
         chan, _ = channel.hdf5_read_channel(fn, stack=True)
         c = chan[0]
         shapes = {'coeff': (2, 3, 3, 2), 'delay': (2, 3, 3, 2), 'path_gain': (3, 2), 'path_length': (3, 2),
-                  'path_polarization': (4, 3, 2), 'path_angles': (3, 4, 2), 'fbs_pos': (3, 3, 2),
+                  'path_polarization': (8, 3, 2), 'path_angles': (3, 4, 2), 'fbs_pos': (3, 3, 2),
                   'lbs_pos': (3, 3, 2), 'no_interact': (3, 2), 'interact_coord': (3, 3, 2)}
         for key, shape in shapes.items():
             self.assertEqual(c[key].shape, shape, key)

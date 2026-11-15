@@ -393,7 +393,7 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
     if (!channel.path_length.empty())
         output["path_length"] = qd_python_emit_paths<double>(&channel.path_length, stack, i_snap);
     if (!channel.path_polarization.empty())
-        output["path_polarization"] = qd_python_emit_paths<std::complex<double>>(&channel.path_polarization, stack, i_snap);
+        output["path_polarization"] = qd_python_emit_paths<double>(&channel.path_polarization, stack, i_snap);
     if (!channel.path_angles.empty())
         output["path_angles"] = qd_python_emit_paths<double>(&channel.path_angles, stack, i_snap);
 
@@ -569,17 +569,14 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
             c.interact_coord = qd_python_numpy2arma_vecMat<double>(v);
     }
 
-    // Polarization (complex): list of (4, n_path_s) or 3D (4, n_path, n_snap)
-    //     Channel stores it interleaved (real Mat, 2*4 rows) -> convert from complex.
+    // Polarization, real interleaved as in C++: list of (8, n_path_s) or 3D (8, n_path, n_snap)
     if (has("path_polarization"))
     {
         py::object v = dict["path_polarization"];
-        std::vector<arma::Mat<std::complex<double>>> pol;
         if (py::isinstance<py::list>(v))
-            pol = qd_python_list2vector_Mat<std::complex<double>>(py::reinterpret_borrow<py::list>(v));
+            c.path_polarization = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
         else
-            pol = qd_python_numpy2arma_vecMat<std::complex<double>>(v);
-        c.path_polarization = qd_python_Complex2Interleaved(pol);
+            c.path_polarization = qd_python_numpy2arma_vecMat<double>(v);
     }
 
     if (validate && !c.empty())

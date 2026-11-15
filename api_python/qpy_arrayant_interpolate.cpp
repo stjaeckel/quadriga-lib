@@ -30,18 +30,18 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 ## Usage:
 ```
 # Single-frequency mode
-V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, \
-    orientation, element_pos, use_kernel=0 )
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, orientation, element_pos, \
+    use_kernel=0 )
 
 # Single-frequency mode with the projected distance and the local angles
-V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( \
-    arrayant, azimuth, elevation, ..., dist=True, local_angles=True )
+V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \
+    elevation, ..., dist=True, local_angles=True )
 
 # Multi-frequency mode
-V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., frequency=freqs )
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., frequency=freqs )
 
-# Complex output
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=True )
+# Real and imaginary parts as separate arrays
+V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=False )
 ```
 
 ## Inputs:
@@ -64,13 +64,14 @@ V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., com
   a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
   default: `False`
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
-- **`complex`** — Return `V` and `H` as complex arrays instead of `V_re, V_im, H_re, H_im`; default: `False`
+- **`complex`** — Return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
+  default: `True`
 
 ## Outputs:
-- **`V_re`** / **`V_im`** — e-theta (vertical) field, real / imaginary part; `(n_out, n_ang)`; multi-frequency mode:
-  `(n_out, n_ang, n_freq)`
-- **`H_re`** / **`H_im`** — e-phi (horizontal) field, real / imaginary part; same shape as `V_re`
-- **`V`** / **`H`** — e-theta and e-phi field, complex; returned instead of the real parts when `complex` is `True`
+- **`V`** — e-theta (vertical) field, complex; `(n_out, n_ang)`; multi-frequency mode: `(n_out, n_ang, n_freq)`
+- **`H`** — e-phi (horizontal) field, complex; same shape as `V`
+- **`V_re`** / **`V_im`** / **`H_re`** / **`H_im`** — Real and imaginary parts of `V` and `H`; returned in their place
+  when `complex` is `False`
 - **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
   elements closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`;
@@ -100,7 +101,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     const bool want_dist = qd_python_flag(dist, false, "dist");
     const bool want_local_angles = qd_python_flag(local_angles, false, "local_angles");
     const bool strict = qd_python_flag(fast_access, false, "fast_access");
-    const bool want_complex = qd_python_flag(complex, false, "complex");
+    const bool want_complex = qd_python_flag(complex, true, "complex");
 
     const auto azimuth_a = qd_python_numpy2arma_Mat(azimuth, true);
     const auto elevation_a = qd_python_numpy2arma_Mat(elevation, true);
@@ -221,4 +222,4 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
 //       py::arg("local_angles") = false,
 //       py::arg("fast_access") = false,
 //       py::arg("use_kernel") = 0,
-//       py::arg("complex") = false);
+//       py::arg("complex") = true);

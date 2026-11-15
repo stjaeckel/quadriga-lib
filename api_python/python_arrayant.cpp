@@ -113,7 +113,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("local_angles") = false,
           py::arg("fast_access") = false,
           py::arg("use_kernel") = 0,
-          py::arg("complex") = false);
+          py::arg("complex") = true);
 
     m.def("qdant_read", &qdant_read, py::arg("fn"), py::arg("id") = 1);
 
@@ -146,7 +146,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("center_freq") = py::none(),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
-          py::arg("complex") = false,
+          py::arg("complex") = true,
           py::arg("freq") = 0);
 
     m.def("get_channels_spherical", &get_channels_spherical,
@@ -165,7 +165,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false,
-          py::arg("complex") = false,
+          py::arg("complex") = true,
           py::arg("freq") = 0,
           py::arg("use_kernel") = 0);
 
@@ -186,5 +186,5 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("propagation_speed") = 299792458.0,
-          py::arg("complex") = false);
+          py::arg("complex") = true);
 }

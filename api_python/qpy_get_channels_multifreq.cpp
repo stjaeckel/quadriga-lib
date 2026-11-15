@@ -44,16 +44,17 @@ Compute channel coefficients for spherical waves across multiple frequencies
   before it interpolates across `freq_in`, so it needs channels generated with `use_absolute_delays = True`; with
   relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
   grid and gives wrong phases
-- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im`
+- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Usage:
 ```
-coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ant_tx, ant_rx, fbs_pos, \
+coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ant_tx, ant_rx, fbs_pos, \
     lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq_in, \
     freq_out, use_absolute_delays, add_fake_los_path, propagation_speed )
 
-coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
+coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=False )
 ```
 
 ## Inputs:
@@ -78,12 +79,12 @@ coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `False`
+  separate `coeff_re` and `coeff_im`; default: `True`
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
-- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
 
 ## See also:
@@ -107,8 +108,10 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                  const bool use_absolute_delays,
                                  const bool add_fake_los_path,
                                  const double propagation_speed,
-                                 const bool complex)
+                                 py::handle complex)
 {
+    const bool want_complex = qd_python_flag(complex, true, "complex");
+
     // Parse antenna dictionaries (3D single-freq or 4D multi-freq handled internally)
     auto ant_tx_vec = qd_python_dict2arrayant_multi(ant_tx, true);
     auto ant_rx_vec = qd_python_dict2arrayant_multi(ant_rx, true);
@@ -140,7 +143,7 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
 
     std::vector<arma::cube> coeff_re, coeff_im, delay;
 
-    if (complex)
+    if (want_complex)
     {
         // Complex output written in place by C++ (0 paths: the zero-power LOS path with add_fake_los_path, else
         // empty outputs)
@@ -192,4 +195,4 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
 //       py::arg("use_absolute_delays") = false,
 //       py::arg("add_fake_los_path") = false,
 //       py::arg("propagation_speed") = 299792458.0,
-//       py::arg("complex") = false);
+//       py::arg("complex") = true);
