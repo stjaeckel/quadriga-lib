@@ -43,7 +43,7 @@ Approximation error of the ACF of a set of sinusoids
 ## Declaration:
 ```
 dtype quadriga_lib::sos_calc_mse(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
     dtype *mse_core = nullptr,
@@ -54,7 +54,7 @@ dtype quadriga_lib::sos_calc_mse(
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; `[n_acf]`
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
@@ -75,7 +75,7 @@ dtype quadriga_lib::sos_calc_mse(
 MD!*/
 
 template <typename dtype>
-dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
+dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
                                  const arma::Col<dtype> &acf,
                                  const arma::Col<dtype> &dist,
                                  dtype *mse_core,
@@ -84,13 +84,13 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
                                  arma::Mat<dtype> *test_dir,
                                  arma::uword n_dir)
 {
-    if (freq.n_elem == 0)
-        throw std::invalid_argument("Input 'freq' cannot be empty.");
-    if (freq.n_cols > 3)
-        throw std::invalid_argument("Input 'freq' must have 1, 2 or 3 columns.");
+    if (spatial_freq.n_elem == 0)
+        throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
+    if (spatial_freq.n_cols > 3)
+        throw std::invalid_argument("Input 'spatial_freq' must have 1, 2 or 3 columns.");
     qd_sos_check_acf(acf, dist);
-    qd_check_alias(acf_tail, "acf_tail", &freq, &acf, &dist);
-    qd_check_alias(test_dir, "test_dir", &freq, &acf, &dist);
+    qd_check_alias(acf_tail, "acf_tail", &spatial_freq, &acf, &dist);
+    qd_check_alias(test_dir, "test_dir", &spatial_freq, &acf, &dist);
     qd_check_alias_outputs(acf_tail, "acf_tail", test_dir, "test_dir");
     qd_check_alias_outputs(mse_core, "mse_core", mse_all, "mse_all");
     if (!qd_sos_equally_spaced(dist))
@@ -98,9 +98,9 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
     if (n_dir == 0)
         throw std::invalid_argument("Input 'n_dir' cannot be 0.");
 
-    const arma::uword n_dim = freq.n_cols, n_test = (n_dim == 1) ? 1 : n_dir;
+    const arma::uword n_dim = spatial_freq.n_cols, n_test = (n_dim == 1) ? 1 : n_dir;
 
-    const arma::uword n_coeff = freq.n_rows, n_acf = acf.n_elem;
+    const arma::uword n_coeff = spatial_freq.n_rows, n_acf = acf.n_elem;
     const double two_pi = 6.283185307179586, d_max = (double)dist.at(n_acf - 1);
 
     // Test directions and the frequency of each sinusoid along each of them
@@ -111,11 +111,11 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
     for (arma::uword t = 0; t < n_test; ++t)
         for (arma::uword n = 0; n < n_coeff; ++n)
         {
-            double f = (double)freq.at(n, 0) * ux[t];
+            double f = (double)spatial_freq.at(n, 0) * ux[t];
             if (n_dim > 1)
-                f += (double)freq.at(n, 1) * uy[t];
+                f += (double)spatial_freq.at(n, 1) * uy[t];
             if (n_dim > 2)
-                f += (double)freq.at(n, 2) * uz[t];
+                f += (double)spatial_freq.at(n, 2) * uz[t];
             ft.at(n, t) = f;
         }
 
@@ -151,7 +151,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
 
     if (mse_core != nullptr || mse_all != nullptr)
     {
-        const arma::mat freq_d = arma::conv_to<arma::mat>::from(freq);
+        const arma::mat freq_d = arma::conv_to<arma::mat>::from(spatial_freq);
         const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
         const long long S = (long long)n_acf, half = 2 * S - 2;
 
@@ -232,7 +232,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &freq,
     return (dtype)mse;
 }
 
-template float quadriga_lib::sos_calc_mse(const arma::Mat<float> &freq, const arma::Col<float> &acf, const arma::Col<float> &dist, float *mse_core, float *mse_all,
+template float quadriga_lib::sos_calc_mse(const arma::Mat<float> &spatial_freq, const arma::Col<float> &acf, const arma::Col<float> &dist, float *mse_core, float *mse_all,
                                           arma::Col<float> *acf_tail, arma::Mat<float> *test_dir, arma::uword n_dir);
-template double quadriga_lib::sos_calc_mse(const arma::Mat<double> &freq, const arma::Col<double> &acf, const arma::Col<double> &dist, double *mse_core, double *mse_all,
+template double quadriga_lib::sos_calc_mse(const arma::Mat<double> &spatial_freq, const arma::Col<double> &acf, const arma::Col<double> &dist, double *mse_core, double *mse_all,
                                            arma::Col<double> *acf_tail, arma::Mat<double> *test_dir, arma::uword n_dir);

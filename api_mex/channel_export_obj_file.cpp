@@ -77,7 +77,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     c.tx_pos = qd_mex_get_Mat<double>(prhs[9]);
     c.no_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[10], 1, "no_interact");
     c.interact_coord = qd_mex_matlab2vector_Mat<double>(prhs[11], 2, "interact_coord");
-    c.center_frequency = qd_mex_get_Col<double>(prhs[12], false, "center_freq");
+    c.center_freq = qd_mex_get_Col<double>(prhs[12], false, "center_freq");
     c.coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[13], 3, "coeff_re");
     c.coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[14], 3, "coeff_im");
 

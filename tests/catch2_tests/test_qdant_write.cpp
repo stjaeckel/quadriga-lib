@@ -40,7 +40,7 @@ TEST_CASE("Arrayant writing to QDANT file - Minimal test")
 
     ant.coupling_re = {1.0f};
     ant.coupling_im = {0.1f};
-    ant.center_frequency = 2.0e9f;
+    ant.center_freq = 2.0e9f;
     ant.name = "name";
 
     unsigned id = quadriga_lib::qdant_write("test.qdant", ant);
@@ -58,7 +58,7 @@ TEST_CASE("Arrayant writing to QDANT file - Minimal test")
     CHECK(arma::approx_equal(antI.element_pos, ant.element_pos, "absdiff", 1e-6));
     CHECK(arma::approx_equal(antI.coupling_re, ant.coupling_re, "absdiff", 1e-4));
     CHECK(arma::approx_equal(antI.coupling_im, ant.coupling_im, "absdiff", 1e-4));
-    CHECK(std::abs(antI.center_frequency - ant.center_frequency) < 0.1f);
+    CHECK(std::abs(antI.center_freq - ant.center_freq) < 0.1f);
     CHECK(antI.name == ant.name);
 
     std::remove("test.qdant");
@@ -142,7 +142,7 @@ TEST_CASE("Arrayant writing to QDANT file - Complex test")
 
     ant.coupling_re = {1.0};
     ant.coupling_im = {0.1};
-    ant.center_frequency = 2.0e9;
+    ant.center_freq = 2.0e9;
     ant.name = "name";
 
     // Append new antenna
@@ -300,7 +300,7 @@ TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positio
         a.element_pos(0, 1) = 123.456789, a.element_pos(1, 1) = 0.000123456789;
         a.coupling_re.randn(3, 2), a.coupling_im.randn(3, 2);
         a.coupling_re(0, 0) = 0.123456789;
-        a.center_frequency = 3.456789012e9;
+        a.center_freq = 3.456789012e9;
         quadriga_lib::qdant_write(fn, a);
 
         auto b = quadriga_lib::qdant_read<double>(fn, 1);
@@ -318,7 +318,7 @@ TEST_CASE("Arrayant writing to QDANT file - Single-precision accuracy of positio
         // Pattern within 1.2e-7 of the element peak (float epsilon), also for the element at -120 dB; samples far
         // below the peak are not accurate to 1.2e-7 of their own amplitude
         CHECK(qdant_err_element(a, b) < 1.2e-7);
-        CHECK(b.center_frequency == a.center_frequency);
+        CHECK(b.center_freq == a.center_freq);
     }
 
     // Float: positions exact; the pattern error includes the float arithmetic of the reader

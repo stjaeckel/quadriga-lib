@@ -16,7 +16,7 @@ pl = [ d; norm( gr - tx ) + norm( rx - gr ); norm( fb(:, 3) - tx ) + norm( lb(:,
 pg = [ 1e-6, 2e-6; 3e-7, 4e-7; 5e-8, 6e-8 ];
 M = reshape( 1 : 48, 8, 3, 2 ) / 48;
 pt = [ 0; 1; 2 ];
-fields = { 'method', 'tx_pos', 'rx_pos', 'center_frequency', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', ...
+fields = { 'method', 'tx_pos', 'rx_pos', 'center_freq', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', ...
     'M', 'path_type', 'tap', 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
 
 %% Basic call and values
@@ -26,7 +26,7 @@ assertEqual( size(rays), [1, 1] );
 assertEqual( rays.method, 'quadriga' );
 assertEqual( rays.tx_pos, tx );
 assertEqual( rays.rx_pos, rx );
-assertEqual( rays.center_frequency, fc );
+assertEqual( rays.center_freq, fc );
 assertElementsAlmostEqual( rays.delay, ( pl - d ) / c0, 'absolute', 1e-18 );
 assertEqual( rays.power, pg );
 assertEqual( rays.M, M );
@@ -75,7 +75,7 @@ r7 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, zeros( 3, 0 ), zeros( 3, 0 )
     zeros( 8, 0, 2 ) );
 assertTrue( isempty(r7.delay) && isempty(r7.path_type) );
 assertEqual( { size(r7.power), size(r7.fbs_pos), size(r7.M, 1), size(r7.M, 2) }, { [0, 2], [3, 0], 8, 0 } );
-assertEqual( r7.center_frequency, fc );
+assertEqual( r7.center_freq, fc );
 assertTrue( isempty( quadriga_lib.ssf_paths( r7, [0; 0], 'drift' ) ) );
 
 %% Outputs and type handling
@@ -98,7 +98,7 @@ lz(3, 2) = 0.01;
 assert_throws( @() quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, lz, lz, pg, pl, M, [], pt ), ...
     'The interaction point of the GR path must be on the ground' );
 assert_throws( @() quadriga_lib.gbsm_rays_from_paths( 0 * fc, tx, rx, fb, lb, pg, pl, M ), ...
-    'Input ''center_frequency'' must be finite and > 0.' );
+    'Input ''center_freq'' must be finite and > 0.' );
 
 end
 

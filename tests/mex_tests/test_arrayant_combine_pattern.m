@@ -257,7 +257,7 @@ assertEqual( out(1).center_freq, 2e9 );
 assertEqual( out(2).center_freq, 1e9 );
 assertEqual( out(3).center_freq, 3e9 );
 
-% Unsorted freq_grid_new is allowed; outputs match positionally
+% Unsorted freq_new is allowed; outputs match positionally
 out = quadriga_lib.arrayant_combine_pattern(ant_mf, [3e9, 1e9, 2e9]);
 assertEqual( length(out), 3 );
 assertElementsAlmostEqual( out(1).e_theta_re, ones(3,4) * 3, 'absolute', 1e-12 );

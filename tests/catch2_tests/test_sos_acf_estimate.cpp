@@ -58,7 +58,7 @@ namespace
     };
 
     // Oracle: the documented procedure. Returns [n_bin, 3] = {acf_est, dist_est, acf_est_dual}
-    arma::mat ref_estimate(const arma::mat &freq, const arma::vec &phase, const arma::vec &bins, arma::uword n_pos,
+    arma::mat ref_estimate(const arma::mat &spatial_freq, const arma::vec &phase, const arma::vec &bins, arma::uword n_pos,
                            const arma::vec &acf, const arma::vec &dist, unsigned long long seed)
     {
         const arma::uword n_bin = bins.n_elem, n2 = 2 * n_pos;
@@ -78,8 +78,8 @@ namespace
         }
 
         arma::mat ph = phase, v3, v6, pa = pos.rows(0, n_pos - 1), pb = pos.rows(n_pos, n2 - 1);
-        quadriga_lib::sos_val(freq, ph, pos, v3, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, 1);
-        quadriga_lib::sos_val(freq, ph, pa, v6, &pb, (arma::mat *)nullptr, &acf, &dist, 1.0, false, 1);
+        quadriga_lib::sos_val(spatial_freq, ph, pos, v3, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, false, 1);
+        quadriga_lib::sos_val(spatial_freq, ph, pa, v6, &pb, (arma::mat *)nullptr, &acf, &dist, 1.0, false, 1);
 
         auto distance = [&](arma::uword i, arma::uword j)
         { return std::sqrt(std::pow(pos(i, 0) - pos(j, 0), 2) + std::pow(pos(i, 1) - pos(j, 1), 2) + std::pow(pos(i, 2) - pos(j, 2), 2)); };
@@ -119,17 +119,17 @@ namespace
 
 TEST_CASE("sos_acf_estimate - the estimate equals the documented procedure for one and two devices")
 {
-    arma::mat freq = rnd(40, 3, -0.08, 0.08, 1);
+    arma::mat spatial_freq = rnd(40, 3, -0.08, 0.08, 1);
     arma::vec phase = rnd(40, 1, -pi, pi, 2), bins = {2.0, 5.0, 10.0, 15.0, 22.0, 30.0};
     arma::vec dist = arma::regspace(0.0, 1.0, 30.0), acf = arma::exp(-dist / 8.0);
 
     arma::vec est, dest, dual;
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 60, est, &dest, &dual, &acf, &dist, 5);
+    quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 60, est, &dest, &dual, &acf, &dist, 5);
     REQUIRE(est.n_elem == 6);
     REQUIRE(dest.n_elem == 6);
     REQUIRE(dual.n_elem == 6);
 
-    arma::mat ref = ref_estimate(freq, phase, bins, 60, acf, dist, 5);
+    arma::mat ref = ref_estimate(spatial_freq, phase, bins, 60, acf, dist, 5);
     QD_DIAG("\n# diag: sos_acf_estimate against the documented procedure, n_pos = 60\n");
     QD_DIAG("bin,est,ref,dist_est,ref,dual,ref\n");
     arma::uword n_finite = 0, n_dual = 0;
@@ -153,13 +153,13 @@ TEST_CASE("sos_acf_estimate - the estimate follows the ACF of the sinusoids")
     // sigma = 0.03 / m: R(d) = exp( -2·pi^2·sigma^2·d^2 ), which is 0.41 at 7 m and 0.03 at 14 m.
     const arma::uword n_coeff = 400;
     const double sigma = 0.03;
-    arma::mat u1 = rnd(n_coeff, 3, 1e-12, 1.0, 3), u2 = rnd(n_coeff, 3, 0.0, 1.0, 4), freq(n_coeff, 3);
-    for (arma::uword i = 0; i < freq.n_elem; ++i)
-        freq(i) = sigma * std::sqrt(-2.0 * std::log(u1(i))) * std::cos(2.0 * pi * u2(i));
+    arma::mat u1 = rnd(n_coeff, 3, 1e-12, 1.0, 3), u2 = rnd(n_coeff, 3, 0.0, 1.0, 4), spatial_freq(n_coeff, 3);
+    for (arma::uword i = 0; i < spatial_freq.n_elem; ++i)
+        spatial_freq(i) = sigma * std::sqrt(-2.0 * std::log(u1(i))) * std::cos(2.0 * pi * u2(i));
     arma::vec phase = rnd(n_coeff, 1, -pi, pi, 5), bins = arma::regspace(2.0, 4.0, 62.0);
 
     arma::vec est, dest;
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 600, est, &dest, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1);
+    quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 600, est, &dest, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1);
     REQUIRE(est.n_elem == bins.n_elem);
 
     // One realisation in a cube of 50 m edge with a correlation length of about 7 m holds a few hundred
@@ -179,15 +179,15 @@ TEST_CASE("sos_acf_estimate - the estimate follows the ACF of the sinusoids")
 
 TEST_CASE("sos_acf_estimate - bins with fewer than 6 pairs are NaN")
 {
-    arma::mat freq = rnd(20, 3, -0.08, 0.08, 6);
+    arma::mat spatial_freq = rnd(20, 3, -0.08, 0.08, 6);
     arma::vec phase = rnd(20, 1, -pi, pi, 7), bins = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0};
     arma::vec dist = arma::regspace(0.0, 1.0, 10.0), acf = arma::exp(-dist / 3.0);
 
     // 4 positions give 6 pairs in total, spread over 8 bins; one pair of links for the two-device estimate
     arma::vec est, dest, dual;
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 2, est, &dest, &dual, &acf, &dist, 3);
+    quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 2, est, &dest, &dual, &acf, &dist, 3);
     REQUIRE(est.n_elem == 8);
-    arma::mat ref = ref_estimate(freq, phase, bins, 2, acf, dist, 3);
+    arma::mat ref = ref_estimate(spatial_freq, phase, bins, 2, acf, dist, 3);
     arma::uword n_nan = 0;
     for (arma::uword b = 0; b < 8; ++b)
     {
@@ -201,14 +201,14 @@ TEST_CASE("sos_acf_estimate - bins with fewer than 6 pairs are NaN")
 
 TEST_CASE("sos_acf_estimate - seeds, optional outputs, pre-sized outputs and float")
 {
-    arma::mat freq = rnd(40, 3, -0.08, 0.08, 8);
+    arma::mat spatial_freq = rnd(40, 3, -0.08, 0.08, 8);
     arma::vec phase = rnd(40, 1, -pi, pi, 9), bins = {2.0, 5.0, 10.0, 15.0, 22.0, 30.0};
     arma::vec dist = arma::regspace(0.0, 1.0, 30.0), acf = arma::exp(-dist / 8.0);
 
     arma::vec a, b, c, d1, d2, dual;
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 80, a, &d1, &dual, &acf, &dist, 1);
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 80, b, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1);
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 80, c, &d2, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 2);
+    quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 80, a, &d1, &dual, &acf, &dist, 1);
+    quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 80, b, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1);
+    quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 80, c, &d2, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 2);
     REQUIRE(a.n_elem == 6);
     CHECK(arma::abs(a).max() > 0.05);
     CHECK(arma::approx_equal(a, b, "absdiff", 0.0)); // Requesting more outputs does not change the estimate
@@ -217,11 +217,11 @@ TEST_CASE("sos_acf_estimate - seeds, optional outputs, pre-sized outputs and flo
     arma::vec sized(6);
     sized.fill(9.0);
     const double *ptr = sized.memptr();
-    quadriga_lib::sos_acf_estimate(freq, phase, bins, 80, sized, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1);
+    quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 80, sized, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1);
     CHECK(sized.memptr() == ptr);
     CHECK(arma::approx_equal(sized, a, "absdiff", 0.0));
 
-    arma::fmat ff = arma::conv_to<arma::fmat>::from(freq);
+    arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq);
     arma::fvec pf = arma::conv_to<arma::fvec>::from(phase), bf = arma::conv_to<arma::fvec>::from(bins), ef, df;
     quadriga_lib::sos_acf_estimate(ff, pf, bf, 80, ef, &df, (arma::fvec *)nullptr, (arma::fvec *)nullptr, (arma::fvec *)nullptr, 1);
     REQUIRE(ef.n_elem == 6);
@@ -232,84 +232,84 @@ TEST_CASE("sos_acf_estimate - seeds, optional outputs, pre-sized outputs and flo
 
 TEST_CASE("sos_acf_estimate - input validation")
 {
-    arma::mat freq = rnd(10, 3, -0.08, 0.08, 10);
+    arma::mat spatial_freq = rnd(10, 3, -0.08, 0.08, 10);
     arma::vec phase = rnd(10, 1, -pi, pi, 11), bins = {2.0, 5.0, 10.0}, est, dual;
     arma::vec dist = arma::regspace(0.0, 1.0, 10.0), acf = arma::exp(-dist / 3.0);
     arma::vec *no_vec = nullptr;
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est));
-        CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, no_vec, &dual, &acf, &dist, 0));
+        CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est));
+        CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, no_vec, &dual, &acf, &dist, 0));
     }
-    SECTION("freq")
+    SECTION("spatial_freq")
     {
-        arma::mat empty, two = freq.cols(0, 1);
+        arma::mat empty, two = spatial_freq.cols(0, 1);
         CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(empty, phase, bins, 10, est), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(two, phase, bins, 10, est), std::invalid_argument);
     }
     SECTION("phase")
     {
         arma::vec bad(9, arma::fill::zeros);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, bad, bins, 10, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, bad, bins, 10, est), std::invalid_argument);
     }
     SECTION("bins")
     {
         arma::vec one = {2.0}, order = {2.0, 10.0, 5.0}, neg = {-1.0, 2.0, 3.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, one, 10, est), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, order, 10, est), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, neg, 10, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, one, 10, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, order, 10, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, neg, 10, est), std::invalid_argument);
         // Non-finite bin centers: Inf would give positions at infinity and NaN in all outputs
         arma::vec inf_end = {1.0, 2.0, arma::datum::inf}, nan_first = {std::nan(""), 2.0, 3.0}, nan_end = {1.0, 2.0, std::nan("")};
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, inf_end, 10, est), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, nan_first, 10, est), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, nan_end, 10, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, inf_end, 10, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, nan_first, 10, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, nan_end, 10, est), std::invalid_argument);
     }
     SECTION("n_pos")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 1, est), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 1, est), std::invalid_argument);
     }
     SECTION("acf and dist for the two-device estimate")
     {
         arma::vec bad_dist = dist + 1.0;
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, no_vec, &dual), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, no_vec, &dual, &acf, &bad_dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, no_vec, &dual), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, no_vec, &dual, &acf, &bad_dist), std::invalid_argument);
         // An ACF value of -1 or below makes the normalisation of the two-device value singular
         arma::vec minus_one = acf, below = acf;
         minus_one(4) = -1.0, below(4) = -1.5;
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, no_vec, &dual, &minus_one, &dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, no_vec, &dual, &below, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, no_vec, &dual, &minus_one, &dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, no_vec, &dual, &below, &dist), std::invalid_argument);
         // Without the two-device output the table is not used
-        CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, no_vec, no_vec, &minus_one, &dist, 0));
+        CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, no_vec, no_vec, &minus_one, &dist, 0));
     }
     SECTION("seed")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, no_vec, no_vec, no_vec, no_vec, -2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, no_vec, no_vec, no_vec, no_vec, -2), std::invalid_argument);
     }
 }
 
 TEST_CASE("sos_acf_estimate - outputs that alias inputs")
 {
-    arma::mat freq = rnd(8, 3, -0.08, 0.08, 12);
+    arma::mat spatial_freq = rnd(8, 3, -0.08, 0.08, 12);
     arma::vec phase = rnd(8, 1, -pi, pi, 13), bins = {2.0, 5.0, 10.0};
     arma::vec dist = arma::regspace(0.0, 1.0, 30.0), acf = arma::exp(-dist / 8.0), est, est_dist, est_dual;
-    CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, &est_dist, &est_dual, &acf, &dist, 1));
+    CHECK_NOTHROW(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, &est_dist, &est_dual, &acf, &dist, 1));
 
     arma::vec a = acf, d = dist, b = bins, p = phase;
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, a, &est_dist, &est_dual, &a, &dist, 1), std::invalid_argument); // acf_est is 'acf'
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, &d, &est_dual, &acf, &d, 1), std::invalid_argument);   // dist_est is 'dist'
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, b, 10, est, &est_dist, &b, &acf, &dist, 1), std::invalid_argument);   // acf_est_dual is 'bins'
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, p, bins, 10, p, &est_dist, &est_dual, &acf, &dist, 1), std::invalid_argument); // acf_est is 'phase'
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, est, &est, &est_dual, &acf, &dist, 1), std::invalid_argument); // dist_est is 'acf_est'
-    arma::vec f(freq.memptr(), 3, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(freq, phase, bins, 10, f, &est_dist, &est_dual, &acf, &dist, 1), std::invalid_argument); // acf_est on the memory of 'freq'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, a, &est_dist, &est_dual, &a, &dist, 1), std::invalid_argument); // acf_est is 'acf'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, &d, &est_dual, &acf, &d, 1), std::invalid_argument);   // dist_est is 'dist'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, b, 10, est, &est_dist, &b, &acf, &dist, 1), std::invalid_argument);   // acf_est_dual is 'bins'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, p, bins, 10, p, &est_dist, &est_dual, &acf, &dist, 1), std::invalid_argument); // acf_est is 'phase'
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, est, &est, &est_dual, &acf, &dist, 1), std::invalid_argument); // dist_est is 'acf_est'
+    arma::vec f(spatial_freq.memptr(), 3, false, true);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 10, f, &est_dist, &est_dual, &acf, &dist, 1), std::invalid_argument); // acf_est on the memory of 'spatial_freq'
 }
 
 TEST_CASE("sos_acf_estimate - results do not depend on the number of threads")
 {
     // 400 positions per device: the pairs are searched in parallel for blocks of 256 rows and added in the
     // order of the rows, so 800 rows cross several blocks
-    arma::mat freq = rnd(40, 3, -0.08, 0.08, 14);
+    arma::mat spatial_freq = rnd(40, 3, -0.08, 0.08, 14);
     arma::vec phase = rnd(40, 1, -pi, pi, 15), bins = {2.0, 5.0, 10.0, 15.0, 22.0, 30.0};
     arma::vec dist = arma::regspace(0.0, 1.0, 30.0), acf = arma::exp(-dist / 8.0);
 
@@ -321,7 +321,7 @@ TEST_CASE("sos_acf_estimate - results do not depend on the number of threads")
         if (run == 1)
             omp_set_num_threads(1);
 #endif
-        quadriga_lib::sos_acf_estimate(freq, phase, bins, 400, est[run], &dest[run], &dual[run], &acf, &dist, 3);
+        quadriga_lib::sos_acf_estimate(spatial_freq, phase, bins, 400, est[run], &dest[run], &dual[run], &acf, &dist, 3);
 #ifdef _OPENMP
         omp_set_num_threads(n_threads);
 #endif
@@ -335,7 +335,7 @@ TEST_CASE("sos_acf_estimate - results do not depend on the number of threads")
     CHECK(arma::approx_equal(dual[0], dual[1], "absdiff", 0.0));
 
     // The estimate is still the documented procedure
-    arma::mat ref = ref_estimate(freq, phase, bins, 400, acf, dist, 3);
+    arma::mat ref = ref_estimate(spatial_freq, phase, bins, 400, acf, dist, 3);
     for (arma::uword b = 0; b < 6; ++b)
     {
         INFO("bin " << b);

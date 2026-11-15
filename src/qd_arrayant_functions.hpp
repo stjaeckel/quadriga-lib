@@ -43,7 +43,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                    arma::Mat<dtype> *element_pos,
                                    arma::Mat<dtype> *coupling_re,
                                    arma::Mat<dtype> *coupling_im,
-                                   dtype *center_frequency,
+                                   dtype *center_freq,
                                    arma::Mat<unsigned> *layout);
 
 // Returns empty string if there was no error or an error message otherwise
@@ -59,7 +59,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                     const arma::Mat<dtype> *element_pos,
                                     const arma::Mat<dtype> *coupling_re,
                                     const arma::Mat<dtype> *coupling_im,
-                                    const dtype *center_frequency,
+                                    const dtype *center_freq,
                                     const arma::Mat<unsigned> *layout,
                                     unsigned *id_in_file);
 

@@ -28,11 +28,11 @@ ACF produced by a set of sinusoids
 
 ## Usage:
 ```
-acf_approx, dist_2d = quadriga_lib.sos.acf_approx( freq, dist )
+acf_approx, dist_2d = quadriga_lib.sos.acf_approx( spatial_freq, dist )
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
 - **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; at least
   2 elements; `(n_acf,)`
 
@@ -45,11 +45,11 @@ acf_approx, dist_2d = quadriga_lib.sos.acf_approx( freq, dist )
 - [[sos.calc_mse]] (difference between the two)
 MD!*/
 
-py::tuple sos_acf_approx(const py::array_t<double> &freq,
+py::tuple sos_acf_approx(const py::array_t<double> &spatial_freq,
                          const py::array_t<double> &dist)
 {
     // Read inputs
-    const auto freq_a = qd_python_numpy2arma_Mat<double>(freq, true);
+    const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
     // Output allocation (invalid sizes are left to the library to reject)
@@ -67,5 +67,5 @@ py::tuple sos_acf_approx(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("acf_approx", &sos_acf_approx,
-//       py::arg("freq").none(false),
+//       py::arg("spatial_freq").none(false),
 //       py::arg("dist").none(false));

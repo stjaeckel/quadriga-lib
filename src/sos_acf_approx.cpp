@@ -33,14 +33,14 @@ ACF produced by a set of sinusoids
 ## Declaration:
 ```
 void quadriga_lib::sos_acf_approx(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &dist,
     arma::Cube<dtype> &acf_approx,
     arma::Col<dtype> *dist_2d = nullptr);
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; at least
   2 elements; `[n_acf]`
 
@@ -54,15 +54,15 @@ void quadriga_lib::sos_acf_approx(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
+void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &spatial_freq,
                                   const arma::Col<dtype> &dist,
                                   arma::Cube<dtype> &acf_approx,
                                   arma::Col<dtype> *dist_2d)
 {
-    if (freq.n_elem == 0)
-        throw std::invalid_argument("Input 'freq' cannot be empty.");
-    if (freq.n_cols > 3)
-        throw std::invalid_argument("Input 'freq' must have 1, 2 or 3 columns.");
+    if (spatial_freq.n_elem == 0)
+        throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
+    if (spatial_freq.n_cols > 3)
+        throw std::invalid_argument("Input 'spatial_freq' must have 1, 2 or 3 columns.");
     if (dist.n_elem < 2)
         throw std::invalid_argument("Input 'dist' must have at least 2 elements.");
     if (dist.at(0) != (dtype)0.0)
@@ -73,15 +73,15 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
     if (!(dist.at(dist.n_elem - 1) > (dtype)0.0) || !qd_sos_equally_spaced(dist))
         throw std::invalid_argument("Input 'dist' must be equally spaced.");
 
-    const arma::uword n_dim = freq.n_cols, n_grid = 4 * dist.n_elem - 3;
+    const arma::uword n_dim = spatial_freq.n_cols, n_grid = 4 * dist.n_elem - 3;
     const arma::uword n_rows = n_grid, n_cols = (n_dim == 1) ? 1 : n_grid, n_slices = (n_dim == 3) ? 3 : 1;
 
-    const arma::uword n_coeff = freq.n_rows;
+    const arma::uword n_coeff = spatial_freq.n_rows;
     const double two_pi = 6.283185307179586, step = (double)dist.at(dist.n_elem - 1) / (double)(dist.n_elem - 1);
     const long long half = 2 * (long long)dist.n_elem - 2;
 
-    qd_check_alias(&acf_approx, "acf_approx", &freq, &dist);
-    qd_check_alias(dist_2d, "dist_2d", &freq, &dist);
+    qd_check_alias(&acf_approx, "acf_approx", &spatial_freq, &dist);
+    qd_check_alias(dist_2d, "dist_2d", &spatial_freq, &dist);
     qd_check_alias_outputs(&acf_approx, "acf_approx", dist_2d, "dist_2d");
 
     if (acf_approx.n_rows != n_rows || acf_approx.n_cols != n_cols || acf_approx.n_slices != n_slices)
@@ -94,7 +94,7 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
     {
         C[d].resize(n_coeff * n_grid), S[d].resize(n_coeff * n_grid);
         double *pc = C[d].data(), *ps = S[d].data();
-        const dtype *pf = freq.colptr(d);
+        const dtype *pf = spatial_freq.colptr(d);
         const long long n_grid_ll = (long long)n_grid;
 #pragma omp parallel for if (n_coeff * n_grid > 4096)
         for (long long i_grid = 0; i_grid < n_grid_ll; ++i_grid)
@@ -163,5 +163,5 @@ void quadriga_lib::sos_acf_approx(const arma::Mat<dtype> &freq,
     }
 }
 
-template void quadriga_lib::sos_acf_approx(const arma::Mat<float> &freq, const arma::Col<float> &dist, arma::Cube<float> &acf_approx, arma::Col<float> *dist_2d);
-template void quadriga_lib::sos_acf_approx(const arma::Mat<double> &freq, const arma::Col<double> &dist, arma::Cube<double> &acf_approx, arma::Col<double> *dist_2d);
+template void quadriga_lib::sos_acf_approx(const arma::Mat<float> &spatial_freq, const arma::Col<float> &dist, arma::Cube<float> &acf_approx, arma::Col<float> *dist_2d);
+template void quadriga_lib::sos_acf_approx(const arma::Mat<double> &spatial_freq, const arma::Col<double> &dist, arma::Cube<double> &acf_approx, arma::Col<double> *dist_2d);

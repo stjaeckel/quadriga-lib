@@ -948,7 +948,7 @@ TEST_CASE("quantize_delays - Relative delays of an acoustic array")
     mic.element_pos.col(0) = arma::vec{0.0, -0.025, 0.0};
     mic.element_pos.col(1) = arma::vec{0.0, 0.025, 0.0};
     std::vector<quadriga_lib::arrayant<double>> rx = {mic}, tx = {quadriga_lib::generate_arrayant_omni<double>()};
-    rx[0].center_frequency = f;
+    rx[0].center_freq = f;
     arma::mat fbs = {{2.5, 2.5}, {0.0, 1.5}, {1.5, 0.2}}; // path 0 on the TX-RX line (LOS)
     arma::mat pg(2, 1);
     pg(0, 0) = 1.0, pg(1, 0) = 0.5;

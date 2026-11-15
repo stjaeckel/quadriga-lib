@@ -209,7 +209,7 @@ NG commits on e318034: 6c30173 (generator state), 15c6590 (`quadriga`, coefficie
 | A21 | Table 7.5-3 | Offsets defined for M = 20 only | W24. |
 | A22 | 7.6.16 | Q ~ N(0, 3²) fixed; for "NLOS channel coefficients"; drawn independently per ray, cluster and component, while 7.6.3.1 lists only coupling, XPR and phases as spatially consistent ray variables | Std from `PolVar_sigma` (v19 files 3; key default 0 = no effect); NLOS rays only, LOS and GR unchanged; η from spatially consistent fields at `SC_lambda` (marginals equal). |
 | A23 | 7.5-18 | Zenith fold stated for ZOA only | Same fold for ZOD (as A12). |
-| A24 | 7.6.1 | "All rays within one cluster share common oxygen absorption"; 7.6-2 for a large bandwidth | Each path's own length (sub-cluster rays up to +0.13 dB more loss); α at each entry of `center_frequency`, 7.6-2 not applied (size in section 14). |
+| A24 | 7.6.1 | "All rays within one cluster share common oxygen absorption"; 7.6-2 for a large bandwidth | Each path's own length (sub-cluster rays up to +0.13 dB more loss); α at each entry of `center_freq`, 7.6-2 not applied (size in section 14). |
 | A25 | 7.5-22, 7.6-31, 7.6-45 | Doppler term written as r̂·v·t | Displacement form r̂·Δr (equal for any trajectory while r̂ is fixed, as in `phase`); the library takes positions. |
 | A26 | 7.6.10 | Dual mobility and reciprocity at ray level not defined | Mirrored "ray" sets (as A7); the Tx displacement term of 7.6-45 in `phase`. |
 | A27 | 7.5 step 8 | Which offset a coupling rank receives | Ascending: rank k gets the k-th smallest offset of its group (W25). |

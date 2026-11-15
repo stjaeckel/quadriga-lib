@@ -97,7 +97,7 @@ Large-scale parameters of a set of links from normalized random values
   [[gbsm_draw]] (`"lsf"`), and on request the absolute TOA offset, the ground permittivity and the EoD offset
 - Mean `mu` and standard deviation `sigma` in the log domain (lg for DS and the angular spreads, dB for KF, SF and
   XPR), with the key prefix `P` (`DS`, `KF`, `SF`, `AS_D`, `AS_A`, `ES_D`, `ES_A`, `XPR`), `d = max(d2D, 1e-4)`,
-  `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(center_frequency/1e9, LSP_fc_min)` in GHz:
+  `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(center_freq/1e9, LSP_fc_min)` in GHz:
   - `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`
   - `sigma = max(0, max(0, P_sigma + P_delta·lg(P_omega + f')) + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`
   - SF has the mean 0. DS adds `lg(DS_VS_a·DS_VS + DS_VS_b)` if `DS_VS > 0` (V/S of the InF hall, TR 38.901 Table
@@ -113,7 +113,7 @@ Large-scale parameters of a set of links from normalized random values
 - The InF and InH NLOS files set `absTOA_Lmax`, and the InF files `DS_VS`, for the hall or office of their
   calibration scenario; for another hall set these keys in `scenpar`
 - Ground permittivity: QuaDRiGa's fits for dry, medium and wet ground, interpolated linearly over column 9 of `rnd`
-  (0 dry, 0.5 medium, 1 wet) with `center_frequency` not limited by `LSP_fc_min`; they are not the materials of TR
+  (0 dry, 0.5 medium, 1 wet) with `center_freq` not limited by `LSP_fc_min`; they are not the materials of TR
   38.901 Table 7.6.8-1
 - EoD offset, the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12: `EoD_offset_e +
   EoD_offset_e_gamma·lg f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) +
@@ -124,7 +124,7 @@ Large-scale parameters of a set of links from normalized random values
 ```
 void quadriga_lib::lsp_generate(
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &rnd,
@@ -142,7 +142,7 @@ void quadriga_lib::lsp_generate(
 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`center_frequency`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [[gbsm_draw]] (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
@@ -173,7 +173,7 @@ void quadriga_lib::lsp_generate(
 MD!*/
 
 void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &scenpar,
-                                const arma::vec &center_frequency,
+                                const arma::vec &center_freq,
                                 const arma::mat &tx_pos,
                                 const arma::mat &rx_pos,
                                 const arma::mat &rnd,
@@ -190,8 +190,8 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
 {
     // Validation, before any output is touched
     qd_gbsm_check_links(&tx_pos, &rx_pos);
-    qd_gbsm_check_fc(center_frequency);
-    const arma::uword n_link = rx_pos.n_rows, n_freq = center_frequency.n_elem;
+    qd_gbsm_check_fc(center_freq);
+    const arma::uword n_link = rx_pos.n_rows, n_freq = center_freq.n_elem;
 
     if (rnd.n_rows != n_link || rnd.n_cols != 11)
         throw std::invalid_argument("Input 'rnd' must have size [n_link, 11].");
@@ -204,13 +204,13 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
         if (!sf_sigma->is_finite() || arma::any(arma::vectorise(*sf_sigma) < 0.0))
             throw std::invalid_argument("Input 'sf_sigma' must be finite and >= 0.");
     }
-    qd_check_alias(&lsp, "lsp", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(abs_toa, "abs_toa", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(gr_eps_re, "gr_eps_re", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(gr_eps_im, "gr_eps_im", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(eod_offset_deg, "eod_offset_deg", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(lsp_mu, "lsp_mu", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(lsp_sigma, "lsp_sigma", &center_frequency, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(&lsp, "lsp", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(abs_toa, "abs_toa", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(gr_eps_re, "gr_eps_re", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(gr_eps_im, "gr_eps_im", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(eod_offset_deg, "eod_offset_deg", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(lsp_mu, "lsp_mu", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(lsp_sigma, "lsp_sigma", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
     qd_check_alias_outputs(&lsp, "lsp", lsp_mu, "lsp_mu");
     qd_check_alias_outputs(&lsp, "lsp", lsp_sigma, "lsp_sigma");
     qd_check_alias_outputs(lsp_mu, "lsp_mu", lsp_sigma, "lsp_sigma");
@@ -259,7 +259,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
     }
 
     // Mean and std per link, frequency and LSP; checks the coefficients and the frequency terms
-    qd_gbsm_lsp_stats stats(sp, center_frequency);
+    qd_gbsm_lsp_stats stats(sp, center_freq);
 
     // Coefficients of the requested EoD offset and absolute TOA: an infinite value can give Inf·0 = NaN
     auto finite = [&](const char *key)
@@ -334,7 +334,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                                    : 0.0;
             for (arma::uword k = 0; k < n_freq; ++k)
             {
-                const double lf = std::log10(std::max(center_frequency(k) / 1.0e9, fc_min));
+                const double lf = std::log10(std::max(center_freq(k) / 1.0e9, fc_min));
                 double e = e0 + e_g * lf;
                 if (b > 0.0)
                     e += std::pow(10.0, (a0 + a_g * lf) * std::log10(std::max(b, d)) + c0 + c_g * lf + c_h * h_ut);
@@ -366,7 +366,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
             gr_eps_im->set_size(n_link, n_freq);
         for (arma::uword k = 0; k < n_freq; ++k)
         {
-            const double f = center_frequency(k) / 1.0e9;
+            const double f = center_freq(k) / 1.0e9;
             const double dry_re = 3.0, dry_im = 0.003 * std::pow(f, 1.34);
             const double med_re = 30.4 * std::pow(f, -0.47), med_im = 0.18 * std::pow(f, 1.05);
             const double wet_re = 31.3 * std::pow(f, -0.48), wet_im = 0.63 * std::pow(f, 0.77);

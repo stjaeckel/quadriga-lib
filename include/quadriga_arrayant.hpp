@@ -28,7 +28,7 @@ namespace quadriga_lib
         arma::Mat<dtype> element_pos;                // Element positions in local Cartesian coords; [3, n_elements] or empty
         arma::Mat<dtype> coupling_re;                // Coupling matrix, real part; [n_elements, n_ports]
         arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part; [n_elements, n_ports]
-        dtype center_frequency = dtype(299792458.0); // Center frequency
+        dtype center_freq = dtype(299792458.0);      // Center frequency
         arrayant() {};                               // Default constructor
 
         // Copy: the target is marked as validated when the source passes the full check; move: the target takes over
@@ -151,13 +151,13 @@ namespace quadriga_lib
     std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(const std::vector<arrayant<dtype>> &arrayant_vec,     // Non-empty vector of valid arrayant objects
                                                                 const arma::Col<dtype> *azimuth_grid_new = nullptr,   // Output azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to input grid
                                                                 const arma::Col<dtype> *elevation_grid_new = nullptr, // Output elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to input grid
-                                                                const arma::Col<dtype> *freq_grid_new = nullptr,      // Output frequency grid in Hz; defaults to input grid
+                                                                const arma::Col<dtype> *freq_new = nullptr,           // Output frequency grid in Hz; defaults to input grid
                                                                 dtype propagation_speed = dtype(299792458.0));        // Wave propagation speed in m/s (~343 for acoustics); positive, finite
     // Concatenate two multi-frequency arrayant vectors into a single multi-element model
-    // - Both inputs must have equal entry counts, identical angular grids, and matching center_frequency values at each index.
+    // - Both inputs must have equal entry counts, identical angular grids, and matching center_freq values at each index.
     // - Per frequency entry: pattern cubes are joined along the element (slice) dimension; element_pos matrices are horizontally concatenated (empty positions treated as zeros).
     // - Both inputs are validated with arrayant_is_valid_multi before processing; each output entry is validated before returning.
-    // - Output inherits name, azimuth/elevation grids, and center_frequency from arrayant_vec1.
+    // - Output inherits name, azimuth/elevation grids, and center_freq from arrayant_vec1.
     template <typename dtype>
     std::vector<arrayant<dtype>> arrayant_concat_multi(const std::vector<arrayant<dtype>> &arrayant_vec1,  // First validated, mutually consistent arrayant vector
                                                        const std::vector<arrayant<dtype>> &arrayant_vec2); // Second arrayant vector; must match entry count, grids, and center frequencies of arrayant_vec1
@@ -204,7 +204,7 @@ namespace quadriga_lib
                                     arma::Cube<dtype> &V_im,                          // Output: e-theta field, imaginary part; [n_out, n_ang, n_freq]
                                     arma::Cube<dtype> &H_re,                          // Output: e-phi field, real part; [n_out, n_ang, n_freq]
                                     arma::Cube<dtype> &H_im,                          // Output: e-phi field, imaginary part; [n_out, n_ang, n_freq]
-                                    const arma::Col<dtype> *frequency = nullptr,      // Optional: target frequencies in Hz; default: the center frequencies of the entries; [n_freq]
+                                    const arma::Col<dtype> *freq_new = nullptr,       // Optional: target frequencies in Hz; default: the center frequencies of the entries; [n_freq]
                                     const arma::uvec *i_element = nullptr,            // Optional: 0-based element indices; [n_out]
                                     const arma::Cube<dtype> *orientation = nullptr,   // Optional: Euler angles in rad, applied at all frequencies; shapes as in arrayant_interpolate
                                     const arma::Mat<dtype> *element_pos = nullptr,    // Optional: element positions in m; default: those of entry 0; [3, n_out]
@@ -216,7 +216,7 @@ namespace quadriga_lib
     // - Each entry is validated individually via its is_valid member (full check).
     // - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
     // - All entries use the same form for element_pos and coupling: all empty or all given (a mix is rejected).
-    // - Pattern data, center_frequency, and coupling matrix values are not compared (expected to vary).
+    // - Pattern data, center_freq, and coupling matrix values are not compared (expected to vary).
     // - Stops at first error and returns a message identifying the failing entry and property.
     template <typename dtype>
     std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec); // Non-empty vector of arrayant objects to validate
@@ -250,7 +250,7 @@ namespace quadriga_lib
     // Read all arrayant objects from a QDANT file into a vector
     // - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
     // - Each unique ID is read exactly once regardless of how many times it appears in the layout.
-    // - Counterpart to qdant_write_multi; primary mechanism for loading frequency-dependent models where center_frequency on each entry identifies the corresponding frequency.
+    // - Counterpart to qdant_write_multi; primary mechanism for loading frequency-dependent models where center_freq on each entry identifies the corresponding frequency.
     template <typename dtype>
     std::vector<arrayant<dtype>> qdant_read_multi(const std::string &fn,            // Filename of the QDANT file
                                                   arma::u32_mat *layout = nullptr); // Optional output: layout of entries in the file
@@ -371,7 +371,7 @@ namespace quadriga_lib
                                                   dtype horn_control_freq = 0.0,                     // Horn pattern control frequency in [Hz], 0 = auto from radius
                                                   dtype baffle_width = 0.15,                         // Enclosure baffle width in [m], piston only
                                                   dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
-                                                  arma::Col<dtype> frequencies = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
+                                                  arma::Col<dtype> center_freq = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
                                                   dtype angular_resolution = 5.0);                   // Angular grid resolution in [deg]
 
     // ---- Channel generation functions ----
@@ -406,7 +406,7 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *coeff_re,         // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *coeff_im,         // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *delay,            // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path]
-                                dtype center_frequency = dtype(0.0), // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
+                                dtype center_freq = dtype(0.0),      // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
                                 bool use_absolute_delays = false,    // Option: If true, the LOS delay is included for all paths
                                 bool add_fake_los_path = false,      // Option: Add one path, slot 0 = LOS path (zero power if none was present)
                                 arma::Cube<dtype> *aod = nullptr,    // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
@@ -419,7 +419,7 @@ namespace quadriga_lib
     // - Extends get_channels_spherical to support frequency-dependent antenna patterns, path gains, and Jones matrices
     // - Geometry (angles, delays, LOS detection) is computed once and reused for all output frequencies
     // - TX/RX antenna patterns are interpolated from multi-frequency arrayant vectors at each output frequency
-    // - Path gain and polarization transfer matrix are interpolated from freq_in to freq_out grids
+    // - Path gain and polarization transfer matrix are interpolated from freq to freq_new grids
     // - Supports both radio (speed of light) and acoustic (speed of sound) propagation
     // - Jones matrix M can have 2 rows (scalar pressure: Re, Im of (V rx, V tx) only) or 8 rows (full polarimetric, row
     //   order as in get_channels_spherical)
@@ -435,14 +435,14 @@ namespace quadriga_lib
                                 dtype Rb, dtype Rt, dtype Rh,                 // Receiver orientation (bank, tilt, head) [rad]
                                 const arma::Mat<dtype> &fbs_pos,              // First-bounce scatterer positions [3, n_path]
                                 const arma::Mat<dtype> &lbs_pos,              // Last-bounce scatterer positions [3, n_path]
-                                const arma::Mat<dtype> &path_gain,            // Path gain (linear), [n_path, n_freq_in]
+                                const arma::Mat<dtype> &path_gain,            // Path gain (linear), [n_path, n_freq]
                                 const arma::Col<dtype> &path_length,          // Absolute path length TX→RX [n_path]
-                                const arma::Cube<dtype> &M,                   // Polarization transfer matrix [8, n_path, n_freq_in] or [2, n_path, n_freq_in]
-                                const arma::Col<dtype> &freq_in,              // Input sample frequencies [Hz], length [n_freq_in]
-                                const arma::Col<dtype> &freq_out,             // Target frequencies [Hz], length [n_freq_out]
-                                std::vector<arma::Cube<dtype>> &coeff_re,     // Output: real part of coefficients, length [n_freq_out], each [n_rx, n_tx, n_path]
-                                std::vector<arma::Cube<dtype>> &coeff_im,     // Output: imag part of coefficients, length [n_freq_out], each [n_rx, n_tx, n_path]
-                                std::vector<arma::Cube<dtype>> &delay,        // Output: delays [s], length [n_freq_out], each [n_rx, n_tx, n_path]
+                                const arma::Cube<dtype> &M,                   // Polarization transfer matrix [8, n_path, n_freq] or [2, n_path, n_freq]
+                                const arma::Col<dtype> &freq,                 // Input sample frequencies [Hz], length [n_freq]
+                                const arma::Col<dtype> &freq_new,             // Target frequencies [Hz], length [n_freq_new]
+                                std::vector<arma::Cube<dtype>> &coeff_re,     // Output: real part of coefficients, length [n_freq_new], each [n_rx, n_tx, n_path]
+                                std::vector<arma::Cube<dtype>> &coeff_im,     // Output: imag part of coefficients, length [n_freq_new], each [n_rx, n_tx, n_path]
+                                std::vector<arma::Cube<dtype>> &delay,        // Output: delays [s], length [n_freq_new], each [n_rx, n_tx, n_path]
                                 bool use_absolute_delays = false,             // If true, include LOS delay in all paths
                                 bool add_fake_los_path = false,               // Add one path, slot 0 = LOS path (zero power if none was present)
                                 dtype propagation_speed = 299792458.0,        // Wave propagation speed [m/s]
@@ -483,7 +483,7 @@ namespace quadriga_lib
                                        arma::Cube<dtype> *delay,                        // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path_irs]
                                        arma::uword i_irs = 0,                           // IRS codebook entry (= port number in the IRS array)
                                        dtype threshold_dB = -140.0,                     // Threshold in dB relative to path gain below which paths are discarded from the output
-                                       dtype center_frequency = 0.0,                    // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
+                                       dtype center_freq = 0.0,                         // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
                                        bool use_absolute_delays = false,                // Option: If true, the LOS delay is included for all paths
                                        arma::Cube<dtype> *aod = nullptr,                // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
                                        arma::Cube<dtype> *eod = nullptr,                // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
@@ -521,7 +521,7 @@ namespace quadriga_lib
                              arma::Cube<dtype> *coeff_re,             // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
                              arma::Cube<dtype> *coeff_im,             // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
                              arma::Cube<dtype> *delay,                // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
-                             dtype center_frequency = dtype(0.0),     // Center frequency in [Hz]; a value of 0.0 disables phase calculation in coefficients
+                             dtype center_freq = dtype(0.0),          // Center frequency in [Hz]; a value of 0.0 disables phase calculation in coefficients
                              bool use_absolute_delays = false,        // Option: If true, the LOS delay is included for all paths
                              bool add_fake_los_path = false,          // Option: Add one path, slot 0 = LOS path (zero power if none was present)
                              arma::Col<dtype> *rx_Doppler = nullptr); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'

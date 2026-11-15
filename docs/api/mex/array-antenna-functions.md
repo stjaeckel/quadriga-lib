@@ -103,14 +103,14 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_combine_pattern) · [P
 
 ### Usage:
 ```matlab
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, ...
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq_new, azimuth_grid_new, ...
     elevation_grid_new, propagation_speed );
 ```
 
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`center_freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
+- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
   recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
    entry's `center_freq` unchanged.
 - **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
@@ -121,8 +121,8 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_n
 ### Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when both input and
-  `center_freq_new` describe a single frequency; struct array of size `numel(center_freq_new)` (or
-  `numel(arrayant_in)` when `center_freq_new` is omitted) otherwise.
+  `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or
+  `numel(arrayant_in)` when `freq_new` is omitted) otherwise.
 
 ### See also:
 - [arrayant_generate](#arrayant_generate) (for field layout in the arrayant struct)
@@ -363,8 +363,8 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [Pytho
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (a 1x1 struct and no `frequency`): up to 8 outputs. Multi-frequency mode (a struct array with
-  more than one entry, or `frequency` given): for each target frequency, the two entries whose center frequencies
+- Single-frequency mode (a 1x1 struct and no `freq_new`): up to 8 outputs. Multi-frequency mode (a struct array with
+  more than one entry, or `freq_new` given): for each target frequency, the two entries whose center frequencies
   bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
 - `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
 - NaN or infinite angles give NaN in all outputs of that angle and output, without an error
@@ -381,7 +381,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [Pytho
 
 % Multi-frequency mode
 [ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
-    element, orientation, element_pos, frequency, use_kernel );
+    element, orientation, element_pos, freq_new, use_kernel );
 ```
 
 ### Inputs:
@@ -395,7 +395,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [Pytho
   `[3, n_out, n_ang]`; default: no rotation
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
   positions of the arrayant
-- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
+- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
   of the entries
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
@@ -465,14 +465,14 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [Python](../python/array-antenna-functions.md#generate_speaker)
 
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
-  directivity pattern in `e_theta_re` and `center_frequency` set to the corresponding frequency.
+  directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
   results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`.
-- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band
+- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band
   below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz.
 - Speed of sound assumed to be 343 m/s.
 - Driver models (`driver_type`):
@@ -492,7 +492,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [Python](.
 ```matlab
 arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upper_cutoff, ...
     lower_rolloff_slope, upper_rolloff_slope, sensitivity, radiation_type, hor_coverage, ...
-    ver_coverage, horn_control_freq, baffle_width, baffle_height, frequencies, ...
+    ver_coverage, horn_control_freq, baffle_width, baffle_height, center_freq, ...
     angular_resolution );
 ```
 
@@ -510,7 +510,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`horn_control_freq`** - Horn pattern control frequency; `0` auto-derives from `radius`; default: 0
 - **`baffle_width`** - Baffle width; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** - Baffle height; used by `hemisphere` model; default: 0.25
-- **`frequencies`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
 - **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
 ### Outputs:

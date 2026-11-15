@@ -13,7 +13,7 @@ SECTION!*/
 Channel coefficients of one link at one frequency over one segment
 
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
-  `rays["center_frequency"][i_freq]`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
+  `rays["center_freq"][i_freq]`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (see Terms)
 - `"phase"`: [[get_channels_planar]] with the arrays at the positions of `rays` and the orientations of the snapshot;
   delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [[get_channels_spherical]] with the
@@ -50,7 +50,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`mobility`** — `"phase"`, `"drift"` or `"auto"` (see Terms; `"auto"` is `"drift"` for `"quadriga"` rays, which then
   need [[ssf_scatterers]]); default: `"auto"`
 - **`output`** — `"taps"` or `"rays"`; default: `"taps"`
-- **`i_freq`** — Frequency index in `rays["center_frequency"]`, 0-based; ray data of the TR methods hold one frequency:
+- **`i_freq`** — Frequency index in `rays["center_freq"]`, 0-based; ray data of the TR methods hold one frequency:
   0; default: 0
 - **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `None`: the positions of `rays`; `(n_snap, 3)` or `(1, 3)`
   (a `(3,)` array is rejected); default: None
@@ -63,7 +63,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`stack`** — Snapshot layout of `chan` as in [[hdf5_read_channel]]; default: `False`
 
 ## Outputs:
-- **`chan`** — Channel dict, layout as documented in [[hdf5_read_channel]]: `center_frequency` `(1,)`;
+- **`chan`** — Channel dict, layout as documented in [[hdf5_read_channel]]: `center_freq` `(1,)`;
   `tx_position`, `rx_position` (the snapshot positions), `tx_orientation`, `rx_orientation` `(3, n_snap)`; per
   snapshot `coeff`, `delay` `(n_rx, n_tx, n_tap)` (`"taps"`) or `(n_rx, n_tx, n_path)` (`"rays"`); `"rays"` also
   `path_gain`, `path_length`, `path_polarization`, `path_angles` and in `"drift"` `fbs_pos`, `lbs_pos`

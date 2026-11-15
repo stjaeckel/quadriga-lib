@@ -376,10 +376,10 @@ class test_set_types(unittest.TestCase):
         self.assertFalse(np.array_equal(f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[28e9]), rr))
         with self.assertRaises(ValueError) as ctx:
             f(sr, "ray", pr, self.tx_pos, self.rx_pos)
-        self.assertIn("Input 'center_frequency' is required for the shared 'ray' set.", str(ctx.exception))
+        self.assertIn("Input 'center_freq' is required for the shared 'ray' set.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[np.nan])
-        self.assertIn("Input 'center_frequency' must be finite and > 0.", str(ctx.exception))
+        self.assertIn("Input 'center_freq' must be finite and > 0.", str(ctx.exception))
         pk = quadriga_lib.gbsm.init_phases(sr, "ray", 7, 1)
         rk = f(sr, "ray", pk, self.tx_pos, self.rx_pos, 1)  # k >= 0
         self.assertEqual(rk.shape, (n_link, 114))

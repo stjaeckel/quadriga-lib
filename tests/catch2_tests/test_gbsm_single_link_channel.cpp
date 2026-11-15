@@ -127,7 +127,7 @@ namespace
             s.M = M.slice(f).cols(sel);
             s.ang = arma::join_rows(arma::join_rows(aod.elem(sel), eod.elem(sel)),
                                     arma::join_rows(aoa.elem(sel), eoa.elem(sel)));
-            const double fc = r.center_frequency(f);
+            const double fc = r.center_freq(f);
             if (a.drift())
             {
                 s.fbs = fbs.cols(sel), s.lbs = lbs.cols(sel);
@@ -318,7 +318,7 @@ TEST_CASE("gbsm_single_link_channel - rays output equals get_channels with the p
     SECTION("static link gain") {}
     SECTION("oxygen at 60 GHz")
     {
-        r.center_frequency(0) = 60e9, a.o2 = true;
+        r.center_freq(0) = 60e9, a.o2 = true;
     }
     SECTION("link gain and K ratio per snapshot")
     {
@@ -370,7 +370,7 @@ TEST_CASE("gbsm_single_link_channel - taps sum the rays per tap with power-weigh
     }
     SECTION("oxygen: the weights are the ray powers, not the path gains")
     {
-        r.center_frequency(0) = 60e9, r.delay(i0) = 50e-9, r.delay(i1) = 250e-9, a.o2 = true; // 60 m apart
+        r.center_freq(0) = 60e9, r.delay(i0) = 50e-9, r.delay(i1) = 250e-9, a.o2 = true; // 60 m apart
         const std::vector<snap_t> e = ref(a);
         check_taps(a.run(), a, e);
         const tap_t x = ref_taps(r, 0, e[0]), g = ref_taps(r, 0, e[0], &e[0].gain);
@@ -388,7 +388,7 @@ TEST_CASE("gbsm_single_link_channel - taps of data from paths use the default ta
     quadriga_lib::ssf_paths(s, arma::vec{-90.0}, pg, pl, M, "drift", nullptr, nullptr, nullptr, nullptr, nullptr,
                             nullptr, nullptr, &fbs, &lbs, &type);
     rays_t d;
-    quadriga_lib::gbsm_rays_from_paths(s.center_frequency, s.tx_pos, s.rx_pos, fbs, lbs, pg, pl, M, d, "quadriga",
+    quadriga_lib::gbsm_rays_from_paths(s.center_freq, s.tx_pos, s.rx_pos, fbs, lbs, pg, pl, M, d, "quadriga",
                                        &type, nullptr, &s.gr_eps_re, &s.gr_eps_im);
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &d};
@@ -444,7 +444,7 @@ TEST_CASE("gbsm_single_link_channel - i_freq selects powers, M, kept rays, weigh
         CHECK(arma::all(e[0].ind == arma::uvec{0, 1, 2, 3, 6, 7}));
         const chan_t c = a.run();
         check_rays(c, a, e);
-        CHECK(c.center_frequency(0) == r.center_frequency(1));
+        CHECK(c.center_freq(0) == r.center_freq(1));
         a.out = "taps";
         check_taps(a.run(), a, e);
     }
@@ -531,7 +531,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
 {
     const auto omni = quadriga_lib::generate_arrayant_omni<double>();
     rays_t s = make_rays(59, true, true, 6, 1, "38.901", true); // given scatterers, Tx and Rx distances differ
-    const double lam = c0 / s.center_frequency(0);
+    const double lam = c0 / s.center_freq(0);
     double bm[2], be[2];
     ref_b(s, 0, bm, be);
     REQUIRE(std::abs(bm[0] - bm[1]) > 1.0);
@@ -611,7 +611,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
         rays_t l = make_rays(59, true, false, 0, 2, "quadriga", true);
         l.rx_pos = l.tx_pos + arma::vec{60.0, 80.0, 0.0};
         l.fbs_pos.col(0) = l.tx_pos + arma::vec{30.0, 40.0, 0.0}, l.lbs_pos.col(0) = l.fbs_pos.col(0);
-        l.center_frequency(1) = 28e9;
+        l.center_freq(1) = 28e9;
         args_t b{&omni, &omni, &l};
         b.mob = "phase", b.R = arma::mat{{l.rx_pos(0) + 0.5, l.rx_pos(1), l.rx_pos(2)}};
         const double expect[2] = {1.0347, 0.3658};
@@ -726,8 +726,7 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
     REQUIRE(e[0].ind.n_elem == 7);
 
     const std::string fn = "test_gbsm_single_link_channel_qrt_route.qrt";
-    const arma::vec f_GHz = r.center_frequency * 1e-9;
-    quadriga_lib::qrt_file_init<double>(fn, f_GHz, a.R, arma::mat(3, 3, arma::fill::zeros));
+    quadriga_lib::qrt_file_init<double>(fn, r.center_freq, a.R, arma::mat(3, 3, arma::fill::zeros));
     std::vector<quadriga_lib::path> all;
     for (arma::uword t = 0; t < 3; ++t)
     {
@@ -736,13 +735,13 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
         arma::cube M(8, e[t].ind.n_elem, 1);
         M.slice(0) = e[t].M;
         const arma::u32_vec type = r.path_type.elem(e[t].ind);
-        const auto p = quadriga_lib::qrt_paths_from_scatterers(r.center_frequency, r.tx_pos, R, e[t].fbs, e[t].lbs,
+        const auto p = quadriga_lib::qrt_paths_from_scatterers(r.center_freq, r.tx_pos, R, e[t].fbs, e[t].lbs,
                                                                pg, M, type, t);
         all.insert(all.end(), p.begin(), p.end());
     }
     quadriga_lib::qrt_file_append<double>(fn, all, r.tx_pos);
 
-    const double k = 2.0 * pi * r.center_frequency(0) / c0;
+    const double k = 2.0 * pi * r.center_freq(0) / c0;
     for (arma::uword t = 0; t < 3; ++t)
     {
         INFO("snapshot " << t);
@@ -823,7 +822,7 @@ TEST_CASE("gbsm_single_link_channel - the channel is valid and stores the positi
             CHECK(arma::approx_equal(c.rx_pos, arma::mat(a.R.t()), "absdiff", 0.0));
             CHECK(arma::approx_equal(c.tx_orientation, arma::mat(3, 2, arma::fill::zeros), "absdiff", 0.0));
             CHECK(arma::approx_equal(c.rx_orientation, arma::repmat(a.Ro.t(), 1, 2), "absdiff", 0.0));
-            CHECK((c.center_frequency.n_elem == 1 && c.center_frequency(0) == r.center_frequency(0)));
+            CHECK((c.center_freq.n_elem == 1 && c.center_freq(0) == r.center_freq(0)));
             CHECK((c.n_rx() == 2 && c.n_tx() == 8 && c.initial_position == 0 && c.name == chan_t().name));
         }
 }

@@ -28,7 +28,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and phases follow this
   length; the per-element offsets follow the FBS / LBS geometry.
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
-- The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
+- The scalar argument `i_freq` selects the frequency index that is processed; a single frequency is returned per call.
 - If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
@@ -70,7 +70,7 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
 
 coeff, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
 
-coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., i_freq=1 )
 
 coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
 ```
@@ -96,7 +96,7 @@ coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `True`
-- **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [[interpolate]];
@@ -200,7 +200,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                  const bool add_fake_los_path,
                                  const bool angles,
                                  py::handle complex,
-                                 const arma::uword freq,
+                                 const arma::uword i_freq,
                                  const int use_kernel)
 {
     const bool want_complex = qd_python_flag(complex, true, "complex");
@@ -276,10 +276,10 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         if (!center_freq_a.empty() && center_freq_a.n_elem != n_freq)
             throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
 
-        if (n_out != 0ULL && freq >= n_freq)
-            throw std::out_of_range("Input 'freq' exceeds the number of frequencies.");
+        if (n_out != 0ULL && i_freq >= n_freq)
+            throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
 
-        const double center_frequency = center_freq_a.empty() ? 0.0 : center_freq_a.at(freq);
+        const double center_freq_sel = center_freq_a.empty() ? 0.0 : center_freq_a.at(i_freq);
 
         // Number of output paths per snapshot
         std::vector<arma::uword> n_path(n_out);
@@ -346,9 +346,9 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                     }
 
                     // Select the frequency slice, aliased without copying the data
-                    const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a[j].colptr(freq)),
+                    const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a[j].colptr(i_freq)),
                                                         path_gain_a[j].n_rows, false, true);
-                    const arma::Mat<double> M_f(const_cast<double *>(M_a[j].slice_memptr(freq)),
+                    const arma::Mat<double> M_f(const_cast<double *>(M_a[j].slice_memptr(i_freq)),
                                                 M_a[j].n_rows, M_a[j].n_cols, false, true);
 
                     const double *T = qd_snapshot_col(tx_pos_a, j);
@@ -361,7 +361,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                                  R[0], R[1], R[2], Ro[0], Ro[1], Ro[2],
                                                                  &fbs_pos_a[j], &lbs_pos_a[j], &path_gain_f, &path_length_a[j], &M_f,
                                                                  &coeff_re[j], &coeff_im[j], &delay[j],
-                                                                 center_frequency, use_absolute_delays, add_fake_los_path,
+                                                                 center_freq_sel, use_absolute_delays, add_fake_los_path,
                                                                  angles ? &aod[j] : nullptr,
                                                                  angles ? &eod[j] : nullptr,
                                                                  angles ? &aoa[j] : nullptr,
@@ -436,13 +436,13 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     if (!center_freq_a.empty() && center_freq_a.n_elem != n_freq)
         throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
 
-    if (freq >= n_freq)
-        throw std::out_of_range("Input 'freq' exceeds the number of frequencies.");
+    if (i_freq >= n_freq)
+        throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
 
     // Select the frequency slice, aliased without copying the data
-    const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a.colptr(freq)), path_gain_a.n_rows, false, true);
-    const arma::Mat<double> M_f(const_cast<double *>(M_a.slice_memptr(freq)), M_a.n_rows, M_a.n_cols, false, true);
-    const double center_frequency = center_freq_a.empty() ? 0.0 : center_freq_a.at(freq);
+    const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a.colptr(i_freq)), path_gain_a.n_rows, false, true);
+    const arma::Mat<double> M_f(const_cast<double *>(M_a.slice_memptr(i_freq)), M_a.n_rows, M_a.n_cols, false, true);
+    const double center_freq_sel = center_freq_a.empty() ? 0.0 : center_freq_a.at(i_freq);
 
     // Initialize angles
     arma::cube aod, eod, aoa, eoa;
@@ -473,7 +473,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                          Rx, Ry, Rz, Rb, Rt, Rh,
                                                          &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
                                                          &coeff_re, &coeff_im, &delay,
-                                                         center_frequency, use_absolute_delays, add_fake_los_path,
+                                                         center_freq_sel, use_absolute_delays, add_fake_los_path,
                                                          p_aod, p_eod, p_aoa, p_eoa, use_kernel);
         }
 
@@ -496,7 +496,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                      Rx, Ry, Rz, Rb, Rt, Rh,
                                                      &fbs_pos_a, &lbs_pos_a, &path_gain_f, &path_length_a, &M_f,
                                                      &coeff_re, &coeff_im, &delay,
-                                                     center_frequency, use_absolute_delays, add_fake_los_path,
+                                                     center_freq_sel, use_absolute_delays, add_fake_los_path,
                                                      p_aod, p_eod, p_aoa, p_eoa, use_kernel);
     }
 
@@ -524,5 +524,5 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
 //       py::arg("add_fake_los_path") = false,
 //       py::arg("angles") = false,
 //       py::arg("complex") = true,
-//       py::arg("freq") = 0,
+//       py::arg("i_freq") = 0,
 //       py::arg("use_kernel") = 0);

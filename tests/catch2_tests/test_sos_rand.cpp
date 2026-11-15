@@ -53,20 +53,20 @@ namespace
                         arma::sword seed, arma::uword g, arma::uword n_gen, bool uniform = false)
     {
         d_a = d_a == 0.0 ? 0.1 : d_a, d_b = d_b == 0.0 ? 0.1 : d_b;
-        arma::mat freq, phase, val;
+        arma::mat spatial_freq, phase, val;
         arma::vec acf, dist;
-        quadriga_lib::sos_preset(preset, freq, &acf, &dist, d_a);
+        quadriga_lib::sos_preset(preset, spatial_freq, &acf, &dist, d_a);
         // Phases: one stream per device, the second one seeded with seed + 2^62 (bit 62 flipped)
         arma::mat phase_b;
-        quadriga_lib::sos_init_phases(freq.n_rows, n_gen, phase, seed);
-        quadriga_lib::sos_init_phases(freq.n_rows, n_gen, phase_b, seed + ((arma::sword)1 << 62));
+        quadriga_lib::sos_init_phases(spatial_freq.n_rows, n_gen, phase, seed);
+        quadriga_lib::sos_init_phases(spatial_freq.n_rows, n_gen, phase_b, seed + ((arma::sword)1 << 62));
         arma::mat ph_a = phase.col(g), ph_b = phase_b.col(g);
         if (pos_b == nullptr)
-            quadriga_lib::sos_val(freq, ph_a, pos, val, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, 1.0, uniform);
         else if (d_a == d_b)
-            quadriga_lib::sos_val(freq, ph_a, pos, val, pos_b, (arma::mat *)nullptr, &acf, &dist, 1.0, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, (arma::mat *)nullptr, &acf, &dist, 1.0, uniform);
         else
-            quadriga_lib::sos_val(freq, ph_a, pos, val, pos_b, &ph_b, (arma::vec *)nullptr, (arma::vec *)nullptr, d_a / d_b, uniform);
+            quadriga_lib::sos_val(spatial_freq, ph_a, pos, val, pos_b, &ph_b, (arma::vec *)nullptr, (arma::vec *)nullptr, d_a / d_b, uniform);
         return val.col(0);
     }
 }

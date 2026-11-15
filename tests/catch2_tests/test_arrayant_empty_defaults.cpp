@@ -18,7 +18,7 @@
 
 // Three-element arrayant on a 30 degree grid with distinct, deterministic patterns; element_pos, coupling_re and
 // coupling_im filled with zeros, identity and zeros
-static quadriga_lib::arrayant<double> filled_arrayant(double center_frequency = 3.0e9)
+static quadriga_lib::arrayant<double> filled_arrayant(double center_freq = 3.0e9)
 {
     const double d2r = arma::datum::pi / 180.0;
     quadriga_lib::arrayant<double> a;
@@ -41,7 +41,7 @@ static quadriga_lib::arrayant<double> filled_arrayant(double center_frequency = 
     a.element_pos.zeros(3, n);
     a.coupling_re.eye(n, n);
     a.coupling_im.zeros(n, n);
-    a.center_frequency = center_frequency;
+    a.center_freq = center_freq;
     return a;
 }
 
@@ -343,17 +343,17 @@ TEST_CASE("Channel functions - Empty element_pos and coupling equal zeros and id
 
         // Multi-frequency (two entries with the same pattern at 2 and 4 GHz)
         std::vector<arma::cube> mre[2], mim[2], mdl[2];
-        const arma::vec freq_in = {2.0e9, 4.0e9}, freq_out = {3.0e9};
+        const arma::vec freq = {2.0e9, 4.0e9}, freq_new = {3.0e9};
         const arma::mat gain_f = arma::join_horiz(gain, gain);
         const arma::cube M_f = arma::join_slices(arma::cube(M.memptr(), 8, 2, 1), arma::cube(M.memptr(), 8, 2, 1));
         for (int k = 0; k < 2; ++k)
         {
             auto tx = *(k == 0 ? c.tx_a : c.tx_b), rx = *(k == 0 ? c.rx_a : c.rx_b);
             auto tx2 = tx, rx2 = rx;
-            tx.center_frequency = rx.center_frequency = 2.0e9, tx2.center_frequency = rx2.center_frequency = 4.0e9;
+            tx.center_freq = rx.center_freq = 2.0e9, tx2.center_freq = rx2.center_freq = 4.0e9;
             quadriga_lib::get_channels_multifreq<double>({tx, tx2}, {rx, rx2},
                                                          0.0, 0.0, 1.0, 0.1, 0.0, 0.0, 20.0, 0.0, 1.0, 0.0, 0.0, 3.0,
-                                                         fbs, fbs, gain_f, len, M_f, freq_in, freq_out, mre[k], mim[k], mdl[k]);
+                                                         fbs, fbs, gain_f, len, M_f, freq, freq_new, mre[k], mim[k], mdl[k]);
         }
         REQUIRE(arma::abs(mre[0][0]).max() > 0.01);
         CHECK(arma::approx_equal(mre[0][0], mre[1][0], "absdiff", 1e-12));

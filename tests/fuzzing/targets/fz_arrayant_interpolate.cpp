@@ -91,7 +91,7 @@ static void run(fz::input &in)
     for (arma::uword f = 0; f < n_freq_ant; ++f)
     {
         vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? fz::arrayant<T>(in) : a);
-        vec.back().center_frequency = in.value<T>();
+        vec.back().center_freq = in.value<T>();
     }
     arma::Col<T> freq = in.col<T>(in.size(5)); // May be empty: the center frequencies of the entries
     arma::Cube<T> CV_re, CV_im, CH_re, CH_im;

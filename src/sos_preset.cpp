@@ -1510,7 +1510,7 @@ SECTION!*/
 
 /*!MD
 # sos_preset
-Frequencies and ACF of a predefined sum-of-sinusoids generator
+Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
 
 - Returns a precomputed frequency table for [[sos_val]] together with the autocorrelation function (ACF)
   it was fitted to
@@ -1524,7 +1524,7 @@ Frequencies and ACF of a predefined sum-of-sinusoids generator
   `d/10` and the frequencies by `10/d`
 - All tables are 3-dimensional and can be used with positions of 1, 2 or 3 columns
 - How the tables were made: [[sos_generate]] with the 200-sample ACF for 10 m, `n_dim = 3`,
-  `uniform_smp = true`, `n_dir = 300`, `random_init = true`, `freq_min = 0.005`, `freq_max = 15 / 49.75`,
+  `uniform_smp = true`, `n_dir = 300`, `random_init = true`, `spatial_freq_min = 0.005`, `spatial_freq_max = 15 / 49.75`,
   and the seeds 39, 3, 2, 5 (Exp), 13, 32, 6, 21 (Gauss), 13, 25, 37, 47 (Comb) for 128, 256, 512 and 1024
   sinusoids. Sinusoid `n` points in direction `n` of the spiral lattice described in [[sos_calc_mse]]
 - The lower frequency limit means that no sinusoid has a wavelength above 20 decorrelation distances. The
@@ -1536,7 +1536,7 @@ Frequencies and ACF of a predefined sum-of-sinusoids generator
 ```
 void quadriga_lib::sos_preset(
     const std::string &name,
-    arma::Mat<dtype> &freq,
+    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *acf = nullptr,
     arma::Col<dtype> *dist = nullptr,
     dtype dist_decorr = 10.0);
@@ -1547,7 +1547,7 @@ void quadriga_lib::sos_preset(
 - **`dist_decorr`** *(optional)* — Decorrelation distance in [m]; must be > 0
 
 ## Outputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, 3]`
 - **`acf`** *(optional)* — Target ACF; `[200]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; `[200]`
 
@@ -1559,7 +1559,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::sos_preset(const std::string &name,
-                              arma::Mat<dtype> &freq,
+                              arma::Mat<dtype> &spatial_freq,
                               arma::Col<dtype> *acf,
                               arma::Col<dtype> *dist,
                               dtype dist_decorr)
@@ -1572,8 +1572,8 @@ void quadriga_lib::sos_preset(const std::string &name,
     if (!(dist_decorr > (dtype)0.0) || !std::isfinite((double)dist_decorr))
         throw std::invalid_argument("Input 'dist_decorr' must be > 0.");
 
-    qd_check_alias_outputs(&freq, "freq", acf, "acf");
-    qd_check_alias_outputs(&freq, "freq", dist, "dist");
+    qd_check_alias_outputs(&spatial_freq, "spatial_freq", acf, "acf");
+    qd_check_alias_outputs(&spatial_freq, "spatial_freq", dist, "dist");
     qd_check_alias_outputs(acf, "acf", dist, "dist");
 
     const double *tables[3][4] = {
@@ -1588,12 +1588,12 @@ void quadriga_lib::sos_preset(const std::string &name,
     std::vector<double> ux(n_coeff), uy(n_coeff), uz(n_coeff);
     qd_sos_directions(n_coeff, 3, ux.data(), uy.data(), uz.data());
 
-    if (freq.n_rows != n_coeff || freq.n_cols != 3)
-        freq.set_size(n_coeff, 3);
+    if (spatial_freq.n_rows != n_coeff || spatial_freq.n_cols != 3)
+        spatial_freq.set_size(n_coeff, 3);
     for (arma::uword n = 0; n < n_coeff; ++n)
     {
         double f = table[n] / scale;
-        freq.at(n, 0) = (dtype)(f * ux[n]), freq.at(n, 1) = (dtype)(f * uy[n]), freq.at(n, 2) = (dtype)(f * uz[n]);
+        spatial_freq.at(n, 0) = (dtype)(f * ux[n]), spatial_freq.at(n, 1) = (dtype)(f * uy[n]), spatial_freq.at(n, 2) = (dtype)(f * uz[n]);
     }
 
     if (acf != nullptr)
@@ -1617,5 +1617,5 @@ void quadriga_lib::sos_preset(const std::string &name,
     }
 }
 
-template void quadriga_lib::sos_preset(const std::string &name, arma::Mat<float> &freq, arma::Col<float> *acf, arma::Col<float> *dist, float dist_decorr);
-template void quadriga_lib::sos_preset(const std::string &name, arma::Mat<double> &freq, arma::Col<double> *acf, arma::Col<double> *dist, double dist_decorr);
+template void quadriga_lib::sos_preset(const std::string &name, arma::Mat<float> &spatial_freq, arma::Col<float> *acf, arma::Col<float> *dist, float dist_decorr);
+template void quadriga_lib::sos_preset(const std::string &name, arma::Mat<double> &spatial_freq, arma::Col<double> *acf, arma::Col<double> *dist, double dist_decorr);

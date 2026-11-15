@@ -15,7 +15,7 @@ rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 
 N = sp.NumClusters - 1;
 M = sp.NumSubPaths;
 n_ray = 2 + N * M;                                                            % LOS, GR, N clusters of M rays
-fields = { 'method', 'tx_pos', 'rx_pos', 'center_frequency', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', ...
+fields = { 'method', 'tx_pos', 'rx_pos', 'center_freq', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', ...
     'M', 'path_type', 'tap', 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
 
 % 'quadriga': clusters of all frequencies, the shared "ray" set
@@ -43,7 +43,7 @@ for l = 1 : 3
     assertEqual( r.method, 'quadriga' );
     assertEqual( r.tx_pos, tx_pos' );
     assertEqual( r.rx_pos, rx_pos(l, :)' );
-    assertEqual( r.center_frequency, fc );
+    assertEqual( r.center_freq, fc );
     assertEqual( size(r.delay), [n_ray, 1] );
     assertEqual( size(r.power), [n_ray, 2] );
     assertEqual( size(r.eoa), [n_ray, 1] );
@@ -76,9 +76,9 @@ assert_throws( @() quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, 
 
 %% Optional inputs: method, i_freq (1-based), angle_model, pol_model, pol_variability, random_phase
 r2 = mf( 1, [], [], gre, gim );
-assertEqual( r2(1).center_frequency, fc(1) );
+assertEqual( r2(1).center_freq, fc(1) );
 r3 = mf( 2, [], [], gre, gim );
-assertEqual( r3(1).center_frequency, fc(2) );                                 % rays(1).center_frequency == fc(i_freq)
+assertEqual( r3(1).center_freq, fc(2) );                                 % rays(1).center_freq == fc(i_freq)
 assertEqual( r3(2).gr_eps_re, gre(2, 2) );
 assertEqual( size(r3(1).power), [n_ray, 1] );
 assertTrue( max(abs(r3(1).delay - r2(1).delay)) > 0 );
@@ -106,7 +106,7 @@ assertEqual( r5(2).M, r2(2).M );
 rd = quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc(1), lsp(:, 1, :), mu(:, 1, :), sig(:, 1, :), d1, p1, a1, e1, ...
     b1, f1, rr(:, :, 1), [], [], [], [], gre(:, 1), gim(:, 1) );
 assertEqual( rd(1).method, '38.901' );
-assertEqual( rd(1).center_frequency, fc(1) );
+assertEqual( rd(1).center_freq, fc(1) );
 
 %% Outputs and type handling
 quadriga_lib.ssf_rays( sp, tx_pos, rx_pos, fc, lsp, mu, sig, d, p, aod, eod, aoa, eoa, rq, 'quadriga', [], [], [], ...

@@ -403,7 +403,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
         ant.coupling_im.zeros(n_el_pattern, n_el_pattern);
     }
 
-    ant.center_frequency = center_freq;
+    ant.center_freq = center_freq;
 
     // Duplicate the existing elements in y-direction (horizontal stacking)
     arma::uword n_elements = ant.n_elements();
@@ -523,7 +523,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
         ant.coupling_im.zeros(n_el_pattern, n_el_pattern);
     }
 
-    ant.center_frequency = center_freq;
+    ant.center_freq = center_freq;
     arma::uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
 
     if (pattern == nullptr) // Generate 3GPP default radiation pattern

@@ -109,8 +109,7 @@ rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. 
 two deliberate library choices: the SOS preset `Comb256` with bias removal ([[gbsm_init_phases]], [[gbsm_draw]]) and
 `method = 'quadriga'` of [[gbsm_rays_from_paths]]; QuaDRiGa variants are options. Units: frequencies in Hz, path loss
 in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file keys and
-`scenpar` fields have the units of the file comments (e.g. `PerClusterDS` in ns). Messages name the argument
-`center_freq` `center_frequency`.
+`scenpar` fields have the units of the file comments (e.g. `PerClusterDS` in ns).
 SECTION_DESC!*/
 
 /*!MD

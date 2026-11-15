@@ -42,27 +42,27 @@ namespace
     }
 
     // Oracle: value of generator g at {x, y, z}
-    double ref_s(const arma::mat &freq, const arma::mat &phase, arma::uword g, double x, double y, double z)
+    double ref_s(const arma::mat &spatial_freq, const arma::mat &phase, arma::uword g, double x, double y, double z)
     {
         double acc = 0.0, p[3] = {x, y, z};
-        for (arma::uword n = 0; n < freq.n_rows; ++n)
+        for (arma::uword n = 0; n < spatial_freq.n_rows; ++n)
         {
             double arg = 0.0;
-            for (arma::uword c = 0; c < freq.n_cols; ++c)
-                arg += freq(n, c) * p[c];
+            for (arma::uword c = 0; c < spatial_freq.n_cols; ++c)
+                arg += spatial_freq(n, c) * p[c];
             acc += std::cos(2.0 * pi * arg + phase(n, g));
         }
-        return std::sqrt(2.0 / (double)freq.n_rows) * acc;
+        return std::sqrt(2.0 / (double)spatial_freq.n_rows) * acc;
     }
 }
 
 TEST_CASE("sos_map - cubes are in meshgrid order with one cube per generator")
 {
-    arma::mat freq = rnd(9, 3, -0.3, 0.3, 1), phase = rnd(9, 2, -pi, pi, 2);
+    arma::mat spatial_freq = rnd(9, 3, -0.3, 0.3, 1), phase = rnd(9, 2, -pi, pi, 2);
     arma::vec x = {-3.0, 0.5, 7.0}, y = {2.0, -4.5}, z = {0.0, 1.0, 2.5, 10.0};
 
     std::vector<arma::cube> map;
-    quadriga_lib::sos_map(freq, phase, x, map, &y, &z, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, map, &y, &z, false, 1);
     REQUIRE(map.size() == 2);
 
     double max_err = 0.0, max_val = 0.0;
@@ -77,7 +77,7 @@ TEST_CASE("sos_map - cubes are in meshgrid order with one cube per generator")
             for (arma::uword ix = 0; ix < 3; ++ix)
                 for (arma::uword iy = 0; iy < 2; ++iy)
                 {
-                    double ref = ref_s(freq, phase, g, x(ix), y(iy), z(iz)), v = map[g](iy, ix, iz);
+                    double ref = ref_s(spatial_freq, phase, g, x(ix), y(iy), z(iz)), v = map[g](iy, ix, iz);
                     if (iz == 1 && iy == 1)
                         QD_DIAG("%llu,%llu,%llu,%llu,%.9f,%.9f,%.2e\n", (unsigned long long)g, (unsigned long long)iy,
                                 (unsigned long long)ix, (unsigned long long)iz, v, ref, v - ref);
@@ -92,41 +92,41 @@ TEST_CASE("sos_map - cubes are in meshgrid order with one cube per generator")
 
 TEST_CASE("sos_map - omitted grid vectors are a single sample at zero")
 {
-    arma::mat freq = rnd(9, 3, -0.3, 0.3, 3), phase = rnd(9, 1, -pi, pi, 4);
+    arma::mat spatial_freq = rnd(9, 3, -0.3, 0.3, 3), phase = rnd(9, 1, -pi, pi, 4);
     arma::vec x = {-3.0, 0.5, 7.0}, y = {2.0, -4.5}, z = {1.0, 2.5, 10.0, -1.0}, none;
 
     std::vector<arma::cube> map;
-    quadriga_lib::sos_map(freq, phase, x, map, (arma::vec *)nullptr, (arma::vec *)nullptr, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, map, (arma::vec *)nullptr, (arma::vec *)nullptr, false, 1);
     REQUIRE(map.size() == 1);
     REQUIRE(map[0].n_rows == 1);
     REQUIRE(map[0].n_cols == 3);
     REQUIRE(map[0].n_slices == 1);
     for (arma::uword ix = 0; ix < 3; ++ix)
-        CHECK(std::abs(map[0](0, ix, 0) - ref_s(freq, phase, 0, x(ix), 0.0, 0.0)) < 1e-12);
+        CHECK(std::abs(map[0](0, ix, 0) - ref_s(spatial_freq, phase, 0, x(ix), 0.0, 0.0)) < 1e-12);
     CHECK(arma::abs(map[0]).max() > 0.1);
 
     // An empty vector means omitted
     std::vector<arma::cube> map_e;
-    quadriga_lib::sos_map(freq, phase, x, map_e, &none, &none, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, map_e, &none, &none, false, 1);
     REQUIRE(map_e.size() == 1);
     CHECK(arma::approx_equal(map_e[0], map[0], "absdiff", 0.0));
 
     // x and y
-    quadriga_lib::sos_map(freq, phase, x, map, &y, (arma::vec *)nullptr, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, map, &y, (arma::vec *)nullptr, false, 1);
     REQUIRE(map[0].n_rows == 2);
     REQUIRE(map[0].n_cols == 3);
     REQUIRE(map[0].n_slices == 1);
-    CHECK(std::abs(map[0](1, 2, 0) - ref_s(freq, phase, 0, x(2), y(1), 0.0)) < 1e-12);
+    CHECK(std::abs(map[0](1, 2, 0) - ref_s(spatial_freq, phase, 0, x(2), y(1), 0.0)) < 1e-12);
 
     // x and z without y
-    quadriga_lib::sos_map(freq, phase, x, map, (arma::vec *)nullptr, &z, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, map, (arma::vec *)nullptr, &z, false, 1);
     REQUIRE(map[0].n_rows == 1);
     REQUIRE(map[0].n_cols == 3);
     REQUIRE(map[0].n_slices == 4);
-    CHECK(std::abs(map[0](0, 1, 3) - ref_s(freq, phase, 0, x(1), 0.0, z(3))) < 1e-12);
+    CHECK(std::abs(map[0](0, 1, 3) - ref_s(spatial_freq, phase, 0, x(1), 0.0, z(3))) < 1e-12);
 
     // Frequencies with one column
-    arma::mat f1 = freq.col(0);
+    arma::mat f1 = spatial_freq.col(0);
     quadriga_lib::sos_map(f1, phase, x, map, (arma::vec *)nullptr, (arma::vec *)nullptr, false, 1);
     REQUIRE(map[0].n_cols == 3);
     CHECK(std::abs(map[0](0, 2, 0) - ref_s(f1, phase, 0, x(2), 0.0, 0.0)) < 1e-12);
@@ -134,13 +134,13 @@ TEST_CASE("sos_map - omitted grid vectors are a single sample at zero")
 
 TEST_CASE("sos_map - Uniform output, kernels and float")
 {
-    arma::mat freq = rnd(30, 3, -0.3, 0.3, 5), phase = rnd(30, 3, -pi, pi, 6);
+    arma::mat spatial_freq = rnd(30, 3, -0.3, 0.3, 5), phase = rnd(30, 3, -pi, pi, 6);
     arma::vec x = arma::linspace(-20.0, 20.0, 11), y = arma::linspace(-5.0, 9.0, 5);
 
     std::vector<arma::cube> nrm, uni, k0;
-    quadriga_lib::sos_map(freq, phase, x, nrm, &y, (arma::vec *)nullptr, false, 1);
-    quadriga_lib::sos_map(freq, phase, x, uni, &y, (arma::vec *)nullptr, true, 1);
-    quadriga_lib::sos_map(freq, phase, x, k0, &y);
+    quadriga_lib::sos_map(spatial_freq, phase, x, nrm, &y, (arma::vec *)nullptr, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, uni, &y, (arma::vec *)nullptr, true, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, k0, &y);
     REQUIRE(uni.size() == 3);
     REQUIRE(k0.size() == 3);
     REQUIRE(uni[2].n_elem == 55);
@@ -151,7 +151,7 @@ TEST_CASE("sos_map - Uniform output, kernels and float")
     // Automatic kernel: within the single-precision bound of the AVX2 kernel, 4e-7 · sqrt(2·30)
     CHECK(arma::abs(k0[1] - nrm[1]).max() < 4e-7 * std::sqrt(60.0));
 
-    arma::fmat ff = arma::conv_to<arma::fmat>::from(freq), pf = arma::conv_to<arma::fmat>::from(phase);
+    arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq), pf = arma::conv_to<arma::fmat>::from(phase);
     arma::fvec xf = arma::conv_to<arma::fvec>::from(x), yf = arma::conv_to<arma::fvec>::from(y);
     std::vector<arma::fcube> mf;
     quadriga_lib::sos_map(ff, pf, xf, mf, &yf);
@@ -164,18 +164,18 @@ TEST_CASE("sos_map - Uniform output, kernels and float")
 
 TEST_CASE("sos_map - a pre-sized output is written in place and a wrong size is replaced")
 {
-    arma::mat freq = rnd(9, 3, -0.3, 0.3, 7), phase = rnd(9, 2, -pi, pi, 8);
+    arma::mat spatial_freq = rnd(9, 3, -0.3, 0.3, 7), phase = rnd(9, 2, -pi, pi, 8);
     arma::vec x = {-3.0, 0.5, 7.0}, y = {2.0, -4.5};
 
     std::vector<arma::cube> ref;
-    quadriga_lib::sos_map(freq, phase, x, ref, &y, (arma::vec *)nullptr, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, ref, &y, (arma::vec *)nullptr, false, 1);
     REQUIRE(ref.size() == 2);
 
     std::vector<arma::cube> sized(2);
     sized[0].set_size(2, 3, 1), sized[1].set_size(2, 3, 1);
     sized[0].fill(99.0), sized[1].fill(99.0);
     const double *p0 = sized[0].memptr(), *p1 = sized[1].memptr();
-    quadriga_lib::sos_map(freq, phase, x, sized, &y, (arma::vec *)nullptr, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, sized, &y, (arma::vec *)nullptr, false, 1);
     CHECK(sized[0].memptr() == p0);
     CHECK(sized[1].memptr() == p1);
     CHECK(arma::approx_equal(sized[0], ref[0], "absdiff", 0.0));
@@ -184,7 +184,7 @@ TEST_CASE("sos_map - a pre-sized output is written in place and a wrong size is 
     std::vector<arma::cube> wrong(5);
     wrong[0].set_size(4, 4, 4);
     wrong[0].fill(99.0);
-    quadriga_lib::sos_map(freq, phase, x, wrong, &y, (arma::vec *)nullptr, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, wrong, &y, (arma::vec *)nullptr, false, 1);
     REQUIRE(wrong.size() == 2);
     CHECK(arma::approx_equal(wrong[0], ref[0], "absdiff", 0.0));
     CHECK(arma::approx_equal(wrong[1], ref[1], "absdiff", 0.0));
@@ -193,16 +193,16 @@ TEST_CASE("sos_map - a pre-sized output is written in place and a wrong size is 
 
 TEST_CASE("sos_map - input validation")
 {
-    arma::mat freq = rnd(9, 3, -0.3, 0.3, 9), phase = rnd(9, 2, -pi, pi, 10);
+    arma::mat spatial_freq = rnd(9, 3, -0.3, 0.3, 9), phase = rnd(9, 2, -pi, pi, 10);
     arma::vec x = {-3.0, 0.5, 7.0}, y = {2.0, -4.5}, z = {1.0};
     std::vector<arma::cube> map;
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_map(freq, phase, x, map));
-        CHECK_NOTHROW(quadriga_lib::sos_map(freq, phase, x, map, &y, &z, true, 1));
+        CHECK_NOTHROW(quadriga_lib::sos_map(spatial_freq, phase, x, map));
+        CHECK_NOTHROW(quadriga_lib::sos_map(spatial_freq, phase, x, map, &y, &z, true, 1));
     }
-    SECTION("freq")
+    SECTION("spatial_freq")
     {
         arma::mat empty, four(9, 4, arma::fill::ones);
         CHECK_THROWS_AS(quadriga_lib::sos_map(empty, phase, x, map), std::invalid_argument);
@@ -211,32 +211,32 @@ TEST_CASE("sos_map - input validation")
     SECTION("phase")
     {
         arma::mat empty, rows(8, 2, arma::fill::ones);
-        CHECK_THROWS_AS(quadriga_lib::sos_map(freq, empty, x, map), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_map(freq, rows, x, map), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_map(spatial_freq, empty, x, map), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_map(spatial_freq, rows, x, map), std::invalid_argument);
     }
     SECTION("x")
     {
         arma::vec empty;
-        CHECK_THROWS_AS(quadriga_lib::sos_map(freq, phase, empty, map), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_map(spatial_freq, phase, empty, map), std::invalid_argument);
     }
     SECTION("y and z need enough dimensions")
     {
-        arma::mat f1 = freq.col(0), f2 = freq.cols(0, 1);
+        arma::mat f1 = spatial_freq.col(0), f2 = spatial_freq.cols(0, 1);
         CHECK_THROWS_AS(quadriga_lib::sos_map(f1, phase, x, map, &y), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_map(f2, phase, x, map, &y, &z), std::invalid_argument);
         CHECK_NOTHROW(quadriga_lib::sos_map(f2, phase, x, map, &y));
     }
     SECTION("use_kernel")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_map(freq, phase, x, map, &y, &z, false, 3), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_map(spatial_freq, phase, x, map, &y, &z, false, 3), std::invalid_argument);
     }
     SECTION("a kernel that is not available")
     {
         // Runs in a build without AVX2 or on a CPU without it; with AVX2 the same call must work
         if (!quadriga_lib::quadriga_lib_has_AVX2())
-            CHECK_THROWS_AS(quadriga_lib::sos_map(freq, phase, x, map, &y, &z, false, 2), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::sos_map(spatial_freq, phase, x, map, &y, &z, false, 2), std::invalid_argument);
         else
-            CHECK_NOTHROW(quadriga_lib::sos_map(freq, phase, x, map, &y, &z, false, 2));
+            CHECK_NOTHROW(quadriga_lib::sos_map(spatial_freq, phase, x, map, &y, &z, false, 2));
     }
     SECTION("a failed call leaves the output untouched")
     {
@@ -244,7 +244,7 @@ TEST_CASE("sos_map - input validation")
         keep[0].set_size(2, 2, 2);
         keep[0].fill(7.0);
         arma::vec empty;
-        CHECK_THROWS_AS(quadriga_lib::sos_map(freq, phase, empty, keep), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_map(spatial_freq, phase, empty, keep), std::invalid_argument);
         REQUIRE(keep.size() == 1);
         CHECK(keep[0].n_slices == 2);
         CHECK(keep[0](1, 1, 1) == 7.0);
@@ -256,12 +256,12 @@ TEST_CASE("sos_map - cubes that share one block of memory are filled in place")
     // The MEX and Python wrappers allocate the 4-D output as one block and hand the function cubes that
     // alias it. The function then evaluates into that block; the result must be the same as for separate
     // cubes, the cubes must keep their memory, and nothing around the block may be written.
-    arma::mat freq = rnd(9, 3, -0.3, 0.3, 11), phase = rnd(9, 3, -pi, pi, 12);
+    arma::mat spatial_freq = rnd(9, 3, -0.3, 0.3, 11), phase = rnd(9, 3, -pi, pi, 12);
     arma::vec x = {-3.0, 0.5, 7.0, 9.0}, y = {2.0, -4.5}, z = {1.0, 6.0, -2.0};
     const arma::uword n_pos = 4 * 2 * 3, n_gen = 3;
 
     std::vector<arma::cube> ref;
-    quadriga_lib::sos_map(freq, phase, x, ref, &y, &z, false, 1);
+    quadriga_lib::sos_map(spatial_freq, phase, x, ref, &y, &z, false, 1);
     REQUIRE(ref.size() == n_gen);
     CHECK(arma::abs(ref[2]).max() > 0.3);
 
@@ -277,8 +277,8 @@ TEST_CASE("sos_map - cubes that share one block of memory are filled in place")
     for (bool uniform : {false, true})
     {
         std::vector<arma::cube> sep;
-        quadriga_lib::sos_map(freq, phase, x, sep, &y, &z, uniform, 1);
-        quadriga_lib::sos_map(freq, phase, x, map, &y, &z, uniform, 1);
+        quadriga_lib::sos_map(spatial_freq, phase, x, sep, &y, &z, uniform, 1);
+        quadriga_lib::sos_map(spatial_freq, phase, x, map, &y, &z, uniform, 1);
         REQUIRE(map.size() == n_gen);
         for (arma::uword g = 0; g < n_gen; ++g)
         {
@@ -291,7 +291,7 @@ TEST_CASE("sos_map - cubes that share one block of memory are filled in place")
     }
 
     // Float
-    arma::fmat ff = arma::conv_to<arma::fmat>::from(freq), pf = arma::conv_to<arma::fmat>::from(phase);
+    arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq), pf = arma::conv_to<arma::fmat>::from(phase);
     arma::fvec xf = arma::conv_to<arma::fvec>::from(x), yf = arma::conv_to<arma::fvec>::from(y), zf = arma::conv_to<arma::fvec>::from(z);
     arma::fvec fblock(n_pos * n_gen);
     std::vector<arma::fcube> fmap, fsep;
@@ -313,17 +313,17 @@ TEST_CASE("sos_map - outputs that alias inputs")
     // with a message that names 'map', for the one-block path, for separate cubes and for the grid vectors
     std::mt19937_64 rng(77);
     std::uniform_real_distribution<double> u(-0.3, 0.3);
-    arma::mat freq(10, 2), phase(10, 2);
-    freq.imbue([&]() { return u(rng); });
+    arma::mat spatial_freq(10, 2), phase(10, 2);
+    spatial_freq.imbue([&]() { return u(rng); });
     phase.imbue([&]() { return 10.0 * u(rng); });
     const arma::vec x = {0.0, 1.0, 2.0, 4.0, 5.0}, y = {0.0, 0.5, 2.0, 3.0}; // 4 x 5 grid = 20 values
-    const arma::mat freq0 = freq, phase0 = phase;
+    const arma::mat freq0 = spatial_freq, phase0 = phase;
 
     auto message = [&](std::vector<arma::cube> &map) -> std::string
     {
         try
         {
-            quadriga_lib::sos_map<double>(freq, phase, x, map, &y);
+            quadriga_lib::sos_map<double>(spatial_freq, phase, x, map, &y);
         }
         catch (const std::invalid_argument &e)
         {
@@ -333,9 +333,9 @@ TEST_CASE("sos_map - outputs that alias inputs")
     };
     const std::string expected = "Output 'map' cannot be an input or share memory with one.";
 
-    // One block: two cubes one after the other on the memory of 'freq' (20 values) and the following block
+    // One block: two cubes one after the other on the memory of 'spatial_freq' (20 values) and the following block
     arma::vec block(60, arma::fill::zeros);
-    std::copy(freq.begin(), freq.end(), block.begin() + 30);
+    std::copy(spatial_freq.begin(), spatial_freq.end(), block.begin() + 30);
     arma::mat f_block(block.memptr() + 30, 10, 2, false, true);
     std::vector<arma::cube> map1;
     map1.reserve(2);
@@ -360,13 +360,13 @@ TEST_CASE("sos_map - outputs that alias inputs")
     CHECK(message(map2) == expected);
     CHECK(arma::approx_equal(phase, phase0, "absdiff", 0.0));
 
-    // A cube on the memory of 'freq'
+    // A cube on the memory of 'spatial_freq'
     std::vector<arma::cube> map3;
     map3.reserve(2);
-    map3.emplace_back(freq.memptr(), 4, 5, 1, false, true);
+    map3.emplace_back(spatial_freq.memptr(), 4, 5, 1, false, true);
     map3.emplace_back(4, 5, 1, arma::fill::zeros);
     CHECK(message(map3) == expected);
-    CHECK(arma::approx_equal(freq, freq0, "absdiff", 0.0));
+    CHECK(arma::approx_equal(spatial_freq, freq0, "absdiff", 0.0));
 
     // A cube on the memory of the grid vector 'x'
     arma::vec xb(20, arma::fill::zeros);
@@ -376,7 +376,7 @@ TEST_CASE("sos_map - outputs that alias inputs")
     map5.emplace_back(xb.memptr(), 4, 5, 1, false, true);
     try
     {
-        quadriga_lib::sos_map<double>(freq, phase.col(0), xv, map5, &y);
+        quadriga_lib::sos_map<double>(spatial_freq, phase.col(0), xv, map5, &y);
         FAIL("no error");
     }
     catch (const std::invalid_argument &e)
@@ -386,9 +386,9 @@ TEST_CASE("sos_map - outputs that alias inputs")
 
     // Memory next to the inputs is accepted and gives the values of a normal call
     std::vector<arma::cube> ref, map4;
-    quadriga_lib::sos_map<double>(freq, phase, x, ref, &y);
+    quadriga_lib::sos_map<double>(spatial_freq, phase, x, ref, &y);
     arma::vec block4(60, arma::fill::zeros);
-    std::copy(freq.begin(), freq.end(), block4.begin());
+    std::copy(spatial_freq.begin(), spatial_freq.end(), block4.begin());
     arma::mat f4(block4.memptr(), 10, 2, false, true);
     map4.reserve(2);
     map4.emplace_back(block4.memptr() + 20, 4, 5, 1, false, true);

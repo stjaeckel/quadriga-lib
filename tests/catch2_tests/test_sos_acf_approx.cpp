@@ -31,22 +31,22 @@ namespace
     const double pi = 3.141592653589793;
 
     // Oracle: ACF of the sinusoids for the displacement a along axis ia and b along axis ib
-    double ref_acf(const arma::mat &freq, arma::uword ia, double a, arma::uword ib, double b)
+    double ref_acf(const arma::mat &spatial_freq, arma::uword ia, double a, arma::uword ib, double b)
     {
         double acc = 0.0;
-        for (arma::uword n = 0; n < freq.n_rows; ++n)
-            acc += std::cos(2.0 * pi * (freq(n, ia) * a + (ib < freq.n_cols ? freq(n, ib) * b : 0.0)));
-        return acc / (double)freq.n_rows;
+        for (arma::uword n = 0; n < spatial_freq.n_rows; ++n)
+            acc += std::cos(2.0 * pi * (spatial_freq(n, ia) * a + (ib < spatial_freq.n_cols ? spatial_freq(n, ib) * b : 0.0)));
+        return acc / (double)spatial_freq.n_rows;
     }
 }
 
 TEST_CASE("sos_acf_approx - a single 3-D sinusoid gives one cosine per plane with the documented axes")
 {
-    arma::mat freq = {{0.03, 0.05, -0.02}};
+    arma::mat spatial_freq = {{0.03, 0.05, -0.02}};
     arma::vec dist = {0.0, 2.0, 4.0, 6.0};
     arma::cube ro;
     arma::vec axis;
-    quadriga_lib::sos_acf_approx(freq, dist, ro, &axis);
+    quadriga_lib::sos_acf_approx(spatial_freq, dist, ro, &axis);
     REQUIRE(ro.n_rows == 13);
     REQUIRE(ro.n_cols == 13);
     REQUIRE(ro.n_slices == 3);
@@ -64,7 +64,7 @@ TEST_CASE("sos_acf_approx - a single 3-D sinusoid gives one cosine per plane wit
         for (arma::uword c = 0; c < 13; ++c)
             for (arma::uword r = 0; r < 13; ++r)
             {
-                double ref = std::cos(2.0 * pi * (freq(0, first[s]) * axis(c) + freq(0, second[s]) * axis(r)));
+                double ref = std::cos(2.0 * pi * (spatial_freq(0, first[s]) * axis(c) + spatial_freq(0, second[s]) * axis(r)));
                 if (r == 2 && c == 9)
                     QD_DIAG("%llu,%llu,%llu,%.9f,%.9f\n", (unsigned long long)s, (unsigned long long)r, (unsigned long long)c, ro(r, c, s), ref);
                 max_err = std::max(max_err, std::abs(ro(r, c, s) - ref));
@@ -77,23 +77,23 @@ TEST_CASE("sos_acf_approx - a single 3-D sinusoid gives one cosine per plane wit
 
 TEST_CASE("sos_acf_approx - several sinusoids average, in one, two and three dimensions")
 {
-    arma::mat freq = {{0.03, 0.05, -0.02}, {-0.07, 0.01, 0.04}, {0.002, -0.09, 0.06}, {0.11, 0.08, 0.0}};
+    arma::mat spatial_freq = {{0.03, 0.05, -0.02}, {-0.07, 0.01, 0.04}, {0.002, -0.09, 0.06}, {0.11, 0.08, 0.0}};
     arma::vec dist = {0.0, 2.0, 4.0, 6.0};
     arma::cube ro;
     arma::vec axis;
 
     // 3-D
-    quadriga_lib::sos_acf_approx(freq, dist, ro, &axis);
+    quadriga_lib::sos_acf_approx(spatial_freq, dist, ro, &axis);
     REQUIRE(ro.n_slices == 3);
-    CHECK(std::abs(ro(1, 10, 0) - ref_acf(freq, 0, axis(10), 1, axis(1))) < 1e-12);
-    CHECK(std::abs(ro(1, 10, 1) - ref_acf(freq, 0, axis(10), 2, axis(1))) < 1e-12);
-    CHECK(std::abs(ro(1, 10, 2) - ref_acf(freq, 1, axis(10), 2, axis(1))) < 1e-12);
+    CHECK(std::abs(ro(1, 10, 0) - ref_acf(spatial_freq, 0, axis(10), 1, axis(1))) < 1e-12);
+    CHECK(std::abs(ro(1, 10, 1) - ref_acf(spatial_freq, 0, axis(10), 2, axis(1))) < 1e-12);
+    CHECK(std::abs(ro(1, 10, 2) - ref_acf(spatial_freq, 1, axis(10), 2, axis(1))) < 1e-12);
     // Point symmetry of an ACF: R(-dx) = R(dx)
     CHECK(std::abs(ro(1, 10, 0) - ro(11, 2, 0)) < 1e-12);
     CHECK(std::abs(ro(1, 10, 0)) < 0.99);
 
     // 2-D
-    arma::mat f2 = freq.cols(0, 1);
+    arma::mat f2 = spatial_freq.cols(0, 1);
     quadriga_lib::sos_acf_approx(f2, dist, ro);
     REQUIRE(ro.n_rows == 13);
     REQUIRE(ro.n_cols == 13);
@@ -105,7 +105,7 @@ TEST_CASE("sos_acf_approx - several sinusoids average, in one, two and three dim
     CHECK(max_err < 1e-12);
 
     // 1-D
-    arma::mat f1 = freq.col(0);
+    arma::mat f1 = spatial_freq.col(0);
     quadriga_lib::sos_acf_approx(f1, dist, ro);
     REQUIRE(ro.n_rows == 13);
     REQUIRE(ro.n_cols == 1);
@@ -120,25 +120,25 @@ TEST_CASE("sos_acf_approx - several sinusoids average, in one, two and three dim
 
 TEST_CASE("sos_acf_approx - pre-sized output and float")
 {
-    arma::mat freq = {{0.03, 0.05, -0.02}, {-0.07, 0.01, 0.04}};
+    arma::mat spatial_freq = {{0.03, 0.05, -0.02}, {-0.07, 0.01, 0.04}};
     arma::vec dist = {0.0, 2.0, 4.0, 6.0};
     arma::cube ref;
-    quadriga_lib::sos_acf_approx(freq, dist, ref);
+    quadriga_lib::sos_acf_approx(spatial_freq, dist, ref);
     REQUIRE(ref.n_slices == 3);
     CHECK(std::abs(ref(6, 6, 1) - 1.0) < 1e-14);
 
     arma::cube sized(13, 13, 3);
     sized.fill(9.0);
     const double *ptr = sized.memptr();
-    quadriga_lib::sos_acf_approx(freq, dist, sized);
+    quadriga_lib::sos_acf_approx(spatial_freq, dist, sized);
     CHECK(sized.memptr() == ptr);
     CHECK(arma::approx_equal(sized, ref, "absdiff", 0.0));
 
     arma::cube wrong(2, 2, 2);
-    quadriga_lib::sos_acf_approx(freq, dist, wrong);
+    quadriga_lib::sos_acf_approx(spatial_freq, dist, wrong);
     CHECK(arma::approx_equal(wrong, ref, "absdiff", 0.0));
 
-    arma::fmat ff = arma::conv_to<arma::fmat>::from(freq);
+    arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq);
     arma::fvec df = arma::conv_to<arma::fvec>::from(dist), axf;
     arma::fcube rf;
     quadriga_lib::sos_acf_approx(ff, df, rf, &axf);
@@ -150,15 +150,15 @@ TEST_CASE("sos_acf_approx - pre-sized output and float")
 
 TEST_CASE("sos_acf_approx - input validation")
 {
-    arma::mat freq = {{0.03, 0.05, -0.02}};
+    arma::mat spatial_freq = {{0.03, 0.05, -0.02}};
     arma::vec dist = {0.0, 2.0, 4.0, 6.0};
     arma::cube ro;
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_acf_approx(freq, dist, ro));
+        CHECK_NOTHROW(quadriga_lib::sos_acf_approx(spatial_freq, dist, ro));
     }
-    SECTION("freq")
+    SECTION("spatial_freq")
     {
         arma::mat empty, four(2, 4, arma::fill::ones);
         CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(empty, dist, ro), std::invalid_argument);
@@ -167,20 +167,20 @@ TEST_CASE("sos_acf_approx - input validation")
     SECTION("dist")
     {
         arma::vec one = {0.0}, start = {1.0, 2.0, 3.0}, uneven = {0.0, 1.0, 3.0};
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, one, ro), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, start, ro), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, uneven, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, one, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, start, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, uneven, ro), std::invalid_argument);
     }
     SECTION("non-finite dist")
     {
         // A NaN passes every comparison of the spacing test, an Inf at the end gives an infinite step
         arma::vec nan_mid = {0.0, std::nan(""), 4.0, 6.0}, nan_end = {0.0, 2.0, 4.0, std::nan("")}, inf_end = {0.0, 2.0, 4.0, arma::datum::inf};
         arma::vec two_nan = {0.0, std::nan("")}, two_inf = {0.0, arma::datum::inf};
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, nan_mid, ro), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, nan_end, ro), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, inf_end, ro), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, two_nan, ro), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, two_inf, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, nan_mid, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, nan_end, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, inf_end, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, two_nan, ro), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, two_inf, ro), std::invalid_argument);
     }
     SECTION("a failed call leaves the outputs untouched")
     {
@@ -188,7 +188,7 @@ TEST_CASE("sos_acf_approx - input validation")
         axis.fill(7.0);
         ro.set_size(2, 2, 2);
         ro.fill(7.0);
-        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(freq, uneven, ro, &axis), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_acf_approx(spatial_freq, uneven, ro, &axis), std::invalid_argument);
         CHECK(ro.n_slices == 2);
         CHECK(ro(1, 1, 1) == 7.0);
         CHECK(axis.n_elem == 2);
@@ -199,11 +199,11 @@ TEST_CASE("sos_acf_approx - the planes are point-symmetric to the last bit")
 {
     // R(-dx) = R(dx). The half of each plane beyond the center column is the mirror image of the other
     // half, so the symmetry is exact, and the mirrored values still match the oracle.
-    arma::mat freq = {{0.031, 0.052, -0.023}, {-0.071, 0.013, 0.044}, {0.017, -0.066, 0.029}, {0.11, 0.07, -0.13}};
+    arma::mat spatial_freq = {{0.031, 0.052, -0.023}, {-0.071, 0.013, 0.044}, {0.017, -0.066, 0.029}, {0.11, 0.07, -0.13}};
     arma::vec dist = arma::regspace(0.0, 0.7, 6.3), axis;
     for (arma::uword n_dim = 2; n_dim <= 3; ++n_dim)
     {
-        arma::mat f = freq.cols(0, n_dim - 1);
+        arma::mat f = spatial_freq.cols(0, n_dim - 1);
         arma::cube ro;
         quadriga_lib::sos_acf_approx(f, dist, ro, &axis);
         const arma::uword n = ro.n_rows;
@@ -228,12 +228,12 @@ TEST_CASE("sos_acf_approx - the planes are point-symmetric to the last bit")
 
 TEST_CASE("sos_acf_approx - outputs that alias inputs")
 {
-    // 'acf_approx' on foreign memory (hand-built) that overlaps 'freq' or 'dist' would be written while the
+    // 'acf_approx' on foreign memory (hand-built) that overlaps 'spatial_freq' or 'dist' would be written while the
     // inputs are still read; the call throws before anything is written. The same holds for 'dist_2d'.
     const arma::vec dist = {0.0, 2.0, 4.0, 6.0}; // grid of 13 points
-    const arma::mat freq = arma::mat({0.05, 0.11, -0.07, 0.2}).t();
+    const arma::mat spatial_freq = arma::mat({0.05, 0.11, -0.07, 0.2}).t();
     arma::cube ref;
-    quadriga_lib::sos_acf_approx<double>(freq, dist, ref);
+    quadriga_lib::sos_acf_approx<double>(spatial_freq, dist, ref);
     REQUIRE(ref.n_elem == 13);
 
     // Output starts inside 'dist'
@@ -241,12 +241,12 @@ TEST_CASE("sos_acf_approx - outputs that alias inputs")
     std::copy(dist.begin(), dist.end(), block.begin());
     arma::vec d(block.memptr(), 4, false, true);
     arma::cube out(block.memptr() + 2, 13, 1, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(freq, d, out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(spatial_freq, d, out), std::invalid_argument);
     CHECK(arma::approx_equal(d, dist, "absdiff", 0.0));
 
-    // Output ends inside 'freq'
+    // Output ends inside 'spatial_freq'
     arma::vec block2(30, arma::fill::zeros);
-    std::copy(freq.begin(), freq.end(), block2.begin() + 14);
+    std::copy(spatial_freq.begin(), spatial_freq.end(), block2.begin() + 14);
     arma::mat f(block2.memptr() + 14, 4, 1, false, true);
     arma::cube out2(block2.memptr() + 2, 13, 1, 1, false, true);
     std::string msg;
@@ -259,7 +259,7 @@ TEST_CASE("sos_acf_approx - outputs that alias inputs")
         msg = e.what();
     }
     CHECK(msg == "Output 'acf_approx' cannot be an input or share memory with one.");
-    CHECK(arma::approx_equal(f, freq, "absdiff", 0.0));
+    CHECK(arma::approx_equal(f, spatial_freq, "absdiff", 0.0));
 
     // Next to the inputs: accepted, same values
     arma::cube out3(block2.memptr() + 1, 13, 1, 1, false, true);
@@ -269,9 +269,9 @@ TEST_CASE("sos_acf_approx - outputs that alias inputs")
     // 'dist_2d' the same object as 'dist', or on the memory of 'acf_approx'
     arma::vec d2 = dist;
     arma::cube out4;
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(freq, d2, out4, &d2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(spatial_freq, d2, out4, &d2), std::invalid_argument);
     CHECK(d2.n_elem == 4);
     arma::cube out5(13, 1, 1);
     arma::vec d5(out5.memptr(), 13, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(freq, dist, out5, &d5), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::sos_acf_approx<double>(spatial_freq, dist, out5, &d5), std::invalid_argument);
 }

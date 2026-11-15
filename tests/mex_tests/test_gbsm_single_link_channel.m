@@ -32,7 +32,7 @@ n_path = sum( any( rays.power > 0, 2 ) | rays.path_type < 2 );
 assertEqual( size(chan), [1, 1] );
 assertEqual( size(chan.coeff_re), [2, 1, n_tap] );
 assertEqual( size(chan.delay), [2, 1, n_tap] );
-assertEqual( chan.center_frequency, fc(1) );
+assertEqual( chan.center_freq, fc(1) );
 assertEqual( chan.tx_position, tx_pos' );
 assertEqual( chan.rx_position, rx_pos' );
 assertEqual( fieldnames(par)', { 'tap', 'n_ray_tap', 'fbs_pos', 'lbs_pos', 'gr_pos', 'link_gain_dB', 'b_med', ...
@@ -62,7 +62,7 @@ assertEqual( size(c3.fbs_pos), [3, n_path] );
 assertEqual( numel(p3.tap), n_path );
 assertTrue( ~isfield( p3, 'n_ray_tap' ) );
 c4 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], 2 );
-assertEqual( c4.center_frequency, fc(2) );
+assertEqual( c4.center_freq, fc(2) );
 assertTrue( max( abs( c4.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );
 c5 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], int32(2) );
 assertEqual( quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], uint8(2) ), c5 );
@@ -82,7 +82,7 @@ assertTrue( max( abs( c8.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );
 c9 = quadriga_lib.gbsm_single_link_channel( tx, rx, rays, -90, [], [], [], [], [], [], [], 0 );
 assertTrue( max( abs( c9.coeff_re(:) - chan.coeff_re(:) ) ) > 1e-9 );        % kf_ratio 0
 s = rays;
-s.center_frequency(2) = 60e9;                                                 % oxygen absorption needs > 52 GHz
+s.center_freq(2) = 60e9;                                                 % oxygen absorption needs > 52 GHz
 c9 = quadriga_lib.gbsm_single_link_channel( tx, rx, s, -90, [], 'rays', 2 );
 c0 = quadriga_lib.gbsm_single_link_channel( tx, rx, s, -90, [], 'rays', 2, [], [], [], [], [], true );
 assertTrue( all( c0.path_gain < c9.path_gain ) );

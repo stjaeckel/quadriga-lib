@@ -247,10 +247,9 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 | `element_pos` | `element_pos` | `[3, n_elements]` | no; default: zeros |
 | `coupling_re` | `coupling_re` | `[n_elements, n_ports]` | no; default: identity |
 | `coupling_im` | `coupling_im` | `[n_elements, n_ports]` | no; default: zeros |
-| `center_freq` | `center_frequency` | scalar | no; default: 299792458 |
+| `center_freq` | `center_freq` | scalar | no; default: 299792458 |
 | `name` | `name` | string | no |
 
-- Note the name difference: the MATLAB field is `center_freq`, the C++ member is `center_frequency`.
 - A 1x1 struct is a single-frequency arrayant; a 1xN struct array is a frequency-dependent (multi-frequency) model and maps to `std::vector<quadriga_lib::arrayant<double>>`.
 - Reading: `qd_mex_struct2arrayant(prhs[i], validate, copy)` or `qd_mex_struct2arrayant_multi(...)`.
   - `validate = true` runs the arrayant validation and throws on inconsistent data. Use `false` when the C++ function validates its inputs anyway.
@@ -279,7 +278,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 | `lbs_pos` | `path_lbs_pos` | `[3, n_path, n_snap]` |
 | `no_interact` | `no_interact` | `[n_path, n_snap]`; uint32 |
 | `interact_coord` | `interact_coord` | `[3, max(sum(no_interact)), n_snap]` |
-| `center_frequency` | `center_frequency` | scalar or `[n_snap]` |
+| `center_freq` | `center_freq` | scalar or `[n_snap]` |
 | `initial_position` | `initial_position` | scalar; int32 |
 
 - Note the name differences: `tx_position` / `rx_position` and `fbs_pos` / `lbs_pos` in MATLAB vs. `tx_pos` / `rx_pos` and `path_fbs_pos` / `path_lbs_pos` in C++.

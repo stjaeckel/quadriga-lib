@@ -584,7 +584,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         // Build channel object for the current user
         quadriga_lib::channel<double> chan_user;
         chan_user.name = "user_" + std::to_string(i_user);
-        chan_user.center_frequency = {CarrierFreq_Hz};
+        chan_user.center_freq = {CarrierFreq_Hz};
 
         // Calculate virtual RX positions based on the direction and distance vector
         double cx = std::cos(Rh), cy = std::sin(Rh);

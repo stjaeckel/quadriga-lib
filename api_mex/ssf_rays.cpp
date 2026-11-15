@@ -63,7 +63,7 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | --- | --- | --- | --- | --- |
 | `method` | string | char | `'38.901'`, `'38.901_MF'` or `'quadriga'`; GR power law and default mobility | yes |
 | `tx_pos`, `rx_pos` | `[3, 1]` | double | Tx and Rx position the ray data refer to in [m] | yes |
-| `center_frequency` | `[n_freq, 1]` | double | Carrier frequencies in [Hz] | yes |
+| `center_freq` | `[n_freq, 1]` | double | Carrier frequencies in [Hz] | yes |
 | `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |

@@ -29,16 +29,16 @@ Also in: [C++](../cpp/channel-functions.md#baseband_freq_response) · [MATLAB](.
 - Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel via OpenMP
 - Two per-snapshot modes, selected by the ndim of the coefficient arrays:
   - single-freq: 3D items `(n_rx, n_tx, n_path)`; DFT over path delays at the requested carriers (AVX2)
-  - multi-freq: 4D items `(n_rx, n_tx, n_path, n_freq_in)`; SLERP interpolation across `freq_in`,
+  - multi-freq: 4D items `(n_rx, n_tx, n_path, n_freq)`; SLERP interpolation across `freq`,
     then delay-induced phase applied per output carrier
-- All list items must share ndim, `n_rx`, `n_tx` (and `n_freq_in` for 4D); `n_path` may vary per snapshot
+- All list items must share ndim, `n_rx`, `n_tx` (and `n_freq` for 4D); `n_path` may vary per snapshot
 - Coefficients are given either as one complex array `coeff`, or as split `coeff_re` + `coeff_im`;
   supplying both forms is an error
 - Output carriers are defined one of two mutually exclusive ways:
   - `bandwidth` paired with `pilot_grid` (or `carriers` for an evenly spaced grid) — single-freq only
-  - `freq_in` + `freq_out` as absolute frequencies — required for multi-freq, optional for single-freq
-- For single-freq with `freq_in` + `freq_out`, the baseband grid is derived internally; the phase is
-  referenced to `freq_in[0]` when given, else to `min(freq_out)`
+  - `freq` + `freq_new` as absolute frequencies — required for multi-freq, optional for single-freq
+- For single-freq with `freq` + `freq_new`, the baseband grid is derived internally; the phase is
+  referenced to `freq[0]` when given, else to `min(freq_new)`
 - `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair;
   for multi-freq a 3D delay item is reused for all input frequencies
 - `snap` selects a 0-based subset of snapshots; omitted processes all snapshots
@@ -53,24 +53,24 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, ba
     carriers=128 )
 
 # Single-freq, absolute frequencies
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, \
-    freq_out=freq_out )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq=freq, \
+    freq_new=freq_new )
 
 # Multi-freq, split real / imaginary parts
 hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, \
-    freq_in=freq_in, freq_out=freq_out )
+    freq=freq, freq_new=freq_new )
 ```
 
 ### Inputs:
 - **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
-  (single-freq) or `(n_rx, n_tx, n_path, n_freq_in)` (multi-freq); mutually exclusive with
+  (single-freq) or `(n_rx, n_tx, n_path, n_freq)` (multi-freq); mutually exclusive with
   `coeff_re` / `coeff_im`; default: `None`
 - **`delay`** — Path delays in seconds; list of length `n_snap`; each item shaped like the matching
-  `coeff` item or broadcast as `(1, 1, n_path)` (with an optional 4th dimension `n_freq_in`)
+  `coeff` item or broadcast as `(1, 1, n_path)` (with an optional 4th dimension `n_freq`)
 - **`bandwidth`** — Baseband bandwidth in Hz; paired with `pilot_grid` or `carriers`; single-freq only;
-  cannot be combined with `freq_out`; default: `0.0`
+  cannot be combined with `freq_new`; default: `0.0`
 - **`carriers`** — Number of evenly spaced carriers on `[0, 1]`; used only when both `pilot_grid` and
-  `freq_out` are omitted; default: 128
+  `freq_new` are omitted; default: 128
 - **`pilot_grid`** — Normalized sub-carrier positions, `0.0` = center, `1.0` = center + `bandwidth`;
   1D array of length `n_carrier`; default: `None`
 - **`snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; omitted processes
@@ -78,14 +78,14 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
 - **`coeff_re`** — Real part of channel coefficients; same list/shape layout as `coeff`; must be
   paired with `coeff_im`; mutually exclusive with `coeff`; default: `None`
 - **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
-- **`freq_in`** — Input sample frequencies in Hz; 1D array; required for multi-freq input; for
-  single-freq input used together with `freq_out` as the phase reference; default: `None`
-- **`freq_out`** — Absolute output carrier frequencies in Hz; 1D array of length `n_carrier`;
+- **`freq`** — Input sample frequencies in Hz; 1D array; required for multi-freq input; for
+  single-freq input used together with `freq_new` as the phase reference; default: `None`
+- **`freq_new`** — Absolute output carrier frequencies in Hz; 1D array of length `n_carrier`;
   required for multi-freq input; may replace `bandwidth` + `pilot_grid` for single-freq; default: `None`
 - **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel generator before SLERP,
   then re-apply it analytically per output carrier; multi-freq only; needs channels generated with
   `use_absolute_delays = True`: the coefficients of `get_channels_*` carry the phase of the absolute path length also
-  when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq_in`,
+  when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`,
   which gives wrong phases (magnitudes stay right); default: `True`
 
 ### Outputs:
@@ -235,7 +235,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, st
   | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
   | `no_interact`      | Number of interaction points per path; int64                             | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
   | `interact_coord`   | Interaction coordinates                                                  | list of `(3, sum(no_interact_s))` | `(3, max(sum(no_interact)), n_snap)` |
-  | `center_frequency` | Center Frequency in Hz                                                   | `(n_snap,)` or scalar             | `(n_snap,)` or scalar                |
+  | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or scalar             | `(n_snap,)` or scalar                |
   | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                     | int32, scalar                        |
 
 - **`par`** — Dict (single slot) or list of dicts (multiple slots) containing the unstructured data in the file.
@@ -497,7 +497,7 @@ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, 
 - **`orig_names`** — Names of the origin points (TX); list of strings; length `no_orig`
 - **`dest_names`** — Names of the destination points (RX); list of strings; length `no_dest`
 - **`version`** — QRT file version number
-- **`center_freq`** — Frequencies as stored in the file; GHz for EM mode (v4/v5), Hz for scalar mode (v6); `(no_freq,)`
+- **`center_freq`** — Center frequencies in Hz; `(no_freq,)`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `(no_cir, 3)`
 - **`cir_orientation`** — CIR orientations as Euler angles; `(no_cir, 3)`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; `(no_orig, 3)`

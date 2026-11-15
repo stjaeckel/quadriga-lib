@@ -4,13 +4,13 @@ function test_sos_calc_mse
 % Physics validation lives in the Catch2 suite (test_sos_calc_mse.cpp).
 
 %% Setup: 1-D, two sinusoids; the target is their own ACF, so there is no error inside the range
-freq = [0.04; 0.13];
+spatial_freq = [0.04; 0.13];
 dist = 0:0.5:20;
 acf = 0.5 * ( cos( 2*pi * 0.04 * dist ) + cos( 2*pi * 0.13 * dist ) );
 other = exp( -dist / 5 );
 
 %% Basic call, 1-D
-[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( freq, acf, dist );
+[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( spatial_freq, acf, dist );
 assertTrue( isa(mse, 'double') && isscalar(mse) && isscalar(mse_core) && isscalar(mse_all) );
 assertTrue( mse > 250 && mse_core > 250 );
 assertTrue( mse_all > 0 && mse_all < 30 );
@@ -20,7 +20,7 @@ tail = 0.5 * ( cos( 2*pi * 0.04 * 20 * [2; 4; 10; 20] ) + cos( 2*pi * 0.13 * 20 
 assertElementsAlmostEqual( acf_tail, tail, 'absolute', 1e-11 );
 
 % A wrong target: error from the definition
-mse2 = quadriga_lib.sos_calc_mse( freq, other, dist );
+mse2 = quadriga_lib.sos_calc_mse( spatial_freq, other, dist );
 assertElementsAlmostEqual( mse2, -10 * log10( mean( ( other - acf ).^2 ) ), 'absolute', 1e-9 );
 
 %% 3-D: test directions and the optional input n_dir
@@ -57,16 +57,16 @@ assertTrue( isa(m10, 'double') );
 assertElementsAlmostEqual( m10, m3, 'absolute', 1e-3 );
 
 %% Errors
-assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf ), 'Wrong number of input arguments.' );
-assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, 10, 1 ), 'Wrong number of input arguments.' );
-assert_throws( @() out6( freq, acf, dist ), 'Wrong number of output arguments.' );
-assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist(1:5) ), 'dist' );       % thrown by C++
-assert_throws( @() quadriga_lib.sos_calc_mse( freq, acf, dist, 0 ), 'n_dir' );        % thrown by C++
+assert_throws( @() quadriga_lib.sos_calc_mse( spatial_freq, acf ), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.sos_calc_mse( spatial_freq, acf, dist, 10, 1 ), 'Wrong number of input arguments.' );
+assert_throws( @() out6( spatial_freq, acf, dist ), 'Wrong number of output arguments.' );
+assert_throws( @() quadriga_lib.sos_calc_mse( spatial_freq, acf, dist(1:5) ), 'dist' );       % thrown by C++
+assert_throws( @() quadriga_lib.sos_calc_mse( spatial_freq, acf, dist, 0 ), 'n_dir' );        % thrown by C++
 
 % n_dir is validated by the wrapper before the conversion to an unsigned type
-assert_cpp_error( @() quadriga_lib.sos_calc_mse( freq, acf, dist, -1 ), 'Input ''n_dir'' must be an integer >= 1.' );
-assert_cpp_error( @() quadriga_lib.sos_calc_mse( freq, acf, dist, NaN ), 'Input ''n_dir'' must be an integer >= 1.' );
-assert_cpp_error( @() quadriga_lib.sos_calc_mse( freq, acf, dist, Inf ), 'Input ''n_dir'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_calc_mse( spatial_freq, acf, dist, -1 ), 'Input ''n_dir'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_calc_mse( spatial_freq, acf, dist, NaN ), 'Input ''n_dir'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_calc_mse( spatial_freq, acf, dist, Inf ), 'Input ''n_dir'' must be an integer >= 1.' );
 
 end
 

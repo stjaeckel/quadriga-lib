@@ -42,7 +42,7 @@ Class for storing and manipulating array antenna models
 | `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords                    |
 | `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]` or empty       | Coupling matrix, real part                                     |
 | `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]` or empty       | Coupling matrix, imaginary part                                |
-| `dtype center_frequency`          | scalar                                 | Center frequency                                               |
+| `dtype center_freq`          | scalar                                 | Center frequency                                               |
 | `std::string name`                | string                                 | Name of the array antenna object                               |
 
 ## Simple member functions:<br>
@@ -123,7 +123,7 @@ void quadriga_lib::arrayant<dtype>::reset()
     if (coupling_im.n_elem != 0)
         coupling_im.reset();
 
-    center_frequency = dtype(299792458.0);
+    center_freq = dtype(299792458.0);
 }
 
 /*!MD
@@ -315,7 +315,7 @@ quadriga_lib::arrayant<dtype> &quadriga_lib::arrayant<dtype>::operator=(const ar
     e_theta_re = other.e_theta_re, e_theta_im = other.e_theta_im, e_phi_re = other.e_phi_re, e_phi_im = other.e_phi_im;
     azimuth_grid = other.azimuth_grid, elevation_grid = other.elevation_grid;
     element_pos = other.element_pos, coupling_re = other.coupling_re, coupling_im = other.coupling_im;
-    center_frequency = other.center_frequency;
+    center_freq = other.center_freq;
     if (qd_arrayant_check(other).empty())
         qd_arrayant_mark_valid(*this);
     return *this;
@@ -343,7 +343,7 @@ quadriga_lib::arrayant<dtype> &quadriga_lib::arrayant<dtype>::operator=(arrayant
     azimuth_grid = std::move(other.azimuth_grid), elevation_grid = std::move(other.elevation_grid);
     element_pos = std::move(other.element_pos), coupling_re = std::move(other.coupling_re);
     coupling_im = std::move(other.coupling_im);
-    center_frequency = other.center_frequency;
+    center_freq = other.center_freq;
     if (marked)
         qd_arrayant_mark_valid(*this);
     return *this;

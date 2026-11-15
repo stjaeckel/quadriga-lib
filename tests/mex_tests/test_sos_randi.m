@@ -15,9 +15,9 @@ assertTrue( isa(val, 'double') );
 assertTrue( all(val(:) >= 1) && all(val(:) <= 6) && all(val(:) == round(val(:))) );
 
 %% The result is the documented composition of preset, phases and evaluation
-[ freq, acf, dist ] = quadriga_lib.sos_preset( 'Comb256', 20 );
+[ spatial_freq, acf, dist ] = quadriga_lib.sos_preset( 'Comb256', 20 );
 phase = quadriga_lib.sos_init_phases( 256, 6, 7 );
-ref = quadriga_lib.sos_val( freq, phase(:, 2), pos, [], [], [], [], [], true );
+ref = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, [], [], [], [], [], true );
 assertElementsAlmostEqual( val(:, 2), ceil( 6 * ref ), 'absolute', 1e-12 );
 freq0 = quadriga_lib.sos_preset( 'Comb256', 0.1 );                             % 0 is replaced by 0.1 m
 ref0 = quadriga_lib.sos_val( freq0, phase(:, 3), pos, [], [], [], [], [], true );
@@ -39,7 +39,7 @@ assertEqual( vb, ceil( 1000 * ub ) );
 
 % Two devices, same map
 val4 = quadriga_lib.sos_randi( dd, pos, 6, pos_b, [], [], 7 );
-ref4 = quadriga_lib.sos_val( freq, phase(:, 2), pos, pos_b, [], acf, dist, [], true );
+ref4 = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, pos_b, [], acf, dist, [], true );
 assertElementsAlmostEqual( val4(:, 2), ceil( 6 * ref4 ), 'absolute', 1e-12 );
 val5 = quadriga_lib.sos_randi( dd, pos, 6, pos_b, dd, [], 7 );                         % equal distances: same map
 assertEqual( val5, val4 );
@@ -48,7 +48,7 @@ assertEqual( val5, val4 );
 % come from a second stream with the seed + 2^62, which is exact only as int64
 phase_b = quadriga_lib.sos_init_phases( 256, 3, int64(7) + int64(4611686018427387904) );
 val6 = quadriga_lib.sos_randi( dd, pos, 6, pos_b, [5, 8, 0], [], 7 );
-ref6 = quadriga_lib.sos_val( freq, phase(:, 2), pos, pos_b, phase_b(:, 2), [], [], 20/8, true );
+ref6 = quadriga_lib.sos_val( spatial_freq, phase(:, 2), pos, pos_b, phase_b(:, 2), [], [], 20/8, true );
 assertElementsAlmostEqual( val6(:, 2), ceil( 6 * ref6 ), 'absolute', 1e-12 );
 assertEqual( val6(:, [1, 3]), val4(:, [1, 3]) );
 

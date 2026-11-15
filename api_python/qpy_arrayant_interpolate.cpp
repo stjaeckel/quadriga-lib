@@ -14,8 +14,8 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (3D pattern arrays and no `frequency`): outputs `(n_out, n_ang)`; `dist` and `local_angles`
-  add outputs. Multi-frequency mode (4D pattern arrays, or `frequency` given): for each target frequency, the two
+- Single-frequency mode (3D pattern arrays and no `freq_new`): outputs `(n_out, n_ang)`; `dist` and `local_angles`
+  add outputs. Multi-frequency mode (4D pattern arrays, or `freq_new` given): for each target frequency, the two
   entries whose center frequencies bracket it are interpolated and blended; frequencies outside the entries take the
   nearest entry; outputs `(n_out, n_ang, n_freq)`; a 3D pattern is the same at every frequency
 - `azimuth` of shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
@@ -38,7 +38,7 @@ V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolat
     elevation, ..., dist=True, local_angles=True )
 
 # Multi-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., frequency=freqs )
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
 
 # Real and imaginary parts as separate arrays
 V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=False )
@@ -55,7 +55,7 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
   `(3, n_out, n_ang)`; default: `None` (no rotation)
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `(3, n_out)`; default: `None`
   (the positions of the arrayant)
-- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `(n_freq,)`; default: `None` (the
+- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `(n_freq,)`; default: `None` (the
   `center_freq` of the entries)
 - **`dist`** — Also return the projected distance; single-frequency mode only; default: `False`
 - **`local_angles`** — Also return the local angles and the polarization rotation angle; single-frequency mode only;
@@ -91,7 +91,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
                                py::handle element,
                                py::handle orientation,
                                py::handle element_pos,
-                               py::handle frequency,
+                               py::handle freq_new,
                                py::handle dist,
                                py::handle local_angles,
                                py::handle fast_access,
@@ -108,7 +108,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     const auto element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
     const auto orientation_a = qd_python_numpy2arma_Cube<double>(orientation, true);
     const auto element_pos_a = qd_python_numpy2arma_Mat<double>(element_pos, true);
-    const auto frequency_a = qd_python_numpy2arma_Col<double>(frequency, true);
+    const auto freq_new_a = qd_python_numpy2arma_Col<double>(freq_new, true);
 
     const arma::uvec *p_element = element_a.is_empty() ? nullptr : &element_a;
     const arma::cube *p_orientation = orientation_a.is_empty() ? nullptr : &orientation_a;
@@ -118,12 +118,12 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     const arma::uword n_out = element_a.is_empty() ? ant[0].n_elements() : element_a.n_elem;
     const arma::uword n_ang = azimuth_a.n_cols;
 
-    if (ant.size() > 1 || !frequency_a.is_empty()) // Multi-frequency mode
+    if (ant.size() > 1 || !freq_new_a.is_empty()) // Multi-frequency mode
     {
         if (want_dist || want_local_angles)
             throw std::invalid_argument("Outputs 'dist' and 'local_angles' are not available in the multi-frequency mode.");
 
-        const arma::uword n_freq = frequency_a.is_empty() ? (arma::uword)ant.size() : frequency_a.n_elem;
+        const arma::uword n_freq = freq_new_a.is_empty() ? (arma::uword)ant.size() : freq_new_a.n_elem;
         arma::cube V_re, V_im, H_re, H_im;
         arma::cx_cube V, H;
         py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py;
@@ -142,7 +142,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
         }
 
         quadriga_lib::arrayant_interpolate_multi<double>(ant, azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
-                                                         frequency_a.is_empty() ? nullptr : &frequency_a,
+                                                         freq_new_a.is_empty() ? nullptr : &freq_new_a,
                                                          p_element, p_orientation, p_element_pos,
                                                          want_complex ? &V : nullptr, want_complex ? &H : nullptr, use_kernel);
 
@@ -217,7 +217,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
 //       py::arg("element") = py::none(),
 //       py::arg("orientation") = py::none(),
 //       py::arg("element_pos") = py::none(),
-//       py::arg("frequency") = py::none(),
+//       py::arg("freq_new") = py::none(),
 //       py::arg("dist") = false,
 //       py::arg("local_angles") = false,
 //       py::arg("fast_access") = false,

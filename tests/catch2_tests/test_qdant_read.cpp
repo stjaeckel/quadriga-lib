@@ -50,7 +50,7 @@ TEST_CASE("Arrayant reading from QDANT file - Minimal test")
 
     B = {0.0f};
     CHECK(arma::approx_equal(x.coupling_im, B, "absdiff", 1e-6));
-    CHECK(std::abs(x.center_frequency - 299792447.0f) < 0.1f);
+    CHECK(std::abs(x.center_freq - 299792447.0f) < 0.1f);
 
     std::remove("test.qdant");
 }
@@ -171,7 +171,7 @@ TEST_CASE("Arrayant reading from QDANT file - More complex test")
     CHECK(arma::approx_equal(x.coupling_re, B, "absdiff", 1e-13));
     CHECK(arma::approx_equal(x.coupling_im, B, "absdiff", 1e-13));
 
-    CHECK(std::abs(x.center_frequency - 3.0e9) < 0.1f);
+    CHECK(std::abs(x.center_freq - 3.0e9) < 0.1f);
     CHECK(x.name == "unknown");
     CHECK(arma::all(arma::vectorise(layout) == 1));
 

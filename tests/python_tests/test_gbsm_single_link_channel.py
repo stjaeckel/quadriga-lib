@@ -65,7 +65,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(chan["coeff"][0].shape, (2, 1, n_tap))
         self.assertEqual(chan["coeff"][0].dtype, np.complex128)
         self.assertEqual(chan["delay"][0].shape, (2, 1, n_tap))
-        npt.assert_array_equal(chan["center_frequency"], FC[0])
+        npt.assert_array_equal(chan["center_freq"], FC[0])
         npt.assert_array_equal(chan["rx_position"], RX.T)
         self.assertIsInstance(par, dict)
         self.assertEqual(list(par.keys()), PAR)
@@ -100,7 +100,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(par["tap"].size, self.n_path)
         self.assertNotIn("n_ray_tap", par)
         chan = self.call(i_freq=1)[0]
-        npt.assert_array_equal(chan["center_frequency"], FC[1])
+        npt.assert_array_equal(chan["center_freq"], FC[1])
         self.assertGreater(np.max(np.abs(chan["coeff"][0] - c0)), 1e-9)
         rx2 = np.vstack([RX, RX + [1.0, 0.0, 0.0]])
         chan = self.call(tx_pos=TX, rx_pos=rx2)[0]
@@ -117,7 +117,7 @@ class test_case(unittest.TestCase):
         chan = self.call(use_absolute_delays=True)[0]
         npt.assert_allclose(chan["delay"][0] - self.out[0]["delay"][0], np.linalg.norm(RX - TX) / 299792458,
                             atol=1e-15, rtol=0)
-        r60 = dict(self.rays, center_frequency=np.array([3.5e9, 60e9]))  # oxygen absorption needs > 52 GHz
+        r60 = dict(self.rays, center_freq=np.array([3.5e9, 60e9]))  # oxygen absorption needs > 52 GHz
         g0 = gbsm.single_link_channel(self.tx, self.rx, r60, [-90.0], output="rays", i_freq=1)[0]["path_gain"][0]
         g1 = gbsm.single_link_channel(self.tx, self.rx, r60, [-90.0], output="rays", i_freq=1, oxygen=True)[0]
         self.assertTrue(np.all(g1["path_gain"][0] < g0))

@@ -55,7 +55,7 @@ namespace
         auto eq = [](const auto &x, const auto &y)
         { return arma::size(x) == arma::size(y) && arma::all(arma::vectorise(x == y)); };
         bool ok = a.method == b.method && eq(a.tx_pos, b.tx_pos) && eq(a.rx_pos, b.rx_pos) &&
-                  eq(a.center_frequency, b.center_frequency) && eq(a.delay, b.delay) && eq(a.power, b.power) &&
+                  eq(a.center_freq, b.center_freq) && eq(a.delay, b.delay) && eq(a.power, b.power) &&
                   eq(a.aod, b.aod) && eq(a.eod, b.eod) && eq(a.aoa, b.aoa) && eq(a.eoa, b.eoa) && eq(a.M, b.M) &&
                   eq(a.path_type, b.path_type) && eq(a.tap, b.tap) && eq(a.gr_eps_re, b.gr_eps_re) &&
                   eq(a.gr_eps_im, b.gr_eps_im);

@@ -724,7 +724,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
    [[ssf_clusters]]; steps 3 to 6 run per scenario
 3. Per BS site and scenario, once, with one seed for all sets: [[gbsm_init_phases]] of the random sets in the table
    below; `"lsf"` with the link positions for the bias removal
-4. [[gbsm_draw]] of each set at the links (the shared `"ray"` set with `center_frequency`, the list later passed to
+4. [[gbsm_draw]] of each set at the links (the shared `"ray"` set with `center_freq`, the list later passed to
    [[ssf_rays]]); [[path_loss]] (`pl`, `sf_sigma`; column 10 of the `"lsf"` set as `rnd_he`); [[lsp_generate]] with
    `sf_sigma` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [[ssf_clusters]] (`n_cluster` is the caller's choice) and [[ssf_rays]] (one [[gbsm_rays]] object per link), called
@@ -736,7 +736,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 
 | Method | Random sets | Calls in step 5 |
 | --- | --- | --- |
-| `"38.901"` | `"lsf"`; `"cluster"` -1 and one per frequency; `"ray"` one per frequency | per frequency `k`: [[ssf_clusters]] and [[ssf_rays]] (`i_freq = 0`) with slice `k` of all per-frequency inputs (`center_frequency`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
+| `"38.901"` | `"lsf"`; `"cluster"` -1 and one per frequency; `"ray"` one per frequency | per frequency `k`: [[ssf_clusters]] and [[ssf_rays]] (`i_freq = 0`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
 | `"38.901_MF"` | as `"38.901"` | [[lsp_generate]] at the anchor frequency with the same `rnd` gives `lsp_anchor`; [[ssf_clusters]] once; [[ssf_rays]] per frequency `k` with `i_freq = k` |
 | `"quadriga"` | `"lsf"`; `"cluster"` -1; `"ray"` -1 | [[ssf_clusters]] and [[ssf_rays]] once for all frequencies |
 

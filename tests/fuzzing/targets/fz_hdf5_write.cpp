@@ -87,7 +87,7 @@ static void run(fz::input &in)
     };
     c.tx_pos = pos(false), c.rx_pos = pos(false), c.tx_orientation = pos(true), c.rx_orientation = pos(true);
     if (mask & 1)
-        c.center_frequency = in.col<T>(in.ConsumeBool() ? 1 : sz(n_snap));
+        c.center_freq = in.col<T>(in.ConsumeBool() ? 1 : sz(n_snap));
 
     for (arma::uword s = 0; s < n_snap; ++s)
     {

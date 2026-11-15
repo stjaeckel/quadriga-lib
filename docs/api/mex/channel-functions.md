@@ -221,7 +221,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [Python](../pyt
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
   | `no_interact`      | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
   | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(no_interact)), n_snap]`|
-  | `center_frequency` | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
+  | `center_freq`      | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
   | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
 - **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
   **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
@@ -476,7 +476,7 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_parse) · [Python](../python
 - **`orig_names`** — Names of origin points; cell array of strings; `[no_orig]`
 - **`dest_names`** — Names of destination points; cell array of strings; `[no_dest]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Frequencies as stored in the file; GHz for EM mode (v4/v5), Hz for scalar mode (v6); single; `[no_freq]`
+- **`center_freq`** — Center frequencies in Hz; single; `[no_freq]`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[no_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles; single; `[no_cir, 3]`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[no_orig, 3]`

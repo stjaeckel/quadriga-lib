@@ -141,7 +141,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         throw std::invalid_argument("Input 'kf_ratio' must be finite and >= 0.");
     auto check = [&](const auto *out, const char *name)
     {
-        qd_check_alias(out, name, &rays.tx_pos, &rays.rx_pos, &rays.center_frequency, &rays.delay, &rays.power, &rays.aod,
+        qd_check_alias(out, name, &rays.tx_pos, &rays.rx_pos, &rays.center_freq, &rays.delay, &rays.power, &rays.aod,
                        &rays.eod, &rays.aoa, &rays.eoa, &rays.M, &rays.path_type, &rays.tap, &rays.gr_eps_re,
                        &rays.gr_eps_im, &rays.fbs_pos, &rays.lbs_pos, &rays.fallback, &link_gain_dB, tx_pos, rx_pos, kf_ratio);
     };
@@ -212,7 +212,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         // outside; τ_Δ of eq. (7.6-1) is not added: each path's own length is used
         const double tab[17] = {0.0, 1.0, 2.2, 4.0, 6.6, 9.7, 12.6, 14.6, 15.0,
                                 14.6, 14.3, 10.5, 6.8, 3.9, 1.9, 1.0, 0.0};
-        const double f = rays.center_frequency(k) * 1e-9 - 52.0;
+        const double f = rays.center_freq(k) * 1e-9 - 52.0;
         alpha(k) = 0.0;
         if (oxygen && f > 0.0 && f < 16.0) // index only inside the table: the cast of a larger f overflows int
         {
@@ -275,7 +275,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
                 m[e] = m0[e];
             if (!drift) // displacement phase exp(j·2·pi·f/c·(r_rx·dR + r_tx·dT)), TR eq. (7.5-22)
             {
-                const double ph = pi2 * rays.center_frequency(k) / c0 * proj, cp = std::cos(ph), sp = std::sin(ph);
+                const double ph = pi2 * rays.center_freq(k) / c0 * proj, cp = std::cos(ph), sp = std::sin(ph);
                 for (int e = 0; e < 8; e += 2)
                     m[e] = m0[e] * cp - m0[e + 1] * sp, m[e + 1] = m0[e] * sp + m0[e + 1] * cp;
             }

@@ -33,7 +33,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
   [[coord2path]] or [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry (spherical waves).
-- If `center_frequency == 0`, phase calculation is disabled and only delays are computed.
+- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -63,7 +63,7 @@ void quadriga_lib::get_channels_spherical(
     arma::Cube<dtype> *coeff_re,
     arma::Cube<dtype> *coeff_im,
     arma::Cube<dtype> *delay,
-    dtype center_frequency = dtype(0.0),
+    dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Cube<dtype> *aod = nullptr,
@@ -87,7 +87,7 @@ void quadriga_lib::get_channels_spherical(
   (e.g. 0) use the polyline length; `[n_path]`
 - **`M`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); `[8, n_path]`
-- **`center_frequency`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot
@@ -121,7 +121,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                                           const arma::Mat<dtype> *fbs_pos, const arma::Mat<dtype> *lbs_pos,
                                           const arma::Col<dtype> *path_gain, const arma::Col<dtype> *path_length, const arma::Mat<dtype> *M,
                                           arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
-                                          dtype center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                          dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                           int use_kernel)
 {
@@ -129,8 +129,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     constexpr dtype los_limit = (dtype)1.0e-4;
     constexpr dtype zero = (dtype)0.0;
     constexpr dtype rC = dtype(1.0 / 299792458.0); // 1 / (Speed of light)
-    dtype wavelength = (center_frequency > zero) ? (dtype)299792458.0 / center_frequency : (dtype)1.0;
-    dtype wave_number = (dtype)2.095845021951682e-08 * center_frequency; // 2 * pi / C
+    dtype wavelength = (center_freq > zero) ? (dtype)299792458.0 / center_freq : (dtype)1.0;
+    dtype wave_number = (dtype)2.095845021951682e-08 * center_freq; // 2 * pi / C
 
     // Catch NULL-Pointers
     std::string error_message;
@@ -169,7 +169,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         arma::Cube<dtype> cr, ci, dl, ad, ed, aa, ea;
         quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
                                                     &fbs_d, &fbs_d, &gain_d, &length_d, &M_d, &cr, &ci, &dl,
-                                                    center_frequency, use_absolute_delays, true,
+                                                    center_freq, use_absolute_delays, true,
                                                     aod == nullptr ? nullptr : &ad, eod == nullptr ? nullptr : &ed,
                                                     aoa == nullptr ? nullptr : &aa, eoa == nullptr ? nullptr : &ea,
                                                     use_kernel);
@@ -681,7 +681,7 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    const arma::Mat<float> *fbs_pos, const arma::Mat<float> *lbs_pos,
                                                    const arma::Col<float> *path_gain, const arma::Col<float> *path_length, const arma::Mat<float> *M,
                                                    arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
-                                                   float center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                                   float center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
                                                    int use_kernel);
 
@@ -691,6 +691,6 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    const arma::Mat<double> *fbs_pos, const arma::Mat<double> *lbs_pos,
                                                    const arma::Col<double> *path_gain, const arma::Col<double> *path_length, const arma::Mat<double> *M,
                                                    arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
-                                                   double center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                                   double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
                                                    int use_kernel);

@@ -14,7 +14,7 @@
 // gbsm_draw ("ray") pins down: the values in single mobility, the decorrelation distances (SC_lambda for blocks 0 to
 // 13 and for block 14 of a per-frequency set, lambda_tau for block 14 of the shared set, also with SC_lambda = 0,
 // and the guards of lambda_tau), the Uniform map of block 14, the swap reciprocity, the marginal distributions, the
-// use of center_frequency, sizes and the input validation.
+// use of center_freq, sizes and the input validation.
 // Oracles, independent of the functions:
 //  - the seed rule, typed here: splitmix64 as in test_gbsm_phases_cluster.cpp; seed_set = splitmix64(splitmix64(seed)
 //    ^ tag) >> 1 with tag 2^63 + 2^32 + set_id + 2; checked first against values of an independent Python script
@@ -430,7 +430,7 @@ TEST_CASE("gbsm_draw - ray: marginal distributions")
     }
 }
 
-TEST_CASE("gbsm_draw - ray: center_frequency is required by the shared set and ignored otherwise")
+TEST_CASE("gbsm_draw - ray: center_freq is required by the shared set and ignored otherwise")
 {
     const arma::uword N = 2, M = 3, b14 = 13 * N * M + N;
     auto sp = scen(2.0, 3.0, 12.0);
@@ -440,7 +440,7 @@ TEST_CASE("gbsm_draw - ray: center_frequency is required by the shared set and i
 
     arma::mat a, b;
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, a), std::invalid_argument,
-                         Message("Input 'center_frequency' is required for the shared 'ray' set."));
+                         Message("Input 'center_freq' is required for the shared 'ray' set."));
 
     // Shared set: another frequency list changes block 14 only
     const arma::vec f1 = {3.5e9}, f2 = {3.5e9, 28e9};
@@ -478,7 +478,7 @@ TEST_CASE("gbsm_draw - ray: n_link = 0 and N = 0")
     CHECK(rnd.n_rows == 0);
     CHECK(rnd.n_cols == 86);
 
-    // N = 0: empty sets; the shared set still requires center_frequency
+    // N = 0: empty sets; the shared set still requires center_freq
     const auto sp0 = scen(0.0, 3.0, 12.0);
     arma::cube ph0, empty;
     quadriga_lib::gbsm_init_phases(sp0, "ray", ph0, 3);
@@ -494,7 +494,7 @@ TEST_CASE("gbsm_draw - ray: n_link = 0 and N = 0")
         CHECK(rnd.n_cols == 0);
     }
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp0, "ray", ph0, tx1, rx, rnd), std::invalid_argument,
-                         Message("Input 'center_frequency' is required for the shared 'ray' set."));
+                         Message("Input 'center_freq' is required for the shared 'ray' set."));
 }
 
 TEST_CASE("gbsm_draw - ray: input validation")
@@ -527,13 +527,13 @@ TEST_CASE("gbsm_draw - ray: input validation")
     // Checks 10 and 11; the output is untouched on error
     arma::mat keep(2, 2, arma::fill::ones);
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep), std::invalid_argument,
-                         Message("Input 'center_frequency' is required for the shared 'ray' set."));
+                         Message("Input 'center_freq' is required for the shared 'ray' set."));
     const arma::vec f_empty;
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep, -1, "Comb256", nullptr, &f_empty),
-                         std::invalid_argument, Message("Input 'center_frequency' cannot be empty."));
+                         std::invalid_argument, Message("Input 'center_freq' cannot be empty."));
     for (const arma::vec &f : {arma::vec{3.5e9, 0.0}, arma::vec{-1.0}, arma::vec{NAN}, arma::vec{INFINITY}})
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, keep, -1, "Comb256", nullptr, &f),
-                             std::invalid_argument, Message("Input 'center_frequency' must be finite and > 0."));
+                             std::invalid_argument, Message("Input 'center_freq' must be finite and > 0."));
     CHECK(keep.n_rows == 2);
     CHECK(arma::all(arma::vectorise(keep) == 1.0));
 }

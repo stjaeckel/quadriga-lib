@@ -27,9 +27,9 @@ class test_case(unittest.TestCase):
         out = quadriga_lib.sos.preset("Comb256")
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 3)
-        freq, acf, dist = out
+        spatial_freq, acf, dist = out
 
-        self.assertEqual(freq.shape, (256, 3))
+        self.assertEqual(spatial_freq.shape, (256, 3))
         self.assertEqual(acf.shape, (200,))
         self.assertEqual(dist.shape, (200,))
         for x in out:
@@ -38,15 +38,15 @@ class test_case(unittest.TestCase):
 
         npt.assert_allclose(dist[[0, 1, 199]], [0.0, 0.25, 49.75], atol=1e-13, rtol=0)
         npt.assert_allclose(acf[[0, 40, 80]], [1.0, np.exp(-1.0), np.exp(-2.0)], atol=1e-14, rtol=0)  # Comb at 0, 10, 20 m
-        self.assertGreater(np.max(np.abs(freq)), 0.01)
+        self.assertGreater(np.max(np.abs(spatial_freq)), 0.01)
 
     def test_name_selects_type_and_size(self):
-        freq, acf, _ = quadriga_lib.sos.preset("Exp128")
-        self.assertEqual(freq.shape, (128, 3))
+        spatial_freq, acf, _ = quadriga_lib.sos.preset("Exp128")
+        self.assertEqual(spatial_freq.shape, (128, 3))
         npt.assert_allclose(acf[80], np.exp(-2.0), atol=1e-14, rtol=0)  # Exp at 20 m
 
-        freq, acf, _ = quadriga_lib.sos.preset("Gauss1024")
-        self.assertEqual(freq.shape, (1024, 3))
+        spatial_freq, acf, _ = quadriga_lib.sos.preset("Gauss1024")
+        self.assertEqual(spatial_freq.shape, (1024, 3))
         npt.assert_allclose(acf[80], np.exp(-4.0), atol=1e-14, rtol=0)  # Gauss at 20 m
 
     def test_keyword_arguments(self):
@@ -56,17 +56,17 @@ class test_case(unittest.TestCase):
             npt.assert_array_equal(a, b)
 
     def test_optional_inputs(self):
-        freq, acf, dist = quadriga_lib.sos.preset("Comb256")
+        spatial_freq, acf, dist = quadriga_lib.sos.preset("Comb256")
 
         # The default is 10 m
         out = quadriga_lib.sos.preset("Comb256", 10.0)
-        for a, b in zip(out, (freq, acf, dist)):
+        for a, b in zip(out, (spatial_freq, acf, dist)):
             npt.assert_array_equal(a, b)
 
         # Another decorrelation distance scales the distances and the frequencies
         freq2, acf2, dist2 = quadriga_lib.sos.preset("Comb256", 25.0)
         npt.assert_allclose(dist2, dist * 2.5, atol=1e-12, rtol=0)
-        npt.assert_allclose(freq2 * 2.5, freq, atol=1e-14, rtol=0)
+        npt.assert_allclose(freq2 * 2.5, spatial_freq, atol=1e-14, rtol=0)
         npt.assert_allclose(acf2, acf, atol=1e-14, rtol=0)
 
         # Integer and numpy scalars

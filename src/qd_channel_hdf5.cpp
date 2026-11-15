@@ -362,7 +362,7 @@ struct qHDF_channel_attributes
 {
     uint32_t n_snap = 0, n_tx = 0, n_rx = 0;
     int32_t initial_position = 0;
-    float center_frequency = NAN;                    // NaN = not set
+    float center_freq = NAN;                    // NaN = not set
     float position[4][3] = {{NAN, NAN, NAN},         // tx_position
                             {NAN, NAN, NAN},         // rx_position
                             {0.0f, 0.0f, 0.0f},      // tx_orientation
@@ -449,7 +449,7 @@ static uint64_t qHDF_emit_channel_group(h5::output &out, h5::header &hdr, const 
     hdr.attribute("NumTx", h5::uint32, 0, nullptr, &a.n_tx);
     hdr.attribute("NumRx", h5::uint32, 0, nullptr, &a.n_rx);
     hdr.attribute("Initial_position", h5::int32, 0, nullptr, &a.initial_position);
-    hdr.attribute("CenterFrequency", h5::float32, 0, nullptr, &a.center_frequency);
+    hdr.attribute("CenterFrequency", h5::float32, 0, nullptr, &a.center_freq);
     for (int k = 0; k < 4; ++k)
         hdr.attribute(qHDF_position_names[k], h5::float32, 1, &three, a.position[k]);
     hdr.attribute("Name", h5::string_type(256), 0, nullptr, a.name);
@@ -634,8 +634,8 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
     a.n_snap = (uint32_t)n_snap, a.n_tx = (uint32_t)ch->n_tx(), a.n_rx = (uint32_t)ch->n_rx();
     a.initial_position = ch->initial_position;
     std::memcpy(a.name, ch->name.data(), std::min(ch->name.size(), (size_t)255));
-    if (ch->center_frequency.n_elem == 1)
-        a.center_frequency = (float)ch->center_frequency.at(0);
+    if (ch->center_freq.n_elem == 1)
+        a.center_freq = (float)ch->center_freq.at(0);
     const arma::Mat<dtype> *positions[4] = {&ch->tx_pos, &ch->rx_pos, &ch->tx_orientation, &ch->rx_orientation};
     for (int k = 0; k < 4; ++k)
         if (positions[k]->n_rows == 3 && positions[k]->n_cols == 1)
@@ -725,8 +725,8 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
     }
 
     // Values per snapshot
-    if (n_snap > 1 && ch->center_frequency.n_elem == n_snap)
-        links.push_back({"CenterFrequency", f32(1, n_snap, 1, 1, ch->center_frequency.memptr())});
+    if (n_snap > 1 && ch->center_freq.n_elem == n_snap)
+        links.push_back({"CenterFrequency", f32(1, n_snap, 1, 1, ch->center_freq.memptr())});
     for (int k = 0; k < 4; ++k)
         if (n_snap > 1 && positions[k]->n_rows == 3 && positions[k]->n_cols == n_snap)
             links.push_back({qHDF_position_names[k], f32(2, n_snap, 3, 1, positions[k]->memptr())});
@@ -871,8 +871,8 @@ Read a channel object from an HDF5 file at a specified 4D index
 - Unstructured fields (`std::any`) retain their original stored type without conversion; see [[hdf5_read_dset]]
   for the returned types.
 - Round trip with [[hdf5_write]]: every per-snapshot field comes back with one entry per snapshot, also for
-  snapshots without paths (empty entries keep their shape); a channel written without `center_frequency` comes back
-  with an empty `center_frequency`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
+  snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
+  with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
 - Throws `std::invalid_argument` if the file is malformed (e.g. a dataset does not have the size given by the
   attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3
   written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified
@@ -1018,15 +1018,15 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     // Center frequency in [Hz]: dataset of length [n_snap] or scalar attribute (NaN = not set, read back empty)
     if (find_dataset(g, "CenterFrequency", h5::float32, {n_snap}))
     {
-        c.center_frequency.set_size((arma::uword)n_snap);
-        read_float(c.center_frequency.memptr());
+        c.center_freq.set_size((arma::uword)n_snap);
+        read_float(c.center_freq.memptr());
     }
     else if (const uint8_t *v = attribute(g, "CenterFrequency", h5::float32, 1, false))
     {
         float value;
         std::memcpy(&value, v, 4);
         if (!std::isnan(value))
-            c.center_frequency = {(dtype)value};
+            c.center_freq = {(dtype)value};
     }
 
     // Positions and orientations: dataset [3, n_snap] or attribute [3, 1]; orientations are optional

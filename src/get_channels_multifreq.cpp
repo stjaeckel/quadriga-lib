@@ -115,7 +115,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 
 - Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (from `tx_array[i].center_frequency`), RX array, input samples (`freq_in`), and output (`freq_out`)
+- Aligns four frequency grids: TX array (from `tx_array[i].center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
 - TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [[arrayant_interpolate_multi]])
 - `path_gain` interpolated linearly; `M` interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to nearest frequency entry on all four grids
@@ -141,8 +141,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
   0.75 m. Use `use_absolute_delays = true` in that case
 - The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
   [[baseband_freq_response_multi]] with `remove_delay_phase = true` removes the phase of `delay` before it
-  interpolates across `freq_in`, so it needs channels generated with `use_absolute_delays = true`; with relative
-  delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the `freq_in` grid and
+  interpolates across `freq`, so it needs channels generated with `use_absolute_delays = true`; with relative
+  delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the `freq` grid and
   gives wrong phases
 
 ## Declaration:
@@ -159,8 +159,8 @@ void quadriga_lib::get_channels_multifreq(
     const arma::Mat<dtype> &path_gain,
     const arma::Col<dtype> &path_length,
     const arma::Cube<dtype> &M,
-    const arma::Col<dtype> &freq_in,
-    const arma::Col<dtype> &freq_out,
+    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &freq_new,
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
@@ -179,20 +179,20 @@ void quadriga_lib::get_channels_multifreq(
 - **`Rb, Rt, Rh`** — RX orientation, Euler angles (bank, tilt, heading), finite
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_gain`** — Linear-scale path gains; `[n_path, n_freq_in]`
+- **`path_gain`** — Linear-scale path gains; `[n_path, n_freq]`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path]`
-- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq_in]` (full pol) or
-  `[2, n_path, n_freq_in]` (scalar)
-- **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in]`
-- **`freq_out`** — Target output frequencies; `[n_freq_out]`
+- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
+  `[2, n_path, n_freq]` (scalar)
+- **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq]`
+- **`freq_new`** — Target output frequencies; `[n_freq_new]`
 - **`use_absolute_delays`** *(optional)* — Include LOS delay in all paths if true
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
 
 ## Outputs:
-- **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
+- **`coeff_re`** — Real part of coefficients; vector length `n_freq_new`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
 - **`coeff_im`** — Imaginary part; same structure as `coeff_re`
 - **`delay`** — Propagation delays [s]; same structure as `coeff_re`
 - **`coeff`** *(optional)* — Coefficients as complex values, replacing `coeff_re` and `coeff_im` (then left empty);
@@ -213,7 +213,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                                           const arma::Mat<dtype> &fbs_pos, const arma::Mat<dtype> &lbs_pos,
                                           const arma::Mat<dtype> &path_gain, const arma::Col<dtype> &path_length,
                                           const arma::Cube<dtype> &M,
-                                          const arma::Col<dtype> &freq_in, const arma::Col<dtype> &freq_out,
+                                          const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
                                           std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                           std::vector<arma::Cube<dtype>> &delay,
                                           bool use_absolute_delays, bool add_fake_los_path, dtype propagation_speed,
@@ -253,7 +253,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         {
             for (const auto &c : vec)
             {
-                qd_check_alias(&c, names_all[name], &fbs_pos, &lbs_pos, &path_gain, &path_length, &M, &freq_in, &freq_out);
+                qd_check_alias(&c, names_all[name], &fbs_pos, &lbs_pos, &path_gain, &path_length, &M, &freq, &freq_new);
                 if (c.n_elem != 0)
                     ranges.push_back({(std::uintptr_t)c.memptr(), (std::uintptr_t)(c.memptr() + c.n_elem), name});
             }
@@ -294,7 +294,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
         const arma::Mat<dtype> fbs_d = pos_d.t();
         const arma::Col<dtype> length_d = {std::sqrt(x * x + y * y + z * z) + one};
-        const arma::uword n_f = freq_in.n_elem;
+        const arma::uword n_f = freq.n_elem;
         const arma::Mat<dtype> gain_d(1, n_f, arma::fill::ones);
         arma::Cube<dtype> M_d((M.n_rows == 2) ? 2 : 8, 1, n_f, arma::fill::zeros);
         for (arma::uword f = 0; f < n_f; ++f)
@@ -307,7 +307,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         std::vector<arma::Cube<dtype>> cr, ci, dl;
         std::vector<arma::Cube<std::complex<dtype>>> cx;
         quadriga_lib::get_channels_multifreq<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
-                                                    fbs_d, fbs_d, gain_d, length_d, M_d, freq_in, freq_out,
+                                                    fbs_d, fbs_d, gain_d, length_d, M_d, freq, freq_new,
                                                     cr, ci, dl, use_absolute_delays, true, propagation_speed,
                                                     coeff ? &cx : nullptr);
 
@@ -343,23 +343,23 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     const bool scalar_M = (M.n_rows == 2);
 
     const arma::uword n_path = fbs_pos.n_cols;
-    const arma::uword n_freq_in = freq_in.n_elem;
-    const arma::uword n_freq_out = freq_out.n_elem;
+    const arma::uword n_freq = freq.n_elem;
+    const arma::uword n_freq_new = freq_new.n_elem;
     const arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path;
 
-    if (n_freq_in == 0)
-        throw std::invalid_argument("get_channels_multifreq: 'freq_in' is empty.");
-    if (n_freq_out == 0)
-        throw std::invalid_argument("get_channels_multifreq: 'freq_out' is empty.");
+    if (n_freq == 0)
+        throw std::invalid_argument("get_channels_multifreq: 'freq' is empty.");
+    if (n_freq_new == 0)
+        throw std::invalid_argument("get_channels_multifreq: 'freq_new' is empty.");
 
     if (!no_paths && lbs_pos.n_cols != n_path)
         throw std::invalid_argument("get_channels_multifreq: 'lbs_pos' must have n_path columns.");
-    if (!no_paths && (path_gain.n_rows != n_path || path_gain.n_cols != n_freq_in))
-        throw std::invalid_argument("get_channels_multifreq: 'path_gain' must have size [n_path, n_freq_in].");
+    if (!no_paths && (path_gain.n_rows != n_path || path_gain.n_cols != n_freq))
+        throw std::invalid_argument("get_channels_multifreq: 'path_gain' must have size [n_path, n_freq].");
     if (!no_paths && path_length.n_elem != n_path)
         throw std::invalid_argument("get_channels_multifreq: 'path_length' must have n_path elements.");
-    if (!no_paths && (M.n_cols != n_path || M.n_slices != n_freq_in))
-        throw std::invalid_argument("get_channels_multifreq: 'M' must have size [8|2, n_path, n_freq_in].");
+    if (!no_paths && (M.n_cols != n_path || M.n_slices != n_freq))
+        throw std::invalid_argument("get_channels_multifreq: 'M' must have size [8|2, n_path, n_freq].");
     if (propagation_speed <= zero)
         throw std::invalid_argument("get_channels_multifreq: 'propagation_speed' must be positive.");
 
@@ -375,8 +375,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     // coeff_re / coeff_im, which are left empty
     auto resize_output = [&](auto &out)
     {
-        if (out.size() != n_freq_out)
-            out.resize(n_freq_out);
+        if (out.size() != n_freq_new)
+            out.resize(n_freq_new);
         for (auto &c : out)
             if (c.n_rows != n_rx_ports || c.n_cols != n_tx_ports || c.n_slices != n_out)
                 c.set_size(n_rx_ports, n_tx_ports, n_out);
@@ -390,13 +390,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     if (n_out == 0) // 0 paths without add_fake_los_path: empty outputs
         return;
 
-    // Build center-frequency vectors for TX, RX, and freq_in grids
+    // Build center-frequency vectors for TX, RX, and freq grids
     arma::Col<dtype> tx_center_freqs((arma::uword)tx_array.size());
     arma::Col<dtype> rx_center_freqs((arma::uword)rx_array.size());
     for (arma::uword i = 0; i < tx_center_freqs.n_elem; ++i)
-        tx_center_freqs[i] = (dtype)tx_array[i].center_frequency;
+        tx_center_freqs[i] = (dtype)tx_array[i].center_freq;
     for (arma::uword i = 0; i < rx_center_freqs.n_elem; ++i)
-        rx_center_freqs[i] = (dtype)rx_array[i].center_frequency;
+        rx_center_freqs[i] = (dtype)rx_array[i].center_freq;
 
     // Phase 1: Geometry computation (frequency-independent, sequential)
     // Transmitter and receiver orientation
@@ -642,26 +642,26 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     // is passed on after the region
     bool omp_failed = false;
     std::string omp_error;
-    const int n_freq_out_i = (int)n_freq_out;
-#pragma omp parallel for schedule(static) if (n_freq_out >= 8)
-    for (int f_i = 0; f_i < n_freq_out_i; ++f_i)
+    const int n_freq_new_i = (int)n_freq_new;
+#pragma omp parallel for schedule(static) if (n_freq_new >= 8)
+    for (int f_i = 0; f_i < n_freq_new_i; ++f_i)
     {
         const arma::uword f = (arma::uword)f_i;
-        const dtype freq = freq_out[f];
-        const dtype wavelength = (freq > zero) ? propagation_speed / freq : one;
-        const dtype wave_number = (freq > zero) ? two_pi * freq / propagation_speed : zero;
+        const dtype f_new = freq_new[f];
+        const dtype wavelength = (f_new > zero) ? propagation_speed / f_new : one;
+        const dtype wave_number = (f_new > zero) ? two_pi * f_new / propagation_speed : zero;
 
-        // Find frequency brackets for TX, RX, and freq_in grids
+        // Find frequency brackets for TX, RX, and freq grids
         arma::uword tx_lo, tx_hi, rx_lo, rx_hi, fin_lo, fin_hi;
         dtype tx_w, rx_w, fin_w;
         bool tx_exact, rx_exact, fin_exact;
 
-        find_freq_bracket(tx_center_freqs, freq, tx_lo, tx_hi, tx_w, tx_exact);
-        find_freq_bracket(rx_center_freqs, freq, rx_lo, rx_hi, rx_w, rx_exact);
-        find_freq_bracket(freq_in, freq, fin_lo, fin_hi, fin_w, fin_exact);
+        find_freq_bracket(tx_center_freqs, f_new, tx_lo, tx_hi, tx_w, tx_exact);
+        find_freq_bracket(rx_center_freqs, f_new, rx_lo, rx_hi, rx_w, rx_exact);
+        find_freq_bracket(freq, f_new, fin_lo, fin_hi, fin_w, fin_exact);
 
         // Interpolate path gain at this frequency (linear interpolation)
-        const dtype *p_gain_in = path_gain.memptr(); // Column-major [n_path, n_freq_in]
+        const dtype *p_gain_in = path_gain.memptr(); // Column-major [n_path, n_freq]
         arma::Col<dtype> gain_f(n_path);
         if (fin_exact)
         {

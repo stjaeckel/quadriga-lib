@@ -236,7 +236,7 @@ namespace fz
             a.coupling_im = in.mat<T>(in.size(n_e + 1), in.size(n_p + 1));
             break;
         }
-        a.center_frequency = in.value<T>();
+        a.center_freq = in.value<T>();
 
         // Validated, then grid values changed in place (keeps the data pointers of the quick check)
         if (in.ConsumeBool())

@@ -21,7 +21,7 @@ if package_path not in sys.path:
 import quadriga_lib
 
 gbsm = quadriga_lib.gbsm
-KEYS = ["method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
+KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
 C0 = 299792458.0
 
@@ -52,7 +52,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(list(r.keys()), KEYS)
         self.assertEqual(r["method"], "quadriga")
         npt.assert_array_equal(r["tx_pos"], self.tx)
-        npt.assert_array_equal(r["center_frequency"], self.fc)
+        npt.assert_array_equal(r["center_freq"], self.fc)
         npt.assert_allclose(r["delay"], (self.pl - self.d) / C0, atol=1e-18, rtol=0)
         npt.assert_array_equal(r["power"], self.pg)
         npt.assert_array_equal(r["M"], self.M)
@@ -127,7 +127,7 @@ class test_case(unittest.TestCase):
         self.assertIn("Entries in 'tap' must be integers from 0 to 4294967295.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.rays_from_paths(self.fc * 0, *self.args[1:])
-        self.assertIn("Input 'center_frequency' must be finite and > 0.", str(ctx.exception))
+        self.assertIn("Input 'center_freq' must be finite and > 0.", str(ctx.exception))
         with self.assertRaises(TypeError):
             gbsm.rays_from_paths(*self.args[:7])
         with self.assertRaises(TypeError):

@@ -68,7 +68,7 @@ class test_case(unittest.TestCase):
         pos_res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0], ori, pos, None, True, True,
                                                     False, 1, False)
         kw_res = quadriga_lib.arrayant.interpolate(arrayant=self.ant, azimuth=self.az, elevation=self.el, element=[1, 0],
-                                                   orientation=ori, element_pos=pos, frequency=None, dist=True,
+                                                   orientation=ori, element_pos=pos, freq_new=None, dist=True,
                                                    local_angles=True, fast_access=False, use_kernel=1, complex=False)
         self.assertEqual(len(kw_res), 8)
         for a, b in zip(pos_res, kw_res):
@@ -130,7 +130,7 @@ class test_case(unittest.TestCase):
 
     def test_multi_frequency(self):
         V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)
-        res = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, 1.5e9, 2e9],
+        res = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, freq_new=[1e9, 1.5e9, 2e9],
                                                 complex=False)
         self.assertEqual(len(res), 4)
         self.assertEqual(res[0].shape, (2, 3, 3))
@@ -139,18 +139,18 @@ class test_case(unittest.TestCase):
         # Default: the center frequencies of the entries
         res_d = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, complex=False)
         npt.assert_array_equal(res_d[0], res[0][:, :, [0, 2]])
-        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=None,
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, freq_new=None,
                                                                  complex=False)[0], res_d[0])
         # A 3D pattern with target frequencies is the same at every frequency
-        r3 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, frequency=1e9, complex=False)
+        r3 = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, freq_new=1e9, complex=False)
         self.assertEqual(r3[0].shape, (2, 3, 1))
         npt.assert_array_equal(r3[0][:, :, 0], V_re)
         # Element indices in the multi-frequency mode
-        r_e = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, element=[1, 0, 1], frequency=[1.5e9],
+        r_e = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, element=[1, 0, 1], freq_new=[1.5e9],
                                                 complex=False)
         npt.assert_array_equal(r_e[0][:, :, 0], res[0][[1, 0, 1], :, 1])
         # Complex output
-        V, H = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, 1.5e9, 2e9], complex=True)
+        V, H = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, freq_new=[1e9, 1.5e9, 2e9], complex=True)
         self.assertEqual(V.dtype, np.complex128)
         npt.assert_array_equal(V.real, res[0])
         npt.assert_array_equal(H.imag, res[3])
@@ -262,8 +262,8 @@ class test_case(unittest.TestCase):
             quadriga_lib.arrayant.interpolate(bad, self.az, self.el)
         self.assertIn("'azimuth_grid' must be between -pi and pi", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, frequency=[1e9, np.inf])
-        self.assertIn("'frequency' must contain finite values", str(ctx.exception))
+            quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, freq_new=[1e9, np.inf])
+        self.assertIn("'freq_new' must contain finite values", str(ctx.exception))
         # From the wrapper
         for flag in ("dist", "local_angles"):
             with self.assertRaises(ValueError) as ctx:

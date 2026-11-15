@@ -47,7 +47,7 @@ void calc_diffraction_gain(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-    dtype center_frequency,
+    dtype center_freq,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
     arma::Mat<dtype> *xprmat = nullptr,
@@ -68,7 +68,7 @@ void calc_diffraction_gain(
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
-- **`center_frequency`** — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic)
+- **`center_freq`** — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic)
   mode the EM-equivalent frequency `f_eq = f_acoustic · c_light / c_sound` (c_light = 299 792 458 m/s,
   c_sound = 342.76271 m/s), so that `c_light / f_eq` is the acoustic wavelength; this is the frequency unit of
   [[ray_mesh_interact]], [[ray_progress]] and [[generate_diffraction_paths]] in scalar mode. Passing the acoustic
@@ -89,10 +89,10 @@ void calc_diffraction_gain(
   the direct TX-RX distance, matching the `path_length` definition used by [[qrt_file_read]] for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
   `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at the
-  acoustic frequency `f = center_frequency · c_sound / c_light`.
+  acoustic frequency `f = center_freq · c_sound / c_light`.
 - **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
-  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c_light / center_frequency` in both
-  modes; in scalar mode this is the acoustic wavelength because `center_frequency` is the EM-equivalent
+  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c_light / center_freq` in both
+  modes; in scalar mode this is the acoustic wavelength because `center_freq` is the EM-equivalent
   frequency (see above). Since the term has unit
   magnitude, `xprmat` stays normalized. This is the phase contribution that
   [[get_channels_spherical]] would otherwise add from `path_length`; enabling it here gives the complete
@@ -127,7 +127,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          const arma::Mat<dtype> &mesh,
                                          const arma::uvec &mtl_ind,
                                          const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                                         dtype center_frequency,
+                                         dtype center_freq,
                                          int lod,
                                          arma::Col<dtype> *gain,
                                          arma::Mat<dtype> *xprmat,
@@ -166,7 +166,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
         throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
 
     // Frequency in GHz
-    if (center_frequency <= (dtype)0.0)
+    if (center_freq <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
 
     // Material indices are carried as 14 bits of the signed 16-bit state words by ray_state_update.
@@ -189,7 +189,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     if (lod == 0)
         weight.ones(n_pos, 1, 1);
     else
-        quadriga_lib::generate_diffraction_paths<dtype>(orig, dest, center_frequency, lod, ray_x, ray_y, ray_z, weight);
+        quadriga_lib::generate_diffraction_paths<dtype>(orig, dest, center_freq, lod, ray_x, ray_y, ray_z, weight);
 
     // Dimensions of the diffraction ellipsoid
     const arma::uword n_path = weight.n_cols;  // Number of diffraction arcs
@@ -301,7 +301,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                         double alpha = std::acos(dot);           // air-referenced bend
                         if (axis_len > 1.0e-6 && alpha > 1.0e-6) // co-linear gate
                         {
-                            double n = (double)quadriga_lib::refractive_index<dtype>(mtl_prop, (arma::uword)mtl_cur, center_frequency);
+                            double n = (double)quadriga_lib::refractive_index<dtype>(mtl_prop, (arma::uword)mtl_cur, center_freq);
                             double c = (double)g_cosair[iG]; // cos(theta_air) at entry
                             double s2 = 1.0 - (1.0 - c * c) / (n * n);
                             double C = (s2 > 1.0e-12) ? c / (n * std::sqrt(s2)) : 0.0; // s2<=0 => exit-side TIR
@@ -373,7 +373,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
             std::vector<uint8_t> hit_type; // Interaction type code from ray_mesh_interact, [R]
 
             // Calculate the interface interactions; no compaction
-            quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_frequency, &s_orig, &s_dest, &mesh, &mtl_ind, &mtl_prop,
+            quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_freq, &s_orig, &s_dest, &mesh, &mtl_ind, &mtl_prop,
                                                    &fbs_ind, &sbs_ind, nullptr, nullptr, &origN, nullptr, &fbsN, &sbsN,
                                                    &gainN, &xprmatN, nullptr, nullptr, &fbs_angle, nullptr,
                                                    nullptr, &normal_vec, &hit_type, &dirN, false);
@@ -424,7 +424,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                         normal_vec(iR, 0) = g_normal(iG, 0), normal_vec(iR, 1) = g_normal(iG, 1), normal_vec(iR, 2) = g_normal(iG, 2);
                 }
 
-                quadriga_lib::ray_state_update<dtype>(interaction_type, center_frequency,
+                quadriga_lib::ray_state_update<dtype>(interaction_type, center_freq,
                                                       &s_orig, &s_dest, &fbsN, &sbsN, &no_interact, // RT geometry
                                                       &fbs_angle, &normal_vec,                      // Incidence angle, normal vector
                                                       &hit_type,                                    // Hit type code
@@ -463,7 +463,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 // Account for in-medium gain if the last segment ends inside an object
                 // Note: the in-medium gain for intermediate segments is resolved by ray_state_update
                 if (last_segment && !ray_continues)
-                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_ref_out[iR], center_frequency) : 1.0;
+                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_ref_out[iR], center_freq) : 1.0;
 
                 // Capture cos(theta_air)
                 if (old_cur == 0 && new_cur != 0)                     // air -> medium: capture cos(theta_air)
@@ -641,7 +641,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     // get_channels_spherical see for a transmission-only path (the spine ray is a straight line).
     if ((apply_fspl && p_gain) || (apply_phase && xprmat))
     {
-        const double freq = (double)center_frequency;
+        const double freq = (double)center_freq;
 
         // Path-loss reference at 1 m and air absorption, shared with the QRT reader
         const double gain_at_1m = qd_gain_at_1m(freq, scalar_mode);
@@ -696,7 +696,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, const arma::Mat<float> &dest,
                                                   const arma::Mat<float> &mesh, const arma::uvec &mtl_ind,
                                                   const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-                                                  float center_frequency, int lod,
+                                                  float center_freq, int lod,
                                                   arma::Col<float> *gain, arma::Mat<float> *xprmat, arma::Cube<float> *coord,
                                                   int verbose, const arma::u32_vec *sub_mesh_index,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
@@ -705,7 +705,7 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, 
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> &orig, const arma::Mat<double> &dest,
                                                   const arma::Mat<double> &mesh, const arma::uvec &mtl_ind,
                                                   const std::unordered_map<std::string, std::vector<double>> &mtl_prop,
-                                                  double center_frequency, int lod,
+                                                  double center_freq, int lod,
                                                   arma::Col<double> *gain, arma::Mat<double> *xprmat, arma::Cube<double> *coord,
                                                   int verbose, const arma::u32_vec *sub_mesh_index,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,

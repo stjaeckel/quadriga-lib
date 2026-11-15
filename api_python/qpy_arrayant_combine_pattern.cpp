@@ -18,7 +18,7 @@ Combine element patterns, positions, and coupling weights into effective radiati
   identity coupling matrix
 - Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
 - Accepts a frequency-dependent antenna (4D pattern fields); the pattern is then combined per frequency
-- `freq` may recompute (interpolate) the combined pattern at one or more requested frequencies
+- `freq_new` may recompute (interpolate) the combined pattern at one or more requested frequencies
 - The element positions add a phase that depends on frequency and `propagation_speed`; the default speed of light
   applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 
@@ -26,10 +26,10 @@ Combine element patterns, positions, and coupling weights into effective radiati
 ```
 # Single frequency
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant )
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
 
-# Multiple frequencies (freq as a 1D array, or a frequency-dependent input antenna)
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq, azimuth_grid, elevation_grid )
+# Multiple frequencies (freq_new as a 1D array, or a frequency-dependent input antenna)
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
 
 # Acoustic array (speed of sound)
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_speed=343.0 )
@@ -38,7 +38,7 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 ## Inputs:
 - **`arrayant`** — Dict with the array antenna data; keys as documented in [[generate]]; 4D pattern fields
   require `center_freq` with one value per frequency entry `(n_freq,)`
-- **`freq`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
+- **`freq_new`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
   recomputed at each value; if `None`, each input entry's `center_freq` is used; a scalar `<= 0`
   is treated as not given; default: `None`
 - **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; strictly increasing; `(n_azimuth_out,)`;
@@ -59,7 +59,7 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 MD!*/
 
 py::dict arrayant_combine_pattern(const py::dict &arrayant,
-                                  py::handle freq,
+                                  py::handle freq_new,
                                   py::handle azimuth_grid,
                                   py::handle elevation_grid,
                                   double propagation_speed)
@@ -69,23 +69,23 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
     const auto elevation_grid_a = qd_python_numpy2arma_Col<double>(elevation_grid, true);
 
     // Optional frequency override: accepts a scalar or a 1D array.
-    arma::vec freq_a = qd_python_numpy2arma_Col<double>(freq, false); // Copy: may be reset below
-    if (freq_a.n_elem == 1 && freq_a[0] <= 0.0)
-        freq_a.reset();
+    arma::vec freq_new_a = qd_python_numpy2arma_Col<double>(freq_new, false); // Copy: may be reset below
+    if (freq_new_a.n_elem == 1 && freq_new_a[0] <= 0.0)
+        freq_new_a.reset();
 
     // Parse the (possibly frequency-dependent) input antenna; length 1 for a single-freq dict.
     auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true);
 
-    // Multi-frequency branch: frequency-dependent input, or a freq vector with > 1 entry
-    if (ant.size() > 1 || freq_a.n_elem > 1)
+    // Multi-frequency branch: frequency-dependent input, or a freq_new vector with > 1 entry
+    if (ant.size() > 1 || freq_new_a.n_elem > 1)
     {
-        auto out = quadriga_lib::arrayant_combine_pattern_multi(ant, &azimuth_grid_a, &elevation_grid_a, &freq_a, propagation_speed);
+        auto out = quadriga_lib::arrayant_combine_pattern_multi(ant, &azimuth_grid_a, &elevation_grid_a, &freq_new_a, propagation_speed);
         return qd_python_arrayant2dict_multi(out);
     }
 
     // Single-frequency branch
-    if (freq_a.n_elem == 1)
-        ant[0].center_frequency = freq_a[0];
+    if (freq_new_a.n_elem == 1)
+        ant[0].center_freq = freq_new_a[0];
 
     auto arrayant_out = quadriga_lib::arrayant_combine_pattern(ant[0], &azimuth_grid_a, &elevation_grid_a, propagation_speed);
     return qd_python_arrayant2dict(arrayant_out);
@@ -94,7 +94,7 @@ py::dict arrayant_combine_pattern(const py::dict &arrayant,
 // pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
 // m.def("combine_pattern", &arrayant_combine_pattern,
 //       py::arg("arrayant"),
-//       py::arg("freq") = py::none(),
+//       py::arg("freq_new") = py::none(),
 //       py::arg("azimuth_grid") = py::none(),
 //       py::arg("elevation_grid") = py::none(),
 //       py::arg("propagation_speed") = 299792458.0);

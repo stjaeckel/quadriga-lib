@@ -13,7 +13,7 @@ fclose(f);
 [ant, layout] = quadriga_lib.qdant_read('test.qdant');
 e_theta_re = ant.e_theta_re; e_theta_im = ant.e_theta_im; e_phi_re = ant.e_phi_re; e_phi_im = ant.e_phi_im;
 azimuth_grid = ant.azimuth_grid; elevation_grid = ant.elevation_grid; element_pos = ant.element_pos;
-coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_frequency = ant.center_freq; name = ant.name;
+coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_freq = ant.center_freq; name = ant.name;
 
 assertTrue( isa(e_theta_re,'double') );
 assertTrue( isa(e_theta_im,'double') );
@@ -24,7 +24,7 @@ assertTrue( isa(elevation_grid,'double') );
 assertTrue( isa(element_pos,'double') );
 assertTrue( isa(coupling_re,'double') );
 assertTrue( isa(coupling_im,'double') );
-assertTrue( isa(center_frequency,'double') );
+assertTrue( isa(center_freq,'double') );
 assertTrue( isa(layout,'uint32') );
 
 assertElementsAlmostEqual( 20*log10(e_theta_re), reshape(1:15,3,5)', 'absolute', 1e-14 );
@@ -36,7 +36,7 @@ assertElementsAlmostEqual( elevation_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute'
 assertElementsAlmostEqual( element_pos, [0;0;0], 'absolute', 1e-13 );
 assertElementsAlmostEqual( coupling_re, 1, 'absolute', 1e-13 );
 assertElementsAlmostEqual( coupling_im, 0, 'absolute', 1e-13 );
-assertElementsAlmostEqual( center_frequency, 299792458, 'absolute', 1e-13 );
+assertElementsAlmostEqual( center_freq, 299792458, 'absolute', 1e-13 );
 assertTrue( strcmp(name,'bla') );
 assertEqual( layout, uint32(1) );
 
@@ -65,7 +65,7 @@ fclose(f);
 [ant, layout] = quadriga_lib.qdant_read('test.qdant',1);
 e_theta_re = ant.e_theta_re; e_theta_im = ant.e_theta_im; e_phi_re = ant.e_phi_re; e_phi_im = ant.e_phi_im;
 azimuth_grid = ant.azimuth_grid; elevation_grid = ant.elevation_grid; element_pos = ant.element_pos;
-coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_frequency = ant.center_freq; name = ant.name;
+coupling_re = ant.coupling_re; coupling_im = ant.coupling_im; center_freq = ant.center_freq; name = ant.name;
 
 assertElementsAlmostEqual( azimuth_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute', 1e-12 );
 assertElementsAlmostEqual( elevation_grid, [-pi/2,0,pi/2], 'absolute', 1e-12 );
@@ -76,7 +76,7 @@ assertElementsAlmostEqual( e_phi_im, ones(3,5), 'absolute', 1e-12 );
 assertElementsAlmostEqual( element_pos, [1;2;3], 'absolute', 1e-12 );
 assertElementsAlmostEqual( coupling_re, 1/sqrt(2), 'absolute', 1e-12 );
 assertElementsAlmostEqual( coupling_im, 1/sqrt(2), 'absolute', 1e-12 );
-assertElementsAlmostEqual( center_frequency, 3e9, 'absolute', 1e-12 );
+assertElementsAlmostEqual( center_freq, 3e9, 'absolute', 1e-12 );
 assertTrue( strcmp(name,'unknown') );
 assertEqual( layout, ones(2,3,'uint32') );
 
@@ -90,7 +90,7 @@ assertElementsAlmostEqual( data.elevation_grid, elevation_grid, 'absolute', 1e-1
 assertElementsAlmostEqual( data.element_pos, element_pos, 'absolute', 1e-14)
 assertElementsAlmostEqual( data.coupling_re, coupling_re, 'absolute', 1e-14)
 assertElementsAlmostEqual( data.coupling_im, coupling_im, 'absolute', 1e-14)
-assertElementsAlmostEqual( data.center_freq, center_frequency, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.center_freq, center_freq, 'absolute', 1e-14)
 assertTrue( strcmp(data.name,'unknown') );
 assertEqual( layout, ones(2,3,'uint32') );
 

@@ -203,7 +203,7 @@ Combine element patterns, positions, and coupling weights into effective radiati
 Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_combine_pattern) · [Python](../python/array-antenna-functions.md#combine_pattern)
 
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output element per port (column) of the coupling matrix
-- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_frequency` and `d` the distance
+- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_freq` and `d` the distance
   of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use
   about 343 m/s for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
 - Empty `element_pos` counts as zeros, empty coupling as identity
@@ -241,7 +241,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_combine_pattern) ·
 
 - Multi-frequency counterpart to [arrayant_combine_pattern](#arrayant_combine_pattern)
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
-- Output length = `freq_grid_new->n_elem` if provided; otherwise one entry per input arrayant
+- Output length = `freq_new->n_elem` if provided; otherwise one entry per input arrayant
 - Field interpolation across frequency is delegated to [arrayant_interpolate_multi](#arrayant_interpolate_multi) (SLERP with linear-interpolation fallback)
 - Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
 - Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
@@ -254,7 +254,7 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Col<dtype> *azimuth_grid_new = nullptr,
     const arma::Col<dtype> *elevation_grid_new = nullptr,
-    const arma::Col<dtype> *freq_grid_new = nullptr,
+    const arma::Col<dtype> *freq_new = nullptr,
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -262,12 +262,12 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects (must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi))
 - **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to `arrayant_vec[0].azimuth_grid`
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to `arrayant_vec[0].elevation_grid`
-- **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz, positive and finite; defaults to per-entry
-  `center_frequency`
+- **`freq_new`** *(optional)* — Alternative frequency grid in Hz, positive and finite; defaults to per-entry
+  `center_freq`
 - **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ### Returns:
-- Vector of arrayant objects (length = `n_freq_out`), each with `n_ports` elements equal to the number of columns in the coupling matrix
+- Vector of arrayant objects (length = `n_freq_new`), each with `n_ports` elements equal to the number of columns in the coupling matrix
 
 ### See also:
 - [arrayant_combine_pattern](#arrayant_combine_pattern) (single-frequency counterpart)
@@ -282,7 +282,7 @@ Concatenate the elements of two arrayants into a new arrayant
 Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_concat) · [Python](../python/array-antenna-functions.md#concat)
 
 - Both arrays must share identical sampling grids; throws otherwise
-- Coupling is block-diagonal (see [arrayant_concat_multi](#arrayant_concat_multi) diagram); name and center_frequency are taken from `ant_1`
+- Coupling is block-diagonal (see [arrayant_concat_multi](#arrayant_concat_multi) diagram); name and center_freq are taken from `ant_1`
 - An empty `element_pos` counts as zeros, an empty `coupling_re` as identity (one port per element), an empty
   `coupling_im` as zeros
 
@@ -310,10 +310,10 @@ Concatenate two multi-frequency arrayant vectors into a single multi-element mod
 
 Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_concat) · [Python](../python/array-antenna-functions.md#concat)
 
-- Both inputs must have equal entry counts, identical angular grids, and matching `center_frequency` values at each index.
+- Both inputs must have equal entry counts, identical angular grids, and matching `center_freq` values at each index.
 - Per frequency entry: pattern cubes are joined along the element (slice) dimension; `element_pos` matrices are horizontally concatenated (empty positions treated as zeros).
 - Both inputs are validated with [arrayant_is_valid_multi](#arrayant_is_valid_multi) before processing; each output entry is validated before returning.
-- Output inherits name, azimuth/elevation grids, and `center_frequency` from `arrayant_vec1`.
+- Output inherits name, azimuth/elevation grids, and `center_freq` from `arrayant_vec1`.
 
 ### Declaration:
 ```cpp
@@ -566,7 +566,7 @@ void quadriga_lib::arrayant_interpolate_multi(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> *frequency = nullptr,
+    const arma::Col<dtype> *freq_new = nullptr,
     const arma::uvec *i_element = nullptr,
     const arma::Cube<dtype> *orientation = nullptr,
     const arma::Mat<dtype> *element_pos = nullptr,
@@ -580,7 +580,7 @@ void quadriga_lib::arrayant_interpolate_multi(
   frequency
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`frequency`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
+- **`freq_new`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
   in vector order; `[n_freq]`
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements;
   `[n_out]`
@@ -621,7 +621,7 @@ Not in: MATLAB, Python
 
 - Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
 - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
-- Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
+- Pattern data, `center_freq`, and coupling matrix values are not compared (expected to vary).
 - All entries must use the same form for `element_pos`, `coupling_re` and `coupling_im`: all empty or all given; a
   mix of empty members and explicit zeros / identity is rejected.
 - Stops at first error and returns a message identifying the failing entry and property.
@@ -674,7 +674,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_rotate_pattern) · 
 - Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
   [arrayant_interpolate](#arrayant_interpolate) returns for the unrotated pattern with the same `orientation`
 - A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
-- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_frequency` and `name` are kept
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_freq` and `name` are kept
 - Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
   in `i_element` throws when the grid must be adjusted
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
@@ -1030,13 +1030,13 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python](../python/array-antenna-functions.md#generate_speaker)
 
 - Returns one [arrayant](array-antenna-class.md#arrayant) object per frequency sample; each has a single element with the real-valued 
-  directivity pattern in `e_theta_re` and `center_frequency` set to the corresponding frequency.
+  directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results 
   via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
-- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band below 
+- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
 - **Driver models** (`driver_type`):
@@ -1066,7 +1066,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype horn_control_freq = 0.0,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
-        arma::Col<dtype> frequencies = arma::Col<dtype>(),
+        arma::Col<dtype> center_freq = arma::Col<dtype>(),
         dtype angular_resolution = 5.0);
 ```
 
@@ -1084,7 +1084,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; `0` auto-derives from `radius`
 - **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
-- **`frequencies`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
 - **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 5°
 
 ### Returns:
@@ -1144,7 +1144,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#qdant_read) · [Python](../p
 
 - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
 - Each unique ID is read exactly once regardless of how many times it appears in the layout.
-- Counterpart to [qdant_write_multi](#qdant_write_multi); primary mechanism for loading frequency-dependent models where `center_frequency` on each entry identifies the corresponding frequency.
+- Counterpart to [qdant_write_multi](#qdant_write_multi); primary mechanism for loading frequency-dependent models where `center_freq` on each entry identifies the corresponding frequency.
 
 ### Declaration:
 ```cpp
@@ -1222,7 +1222,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#qdant_write) · [Python](../
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
 - All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
   Invalid input throws and leaves an existing file unchanged.
-- Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_frequency`.
+- Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_freq`.
 
 ### Declaration:
 ```cpp

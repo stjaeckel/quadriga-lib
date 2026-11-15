@@ -153,7 +153,7 @@ TEST_CASE("Arrayant combine pattern - Propagation speed")
     ant.element_pos = {{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}};
     ant.coupling_re = arma::mat(2, 1, arma::fill::ones);
     ant.coupling_im = arma::mat(2, 1, arma::fill::zeros);
-    ant.center_frequency = 1000.0;
+    ant.center_freq = 1000.0;
 
     const arma::uword ie = 9, ia0 = 18, ia90 = 27; // el = 0; az = 0 and 90 deg on the 10 deg grid
     auto amp = [](const quadriga_lib::arrayant<double> &a, arma::uword i, arma::uword j)
@@ -182,7 +182,7 @@ TEST_CASE("Arrayant combine pattern - Propagation speed")
     antf.element_pos = {{0.0f, 0.0f}, {-0.1f, 0.1f}, {0.0f, 0.0f}};
     antf.coupling_re = arma::fmat(2, 1, arma::fill::ones);
     antf.coupling_im = arma::fmat(2, 1, arma::fill::zeros);
-    antf.center_frequency = 1000.0f;
+    antf.center_freq = 1000.0f;
     auto acf = quadriga_lib::arrayant_combine_pattern<float>(antf, nullptr, nullptr, 344.0f);
     CHECK(std::abs(std::hypot(acf.e_theta_re(ie, ia90, 0), acf.e_theta_im(ie, ia90, 0)) - expected) < 1e-4);
 

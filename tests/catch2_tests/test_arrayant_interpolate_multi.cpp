@@ -92,7 +92,7 @@ namespace
         ant.e_phi_re.set_size(1, 1, 1), ant.e_phi_im.set_size(1, 1, 1);
         ant.e_theta_re(0) = V.real(), ant.e_theta_im(0) = V.imag(), ant.e_phi_re(0) = H.real(), ant.e_phi_im(0) = H.imag();
         ant.azimuth_grid = {0.0}, ant.elevation_grid = {0.0};
-        ant.center_frequency = freq;
+        ant.center_freq = freq;
         return ant;
     }
 
@@ -106,7 +106,7 @@ namespace
         {
             auto ant = base;
             ant.e_theta_re *= scale(i), ant.e_theta_im *= scale(i), ant.e_phi_re *= scale(i), ant.e_phi_im *= scale(i);
-            ant.center_frequency = cf(i);
+            ant.center_freq = cf(i);
             vec.push_back(ant);
         }
         return vec;
@@ -362,7 +362,7 @@ TEST_CASE("arrayant_interpolate_multi - float and double agree")
         b.e_phi_re = arma::conv_to<arma::fcube>::from(a.e_phi_re), b.e_phi_im = arma::conv_to<arma::fcube>::from(a.e_phi_im);
         b.azimuth_grid = arma::conv_to<arma::fvec>::from(a.azimuth_grid), b.elevation_grid = arma::conv_to<arma::fvec>::from(a.elevation_grid);
         b.element_pos = arma::conv_to<arma::fmat>::from(a.element_pos);
-        b.center_frequency = (float)a.center_frequency;
+        b.center_freq = (float)a.center_freq;
         vec_f.push_back(b);
     }
     const arma::fmat az = {{0.3f, -1.1f, 0.7f}}, el = {{0.2f, -0.5f, 0.1f}};
@@ -435,7 +435,7 @@ TEST_CASE("arrayant_interpolate_multi - complex outputs equal the split outputs 
     for (double f : {1.0e9, 2.0e9, 3.0e9})
     {
         vec.push_back(quadriga_lib::generate_arrayant_3GPP<double>(1, 2, 1.0e9, 3, 0.0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10.0));
-        vec.back().center_frequency = f;
+        vec.back().center_freq = f;
         vec.back().e_theta_re *= f / 1.0e9; // Different patterns per entry
         vec.back().e_phi_im += 0.1 * f / 1.0e9;
     }
@@ -568,7 +568,7 @@ TEST_CASE("arrayant_interpolate_multi - a positive tilt points down (3GPP TR 38.
     // A beam along x, tilted by +10 degree, has its largest gain 10 degree below the horizon at every frequency
     auto beam = quadriga_lib::generate_arrayant_custom<double>(30.0, 30.0, 0.0, 5.0);
     std::vector<quadriga_lib::arrayant<double>> vec = {beam, beam};
-    vec[1].center_frequency = 2.0 * beam.center_frequency;
+    vec[1].center_freq = 2.0 * beam.center_freq;
     const arma::mat el = arma::regspace<arma::rowvec>(-30.0, 1.0, 30.0) * arma::datum::pi / 180.0;
     const arma::mat az(1, el.n_elem, arma::fill::zeros);
     arma::cube O(3, 1, 1, arma::fill::zeros), Vr, Vi, Hr, Hi;

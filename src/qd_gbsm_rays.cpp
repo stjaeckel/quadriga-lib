@@ -61,7 +61,7 @@ Class for the ray data of one link (geometry-based stochastic model)
 | --- | --- | --- | --- |
 | `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
 | `tx_pos`, `rx_pos` | `arma::vec`, `[3]` | Tx and Rx position the ray data refer to in [m] | all |
-| `center_frequency` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
+| `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
@@ -76,7 +76,7 @@ Class for the ray data of one link (geometry-based stochastic model)
 | Member | Returns |
 | --- | --- |
 | `n_ray()` | Number of rays, length of `delay` |
-| `n_freq()` | Number of frequencies, length of `center_frequency` |
+| `n_freq()` | Number of frequencies, length of `center_freq` |
 | `empty()` | `true` if `n_ray() == 0` |
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
 | `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
@@ -100,7 +100,7 @@ arma::uword quadriga_lib::gbsm_rays::n_ray() const
 
 arma::uword quadriga_lib::gbsm_rays::n_freq() const
 {
-    return center_frequency.n_elem;
+    return center_freq.n_elem;
 }
 
 bool quadriga_lib::gbsm_rays::empty() const
@@ -123,9 +123,9 @@ std::string quadriga_lib::gbsm_rays::is_valid() const
             return "Input 'rays." + p.first + "' must be finite.";
     }
     if (nf == 0)
-        return "Input 'rays.center_frequency' cannot be empty.";
-    if (!center_frequency.is_finite() || arma::any(center_frequency <= 0.0))
-        return "Input 'rays.center_frequency' must be finite and > 0.";
+        return "Input 'rays.center_freq' cannot be empty.";
+    if (!center_freq.is_finite() || arma::any(center_freq <= 0.0))
+        return "Input 'rays.center_freq' must be finite and > 0.";
     if (!delay.is_finite())
         return "Input 'rays.delay' must be finite.";
     if (power.n_rows != n || power.n_cols != nf)

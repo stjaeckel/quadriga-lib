@@ -12,15 +12,15 @@
 
 // Helper: build constant-envelope test data (no baked-in delay phase)
 // coeff = amplitude * exp(j * env_phase) at all input frequencies
-static void build_flat_envelope(arma::uword n_rx, arma::uword n_tx, arma::uword n_path, arma::uword n_freq_in,
+static void build_flat_envelope(arma::uword n_rx, arma::uword n_tx, arma::uword n_path, arma::uword n_freq,
                                 double amplitude, double env_phase,
                                 std::vector<arma::Cube<double>> &cre, std::vector<arma::Cube<double>> &cim)
 {
-    cre.resize(n_freq_in);
-    cim.resize(n_freq_in);
+    cre.resize(n_freq);
+    cim.resize(n_freq);
     double re = amplitude * std::cos(env_phase);
     double im = amplitude * std::sin(env_phase);
-    for (arma::uword f = 0; f < n_freq_in; ++f)
+    for (arma::uword f = 0; f < n_freq; ++f)
     {
         cre[f].set_size(n_rx, n_tx, n_path);
         cim[f].set_size(n_rx, n_tx, n_path);
@@ -30,11 +30,11 @@ static void build_flat_envelope(arma::uword n_rx, arma::uword n_tx, arma::uword 
 }
 
 // Helper: build delay vector (planar wave)
-static std::vector<arma::Cube<double>> build_planar_delays(arma::uword n_path, arma::uword n_freq_in,
+static std::vector<arma::Cube<double>> build_planar_delays(arma::uword n_path, arma::uword n_freq,
                                                            const arma::Col<double> &tau)
 {
-    std::vector<arma::Cube<double>> dl(n_freq_in);
-    for (arma::uword f = 0; f < n_freq_in; ++f)
+    std::vector<arma::Cube<double>> dl(n_freq);
+    for (arma::uword f = 0; f < n_freq; ++f)
     {
         dl[f].set_size(1, 1, n_path);
         for (arma::uword p = 0; p < n_path; ++p)
@@ -45,25 +45,25 @@ static std::vector<arma::Cube<double>> build_planar_delays(arma::uword n_path, a
 
 // Helper: build delay vector (spherical wave)
 static std::vector<arma::Cube<double>> build_spherical_delays(arma::uword n_rx, arma::uword n_tx, arma::uword n_path,
-                                                              arma::uword n_freq_in, const arma::Cube<double> &tau)
+                                                              arma::uword n_freq, const arma::Cube<double> &tau)
 {
-    std::vector<arma::Cube<double>> dl(n_freq_in);
-    for (arma::uword f = 0; f < n_freq_in; ++f)
+    std::vector<arma::Cube<double>> dl(n_freq);
+    for (arma::uword f = 0; f < n_freq; ++f)
         dl[f] = tau;
     return dl;
 }
 
 // Helper: bake delay phase into coefficients (simulates get_channels_multifreq output)
-// coeff_baked[f] = coeff_env[f] * exp(-j * 2 * pi * freq_in[f] * delay)
+// coeff_baked[f] = coeff_env[f] * exp(-j * 2 * pi * freq[f] * delay)
 static void bake_delay_phase(std::vector<arma::Cube<double>> &cre, std::vector<arma::Cube<double>> &cim,
-                             const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq_in)
+                             const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq)
 {
-    arma::uword n_freq_in = freq_in.n_elem;
+    arma::uword n_freq = freq.n_elem;
     bool planar = (delay[0].n_rows == 1 && delay[0].n_cols == 1);
     arma::uword n_rx = cre[0].n_rows, n_tx = cre[0].n_cols, n_path = cre[0].n_slices;
     arma::uword n_ant = n_rx * n_tx;
 
-    for (arma::uword f = 0; f < n_freq_in; ++f)
+    for (arma::uword f = 0; f < n_freq; ++f)
     {
         double *pr = cre[f].memptr();
         double *pi = cim[f].memptr();
@@ -74,7 +74,7 @@ static void bake_delay_phase(std::vector<arma::Cube<double>> &cre, std::vector<a
             {
                 arma::uword idx = p * n_ant + a;
                 double dl = planar ? pd[p] : pd[idx];
-                double phase = -6.283185307179586 * (double)freq_in(f) * dl;
+                double phase = -6.283185307179586 * (double)freq(f) * dl;
                 double c = std::cos(phase), s = std::sin(phase);
                 double re = pr[idx], im = pi[idx];
                 pr[idx] = re * c - im * s;
@@ -89,9 +89,9 @@ static void bake_delay_phase(std::vector<arma::Cube<double>> &cre, std::vector<a
 
 TEST_CASE("baseband_freq_response_multi - Error handling")
 {
-    // Minimal valid data: 1 RX, 1 TX, 1 path, 1 freq_in
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9};
+    // Minimal valid data: 1 RX, 1 TX, 1 path, 1 freq
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9};
     std::vector<arma::Cube<double>> cre(1), cim(1), dl(1);
     cre[0].set_size(1, 1, 1); cre[0].fill(1.0);
     cim[0].set_size(1, 1, 1); cim[0].fill(0.0);
@@ -99,18 +99,18 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
 
     arma::Cube<double> Hr, Hi;
 
-    // --- Empty freq_in ---
+    // --- Empty freq ---
     {
         arma::Col<double> fin_empty;
         std::vector<arma::Cube<double>> cre_e, cim_e, dl_e;
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre_e, cim_e, dl_e, fin_empty, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre_e, cim_e, dl_e, fin_empty, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
-    // --- Empty freq_out ---
+    // --- Empty freq_new ---
     {
         arma::Col<double> fout_empty;
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, fout_empty, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, fout_empty, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
@@ -119,7 +119,7 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
         std::vector<arma::Cube<double>> cre_bad(2);
         cre_bad[0].set_size(1, 1, 1); cre_bad[0].fill(1.0);
         cre_bad[1].set_size(1, 1, 1); cre_bad[1].fill(1.0);
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre_bad, cim, dl, freq_in, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre_bad, cim, dl, freq, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
@@ -128,7 +128,7 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
         std::vector<arma::Cube<double>> cim_bad(2);
         cim_bad[0].set_size(1, 1, 1); cim_bad[0].fill(0.0);
         cim_bad[1].set_size(1, 1, 1); cim_bad[1].fill(0.0);
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim_bad, dl, freq_in, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim_bad, dl, freq, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
@@ -137,7 +137,7 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
         std::vector<arma::Cube<double>> dl_bad(2);
         dl_bad[0].set_size(1, 1, 1); dl_bad[0].fill(0.0);
         dl_bad[1].set_size(1, 1, 1); dl_bad[1].fill(0.0);
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl_bad, freq_in, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl_bad, freq, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
@@ -146,7 +146,7 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
         std::vector<arma::Cube<double>> cre_e(1), cim_e(1);
         cre_e[0].set_size(0, 1, 1);
         cim_e[0].set_size(0, 1, 1);
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre_e, cim_e, dl, freq_in, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre_e, cim_e, dl, freq, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
@@ -160,7 +160,7 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
         cim2[1].set_size(2, 1, 1); cim2[1].fill(0.0);
         dl2[0].set_size(1, 1, 1); dl2[0].fill(0.0);
         dl2[1].set_size(1, 1, 1); dl2[1].fill(0.0);
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre2, cim2, dl2, fin2, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre2, cim2, dl2, fin2, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
@@ -174,7 +174,7 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
         cim2[1].set_size(1, 1, 2); cim2[1].fill(0.0); // Different n_path
         dl2[0].set_size(1, 1, 1); dl2[0].fill(0.0);
         dl2[1].set_size(1, 1, 1); dl2[1].fill(0.0);
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre2, cim2, dl2, fin2, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre2, cim2, dl2, fin2, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 
@@ -182,7 +182,7 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
     {
         std::vector<arma::Cube<double>> dl_bad(1);
         dl_bad[0].set_size(2, 2, 1); dl_bad[0].fill(0.0); // n_rx=1,n_tx=1 but delay is 2x2
-        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl_bad, freq_in, freq_out, &Hr, &Hi,
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl_bad, freq, freq_new, &Hr, &Hi,
                          (arma::Cube<std::complex<double>> *)nullptr, true), std::invalid_argument);
     }
 }
@@ -193,8 +193,8 @@ TEST_CASE("baseband_freq_response_multi - Error handling")
 
 TEST_CASE("baseband_freq_response_multi - Zero paths")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9, 2.0e9, 3.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9, 2.0e9, 3.0e9};
     std::vector<arma::Cube<double>> cre(1), cim(1), dl(1);
     cre[0].set_size(2, 2, 0);
     cim[0].set_size(2, 2, 0);
@@ -203,7 +203,7 @@ TEST_CASE("baseband_freq_response_multi - Zero paths")
     arma::Cube<double> Hr, Hi;
     arma::Cube<std::complex<double>> Hc;
 
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi, &Hc, false);
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi, &Hc, false);
 
     REQUIRE(Hr.n_rows == 2);
     REQUIRE(Hr.n_cols == 2);
@@ -223,8 +223,8 @@ TEST_CASE("baseband_freq_response_multi - Zero paths")
 
 TEST_CASE("baseband_freq_response_multi - Single freq, single path, zero delay, no phase removal")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {0.5e9, 1.0e9, 2.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {0.5e9, 1.0e9, 2.0e9};
 
     double amp = 0.7, phi = 0.3;
     std::vector<arma::Cube<double>> cre, cim;
@@ -234,7 +234,7 @@ TEST_CASE("baseband_freq_response_multi - Single freq, single path, zero delay, 
     auto dl = build_planar_delays(1, 1, tau);
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     REQUIRE(Hr.n_slices == 3);
@@ -255,8 +255,8 @@ TEST_CASE("baseband_freq_response_multi - Single freq, single path, zero delay, 
 
 TEST_CASE("baseband_freq_response_multi - Single freq, nonzero delay, no phase removal")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9, 1.5e9, 2.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9, 1.5e9, 2.0e9};
 
     double amp = 1.0, phi = 0.0;
     std::vector<arma::Cube<double>> cre, cim;
@@ -267,12 +267,12 @@ TEST_CASE("baseband_freq_response_multi - Single freq, nonzero delay, no phase r
     auto dl = build_planar_delays(1, 1, tau);
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     for (arma::uword k = 0; k < 3; ++k)
     {
-        double f = freq_out(k);
+        double f = freq_new(k);
         double expected_phase = -6.283185307179586 * f * tau_val;
         double expected_re = amp * std::cos(expected_phase);
         double expected_im = amp * std::sin(expected_phase);
@@ -288,8 +288,8 @@ TEST_CASE("baseband_freq_response_multi - Single freq, nonzero delay, no phase r
 
 TEST_CASE("baseband_freq_response_multi - Two-path superposition, no phase removal")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9, 1.25e9, 1.5e9, 2.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9, 1.25e9, 1.5e9, 2.0e9};
 
     double A1 = 1.0, A2 = 0.5;
     double tau1 = 5.0e-9, tau2 = 20.0e-9;
@@ -304,12 +304,12 @@ TEST_CASE("baseband_freq_response_multi - Two-path superposition, no phase remov
     dl[0](0, 0, 1) = tau2;
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
-    for (arma::uword k = 0; k < freq_out.n_elem; ++k)
+    for (arma::uword k = 0; k < freq_new.n_elem; ++k)
     {
-        double f = freq_out(k);
+        double f = freq_new(k);
         double phase1 = -6.283185307179586 * f * tau1;
         double phase2 = -6.283185307179586 * f * tau2;
         double expected_re = A1 * std::cos(phase1) + A2 * std::cos(phase2);
@@ -325,8 +325,8 @@ TEST_CASE("baseband_freq_response_multi - Two-path superposition, no phase remov
 
 TEST_CASE("baseband_freq_response_multi - SLERP magnitude interpolation, no phase removal")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9};
-    arma::Col<double> freq_out = {1.0e9, 1.25e9, 1.5e9, 1.75e9, 2.0e9};
+    arma::Col<double> freq = {1.0e9, 2.0e9};
+    arma::Col<double> freq_new = {1.0e9, 1.25e9, 1.5e9, 1.75e9, 2.0e9};
 
     // Path with zero delay: magnitude 1.0 at 1 GHz, 3.0 at 2 GHz, phase zero
     std::vector<arma::Cube<double>> cre(2), cim(2), dl(2);
@@ -342,14 +342,14 @@ TEST_CASE("baseband_freq_response_multi - SLERP magnitude interpolation, no phas
     cre[1](0, 0, 0) = 3.0; // mag=3.0 at 2 GHz
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // With zero delay and zero phase, H(f) = interpolated_magnitude
     // Linear interpolation: mag(f) = 1.0 + (f - 1e9) / 1e9 * 2.0
-    for (arma::uword k = 0; k < freq_out.n_elem; ++k)
+    for (arma::uword k = 0; k < freq_new.n_elem; ++k)
     {
-        double t = (freq_out(k) - 1.0e9) / 1.0e9;
+        double t = (freq_new(k) - 1.0e9) / 1.0e9;
         double expected_mag = 1.0 + t * 2.0;
         CHECK(std::abs(Hr(0, 0, k) - expected_mag) < 1e-6);
         CHECK(std::abs(Hi(0, 0, k)) < 1e-6);
@@ -362,9 +362,9 @@ TEST_CASE("baseband_freq_response_multi - SLERP magnitude interpolation, no phas
 
 TEST_CASE("baseband_freq_response_multi - Constant extrapolation outside input range")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9};
+    arma::Col<double> freq = {1.0e9, 2.0e9};
     // Output extends below and above the input range
-    arma::Col<double> freq_out = {0.5e9, 1.0e9, 1.5e9, 2.0e9, 3.0e9};
+    arma::Col<double> freq_new = {0.5e9, 1.0e9, 1.5e9, 2.0e9, 3.0e9};
 
     // Amplitudes: 1.0 at 1 GHz, 2.0 at 2 GHz, zero delay and phase
     std::vector<arma::Cube<double>> cre(2), cim(2), dl(2);
@@ -380,7 +380,7 @@ TEST_CASE("baseband_freq_response_multi - Constant extrapolation outside input r
     cre[1](0, 0, 0) = 2.0;
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Below range: clamped to 1.0
@@ -403,8 +403,8 @@ TEST_CASE("baseband_freq_response_multi - Constant extrapolation outside input r
 
 TEST_CASE("baseband_freq_response_multi - remove_delay_phase correctness")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9, 3.0e9};
-    arma::Col<double> freq_out = arma::linspace<arma::Col<double>>(1.0e9, 3.0e9, 32);
+    arma::Col<double> freq = {1.0e9, 2.0e9, 3.0e9};
+    arma::Col<double> freq_new = arma::linspace<arma::Col<double>>(1.0e9, 3.0e9, 32);
 
     double amp = 0.8, env_phi = 0.5;
     double tau_val = 50.0e-9; // 50 ns - significant delay
@@ -416,16 +416,16 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase correctness")
     auto dl = build_planar_delays(1, 3, tau);
 
     arma::Cube<double> Hr_ref, Hi_ref;
-    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq_in, freq_out, &Hr_ref, &Hi_ref,
+    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq, freq_new, &Hr_ref, &Hi_ref,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // --- Build baked version (simulate get_channels_multifreq output) ---
     std::vector<arma::Cube<double>> cre_baked, cim_baked;
     build_flat_envelope(1, 1, 1, 3, amp, env_phi, cre_baked, cim_baked);
-    bake_delay_phase(cre_baked, cim_baked, dl, freq_in);
+    bake_delay_phase(cre_baked, cim_baked, dl, freq);
 
     arma::Cube<double> Hr_test, Hi_test;
-    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq_in, freq_out, &Hr_test, &Hi_test,
+    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq, freq_new, &Hr_test, &Hi_test,
                                                (arma::Cube<std::complex<double>> *)nullptr, true);
 
     // Both should produce identical results
@@ -444,11 +444,11 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase correctness")
 
 TEST_CASE("baseband_freq_response_multi - remove_delay_phase multi-path")
 {
-    arma::Col<double> freq_in = {1.0e9, 1.5e9, 2.0e9};
-    arma::Col<double> freq_out = arma::linspace<arma::Col<double>>(1.0e9, 2.0e9, 16);
+    arma::Col<double> freq = {1.0e9, 1.5e9, 2.0e9};
+    arma::Col<double> freq_new = arma::linspace<arma::Col<double>>(1.0e9, 2.0e9, 16);
 
     arma::uword n_path = 3;
-    arma::uword n_freq_in = 3;
+    arma::uword n_freq = 3;
 
     // Different amplitudes per path, frequency-flat envelopes
     double amps[3] = {1.0, 0.5, 0.3};
@@ -456,8 +456,8 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase multi-path")
     double taus[3] = {10.0e-9, 30.0e-9, 80.0e-9};
 
     // Build pure envelope
-    std::vector<arma::Cube<double>> cre_env(n_freq_in), cim_env(n_freq_in);
-    for (arma::uword f = 0; f < n_freq_in; ++f)
+    std::vector<arma::Cube<double>> cre_env(n_freq), cim_env(n_freq);
+    for (arma::uword f = 0; f < n_freq; ++f)
     {
         cre_env[f].set_size(1, 1, n_path);
         cim_env[f].set_size(1, 1, n_path);
@@ -470,29 +470,29 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase multi-path")
 
     arma::Col<double> tau(n_path);
     tau(0) = taus[0]; tau(1) = taus[1]; tau(2) = taus[2];
-    auto dl = build_planar_delays(n_path, n_freq_in, tau);
+    auto dl = build_planar_delays(n_path, n_freq, tau);
 
     // Reference: pure envelope, no phase removal
     arma::Cube<double> Hr_ref, Hi_ref;
-    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq_in, freq_out, &Hr_ref, &Hi_ref,
+    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq, freq_new, &Hr_ref, &Hi_ref,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Test: baked + phase removal
     std::vector<arma::Cube<double>> cre_baked = cre_env;
     std::vector<arma::Cube<double>> cim_baked = cim_env;
     // Deep copy needed since bake_delay_phase modifies in-place
-    for (arma::uword f = 0; f < n_freq_in; ++f)
+    for (arma::uword f = 0; f < n_freq; ++f)
     {
         cre_baked[f] = arma::Cube<double>(cre_env[f]);
         cim_baked[f] = arma::Cube<double>(cim_env[f]);
     }
-    bake_delay_phase(cre_baked, cim_baked, dl, freq_in);
+    bake_delay_phase(cre_baked, cim_baked, dl, freq);
 
     arma::Cube<double> Hr_test, Hi_test;
-    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq_in, freq_out, &Hr_test, &Hi_test,
+    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq, freq_new, &Hr_test, &Hi_test,
                                                (arma::Cube<std::complex<double>> *)nullptr, true);
 
-    for (arma::uword k = 0; k < freq_out.n_elem; ++k)
+    for (arma::uword k = 0; k < freq_new.n_elem; ++k)
     {
         CHECK(std::abs(Hr_test(0, 0, k) - Hr_ref(0, 0, k)) < 1e-6);
         CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-6);
@@ -505,8 +505,8 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase multi-path")
 
 TEST_CASE("baseband_freq_response_multi - Phase unwrapping across pi boundary")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9};
-    arma::Col<double> freq_out = {1.5e9};
+    arma::Col<double> freq = {1.0e9, 2.0e9};
+    arma::Col<double> freq_new = {1.5e9};
 
     // Coefficient at 1 GHz: phase = +2.8 rad (near +pi)
     // Coefficient at 2 GHz: phase = -2.8 rad (near -pi)
@@ -528,7 +528,7 @@ TEST_CASE("baseband_freq_response_multi - Phase unwrapping across pi boundary")
     cim[1](0, 0, 0) = amp * std::sin(phi_hi);
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Unwrapped phase at 2 GHz: 2.8 + wrap(-2.8 - 2.8) = 2.8 + (-5.6 + 2*pi) ≈ 2.8 + 0.683 = 3.483
@@ -557,8 +557,8 @@ TEST_CASE("baseband_freq_response_multi - Phase unwrapping across pi boundary")
 
 TEST_CASE("baseband_freq_response_multi - Spherical wave delays")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9, 2.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9, 2.0e9};
 
     // 2 RX, 1 TX, 1 path - different delay per antenna
     arma::uword n_rx = 2, n_tx = 1, n_path = 1;
@@ -573,7 +573,7 @@ TEST_CASE("baseband_freq_response_multi - Spherical wave delays")
     auto dl = build_spherical_delays(n_rx, n_tx, n_path, 1, tau_cube);
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     REQUIRE(Hr.n_rows == 2);
@@ -583,7 +583,7 @@ TEST_CASE("baseband_freq_response_multi - Spherical wave delays")
     // Verify different phase rotations for each RX antenna at each output freq
     for (arma::uword k = 0; k < 2; ++k)
     {
-        double f = freq_out(k);
+        double f = freq_new(k);
 
         double phase0 = -6.283185307179586 * f * tau_rx0;
         CHECK(std::abs(Hr(0, 0, k) - std::cos(phase0)) < 1e-6);
@@ -601,8 +601,8 @@ TEST_CASE("baseband_freq_response_multi - Spherical wave delays")
 
 TEST_CASE("baseband_freq_response_multi - 2x2 MIMO")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9};
 
     arma::uword n_rx = 2, n_tx = 2, n_path = 1;
 
@@ -619,7 +619,7 @@ TEST_CASE("baseband_freq_response_multi - 2x2 MIMO")
     cre[0](1, 1, 0) = 4.0; cim[0](1, 1, 0) = 0.0;  // RX1-TX1
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     REQUIRE(Hr.n_rows == 2);
@@ -638,8 +638,8 @@ TEST_CASE("baseband_freq_response_multi - 2x2 MIMO")
 
 TEST_CASE("baseband_freq_response_multi - Complex output consistency")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9};
-    arma::Col<double> freq_out = arma::linspace<arma::Col<double>>(1.0e9, 2.0e9, 8);
+    arma::Col<double> freq = {1.0e9, 2.0e9};
+    arma::Col<double> freq_new = arma::linspace<arma::Col<double>>(1.0e9, 2.0e9, 8);
 
     std::vector<arma::Cube<double>> cre(2), cim(2), dl(2);
     for (int f = 0; f < 2; ++f)
@@ -657,7 +657,7 @@ TEST_CASE("baseband_freq_response_multi - Complex output consistency")
 
     arma::Cube<double> Hr, Hi;
     arma::Cube<std::complex<double>> Hc;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi, &Hc, false);
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi, &Hc, false);
 
     REQUIRE(Hc.n_slices == 8);
     for (arma::uword k = 0; k < 8; ++k)
@@ -673,8 +673,8 @@ TEST_CASE("baseband_freq_response_multi - Complex output consistency")
 
 TEST_CASE("baseband_freq_response_multi - Selective output pointers")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9};
     std::vector<arma::Cube<double>> cre(1), cim(1), dl(1);
     cre[0].set_size(1, 1, 1); cre[0].fill(1.0);
     cim[0].set_size(1, 1, 1); cim[0].fill(0.0);
@@ -683,7 +683,7 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
     // Only hmat_re
     {
         arma::Cube<double> Hr;
-        quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr,
+        quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr,
                                                    (arma::Cube<double> *)nullptr,
                                                    (arma::Cube<std::complex<double>> *)nullptr, false);
         REQUIRE(Hr.n_slices == 1);
@@ -693,7 +693,7 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
     // Only hmat_im
     {
         arma::Cube<double> Hi;
-        quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out,
+        quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new,
                                                    (arma::Cube<double> *)nullptr, &Hi,
                                                    (arma::Cube<std::complex<double>> *)nullptr, false);
         REQUIRE(Hi.n_slices == 1);
@@ -703,7 +703,7 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
     // Only hmat (complex)
     {
         arma::Cube<std::complex<double>> Hc;
-        quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out,
+        quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new,
                                                    (arma::Cube<double> *)nullptr,
                                                    (arma::Cube<double> *)nullptr, &Hc, false);
         REQUIRE(Hc.n_slices == 1);
@@ -718,8 +718,8 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
 
 TEST_CASE("baseband_freq_response_multi - Float precision")
 {
-    arma::Col<float> freq_in = {1.0e9f, 2.0e9f};
-    arma::Col<float> freq_out = {1.0e9f, 1.5e9f, 2.0e9f};
+    arma::Col<float> freq = {1.0e9f, 2.0e9f};
+    arma::Col<float> freq_new = {1.0e9f, 1.5e9f, 2.0e9f};
 
     std::vector<arma::Cube<float>> cre(2), cim(2), dl(2);
     for (int f = 0; f < 2; ++f)
@@ -734,7 +734,7 @@ TEST_CASE("baseband_freq_response_multi - Float precision")
     cre[1](0, 0, 0) = 2.0f;
 
     arma::Cube<float> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<float>> *)nullptr, false);
 
     REQUIRE(Hr.n_slices == 3);
@@ -749,9 +749,9 @@ TEST_CASE("baseband_freq_response_multi - Float precision")
 
 TEST_CASE("baseband_freq_response_multi - Three input frequencies, segment selection")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9, 4.0e9};
+    arma::Col<double> freq = {1.0e9, 2.0e9, 4.0e9};
     // Test points: in first segment, at boundary, in second segment
-    arma::Col<double> freq_out = {1.5e9, 2.0e9, 3.0e9};
+    arma::Col<double> freq_new = {1.5e9, 2.0e9, 3.0e9};
 
     // Amplitudes: 1.0, 3.0, 7.0 at each input freq (zero delay, zero phase)
     std::vector<arma::Cube<double>> cre(3), cim(3), dl(3);
@@ -768,7 +768,7 @@ TEST_CASE("baseband_freq_response_multi - Three input frequencies, segment selec
     cre[2](0, 0, 0) = 7.0;
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // At 1.5 GHz: first segment, t=0.5, mag = 1.0 + 0.5*2.0 = 2.0
@@ -798,13 +798,13 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
     for (arma::uword k = 0; k < n_carrier; ++k)
         pilot_grid(k) = (double)k / (double)n_carrier;
 
-    // Build freq_out for multi function: absolute frequencies
-    arma::Col<double> freq_out(n_carrier);
+    // Build freq_new for multi function: absolute frequencies
+    arma::Col<double> freq_new(n_carrier);
     for (arma::uword k = 0; k < n_carrier; ++k)
-        freq_out(k) = center_freq + bandwidth * pilot_grid(k);
+        freq_new(k) = center_freq + bandwidth * pilot_grid(k);
 
     // Single input frequency at center_freq (no interpolation needed)
-    arma::Col<double> freq_in = {center_freq};
+    arma::Col<double> freq = {center_freq};
 
     // Channel: 2 RX, 1 TX, 2 paths
     arma::uword n_rx = 2, n_tx = 1, n_path = 2;
@@ -843,7 +843,7 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
     dl_multi[0] = delay_nb;
 
     arma::Cube<double> Hr_multi, Hi_multi;
-    quadriga_lib::baseband_freq_response_multi(cre_multi, cim_multi, dl_multi, freq_in, freq_out,
+    quadriga_lib::baseband_freq_response_multi(cre_multi, cim_multi, dl_multi, freq, freq_new,
                                                &Hr_multi, &Hi_multi,
                                                (arma::Cube<std::complex<double>> *)nullptr, true);
 
@@ -868,8 +868,8 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
 
 TEST_CASE("baseband_freq_response_multi - remove_delay_phase with spherical delays")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9};
-    arma::Col<double> freq_out = arma::linspace<arma::Col<double>>(1.0e9, 2.0e9, 8);
+    arma::Col<double> freq = {1.0e9, 2.0e9};
+    arma::Col<double> freq_new = arma::linspace<arma::Col<double>>(1.0e9, 2.0e9, 8);
 
     arma::uword n_rx = 2, n_tx = 1, n_path = 1;
 
@@ -889,7 +889,7 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase with spherical dela
 
     // Reference: envelope, no removal
     arma::Cube<double> Hr_ref, Hi_ref;
-    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq_in, freq_out, &Hr_ref, &Hi_ref,
+    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq, freq_new, &Hr_ref, &Hi_ref,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Bake and test
@@ -899,13 +899,13 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase with spherical dela
         cre_baked[f] = arma::Cube<double>(cre_env[f]);
         cim_baked[f] = arma::Cube<double>(cim_env[f]);
     }
-    bake_delay_phase(cre_baked, cim_baked, dl, freq_in);
+    bake_delay_phase(cre_baked, cim_baked, dl, freq);
 
     arma::Cube<double> Hr_test, Hi_test;
-    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq_in, freq_out, &Hr_test, &Hi_test,
+    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq, freq_new, &Hr_test, &Hi_test,
                                                (arma::Cube<std::complex<double>> *)nullptr, true);
 
-    for (arma::uword k = 0; k < freq_out.n_elem; ++k)
+    for (arma::uword k = 0; k < freq_new.n_elem; ++k)
         for (arma::uword r = 0; r < n_rx; ++r)
         {
             CHECK(std::abs(Hr_test(r, 0, k) - Hr_ref(r, 0, k)) < 1e-6);
@@ -920,8 +920,8 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase with spherical dela
 
 TEST_CASE("baseband_freq_response_multi - Frequency-dependent envelope with baked phase")
 {
-    arma::Col<double> freq_in = {1.0e9, 2.0e9, 3.0e9};
-    arma::Col<double> freq_out = arma::linspace<arma::Col<double>>(1.0e9, 3.0e9, 64);
+    arma::Col<double> freq = {1.0e9, 2.0e9, 3.0e9};
+    arma::Col<double> freq_new = arma::linspace<arma::Col<double>>(1.0e9, 3.0e9, 64);
 
     double tau_val = 100.0e-9; // Large delay to stress-test phase undo
 
@@ -941,7 +941,7 @@ TEST_CASE("baseband_freq_response_multi - Frequency-dependent envelope with bake
 
     // Reference: envelope only
     arma::Cube<double> Hr_ref, Hi_ref;
-    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq_in, freq_out, &Hr_ref, &Hi_ref,
+    quadriga_lib::baseband_freq_response_multi(cre_env, cim_env, dl, freq, freq_new, &Hr_ref, &Hi_ref,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Bake delay phase (100 ns * 1 GHz = 100 full rotations per input step — very fast)
@@ -951,14 +951,14 @@ TEST_CASE("baseband_freq_response_multi - Frequency-dependent envelope with bake
         cre_baked[f] = arma::Cube<double>(cre_env[f]);
         cim_baked[f] = arma::Cube<double>(cim_env[f]);
     }
-    bake_delay_phase(cre_baked, cim_baked, dl, freq_in);
+    bake_delay_phase(cre_baked, cim_baked, dl, freq);
 
     arma::Cube<double> Hr_test, Hi_test;
-    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq_in, freq_out, &Hr_test, &Hi_test,
+    quadriga_lib::baseband_freq_response_multi(cre_baked, cim_baked, dl, freq, freq_new, &Hr_test, &Hi_test,
                                                (arma::Cube<std::complex<double>> *)nullptr, true);
 
     // Verify magnitude and phase match
-    for (arma::uword k = 0; k < freq_out.n_elem; ++k)
+    for (arma::uword k = 0; k < freq_new.n_elem; ++k)
     {
         double power_ref = Hr_ref(0, 0, k) * Hr_ref(0, 0, k) + Hi_ref(0, 0, k) * Hi_ref(0, 0, k);
         double power_test = Hr_test(0, 0, k) * Hr_test(0, 0, k) + Hi_test(0, 0, k) * Hi_test(0, 0, k);
@@ -974,8 +974,8 @@ TEST_CASE("baseband_freq_response_multi - Frequency-dependent envelope with bake
 
 TEST_CASE("baseband_freq_response_multi - Output auto-resize")
 {
-    arma::Col<double> freq_in = {1.0e9};
-    arma::Col<double> freq_out = {1.0e9, 2.0e9, 3.0e9, 4.0e9};
+    arma::Col<double> freq = {1.0e9};
+    arma::Col<double> freq_new = {1.0e9, 2.0e9, 3.0e9, 4.0e9};
 
     std::vector<arma::Cube<double>> cre(1), cim(1), dl(1);
     cre[0].set_size(2, 3, 1); cre[0].fill(1.0);
@@ -986,7 +986,7 @@ TEST_CASE("baseband_freq_response_multi - Output auto-resize")
     arma::Cube<double> Hr, Hi;
     arma::Cube<std::complex<double>> Hc;
 
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi, &Hc, false);
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi, &Hc, false);
 
     REQUIRE(Hr.n_rows == 2);
     REQUIRE(Hr.n_cols == 3);
@@ -1010,8 +1010,8 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
     // At 1000 Hz carrier, phase = 2*pi*1000*0.02915 ≈ 183 rad
     double tau_val = 10.0 / 343.0; // ~29.15 ms
 
-    arma::Col<double> freq_in = {500.0, 1000.0, 2000.0};
-    arma::Col<double> freq_out = {500.0, 750.0, 1000.0, 1500.0, 2000.0};
+    arma::Col<double> freq = {500.0, 1000.0, 2000.0};
+    arma::Col<double> freq_new = {500.0, 750.0, 1000.0, 1500.0, 2000.0};
 
     std::vector<arma::Cube<double>> cre(3), cim(3);
     for (int f = 0; f < 3; ++f)
@@ -1024,11 +1024,11 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
     auto dl = build_planar_delays(1, 3, tau);
 
     arma::Cube<double> Hr, Hi;
-    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi,
+    quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi,
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Verify power is unity at all carriers (|H(f)|^2 = 1 for unit envelope)
-    for (arma::uword k = 0; k < freq_out.n_elem; ++k)
+    for (arma::uword k = 0; k < freq_new.n_elem; ++k)
     {
         double power = Hr(0, 0, k) * Hr(0, 0, k) + Hi(0, 0, k) * Hi(0, 0, k);
         CHECK(std::abs(power - 1.0) < 1e-6);
@@ -1047,8 +1047,8 @@ TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with abs
 {
     // remove_delay_phase = true needs channels generated with use_absolute_delays = true: the coefficients of
     // get_channels_* carry the phase of the absolute path length. Reproduction geometry: LOS + one single-bounce path,
-    // TX (0,0,2), RX (30,0,1.5), freq_in 2-3 GHz in 100 MHz steps, freq_out in 1 MHz steps; the truth is
-    // get_channels_multifreq evaluated directly at freq_out.
+    // TX (0,0,2), RX (30,0,1.5), freq 2-3 GHz in 100 MHz steps, freq_new in 1 MHz steps; the truth is
+    // get_channels_multifreq evaluated directly at freq_new.
     auto omni = quadriga_lib::generate_arrayant_omni<double>(5.0);
     std::vector<quadriga_lib::arrayant<double>> va = {omni};
     arma::mat fbs(3, 2);
@@ -1081,8 +1081,8 @@ TEST_CASE("baseband_freq_response_multi - get_channels_multifreq output with abs
 
 TEST_CASE("baseband_freq_response_multi - Outputs that alias inputs")
 {
-    arma::vec freq_in = {1.0e9, 1.1e9};
-    arma::vec freq_out = {1.0e9, 1.05e9};
+    arma::vec freq = {1.0e9, 1.1e9};
+    arma::vec freq_new = {1.0e9, 1.05e9};
     std::vector<arma::cube> cre(2), cim(2), dl(2);
     for (int f = 0; f < 2; ++f)
     {
@@ -1092,19 +1092,19 @@ TEST_CASE("baseband_freq_response_multi - Outputs that alias inputs")
     }
     arma::cube Hr, Hi;
     arma::Cube<std::complex<double>> *no_cplx = nullptr;
-    CHECK_NOTHROW(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hi, no_cplx));
+    CHECK_NOTHROW(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hi, no_cplx));
 
     // An output is an element of an input
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &cre[1], &Hi, no_cplx), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &cim[0], no_cplx), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &dl[0], &Hi, no_cplx), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &cre[1], &Hi, no_cplx), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &cim[0], no_cplx), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &dl[0], &Hi, no_cplx), std::invalid_argument);
 
     // Both outputs are the same object
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &Hr, &Hr, no_cplx), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &Hr, &Hr, no_cplx), std::invalid_argument);
 
     // An output uses the memory of an input
     arma::cube cim_view(cim[1].memptr(), 2, 2, 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, &cim_view, &Hi, no_cplx), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, &cim_view, &Hi, no_cplx), std::invalid_argument);
 }
 
 TEST_CASE("baseband_freq_response_multi - Non-finite frequencies throw")

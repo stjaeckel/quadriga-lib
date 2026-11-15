@@ -37,7 +37,7 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("combine_pattern", &arrayant_combine_pattern,
           py::arg("arrayant"),
-          py::arg("freq") = py::none(),
+          py::arg("freq_new") = py::none(),
           py::arg("azimuth_grid") = py::none(),
           py::arg("elevation_grid") = py::none(),
           py::arg("propagation_speed") = 299792458.0);
@@ -98,7 +98,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("horn_control_freq") = 0.0,
           py::arg("baffle_width") = 0.15,
           py::arg("baffle_height") = 0.25,
-          py::arg("frequencies") = py::none(),
+          py::arg("center_freq") = py::none(),
           py::arg("angular_resolution") = 5.0);
 
     m.def("interpolate", &arrayant_interpolate,
@@ -108,7 +108,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("element") = py::none(),
           py::arg("orientation") = py::none(),
           py::arg("element_pos") = py::none(),
-          py::arg("frequency") = py::none(),
+          py::arg("freq_new") = py::none(),
           py::arg("dist") = false,
           py::arg("local_angles") = false,
           py::arg("fast_access") = false,
@@ -147,7 +147,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("complex") = true,
-          py::arg("freq") = 0);
+          py::arg("i_freq") = 0);
 
     m.def("get_channels_spherical", &get_channels_spherical,
           py::arg("ant_tx"),
@@ -166,7 +166,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false,
           py::arg("complex") = true,
-          py::arg("freq") = 0,
+          py::arg("i_freq") = 0,
           py::arg("use_kernel") = 0);
 
     m.def("get_channels_multifreq", &get_channels_multifreq,
@@ -181,8 +181,8 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("tx_orientation"),
           py::arg("rx_pos"),
           py::arg("rx_orientation"),
-          py::arg("freq_in"),
-          py::arg("freq_out"),
+          py::arg("freq"),
+          py::arg("freq_new"),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("propagation_speed") = 299792458.0,

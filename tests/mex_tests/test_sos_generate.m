@@ -9,10 +9,10 @@ acf = 0.5 * ( cos( 2*pi * 0.04 * dist ) + cos( 2*pi * 0.13 * dist ) );
 expo = exp( -(0:1:40) / 10 );
 
 %% Basic call, all inputs and outputs, 1-D
-[ freq, ase, test_dir ] = quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, 3 );
-assertEqual( size(freq), [2, 1] );                                             % [n_coeff, n_dim]
-assertTrue( isa(freq, 'double') && isa(ase, 'double') );
-assertElementsAlmostEqual( sort(abs(freq)), [0.04; 0.13], 'absolute', 1e-5 );
+[ spatial_freq, ase, test_dir ] = quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, 3 );
+assertEqual( size(spatial_freq), [2, 1] );                                             % [n_coeff, n_dim]
+assertTrue( isa(spatial_freq, 'double') && isa(ase, 'double') );
+assertElementsAlmostEqual( sort(abs(spatial_freq)), [0.04; 0.13], 'absolute', 1e-5 );
 assertTrue( size(ase, 2) == 1 && size(ase, 1) >= 1 );
 assertTrue( ase(end) < 1e-6 );
 assertTrue( isempty(test_dir) );
@@ -36,7 +36,7 @@ f5 = quadriga_lib.sos_generate( expo, 0:40, 12, 2, false, 7, true, 0, 0, 5 );   
 assertTrue( max(abs( f5(:, 2) .* cos(az) - f5(:, 1) .* sin(az) )) > 1e-3 );
 f6 = quadriga_lib.sos_generate( expo, 0:40, 12, 2, true, 7, false, 0, 0, 5 );                % random_init = false
 assertTrue( max(abs(f6(:) - f4(:))) > 1e-6 );
-f7 = quadriga_lib.sos_generate( expo, 0:40, 12, 2, true, 7, true, 0.03, 0.2, 5 );            % freq_min, freq_max
+f7 = quadriga_lib.sos_generate( expo, 0:40, 12, 2, true, 7, true, 0.03, 0.2, 5 );            % spatial_freq_min, spatial_freq_max
 mag = sqrt( sum( f7.^2, 2 ) );
 assertTrue( all(mag >= 0.03 - 1e-12) && all(mag <= 0.2 + 1e-12) );
 assertTrue( min( sqrt( sum( f4.^2, 2 ) ) ) < 0.03 );
@@ -53,7 +53,7 @@ assertEqual( a10, a4 );
 
 %% Type handling and orientation
 f11 = quadriga_lib.sos_generate( acf', dist', uint32(2), int32(1), true, single(10), true, single(0), single(0), int32(3) );
-assertEqual( f11, freq );
+assertEqual( f11, spatial_freq );
 
 %% Errors
 assert_throws( @() quadriga_lib.sos_generate( acf, dist ), 'Wrong number of input arguments.' );
@@ -71,7 +71,7 @@ assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 0 ), 'Input ''n_d
 assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, -1 ), 'Input ''n_dir'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 0 ), 'Input ''n_dir'' must be an integer >= 1.' );
 assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, NaN ), 'Input ''seed''' );
-assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 1e6 ), 'freq_max' );   % thrown by C++
+assert_throws( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 1e6 ), 'spatial_freq_max' );   % thrown by C++
 
 %% Non-integer counts and seeds are rejected, integer-valued doubles are accepted
 assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2.9, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );

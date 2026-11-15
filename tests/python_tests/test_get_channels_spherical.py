@@ -999,12 +999,12 @@ class TestGetChannelsSpherical(unittest.TestCase):
             return arrayant.get_channels_spherical(ant, ant, fbs, lbs, gain, plen, M,
                                                    conv(tx_pos[:, s].copy()), conv(tx_ori[:, s].copy()),
                                                    conv(rx_pos[:, s].copy()), conv(rx_ori[:, s].copy()),
-                                                   conv(cf), angles=True, freq=freq, complex=False)
+                                                   conv(cf), angles=True, i_freq=freq, complex=False)
 
         def batch(conv, freq):
             lists = [[conv(snaps[s][k]) for s in range(n_out)] for k in range(5)]
             return arrayant.get_channels_spherical(ant, ant, *lists, conv(tx_pos), conv(tx_ori), conv(rx_pos),
-                                                   conv(rx_ori), conv(cf), angles=True, freq=freq, complex=False)
+                                                   conv(rx_ori), conv(cf), angles=True, i_freq=freq, complex=False)
 
         def sliced(x):  # same values, every second element along the last axis of a larger array
             big = np.zeros(x.shape[:-1] + (2 * x.shape[-1],), order='F')
@@ -1025,7 +1025,7 @@ class TestGetChannelsSpherical(unittest.TestCase):
                         npt.assert_array_equal(r[k], ref[s][k], err_msg="single, %s, freq %d" % (name, freq))
                         npt.assert_array_equal(b[k][s], ref[s][k], err_msg="batch, %s, freq %d" % (name, freq))
             b = arrayant.get_channels_spherical(ant_c, ant_c, *[[snaps[s][k] for s in range(n_out)] for k in range(5)],
-                                                tx_pos, tx_ori, rx_pos, rx_ori, cf, angles=True, freq=freq,
+                                                tx_pos, tx_ori, rx_pos, rx_ori, cf, angles=True, i_freq=freq,
                                                 complex=False)
             for s in range(n_out):
                 for k in range(7):

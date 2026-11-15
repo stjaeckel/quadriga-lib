@@ -68,39 +68,39 @@ namespace
     }
 
     // Oracle: ACF of the sinusoids at distance d along the unit vector in row t of u
-    double ref_acf_dir(const arma::mat &freq, const arma::mat &u, arma::uword t, double d)
+    double ref_acf_dir(const arma::mat &spatial_freq, const arma::mat &u, arma::uword t, double d)
     {
         double acc = 0.0;
-        for (arma::uword n = 0; n < freq.n_rows; ++n)
+        for (arma::uword n = 0; n < spatial_freq.n_rows; ++n)
         {
             double fu = 0.0;
-            for (arma::uword c = 0; c < freq.n_cols; ++c)
-                fu += freq(n, c) * u(t, c);
+            for (arma::uword c = 0; c < spatial_freq.n_cols; ++c)
+                fu += spatial_freq(n, c) * u(t, c);
             acc += std::cos(2.0 * pi * fu * d);
         }
-        return acc / (double)freq.n_rows;
+        return acc / (double)spatial_freq.n_rows;
     }
 
     // Oracle: mean squared error along the test directions on the sample points, linear
-    double ref_mse_dir(const arma::mat &freq, const arma::vec &acf, const arma::vec &dist, arma::uword n_dir)
+    double ref_mse_dir(const arma::mat &spatial_freq, const arma::vec &acf, const arma::vec &dist, arma::uword n_dir)
     {
-        arma::mat u = ref_dirs(n_dir, freq.n_cols);
+        arma::mat u = ref_dirs(n_dir, spatial_freq.n_cols);
         double acc = 0.0;
         for (arma::uword t = 0; t < u.n_rows; ++t)
             for (arma::uword s = 0; s < dist.n_elem; ++s)
             {
-                double e = acf(s) - ref_acf_dir(freq, u, t, dist(s));
+                double e = acf(s) - ref_acf_dir(spatial_freq, u, t, dist(s));
                 acc += e * e;
             }
         return acc / (double)(u.n_rows * dist.n_elem);
     }
 
     // Oracle: grid errors [core, all] in dB for n_dim = 2 or 3
-    void ref_mse_grid(const arma::mat &freq, const arma::vec &acf, const arma::vec &dist, double &core_dB, double &all_dB)
+    void ref_mse_grid(const arma::mat &spatial_freq, const arma::vec &acf, const arma::vec &dist, double &core_dB, double &all_dB)
     {
         const long long S = (long long)acf.n_elem, half = 2 * S - 2;
         const double step = dist(1) - dist(0), d_max = dist(dist.n_elem - 1);
-        const arma::uword n_plane = (freq.n_cols == 3) ? 3 : 1;
+        const arma::uword n_plane = (spatial_freq.n_cols == 3) ? 3 : 1;
         const arma::uword first[3] = {0, 0, 1}, second[3] = {1, 2, 2};
         double core = 0.0, all = 0.0;
         for (arma::uword pl = 0; pl < n_plane; ++pl)
@@ -118,8 +118,8 @@ namespace
                         target = acf(i) + (r - dist(i)) / step * (acf(i + 1) - acf(i));
                     }
                     double approx = 0.0;
-                    for (arma::uword n = 0; n < freq.n_rows; ++n)
-                        approx += std::cos(2.0 * pi * (freq(n, first[pl]) * a + freq(n, second[pl]) * b)) / (double)freq.n_rows;
+                    for (arma::uword n = 0; n < spatial_freq.n_rows; ++n)
+                        approx += std::cos(2.0 * pi * (spatial_freq(n, first[pl]) * a + spatial_freq(n, second[pl]) * b)) / (double)spatial_freq.n_rows;
                     double e2 = (approx - target) * (approx - target);
                     sa += e2, na += 1.0;
                     if (std::sqrt((double)(ic * ic + ir * ir)) <= (double)S)
@@ -138,11 +138,11 @@ TEST_CASE("sos_calc_mse - the directional error matches the brute-force evaluati
     for (arma::uword n_dim = 2; n_dim <= 3; ++n_dim)
         for (arma::uword n_dir : {1, 7, 10})
         {
-            arma::mat freq = rnd(12, n_dim, -0.15, 0.15, 10 + (unsigned)n_dim);
+            arma::mat spatial_freq = rnd(12, n_dim, -0.15, 0.15, 10 + (unsigned)n_dim);
             arma::mat test_dir;
-            double mse = quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, (double *)nullptr,
+            double mse = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, (double *)nullptr, (double *)nullptr,
                                                     (arma::vec *)nullptr, &test_dir, n_dir);
-            double ref = -10.0 * std::log10(ref_mse_dir(freq, acf, dist, n_dir));
+            double ref = -10.0 * std::log10(ref_mse_dir(spatial_freq, acf, dist, n_dir));
             QD_DIAG("\n# diag: sos_calc_mse directional error, n_dim %llu, n_dir %llu: %.6f dB, oracle %.6f dB\n",
                     (unsigned long long)n_dim, (unsigned long long)n_dir, mse, ref);
             INFO("n_dim " << n_dim << ", n_dir " << n_dir);
@@ -170,10 +170,10 @@ TEST_CASE("sos_calc_mse - the grid errors match the brute-force evaluation in 2-
 
     for (arma::uword n_dim = 2; n_dim <= 3; ++n_dim)
     {
-        arma::mat freq = rnd(12, n_dim, -0.15, 0.15, 20 + (unsigned)n_dim);
+        arma::mat spatial_freq = rnd(12, n_dim, -0.15, 0.15, 20 + (unsigned)n_dim);
         double core = 0.0, all = 0.0, ref_core = 0.0, ref_all = 0.0;
-        quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all);
-        ref_mse_grid(freq, acf, dist, ref_core, ref_all);
+        quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core, &all);
+        ref_mse_grid(spatial_freq, acf, dist, ref_core, ref_all);
         QD_DIAG("\n# diag: sos_calc_mse grid errors, n_dim %llu\n", (unsigned long long)n_dim);
         QD_DIAG("measure,value_dB,oracle_dB\ncore,%.6f,%.6f\nall,%.6f,%.6f\n", core, ref_core, all, ref_all);
         INFO("n_dim " << n_dim);
@@ -188,15 +188,15 @@ TEST_CASE("sos_calc_mse - one dimension: an exact target has no error inside the
 {
     // Target = ACF of the two sinusoids. Inside the range the error vanishes; on the axis up to 2·Dmax the
     // target is 0 beyond Dmax while the sinusoids continue, which gives a finite error.
-    arma::mat freq(2, 1);
-    freq(0, 0) = 0.04, freq(1, 0) = 0.13;
+    arma::mat spatial_freq(2, 1);
+    spatial_freq(0, 0) = 0.04, spatial_freq(1, 0) = 0.13;
     arma::vec dist = arma::regspace(0.0, 0.5, 20.0), acf(dist.n_elem);
     for (arma::uword s = 0; s < dist.n_elem; ++s)
         acf(s) = 0.5 * (std::cos(2.0 * pi * 0.04 * dist(s)) + std::cos(2.0 * pi * 0.13 * dist(s)));
 
     double core = 0.0, all = 0.0;
     arma::mat test_dir(3, 3);
-    double mse = quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all, (arma::vec *)nullptr, &test_dir, 5);
+    double mse = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core, &all, (arma::vec *)nullptr, &test_dir, 5);
 
     // Oracle for the complete axis: 4·S - 3 points, error only on the 2·(S - 1) points beyond Dmax
     const arma::uword S = dist.n_elem;
@@ -217,19 +217,19 @@ TEST_CASE("sos_calc_mse - one dimension: an exact target has no error inside the
 
     // A wrong target has a finite error that matches the oracle
     arma::vec other = arma::exp(-dist / 5.0);
-    mse = quadriga_lib::sos_calc_mse(freq, other, dist);
-    CHECK(std::abs(mse + 10.0 * std::log10(ref_mse_dir(freq, other, dist, 1))) < 1e-9);
+    mse = quadriga_lib::sos_calc_mse(spatial_freq, other, dist);
+    CHECK(std::abs(mse + 10.0 * std::log10(ref_mse_dir(spatial_freq, other, dist, 1))) < 1e-9);
     CHECK(mse < 30.0);
 }
 
 TEST_CASE("sos_calc_mse - the tail measure is the directional average beyond the fitted range")
 {
     arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0);
-    arma::mat freq = rnd(40, 3, -0.2, 0.2, 30);
-    freq.rows(0, 9).zeros(); // 10 of 40 sinusoids at zero frequency
+    arma::mat spatial_freq = rnd(40, 3, -0.2, 0.2, 30);
+    spatial_freq.rows(0, 9).zeros(); // 10 of 40 sinusoids at zero frequency
 
     arma::vec tail;
-    quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, (double *)nullptr, &tail, (arma::mat *)nullptr, 50);
+    quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, (double *)nullptr, (double *)nullptr, &tail, (arma::mat *)nullptr, 50);
     REQUIRE(tail.n_elem == 4);
 
     arma::mat u = ref_dirs(50, 3);
@@ -239,7 +239,7 @@ TEST_CASE("sos_calc_mse - the tail measure is the directional average beyond the
     {
         double ref = 0.0;
         for (arma::uword t = 0; t < 50; ++t)
-            ref += ref_acf_dir(freq, u, t, mult[k] * 10.0) / 50.0;
+            ref += ref_acf_dir(spatial_freq, u, t, mult[k] * 10.0) / 50.0;
         QD_DIAG("%.0f,%.6f,%.6f\n", mult[k], tail(k), ref);
         INFO("multiple " << mult[k]);
         CHECK(std::abs(tail(k) - ref) < 1e-12);
@@ -256,28 +256,28 @@ TEST_CASE("sos_calc_mse - the tail measure is the directional average beyond the
 TEST_CASE("sos_calc_mse - optional outputs do not change each other, float agrees with double")
 {
     arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0);
-    arma::mat freq = rnd(12, 3, -0.15, 0.15, 40);
+    arma::mat spatial_freq = rnd(12, 3, -0.15, 0.15, 40);
 
     double core = 0.0, all = 0.0, core1 = 0.0, all1 = 0.0;
     arma::vec tail(9), tail1;
     tail.fill(9.0);
     arma::mat dir, dir1;
-    double m_all = quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all, &tail, &dir);
-    double m_none = quadriga_lib::sos_calc_mse(freq, acf, dist);
+    double m_all = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core, &all, &tail, &dir);
+    double m_none = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist);
     CHECK(m_all == m_none);
     CHECK(m_all > 1.0);
-    CHECK(quadriga_lib::sos_calc_mse(freq, acf, dist, &core1) == m_none);
+    CHECK(quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core1) == m_none);
     CHECK(core1 == core);
-    CHECK(quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, &all1) == m_none);
+    CHECK(quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, (double *)nullptr, &all1) == m_none);
     CHECK(all1 == all);
-    quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, (double *)nullptr, &tail1);
+    quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, (double *)nullptr, (double *)nullptr, &tail1);
     REQUIRE(tail.n_elem == 4);
     CHECK(arma::approx_equal(tail, tail1, "absdiff", 0.0));
-    quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, &dir1);
+    quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, &dir1);
     REQUIRE(dir.n_rows == 10);
     CHECK(arma::approx_equal(dir, dir1, "absdiff", 0.0));
 
-    arma::fmat ff = arma::conv_to<arma::fmat>::from(freq);
+    arma::fmat ff = arma::conv_to<arma::fmat>::from(spatial_freq);
     arma::fvec af = arma::conv_to<arma::fvec>::from(acf), df = arma::conv_to<arma::fvec>::from(dist), tf;
     float cf = 0.0f, alf = 0.0f;
     float mf = quadriga_lib::sos_calc_mse(ff, af, df, &cf, &alf, &tf);
@@ -292,13 +292,13 @@ TEST_CASE("sos_calc_mse - optional outputs do not change each other, float agree
 TEST_CASE("sos_calc_mse - input validation")
 {
     arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0);
-    arma::mat freq = rnd(12, 3, -0.15, 0.15, 50);
+    arma::mat spatial_freq = rnd(12, 3, -0.15, 0.15, 50);
 
     SECTION("valid baseline")
     {
-        CHECK_NOTHROW(quadriga_lib::sos_calc_mse(freq, acf, dist));
+        CHECK_NOTHROW(quadriga_lib::sos_calc_mse(spatial_freq, acf, dist));
     }
-    SECTION("freq")
+    SECTION("spatial_freq")
     {
         arma::mat empty, four(3, 4, arma::fill::ones);
         CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(empty, acf, dist), std::invalid_argument);
@@ -308,19 +308,19 @@ TEST_CASE("sos_calc_mse - input validation")
     {
         arma::vec short_acf = {1.0, 0.5}, uneven = dist, start = dist + 1.0;
         uneven(3) += 0.5;
-        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, short_acf, dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, uneven), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, start), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, short_acf, dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, uneven), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, start), std::invalid_argument);
         // Non-finite table
         arma::vec inf_dist = dist, nan_dist = dist, nan_acf = acf;
         inf_dist(5) = arma::datum::inf, nan_dist(2) = std::nan(""), nan_acf(2) = std::nan("");
-        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, inf_dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, nan_dist), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, nan_acf, dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, inf_dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, nan_dist), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, nan_acf, dist), std::invalid_argument);
     }
     SECTION("n_dir")
     {
-        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, (double *)nullptr, (double *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, 0), std::invalid_argument);
     }
 }
 
@@ -331,9 +331,9 @@ TEST_CASE("sos_calc_mse - a perfect fit returns +Inf")
     arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf(dist.n_elem, arma::fill::ones);
     for (arma::uword n_dim = 1; n_dim <= 3; ++n_dim)
     {
-        arma::mat freq(4, n_dim, arma::fill::zeros);
+        arma::mat spatial_freq(4, n_dim, arma::fill::zeros);
         double core = 0.0, all = 0.0;
-        double mse = quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all);
+        double mse = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core, &all);
         QD_DIAG("\n# diag: sos_calc_mse perfect fit, n_dim %llu: mse %f, core %f, all %f\n", (unsigned long long)n_dim, mse, core, all);
         INFO("n_dim " << n_dim);
         CHECK(std::isinf(mse));
@@ -355,25 +355,25 @@ TEST_CASE("sos_calc_mse - a perfect fit returns +Inf")
 TEST_CASE("sos_calc_mse - outputs that alias inputs")
 {
     arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0), tail;
-    arma::mat freq = rnd(12, 3, -0.15, 0.15, 60), dir;
+    arma::mat spatial_freq = rnd(12, 3, -0.15, 0.15, 60), dir;
     double core = 0.0, all = 0.0;
-    CHECK_NOTHROW(quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &all, &tail, &dir, 7));
+    CHECK_NOTHROW(quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core, &all, &tail, &dir, 7));
 
     arma::vec a = acf, d = dist;
-    arma::mat f = freq;
-    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, a, dist, &core, &all, &a, &dir, 7), std::invalid_argument);  // acf_tail is 'acf'
-    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, d, &core, &all, &tail, &d, 7), std::invalid_argument);  // test_dir is 'dist'
-    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(f, acf, dist, &core, &all, &tail, &f, 7), std::invalid_argument);  // test_dir is 'freq'
-    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, dist, &core, &core, &tail, &dir, 7), std::invalid_argument); // mse_all is 'mse_core'
+    arma::mat f = spatial_freq;
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, a, dist, &core, &all, &a, &dir, 7), std::invalid_argument);  // acf_tail is 'acf'
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, d, &core, &all, &tail, &d, 7), std::invalid_argument);  // test_dir is 'dist'
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(f, acf, dist, &core, &all, &tail, &f, 7), std::invalid_argument);  // test_dir is 'spatial_freq'
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core, &core, &tail, &dir, 7), std::invalid_argument); // mse_all is 'mse_core'
     arma::vec t(f.memptr(), 4, false, true);
-    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(f, acf, dist, &core, &all, &t, &dir, 7), std::invalid_argument); // acf_tail on the memory of 'freq'
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(f, acf, dist, &core, &all, &t, &dir, 7), std::invalid_argument); // acf_tail on the memory of 'spatial_freq'
 }
 
 TEST_CASE("sos_calc_mse - results do not depend on the number of threads")
 {
     // The test directions are evaluated in parallel and summed in a fixed order
     arma::vec dist = arma::regspace(0.0, 2.0, 10.0), acf = arma::exp(-dist / 4.0);
-    arma::mat freq = rnd(40, 3, -0.15, 0.15, 70);
+    arma::mat spatial_freq = rnd(40, 3, -0.15, 0.15, 70);
 
     double mse[2], core[2], all[2];
     arma::vec tail[2];
@@ -384,7 +384,7 @@ TEST_CASE("sos_calc_mse - results do not depend on the number of threads")
         if (run == 1)
             omp_set_num_threads(1);
 #endif
-        mse[run] = quadriga_lib::sos_calc_mse(freq, acf, dist, &core[run], &all[run], &tail[run], (arma::mat *)nullptr, 97);
+        mse[run] = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, &core[run], &all[run], &tail[run], (arma::mat *)nullptr, 97);
 #ifdef _OPENMP
         omp_set_num_threads(n_threads);
 #endif
@@ -394,5 +394,5 @@ TEST_CASE("sos_calc_mse - results do not depend on the number of threads")
     CHECK(core[0] == core[1]);
     CHECK(all[0] == all[1]);
     CHECK(arma::approx_equal(tail[0], tail[1], "absdiff", 0.0));
-    CHECK(std::abs(mse[0] + 10.0 * std::log10(ref_mse_dir(freq, acf, dist, 97))) < 1e-9);
+    CHECK(std::abs(mse[0] + 10.0 * std::log10(ref_mse_dir(spatial_freq, acf, dist, 97))) < 1e-9);
 }

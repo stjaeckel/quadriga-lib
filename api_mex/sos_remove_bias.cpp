@@ -30,7 +30,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   zeroes the mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b_in` given): each device is treated on its
   own, `phase_in` with `pos` and `phase_b_in` with `pos_b` and the frequencies
-  `freq · freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
+  `spatial_freq · spatial_freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
   as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions.
   The variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the
@@ -50,16 +50,16 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 
 ## Usage:
 ```
-[ phase_out, phase_b_out, offset, mean_before ] = quadriga_lib.sos_remove_bias( freq, phase_in, ...
-    pos, pos_b, phase_b_in, acf, dist, freq_scale_b );
+[ phase_out, phase_b_out, offset, mean_before ] = quadriga_lib.sos_remove_bias( spatial_freq, phase_in, ...
+    pos, pos_b, phase_b_in, acf, dist, spatial_freq_scale_b );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase_in`** — Phases; one column per generator; `[n_coeff, n_gen]`
 - **`pos`** — Positions of the first device; one row per position; the number of columns sets the
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map,
   any number for different maps
@@ -69,7 +69,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   be > -1; `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`freq_scale_b`** — Frequency scale of the second device, i.e. decorrelation distance of the
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
   first device divided by that of the second; must be > 0; other than 1 requires `phase_b_in`;
   default: 1
 
@@ -96,14 +96,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs; the phases are modified by the library and therefore copied
-    const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
     arma::mat phase = qd_mex_get_Mat<double>(prhs[1], true);
     const arma::mat pos = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat pos_b = (nrhs < 4) ? arma::mat() : qd_mex_get_Mat<double>(prhs[3]);
     arma::mat phase_b = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4], true);
     const arma::vec acf = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
     const arma::vec dist = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6]);
-    const double freq_scale_b = (nrhs < 8) ? 1.0 : qd_mex_get_scalar<double>(prhs[7], "freq_scale_b", 1.0);
+    const double spatial_freq_scale_b = (nrhs < 8) ? 1.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_scale_b", 1.0);
 
     // Wrap optional pointers
     arma::mat offset, mean_before;
@@ -115,7 +115,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_mean_before = (nlhs > 3) ? &mean_before : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_remove_bias<double>(freq, phase, pos, p_pos_b, p_phase_b, p_acf, p_dist, p_offset, p_mean_before, freq_scale_b));
+    CALL_QD(quadriga_lib::sos_remove_bias<double>(spatial_freq, phase, pos, p_pos_b, p_phase_b, p_acf, p_dist, p_offset, p_mean_before, spatial_freq_scale_b));
 
     // Copy to MATLAB
     if (nlhs > 0)

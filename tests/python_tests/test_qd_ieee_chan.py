@@ -589,8 +589,8 @@ class test_case(unittest.TestCase):
                     "tx_orientation", "rx_orientation"):
             npt.assert_array_equal(np.asarray(ch_l[key]), np.asarray(ch_s[key]))
         self.assertEqual(ch_l["name"], ch_s["name"])
-        npt.assert_array_equal(np.asarray(ch_l["center_frequency"]),
-                               np.asarray(ch_s["center_frequency"]))
+        npt.assert_array_equal(np.asarray(ch_l["center_freq"]),
+                               np.asarray(ch_s["center_freq"]))
 
     # ------------------------------------------------------------------
     # 11) stack option: per-user list is preserved for MU-MIMO
@@ -634,14 +634,14 @@ class test_case(unittest.TestCase):
             
 
     def test_output_keys_and_center_frequency_shape(self):
-        """center_frequency is an array of shape (1,); initial_position is returned."""
+        """center_freq is an array of shape (1,); initial_position is returned."""
         ant = arrayant.generate('omni')
         c = channel.get_ieee_indoor(ant, ant, 'B', seed=1)[0]
-        self.assertIsInstance(c['center_frequency'], np.ndarray)
-        self.assertEqual(c['center_frequency'].shape, (1,))
+        self.assertIsInstance(c['center_freq'], np.ndarray)
+        self.assertEqual(c['center_freq'].shape, (1,))
         self.assertIn('initial_position', c)
         self.assertEqual(set(c.keys()), {'name', 'tx_position', 'rx_position', 'tx_orientation', 'rx_orientation',
-                                         'coeff', 'delay', 'path_gain', 'center_frequency', 'initial_position'})
+                                         'coeff', 'delay', 'path_gain', 'center_freq', 'initial_position'})
 
 
 if __name__ == '__main__':

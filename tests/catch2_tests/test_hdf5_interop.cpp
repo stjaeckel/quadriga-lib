@@ -133,9 +133,9 @@ namespace
         a["Initial_position"] = raw(H5T_STD_I32LE, {}, &initial_position, 1);
 
         // One value: attribute; one value per snapshot: dataset (the attribute keeps its default)
-        a["CenterFrequency"] = c.center_frequency.n_elem == 1 ? as_float(c.center_frequency, {}) : raw(H5T_IEEE_F32LE, {}, nan3, 1);
-        if (c.center_frequency.n_elem > 1)
-            t.add_dataset(g + "/CenterFrequency", as_float(c.center_frequency, {n_snap}));
+        a["CenterFrequency"] = c.center_freq.n_elem == 1 ? as_float(c.center_freq, {}) : raw(H5T_IEEE_F32LE, {}, nan3, 1);
+        if (c.center_freq.n_elem > 1)
+            t.add_dataset(g + "/CenterFrequency", as_float(c.center_freq, {n_snap}));
         auto position = [&](const arma::Mat<dtype> &x, const char *name, const float *default_value)
         {
             a[name] = x.n_cols == 1 ? as_float(x, {3}) : raw(H5T_IEEE_F32LE, {3}, default_value, 3);
@@ -419,7 +419,7 @@ namespace
         quadriga_lib::channel<dtype> c;
         c.name = name;
         c.initial_position = 1;
-        c.center_frequency = filled(col(n_pos), 1.0, 1e9);
+        c.center_freq = filled(col(n_pos), 1.0, 1e9);
         c.tx_pos = filled(mat(3, n_pos), 1.0);
         c.rx_pos = filled(mat(3, n_pos), 10.0);
         if (per_snapshot)

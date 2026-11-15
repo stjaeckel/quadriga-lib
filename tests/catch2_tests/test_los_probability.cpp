@@ -547,9 +547,9 @@ TEST_CASE("los_probability - optional inputs")
 
     // los_soft requires rnd_g and fc
     CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, nullptr, &fc, &soft), std::invalid_argument,
-                         Message("Output 'los_soft' requires 'rnd_g' and 'center_frequency'."));
+                         Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
     CHECK_THROWS_MATCHES(quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p, NAN, NAN, NAN, &g, nullptr, &soft), std::invalid_argument,
-                         Message("Output 'los_soft' requires 'rnd_g' and 'center_frequency'."));
+                         Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
 
     // rnd_g and fc without los_soft are ignored (not validated)
     quadriga_lib::los_probability("38.901_UMi", d, arma::vec{10.0}, arma::vec{1.5}, p_ref);
@@ -731,18 +731,18 @@ TEST_CASE("los_probability - input validation")
     SECTION("los_soft")
     {
         CHECK_THROWS_MATCHES(call_s(nullptr, &fc), std::invalid_argument,
-                             Message("Output 'los_soft' requires 'rnd_g' and 'center_frequency'."));
+                             Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
         CHECK_THROWS_MATCHES(call_s(&g, nullptr), std::invalid_argument,
-                             Message("Output 'los_soft' requires 'rnd_g' and 'center_frequency'."));
+                             Message("Output 'los_soft' requires 'rnd_g' and 'center_freq'."));
         const arma::vec g2 = {0.3, 0.1}, g_nan = {0.3, NAN, 0.1}, g_inf = {0.3, inf, 0.1};
         CHECK_THROWS_MATCHES(call_s(&g2, &fc), std::invalid_argument,
                              Message("Number of elements in 'rnd_g' does not match number of elements in 'd2d_out'."));
         CHECK_THROWS_MATCHES(call_s(&g_nan, &fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
         CHECK_THROWS_MATCHES(call_s(&g_inf, &fc), std::invalid_argument, Message("Input 'rnd_g' must be finite."));
         const arma::vec f0, f1 = {3.5e9, 0.0}, f2 = {-1.0}, f3 = {NAN}, f4 = {inf};
-        CHECK_THROWS_MATCHES(call_s(&g, &f0), std::invalid_argument, Message("Input 'center_frequency' cannot be empty."));
+        CHECK_THROWS_MATCHES(call_s(&g, &f0), std::invalid_argument, Message("Input 'center_freq' cannot be empty."));
         for (const arma::vec *f : {&f1, &f2, &f3, &f4})
-            CHECK_THROWS_MATCHES(call_s(&g, f), std::invalid_argument, Message("Input 'center_frequency' must be finite and > 0."));
+            CHECK_THROWS_MATCHES(call_s(&g, f), std::invalid_argument, Message("Input 'center_freq' must be finite and > 0."));
     }
 }
 
@@ -756,7 +756,7 @@ TEST_CASE("los_probability - outputs that alias inputs")
     CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, b, hU, b), std::invalid_argument);                              // p_los is 'h_bs'
     CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, u, u), std::invalid_argument);                              // p_los is 'h_ut'
     CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, gg, NAN, NAN, NAN, &gg, &fc, &soft), std::invalid_argument); // p_los is 'rnd_g'
-    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, f, NAN, NAN, NAN, &g, &f, &soft), std::invalid_argument);   // p_los is 'center_frequency'
+    CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, f, NAN, NAN, NAN, &g, &f, &soft), std::invalid_argument);   // p_los is 'center_freq'
     CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, hU, p, NAN, NAN, NAN, &g, &fc, &p), std::invalid_argument);     // los_soft is 'p_los'
     arma::mat on_u(u.memptr(), 3, 1, false, true);
     CHECK_THROWS_AS(quadriga_lib::los_probability("38.901_UMa", d, hB, u, p, NAN, NAN, NAN, &g, &fc, &on_u), std::invalid_argument);   // los_soft on the memory of 'h_ut'

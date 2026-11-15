@@ -25,7 +25,7 @@ CONF_DIR = os.path.join(current_dir, "../../data/config")
 TX = np.array([[0.0, 0.0, 10.0]])
 RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5], [120.0, -40.0, 7.5]])
 FC = np.array([6e9, 30e9])
-KEYS = ["method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
+KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
 
 
@@ -75,7 +75,7 @@ class test_case(unittest.TestCase):
             self.assertEqual(r["method"], "quadriga")
             npt.assert_array_equal(r["tx_pos"], TX[0])
             npt.assert_array_equal(r["rx_pos"], RX[l])
-            npt.assert_array_equal(r["center_frequency"], FC)
+            npt.assert_array_equal(r["center_freq"], FC)
             self.assertEqual(r["delay"].shape, (n_ray,))
             self.assertEqual(r["power"].shape, (n_ray, 2))
             self.assertEqual(r["eoa"].shape, (n_ray,))
@@ -103,9 +103,9 @@ class test_case(unittest.TestCase):
 
     def test_keywords_and_i_freq(self):
         r0 = self.mf()
-        npt.assert_array_equal(r0[0]["center_frequency"], [FC[0]])
+        npt.assert_array_equal(r0[0]["center_freq"], [FC[0]])
         r1 = self.mf(i_freq=1)
-        npt.assert_array_equal(r1[0]["center_frequency"], [FC[1]])  # 0-based
+        npt.assert_array_equal(r1[0]["center_freq"], [FC[1]])  # 0-based
         npt.assert_array_equal(r1[1]["gr_eps"], [self.gr_eps[1, 1]])
         self.assertEqual(r1[0]["power"].shape, (self.n_ray, 1))
         self.assertGreater(np.max(np.abs(r1[0]["delay"] - r0[0]["delay"])), 0)
@@ -134,7 +134,7 @@ class test_case(unittest.TestCase):
         rd = gbsm.ssf_rays(self.sp, TX, RX, FC[:1], self.lsp[:, :1], self.mu[:, :1], self.sig[:, :1],
                            *[c[:, :, :1] for c in cl[:6]], self.rr[:, :, :1], gr_eps=self.gr_eps[:, :1])
         self.assertEqual(rd[0]["method"], "38.901")
-        npt.assert_array_equal(rd[0]["center_frequency"], FC[:1])
+        npt.assert_array_equal(rd[0]["center_freq"], FC[:1])
 
     def test_array_handling(self):
         tx = np.asfortranarray(TX.astype(np.float32))

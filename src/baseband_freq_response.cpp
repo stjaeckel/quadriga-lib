@@ -359,14 +359,14 @@ template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::C
 # baseband_freq_response_multi
 Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 
-- Interpolates complex channel coefficients from a coarse input frequency grid (`freq_in`) to a dense
-  output grid (`freq_out`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
-- Applies delay-induced phase rotation `exp(-j·2·pi·freq_out·delay)` per output carrier in double
+- Interpolates complex channel coefficients from a coarse input frequency grid (`freq`) to a dense
+  output grid (`freq_new`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
+- Applies delay-induced phase rotation `exp(-j·2·pi·freq_new·delay)` per output carrier in double
   precision to preserve accuracy at high carrier frequencies
 - Only `delay[0]` is used; all entries in the `delay` vector should be identical
   (path geometry is frequency-independent)
 - `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
-- Output frequencies outside the range of `freq_in` use constant extrapolation from the nearest endpoint
+- Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
 - At least one of `hmat_re`/`hmat_im` or `hmat` must be non-null
 
 ## Declaration:
@@ -375,8 +375,8 @@ void quadriga_lib::baseband_freq_response_multi(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &freq_in,
-    const arma::Col<dtype> &freq_out,
+    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &freq_new,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
@@ -384,17 +384,17 @@ void quadriga_lib::baseband_freq_response_multi(
 ```
 
 ## Inputs:
-- **`coeff_re`** — Real part of channel coefficients at each input frequency, vector of `n_freq_in` cubes `[n_rx, n_tx, n_path]`
+- **`coeff_re`** — Real part of channel coefficients at each input frequency, vector of `n_freq` cubes `[n_rx, n_tx, n_path]`
 - **`coeff_im`** — Imaginary part of channel coefficients at each input frequency, same structure as `coeff_re`
-- **`delay`** — Path delays in seconds, vector of `n_freq_in` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`freq_in`** — Input sample frequencies, sorted ascending; `[n_freq_in]`
-- **`freq_out`** — Output carrier frequencies (absolute); `[n_carrier]`
-- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq_in[f]·delay)` before SLERP and re-applies
+- **`delay`** — Path delays in seconds, vector of `n_freq` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
+- **`freq`** — Input sample frequencies, sorted ascending; `[n_freq]`
+- **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
+- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq[f]·delay)` before SLERP and re-applies
   analytically at output frequencies; must be `true` for output from [[get_channels_multifreq]] or
   [[get_channels_spherical]], `false` for pure envelope coefficients. These channels must be generated with
   `use_absolute_delays = true`: their coefficients carry the phase of the absolute path length also when `delay` holds
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
-  across the `freq_in` grid, which gives wrong phases (magnitudes stay right) unless the `freq_in` spacing is far
+  across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
 
 ## Outputs:
@@ -409,11 +409,11 @@ void quadriga_lib::baseband_freq_response_multi(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dtype>> &coeff_re, // Real part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
-                                                const std::vector<arma::Cube<dtype>> &coeff_im, // Imag part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
-                                                const std::vector<arma::Cube<dtype>> &delay,    // Delays [s], length [n_freq_in], each [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                                const arma::Col<dtype> &freq_in,                // Input sample frequencies [Hz], length [n_freq_in]
-                                                const arma::Col<dtype> &freq_out,               // Output carrier frequencies [Hz], length [n_carrier]
+void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dtype>> &coeff_re, // Real part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
+                                                const std::vector<arma::Cube<dtype>> &coeff_im, // Imag part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
+                                                const std::vector<arma::Cube<dtype>> &delay,    // Delays [s], length [n_freq], each [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                                const arma::Col<dtype> &freq,                // Input sample frequencies [Hz], length [n_freq]
+                                                const arma::Col<dtype> &freq_new,               // Output carrier frequencies [Hz], length [n_carrier]
                                                 arma::Cube<dtype> *hmat_re,                     // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
                                                 arma::Cube<dtype> *hmat_im,                     // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
                                                 arma::Cube<std::complex<dtype>> *hmat,          // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
@@ -421,31 +421,31 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 {
     // --- Input validation ---
 
-    size_t n_freq_in = (size_t)freq_in.n_elem;
-    size_t n_carrier = (size_t)freq_out.n_elem;
+    size_t n_freq = (size_t)freq.n_elem;
+    size_t n_carrier = (size_t)freq_new.n_elem;
 
-    if (n_freq_in == 0)
-        throw std::invalid_argument("Input 'freq_in' must have at least one element.");
+    if (n_freq == 0)
+        throw std::invalid_argument("Input 'freq' must have at least one element.");
 
     if (n_carrier == 0)
-        throw std::invalid_argument("Input 'freq_out' must have at least one element.");
+        throw std::invalid_argument("Input 'freq_new' must have at least one element.");
 
-    if (coeff_re.size() != n_freq_in)
-        throw std::invalid_argument("Length of 'coeff_re' must match length of 'freq_in'.");
+    if (coeff_re.size() != n_freq)
+        throw std::invalid_argument("Length of 'coeff_re' must match length of 'freq'.");
 
-    if (coeff_im.size() != n_freq_in)
-        throw std::invalid_argument("Length of 'coeff_im' must match length of 'freq_in'.");
+    if (coeff_im.size() != n_freq)
+        throw std::invalid_argument("Length of 'coeff_im' must match length of 'freq'.");
 
-    if (delay.size() != n_freq_in)
-        throw std::invalid_argument("Length of 'delay' must match length of 'freq_in'.");
+    if (delay.size() != n_freq)
+        throw std::invalid_argument("Length of 'delay' must match length of 'freq'.");
 
-    if (!freq_in.is_finite() || !freq_out.is_finite())
-        throw std::invalid_argument("Inputs 'freq_in' and 'freq_out' must contain finite values only.");
+    if (!freq.is_finite() || !freq_new.is_finite())
+        throw std::invalid_argument("Inputs 'freq' and 'freq_new' must contain finite values only.");
 
-    // Verify that freq_in is sorted in strictly ascending order
-    for (size_t f = 1; f < n_freq_in; ++f)
-        if (freq_in[f] <= freq_in[f - 1])
-            throw std::invalid_argument("Input 'freq_in' must be sorted in strictly ascending order.");
+    // Verify that freq is sorted in strictly ascending order
+    for (size_t f = 1; f < n_freq; ++f)
+        if (freq[f] <= freq[f - 1])
+            throw std::invalid_argument("Input 'freq' must be sorted in strictly ascending order.");
 
     // Get dimensions from first element
     arma::uword n_rx = coeff_re[0].n_rows;
@@ -457,7 +457,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
         throw std::invalid_argument("Coefficient cubes must not be empty.");
 
     // Validate all coefficient cubes have consistent dimensions
-    for (size_t f = 0; f < n_freq_in; ++f)
+    for (size_t f = 0; f < n_freq; ++f)
     {
         if (coeff_re[f].n_rows != n_rx || coeff_re[f].n_cols != n_tx || coeff_re[f].n_slices != n_path)
             throw std::invalid_argument("All cubes in 'coeff_re' must have the same dimensions.");
@@ -472,7 +472,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     if (!planar_wave && !(delay0.n_rows == n_rx && delay0.n_cols == n_tx && delay0.n_slices == n_path))
         throw std::invalid_argument("Input 'delay[0]' must have shape [n_rx, n_tx, n_path] or [1, 1, n_path].");
 
-    for (size_t f = 0; f < n_freq_in; ++f)
+    for (size_t f = 0; f < n_freq; ++f)
     {
         qd_check_alias(hmat_re, "hmat_re", &coeff_re[f], &coeff_im[f], &delay[f]);
         qd_check_alias(hmat_im, "hmat_im", &coeff_re[f], &coeff_im[f], &delay[f]);
@@ -510,20 +510,20 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
         return;
 
     // --- Precompute interpolation table ---
-    // For each output carrier k, find the left segment index and fractional weight in freq_in
+    // For each output carrier k, find the left segment index and fractional weight in freq
 
-    const dtype *p_fin = freq_in.memptr();
-    const dtype *p_fout = freq_out.memptr();
+    const dtype *p_fin = freq.memptr();
+    const dtype *p_fout = freq_new.memptr();
 
-    std::vector<size_t> seg(n_carrier);    // Left segment index into freq_in
+    std::vector<size_t> seg(n_carrier);    // Left segment index into freq
     std::vector<double> frac(n_carrier);   // Fractional position within segment [0, 1]
-    std::vector<double> phasor(n_carrier); // -2 * pi * freq_out[k]
+    std::vector<double> phasor(n_carrier); // -2 * pi * freq_new[k]
 
     for (size_t k = 0; k < n_carrier; ++k)
     {
         phasor[k] = -6.283185307179586 * (double)p_fout[k];
 
-        if (n_freq_in == 1)
+        if (n_freq == 1)
         {
             seg[k] = 0;
             frac[k] = 0.0;
@@ -536,16 +536,16 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
                 seg[k] = 0;
                 frac[k] = 0.0;
             }
-            else if (p_fout[k] >= p_fin[n_freq_in - 1])
+            else if (p_fout[k] >= p_fin[n_freq - 1])
             {
-                seg[k] = n_freq_in - 2;
+                seg[k] = n_freq - 2;
                 frac[k] = 1.0;
             }
             else
             {
-                // Linear search (n_freq_in is small, typically ~40)
+                // Linear search (n_freq is small, typically ~40)
                 size_t s = 0;
-                for (size_t i = 1; i < n_freq_in - 1; ++i)
+                for (size_t i = 1; i < n_freq - 1; ++i)
                     if (p_fout[k] >= p_fin[i])
                         s = i;
                 seg[k] = s;
@@ -557,8 +557,8 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 
     // --- Get raw pointers to coefficient data for each input frequency ---
 
-    std::vector<const dtype *> p_cre(n_freq_in), p_cim(n_freq_in);
-    for (size_t f = 0; f < n_freq_in; ++f)
+    std::vector<const dtype *> p_cre(n_freq), p_cim(n_freq);
+    for (size_t f = 0; f < n_freq; ++f)
     {
         p_cre[f] = coeff_re[f].memptr();
         p_cim[f] = coeff_im[f].memptr();
@@ -566,11 +566,11 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     const dtype *p_delay = delay0.memptr();
 
     // --- Precompute delay-phase undo phasors for each input frequency ---
-    // When remove_delay_phase is true, we need +2*pi*freq_in[f] to undo the baked-in exp(-j*2*pi*f*tau)
-    std::vector<double> undo_phasor(n_freq_in, 0.0);
+    // When remove_delay_phase is true, we need +2*pi*freq[f] to undo the baked-in exp(-j*2*pi*f*tau)
+    std::vector<double> undo_phasor(n_freq, 0.0);
     if (remove_delay_phase)
     {
-        for (size_t f = 0; f < n_freq_in; ++f)
+        for (size_t f = 0; f < n_freq; ++f)
             undo_phasor[f] = 6.283185307179586 * (double)p_fin[f];
     }
 
@@ -592,7 +592,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 
     // Pre-build SLERP weight vector from fractional interpolation table (path/antenna-independent)
     arma::Col<dtype> w_vec;
-    if (n_freq_in > 1)
+    if (n_freq > 1)
     {
         w_vec.set_size(n_carrier_u);
         dtype *pw = w_vec.memptr();
@@ -606,7 +606,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     arma::Col<dtype> slerp_Ar, slerp_Ai; // SLERP gather: left bracket
     arma::Col<dtype> slerp_Br, slerp_Bi; // SLERP gather: right bracket
     arma::fvec Xr, Xi;                   // SLERP output, single precision
-    if (n_freq_in > 1)
+    if (n_freq > 1)
     {
         slerp_Ar.set_size(n_carrier_u);
         slerp_Ai.set_size(n_carrier_u);
@@ -615,7 +615,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     }
 
     // Envelope samples for one (antenna, path) pair across input frequencies
-    std::vector<double> env_re(n_freq_in), env_im(n_freq_in);
+    std::vector<double> env_re(n_freq), env_im(n_freq);
 
     // Accumulators for all antenna pairs, flat layout [i_ant * n_carrier + k], double precision
     std::vector<double> Hr(n_ant * n_carrier, 0.0), Hi(n_ant * n_carrier, 0.0);
@@ -654,16 +654,16 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
             }
 
             // --- Extract coefficient envelope samples ---
-            // If remove_delay_phase is enabled, undo the baked-in exp(-j*2*pi*freq_in[f]*delay)
-            // by multiplying with exp(+j*2*pi*freq_in[f]*delay) to recover the slowly-varying envelope
-            for (size_t f = 0; f < n_freq_in; ++f)
+            // If remove_delay_phase is enabled, undo the baked-in exp(-j*2*pi*freq[f]*delay)
+            // by multiplying with exp(+j*2*pi*freq[f]*delay) to recover the slowly-varying envelope
+            for (size_t f = 0; f < n_freq; ++f)
             {
                 double re = (double)p_cre[f][idx];
                 double im = (double)p_cim[f][idx];
 
                 if (remove_delay_phase)
                 {
-                    double undo_phase = undo_phasor[f] * dl; // +2*pi*freq_in[f]*delay
+                    double undo_phase = undo_phasor[f] * dl; // +2*pi*freq[f]*delay
                     double c_undo = std::cos(undo_phase);
                     double s_undo = std::sin(undo_phase);
                     double re_env = re * c_undo - im * s_undo;
@@ -679,7 +679,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
             // --- SLERP interpolation across output carriers ---
             const float *pXr, *pXi;
 
-            if (n_freq_in == 1)
+            if (n_freq == 1)
             {
                 // No interpolation: broadcast the single envelope sample into Xr, Xi
                 Xr.set_size(n_carrier_u);
@@ -708,7 +708,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
                 pXi = Xi.memptr();
             }
 
-            // --- Accumulate: interpolated envelope * exp(-j*2*pi*freq_out*delay) ---
+            // --- Accumulate: interpolated envelope * exp(-j*2*pi*freq_new*delay) ---
             // Cast float products to double before accumulating to preserve summation precision
             const float *pC = c_dl.memptr(), *pS = s_dl.memptr();
             double *pHr = &Hr[i_ant * n_carrier];
@@ -743,11 +743,11 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 }
 
 template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
-                                                         const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &freq_in,
-                                                         const arma::Col<float> &freq_out, arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im,
+                                                         const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &freq,
+                                                         const arma::Col<float> &freq_new, arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im,
                                                          arma::Cube<std::complex<float>> *hmat, bool remove_delay_phase);
 
 template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
-                                                         const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq_in,
-                                                         const arma::Col<double> &freq_out, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
+                                                         const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq,
+                                                         const arma::Col<double> &freq_new, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
                                                          arma::Cube<std::complex<double>> *hmat, bool remove_delay_phase);

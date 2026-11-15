@@ -20,15 +20,15 @@ path_length = [0,0];
 pg_s = [1, 0.25];                                        % Col, n_path = 2
 M_s  = [1,1; 0,0; 0,0; 0,0; 0,0; 0,0; -1,-1; 0,0];       % [8, n_path]
 
-% Multi-frequency shapes (n_freq_in = 1)
-pg_m = [1; 0.25];                                        % Mat [n_path, n_freq_in]
-M_m  = reshape(M_s, [8, 2, 1]);                          % Cube [8, n_path, n_freq_in]
+% Multi-frequency shapes (n_freq = 1)
+pg_m = [1; 0.25];                                        % Mat [n_path, n_freq]
+M_m  = reshape(M_s, [8, 2, 1]);                          % Cube [8, n_path, n_freq]
 
 fc = 2997924580.0;
 
 % ============================================================================
 % Test 1: Multi-freq with single freq entry matches get_channels_spherical
-%         + verify 4D output shape [n_rx, n_tx, n_path, n_freq_out]
+%         + verify 4D output shape [n_rx, n_tx, n_path, n_freq_new]
 % ============================================================================
 [cr_ref, ci_ref, dl_ref] = quadriga_lib.get_channels_spherical( ant, ant, ...
     fbs_pos, fbs_pos, pg_s, path_length, M_s, ...
@@ -41,7 +41,7 @@ fc = 2997924580.0;
 assertEqual( size(cr,1), 2 );   % n_rx
 assertEqual( size(cr,2), 2 );   % n_tx
 assertEqual( size(cr,3), 2 );   % n_path
-assertEqual( size(cr,4), 1 );   % n_freq_out
+assertEqual( size(cr,4), 1 );   % n_freq_new
 assertEqual( size(dl,4), 1 );
 
 assertElementsAlmostEqual( cr(:,:,:,1), cr_ref, 'absolute', 5e-6 );
@@ -49,8 +49,8 @@ assertElementsAlmostEqual( ci(:,:,:,1), ci_ref, 'absolute', 5e-6 );
 assertElementsAlmostEqual( dl(:,:,:,1), dl_ref, 'absolute', 1e-12 );
 
 % ============================================================================
-% Test 2: Multiple output frequencies — trailing dim = n_freq_out
-%         Delays are geometry-only → identical across freq_out slabs
+% Test 2: Multiple output frequencies — trailing dim = n_freq_new
+%         Delays are geometry-only → identical across freq_new slabs
 % ============================================================================
 fo3 = [1e9; 2e9; 3e9];
 [cr3, ~, dl3] = quadriga_lib.get_channels_multifreq( ant, ant, ...
@@ -68,7 +68,7 @@ assertElementsAlmostEqual( dl3(:,:,:,2), dl3(:,:,:,3), 'absolute', 1e-14 );
 ant_o = quadriga_lib.arrayant_generate('omni');
 ant_o.center_freq = 1e9;
 fbs1 = [10;0;0];
-pg2  = [1.0, 4.0];                                  % [n_path=1, n_freq_in=2]
+pg2  = [1.0, 4.0];                                  % [n_path=1, n_freq=2]
 M2   = zeros(2,1,2); M2(1,1,1) = 1; M2(1,1,2) = 1;
 [crp, cip, ~] = quadriga_lib.get_channels_multifreq( ant_o, ant_o, ...
     fbs1, fbs1, pg2, 10, M2, [0;0;0], [0,0,0], [10;0;0], [0,0,0], ...
@@ -214,7 +214,7 @@ for abs_dl = [true, false]
     assertElementsAlmostEqual( dl0, dlL(:,:,1), 'absolute', 1e-17 );
 end
 
-% 0 paths without add_fake_los_path: empty outputs [n_rx_ports, n_tx_ports, 0, n_freq_out] (as in C++ and Python)
+% 0 paths without add_fake_los_path: empty outputs [n_rx_ports, n_tx_ports, 0, n_freq_new] (as in C++ and Python)
 [cr0, ci0, dl0] = quadriga_lib.get_channels_multifreq(ant, ant, zeros(3,0), zeros(3,0), zeros(0,1), zeros(0,1), zeros(8,0), ...
     tx, [0;0;0.3], rx, [0;0;-0.2], fc, [fc, 2*fc], true, false);
 for x = {cr0, ci0, dl0}

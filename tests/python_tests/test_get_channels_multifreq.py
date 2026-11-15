@@ -63,7 +63,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             lower_cutoff=50.0, upper_cutoff=3000.0,
             lower_rolloff_slope=12.0, upper_rolloff_slope=24.0, sensitivity=87.0,
             radiation_type='hemisphere', baffle_width=0.20, baffle_height=0.30,
-            frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
+            center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
             angular_resolution=10.0)
 
         # Omnidirectional microphone as RX (single-frequency, clamped for all output frequencies)
@@ -75,19 +75,19 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         path_length = np.array([1.0])
 
         # Frequency-flat path gain and scalar Jones matrix at two input frequencies
-        freq_in = np.array([100.0, 10000.0])
+        freq = np.array([100.0, 10000.0])
         path_gain = np.ones((1, 2))
         M = np.zeros((2, 1, 2))
         M[0, 0, 0] = 1.0; M[0, 0, 1] = 1.0
 
         # Compute channel at 3 output frequencies using speed of sound
-        freq_out = np.array([200.0, 1000.0, 5000.0])
+        freq_new = np.array([200.0, 1000.0, 5000.0])
         coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_multifreq(
             tx_woofer, rx, fbs_pos, lbs_pos, path_gain, path_length, M,
             np.zeros(3), np.zeros(3), np.array([1.0, 0.0, 0.0]), np.zeros(3),
-            freq_in, freq_out, propagation_speed=343.0, complex=False)
+            freq, freq_new, propagation_speed=343.0, complex=False)
 
-        # Shape: (n_rx_ports, n_tx_ports, n_path, n_freq_out)
+        # Shape: (n_rx_ports, n_tx_ports, n_path, n_freq_new)
         self.assertEqual(coeff_re.ndim, 4)
         self.assertEqual(coeff_re.shape[0], 1)   # 1 RX port (omni mic)
         self.assertEqual(coeff_re.shape[2], 1)   # 1 path
@@ -126,8 +126,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
                 np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3),
                 fi, fo)
 
-    def test_empty_freq_in_throws(self):
-        """Empty freq_in should raise an error."""
+    def test_empty_freq_throws(self):
+        """Empty freq should raise an error."""
         tx = gen_omni(); rx = gen_omni()
         fbs = np.zeros((3, 1), order='F'); lbs = np.zeros((3, 1), order='F')
         pg = np.ones((1, 1), order='F'); pl = np.array([1.0])
@@ -139,8 +139,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
                 np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3),
                 fi, fo)
 
-    def test_empty_freq_out_throws(self):
-        """Empty freq_out should raise an error."""
+    def test_empty_freq_new_throws(self):
+        """Empty freq_new should raise an error."""
         tx = gen_omni(); rx = gen_omni()
         fbs = np.zeros((3, 1), order='F'); lbs = np.zeros((3, 1), order='F')
         pg = np.ones((1, 1), order='F'); pl = np.array([1.0])
@@ -201,7 +201,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
     # ============================================================================
 
     def test_output_dimensions(self):
-        """Verify 4D output shape: (n_rx, n_tx, n_path, n_freq_out)."""
+        """Verify 4D output shape: (n_rx, n_tx, n_path, n_freq_new)."""
         tx = gen_omni(); rx = gen_omni()
         fbs = np.zeros((3, 3), order='F'); lbs = np.zeros((3, 3), order='F')
         fbs[0, :] = 10.0; lbs[0, :] = 10.0
@@ -217,7 +217,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             fi, fo, complex=False)
 
         self.assertEqual(cr.ndim, 4)
-        self.assertEqual(cr.shape, (1, 1, 3, 4))  # (n_rx, n_tx, n_path, n_freq_out)
+        self.assertEqual(cr.shape, (1, 1, 3, 4))  # (n_rx, n_tx, n_path, n_freq_new)
         self.assertEqual(ci.shape, (1, 1, 3, 4))
         self.assertEqual(dl.shape, (1, 1, 3, 4))
 
@@ -283,7 +283,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             tx_pos, ori, rx_pos, ori, fi, fo,
             use_absolute_delays=True, complex=False)
 
-        self.assertEqual(cr.shape[3], 1)  # single freq_out
+        self.assertEqual(cr.shape[3], 1)  # single freq_new
         npt.assert_allclose(cr[:, :, :, 0], cr_ref, atol=1e-10, rtol=0)
         npt.assert_allclose(ci[:, :, :, 0], ci_ref, atol=1e-10, rtol=0)
         npt.assert_allclose(dl[:, :, :, 0], dl_ref, atol=1e-14, rtol=0)
@@ -404,8 +404,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         pl = np.array([10.0])
         pg = np.ones((1, 2), order='F')
         M = np.zeros((2, 1, 2), order='F')
-        M[0, 0, 0] = 1.0  # ReVV = 1 at freq_in[0]
-        M[1, 0, 1] = 1.0  # ImVV = 1 at freq_in[1] (90 deg phase)
+        M[0, 0, 0] = 1.0  # ReVV = 1 at freq[0]
+        M[1, 0, 1] = 1.0  # ImVV = 1 at freq[1] (90 deg phase)
         fi = np.array([1e9, 2e9]); fo = np.array([1.5e9])
 
         cr, ci, dl = quadriga_lib.arrayant.get_channels_multifreq(
@@ -422,7 +422,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
     # ============================================================================
 
     def test_extrapolation_clamps(self):
-        """Querying below freq_in range should clamp to first entry."""
+        """Querying below freq range should clamp to first entry."""
         tx = gen_omni(); rx = gen_omni()
         fbs = np.zeros((3, 1), order='F'); lbs = np.zeros((3, 1), order='F')
         fbs[0, 0] = 10.0; lbs[0, 0] = 10.0
@@ -541,7 +541,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             driver_type='piston', radius=0.083, lower_cutoff=50.0, upper_cutoff=3000.0,
             lower_rolloff_slope=12.0, upper_rolloff_slope=24.0, sensitivity=87.0,
             radiation_type='hemisphere', baffle_width=0.20, baffle_height=0.30,
-            frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
+            center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
             angular_resolution=10.0)
 
         # Note: arrayant_concat_multi is not yet available in Python, so we test
@@ -719,7 +719,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertAlmostEqual(a01 / a00, 2.0, delta=0.1)
 
     # ============================================================================
-    # SECTION 17: Zero center_frequency (phase disabled)
+    # SECTION 17: Zero center_freq (phase disabled)
     # ============================================================================
 
     def test_zero_frequency_disables_phase(self):
@@ -740,11 +740,11 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertAlmostEqual(cr[0, 0, 0, 0], 1.0, delta=1e-10)
 
     # ============================================================================
-    # SECTION 18: Multiple freq_in entries
+    # SECTION 18: Multiple freq entries
     # ============================================================================
 
-    def test_multiple_freq_in_varying_gain(self):
-        """Multiple freq_in entries with varying path gain should interpolate correctly."""
+    def test_multiple_freq_varying_gain(self):
+        """Multiple freq entries with varying path gain should interpolate correctly."""
         tx = gen_omni(); rx = gen_omni()
         fbs = np.zeros((3, 1), order='F'); lbs = np.zeros((3, 1), order='F')
         fbs[0, 0] = 10.0; lbs[0, 0] = 10.0
@@ -760,7 +760,7 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3),
             fi, fo, use_absolute_delays=True, complex=False)
 
-        # At exact freq_in entries: amplitude = sqrt(gain)
+        # At exact freq entries: amplitude = sqrt(gain)
         a0 = amp(cr, ci, 0, 0, 0, 0)
         a1 = amp(cr, ci, 0, 0, 0, 1)
         a2 = amp(cr, ci, 0, 0, 0, 2)
@@ -928,11 +928,11 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         self.assertFalse(np.allclose(cr[:, :, :, 0], cr[:, :, :, 1], atol=1e-6))
 
     # ============================================================================
-    # SECTION 25: Reversed freq_out order
+    # SECTION 25: Reversed freq_new order
     # ============================================================================
 
-    def test_reversed_freq_out_order(self):
-        """Reversed freq_out order should give consistent results."""
+    def test_reversed_freq_new_order(self):
+        """Reversed freq_new order should give consistent results."""
         tx = gen_omni(); rx = gen_omni()
         fbs = np.zeros((3, 1), order='F'); lbs = np.zeros((3, 1), order='F')
         fbs[0, 0] = 10.0; lbs[0, 0] = 10.0
@@ -1040,7 +1040,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
         npt.assert_array_equal(np.concatenate([np.ravel(cr), np.ravel(ci)]), np.zeros(4))
         npt.assert_allclose(np.ravel(dl), [10 / 299792458.0] * 2, rtol=1e-15)
 
-    # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0, n_freq_out), as in C++ and MATLAB
+    # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0, n_freq_new), as in C++ and MATLAB
     def test_without_fake_los(self):
         ant = quadriga_lib.arrayant.generate('xpol')
         fc = 3e9

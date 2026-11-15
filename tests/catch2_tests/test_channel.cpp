@@ -46,7 +46,7 @@ TEST_CASE("Channel - Effective Path Gain")
     CHECK(std::abs(a2 * arma::sum(q2) - p.at(1)) < 1e-14);
 
     // Set same frequency for all snapshots
-    c.center_frequency = 10.0e9;
+    c.center_freq = 10.0e9;
 
     // Check additional gain
     p = c.calc_effective_path_gain();
@@ -56,7 +56,7 @@ TEST_CASE("Channel - Effective Path Gain")
     CHECK(std::abs(a2 * arma::sum(q2) - p.at(1)) < 1e-14 * p.at(1));
 
     // Sett different frequencies for snapshots
-    c.center_frequency = {12.0e9, 20.0e9};
+    c.center_freq = {12.0e9, 20.0e9};
 
     // Check gain
     p = c.calc_effective_path_gain();

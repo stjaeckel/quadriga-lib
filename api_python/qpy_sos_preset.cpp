@@ -11,7 +11,7 @@ SECTION!*/
 
 /*!MD
 # sos.preset
-Frequencies and ACF of a predefined sum-of-sinusoids generator
+Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
 
 - Returns a precomputed frequency table for [[sos.val]] together with the autocorrelation
   function (ACF) it was fitted to
@@ -31,7 +31,7 @@ Frequencies and ACF of a predefined sum-of-sinusoids generator
 
 ## Usage:
 ```
-freq, acf, dist = quadriga_lib.sos.preset( name, dist_decorr )
+spatial_freq, acf, dist = quadriga_lib.sos.preset( name, dist_decorr )
 ```
 
 ## Inputs:
@@ -39,7 +39,7 @@ freq, acf, dist = quadriga_lib.sos.preset( name, dist_decorr )
 - **`dist_decorr`** — Decorrelation distance; must be > 0; default: 10.0
 
 ## Outputs:
-- **`freq`** — Frequencies; `(n_coeff, 3)`
+- **`spatial_freq`** — Spatial frequencies; `(n_coeff, 3)`
 - **`acf`** — Target ACF; `(200,)`
 - **`dist`** — Sample points of the ACF; `(200,)`
 
@@ -53,16 +53,16 @@ py::tuple sos_preset(const std::string &name,
                      double dist_decorr)
 {
     // Output allocation; the number of sinusoids is known only after the call
-    arma::mat freq;
+    arma::mat spatial_freq;
     arma::vec acf, dist;
     auto acf_py = qd_python_init_output((arma::uword)200, &acf);
     auto dist_py = qd_python_init_output((arma::uword)200, &dist);
 
     // Call library function
-    quadriga_lib::sos_preset<double>(name, freq, &acf, &dist, dist_decorr);
+    quadriga_lib::sos_preset<double>(name, spatial_freq, &acf, &dist, dist_decorr);
 
     // Copy to python
-    auto freq_py = qd_python_copy2numpy(&freq);
+    auto freq_py = qd_python_copy2numpy(&spatial_freq);
 
     return py::make_tuple(freq_py, acf_py, dist_py);
 }

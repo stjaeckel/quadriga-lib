@@ -24,7 +24,7 @@ Commit the paths of a launch configuration that reach a receiver
 - Intersects the current beam set with the receive point cloud ([[ray_point_intersect]]) and appends one
   [[path]] object to `paths_commit` for every ray-point pair that survives the gates below.
 - A pair is committed when the receiver is not shaded by the ray's own first-bounce face, the total path
-  length stays below `max_path_length`, and the gain at `center_frequency[0]` stays above `min_gain_dB`.
+  length stays below `max_path_length`, and the gain at `center_freq[0]` stays above `min_gain_dB`.
 - Shading is a half-space test against the plane of the first-bounce face: the receiver must lie on the
   same side of that plane as the ray origin. The face is treated as an infinite plane, so a receiver just
   past the edge of a small face is conservatively dropped.
@@ -52,7 +52,7 @@ arma::uword quadriga_lib::ray_commit(
     std::vector<quadriga_lib::path> &paths_commit,
     const arma::fmat &mesh,
     const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-    const arma::fvec &center_frequency,
+    const arma::fvec &center_freq,
     const arma::fmat &orig,
     const arma::u32_vec &fbs_ind,
     const arma::fmat &trivec,
@@ -74,8 +74,8 @@ arma::uword quadriga_lib::ray_commit(
   faces named by `fbs_ind` are read, for the shading plane
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]);
   each value has length `n_mtl` (max 16383)
-- **`center_frequency`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries, must match the layout of
-  `paths`. `center_frequency[0]` is the reference frequency for the gain gate
+- **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries, must match the layout of
+  `paths`. `center_freq[0]` is the reference frequency for the gain gate
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from
   [[ray_triangle_intersect]] for the same launch configuration
@@ -95,7 +95,7 @@ arma::uword quadriga_lib::ray_commit(
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [[ray_subdivide_flag]] for the
   same launch configuration. NULL / empty → no ray is excluded on these grounds
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
-- **`min_gain_dB`** *(optional)* — Gain at `center_frequency[0]` below which a path is not committed, in dB;
+- **`min_gain_dB`** *(optional)* — Gain at `center_freq[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
 - **`min_no_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
   before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
@@ -127,7 +127,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
                                      std::vector<quadriga_lib::path> &paths_commit,
                                      const arma::fmat &mesh,
                                      const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-                                     const arma::fvec &center_frequency,
+                                     const arma::fvec &center_freq,
                                      const arma::fmat &orig,
                                      const arma::u32_vec &fbs_ind,
                                      const arma::fmat &trivec,
@@ -161,14 +161,14 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
         throw std::invalid_argument("Number of materials cannot exceed 16383.");
 
     // Frequencies; the path storage layout supports 1 to 127 frequencies
-    const arma::uword n_freq = center_frequency.n_elem;
+    const arma::uword n_freq = center_freq.n_elem;
     if (n_freq == 0)
-        throw std::invalid_argument("Input 'center_frequency' cannot be empty.");
+        throw std::invalid_argument("Input 'center_freq' cannot be empty.");
     if (n_freq > 127)
-        throw std::invalid_argument("Input 'center_frequency' cannot have more than 127 elements.");
-    if (center_frequency.min() <= 0.0f)
-        throw std::invalid_argument("Input 'center_frequency' must be > 0.");
-    float fRef_Hz = center_frequency[0];
+        throw std::invalid_argument("Input 'center_freq' cannot have more than 127 elements.");
+    if (center_freq.min() <= 0.0f)
+        throw std::invalid_argument("Input 'center_freq' must be > 0.");
+    float fRef_Hz = center_freq[0];
     float fRef_GHz = fRef_Hz * 1e-9f;
 
     // Ray count is defined by 'orig'; all other per-ray inputs must match it
@@ -191,7 +191,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     if (paths.size() != n_ray)
         throw std::invalid_argument("Input 'paths' must have n_ray elements.");
     if (paths[0].n_freq() != n_freq) // Cheap check here, every path is checked in the gate pass
-        throw std::invalid_argument("Number of frequencies in 'paths' must match 'center_frequency'.");
+        throw std::invalid_argument("Number of frequencies in 'paths' must match 'center_freq'.");
 
     const bool scalar_mode = paths[0].is_scalar();
 
@@ -465,7 +465,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             // One coefficient update per frequency: mirror and medium loss in a single call
             for (size_t i_freq = 0; i_freq < n_freq; ++i_freq)
             {
-                float medium_g = material ? quadriga_lib::medium_gain(mtl_prop, material, seg_length, center_frequency[i_freq]) : 1.0f;
+                float medium_g = material ? quadriga_lib::medium_gain(mtl_prop, material, seg_length, center_freq[i_freq]) : 1.0f;
                 C.xpr_update(p_mirror, medium_g, i_freq);
             }
         }

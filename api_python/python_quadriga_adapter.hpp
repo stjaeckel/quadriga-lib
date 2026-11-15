@@ -24,7 +24,7 @@ static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &an
     output["element_pos"] = qd_python_copy2numpy(&ant.element_pos);
     output["coupling_re"] = qd_python_copy2numpy(&ant.coupling_re);
     output["coupling_im"] = qd_python_copy2numpy(&ant.coupling_im);
-    output["center_freq"] = ant.center_frequency;
+    output["center_freq"] = ant.center_freq;
     output["name"] = ant.name;
     return output;
 }
@@ -65,7 +65,7 @@ static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::ar
     // Center frequency as 1D array
     arma::Col<double> center_freqs(n_freq);
     for (size_t f = 0; f < n_freq; ++f)
-        center_freqs[f] = ant[f].center_frequency;
+        center_freqs[f] = ant[f].center_freq;
     output["center_freq"] = qd_python_copy2numpy(&center_freqs);
 
     // Coupling: check if all entries are identical
@@ -161,7 +161,7 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
         const auto center_freq = qd_python_numpy2arma_Col<double>(arrayant["center_freq"]);
         if (center_freq.n_elem != 1)
             throw std::invalid_argument("Input 'center_freq' must have exactly one element for a single-frequency arrayant.");
-        ant.center_frequency = center_freq.at(0);
+        ant.center_freq = center_freq.at(0);
     }
 
     if (arrayant.contains("name"))
@@ -296,7 +296,7 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
         ant[f].azimuth_grid = azimuth_grid;
         ant[f].elevation_grid = elevation_grid;
         ant[f].element_pos = element_pos;
-        ant[f].center_frequency = center_freqs[f];
+        ant[f].center_freq = center_freqs[f];
         ant[f].name = name;
         if (has_coupling_re)
             ant[f].coupling_re = std::move(coupling_re_vec[f]);
@@ -408,10 +408,10 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
         output["interact_coord"] = qd_python_emit_paths<double>(&channel.interact_coord, stack, i_snap);
 
     // Center frequency: scalar shared or per-snapshot
-    if (channel.center_frequency.n_elem == 1 || (channel.center_frequency.n_elem > 1 && !snap_given))
-        output["center_frequency"] = qd_python_copy2numpy(&channel.center_frequency);
-    else if (snap_given && channel.center_frequency.n_elem > 1)
-        output["center_frequency"] = qd_python_copy2numpy<double, double>(&channel.center_frequency, nullptr, i_snap);
+    if (channel.center_freq.n_elem == 1 || (channel.center_freq.n_elem > 1 && !snap_given))
+        output["center_freq"] = qd_python_copy2numpy(&channel.center_freq);
+    else if (snap_given && channel.center_freq.n_elem > 1)
+        output["center_freq"] = qd_python_copy2numpy<double, double>(&channel.center_freq, nullptr, i_snap);
 
     if (n_snap_channel > 0)
     {
@@ -436,7 +436,7 @@ static py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<d
 // Per-snapshot fields are accepted in either layout, auto-detected per field:
 //   * "list" model  — a Python list of per-snapshot arrays (n_path may vary per snapshot)
 //   * "stack" model — a single Numpy array with the snapshot index as the last axis
-// Positions, orientations and center_frequency are plain arrays in both models.
+// Positions, orientations and center_freq are plain arrays in both models.
 // Dict keys match qd_python_channel2dict / hdf5_read_channel (NOT the legacy write keys).
 // Unstructured "par" data is NOT handled here — it is kept separate (see hdf5_write_channel).
 static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict,
@@ -475,8 +475,8 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
         c.rx_orientation = qd_python_numpy2arma_Mat<double>(dict["rx_orientation"], true);
 
     // Center frequency: (n_snap,) or scalar
-    if (has("center_frequency"))
-        c.center_frequency = qd_python_numpy2arma_Col<double>(dict["center_frequency"], true);
+    if (has("center_freq"))
+        c.center_freq = qd_python_numpy2arma_Col<double>(dict["center_freq"], true);
 
     // Coefficients (complex)
     // Accepted in one of two mutually exclusive forms:
@@ -873,7 +873,7 @@ static py::dict qd_python_plpar2dict(const std::string &pl_model,
 // Keys of the gbsm_rays dict in their order; the first qd_python_gbsm_rays_n_required are required as input, the
 // others optional (missing or None = empty), also any key appended later
 static const char *const qd_python_gbsm_rays_keys[] = {
-    "method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa",
+    "method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa",
     "eoa", "M", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
 static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap"
 
@@ -921,7 +921,7 @@ static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const
     r.method = py::cast<std::string>(method);
     r.tx_pos = qd_python_numpy2arma_Col<double>(get("tx_pos"), true);
     r.rx_pos = qd_python_numpy2arma_Col<double>(get("rx_pos"), true);
-    r.center_frequency = qd_python_numpy2arma_Col<double>(get("center_frequency"), true);
+    r.center_freq = qd_python_numpy2arma_Col<double>(get("center_freq"), true);
     r.delay = qd_python_numpy2arma_Col<double>(get("delay"), true);
     r.power = qd_python_numpy2arma_Mat<double>(get("power"), true);
     r.aod = qd_python_numpy2arma_Col<double>(get("aod"), true);
@@ -962,7 +962,7 @@ static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, 
         d["method"] = "";
         d["tx_pos"] = qd_python_init_output(n3, &r.tx_pos);
         d["rx_pos"] = qd_python_init_output(n3, &r.rx_pos);
-        d["center_frequency"] = qd_python_init_output(n_freq, &r.center_frequency);
+        d["center_freq"] = qd_python_init_output(n_freq, &r.center_freq);
         d["delay"] = qd_python_init_output(n_ray, &r.delay);
         d["power"] = qd_python_init_output(n_ray, n_freq, &r.power);
         d["aod"] = qd_python_init_output(n_ray, &r.aod);

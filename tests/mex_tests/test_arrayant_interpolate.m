@@ -132,7 +132,7 @@ assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, 3 ), 'exceed 
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [], [], [], [], 3 ), ...
     'Input ''use_kernel'' must be 0, 1 or 2.' );                                       % C++
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant_m, az, el, [], [], [], [1e9, NaN] ), ...
-    'Input ''frequency'' must contain finite values.' );                               % C++, multi-frequency
+    'Input ''freq_new'' must contain finite values.' );                               % C++, multi-frequency
 assert_throws( @() out0( ant, az, el(1:2) ), 'must have the same size' );                % C++ called with 0 outputs
 
 end

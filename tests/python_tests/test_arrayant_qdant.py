@@ -556,7 +556,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
 
     def test_speaker_round_trip(self):
         """A generated speaker (multi-freq) should survive write/read round-trip."""
-        speaker = arrayant.generate_speaker(frequencies=np.array([500.0, 2000.0]),
+        speaker = arrayant.generate_speaker(center_freq=np.array([500.0, 2000.0]),
                                             angular_resolution=10.0)
         fn = _temp_qdant()
         try:

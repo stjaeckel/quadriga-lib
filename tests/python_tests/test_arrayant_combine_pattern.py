@@ -393,7 +393,7 @@ class test_case(unittest.TestCase):
         # Positional argument, and the multi-frequency branch (vector freq)
         out = arrayant.combine_pattern(ant, None, None, None, 344.0)
         self.assertAlmostEqual(amp(out, ie, ia90), expected, places=6)
-        out = arrayant.combine_pattern(ant, freq=np.array([500.0, 1000.0]), propagation_speed=344.0)
+        out = arrayant.combine_pattern(ant, freq_new=np.array([500.0, 1000.0]), propagation_speed=344.0)
         self.assertEqual(out["e_theta_re"].shape[3], 2)
         a500 = np.hypot(out["e_theta_re"][ie, ia90, 0, 0], out["e_theta_im"][ie, ia90, 0, 0])
         a1k = np.hypot(out["e_theta_re"][ie, ia90, 0, 1], out["e_theta_im"][ie, ia90, 0, 1])
@@ -405,7 +405,7 @@ class test_case(unittest.TestCase):
             with self.assertRaises(ANY_ERR):
                 arrayant.combine_pattern(ant, propagation_speed=v)
             with self.assertRaises(ANY_ERR):
-                arrayant.combine_pattern(ant, freq=np.array([500.0, 1000.0]), propagation_speed=v)
+                arrayant.combine_pattern(ant, freq_new=np.array([500.0, 1000.0]), propagation_speed=v)
 
 
 if __name__ == '__main__':

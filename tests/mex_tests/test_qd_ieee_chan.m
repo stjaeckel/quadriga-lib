@@ -33,7 +33,7 @@ if numel(sz) >= 4
 end
 assertEqual(n_snap, 1);
 
-assertElementsAlmostEqual(chan(1).center_frequency(1), 5.25e9, 'absolute', 0);
+assertElementsAlmostEqual(chan(1).center_freq(1), 5.25e9, 'absolute', 0);
 
 % Both paths have equal power at KF = 0 dB
 pg = chan(1).path_gain(:);

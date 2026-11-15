@@ -209,7 +209,7 @@ class test_case(unittest.TestCase):
         self.assertIn("LSP cross-correlation matrix in 'scenpar' is not positive definite.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             self.call(self.sp, np.zeros(0), self.tx_pos, self.rx_pos, self.rnd)
-        self.assertIn("Input 'center_frequency' cannot be empty.", str(ctx.exception))
+        self.assertIn("Input 'center_freq' cannot be empty.", str(ctx.exception))
         with self.assertRaises(TypeError):
             self.call(self.sp, self.fc, self.tx_pos, self.rx_pos)
         with self.assertRaises(TypeError):

@@ -398,7 +398,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
 
     def test_copy_on_generated_speaker(self):
         """Copy element on a generated speaker (multi-freq)."""
-        speaker = arrayant.generate_speaker(frequencies=np.array([500.0, 2000.0, 8000.0]),
+        speaker = arrayant.generate_speaker(center_freq=np.array([500.0, 2000.0, 8000.0]),
                                             angular_resolution=10.0)
         n_elem_before = speaker['e_theta_re'].shape[2]
         out = arrayant.copy_element(speaker, 0,

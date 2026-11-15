@@ -16,19 +16,19 @@ Spatially correlated random values on a regular grid
 - Evaluates the generators of [[sos.val]] for one device at all combinations of the grid vectors
 - Output in meshgrid order: element `[iy, ix, iz, g]` belongs to the position
   `(x[ix], y[iy], z[iz])` and to generator `g`, i.e. column `g` of `phase`
-- The number of grid vectors given must not exceed the number of columns of `freq`; a `y` or `z`
+- The number of grid vectors given must not exceed the number of columns of `spatial_freq`; a `y` or `z`
   that is `None` or empty means a single sample at 0 on that axis
-- `z` can be given without `y` if `freq` has 3 columns
+- `z` can be given without `y` if `spatial_freq` has 3 columns
 - The values are those of [[sos.val]] at the grid points, bit for bit; kernels, accuracy and the
   Uniform mapping are described there
 
 ## Usage:
 ```
-map = quadriga_lib.sos.map( freq, phase, x, y, z, uniform, use_kernel )
+map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, uniform, use_kernel )
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
 - **`phase`** — Phases; one column per generator; `(n_coeff, n_gen)`
 - **`x`** — Grid points on the x-axis; `(nx,)`
 - **`y`** — Grid points on the y-axis; requires `n_dim >= 2`; `None` = one sample at 0, `ny = 1`;
@@ -47,7 +47,7 @@ map = quadriga_lib.sos.map( freq, phase, x, y, z, uniform, use_kernel )
 - [[sos.val]] (evaluation at arbitrary positions, two devices)
 MD!*/
 
-py::array_t<double> sos_map(const py::array_t<double> &freq,
+py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
                             const py::array_t<double> &phase,
                             const py::array_t<double> &x,
                             py::handle y,
@@ -56,7 +56,7 @@ py::array_t<double> sos_map(const py::array_t<double> &freq,
                             int use_kernel)
 {
     // Read inputs
-    const auto freq_a = qd_python_numpy2arma_Mat<double>(freq, true);
+    const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto phase_a = qd_python_numpy2arma_Mat<double>(phase, true);
     const auto x_a = qd_python_numpy2arma_Col<double>(x, true);
     const auto y_a = qd_python_numpy2arma_Col<double>(y, true);
@@ -81,7 +81,7 @@ py::array_t<double> sos_map(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("map", &sos_map,
-//       py::arg("freq").none(false),
+//       py::arg("spatial_freq").none(false),
 //       py::arg("phase").none(false),
 //       py::arg("x").none(false),
 //       py::arg("y") = py::none(),

@@ -700,7 +700,7 @@ TEST_CASE("Get Channels Spherical - Zero center frequency disables phase")
 
     arma::cube coeff_re, coeff_im, delay;
 
-    // center_frequency = 0 → phase calculation disabled
+    // center_freq = 0 → phase calculation disabled
     quadriga_lib::get_channels_spherical<double>(
         &ant, &ant,
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -1161,7 +1161,7 @@ TEST_CASE("Get Channels Spherical - Complex polarization transfer matrix M")
                            coeff_im.at(0, 0, 0) * coeff_im.at(0, 0, 0));
     CHECK(std::abs(amp - 1.0) < 1.0e-6);
 
-    // The imaginary component of M should introduce phase even without center_frequency
+    // The imaginary component of M should introduce phase even without center_freq
     // coeff_im should be non-zero
     CHECK(std::abs(coeff_im.at(0, 0, 0)) > 1.0e-3);
 }

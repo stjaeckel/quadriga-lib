@@ -20,7 +20,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`
-- If `frequencies` is None or empty, third-octave band centers are auto-generated from one band below
+- If `center_freq` is None or empty, third-octave band centers are auto-generated from one band below
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz
 - Speed of sound assumed to be 343 m/s
 - Driver models (`driver_type`):
@@ -49,7 +49,7 @@ speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.16
     sensitivity=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, \
+speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, \
     10000.0]), angular_resolution=5.0)
 ```
 
@@ -73,7 +73,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 5
   default: 0
 - **`baffle_width`** — Baffle width in m; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** — Baffle height in m; used by `hemisphere` model; default: 0.25
-- **`frequencies`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
+- **`center_freq`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
   `(n_freq,)` or None; default: None
 - **`angular_resolution`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
 
@@ -108,11 +108,11 @@ py::dict arrayant_generate_speaker(const std::string &driver_type,
                                    double horn_control_freq,
                                    double baffle_width,
                                    double baffle_height,
-                                   py::handle frequencies,
+                                   py::handle center_freq,
                                    double angular_resolution)
 {
-    // Empty arma::vec when frequencies is None or empty
-    const auto freq_vec = qd_python_numpy2arma_Col<double>(frequencies, true);
+    // Empty arma::vec when center_freq is None or empty
+    const auto freq_vec = qd_python_numpy2arma_Col<double>(center_freq, true);
 
     auto speaker = quadriga_lib::generate_speaker<double>(
         driver_type, radius, lower_cutoff, upper_cutoff,
@@ -138,5 +138,5 @@ py::dict arrayant_generate_speaker(const std::string &driver_type,
 //       py::arg("horn_control_freq") = 0.0,
 //       py::arg("baffle_width") = 0.15,
 //       py::arg("baffle_height") = 0.25,
-//       py::arg("frequencies") = py::none(),
+//       py::arg("center_freq") = py::none(),
 //       py::arg("angular_resolution") = 5.0);

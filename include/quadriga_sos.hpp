@@ -21,14 +21,14 @@ namespace quadriga_lib
     // ---- Sum-of-sinusoids random number generator ----
 
     // A generator with N sinusoids produces at position x the value s(x) = sqrt(2/N) · sum_n cos( 2·pi · f_n·x + phi_n )
-    // with the frequencies f_n (rows of 'freq') and the phases phi_n (one column of 'phase' per generator)
+    // with the spatial frequencies f_n (rows of 'spatial_freq') and the phases phi_n (one column of 'phase' per generator)
     // The functions are documented in src/sos_*.cpp
 
-    // Frequencies and ACF of a predefined sum-of-sinusoids generator
+    // Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
     // - Presets: Exp, Gauss or Comb followed by the number of sinusoids 128, 256, 512 or 1024, e.g. "Comb256"
     template <typename dtype>
     void sos_preset(const std::string &name,          // Name of the preset, e.g. "Comb256"
-                    arma::Mat<dtype> &freq,           // Output: Frequencies in [1/m], [n_coeff, 3]
+                    arma::Mat<dtype> &spatial_freq,   // Output: Spatial frequencies in [1/m], [n_coeff, 3]
                     arma::Col<dtype> *acf = nullptr,  // Optional output: Target ACF, [200]
                     arma::Col<dtype> *dist = nullptr, // Optional output: Sample points of the ACF in [m], [200]
                     dtype dist_decorr = 10.0);        // Decorrelation distance in [m], must be > 0
@@ -53,7 +53,7 @@ namespace quadriga_lib
     // - One device (pos_b omitted), two devices on the same map (pos_b given, phase_b omitted; needs acf and dist)
     //   or two devices on different maps (pos_b and phase_b given)
     template <typename dtype>
-    void sos_val(const arma::Mat<dtype> &freq,              // Frequencies in [1/m], [n_coeff, n_dim]
+    void sos_val(const arma::Mat<dtype> &spatial_freq,      // Spatial frequencies in [1/m], [n_coeff, n_dim]
                  const arma::Mat<dtype> &phase,             // Phases in [rad], [n_coeff, n_gen]
                  const arma::Mat<dtype> &pos,               // Positions of the first device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
                  arma::Mat<dtype> &val,                     // Output: Values, [n_pos, n_gen]
@@ -61,14 +61,14 @@ namespace quadriga_lib
                  const arma::Mat<dtype> *phase_b = nullptr, // Optional: Phases of the second device in [rad], [n_coeff, n_gen]
                  const arma::Col<dtype> *acf = nullptr,     // Optional: Target ACF, [n_acf]
                  const arma::Col<dtype> *dist = nullptr,    // Optional: Sample points of the ACF in [m], [n_acf]
-                 dtype freq_scale_b = 1.0,                  // Frequency scale of the second device, d_first / d_second, must be > 0
+                 dtype spatial_freq_scale_b = 1.0,          // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
                  bool uniform = false,                      // Output distribution: false = Normal, true = Uniform in [0, 1]
                  int use_kernel = 0);                       // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
     // Spatially correlated random values on a regular grid
     // - One device; output in meshgrid order: map[g](iy, ix, iz) belongs to position {x(ix), y(iy), z(iz)}
     template <typename dtype>
-    void sos_map(const arma::Mat<dtype> &freq,          // Frequencies in [1/m], [n_coeff, n_dim]
+    void sos_map(const arma::Mat<dtype> &spatial_freq,  // Spatial frequencies in [1/m], [n_coeff, n_dim]
                  const arma::Mat<dtype> &phase,         // Phases in [rad], [n_coeff, n_gen]
                  const arma::Col<dtype> &x,             // Grid points on the x-axis in [m], [nx]
                  std::vector<arma::Cube<dtype>> &map,   // Output: Values, vector (n_gen) of cubes [ny, nx, nz]
@@ -111,7 +111,7 @@ namespace quadriga_lib
     // Remove the sample mean of the generators over a set of positions by a phase offset
     // - Closed form, one offset per generator (two with phase_b); same device modes as sos_val
     template <typename dtype>
-    void sos_remove_bias(const arma::Mat<dtype> &freq,            // Frequencies in [1/m], [n_coeff, n_dim]
+    void sos_remove_bias(const arma::Mat<dtype> &spatial_freq,    // Spatial frequencies in [1/m], [n_coeff, n_dim]
                          arma::Mat<dtype> &phase,                 // Phases in [rad], updated in-place, [n_coeff, n_gen]
                          const arma::Mat<dtype> &pos,             // Positions of the first device in [m], [n_pos, 1], [n_pos, 2] or [n_pos, 3]
                          const arma::Mat<dtype> *pos_b = nullptr, // Optional: Positions of the second device in [m], [n_pos_b, 1], [n_pos_b, 2] or [n_pos_b, 3]
@@ -120,7 +120,7 @@ namespace quadriga_lib
                          const arma::Col<dtype> *dist = nullptr,  // Optional: Sample points of the ACF in [m], [n_acf]
                          arma::Mat<dtype> *offset = nullptr,      // Optional output: Applied offsets in [rad], [n_gen, 1], or [n_gen, 2] with phase_b
                          arma::Mat<dtype> *mean_before = nullptr, // Optional output: Sample mean before the correction, [n_gen, 1]; with phase_b the mean of each device's own field, [n_gen, 2]
-                         dtype freq_scale_b = 1.0);               // Frequency scale of the second device, d_first / d_second, must be > 0
+                         dtype spatial_freq_scale_b = 1.0);       // Spatial-frequency scale of the second device, d_first / d_second, must be > 0
 
     // Target ACF on a 2-D grid
     // - Grid axis from -2·Dmax to 2·Dmax with the spacing of 'dist', Dmax = last sample point, n_grid = 4·n_acf - 3
@@ -133,7 +133,7 @@ namespace quadriga_lib
     // ACF produced by a set of sinusoids, on the grid axis of sos_acf_2d
     // - n_dim = 1: along the axis; n_dim = 2: x-y plane; n_dim = 3: x-y, x-z and y-z plane (slices 0, 1, 2)
     template <typename dtype>
-    void sos_acf_approx(const arma::Mat<dtype> &freq,         // Frequencies in [1/m], [n_coeff, n_dim]
+    void sos_acf_approx(const arma::Mat<dtype> &spatial_freq, // Spatial frequencies in [1/m], [n_coeff, n_dim]
                         const arma::Col<dtype> &dist,         // Sample points of the ACF in [m], [n_acf]
                         arma::Cube<dtype> &acf_approx,        // Output: Approximated ACF, see above
                         arma::Col<dtype> *dist_2d = nullptr); // Optional output: Grid axis in [m], [n_grid]
@@ -142,7 +142,7 @@ namespace quadriga_lib
     // - All errors are returned as -10·log10( mean squared error ), larger is better
     // - Return value: error along the test directions on the sample points 'dist'
     template <typename dtype>
-    dtype sos_calc_mse(const arma::Mat<dtype> &freq,         // Frequencies in [1/m], [n_coeff, n_dim]
+    dtype sos_calc_mse(const arma::Mat<dtype> &spatial_freq, // Spatial frequencies in [1/m], [n_coeff, n_dim]
                        const arma::Col<dtype> &acf,          // Target ACF, [n_acf]
                        const arma::Col<dtype> &dist,         // Sample points of the ACF in [m], equally spaced, [n_acf]
                        dtype *mse_core = nullptr,            // Optional output: Error within the core radius in [dB]
@@ -154,7 +154,7 @@ namespace quadriga_lib
     // Monte-Carlo estimate of the ACF of one generator
     // - Correlates the values at 2·n_pos random positions for all position pairs whose distance falls into a bin
     template <typename dtype>
-    void sos_acf_estimate(const arma::Mat<dtype> &freq,             // Frequencies in [1/m], [n_coeff, 3]
+    void sos_acf_estimate(const arma::Mat<dtype> &spatial_freq,     // Spatial frequencies in [1/m], [n_coeff, 3]
                           const arma::Col<dtype> &phase,            // Phases of the generator in [rad], [n_coeff]
                           const arma::Col<dtype> &bins,             // Bin centers in [m], >= 0, increasing, finite, [n_bin]
                           arma::uword n_pos,                        // Number of random positions per device, must be > 1
@@ -165,21 +165,21 @@ namespace quadriga_lib
                           const arma::Col<dtype> *dist = nullptr,   // Optional: Sample points of the ACF in [m], [n_acf]
                           arma::sword seed = -1);                   // Seed for the positions, -1 = system random device
 
-    // Find the frequencies of a sum-of-sinusoids generator for a given ACF
+    // Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
     // - Iterative fit, one sinusoid at a time; computation in double precision for both instantiations
     template <typename dtype>
     void sos_generate(const arma::Col<dtype> &acf,          // Target ACF, [n_acf]
                       const arma::Col<dtype> &dist,         // Sample points of the ACF in [m], [n_acf]
                       arma::uword n_coeff,                  // Number of sinusoids, must be > 0
-                      arma::Mat<dtype> &freq,               // Output: Frequencies in [1/m], [n_coeff, n_dim]
+                      arma::Mat<dtype> &spatial_freq,       // Output: Spatial frequencies in [1/m], [n_coeff, n_dim]
                       arma::Col<dtype> *ase = nullptr,      // Optional output: Mean squared error after each pass, linear, [n_pass]
                       arma::Mat<dtype> *test_dir = nullptr, // Optional output: Test directions in [rad], as in sos_calc_mse
                       arma::uword n_dim = 3,                // Number of dimensions, 1, 2 or 3
                       bool uniform_smp = true,              // Regular (true) or random (false) directions of the sinusoids
                       arma::uword n_dir = 10,               // Number of test directions, must be > 0
                       bool random_init = true,              // Start from random frequencies (true) or build up sinusoid by sinusoid (false)
-                      dtype freq_min = 0.0,                 // Lower limit of abs(f) in [1/m], 0 = none
-                      dtype freq_max = 0.0,                 // Upper limit of abs(f) in [1/m], 0 = 15 / max(dist)
+                      dtype spatial_freq_min = 0.0,         // Lower limit of abs(f) in [1/m], 0 = none
+                      dtype spatial_freq_max = 0.0,         // Upper limit of abs(f) in [1/m], 0 = 15 / max(dist)
                       arma::sword seed = -1);               // Seed, -1 = system random device
 }
 

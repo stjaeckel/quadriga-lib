@@ -77,7 +77,7 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
   | `coeff_im`         | Channel coefficients, imaginary part                                     | Size: `[n_rx, n_tx, n_path, n_snap]`  |
   | `delay`            | Propagation delays in seconds                                            | Size: `[n_rx, n_tx, n_path, n_snap]`  |
   | `path_gain`        | Path gain before antenna, linear scale                                   | Size: `[n_path, n_snap]`              |
-  | `center_frequency` | Center Frequency in Hz                                                   | Scalar                                |
+  | `center_freq` | Center Frequency in Hz                                                   | Scalar                                |
 
 ## See also:
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc">IEEE 802.11-03/940r4 - TGn Channel Models</a>

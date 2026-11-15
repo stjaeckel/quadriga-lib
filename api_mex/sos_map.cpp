@@ -17,19 +17,19 @@ Spatially correlated random values on a regular grid
 - Evaluates the generators of [[sos_val]] for one device at all combinations of the grid vectors
 - Output in meshgrid order: element `(iy, ix, iz, g)` belongs to the position
   `{x(ix), y(iy), z(iz)}` and to generator `g`, i.e. column `g` of `phase`
-- The number of grid vectors given must not exceed the number of columns of `freq`; an omitted or
+- The number of grid vectors given must not exceed the number of columns of `spatial_freq`; an omitted or
   empty `y` or `z` means a single sample at 0 on that axis
-- `z` can be given without `y` if `freq` has 3 columns
+- `z` can be given without `y` if `spatial_freq` has 3 columns
 - The values are those of [[sos_val]] at the grid points, bit for bit; kernels, accuracy and the
   Uniform mapping are described there
 
 ## Usage:
 ```
-map = quadriga_lib.sos_map( freq, phase, x, y, z, uniform, use_kernel );
+map = quadriga_lib.sos_map( spatial_freq, phase, x, y, z, uniform, use_kernel );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases; one column per generator; `[n_coeff, n_gen]`
 - **`x`** — Grid points on the x-axis; `[nx]`
 - **`y`** *(optional)* — Grid points on the y-axis; requires `n_dim >= 2`; omitted or empty = one
@@ -57,7 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
     const arma::mat phase = qd_mex_get_Mat<double>(prhs[1]);
     const arma::vec x = qd_mex_get_Col<double>(prhs[2]);
     const arma::vec y = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3]);
@@ -77,5 +77,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec *p_z = z.empty() ? nullptr : &z;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_map<double>(freq, phase, x, map, p_y, p_z, uniform, use_kernel));
+    CALL_QD(quadriga_lib::sos_map<double>(spatial_freq, phase, x, map, p_y, p_z, uniform, use_kernel));
 }

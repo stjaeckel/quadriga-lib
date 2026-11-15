@@ -100,10 +100,10 @@ lang: en-US
 | [sos_acf_estimate](#sos_acf_estimate) | Sum-of-sinusoids random number generator | Monte-Carlo estimate of the ACF of one generator |
 | [sos_acfi](#sos_acfi) | Sum-of-sinusoids random number generator | Target ACF at given distances |
 | [sos_calc_mse](#sos_calc_mse) | Sum-of-sinusoids random number generator | Approximation error of the ACF of a set of sinusoids |
-| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | Find the frequencies of a sum-of-sinusoids generator for a given ACF |
+| [sos_generate](#sos_generate) | Sum-of-sinusoids random number generator | Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF |
 | [sos_init_phases](#sos_init_phases) | Sum-of-sinusoids random number generator | Draw random phases for a set of sum-of-sinusoids generators |
 | [sos_map](#sos_map) | Sum-of-sinusoids random number generator | Spatially correlated random values on a regular grid |
-| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | Frequencies and ACF of a predefined sum-of-sinusoids generator |
+| [sos_preset](#sos_preset) | Sum-of-sinusoids random number generator | Spatial frequencies and ACF of a predefined sum-of-sinusoids generator |
 | [sos_rand](#sos_rand) | Sum-of-sinusoids random number generator | Spatially correlated Uniform distributed random numbers |
 | [sos_randi](#sos_randi) | Sum-of-sinusoids random number generator | Spatially correlated integer random numbers |
 | [sos_randn](#sos_randn) | Sum-of-sinusoids random number generator | Spatially correlated Normal distributed random numbers |
@@ -201,14 +201,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_combine_pattern) · [Python](qua
 
 ### Usage:
 ```matlab
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, ...
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq_new, azimuth_grid_new, ...
     elevation_grid_new, propagation_speed );
 ```
 
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [arrayant_generate](#arrayant_generate);
   a struct array may contain a frequency-dependent model
-- **`center_freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
+- **`freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
   recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
    entry's `center_freq` unchanged.
 - **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; strictly increasing; defaults to input grid
@@ -219,8 +219,8 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_n
 ### Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [arrayant_generate](#arrayant_generate). Single struct when both input and
-  `center_freq_new` describe a single frequency; struct array of size `numel(center_freq_new)` (or
-  `numel(arrayant_in)` when `center_freq_new` is omitted) otherwise.
+  `freq_new` describe a single frequency; struct array of size `numel(freq_new)` (or
+  `numel(arrayant_in)` when `freq_new` is omitted) otherwise.
 
 ### See also:
 - [arrayant_generate](#arrayant_generate) (for field layout in the arrayant struct)
@@ -461,8 +461,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadrig
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (a 1x1 struct and no `frequency`): up to 8 outputs. Multi-frequency mode (a struct array with
-  more than one entry, or `frequency` given): for each target frequency, the two entries whose center frequencies
+- Single-frequency mode (a 1x1 struct and no `freq_new`): up to 8 outputs. Multi-frequency mode (a struct array with
+  more than one entry, or `freq_new` given): for each target frequency, the two entries whose center frequencies
   bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
 - `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
 - NaN or infinite angles give NaN in all outputs of that angle and output, without an error
@@ -479,7 +479,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadrig
 
 % Multi-frequency mode
 [ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
-    element, orientation, element_pos, frequency, use_kernel );
+    element, orientation, element_pos, freq_new, use_kernel );
 ```
 
 ### Inputs:
@@ -493,7 +493,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadrig
   `[3, n_out, n_ang]`; default: no rotation
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
   positions of the arrayant
-- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
+- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
   of the entries
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
@@ -563,14 +563,14 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 Also in: [C++](quadriga_lib_api_cpp.md#generate_speaker) · [Python](quadriga_lib_api_python.md#generate_speaker)
 
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
-  directivity pattern in `e_theta_re` and `center_frequency` set to the corresponding frequency.
+  directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
   results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`.
-- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band
+- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band
   below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz.
 - Speed of sound assumed to be 343 m/s.
 - Driver models (`driver_type`):
@@ -590,7 +590,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#generate_speaker) · [Python](quadriga_li
 ```matlab
 arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upper_cutoff, ...
     lower_rolloff_slope, upper_rolloff_slope, sensitivity, radiation_type, hor_coverage, ...
-    ver_coverage, horn_control_freq, baffle_width, baffle_height, frequencies, ...
+    ver_coverage, horn_control_freq, baffle_width, baffle_height, center_freq, ...
     angular_resolution );
 ```
 
@@ -608,7 +608,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 - **`horn_control_freq`** - Horn pattern control frequency; `0` auto-derives from `radius`; default: 0
 - **`baffle_width`** - Baffle width; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** - Baffle height; used by `hemisphere` model; default: 0.25
-- **`frequencies`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
 - **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
 ### Outputs:
@@ -909,7 +909,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [Python](quadriga_l
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
   | `no_interact`      | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
   | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(no_interact)), n_snap]`|
-  | `center_frequency` | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
+  | `center_freq`      | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
   | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
 - **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
   **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
@@ -1164,7 +1164,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_parse) · [Python](quadriga_lib_
 - **`orig_names`** — Names of origin points; cell array of strings; `[no_orig]`
 - **`dest_names`** — Names of destination points; cell array of strings; `[no_dest]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Frequencies as stored in the file; GHz for EM mode (v4/v5), Hz for scalar mode (v6); single; `[no_freq]`
+- **`center_freq`** — Center frequencies in Hz; single; `[no_freq]`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[no_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles; single; `[no_cir, 3]`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[no_orig, 3]`
@@ -1372,7 +1372,7 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
   | `coeff_im`         | Channel coefficients, imaginary part                                     | Size: `[n_rx, n_tx, n_path, n_snap]`  |
   | `delay`            | Propagation delays in seconds                                            | Size: `[n_rx, n_tx, n_path, n_snap]`  |
   | `path_gain`        | Path gain before antenna, linear scale                                   | Size: `[n_path, n_snap]`              |
-  | `center_frequency` | Center Frequency in Hz                                                   | Scalar                                |
+  | `center_freq` | Center Frequency in Hz                                                   | Scalar                                |
 
 ### See also:
 - [IEEE 802.11-03/940r4 - TGn Channel Models](https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc)
@@ -1469,7 +1469,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq_in`), and output (`freq_out`)
+- Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to the nearest frequency entry on all four grids
@@ -1485,7 +1485,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
   (input index + 1); all other paths keep their order, shifted by one slot
-- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0, n_freq_out]`; with
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0, n_freq_new]`; with
   `add_fake_los_path = true` they hold only this zero-power LOS path, with the LOS delays per antenna pair
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
@@ -1502,7 +1502,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 ```matlab
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    freq_in, freq_out, use_absolute_delays, add_fake_los_path, propagation_speed );
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed );
 ```
 
 ### Inputs:
@@ -1510,26 +1510,26 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 - **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [arrayant_generate](#arrayant_generate)
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq_in]`
+- **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq]`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq_in]` (full pol) or
-  `[2, n_path, n_freq_in]` (scalar pressure)
+- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
+  `[2, n_path, n_freq]` (scalar pressure)
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`rx_pos`** — Receiver position, finite; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in, 1]`
-- **`freq_out`** — Target output frequencies; `[n_freq_out, 1]`
+- **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq, 1]`
+- **`freq_new`** — Target output frequencies; `[n_freq_new, 1]`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 
 ### Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_out]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_out]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_out, n_freq_out]`
+- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
+- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_out, n_freq_new]`
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)
@@ -1989,8 +1989,7 @@ rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. 
 two deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm_init_phases](#gbsm_init_phases), [gbsm_draw](#gbsm_draw)) and
 `method = 'quadriga'` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Units: frequencies in Hz, path loss
 in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file keys and
-`scenpar` fields have the units of the file comments (e.g. `PerClusterDS` in ns). Messages name the argument
-`center_freq` `center_frequency`.
+`scenpar` fields have the units of the file comments (e.g. `PerClusterDS` in ns).
 
 ---
 <a id="conf_file_list"></a>
@@ -2319,7 +2318,7 @@ Channel coefficients of one link at one frequency over one segment
 Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](quadriga_lib_api_python.md#gbsm.single_link_channel)
 
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
-  `rays.center_frequency(i_freq)`: per snapshot, the paths of [ssf_paths](#ssf_paths) at the snapshot positions with the link
+  `rays.center_freq(i_freq)`: per snapshot, the paths of [ssf_paths](#ssf_paths) at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (see Terms)
 - `'phase'`: [get_channels_planar](#get_channels_planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
   delays, path lengths and angles stay those of the ray-data positions. `'drift'`: [get_channels_spherical](#get_channels_spherical) with the
@@ -2352,11 +2351,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 - **`tx_array`**, **`rx_array`** — Structs containing the arrayant data with `n_tx` and `n_rx` ports; field layout
   as documented in [arrayant_generate](#arrayant_generate)
 - **`rays`** — Ray struct of the link, see [ssf_rays](#ssf_rays); `[1, 1]` struct
-- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
+- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_freq(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** — `'phase'`, `'drift'` or `'auto'` (see Terms; `'auto'` is `'drift'` for `'quadriga'` rays, which then
   need [ssf_scatterers](#ssf_scatterers)); default: `'auto'`
 - **`output`** — `'taps'` or `'rays'`; default: `'taps'`
-- **`i_freq`** — Frequency index in `rays.center_frequency`, 1-based; ray data of the TR methods hold one frequency: 1;
+- **`i_freq`** — Frequency index in `rays.center_freq`, 1-based; ray data of the TR methods hold one frequency: 1;
   default: 1
 - **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in [m]; `[n_snap, 3]` or `[1, 3]` (a `[3, 1]` column is rejected);
   default: the positions of `rays`
@@ -2368,7 +2367,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
   `false`
 
 ### Outputs:
-- **`chan`** — Channel struct, layout as documented in [hdf5_read_channel](#hdf5_read_channel): `center_frequency` scalar;
+- **`chan`** — Channel struct, layout as documented in [hdf5_read_channel](#hdf5_read_channel): `center_freq` scalar;
   `tx_position`, `rx_position` (the snapshot positions), `tx_orientation`, `rx_orientation` `[3, n_snap]`;
   `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
   (`'rays'`); `'rays'` also `path_gain`, `path_length`, `path_polarization`, `path_angles` and in `'drift'`
@@ -2926,7 +2925,7 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | --- | --- | --- | --- | --- |
 | `method` | string | char | `'38.901'`, `'38.901_MF'` or `'quadriga'`; GR power law and default mobility | yes |
 | `tx_pos`, `rx_pos` | `[3, 1]` | double | Tx and Rx position the ray data refer to in [m] | yes |
-| `center_frequency` | `[n_freq, 1]` | double | Carrier frequencies in [Hz] | yes |
+| `center_freq` | `[n_freq, 1]` | double | Carrier frequencies in [Hz] | yes |
 | `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |
@@ -3372,13 +3371,13 @@ Also in: [C++](quadriga_lib_api_cpp.md#generate_diffraction_paths) · Not in: Py
 
 ### Usage:
 ```matlab
-[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_frequency, lod );
+[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_freq, lod );
 ```
 
 ### Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_frequency`** — Center frequency in Hz
+- **`center_freq`** — Center frequency in Hz
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:
    | `lod` | `n_path` | `n_seg` | Note  |
    | :---: | -------: | ------: | ----: |
@@ -3704,14 +3703,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_mesh_interact) · Not in: Python
 ```matlab
 [ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
     edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
-    quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, orig, dest, mesh, ...
+    quadriga_lib.ray_mesh_interact( interaction_type, center_freq, orig, dest, mesh, ...
     mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
 ```
 
 ### Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction,
   3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_frequency`** — Center frequency
+- **`center_freq`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of
@@ -4017,24 +4016,24 @@ positions are shared: 20 generators take less than twice as long as one.
 
 ```matlab
 % Frequencies of a predefined generator for a decorrelation distance of 10 m
-[freq, acf, dist] = quadriga_lib.sos_preset('Comb256', 10);
+[spatial_freq, acf, dist] = quadriga_lib.sos_preset('Comb256', 10);
 
 % Phases of 20 generators; each column is one independent random field
-phase = quadriga_lib.sos_init_phases(size(freq, 1), 20, 42);
+phase = quadriga_lib.sos_init_phases(size(spatial_freq, 1), 20, 42);
 
 % Values of all 20 generators at the positions, size [1000, 20]
-val_all = quadriga_lib.sos_val(freq, phase, pos);
+val_all = quadriga_lib.sos_val(spatial_freq, phase, pos);
 
 % The same fields at other positions, at any later time
 pos_new = pos + 2.5;
-val_new = quadriga_lib.sos_val(freq, phase, pos_new);
+val_new = quadriga_lib.sos_val(spatial_freq, phase, pos_new);
 
 % Uniform distributed output
-val_uni = quadriga_lib.sos_val(freq, phase, pos, [], [], [], [], [], true);
+val_uni = quadriga_lib.sos_val(spatial_freq, phase, pos, [], [], [], [], [], true);
 
 % Map on a regular grid, size [n_y, n_x, 1, 20]
 x = 0:0.5:250;  y = 0:0.5:100;
-grid = quadriga_lib.sos_map(freq, phase, x, y);
+grid = quadriga_lib.sos_map(spatial_freq, phase, x, y);
 imagesc(x, y, grid(:, :, 1, 1));  axis xy;
 ```
 
@@ -4053,7 +4052,7 @@ imagesc(x, y, grid(:, :, 1, 1));  axis xy;
 % Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 pos_tx = pos;
 pos_rx = rand(1000, 3) * 100;
-val_link = quadriga_lib.sos_val(freq, phase, pos_tx, pos_rx, [], acf, dist);
+val_link = quadriga_lib.sos_val(spatial_freq, phase, pos_tx, pos_rx, [], acf, dist);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -4153,11 +4152,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acf_approx) · [Python](quadriga_lib_
 
 ### Usage:
 ```matlab
-[ acf_approx, dist_2d ] = quadriga_lib.sos_acf_approx( freq, dist );
+[ acf_approx, dist_2d ] = quadriga_lib.sos_acf_approx( spatial_freq, dist );
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; at least
   2 elements; `[n_acf]`
 
@@ -4198,12 +4197,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acf_estimate) · [Python](quadriga_li
 
 ### Usage:
 ```matlab
-[ acf_est, dist_est, acf_est_dual ] = quadriga_lib.sos_acf_estimate( freq, phase, bins, n_pos, ...
+[ acf_est, dist_est, acf_est_dual ] = quadriga_lib.sos_acf_estimate( spatial_freq, phase, bins, n_pos, ...
     acf, dist, seed );
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies; `[n_coeff, 3]`
 - **`phase`** — Phases of the generator; `[n_coeff]`
 - **`bins`** — Bin centers; must be >= 0, increase strictly and be finite; at least 2
   elements; `[n_bin]`
@@ -4283,12 +4282,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_calc_mse) · [Python](quadriga_lib_ap
 
 ### Usage:
 ```matlab
-[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( freq, acf, dist, ...
+[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( spatial_freq, acf, dist, ...
     n_dir );
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
 - **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; `[n_acf]`
 - **`n_dir`** — Number of test directions; must be > 0; ignored for `n_dim = 1`; default: 10
@@ -4308,7 +4307,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_calc_mse) · [Python](quadriga_lib_ap
 ---
 <a id="sos_generate"></a>
 ## sos_generate
-Find the frequencies of a sum-of-sinusoids generator for a given ACF
+Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
 
 Also in: [C++](quadriga_lib_api_cpp.md#sos_generate) · [Python](quadriga_lib_api_python.md#sos.generate)
 
@@ -4328,12 +4327,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_generate) · [Python](quadriga_lib_ap
   sinusoid by sinusoid in the first pass
 - The fit covers the range of `dist` only. The ACF of the result beyond the last sample point is
   not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
-  (see `acf_tail` of [sos_calc_mse](#sos_calc_mse)). To prevent this, set `freq_min`
-- `freq_min` and `freq_max` limit the magnitude of the frequency along the direction of each
+  (see `acf_tail` of [sos_calc_mse](#sos_calc_mse)). To prevent this, set `spatial_freq_min`
+- `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each
   sinusoid; 0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
-- The search grid has `( freq_max - freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
+- The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
   stored for all sample points. It must not have more than 100000 points (the default has 151),
-  which limits `freq_max - freq_min` to less than `10000 / max(dist)`
+  which limits `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse
   in others; the predefined tables of [sos_preset](#sos_preset) were made with 300
@@ -4343,8 +4342,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_generate) · [Python](quadriga_lib_ap
 
 ### Usage:
 ```matlab
-[ freq, ase, test_dir ] = quadriga_lib.sos_generate( acf, dist, n_coeff, n_dim, uniform_smp, ...
-    n_dir, random_init, freq_min, freq_max, seed );
+[ spatial_freq, ase, test_dir ] = quadriga_lib.sos_generate( acf, dist, n_coeff, n_dim, uniform_smp, ...
+    n_dir, random_init, spatial_freq_min, spatial_freq_max, seed );
 ```
 
 ### Inputs:
@@ -4356,15 +4355,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_generate) · [Python](quadriga_lib_ap
 - **`n_dir`** — Number of test directions; must be > 0; ignored for `n_dim = 1`; default: 10
 - **`random_init`** — Start from random frequencies (true) or build up sinusoid by sinusoid
   (false); default: true
-- **`freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
+- **`spatial_freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
   default: 0
-- **`freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
-  larger than `freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
+- **`spatial_freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
+  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
   grid, see above; default: 0
 - **`seed`** — Seed; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1
 
 ### Outputs:
-- **`freq`** — Frequencies; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `[n_coeff, n_dim]`
 - **`ase`** — Mean squared error over the test directions after each pass, linear scale; column
   vector; `[n_pass]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
@@ -4421,19 +4420,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_map) · [Python](quadriga_lib_api_pyt
 - Evaluates the generators of [sos_val](#sos_val) for one device at all combinations of the grid vectors
 - Output in meshgrid order: element `(iy, ix, iz, g)` belongs to the position
   `{x(ix), y(iy), z(iz)}` and to generator `g`, i.e. column `g` of `phase`
-- The number of grid vectors given must not exceed the number of columns of `freq`; an omitted or
+- The number of grid vectors given must not exceed the number of columns of `spatial_freq`; an omitted or
   empty `y` or `z` means a single sample at 0 on that axis
-- `z` can be given without `y` if `freq` has 3 columns
+- `z` can be given without `y` if `spatial_freq` has 3 columns
 - The values are those of [sos_val](#sos_val) at the grid points, bit for bit; kernels, accuracy and the
   Uniform mapping are described there
 
 ### Usage:
 ```matlab
-map = quadriga_lib.sos_map( freq, phase, x, y, z, uniform, use_kernel );
+map = quadriga_lib.sos_map( spatial_freq, phase, x, y, z, uniform, use_kernel );
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases; one column per generator; `[n_coeff, n_gen]`
 - **`x`** — Grid points on the x-axis; `[nx]`
 - **`y`** *(optional)* — Grid points on the y-axis; requires `n_dim >= 2`; omitted or empty = one
@@ -4454,7 +4453,7 @@ map = quadriga_lib.sos_map( freq, phase, x, y, z, uniform, use_kernel );
 ---
 <a id="sos_preset"></a>
 ## sos_preset
-Frequencies and ACF of a predefined sum-of-sinusoids generator
+Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
 
 Also in: [C++](quadriga_lib_api_cpp.md#sos_preset) · [Python](quadriga_lib_api_python.md#sos.preset)
 
@@ -4476,7 +4475,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_preset) · [Python](quadriga_lib_api_
 
 ### Usage:
 ```matlab
-[ freq, acf, dist ] = quadriga_lib.sos_preset( name, dist_decorr );
+[ spatial_freq, acf, dist ] = quadriga_lib.sos_preset( name, dist_decorr );
 ```
 
 ### Inputs:
@@ -4484,7 +4483,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_preset) · [Python](quadriga_lib_api_
 - **`dist_decorr`** — Decorrelation distance; must be > 0; default: 10
 
 ### Outputs:
-- **`freq`** — Frequencies; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies; `[n_coeff, 3]`
 - **`acf`** — Target ACF; `[200]`
 - **`dist`** — Sample points of the ACF; `[200]`
 
@@ -4700,7 +4699,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_remove_bias) · [Python](quadriga_lib
   zeroes the mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b_in` given): each device is treated on its
   own, `phase_in` with `pos` and `phase_b_in` with `pos_b` and the frequencies
-  `freq · freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
+  `spatial_freq · spatial_freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
   as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions.
   The variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the
@@ -4720,16 +4719,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_remove_bias) · [Python](quadriga_lib
 
 ### Usage:
 ```matlab
-[ phase_out, phase_b_out, offset, mean_before ] = quadriga_lib.sos_remove_bias( freq, phase_in, ...
-    pos, pos_b, phase_b_in, acf, dist, freq_scale_b );
+[ phase_out, phase_b_out, offset, mean_before ] = quadriga_lib.sos_remove_bias( spatial_freq, phase_in, ...
+    pos, pos_b, phase_b_in, acf, dist, spatial_freq_scale_b );
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase_in`** — Phases; one column per generator; `[n_coeff, n_gen]`
 - **`pos`** — Positions of the first device; one row per position; the number of columns sets the
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map,
   any number for different maps
@@ -4739,7 +4738,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_remove_bias) · [Python](quadriga_lib
   be > -1; `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`freq_scale_b`** — Frequency scale of the second device, i.e. decorrelation distance of the
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
   first device divided by that of the second; must be > 0; other than 1 requires `phase_b_in`;
   default: 1
 
@@ -4765,14 +4764,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_val) · [Python](quadriga_lib_api_pyt
 
 - Sum-of-sinusoids generator: at position `x` a generator with `n_coeff` sinusoids produces
   `s(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )`, with the frequencies `f_n` (rows of
-  `freq`, in cycles per meter) and the phases `phi_n` (one column of `phase`)
+  `spatial_freq`, in cycles per meter) and the phases `phi_n` (one column of `phase`)
 - For uniformly random phases, `s` has zero mean, unit variance and the autocorrelation function
   (ACF) `(1/n_coeff) · sum_n cos( 2·pi · f_n·dx )`, which approximates the target ACF the
   frequencies were fitted to; with many sinusoids the values are approximately Normal distributed
 - All generators of one call share the frequencies; each column of `phase` is one generator. The
   sines and cosines of the positions are computed once and reused for all generators
 - Positions are given as one row per position with the columns `{x, y, z}`; they may have fewer
-  columns than `freq`; missing coordinates are 0
+  columns than `spatial_freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
 - Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
   `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and
@@ -4780,10 +4779,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_val) · [Python](quadriga_lib_api_pyt
   The value does not change when the two devices swap their positions
 - Two devices on different maps (`pos_b` and `phase_b` given):
   `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
-  `freq · freq_scale_b`; `acf` and `dist` are ignored
+  `spatial_freq · spatial_freq_scale_b`; `acf` and `dist` are ignored
 - The mode follows from the arguments only; phase values are never compared. Passing the same
   matrix as `phase` and `phase_b` selects the two-map formula
-- `freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
+- `spatial_freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
   consistent ACF
 - Two devices on the same map need an ACF above -1 at all sample points, because the value is
   divided by `sqrt( 2 + 2·A(D) )`
@@ -4802,16 +4801,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_val) · [Python](quadriga_lib_api_pyt
 
 ### Usage:
 ```matlab
-val = quadriga_lib.sos_val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_scale_b, ...
+val = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase_b, acf, dist, spatial_freq_scale_b, ...
     uniform, use_kernel );
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases; one column per generator; `[n_coeff, n_gen]`
 - **`pos`** — Positions of the first device; one row per position; the number of columns sets the
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
   `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from
   `pos`
@@ -4821,7 +4820,7 @@ val = quadriga_lib.sos_val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_sc
   be > -1; `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`freq_scale_b`** — Frequency scale of the second device, i.e. decorrelation distance of the
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
   first device divided by that of the second; must be > 0; default: 1
 - **`uniform`** — Output distribution: false = Normal(0,1), true = Uniform between 0 and 1;
   default: false

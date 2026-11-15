@@ -41,15 +41,15 @@ template <typename T>
 static void run(fz::input &in)
 {
     // Frequencies: from a preset (up to 1024 x 3) or fuzzed (up to 16 x 4)
-    arma::Mat<T> freq;
+    arma::Mat<T> spatial_freq;
     arma::Col<T> acf, dist;
     if (in.ConsumeBool())
-        fz::clean([&] { quadriga_lib::sos_preset<T>(preset_name(in), freq, &acf, &dist, in.value<T>()); });
+        fz::clean([&] { quadriga_lib::sos_preset<T>(preset_name(in), spatial_freq, &acf, &dist, in.value<T>()); });
     else
-        freq = in.mat<T>(in.size(16), in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.size(4) : in.ConsumeIntegralInRange<arma::uword>(1, 3)),
+        spatial_freq = in.mat<T>(in.size(16), in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.size(4) : in.ConsumeIntegralInRange<arma::uword>(1, 3)),
         acf_table<T>(in, acf, dist);
-    if (in.ConsumeBool() && freq.n_rows > 16)
-        freq = freq.rows(0, in.ConsumeIntegralInRange<arma::uword>(0, 15));
+    if (in.ConsumeBool() && spatial_freq.n_rows > 16)
+        spatial_freq = spatial_freq.rows(0, in.ConsumeIntegralInRange<arma::uword>(0, 15));
     if (acf.n_elem > 16) // the 200 points of a preset make the 2-D grids slow
         acf.resize(in.size(16)), dist.resize(acf.n_elem);
 
@@ -57,9 +57,9 @@ static void run(fz::input &in)
     arma::Mat<T> phase, phase_b;
     const arma::uword n_gen = in.size(4);
     if (in.ConsumeBool())
-        fz::clean([&] { quadriga_lib::sos_init_phases<T>(freq.n_rows, n_gen, phase, seed(in)); });
+        fz::clean([&] { quadriga_lib::sos_init_phases<T>(spatial_freq.n_rows, n_gen, phase, seed(in)); });
     else
-        phase = in.mat<T>(in.ConsumeBool() ? freq.n_rows : in.size(17), n_gen);
+        phase = in.mat<T>(in.ConsumeBool() ? spatial_freq.n_rows : in.size(17), n_gen);
     phase_b = in.ConsumeBool() ? phase : in.mat<T>(phase.n_rows, in.ConsumeBool() ? phase.n_cols : in.size(4));
 
     // Positions with 1 to 3 columns (sometimes 0 or 4), up to 16 rows
@@ -90,7 +90,7 @@ static void run(fz::input &in)
         // val is a fresh matrix or one of the inputs
         arma::Mat<T> *out[] = {&val, &pos, &pos_b, &phase, &phase_b};
         arma::Mat<T> *v = out[in.ConsumeIntegralInRange<int>(0, 7) < 5 ? 0 : in.ConsumeIntegralInRange<int>(0, 4)];
-        fz::clean([&] { quadriga_lib::sos_val(freq, phase, pos, *v, use_b ? &pos_b : nullptr, use_phase_b ? &phase_b : nullptr,
+        fz::clean([&] { quadriga_lib::sos_val(spatial_freq, phase, pos, *v, use_b ? &pos_b : nullptr, use_phase_b ? &phase_b : nullptr,
                                               use_acf ? &acf : nullptr, use_acf ? &dist : nullptr, scale_b, uniform, kernel); });
         break;
     }
@@ -101,7 +101,7 @@ static void run(fz::input &in)
         if (in.ConsumeBool() && !map.empty())
             map[0].set_size(in.size(3), in.size(3), in.size(3));
         const int mode = in.ConsumeIntegralInRange<int>(0, 3);
-        fz::clean([&] { quadriga_lib::sos_map(freq, phase, x, map, mode & 1 ? &y : nullptr, mode & 2 ? &z : nullptr, uniform, kernel); });
+        fz::clean([&] { quadriga_lib::sos_map(spatial_freq, phase, x, map, mode & 1 ? &y : nullptr, mode & 2 ? &z : nullptr, uniform, kernel); });
         break;
     }
     case 3:
@@ -127,7 +127,7 @@ static void run(fz::input &in)
         arma::Mat<T> offset, mean_before;
         const int outs = in.ConsumeIntegralInRange<int>(0, 3);
         arma::Mat<T> *off = outs & 1 ? (in.ConsumeBool() ? &offset : &phase_b) : nullptr; // phase_b as output may clash
-        fz::clean([&] { quadriga_lib::sos_remove_bias(freq, phase, pos, use_b ? &pos_b : nullptr, use_phase_b ? &phase_b : nullptr,
+        fz::clean([&] { quadriga_lib::sos_remove_bias(spatial_freq, phase, pos, use_b ? &pos_b : nullptr, use_phase_b ? &phase_b : nullptr,
                                                       use_acf ? &acf : nullptr, use_acf ? &dist : nullptr, off,
                                                       outs & 2 ? &mean_before : nullptr, scale_b); });
         break;
@@ -143,7 +143,7 @@ static void run(fz::input &in)
     {
         arma::Cube<T> approx;
         arma::Col<T> d2;
-        fz::clean([&] { quadriga_lib::sos_acf_approx(freq, dist, approx, in.ConsumeBool() ? (in.ConsumeBool() ? &d2 : &dist) : nullptr); });
+        fz::clean([&] { quadriga_lib::sos_acf_approx(spatial_freq, dist, approx, in.ConsumeBool() ? (in.ConsumeBool() ? &d2 : &dist) : nullptr); });
         break;
     }
     case 7:
@@ -153,7 +153,7 @@ static void run(fz::input &in)
         arma::Mat<T> dir;
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
         const arma::uword n_dir = in.size(6);
-        fz::clean([&] { quadriga_lib::sos_calc_mse(freq, acf, dist, outs & 1 ? &core : nullptr, outs & 2 ? &all : nullptr,
+        fz::clean([&] { quadriga_lib::sos_calc_mse(spatial_freq, acf, dist, outs & 1 ? &core : nullptr, outs & 2 ? &all : nullptr,
                                                    outs & 4 ? (outs & 16 ? &acf : &tail) : nullptr, outs & 8 ? &dir : nullptr, n_dir); });
         break;
     }
@@ -165,14 +165,14 @@ static void run(fz::input &in)
         arma::Col<T> ph = phase.n_elem ? arma::Col<T>(phase.col(0)) : in.col<T>(in.size(17));
         const arma::uword n_pos = in.size(32);
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
-        fz::clean([&] { quadriga_lib::sos_acf_estimate(freq, ph, bins, n_pos, outs & 8 ? bins : est, outs & 1 ? &d_est : nullptr,
+        fz::clean([&] { quadriga_lib::sos_acf_estimate(spatial_freq, ph, bins, n_pos, outs & 8 ? bins : est, outs & 1 ? &d_est : nullptr,
                                                        outs & 2 ? &dual : nullptr, outs & 4 ? &acf : nullptr,
                                                        outs & 4 ? &dist : nullptr, seed(in)); });
         break;
     }
     case 9:
     {
-        // A search grid of at most a few hundred points: freq_max - freq_min below 30 / max(dist)
+        // A search grid of at most a few hundred points: spatial_freq_max - spatial_freq_min below 30 / max(dist)
         arma::Mat<T> f_out, dir;
         arma::Col<T> ase;
         const arma::uword n_coeff = in.size(8), n_dim = in.size(4), n_dir = in.size(4);
@@ -195,7 +195,7 @@ static void run(fz::input &in)
         arma::Mat<T> f;
         arma::Col<T> a, d;
         const uint8_t outs = in.ConsumeIntegral<uint8_t>();
-        fz::clean([&] { quadriga_lib::sos_preset<T>(preset_name(in), outs & 4 ? freq : f, outs & 1 ? &a : nullptr,
+        fz::clean([&] { quadriga_lib::sos_preset<T>(preset_name(in), outs & 4 ? spatial_freq : f, outs & 1 ? &a : nullptr,
                                                     outs & 2 ? &d : nullptr, in.value<T>()); });
         fz::clean([&] { quadriga_lib::sos_init_phases<T>(in.size(1100), in.size(5), phase, seed(in)); });
     }

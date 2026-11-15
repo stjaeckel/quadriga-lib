@@ -122,16 +122,16 @@ static void qd_sos_rand_impl(const arma::Col<dtype> &dist_decorr, const arma::Ma
         arma::mat v_local, *v_out = (n_grp == n_gen) ? qd_sos_double_output(val) : nullptr;
         arma::mat &v = (v_out != nullptr) ? *v_out : v_local;
 
-        const arma::mat freq = freq10 * (10.0 / da[g0]);
+        const arma::mat spatial_freq = freq10 * (10.0 / da[g0]);
         if (!two_devices)
-            quadriga_lib::sos_val<double>(freq, ph_a, pos_d, v, nullptr, nullptr, nullptr, nullptr, 1.0, uniform, 0);
+            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, nullptr, nullptr, nullptr, nullptr, 1.0, uniform, 0);
         else if (!two_maps)
         {
             const arma::vec dist = dist10 * (da[g0] / 10.0);
-            quadriga_lib::sos_val<double>(freq, ph_a, pos_d, v, &pos_b_d, nullptr, &acf, &dist, 1.0, uniform, 0);
+            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, &pos_b_d, nullptr, &acf, &dist, 1.0, uniform, 0);
         }
         else
-            quadriga_lib::sos_val<double>(freq, ph_a, pos_d, v, &pos_b_d, &ph_b, nullptr, nullptr, da[g0] / db[g0], uniform, 0);
+            quadriga_lib::sos_val<double>(spatial_freq, ph_a, pos_d, v, &pos_b_d, &ph_b, nullptr, nullptr, da[g0] / db[g0], uniform, 0);
 
         if (v_out != nullptr && imax == 0)
             continue;

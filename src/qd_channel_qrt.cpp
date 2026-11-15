@@ -298,7 +298,7 @@ Create a new QRT file and write its metadata header
 template <typename dtype>
 void quadriga_lib::qrt_file_init(
     const std::string &fn,
-    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &center_freq,
     const arma::Mat<dtype> &cir_pos,
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
@@ -310,7 +310,7 @@ void quadriga_lib::qrt_file_init(
 ## Inputs:
 - **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
   opened, so an invalid input throws and leaves an existing file unchanged)
-- **`freq`** — Frequencies in GHz (EM) or Hz (scalar); `[n_freq]`, 1 to 127 entries
+- **`center_freq`** — Center frequencies in Hz; `[n_freq]`, 1 to 127 entries; an EM file stores them in GHz
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[no_cir, 3]` or empty for none
 - **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[no_dest]`
@@ -325,7 +325,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::qrt_file_init(const std::string &fn,
-                                 const arma::Col<dtype> &freq,
+                                 const arma::Col<dtype> &center_freq,
                                  const arma::Mat<dtype> &cir_pos,
                                  const arma::Mat<dtype> &cir_orientation,
                                  const std::vector<std::string> &dest_names,
@@ -333,8 +333,8 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
                                  unsigned no_orig,
                                  bool scalar_mode)
 {
-    if (freq.n_elem == 0 || freq.n_elem > 127)
-        throw std::invalid_argument("qrt_file_init: 'freq' must hold 1..127 frequencies.");
+    if (center_freq.n_elem == 0 || center_freq.n_elem > 127)
+        throw std::invalid_argument("qrt_file_init: 'center_freq' must hold 1..127 frequencies.");
     if (no_orig == 0)
         throw std::invalid_argument("qrt_file_init: 'no_orig' must be at least 1.");
 
@@ -357,7 +357,7 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
             throw std::invalid_argument("qrt_file_init: RX name exceeds 255 characters.");
 
     unsigned no_dest = (unsigned)dest_names.size();
-    unsigned no_freq = (unsigned)freq.n_elem;
+    unsigned no_freq = (unsigned)center_freq.n_elem;
 
     // Write a dtype column as float, one element at a time.
     auto wr_col = [](std::ofstream &f, const dtype *src, unsigned n)
@@ -400,7 +400,9 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
     fileW.write((char *)&no_dest, sizeof(unsigned));
     fileW.write((char *)&no_freq, sizeof(unsigned));
 
-    wr_col(fileW, freq.memptr(), no_freq);
+    // EM files (v5) store the frequencies in GHz, scalar files (v6) in Hz
+    const arma::Col<dtype> freq_stored = scalar_mode ? center_freq : arma::Col<dtype>(center_freq / dtype(1.0e9));
+    wr_col(fileW, freq_stored.memptr(), no_freq);
 
     if (no_cir != 0)
     {
@@ -438,11 +440,11 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
         throw std::runtime_error("qrt_file_init: write error.");
 }
 
-template void quadriga_lib::qrt_file_init<float>(const std::string &fn, const arma::Col<float> &freq, const arma::Mat<float> &cir_pos,
+template void quadriga_lib::qrt_file_init<float>(const std::string &fn, const arma::Col<float> &center_freq, const arma::Mat<float> &cir_pos,
                                                  const arma::Mat<float> &cir_orientation, const std::vector<std::string> &dest_names,
                                                  const arma::u32_vec &cir_offset, unsigned no_orig, bool scalar_mode);
 
-template void quadriga_lib::qrt_file_init<double>(const std::string &fn, const arma::Col<double> &freq, const arma::Mat<double> &cir_pos,
+template void quadriga_lib::qrt_file_init<double>(const std::string &fn, const arma::Col<double> &center_freq, const arma::Mat<double> &cir_pos,
                                                   const arma::Mat<double> &cir_orientation, const std::vector<std::string> &dest_names,
                                                   const arma::u32_vec &cir_offset, unsigned no_orig, bool scalar_mode);
 
@@ -717,7 +719,7 @@ void quadriga_lib::qrt_file_parse(
     std::vector<std::string> *orig_names = nullptr,
     std::vector<std::string> *dest_names = nullptr,
     int *version = nullptr,
-    arma::fvec *freq = nullptr,
+    arma::fvec *center_freq = nullptr,
     arma::fmat *cir_pos = nullptr,
     arma::fmat *cir_orientation = nullptr,
     arma::fmat *orig_pos = nullptr,
@@ -738,7 +740,7 @@ void quadriga_lib::qrt_file_parse(
 - **`orig_names`** *(optional)* — Names of origin points; `[no_orig]`
 - **`dest_names`** *(optional)* — Names of destination points; `[no_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`freq`** *(optional)* — Frequencies as stored in the file; usually in GHz; `[no_freq]`
+- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[no_freq]`
 - **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[no_cir, 3]`
 - **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[no_orig, 3]`
@@ -754,7 +756,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
                                   std::vector<std::string> *orig_names,
                                   std::vector<std::string> *dest_names,
                                   int *version,
-                                  arma::fvec *freq,
+                                  arma::fvec *center_freq,
                                   arma::fmat *cir_pos,
                                   arma::fmat *cir_orientation,
                                   arma::fmat *orig_pos,
@@ -763,8 +765,8 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 {
     qd_check_alias_list({no_cir, no_orig, no_dest, no_freq}, {"no_cir", "no_orig", "no_dest", "no_freq"});
     qd_check_alias_list({orig_names, dest_names}, {"orig_names", "dest_names"});
-    qd_check_alias_list<arma::fmat>({freq, cir_pos, cir_orientation, orig_pos, orig_orientation},
-                                    {"freq", "cir_pos", "cir_orientation", "orig_pos", "orig_orientation"});
+    qd_check_alias_list<arma::fmat>({center_freq, cir_pos, cir_orientation, orig_pos, orig_orientation},
+                                    {"center_freq", "cir_pos", "cir_orientation", "orig_pos", "orig_orientation"});
 
     // Determine which stream to use and whether we own it
     std::ifstream local_stream;
@@ -957,7 +959,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
         }
     }
 
-    if (freq)
+    if (center_freq)
     {
         if (ver == 4 && l_no_orig != 0)
         {
@@ -973,7 +975,9 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
             fileR.read((char *)l_freq.memptr(), sizeof(float));
             qrt_check_stream(fileR);
         }
-        *freq = std::move(l_freq);
+        if (ver != 6) // EM files store GHz, scalar files (v6) Hz
+            l_freq *= 1.0e9f;
+        *center_freq = std::move(l_freq);
     }
 
     if (cir_pos)
@@ -1013,7 +1017,7 @@ void quadriga_lib::qrt_file_read(
     arma::uword i_cir = 0,
     arma::uword i_orig = 0,
     bool downlink = true,
-    arma::Col<dtype> *center_frequency = nullptr,
+    arma::Col<dtype> *center_freq = nullptr,
     arma::Col<dtype> *tx_pos = nullptr,
     arma::Col<dtype> *tx_orientation = nullptr,
     arma::Col<dtype> *rx_pos = nullptr,
@@ -1055,7 +1059,7 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]<br><br>
 
 ## Outputs:
-- **`center_frequency`** — Center frequency in Hz; `[n_freq]`
+- **`center_freq`** — Center frequency in Hz; `[n_freq]`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3]`
 - **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3]`
@@ -1098,7 +1102,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
-                                 arma::Col<dtype> *center_frequency, arma::Col<dtype> *tx_pos, arma::Col<dtype> *tx_orientation,
+                                 arma::Col<dtype> *center_freq, arma::Col<dtype> *tx_pos, arma::Col<dtype> *tx_orientation,
                                  arma::Col<dtype> *rx_pos, arma::Col<dtype> *rx_orientation,
                                  arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos,
                                  arma::Mat<dtype> *path_gain, arma::Col<dtype> *path_length, arma::Cube<dtype> *M,
@@ -1111,9 +1115,9 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
     // Outputs must be distinct and must not be part of the cache; 'coord' is a float matrix, like the outputs for
     // dtype = float
-    const arma::Mat<dtype> *out[] = {center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos,
+    const arma::Mat<dtype> *out[] = {center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos,
                                      path_gain, path_length, aod, eod, aoa, eoa};
-    const char *const name[] = {"center_frequency", "tx_pos", "tx_orientation", "rx_pos", "rx_orientation", "fbs_pos",
+    const char *const name[] = {"center_freq", "tx_pos", "tx_orientation", "rx_pos", "rx_orientation", "fbs_pos",
                                 "lbs_pos", "path_gain", "path_length", "aod", "eod", "aoa", "eoa"};
     auto check_cache = [cache](const auto *o, const char *n)
     {
@@ -1393,11 +1397,11 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     if (l_path_data_offset == 0)
     {
         // Positions/orientations already default to the reserved zeros; report no paths.
-        if (center_frequency)
+        if (center_freq)
         {
-            center_frequency->set_size(no_freq);
+            center_freq->set_size(no_freq);
             for (arma::uword k = 0; k < no_freq; ++k)
-                center_frequency->at(k) = v6 ? (dtype)p_freq[k] : (dtype)p_freq[k] * (dtype)1e9;
+                center_freq->at(k) = v6 ? (dtype)p_freq[k] : (dtype)p_freq[k] * (dtype)1e9;
         }
         if (tx_pos)
             tx_pos->zeros(3);
@@ -1522,12 +1526,12 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
             alpha_dB_per_m[i_freq] = qd_iso9613_alpha((double)p_freq[i_freq]);
 
-    // Output: center_frequency
-    if (center_frequency)
+    // Output: center_freq
+    if (center_freq)
     {
-        center_frequency->set_size(no_freq);
+        center_freq->set_size(no_freq);
         for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-            center_frequency->at(i_freq) = v6 ? (dtype)p_freq[i_freq] : (dtype)p_freq[i_freq] * (dtype)1e9;
+            center_freq->at(i_freq) = v6 ? (dtype)p_freq[i_freq] : (dtype)p_freq[i_freq] * (dtype)1e9;
     }
 
     // Output: positions
@@ -1750,7 +1754,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 }
 
 template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
-                                          arma::Col<float> *center_frequency, arma::Col<float> *tx_pos, arma::Col<float> *tx_orientation,
+                                          arma::Col<float> *center_freq, arma::Col<float> *tx_pos, arma::Col<float> *tx_orientation,
                                           arma::Col<float> *rx_pos, arma::Col<float> *rx_orientation,
                                           arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos,
                                           arma::Mat<float> *path_gain, arma::Col<float> *path_length, arma::Cube<float> *M,
@@ -1759,7 +1763,7 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_c
                                           std::vector<uint8_t> *interact_type, std::ifstream *file, const qrt_read_cache *cache);
 
 template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
-                                          arma::Col<double> *center_frequency, arma::Col<double> *tx_pos, arma::Col<double> *tx_orientation,
+                                          arma::Col<double> *center_freq, arma::Col<double> *tx_pos, arma::Col<double> *tx_orientation,
                                           arma::Col<double> *rx_pos, arma::Col<double> *rx_orientation,
                                           arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos,
                                           arma::Mat<double> *path_gain, arma::Col<double> *path_length, arma::Cube<double> *M,
@@ -1972,7 +1976,7 @@ Path objects of one CIR from spherical path data, for qrt_file_append
 ## Declaration:
 ```
 std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::vec &tx_pos,
     const arma::vec &rx_pos,
     const arma::mat &fbs_pos,
@@ -1984,7 +1988,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 ```
 
 ## Inputs:
-- **`center_frequency`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
+- **`center_freq`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
 - **`tx_pos`** — Tx (origin) position in [m]; `[3]`
 - **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
@@ -2001,7 +2005,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - [[gbsm_rays_from_paths]] (ray data from the paths read back)
 MD!*/
 
-std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const arma::vec &center_frequency,
+std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const arma::vec &center_freq,
                                                                         const arma::vec &tx_pos,
                                                                         const arma::vec &rx_pos,
                                                                         const arma::mat &fbs_pos,
@@ -2011,11 +2015,11 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
                                                                         const arma::u32_vec &path_type,
                                                                         arma::uword i_cir)
 {
-    const arma::uword n_freq = center_frequency.n_elem, n_path = fbs_pos.n_cols;
+    const arma::uword n_freq = center_freq.n_elem, n_path = fbs_pos.n_cols;
     if (n_freq == 0 || n_freq > 127)
-        throw std::invalid_argument("Input 'center_frequency' must have 1 to 127 elements.");
-    if (!center_frequency.is_finite() || arma::any(center_frequency <= 0.0))
-        throw std::invalid_argument("Input 'center_frequency' must be finite and > 0.");
+        throw std::invalid_argument("Input 'center_freq' must have 1 to 127 elements.");
+    if (!center_freq.is_finite() || arma::any(center_freq <= 0.0))
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
     auto check_pos = [](const arma::vec &x, const std::string &name)
     {
         if (x.n_elem != 3)
@@ -2060,7 +2064,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
     // Amplitude of the inverse free-space loss at 1 m that qrt_file_read applies, per frequency
     arma::vec a_1m(n_freq);
     for (arma::uword f = 0; f < n_freq; ++f)
-        a_1m(f) = std::pow(10.0, -0.05 * qd_gain_at_1m(center_frequency(f), false));
+        a_1m(f) = std::pow(10.0, -0.05 * qd_gain_at_1m(center_freq(f), false));
 
     const float Tf[3] = {(float)T[0], (float)T[1], (float)T[2]}, Rf[3] = {(float)R[0], (float)R[1], (float)R[2]};
     std::vector<quadriga_lib::path> out(n_path);

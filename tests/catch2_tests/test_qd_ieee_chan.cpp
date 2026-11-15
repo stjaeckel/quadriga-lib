@@ -95,7 +95,7 @@ TEST_CASE("IEEE Chan - A + 1user + Xpol")
     REQUIRE(chan[0].n_snap() == 1);
     REQUIRE(chan[0].path_gain[0].n_elem == 2);
 
-    CHECK(chan[0].center_frequency[0] == 5.25e9);
+    CHECK(chan[0].center_freq[0] == 5.25e9);
 
     // Both paths should have equal power at KF = 0 dB
     CHECK(std::abs(chan[0].path_gain[0][0] - chan[0].path_gain[0][1]) < 1e-20);
@@ -151,8 +151,8 @@ TEST_CASE("IEEE Chan - A + 2user + Steering")
     REQUIRE(chan[1].n_snap() == 1);
     REQUIRE(chan[1].path_gain[0].n_elem == 2);
 
-    CHECK(chan[0].center_frequency[0] == 2.4e9);
-    CHECK(chan[1].center_frequency[0] == 2.4e9);
+    CHECK(chan[0].center_freq[0] == 2.4e9);
+    CHECK(chan[1].center_freq[0] == 2.4e9);
 
     // Check receiver positions and orientations
     double aod_deg = -78.0189;  // From TGac doc.: IEEE 802.11-09/0308r12
@@ -238,7 +238,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     arma::uvec n_floors = {0, 0, 1};
 
     auto ant = quadriga_lib::generate_arrayant_ula<double>(4, 2.4e9, 0.5, nullptr, 30.0);
-    auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", ant.center_frequency,
+    auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", ant.center_freq,
                                                        tap_spacing_s, n_users, observation_time, update_rate,
                                                        speed_station_kmh, speed_env_kmh, Dist_m, n_floors);
 

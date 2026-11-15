@@ -138,7 +138,7 @@ TEST_CASE("Generate Arrayant - 3GPP")
     float gain = pattern.e_theta_re.at(90, 180, 0);
     gain = std::sqrt(2.0 * gain * gain);
 
-    ant = quadriga_lib::generate_arrayant_3GPP<float>(2, 2, pattern.center_frequency,
+    ant = quadriga_lib::generate_arrayant_3GPP<float>(2, 2, pattern.center_freq,
                                                       4, 0.0, 0.5, 1, 1, 0.0, 0.0, &pattern);
     CHECK(ant.n_elements() == 6);
 
@@ -280,7 +280,7 @@ TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a c
     p.element_pos = {{0.3, 0.3}, {0.0, 0.0}, {0.7, -0.7}};
     p.coupling_re = arma::mat(2, 1, arma::fill::ones); // 2 elements -> 1 port
     p.coupling_im = arma::mat(2, 1, arma::fill::zeros);
-    p.center_frequency = 1e9;
+    p.center_freq = 1e9;
 
     const double lambda = 299792458.0 / 3e9;
     auto u = quadriga_lib::generate_arrayant_ula<double>(2, 3e9, 0.5, &p);
@@ -292,7 +292,7 @@ TEST_CASE("Generate Arrayant - ULA and 3GPP ignore positions and coupling of a c
     CHECK(arma::all(u.element_pos.row(2) == 0.0));
     arma::rowvec y = {-0.25 * lambda, -0.25 * lambda, 0.25 * lambda, 0.25 * lambda};
     CHECK(arma::approx_equal(u.element_pos.row(1), y, "absdiff", 1e-12));
-    CHECK(u.center_frequency == 3e9);
+    CHECK(u.center_freq == 3e9);
 
     auto g = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3e9, 1, 0.0, 0.5, 1, 1, 0.5, 0.5, &p);
     CHECK(g.n_elements() == 2);

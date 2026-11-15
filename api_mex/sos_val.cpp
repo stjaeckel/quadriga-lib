@@ -59,24 +59,24 @@ positions are shared: 20 generators take less than twice as long as one.
 
 ```
 % Frequencies of a predefined generator for a decorrelation distance of 10 m
-[freq, acf, dist] = quadriga_lib.sos_preset('Comb256', 10);
+[spatial_freq, acf, dist] = quadriga_lib.sos_preset('Comb256', 10);
 
 % Phases of 20 generators; each column is one independent random field
-phase = quadriga_lib.sos_init_phases(size(freq, 1), 20, 42);
+phase = quadriga_lib.sos_init_phases(size(spatial_freq, 1), 20, 42);
 
 % Values of all 20 generators at the positions, size [1000, 20]
-val_all = quadriga_lib.sos_val(freq, phase, pos);
+val_all = quadriga_lib.sos_val(spatial_freq, phase, pos);
 
 % The same fields at other positions, at any later time
 pos_new = pos + 2.5;
-val_new = quadriga_lib.sos_val(freq, phase, pos_new);
+val_new = quadriga_lib.sos_val(spatial_freq, phase, pos_new);
 
 % Uniform distributed output
-val_uni = quadriga_lib.sos_val(freq, phase, pos, [], [], [], [], [], true);
+val_uni = quadriga_lib.sos_val(spatial_freq, phase, pos, [], [], [], [], [], true);
 
 % Map on a regular grid, size [n_y, n_x, 1, 20]
 x = 0:0.5:250;  y = 0:0.5:100;
-grid = quadriga_lib.sos_map(freq, phase, x, y);
+grid = quadriga_lib.sos_map(spatial_freq, phase, x, y);
 imagesc(x, y, grid(:, :, 1, 1));  axis xy;
 ```
 
@@ -95,7 +95,7 @@ imagesc(x, y, grid(:, :, 1, 1));  axis xy;
 % Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 pos_tx = pos;
 pos_rx = rand(1000, 3) * 100;
-val_link = quadriga_lib.sos_val(freq, phase, pos_tx, pos_rx, [], acf, dist);
+val_link = quadriga_lib.sos_val(spatial_freq, phase, pos_tx, pos_rx, [], acf, dist);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -148,14 +148,14 @@ Spatially correlated random values at given positions
 
 - Sum-of-sinusoids generator: at position `x` a generator with `n_coeff` sinusoids produces
   `s(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )`, with the frequencies `f_n` (rows of
-  `freq`, in cycles per meter) and the phases `phi_n` (one column of `phase`)
+  `spatial_freq`, in cycles per meter) and the phases `phi_n` (one column of `phase`)
 - For uniformly random phases, `s` has zero mean, unit variance and the autocorrelation function
   (ACF) `(1/n_coeff) · sum_n cos( 2·pi · f_n·dx )`, which approximates the target ACF the
   frequencies were fitted to; with many sinusoids the values are approximately Normal distributed
 - All generators of one call share the frequencies; each column of `phase` is one generator. The
   sines and cosines of the positions are computed once and reused for all generators
 - Positions are given as one row per position with the columns `{x, y, z}`; they may have fewer
-  columns than `freq`; missing coordinates are 0
+  columns than `spatial_freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
 - Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
   `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and
@@ -163,10 +163,10 @@ Spatially correlated random values at given positions
   The value does not change when the two devices swap their positions
 - Two devices on different maps (`pos_b` and `phase_b` given):
   `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
-  `freq · freq_scale_b`; `acf` and `dist` are ignored
+  `spatial_freq · spatial_freq_scale_b`; `acf` and `dist` are ignored
 - The mode follows from the arguments only; phase values are never compared. Passing the same
   matrix as `phase` and `phase_b` selects the two-map formula
-- `freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
+- `spatial_freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
   consistent ACF
 - Two devices on the same map need an ACF above -1 at all sample points, because the value is
   divided by `sqrt( 2 + 2·A(D) )`
@@ -185,16 +185,16 @@ Spatially correlated random values at given positions
 
 ## Usage:
 ```
-val = quadriga_lib.sos_val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_scale_b, ...
+val = quadriga_lib.sos_val( spatial_freq, phase, pos, pos_b, phase_b, acf, dist, spatial_freq_scale_b, ...
     uniform, use_kernel );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases; one column per generator; `[n_coeff, n_gen]`
 - **`pos`** — Positions of the first device; one row per position; the number of columns sets the
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device; omitted or empty = one device;
   `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from
   `pos`
@@ -204,7 +204,7 @@ val = quadriga_lib.sos_val( freq, phase, pos, pos_b, phase_b, acf, dist, freq_sc
   be > -1; `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`freq_scale_b`** — Frequency scale of the second device, i.e. decorrelation distance of the
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
   first device divided by that of the second; must be > 0; default: 1
 - **`uniform`** — Output distribution: false = Normal(0,1), true = Uniform between 0 and 1;
   default: false
@@ -230,14 +230,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
     const arma::mat phase = qd_mex_get_Mat<double>(prhs[1]);
     const arma::mat pos = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat pos_b = (nrhs < 4) ? arma::mat() : qd_mex_get_Mat<double>(prhs[3]);
     const arma::mat phase_b = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4]);
     const arma::vec acf = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
     const arma::vec dist = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6]);
-    const double freq_scale_b = (nrhs < 8) ? 1.0 : qd_mex_get_scalar<double>(prhs[7], "freq_scale_b", 1.0);
+    const double spatial_freq_scale_b = (nrhs < 8) ? 1.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_scale_b", 1.0);
     const bool uniform = (nrhs < 9) ? false : qd_mex_get_scalar<bool>(prhs[8], "uniform", false);
     const int use_kernel = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "use_kernel", 0);
 
@@ -253,5 +253,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec *p_dist = dist.empty() ? nullptr : &dist;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_val<double>(freq, phase, pos, val, p_pos_b, p_phase_b, p_acf, p_dist, freq_scale_b, uniform, use_kernel));
+    CALL_QD(quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val, p_pos_b, p_phase_b, p_acf, p_dist, spatial_freq_scale_b, uniform, use_kernel));
 }

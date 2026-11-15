@@ -412,7 +412,7 @@ template void quadriga_lib::arrayant_calc_directivity(const arrayant<double> &, 
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output element per port (column) of the coupling matrix
-- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_frequency` and `d` the distance
+- The element positions add the phase `-2 pi f d / propagation_speed` with `f = center_freq` and `d` the distance
   of the element from the wavefront plane through the origin; the default speed of light applies to radio waves, use
   about 343 m/s for acoustic arrays (e.g. from [[generate_speaker]])
 - Empty `element_pos` counts as zeros, empty coupling as identity
@@ -497,7 +497,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const array
                                             V_re, V_im, H_re, H_im, &dist, nullptr, nullptr, nullptr, 1);
 
     // Apply phase shift caused by element positions
-    double lambda = (double)propagation_speed / (double)ant.center_frequency;
+    double lambda = (double)propagation_speed / (double)ant.center_freq;
     dtype wave_no = dtype(2.0 * arma::datum::pi / lambda);
     arma::Mat<std::complex<dtype>> phase(arma::cos(wave_no * dist), arma::sin(-wave_no * dist));
     arma::Mat<std::complex<dtype>> Vi(V_re, V_im), Hi(H_re, H_im);
@@ -549,7 +549,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_combine_pattern(const array
         output.element_pos.zeros();
         output.coupling_re.eye();
         output.coupling_im.zeros();
-        output.center_frequency = ant.center_frequency;
+        output.center_freq = ant.center_freq;
         output.name = ant.name;
 
         qd_arrayant_mark_valid(output);
@@ -566,7 +566,7 @@ template quadriga_lib::arrayant<double> quadriga_lib::arrayant_combine_pattern(c
 Concatenate the elements of two arrayants into a new arrayant
 
 - Both arrays must share identical sampling grids; throws otherwise
-- Coupling is block-diagonal (see [[arrayant_concat_multi]] diagram); name and center_frequency are taken from `ant_1`
+- Coupling is block-diagonal (see [[arrayant_concat_multi]] diagram); name and center_freq are taken from `ant_1`
 - An empty `element_pos` counts as zeros, an empty `coupling_re` as identity (one port per element), an empty
   `coupling_im` as zeros
 
@@ -627,7 +627,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant_concat(const arrayant<dtype
         std::memcpy(output.element_pos.colptr(0), ant_1.element_pos.memptr(), 3 * n_elements_1 * sizeof(dtype));
 
     // Inherit scalar/string metadata from ant_1
-    output.center_frequency = ant_1.center_frequency;
+    output.center_freq = ant_1.center_freq;
     output.name = ant_1.name;
 
     // Copy data from second antenna
@@ -1285,7 +1285,7 @@ Rotate antenna radiation patterns using Euler rotations, in place
 - Rotates the pattern and/or polarization by the orientation (bank, tilt, heading); the rotated pattern equals what
   [[arrayant_interpolate]] returns for the unrotated pattern with the same `orientation`
 - A positive tilt turns the main beam down (downtilt), as in 3GPP TR 38.901
-- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_frequency` and `name` are kept
+- Element positions are rotated with the pattern (usage 0, 1, 3 and 4); coupling, `center_freq` and `name` are kept
 - Usage 0 and 1 adjust the sampling grid for non-uniformly sampled antennas; this needs all elements, so a subset
   in `i_element` throws when the grid must be adjusted
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects
@@ -1665,7 +1665,7 @@ unsigned quadriga_lib::qdant_write(const std::string &fn, const arrayant<dtype> 
     unsigned id_in_file = 0;
     error_message = qd_arrayant_qdant_write(fn, id, &ant.name, &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
                                             &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
-                                            &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
+                                            &ant.coupling_re, &ant.coupling_im, &ant.center_freq,
                                             layout == nullptr ? &layout_empty : layout, &id_in_file);
 
     if (error_message.length() != 0)

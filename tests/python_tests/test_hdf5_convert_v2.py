@@ -41,6 +41,9 @@ script = os.path.join(current_dir, '../../tools/hdf5_convert_v2.py')
 data_dir = os.path.join(current_dir, '../data')
 fixtures = ('hdf5_v2_written.hdf5', 'hdf5_v2_edited.hdf5', 'hdf5_v2_lossy.hdf5')
 
+# Channel dict keys renamed since release 0.12.4, which wrote the oracle: {current key: oracle key}
+oracle_key = {'center_freq': 'center_frequency'}
+
 
 def slot_index(s, dims):
     nx, ny, nz = (int(n) for n in dims[:3])
@@ -140,8 +143,9 @@ class test_case(unittest.TestCase):
             self.assertEqual(chan, [], key)
         else:
             self.assertEqual(len(chan), 1, key)
-            self.assertEqual(list(chan[0]), list(o[key + 'chan_keys']), key)
-            for k, v in chan[0].items():
+            self.assertEqual([oracle_key.get(k, k) for k in chan[0]], list(o[key + 'chan_keys']), key)
+            for k_new, v in chan[0].items():
+                k = oracle_key.get(k_new, k_new)
                 if key + 'chan/' + k in o:
                     self.assert_value(v, o[key + 'chan/' + k], key + k)
                     continue

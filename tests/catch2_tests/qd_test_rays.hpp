@@ -216,9 +216,9 @@ namespace
 
         quadriga_lib::gbsm_rays r;
         r.method = method, r.tx_pos = T, r.rx_pos = R;
-        r.center_frequency.set_size(n_freq);
+        r.center_freq.set_size(n_freq);
         for (arma::uword k = 0; k < n_freq; ++k)
-            r.center_frequency(k) = 3.5e9 + 4.5e9 * (double)k;
+            r.center_freq(k) = 3.5e9 + 4.5e9 * (double)k;
         r.delay.zeros(n_ray), r.power.zeros(n_ray, n_freq), r.M.zeros(8, n_ray, n_freq);
         r.aod.zeros(n_ray), r.eod.zeros(n_ray), r.aoa.zeros(n_ray), r.eoa.zeros(n_ray);
         r.path_type.zeros(n_ray), r.tap.zeros(n_ray);
@@ -459,7 +459,7 @@ namespace
         auto eq = [](const auto &x, const auto &y)
         { return arma::size(x) == arma::size(y) && arma::all(arma::vectorise(x) == arma::vectorise(y)); };
         return a.method == b.method && eq(a.tx_pos, b.tx_pos) && eq(a.rx_pos, b.rx_pos) &&
-               eq(a.center_frequency, b.center_frequency) && eq(a.delay, b.delay) && eq(a.power, b.power) &&
+               eq(a.center_freq, b.center_freq) && eq(a.delay, b.delay) && eq(a.power, b.power) &&
                eq(a.aod, b.aod) && eq(a.eod, b.eod) && eq(a.aoa, b.aoa) && eq(a.eoa, b.eoa) && eq(a.M, b.M) &&
                eq(a.path_type, b.path_type) && eq(a.tap, b.tap) && eq(a.gr_eps_re, b.gr_eps_re) &&
                eq(a.gr_eps_im, b.gr_eps_im) && a.fbs_pos.empty() && b.fbs_pos.empty() && a.lbs_pos.empty() &&

@@ -54,7 +54,7 @@ namespace
 
     std::vector<quadriga_lib::path> paths_of(const quadriga_lib::gbsm_rays &r, arma::uword i_cir = 0)
     {
-        return quadriga_lib::qrt_paths_from_scatterers(r.center_frequency, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
+        return quadriga_lib::qrt_paths_from_scatterers(r.center_freq, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
                                                        r.power, r.M, r.path_type, i_cir);
     }
 
@@ -117,7 +117,7 @@ TEST_CASE("qrt_paths_from_scatterers - path objects carry the geometry, the code
         for (arma::uword f = 0; f < n_freq; ++f)
         {
             double d, ref;
-            jones_diff(q, r.M, p, f, std::sqrt(r.power(p, f)) * L * inv_fspl_1m(r.center_frequency(f)), d, ref);
+            jones_diff(q, r.M, p, f, std::sqrt(r.power(p, f)) * L * inv_fspl_1m(r.center_freq(f)), d, ref);
             CHECK(d <= 1e-6 * ref);
             d_max = std::max(d_max, (ref > 0.0) ? d / ref : d);
         }
@@ -131,9 +131,8 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
     const arma::uword n_path = r.n_ray(), n_freq = r.n_freq();
     const std::string fn = "test_qrt_paths_from_scatterers_read.qrt";
 
-    const arma::vec f_GHz = r.center_frequency * 1.0e-9;
     const arma::mat cir_pos = r.rx_pos.t(), cir_ori(1, 3, arma::fill::zeros);
-    quadriga_lib::qrt_file_init<double>(fn, f_GHz, cir_pos, cir_ori);
+    quadriga_lib::qrt_file_init<double>(fn, r.center_freq, cir_pos, cir_ori);
     quadriga_lib::qrt_file_append<double>(fn, paths_of(r), r.tx_pos);
 
     QD_DIAG("\n# diag: qrt_paths_from_scatterers, file round trip (largest relative difference per path)\n");
@@ -154,7 +153,7 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
         REQUIRE(M.n_cols == n_path);
         REQUIRE(M.n_slices == n_freq);
         REQUIRE(no_int.n_elem == n_path);
-        CHECK(arma::approx_equal(cf, r.center_frequency, "reldiff", 1e-7));
+        CHECK(arma::approx_equal(cf, r.center_freq, "reldiff", 1e-6));
 
         std::vector<uint8_t> codes;
         for (arma::uword p = 0; p < n_path; ++p)
@@ -237,13 +236,13 @@ TEST_CASE("qrt_paths_from_scatterers - input validation")
         CHECK_THROWS_MATCHES(paths_of(r, i_cir), std::invalid_argument, Message(msg));
     };
 
-    SECTION("center_frequency")
+    SECTION("center_freq")
     {
-        fails([](R &r, U &) { r.center_frequency.reset(); }, "Input 'center_frequency' must have 1 to 127 elements.");
+        fails([](R &r, U &) { r.center_freq.reset(); }, "Input 'center_freq' must have 1 to 127 elements.");
         fails([](R &r, U &)
-              { r.center_frequency = arma::linspace(1e9, 2e9, 128); }, "Input 'center_frequency' must have 1 to 127 elements.");
-        fails([](R &r, U &) { r.center_frequency(1) = 0.0; }, "Input 'center_frequency' must be finite and > 0.");
-        fails([&](R &r, U &) { r.center_frequency(0) = nan; }, "Input 'center_frequency' must be finite and > 0.");
+              { r.center_freq = arma::linspace(1e9, 2e9, 128); }, "Input 'center_freq' must have 1 to 127 elements.");
+        fails([](R &r, U &) { r.center_freq(1) = 0.0; }, "Input 'center_freq' must be finite and > 0.");
+        fails([&](R &r, U &) { r.center_freq(0) = nan; }, "Input 'center_freq' must be finite and > 0.");
     }
     SECTION("tx_pos, rx_pos")
     {

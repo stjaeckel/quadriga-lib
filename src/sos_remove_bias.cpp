@@ -34,7 +34,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 - Two devices on the same map (`pos_b` given, `phase_b` omitted): one offset per generator that zeroes the
   mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
-  with `pos` and `phase_b` with `pos_b` and the frequencies `freq · freq_scale_b`; two offsets per generator.
+  with `pos` and `phase_b` with `pos_b` and the frequencies `spatial_freq · spatial_freq_scale_b`; two offsets per generator.
   The mean of the combined value is then zero as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
@@ -57,7 +57,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 ## Declaration:
 ```
 void quadriga_lib::sos_remove_bias(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
     const arma::Mat<dtype> *pos_b = nullptr,
@@ -66,15 +66,15 @@ void quadriga_lib::sos_remove_bias(
     const arma::Col<dtype> *dist = nullptr,
     arma::Mat<dtype> *offset = nullptr,
     arma::Mat<dtype> *mean_before = nullptr,
-    dtype freq_scale_b = 1.0);
+    dtype spatial_freq_scale_b = 1.0);
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases in [rad]; one column per generator; updated in-place; `[n_coeff, n_gen]`
 - **`pos`** — Positions of the first device in [m]; one row per position; the number of columns sets the
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device in [m]; omitted or empty = one device;
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
   number for different maps
@@ -84,7 +84,7 @@ void quadriga_lib::sos_remove_bias(
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`freq_scale_b`** *(optional)* — Frequency scale of the second device, i.e. decorrelation distance of
+- **`spatial_freq_scale_b`** *(optional)* — Spatial-frequency scale of the second device, i.e. decorrelation distance of
   the first device divided by that of the second; must be > 0; other than 1 requires `phase_b`
 
 ## Outputs:
@@ -99,7 +99,7 @@ void quadriga_lib::sos_remove_bias(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
+void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &spatial_freq,
                                    arma::Mat<dtype> &phase,
                                    const arma::Mat<dtype> &pos,
                                    const arma::Mat<dtype> *pos_b,
@@ -108,25 +108,25 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
                                    const arma::Col<dtype> *dist,
                                    arma::Mat<dtype> *offset,
                                    arma::Mat<dtype> *mean_before,
-                                   dtype freq_scale_b)
+                                   dtype spatial_freq_scale_b)
 {
     const bool two_devices = pos_b != nullptr && !pos_b->is_empty();
     const bool two_maps = phase_b != nullptr && !phase_b->is_empty();
 
-    if (freq.n_elem == 0)
-        throw std::invalid_argument("Input 'freq' cannot be empty.");
-    if (freq.n_cols > 3)
-        throw std::invalid_argument("Input 'freq' must have 1, 2 or 3 columns.");
+    if (spatial_freq.n_elem == 0)
+        throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
+    if (spatial_freq.n_cols > 3)
+        throw std::invalid_argument("Input 'spatial_freq' must have 1, 2 or 3 columns.");
     if (phase.n_elem == 0)
         throw std::invalid_argument("Input 'phase' cannot be empty.");
-    if (phase.n_rows != freq.n_rows)
-        throw std::invalid_argument("Number of rows in 'phase' does not match number of rows in 'freq'.");
+    if (phase.n_rows != spatial_freq.n_rows)
+        throw std::invalid_argument("Number of rows in 'phase' does not match number of rows in 'spatial_freq'.");
     if (pos.n_elem == 0)
         throw std::invalid_argument("Input 'pos' cannot be empty.");
-    if (pos.n_cols > freq.n_cols)
-        throw std::invalid_argument("Input 'pos' cannot have more columns than 'freq'.");
-    if (two_devices && pos_b->n_cols > freq.n_cols)
-        throw std::invalid_argument("Input 'pos_b' cannot have more columns than 'freq'.");
+    if (pos.n_cols > spatial_freq.n_cols)
+        throw std::invalid_argument("Input 'pos' cannot have more columns than 'spatial_freq'.");
+    if (two_devices && pos_b->n_cols > spatial_freq.n_cols)
+        throw std::invalid_argument("Input 'pos_b' cannot have more columns than 'spatial_freq'.");
     if (two_maps)
     {
         if (!two_devices)
@@ -134,10 +134,10 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
         if (phase_b->n_rows != phase.n_rows || phase_b->n_cols != phase.n_cols)
             throw std::invalid_argument("Input 'phase_b' must have the same size as 'phase'.");
     }
-    if (!(freq_scale_b > (dtype)0.0) || !std::isfinite((double)freq_scale_b))
-        throw std::invalid_argument("Input 'freq_scale_b' must be > 0.");
-    if (freq_scale_b != (dtype)1.0 && !two_maps)
-        throw std::invalid_argument("Input 'freq_scale_b' other than 1 requires 'phase_b'.");
+    if (!(spatial_freq_scale_b > (dtype)0.0) || !std::isfinite((double)spatial_freq_scale_b))
+        throw std::invalid_argument("Input 'spatial_freq_scale_b' must be > 0.");
+    if (spatial_freq_scale_b != (dtype)1.0 && !two_maps)
+        throw std::invalid_argument("Input 'spatial_freq_scale_b' other than 1 requires 'phase_b'.");
     if (two_devices && !two_maps)
     {
         if (pos_b->n_rows != pos.n_rows)
@@ -148,16 +148,16 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
     }
 
     // 'phase' and 'phase_b' are updated in place, 'offset' and 'mean_before' are written
-    qd_check_alias(&phase, "phase", &freq, &pos, pos_b, acf, dist);
-    qd_check_alias(phase_b, "phase_b", &freq, &pos, pos_b, acf, dist);
-    qd_check_alias(offset, "offset", &freq, &phase, &pos, pos_b, phase_b, acf, dist);
-    qd_check_alias(mean_before, "mean_before", &freq, &phase, &pos, pos_b, phase_b, acf, dist);
+    qd_check_alias(&phase, "phase", &spatial_freq, &pos, pos_b, acf, dist);
+    qd_check_alias(phase_b, "phase_b", &spatial_freq, &pos, pos_b, acf, dist);
+    qd_check_alias(offset, "offset", &spatial_freq, &phase, &pos, pos_b, phase_b, acf, dist);
+    qd_check_alias(mean_before, "mean_before", &spatial_freq, &phase, &pos, pos_b, phase_b, acf, dist);
     qd_check_alias_outputs(&phase, "phase", phase_b, "phase_b");
     qd_check_alias_outputs(offset, "offset", mean_before, "mean_before");
 
     const arma::uword n_gen = phase.n_cols, n_col = two_maps ? 2 : 1;
 
-    const arma::uword n_coeff = freq.n_rows;
+    const arma::uword n_coeff = spatial_freq.n_rows;
     const double two_pi = 6.283185307179586, pi = 3.141592653589793, amp = std::sqrt(2.0 / (double)n_coeff);
 
     // z_n = sum over the positions of weight · exp( j·2·pi · scale · f_n·x ), added to (zr, zi)
@@ -172,8 +172,8 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
         for (long long i_coeff = 0; i_coeff < n_coeff_ll; ++i_coeff)
         {
             const arma::uword n = (arma::uword)i_coeff;
-            double fx = scale * (double)freq.at(n, 0), fy = (freq.n_cols > 1) ? scale * (double)freq.at(n, 1) : 0.0;
-            double fz = (freq.n_cols > 2) ? scale * (double)freq.at(n, 2) : 0.0, re = 0.0, im = 0.0;
+            double fx = scale * (double)spatial_freq.at(n, 0), fy = (spatial_freq.n_cols > 1) ? scale * (double)spatial_freq.at(n, 1) : 0.0;
+            double fz = (spatial_freq.n_cols > 2) ? scale * (double)spatial_freq.at(n, 2) : 0.0, re = 0.0, im = 0.0;
             for (arma::uword i = 0; i < n_rows; ++i)
             {
                 double t = fx * (double)p0[i];
@@ -251,7 +251,7 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
         {
             std::fill(zr.begin(), zr.end(), 0.0), std::fill(zi.begin(), zi.end(), 0.0);
             w.assign(pos_b->n_rows, 1.0 / (double)pos_b->n_rows);
-            accumulate(*pos_b, (double)freq_scale_b, w.data(), zr, zi);
+            accumulate(*pos_b, (double)spatial_freq_scale_b, w.data(), zr, zi);
             correct(*phase_b, zr, zi, 1);
         }
     }
@@ -272,9 +272,9 @@ void quadriga_lib::sos_remove_bias(const arma::Mat<dtype> &freq,
     }
 }
 
-template void quadriga_lib::sos_remove_bias(const arma::Mat<float> &freq, arma::Mat<float> &phase, const arma::Mat<float> &pos, const arma::Mat<float> *pos_b,
+template void quadriga_lib::sos_remove_bias(const arma::Mat<float> &spatial_freq, arma::Mat<float> &phase, const arma::Mat<float> &pos, const arma::Mat<float> *pos_b,
                                             arma::Mat<float> *phase_b, const arma::Col<float> *acf, const arma::Col<float> *dist, arma::Mat<float> *offset,
-                                            arma::Mat<float> *mean_before, float freq_scale_b);
-template void quadriga_lib::sos_remove_bias(const arma::Mat<double> &freq, arma::Mat<double> &phase, const arma::Mat<double> &pos, const arma::Mat<double> *pos_b,
+                                            arma::Mat<float> *mean_before, float spatial_freq_scale_b);
+template void quadriga_lib::sos_remove_bias(const arma::Mat<double> &spatial_freq, arma::Mat<double> &phase, const arma::Mat<double> &pos, const arma::Mat<double> *pos_b,
                                             arma::Mat<double> *phase_b, const arma::Col<double> *acf, const arma::Col<double> *dist, arma::Mat<double> *offset,
-                                            arma::Mat<double> *mean_before, double freq_scale_b);
+                                            arma::Mat<double> *mean_before, double spatial_freq_scale_b);

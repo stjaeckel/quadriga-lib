@@ -38,11 +38,11 @@ Approximation error of the ACF of a set of sinusoids
 
 ## Usage:
 ```
-mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( freq, acf, dist, n_dir )
+mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, dist, n_dir )
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
 - **`acf`** — Target ACF; at least 2 elements; `(n_acf,)`
 - **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; `(n_acf,)`
 - **`n_dir`** — Number of test directions; `int`; must be > 0; ignored for `n_dim = 1`; default: 10
@@ -60,13 +60,13 @@ mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( freq, ac
 - [[sos.acf_approx]], [[sos.acf_2d]] (the two grids that are compared)
 MD!*/
 
-py::tuple sos_calc_mse(const py::array_t<double> &freq,
+py::tuple sos_calc_mse(const py::array_t<double> &spatial_freq,
                        const py::array_t<double> &acf,
                        const py::array_t<double> &dist,
                        arma::uword n_dir)
 {
     // Read inputs
-    const auto freq_a = qd_python_numpy2arma_Mat<double>(freq, true);
+    const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
 
@@ -87,7 +87,7 @@ py::tuple sos_calc_mse(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("calc_mse", &sos_calc_mse,
-//       py::arg("freq").none(false),
+//       py::arg("spatial_freq").none(false),
 //       py::arg("acf").none(false),
 //       py::arg("dist").none(false),
 //       py::arg("n_dir") = 10);

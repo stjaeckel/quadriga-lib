@@ -50,7 +50,7 @@ Monte-Carlo estimate of the ACF of one generator
 ## Declaration:
 ```
 void quadriga_lib::sos_acf_estimate(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &phase,
     const arma::Col<dtype> &bins,
     arma::uword n_pos,
@@ -63,7 +63,7 @@ void quadriga_lib::sos_acf_estimate(
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, 3]`
 - **`phase`** — Phases of the generator in [rad]; `[n_coeff]`
 - **`bins`** — Bin centers in [m]; must be >= 0, increase strictly and be finite; at least 2 elements;
   `[n_bin]`
@@ -84,7 +84,7 @@ void quadriga_lib::sos_acf_estimate(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
+void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &spatial_freq,
                                     const arma::Col<dtype> &phase,
                                     const arma::Col<dtype> &bins,
                                     arma::uword n_pos,
@@ -95,12 +95,12 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
                                     const arma::Col<dtype> *dist,
                                     arma::sword seed)
 {
-    if (freq.n_elem == 0)
-        throw std::invalid_argument("Input 'freq' cannot be empty.");
-    if (freq.n_cols != 3)
-        throw std::invalid_argument("Input 'freq' must have 3 columns.");
-    if (phase.n_elem != freq.n_rows)
-        throw std::invalid_argument("Number of elements in 'phase' does not match number of rows in 'freq'.");
+    if (spatial_freq.n_elem == 0)
+        throw std::invalid_argument("Input 'spatial_freq' cannot be empty.");
+    if (spatial_freq.n_cols != 3)
+        throw std::invalid_argument("Input 'spatial_freq' must have 3 columns.");
+    if (phase.n_elem != spatial_freq.n_rows)
+        throw std::invalid_argument("Number of elements in 'phase' does not match number of rows in 'spatial_freq'.");
     if (bins.n_elem < 2)
         throw std::invalid_argument("Input 'bins' must have at least 2 elements.");
     if (!(bins.at(0) >= (dtype)0.0))
@@ -120,9 +120,9 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
             throw std::invalid_argument("Inputs 'acf' and 'dist' are required for output 'acf_est_dual'.");
         qd_sos_check_acf_same_map(*acf, *dist);
     }
-    qd_check_alias(&acf_est, "acf_est", &freq, &phase, &bins, acf, dist);
-    qd_check_alias(dist_est, "dist_est", &freq, &phase, &bins, acf, dist);
-    qd_check_alias(acf_est_dual, "acf_est_dual", &freq, &phase, &bins, acf, dist);
+    qd_check_alias(&acf_est, "acf_est", &spatial_freq, &phase, &bins, acf, dist);
+    qd_check_alias(dist_est, "dist_est", &spatial_freq, &phase, &bins, acf, dist);
+    qd_check_alias(acf_est_dual, "acf_est_dual", &spatial_freq, &phase, &bins, acf, dist);
     qd_check_alias_outputs(&acf_est, "acf_est", dist_est, "dist_est");
     qd_check_alias_outputs(&acf_est, "acf_est", acf_est_dual, "acf_est_dual");
     qd_check_alias_outputs(dist_est, "dist_est", acf_est_dual, "acf_est_dual");
@@ -182,7 +182,7 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
     };
 
     // The GENERIC kernel is used: this is an offline tool and its result should not depend on the CPU
-    const arma::mat freq_d = arma::conv_to<arma::mat>::from(freq), phase_d = arma::conv_to<arma::mat>::from(phase);
+    const arma::mat freq_d = arma::conv_to<arma::mat>::from(spatial_freq), phase_d = arma::conv_to<arma::mat>::from(phase);
     arma::vec acf_d, dist_d;
     if (acf_est_dual != nullptr)
         acf_d = arma::conv_to<arma::vec>::from(*acf), dist_d = arma::conv_to<arma::vec>::from(*dist);
@@ -267,9 +267,9 @@ void quadriga_lib::sos_acf_estimate(const arma::Mat<dtype> &freq,
     }
 }
 
-template void quadriga_lib::sos_acf_estimate(const arma::Mat<float> &freq, const arma::Col<float> &phase, const arma::Col<float> &bins, arma::uword n_pos,
+template void quadriga_lib::sos_acf_estimate(const arma::Mat<float> &spatial_freq, const arma::Col<float> &phase, const arma::Col<float> &bins, arma::uword n_pos,
                                              arma::Col<float> &acf_est, arma::Col<float> *dist_est, arma::Col<float> *acf_est_dual,
                                              const arma::Col<float> *acf, const arma::Col<float> *dist, arma::sword seed);
-template void quadriga_lib::sos_acf_estimate(const arma::Mat<double> &freq, const arma::Col<double> &phase, const arma::Col<double> &bins, arma::uword n_pos,
+template void quadriga_lib::sos_acf_estimate(const arma::Mat<double> &spatial_freq, const arma::Col<double> &phase, const arma::Col<double> &bins, arma::uword n_pos,
                                              arma::Col<double> &acf_est, arma::Col<double> *dist_est, arma::Col<double> *acf_est_dual,
                                              const arma::Col<double> *acf, const arma::Col<double> *dist, arma::sword seed);

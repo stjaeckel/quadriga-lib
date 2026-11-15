@@ -26,7 +26,7 @@ namespace quadriga_lib
     {
     public:
         std::string name = "empty";                      // Name of the channel object
-        arma::Col<dtype> center_frequency;               // Center frequency in [Hz], vector of length [1] or [n_snap] or []
+        arma::Col<dtype> center_freq;                    // Center frequency in [Hz], vector of length [1] or [n_snap] or []
         arma::Mat<dtype> tx_pos;                         // Transmitter positions, matrix of size [3, n_snap] or [3, 1]
         arma::Mat<dtype> rx_pos;                         // Receiver positions, matrix of size [3, n_snap] or [3, 1]
         arma::Mat<dtype> tx_orientation;                 // Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
@@ -343,11 +343,11 @@ namespace quadriga_lib
     // - Delays are taken from delay[0] only (frequency-independent geometry); supports [n_rx, n_tx, n_path]
     //   or broadcastable [1, 1, n_path]
     template <typename dtype>
-    void baseband_freq_response_multi(const std::vector<arma::Cube<dtype>> &coeff_re,  // Real part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
-                                      const std::vector<arma::Cube<dtype>> &coeff_im,  // Imag part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
-                                      const std::vector<arma::Cube<dtype>> &delay,     // Delays [s], length [n_freq_in], each [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                      const arma::Col<dtype> &freq_in,                 // Input sample frequencies [Hz], length [n_freq_in]
-                                      const arma::Col<dtype> &freq_out,                // Output carrier frequencies [Hz], length [n_carrier]
+    void baseband_freq_response_multi(const std::vector<arma::Cube<dtype>> &coeff_re,  // Real part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
+                                      const std::vector<arma::Cube<dtype>> &coeff_im,  // Imag part of coefficients, length [n_freq], each [n_rx, n_tx, n_path]
+                                      const std::vector<arma::Cube<dtype>> &delay,     // Delays [s], length [n_freq], each [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                      const arma::Col<dtype> &freq,                    // Input sample frequencies [Hz], length [n_freq]
+                                      const arma::Col<dtype> &freq_new,                // Output carrier frequencies [Hz], length [n_carrier]
                                       arma::Cube<dtype> *hmat_re = nullptr,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
                                       arma::Cube<dtype> *hmat_im = nullptr,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
                                       arma::Cube<std::complex<dtype>> *hmat = nullptr, // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
@@ -410,7 +410,7 @@ namespace quadriga_lib
     // Initialize new QRT file and write metadata
     template <typename dtype>
     void qrt_file_init(const std::string &fn,                               // Path to the QRT file
-                       const arma::Col<dtype> &freq,                        // List of frequencies in GHz (EM) or Hz (scalar), length [ n_freq ]
+                       const arma::Col<dtype> &center_freq,                 // Center frequencies in [Hz], length [ n_freq ]
                        const arma::Mat<dtype> &cir_pos,                     // CIR positions; [ n_cir, 3 ]
                        const arma::Mat<dtype> &cir_orientation,             // CIR orientations; [ n_cir, 3 ]
                        const std::vector<std::string> &dest_names = {"RX"}, // Receiver names; length [ n_rx ]
@@ -436,7 +436,7 @@ namespace quadriga_lib
                         std::vector<std::string> *orig_names = nullptr, // Names of the origin points (TXs)
                         std::vector<std::string> *dest_names = nullptr, // Names of the destination points (RXs)
                         int *version = nullptr,                         // QRT file version
-                        arma::fvec *freq = nullptr,                     // Center frequency in GHz as stored in the QRT file
+                        arma::fvec *center_freq = nullptr,              // Center frequencies in [Hz], length [ no_freq ]
                         arma::fmat *cir_pos = nullptr,                  // CIR positions in Cartesian coordinates, size [no_cir, 3]
                         arma::fmat *cir_orientation = nullptr,          // CIR orientation in Euler angles in rad, size [no_cir, 3]
                         arma::fmat *orig_pos = nullptr,                 // Origin (TX) positions, size [no_orig, 3]
@@ -452,7 +452,7 @@ namespace quadriga_lib
                        arma::uword i_cir = 0,                               // Snapshot index
                        arma::uword i_orig = 0,                              // Origin index (for downlink Origin = TX)
                        bool downlink = true,                                // Switch for uplink / downlink direction
-                       arma::Col<dtype> *center_frequency = nullptr,        // Center frequency in [Hz], Size [n_freq]
+                       arma::Col<dtype> *center_freq = nullptr,             // Center frequency in [Hz], Size [n_freq]
                        arma::Col<dtype> *tx_pos = nullptr,                  // Transmitter position in Cartesian coordinates, Size [3, 1]
                        arma::Col<dtype> *tx_orientation = nullptr,          // Transmitter orientation (bank, tilt, head) in [rad], Size [3, 1]
                        arma::Col<dtype> *rx_pos = nullptr,                  // Receiver position in Cartesian coordinates, Size [3, 1]
@@ -484,7 +484,7 @@ namespace quadriga_lib
     // - The path gain and the inverse free-space loss of the polyline length are folded into the stored Jones matrices
     // - LOS: 0 interactions; GR: 1 (reflection); NLOS: 2 (scattering)
     // - Use local coordinates (QRT stores float32): shift x and y only, the ground stays at z = 0
-    std::vector<path> qrt_paths_from_scatterers(const arma::vec &center_frequency, // Frequencies in [Hz], [n_freq], 1 to 127 entries
+    std::vector<path> qrt_paths_from_scatterers(const arma::vec &center_freq,      // Frequencies in [Hz], [n_freq], 1 to 127 entries
                                                 const arma::vec &tx_pos,           // Tx (origin) position in [m], [3]
                                                 const arma::vec &rx_pos,           // Rx position of the CIR in [m], [3]
                                                 const arma::mat &fbs_pos,          // First-bounce scatterer positions in [m], [3, n_path]

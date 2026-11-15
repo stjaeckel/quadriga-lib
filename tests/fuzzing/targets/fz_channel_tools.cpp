@@ -76,15 +76,15 @@ static void run(fz::input &in)
 
     // baseband_freq_response_multi with the snapshots as input frequencies
     {
-        arma::Col<T> freq_in = in.col<T>(in.ConsumeBool() ? n_snap : in.size(5)), freq_out = in.col<T>(in.size(16));
+        arma::Col<T> freq = in.col<T>(in.ConsumeBool() ? n_snap : in.size(5)), freq_new = in.col<T>(in.size(16));
         if (in.ConsumeBool())
-            freq_in = arma::sort(freq_in);
+            freq = arma::sort(freq);
         if (in.ConsumeBool())
-            freq_in *= T(1.0e9), freq_out *= T(1.0e9);
+            freq *= T(1.0e9), freq_new *= T(1.0e9);
         arma::Cube<T> h_re, h_im;
         arma::Cube<std::complex<T>> h;
         const bool remove_phase = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq_in, freq_out, (out_mask & 1) ? &h_re : nullptr,
+        fz::clean([&] { quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, (out_mask & 1) ? &h_re : nullptr,
                                                                    (out_mask & 2) ? &h_im : nullptr, (out_mask & 4) ? &h : nullptr,
                                                                    remove_phase); });
     }

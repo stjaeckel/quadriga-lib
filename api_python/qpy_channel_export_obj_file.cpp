@@ -81,7 +81,7 @@ void channel_export_obj_file(const std::string &fn,
 
     c.rx_pos = qd_python_numpy2arma_Mat<double>(rx_pos, true);
     c.tx_pos = qd_python_numpy2arma_Mat<double>(tx_pos, true);
-    c.center_frequency = qd_python_numpy2arma_Col<double>(center_freq, true);
+    c.center_freq = qd_python_numpy2arma_Col<double>(center_freq, true);
 
     // no_interact: list of 1D arrays (ragged) OR a 2D ndarray (n_path, n_snap)
     if (py::isinstance<py::list>(no_interact))

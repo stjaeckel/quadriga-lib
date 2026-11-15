@@ -313,7 +313,7 @@ void quadriga_lib::arrayant_interpolate_multi(
     arma::Cube<dtype> &V_im,
     arma::Cube<dtype> &H_re,
     arma::Cube<dtype> &H_im,
-    const arma::Col<dtype> *frequency = nullptr,
+    const arma::Col<dtype> *freq_new = nullptr,
     const arma::uvec *i_element = nullptr,
     const arma::Cube<dtype> *orientation = nullptr,
     const arma::Mat<dtype> *element_pos = nullptr,
@@ -327,7 +327,7 @@ void quadriga_lib::arrayant_interpolate_multi(
   frequency
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`frequency`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
+- **`freq_new`** *(optional)* — Target frequencies in Hz; `nullptr` or empty: the center frequencies of the entries
   in vector order; `[n_freq]`
 - **`i_element`** *(optional)* — Element indices, 0-based, duplicates allowed; `nullptr` or empty: all elements;
   `[n_out]`
@@ -368,7 +368,7 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
                                               arma::Cube<dtype> &V_im,
                                               arma::Cube<dtype> &H_re,
                                               arma::Cube<dtype> &H_im,
-                                              const arma::Col<dtype> *frequency,
+                                              const arma::Col<dtype> *freq_new,
                                               const arma::uvec *i_element,
                                               const arma::Cube<dtype> *orientation,
                                               const arma::Mat<dtype> *element_pos,
@@ -393,9 +393,9 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
 
     qd_check_interpolation_inputs(azimuth, elevation, orientation, element_pos, n_out);
 
-    const bool has_frequency = frequency != nullptr && frequency->n_elem != 0;
-    if (has_frequency && !frequency->is_finite())
-        throw std::invalid_argument("Input 'frequency' must contain finite values.");
+    const bool has_freq_new = freq_new != nullptr && freq_new->n_elem != 0;
+    if (has_freq_new && !freq_new->is_finite())
+        throw std::invalid_argument("Input 'freq_new' must contain finite values.");
 
     unsigned long long n_pattern_values = 0;
     for (const auto &a : arrayant_vec)
@@ -404,10 +404,10 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
 
     const arma::Cube<dtype> *outs[] = {&V_re, &V_im, &H_re, &H_im};
     const char *names[] = {"V_re", "V_im", "H_re", "H_im"};
-    qd_check_alias_list(outs, names, &azimuth, &elevation, frequency, i_element, orientation, element_pos);
+    qd_check_alias_list(outs, names, &azimuth, &elevation, freq_new, i_element, orientation, element_pos);
     const arma::Cube<std::complex<dtype>> *outs_cx[] = {V, H};
     const char *names_cx[] = {"V", "H"};
-    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, frequency, i_element, orientation, element_pos);
+    qd_check_alias_list(outs_cx, names_cx, &azimuth, &elevation, freq_new, i_element, orientation, element_pos);
     for (int i = 0; i < 2; ++i)
         for (int j = 0; j < 4; ++j)
             qd_check_alias_outputs(outs_cx[i], names_cx[i], outs[j], names[j]);
@@ -417,8 +417,8 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
     // Center frequencies in vector order: default target frequencies and frequency index
     arma::Col<dtype> cf(n_entries);
     for (arma::uword i = 0; i < n_entries; ++i)
-        cf[i] = arrayant_vec[i].center_frequency;
-    const arma::Col<dtype> &freq = has_frequency ? *frequency : cf;
+        cf[i] = arrayant_vec[i].center_freq;
+    const arma::Col<dtype> &freq = has_freq_new ? *freq_new : cf;
     const arma::uword n_freq = freq.n_elem;
 
     // A requested complex output replaces its split pair, which is left empty
@@ -499,7 +499,7 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
     {
         dtype f = p_freq[fi];
 
-        // Find bracketing indices in sorted center_frequency list
+        // Find bracketing indices in sorted center_freq list
         arma::uword idx_lo, idx_hi;
         dtype w;
 
@@ -610,12 +610,12 @@ template void quadriga_lib::arrayant_interpolate(const arrayant<double> &ant, co
 
 template void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<float>> &arrayant_vec, const arma::Mat<float> &azimuth, const arma::Mat<float> &elevation,
                                                        arma::Cube<float> &V_re, arma::Cube<float> &V_im, arma::Cube<float> &H_re, arma::Cube<float> &H_im,
-                                                       const arma::Col<float> *frequency, const arma::uvec *i_element,
+                                                       const arma::Col<float> *freq_new, const arma::uvec *i_element,
                                                        const arma::Cube<float> *orientation, const arma::Mat<float> *element_pos,
                                                        arma::Cube<std::complex<float>> *V, arma::Cube<std::complex<float>> *H, int use_kernel);
 
 template void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<double>> &arrayant_vec, const arma::Mat<double> &azimuth, const arma::Mat<double> &elevation,
                                                        arma::Cube<double> &V_re, arma::Cube<double> &V_im, arma::Cube<double> &H_re, arma::Cube<double> &H_im,
-                                                       const arma::Col<double> *frequency, const arma::uvec *i_element,
+                                                       const arma::Col<double> *freq_new, const arma::uvec *i_element,
                                                        const arma::Cube<double> *orientation, const arma::Mat<double> *element_pos,
                                                        arma::Cube<std::complex<double>> *V, arma::Cube<std::complex<double>> *H, int use_kernel);

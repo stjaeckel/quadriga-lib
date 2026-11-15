@@ -23,13 +23,13 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 
 ## Usage:
 ```
-[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_frequency, lod );
+[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_freq, lod );
 ```
 
 ## Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_frequency`** — Center frequency in Hz
+- **`center_freq`** — Center frequency in Hz
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
    | `lod` | `n_path` | `n_seg` | Note  |
    | :---: | -------: | ------: | ----: |
@@ -61,14 +61,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read input data
     const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
     const arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
-    const double center_frequency = qd_mex_get_scalar<double>(prhs[2], "center_frequency", 0.0);
+    const double center_freq = qd_mex_get_scalar<double>(prhs[2], "center_freq", 0.0);
     if (mxGetNumberOfElements(prhs[3]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'lod' cannot be empty.");
     const int lod = qd_mex_get_scalar<int>(prhs[3], "lod", 1);
 
     // Output sizes depend on lod and are set by C++
     arma::cube ray_x, ray_y, ray_z, weight;
-    CALL_QD(quadriga_lib::generate_diffraction_paths<double>(orig, dest, center_frequency, lod,
+    CALL_QD(quadriga_lib::generate_diffraction_paths<double>(orig, dest, center_freq, lod,
                                                              ray_x, ray_y, ray_z, weight));
 
     // Rays output as a 4D MATLAB array [n_pos, n_path, n_seg-1, 3], x, y, z stacked along the 4th dimension

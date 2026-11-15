@@ -1211,11 +1211,11 @@ TEST_CASE("path_loss - input validation")
     SECTION("fc")
     {
         CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, arma::vec(), tx, rx, pl), std::invalid_argument,
-                             Message("Input 'center_frequency' cannot be empty."));
+                             Message("Input 'center_freq' cannot be empty."));
         CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, arma::vec({3.5e9, 0.0}), tx, rx, pl), std::invalid_argument,
-                             Message("Input 'center_frequency' must be finite and > 0."));
+                             Message("Input 'center_freq' must be finite and > 0."));
         CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, sp, arma::vec({NAN}), tx, rx, pl), std::invalid_argument,
-                             Message("Input 'center_frequency' must be finite and > 0."));
+                             Message("Input 'center_freq' must be finite and > 0."));
     }
     SECTION("positions")
     {

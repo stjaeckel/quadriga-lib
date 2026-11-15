@@ -25,7 +25,7 @@ CONF_DIR = os.path.join(current_dir, "../../data/config")
 TX = np.array([[0.0, 0.0, 10.0]])
 RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5]])
 FC = np.array([3.5e9, 28e9])
-KEYS = ["method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
+KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
 
 

@@ -1120,7 +1120,7 @@ TEST_CASE("lsp_generate - input validation")
         CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, r, rnd, lsp, no_mat, no_vec, no_mat, no_mat, &r), std::invalid_argument); // eod_offset_deg is 'rx_pos'
         CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, t, rx, rnd, lsp, no_mat, no_vec, no_mat, no_mat, &t), std::invalid_argument); // eod_offset_deg is 'tx_pos'
         CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, u, lsp, no_mat, no_vec, &u, &im), std::invalid_argument);            // gr_eps_re is 'rnd'
-        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, f, tx, rx, rnd, lsp, no_mat, &f, &re, &im), std::invalid_argument);              // abs_toa is 'center_frequency'
+        CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, f, tx, rx, rnd, lsp, no_mat, &f, &re, &im), std::invalid_argument);              // abs_toa is 'center_freq'
         CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, no_mat, &toa, &re, &re), std::invalid_argument);           // gr_eps_im is 'gr_eps_re'
         arma::cube on_rnd(u.memptr(), 3, 1, 8, false, true);
         CHECK_THROWS_AS(quadriga_lib::lsp_generate(sp, fc, tx, rx, u, on_rnd), std::invalid_argument);
@@ -1155,11 +1155,11 @@ TEST_CASE("lsp_generate - input validation")
     SECTION("fc")
     {
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec(), tx, rx, rnd, lsp), std::invalid_argument,
-                             Message("Input 'center_frequency' cannot be empty."));
+                             Message("Input 'center_freq' cannot be empty."));
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec({3.5e9, 0.0}), tx, rx, rnd, lsp), std::invalid_argument,
-                             Message("Input 'center_frequency' must be finite and > 0."));
+                             Message("Input 'center_freq' must be finite and > 0."));
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, arma::vec({NAN}), tx, rx, rnd, lsp), std::invalid_argument,
-                             Message("Input 'center_frequency' must be finite and > 0."));
+                             Message("Input 'center_freq' must be finite and > 0."));
     }
     SECTION("rnd")
     {

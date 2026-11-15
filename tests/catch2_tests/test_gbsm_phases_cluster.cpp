@@ -773,7 +773,7 @@ TEST_CASE("gbsm_draw - input validation")
                                  std::invalid_argument, Message("Input 'set_type' must be 'lsf', 'cluster' or 'ray'."));
         }
     }
-    SECTION("center_frequency is ignored for lsf and cluster")
+    SECTION("center_freq is ignored for lsf and cluster")
     {
         arma::cube ph_lsf;
         quadriga_lib::gbsm_init_phases(sp, "lsf", ph_lsf, 3);

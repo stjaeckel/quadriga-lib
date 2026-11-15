@@ -34,7 +34,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
-- Setting `center_frequency = 0.0` disables phase computation
+- Setting `center_freq = 0.0` disables phase computation
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
@@ -65,7 +65,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *delay,
     arma::uword i_irs = 0,
     dtype threshold_dB = -140.0,
-    dtype center_frequency = 0.0,
+    dtype center_freq = 0.0,
     bool use_absolute_delays = false,
     arma::Cube<dtype> *aod = nullptr,
     arma::Cube<dtype> *eod = nullptr,
@@ -99,7 +99,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
 - **`i_irs`** *(optional)* — IRS codebook port index
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
-- **`center_frequency`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [[arrayant]]
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
@@ -134,7 +134,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
                                                  const arma::Mat<dtype> *fbs_pos_2, const arma::Mat<dtype> *lbs_pos_2,
                                                  const arma::Col<dtype> *path_gain_2, const arma::Col<dtype> *path_length_2, const arma::Mat<dtype> *M_2,
                                                  arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
-                                                 arma::uword i_irs, dtype threshold_dB, dtype center_frequency, bool use_absolute_delays,
+                                                 arma::uword i_irs, dtype threshold_dB, dtype center_freq, bool use_absolute_delays,
                                                  arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                                  const arrayant<dtype> *irs_array_2, const std::vector<bool> *active_path)
 {
@@ -190,20 +190,20 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     else
         irs.coupling_im = arma::Mat<dtype>(const_cast<dtype *>(irs_array->coupling_im.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
 
-    if (center_frequency > dtype(1.0e-5))
-        irs.center_frequency = center_frequency;
+    if (center_freq > dtype(1.0e-5))
+        irs.center_freq = center_freq;
 
     // Calculate the channel coefficients of the first segment from the TX to the IRS
     arma::Cube<dtype> coeff_re_1, coeff_im_1, delay_1, aod_1, eod_1;
     if (calc_angles)
     {
         quadriga_lib::get_channels_spherical<dtype>(tx_array, &irs, Tx, Ty, Tz, Tb, Tt, Th, Ix, Iy, Iz, Ib, It, Ih, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_frequency, true, false, &aod_1, &eod_1, nullptr, nullptr, 1);
+                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_freq, true, false, &aod_1, &eod_1, nullptr, nullptr, 1);
     }
     else
     {
         quadriga_lib::get_channels_spherical<dtype>(tx_array, &irs, Tx, Ty, Tz, Tb, Tt, Th, Ix, Iy, Iz, Ib, It, Ih, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_frequency, true, false, nullptr, nullptr, nullptr, nullptr, 1);
+                                                    &coeff_re_1, &coeff_im_1, &delay_1, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 
     // Update the IRS array for the second segment
@@ -249,12 +249,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     if (calc_angles)
     {
         quadriga_lib::get_channels_spherical<dtype>(&irs, rx_array, Ix, Iy, Iz, Ib, It, Ih, Rx, Ry, Rz, Rb, Rt, Rh, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_frequency, true, false, nullptr, nullptr, &aoa_2, &eoa_2, 1);
+                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_freq, true, false, nullptr, nullptr, &aoa_2, &eoa_2, 1);
     }
     else
     {
         quadriga_lib::get_channels_spherical<dtype>(&irs, rx_array, Ix, Iy, Iz, Ib, It, Ih, Rx, Ry, Rz, Rb, Rt, Rh, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_frequency, true, false, nullptr, nullptr, nullptr, nullptr, 1);
+                                                    &coeff_re_2, &coeff_im_2, &delay_2, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 
     // Calculate the LOS delay between TX and RX
@@ -406,7 +406,7 @@ template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<float> 
                                                           const arma::Mat<float> *fbs_pos_2, const arma::Mat<float> *lbs_pos_2,
                                                           const arma::Col<float> *path_gain_2, const arma::Col<float> *path_length_2, const arma::Mat<float> *M_2,
                                                           arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
-                                                          arma::uword i_irs, float threshold_dB, float center_frequency, bool use_absolute_delays,
+                                                          arma::uword i_irs, float threshold_dB, float center_freq, bool use_absolute_delays,
                                                           arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
                                                           const arrayant<float> *irs_array_2, const std::vector<bool> *active_path);
 
@@ -419,6 +419,6 @@ template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double>
                                                           const arma::Mat<double> *fbs_pos_2, const arma::Mat<double> *lbs_pos_2,
                                                           const arma::Col<double> *path_gain_2, const arma::Col<double> *path_length_2, const arma::Mat<double> *M_2,
                                                           arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
-                                                          arma::uword i_irs, double threshold_dB, double center_frequency, bool use_absolute_delays,
+                                                          arma::uword i_irs, double threshold_dB, double center_freq, bool use_absolute_delays,
                                                           arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
                                                           const arrayant<double> *irs_array_2, const std::vector<bool> *active_path);

@@ -4,14 +4,14 @@ function test_sos_preset
 % Physics validation lives in the Catch2 suite (test_sos_preset.cpp).
 
 %% Basic call, all outputs
-[ freq, acf, dist ] = quadriga_lib.sos_preset( 'Comb256' );
-assertEqual( size(freq), [256, 3] );
+[ spatial_freq, acf, dist ] = quadriga_lib.sos_preset( 'Comb256' );
+assertEqual( size(spatial_freq), [256, 3] );
 assertEqual( size(acf), [200, 1] );
 assertEqual( size(dist), [200, 1] );
-assertTrue( isa(freq, 'double') && isa(acf, 'double') && isa(dist, 'double') );
+assertTrue( isa(spatial_freq, 'double') && isa(acf, 'double') && isa(dist, 'double') );
 assertElementsAlmostEqual( dist([1, 2, 200]), [0; 0.25; 49.75], 'absolute', 1e-13 );
 assertElementsAlmostEqual( acf([1, 41]), [1; exp(-1)], 'absolute', 1e-14 );   % R(0) and R(10 m)
-assertTrue( max(abs(freq(:))) > 0.01 );
+assertTrue( max(abs(spatial_freq(:))) > 0.01 );
 
 %% Name selects type and size
 freq_e = quadriga_lib.sos_preset( 'Exp128' );
@@ -22,18 +22,18 @@ assertElementsAlmostEqual( acf(81), exp(-2), 'absolute', 1e-14 );               
 
 %% Optional input: omitted, empty, explicit
 [ freq2, acf2, dist2 ] = quadriga_lib.sos_preset( 'Comb256', [] );
-assertEqual( freq2, freq );
+assertEqual( freq2, spatial_freq );
 assertEqual( acf2, acf );
 assertEqual( dist2, dist );
 [ freq3, acf3, dist3 ] = quadriga_lib.sos_preset( 'Comb256', 25 );
 assertElementsAlmostEqual( dist3, dist * 2.5, 'absolute', 1e-12 );
-assertElementsAlmostEqual( freq3 * 2.5, freq, 'absolute', 1e-14 );
+assertElementsAlmostEqual( freq3 * 2.5, spatial_freq, 'absolute', 1e-14 );
 assertElementsAlmostEqual( acf3, acf, 'absolute', 1e-14 );
 
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.sos_preset( 'Comb256' );
 freq4 = quadriga_lib.sos_preset( 'Comb256' );
-assertEqual( freq4, freq );
+assertEqual( freq4, spatial_freq );
 [ ~, acf5 ] = quadriga_lib.sos_preset( 'Comb256' );
 assertEqual( acf5, acf );
 

@@ -50,7 +50,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
    [ssf_clusters](#ssf_clusters); steps 3 to 6 run per scenario
 3. Per BS site and scenario, once, with one seed for all sets: [gbsm_init_phases](#gbsm_init_phases) of the random sets in the table
    below; `"lsf"` with the link positions for the bias removal
-4. [gbsm_draw](#gbsm_draw) of each set at the links (the shared `"ray"` set with `center_frequency`, the list later passed to
+4. [gbsm_draw](#gbsm_draw) of each set at the links (the shared `"ray"` set with `center_freq`, the list later passed to
    [ssf_rays](#ssf_rays)); [path_loss](#path_loss) (`pl`, `sf_sigma`; column 10 of the `"lsf"` set as `rnd_he`); [lsp_generate](#lsp_generate) with
    `sf_sigma` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [ssf_clusters](#ssf_clusters) (`n_cluster` is the caller's choice) and [ssf_rays](#ssf_rays) (one [gbsm_rays](#gbsm_rays) object per link), called
@@ -62,7 +62,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 
 | Method | Random sets | Calls in step 5 |
 | --- | --- | --- |
-| `"38.901"` | `"lsf"`; `"cluster"` -1 and one per frequency; `"ray"` one per frequency | per frequency `k`: [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) (`i_freq = 0`) with slice `k` of all per-frequency inputs (`center_frequency`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
+| `"38.901"` | `"lsf"`; `"cluster"` -1 and one per frequency; `"ray"` one per frequency | per frequency `k`: [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) (`i_freq = 0`) with slice `k` of all per-frequency inputs (`center_freq`, `lsp`, `lsp_mu`, `lsp_sigma`, `rnd_freq`, `rnd_ray`, `eod_offset_deg`, `gr_eps_re`, `gr_eps_im`) |
 | `"38.901_MF"` | as `"38.901"` | [lsp_generate](#lsp_generate) at the anchor frequency with the same `rnd` gives `lsp_anchor`; [ssf_clusters](#ssf_clusters) once; [ssf_rays](#ssf_rays) per frequency `k` with `i_freq = k` |
 | `"quadriga"` | `"lsf"`; `"cluster"` -1; `"ray"` -1 | [ssf_clusters](#ssf_clusters) and [ssf_rays](#ssf_rays) once for all frequencies |
 
@@ -340,7 +340,7 @@ void quadriga_lib::gbsm_draw(
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
     const arma::u32_vec *floor_id = nullptr,
-    const arma::vec *center_frequency = nullptr,
+    const arma::vec *center_freq = nullptr,
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -356,7 +356,7 @@ void quadriga_lib::gbsm_draw(
 - **`preset`** *(optional)* — Preset of [gbsm_init_phases](#gbsm_init_phases); another preset with the same `n_coeff` is not detected
 - **`floor_id`** *(optional)* — Floor number of the UT per link, ground floor 0 (`n_fl - 1` for the UT heights of
   TR 38.901 Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
-- **`center_frequency`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
+- **`center_freq`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
   uses their mean c_DS ([ssf_rays](#ssf_rays)): pass the same list as to [ssf_rays](#ssf_rays) (another list gives other `"quadriga"`
   rays); ignored and not checked for all other sets; `[n_freq]`
 - **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
@@ -449,7 +449,7 @@ Not in: MATLAB, Python
 | --- | --- | --- | --- |
 | `method` | `std::string`, default `"38.901"` | `"38.901"`, `"38.901_MF"` or `"quadriga"`; GR power law and default mobility | all |
 | `tx_pos`, `rx_pos` | `arma::vec`, `[3]` | Tx and Rx position the ray data refer to in [m] | all |
-| `center_frequency` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
+| `center_freq` | `arma::vec`, `[n_freq]` | Carrier frequencies in [Hz] | all |
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
@@ -464,7 +464,7 @@ Not in: MATLAB, Python
 | Member | Returns |
 | --- | --- |
 | `n_ray()` | Number of rays, length of `delay` |
-| `n_freq()` | Number of frequencies, length of `center_frequency` |
+| `n_freq()` | Number of frequencies, length of `center_freq` |
 | `empty()` | `true` if `n_ray() == 0` |
 | `is_valid()` | Empty string if the object is valid, else the message of the first failed check |
 | `b_med(i_freq = 0)` | `arma::vec` `[2]`, Tx and Rx in [m]: lower power-weighted median of the distances Tx to FBS and Rx to LBS over the NLOS rays with power > 0 at frequency `i_freq` (0-based), fallback rays included; validity scale of the mobility `drift`; NaN without scatterers or without NLOS power |
@@ -501,7 +501,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths
 ### Declaration:
 ```cpp
 void quadriga_lib::gbsm_rays_from_paths(
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::vec &tx_pos,
     const arma::vec &rx_pos,
     const arma::mat &fbs_pos,
@@ -518,7 +518,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 ```
 
 ### Inputs:
-- **`center_frequency`** — Frequencies in [Hz]; `[n_freq]`
+- **`center_freq`** — Frequencies in [Hz]; `[n_freq]`
 - **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
@@ -547,7 +547,7 @@ Channel coefficients of one link at one frequency over one segment
 Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_single_link_channel) · [Python](../python/geometry-based-stochastic-model.md#gbsm.single_link_channel)
 
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
-  `rays.center_frequency(i_freq)`: per snapshot, the paths of [ssf_paths](#ssf_paths) at the snapshot positions with the link
+  `rays.center_freq(i_freq)`: per snapshot, the paths of [ssf_paths](#ssf_paths) at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (power > 0 at `i_freq`, plus LOS and GR)
 - `"phase"`: [get_channels_planar](channel-generation-functions.md#get_channels_planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
   delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) with the
@@ -591,10 +591,10 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ### Inputs:
 - **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
 - **`rays`** — Ray data of the link, see [gbsm_rays](#gbsm_rays)
-- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
+- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_freq(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`output`** *(optional)* — `"taps"` or `"rays"`
-- **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 0-based; ray data of the TR methods hold
+- **`i_freq`** *(optional)* — Frequency index in `rays.center_freq`, 0-based; ray data of the TR methods hold
   one frequency: 0
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in [m]; omitted: the positions of `rays`;
   `[n_snap, 3]` or `[1, 3]` (a `[3]` vector is rejected)
@@ -605,7 +605,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays (`"phase"`: of the ray-data positions)
 
 ### Returns:
-- Channel object: `center_frequency` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
+- Channel object: `center_freq` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
   `rx_orientation` `[3, n_snap]`; per snapshot `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap]` (`"taps"`) or
   `[n_rx, n_tx, n_path]` (`"rays"`); `"rays"` also `path_gain`, `path_length`, `path_polarization`, `path_angles`
   and in `"drift"` `path_fbs_pos`, `path_lbs_pos`; `par_names`, `par_data` with the entries below
@@ -663,7 +663,7 @@ void quadriga_lib::los_probability(
     double r_clutter = NAN,
     double h_clutter = NAN,
     const arma::vec *rnd_g = nullptr,
-    const arma::vec *center_frequency = nullptr,
+    const arma::vec *center_freq = nullptr,
     arma::mat *los_soft = nullptr);
 ```
 
@@ -682,7 +682,7 @@ void quadriga_lib::los_probability(
 - **`h_clutter`** *(optional)* — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0; NaN =
   default. The other models ignore the clutter arguments, which are validated for every model
 - **`rnd_g`** *(optional)* — Normal(0,1) value per link, G of eq. (7.6-18); required with `los_soft`; `[n_link]`
-- **`center_frequency`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; required with `los_soft`;
+- **`center_freq`** *(optional)* — Carrier frequencies in [Hz], finite and > 0; required with `los_soft`;
   `[n_freq]`
 
 ### Outputs:
@@ -705,7 +705,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#lsp_generate) · [Py
   [gbsm_draw](#gbsm_draw) (`"lsf"`), and on request the absolute TOA offset, the ground permittivity and the EoD offset
 - Mean `mu` and standard deviation `sigma` in the log domain (lg for DS and the angular spreads, dB for KF, SF and
   XPR), with the key prefix `P` (`DS`, `KF`, `SF`, `AS_D`, `AS_A`, `ES_D`, `ES_A`, `XPR`), `d = max(d2D, 1e-4)`,
-  `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(center_frequency/1e9, LSP_fc_min)` in GHz:
+  `h = max(hBS, 1e-4)`, `a = atan(h/d)` and `f' = max(center_freq/1e9, LSP_fc_min)` in GHz:
   - `mu = P_mu + P_gamma·lg(P_omega + f') + P_epsilon·lg(d) + P_zeta·lg(h) + P_alpha·lg(a)`
   - `sigma = max(0, max(0, P_sigma + P_delta·lg(P_omega + f')) + P_kappa·lg(d) + P_tau·lg(h) + P_beta·lg(a))`
   - SF has the mean 0. DS adds `lg(DS_VS_a·DS_VS + DS_VS_b)` if `DS_VS > 0` (V/S of the InF hall, TR 38.901 Table
@@ -721,7 +721,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#lsp_generate) · [Py
 - The InF and InH NLOS files set `absTOA_Lmax`, and the InF files `DS_VS`, for the hall or office of their
   calibration scenario; for another hall set these keys in `scenpar`
 - Ground permittivity: QuaDRiGa's fits for dry, medium and wet ground, interpolated linearly over column 9 of `rnd`
-  (0 dry, 0.5 medium, 1 wet) with `center_frequency` not limited by `LSP_fc_min`; they are not the materials of TR
+  (0 dry, 0.5 medium, 1 wet) with `center_freq` not limited by `LSP_fc_min`; they are not the materials of TR
   38.901 Table 7.6.8-1
 - EoD offset, the negative of the ZOD offset of TR 38.901 Tables 7.5-7 to 7.5-12: `EoD_offset_e +
   EoD_offset_e_gamma·lg f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) +
@@ -732,7 +732,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#lsp_generate) · [Py
 ```cpp
 void quadriga_lib::lsp_generate(
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     const arma::mat &rnd,
@@ -750,7 +750,7 @@ void quadriga_lib::lsp_generate(
 
 ### Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
-- **`center_frequency`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [gbsm_draw](#gbsm_draw) (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
@@ -804,7 +804,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#o2i_loss) · [Python
 ### Declaration:
 ```cpp
 void quadriga_lib::o2i_loss(
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::mat &rnd,
     const std::vector<std::string> &models,
     const arma::vec &weights,
@@ -815,7 +815,7 @@ void quadriga_lib::o2i_loss(
 ```
 
 ### Inputs:
-- **`center_frequency`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`rnd`** — Random values per UT: columns 0 to 2 Uniform in [0, 1] (model choice, two indoor distances), column
   3 Normal(0,1), finite (deviation `sigma_P`, car loss); `[n_ut, 4]`, `n_ut = 0` allowed
 - **`models`** — Models to mix: `low`, `high`, `low_A`, `legacy_6GHz`, `car`, `car_metal`; `[n_model]`
@@ -843,7 +843,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#path_loss) · [Pytho
   frequency; the TR 38.901 v19.5.0 conf files of the library reproduce Table 7.4.1-1 with them. The O2I
   penetration loss is not included (see [o2i_loss](#o2i_loss)). The models are evaluated as written for any positive
   frequency, also outside their validity range
-- Notation: `f = center_frequency/1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance, at
+- Notation: `f = center_freq/1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance, at
   least 0.1 m; `hBS`, `hUT` the z coordinates of Tx and Rx; `lg = log10`; `PL1(x) = A1·lg(x) + B + C·lg(f) + D·x`;
   `sf` the shadow-fading std. Keys in parentheses: the required ones, after the semicolon the optional ones (`X = v`:
   default)
@@ -890,7 +890,7 @@ void quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     arma::mat &pl,
@@ -903,7 +903,7 @@ void quadriga_lib::path_loss(
 - **`pl_model`** — Path-loss model, value of `PL_model` from [conf_file_read](#conf_file_read); empty = zero loss
 - **`plpar`** — Path-loss parameters, keys without "PL_", from [conf_file_read](#conf_file_read); keys not read are ignored
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
-- **`center_frequency`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [o2i_loss](#o2i_loss)), finite
@@ -1190,7 +1190,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_rays) · [Python
   ESD), or `PerClusterES_D` if the scale is 0; coupling (step 8): within a cluster or sub-cluster, the ray with the k-th
   smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA, EOD and EOA
 - c_DS, the cluster DS of Table 7.5-6: `max(PerClusterDS_min, PerClusterDS + PerClusterDS_gamma·lg f')` ns with
-  `f' = max(center_frequency/1e9, PerClusterDS_fc_min)`; 3.91 ns where `PerClusterDS` = 0
+  `f' = max(center_freq/1e9, PerClusterDS_fc_min)`; 3.91 ns where `PerClusterDS` = 0
 - `NumSubPaths` other than 20: the offsets of QuaDRiGa-NG (the MATLAB QuaDRiGa fork that uses this library) below 20
   (mean 0, rms 1), Laplacian quantiles at the rms of Table 7.5-3 above 20; no sub-clusters
 
@@ -1219,7 +1219,7 @@ void quadriga_lib::ssf_rays(
     const std::unordered_map<std::string, double> &scenpar,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::cube &lsp,
     const arma::cube &lsp_mu,
     const arma::cube &lsp_sigma,
@@ -1246,7 +1246,7 @@ void quadriga_lib::ssf_rays(
   `PolVar_sigma`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`center_frequency`** — Carrier frequencies in [Hz]; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
 - **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [lsp_generate](#lsp_generate); used: the ESD
   mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`
 - **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [ssf_clusters](#ssf_clusters)
@@ -1255,7 +1255,7 @@ void quadriga_lib::ssf_rays(
 - **`rnd_ray`** — `"ray"` sets from [gbsm_draw](#gbsm_draw) (`n_gen` columns); TR methods: slice `k` = set `k`,
   `[n_link, n_gen, n_freq]`; `"quadriga"`: the shared set, `[n_link, n_gen, 1]`
 - **`method`** *(optional)* — Method of [ssf_clusters](#ssf_clusters): `"38.901"`, `"38.901_MF"` or `"quadriga"`
-- **`i_freq`** *(optional)* — TR methods: index into `center_frequency`, 0-based; `"quadriga"`: must be 0
+- **`i_freq`** *(optional)* — TR methods: index into `center_freq`, 0-based; `"quadriga"`: must be 0
 - **`angle_model`**, **`pol_model`** *(optional)* — See the option table
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [lsp_generate](#lsp_generate); required if
   `GR_enabled`, else ignored; `[n_link, n_freq]`

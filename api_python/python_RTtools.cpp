@@ -31,7 +31,7 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("mesh"),
           py::arg("mtl_ind"),
           py::arg("mtl_prop"),
-          py::arg("center_frequency"),
+          py::arg("center_freq"),
           py::arg("lod") = 2,
           py::arg("verbose") = 0,
           py::arg("sub_mesh_index") = py::none(),

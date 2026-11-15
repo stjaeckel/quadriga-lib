@@ -52,12 +52,12 @@ Monte-Carlo estimate of the ACF of one generator
 
 ## Usage:
 ```
-[ acf_est, dist_est, acf_est_dual ] = quadriga_lib.sos_acf_estimate( freq, phase, bins, n_pos, ...
+[ acf_est, dist_est, acf_est_dual ] = quadriga_lib.sos_acf_estimate( spatial_freq, phase, bins, n_pos, ...
     acf, dist, seed );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies; `[n_coeff, 3]`
 - **`phase`** — Phases of the generator; `[n_coeff]`
 - **`bins`** — Bin centers; must be >= 0, increase strictly and be finite; at least 2
   elements; `[n_bin]`
@@ -88,7 +88,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
     const arma::vec phase = qd_mex_get_Col<double>(prhs[1]);
     const arma::vec bins = qd_mex_get_Col<double>(prhs[2]);
     const arma::uword n_pos = qd_mex_sos_count(prhs[3], "n_pos", 0.0);
@@ -112,5 +112,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec *p_dist = dist.empty() ? nullptr : &dist;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_acf_estimate<double>(freq, phase, bins, n_pos, acf_est, p_dist_est, p_acf_est_dual, p_acf, p_dist, seed));
+    CALL_QD(quadriga_lib::sos_acf_estimate<double>(spatial_freq, phase, bins, n_pos, acf_est, p_dist_est, p_acf_est_dual, p_acf, p_dist, seed));
 }

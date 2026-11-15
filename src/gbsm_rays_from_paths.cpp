@@ -31,7 +31,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 ## Declaration:
 ```
 void quadriga_lib::gbsm_rays_from_paths(
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::vec &tx_pos,
     const arma::vec &rx_pos,
     const arma::mat &fbs_pos,
@@ -48,7 +48,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 ```
 
 ## Inputs:
-- **`center_frequency`** — Frequencies in [Hz]; `[n_freq]`
+- **`center_freq`** — Frequencies in [Hz]; `[n_freq]`
 - **`tx_pos`**, **`rx_pos`** — Tx and Rx position in [m]; `[3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
@@ -70,7 +70,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 - [[gbsm_single_link_channel]] (channel of the link)
 MD!*/
 
-void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
+void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
                                         const arma::vec &tx_pos,
                                         const arma::vec &rx_pos,
                                         const arma::mat &fbs_pos,
@@ -85,11 +85,11 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
                                         const arma::vec *gr_eps_re,
                                         const arma::vec *gr_eps_im)
 {
-    const arma::uword n_freq = center_frequency.n_elem, n_path = fbs_pos.n_cols;
+    const arma::uword n_freq = center_freq.n_elem, n_path = fbs_pos.n_cols;
     if (n_freq == 0)
-        throw std::invalid_argument("Input 'center_frequency' cannot be empty.");
-    if (!center_frequency.is_finite() || arma::any(center_frequency <= 0.0))
-        throw std::invalid_argument("Input 'center_frequency' must be finite and > 0.");
+        throw std::invalid_argument("Input 'center_freq' cannot be empty.");
+    if (!center_freq.is_finite() || arma::any(center_freq <= 0.0))
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
     auto check_pos = [](const arma::vec &x, const std::string &name)
     {
         if (x.n_elem != 3)
@@ -160,10 +160,10 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
 
     auto check = [&](const auto &m)
     {
-        qd_check_alias(&m, "rays", &center_frequency, &tx_pos, &rx_pos, &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
+        qd_check_alias(&m, "rays", &center_freq, &tx_pos, &rx_pos, &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
                        path_type, tap, gr_eps_re, gr_eps_im);
     };
-    check(rays.tx_pos), check(rays.rx_pos), check(rays.center_frequency), check(rays.delay), check(rays.power);
+    check(rays.tx_pos), check(rays.rx_pos), check(rays.center_freq), check(rays.delay), check(rays.power);
     check(rays.aod), check(rays.eod), check(rays.aoa), check(rays.eoa), check(rays.M), check(rays.path_type);
     check(rays.tap), check(rays.gr_eps_re), check(rays.gr_eps_im), check(rays.fbs_pos), check(rays.lbs_pos);
     check(rays.fallback);
@@ -184,7 +184,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_frequency,
     }
 
     rays.method = method;
-    rays.center_frequency = center_frequency, rays.tx_pos = tx_pos, rays.rx_pos = rx_pos;
+    rays.center_freq = center_freq, rays.tx_pos = tx_pos, rays.rx_pos = rx_pos;
     rays.power = path_gain, rays.M = M, rays.fbs_pos = fbs_pos, rays.lbs_pos = lbs_pos;
     rays.path_type = type;
     if (tap)

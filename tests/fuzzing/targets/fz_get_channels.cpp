@@ -118,12 +118,12 @@ static void run(fz::input &in)
     }
     default:
     {
-        // Up to 3 frequencies per array, path gain [n_path, n_freq_in], M [8 or 2, n_path, n_freq_in]
+        // Up to 3 frequencies per array, path gain [n_path, n_freq], M [8 or 2, n_path, n_freq]
         std::vector<quadriga_lib::arrayant<T>> tx_vec, rx_vec;
         for (arma::uword f = 0, n = in.size(3); f < n; ++f)
-            tx_vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? antenna<T>(in) : tx), tx_vec.back().center_frequency = in.value<T>();
+            tx_vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? antenna<T>(in) : tx), tx_vec.back().center_freq = in.value<T>();
         for (arma::uword f = 0, n = in.size(3); f < n; ++f)
-            rx_vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? antenna<T>(in) : rx), rx_vec.back().center_frequency = in.value<T>();
+            rx_vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? antenna<T>(in) : rx), rx_vec.back().center_freq = in.value<T>();
         const arma::uword n_path = in.size(8), n_fin = in.size(3);
         paths<T> q(in, n_path);
         const bool consistent = in.ConsumeIntegralInRange<int>(0, 3) != 0;

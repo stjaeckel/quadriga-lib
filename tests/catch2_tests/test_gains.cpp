@@ -89,14 +89,14 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, EM mode")
 {
     const std::string fn = "test_gains_em.qrt";
 
-    arma::vec freq_GHz = {0.9, 3.5, 28.0};
+    arma::vec freq_Hz = {0.9e9, 3.5e9, 28.0e9};
     arma::vec tx_pos = {-200.0, 0.0, 2.0};
     arma::mat rx_pos = {{-100.0, 0.0, 2.0},    // 100 m
                         {-160.0, 0.0, 2.0},    // 40 m
                         {-187.5, 0.0, 2.0}};   // 12.5 m
     arma::vec dist = {100.0, 40.0, 12.5};
 
-    write_los_qrt(fn, freq_GHz, tx_pos, rx_pos, false);
+    write_los_qrt(fn, freq_Hz, tx_pos, rx_pos, false);
 
     arma::mat cube;
     arma::uvec mtl_ind;
@@ -112,8 +112,8 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, EM mode")
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0);
 
         REQUIRE(pg.n_rows == 1);
-        REQUIRE(pg.n_cols == freq_GHz.n_elem);
-        REQUIRE(cf.n_elem == freq_GHz.n_elem);
+        REQUIRE(pg.n_cols == freq_Hz.n_elem);
+        REQUIRE(cf.n_elem == freq_Hz.n_elem);
 
         // Precondition: the QRT path length is the direct TX-RX distance, which is what
         // calc_diffraction_gain uses. If this drifts, the comparison below is meaningless.
@@ -125,7 +125,7 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, EM mode")
         for (arma::uword k = 0; k < 3; ++k)
             orig(0, k) = txp(k), dest(0, k) = rxp(k);
 
-        for (arma::uword f = 0; f < freq_GHz.n_elem; ++f)
+        for (arma::uword f = 0; f < freq_Hz.n_elem; ++f)
         {
             arma::vec g_rel, g_abs;
             quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, cf(f), 0,
@@ -336,7 +336,7 @@ TEST_CASE("Gains - Phase matches get_channels_spherical, EM mode")
 
 // Acoustic counterpart of the previous test. get_channels_multifreq is the generator that
 // carries a configurable propagation speed and a 2-row scalar M, so it owns the acoustic phase
-// model. Same A/B equivalence; freq_out = 0 disables the generator's own rotation.
+// model. Same A/B equivalence; freq_new = 0 disables the generator's own rotation.
 //
 // This test also pins the speed of sound: if calc_diffraction_gain formed the acoustic
 // wavelength from anything other than SPEED_OF_SOUND, case A and case B would disagree.
@@ -376,8 +376,8 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
         {
             std::vector<quadriga_lib::arrayant<double>> tx_v{quadriga_lib::generate_arrayant_omni<double>()};
             std::vector<quadriga_lib::arrayant<double>> rx_v{quadriga_lib::generate_arrayant_omni<double>()};
-            tx_v[0].center_frequency = freq;
-            rx_v[0].center_frequency = freq;
+            tx_v[0].center_freq = freq;
+            rx_v[0].center_freq = freq;
 
             arma::mat orig(1, 3), dest(1, 3);
             for (arma::uword k = 0; k < 3; ++k)
@@ -396,7 +396,7 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
 
             REQUIRE(X_plain.n_rows == 2);
 
-            // Scalar M is [2, n_path, n_freq_in]
+            // Scalar M is [2, n_path, n_freq]
             arma::cube M_plain(2, 1, 1), M_phase(2, 1, 1);
             for (arma::uword k = 0; k < 2; ++k)
                 M_plain(k, 0, 0) = X_plain(k, 0), M_phase(k, 0, 0) = X_phase(k, 0);
@@ -411,26 +411,26 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
             arma::mat pg(1, 1);
             pg(0, 0) = gain(0);
             arma::vec plen = {dist};
-            arma::vec freq_in = {freq};
+            arma::vec freq_grid = {freq};
 
             std::vector<arma::cube> crA, ciA, dlA, crB, ciB, dlB;
 
             // A: phase supplied by the generator, at the acoustic propagation speed
-            arma::vec freq_out_on = {freq};
+            arma::vec freq_new_on = {freq};
             quadriga_lib::get_channels_multifreq<double>(tx_v, rx_v,
                                                          cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
                                                          cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
                                                          fbs, lbs, pg, plen, M_plain,
-                                                         freq_in, freq_out_on, crA, ciA, dlA,
+                                                         freq_grid, freq_new_on, crA, ciA, dlA,
                                                          false, false, SPEED_OF_SOUND);
 
-            // B: phase already in M; freq_out = 0 disables the generator's rotation
-            arma::vec freq_out_off = {0.0};
+            // B: phase already in M; freq_new = 0 disables the generator's rotation
+            arma::vec freq_new_off = {0.0};
             quadriga_lib::get_channels_multifreq<double>(tx_v, rx_v,
                                                          cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
                                                          cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
                                                          fbs, lbs, pg, plen, M_phase,
-                                                         freq_in, freq_out_off, crB, ciB, dlB,
+                                                         freq_grid, freq_new_off, crB, ciB, dlB,
                                                          false, false, SPEED_OF_SOUND);
 
             REQUIRE(crA.size() == 1);
@@ -447,7 +447,7 @@ TEST_CASE("Gains - Phase matches get_channels_multifreq, scalar mode")
                                                          cs.T(0), cs.T(1), cs.T(2), 0.0, 0.0, 0.0,
                                                          cs.R(0), cs.R(1), cs.R(2), 0.0, 0.0, 0.0,
                                                          fbs, lbs, pg, plen, M_plain,
-                                                         freq_in, freq_out_off, crC, ciC, dlC,
+                                                         freq_grid, freq_new_off, crC, ciC, dlC,
                                                          false, false, SPEED_OF_SOUND);
 
             CHECK(arma::abs(ciA[0] - ciC[0]).max() > 1e-6);

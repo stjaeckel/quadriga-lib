@@ -20,7 +20,7 @@ static std::vector<quadriga_lib::arrayant<T>> fuzzed_vector(fz::input &in, const
     for (arma::uword f = 0; f < n; ++f)
     {
         vec.push_back(in.ConsumeIntegralInRange<int>(0, 5) == 0 ? fz::arrayant<T>(in) : a);
-        vec.back().center_frequency = in.value<T>();
+        vec.back().center_freq = in.value<T>();
     }
     return vec;
 }

@@ -37,12 +37,12 @@ Monte-Carlo estimate of the ACF of one generator
 
 ## Usage:
 ```
-acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( freq, phase, bins, n_pos, \
+acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, phase, bins, n_pos, \
     acf, dist, seed )
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `(n_coeff, 3)`
+- **`spatial_freq`** — Spatial frequencies; `(n_coeff, 3)`
 - **`phase`** — Phases of the generator; `(n_coeff,)` or `(n_coeff, 1)`
 - **`bins`** — Bin centers; must be >= 0, increase strictly and be finite; at least 2
   elements; `(n_bin,)`
@@ -65,7 +65,7 @@ acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( freq, phase, bi
 - [[sos.val]] (evaluation of the generator)
 MD!*/
 
-py::tuple sos_acf_estimate(const py::array_t<double> &freq,
+py::tuple sos_acf_estimate(const py::array_t<double> &spatial_freq,
                            const py::array_t<double> &phase,
                            const py::array_t<double> &bins,
                            arma::uword n_pos,
@@ -74,7 +74,7 @@ py::tuple sos_acf_estimate(const py::array_t<double> &freq,
                            arma::sword seed)
 {
     // Read inputs
-    const auto freq_a = qd_python_numpy2arma_Mat<double>(freq, true);
+    const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto phase_a = qd_python_numpy2arma_Col<double>(phase, true);
     const auto bins_a = qd_python_numpy2arma_Col<double>(bins, true);
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
@@ -105,7 +105,7 @@ py::tuple sos_acf_estimate(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("acf_estimate", &sos_acf_estimate,
-//       py::arg("freq").none(false),
+//       py::arg("spatial_freq").none(false),
 //       py::arg("phase").none(false),
 //       py::arg("bins").none(false),
 //       py::arg("n_pos"),

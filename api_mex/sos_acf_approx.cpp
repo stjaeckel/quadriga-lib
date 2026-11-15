@@ -28,11 +28,11 @@ ACF produced by a set of sinusoids
 
 ## Usage:
 ```
-[ acf_approx, dist_2d ] = quadriga_lib.sos_acf_approx( freq, dist );
+[ acf_approx, dist_2d ] = quadriga_lib.sos_acf_approx( spatial_freq, dist );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; at least
   2 elements; `[n_acf]`
 
@@ -54,11 +54,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
     const arma::vec dist = qd_mex_get_Col<double>(prhs[1]);
 
     // Output allocation (invalid sizes are left to the library to reject)
-    const arma::uword n_dim = freq.n_cols, n_grid = (dist.n_elem < 2) ? 0 : 4 * dist.n_elem - 3;
+    const arma::uword n_dim = spatial_freq.n_cols, n_grid = (dist.n_elem < 2) ? 0 : 4 * dist.n_elem - 3;
     const bool valid = n_grid != 0 && n_dim >= 1 && n_dim <= 3;
     arma::cube acf_approx;
     arma::vec dist_2d;
@@ -71,5 +71,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_dist_2d = dist_2d.empty() ? nullptr : &dist_2d;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_acf_approx<double>(freq, dist, acf_approx, p_dist_2d));
+    CALL_QD(quadriga_lib::sos_acf_approx<double>(spatial_freq, dist, acf_approx, p_dist_2d));
 }

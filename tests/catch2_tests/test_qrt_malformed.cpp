@@ -21,7 +21,7 @@ namespace
     // Byte offsets: no_orig 11, no_cir 15, no_dest 19, no_freq 23, orig_index 76, path_data_index 91, no_path 99.
     static std::vector<char> qrt_small_file(const std::string &fn)
     {
-        quadriga_lib::qrt_file_init<double>(fn, arma::vec{3.0}, arma::mat{{1.0, 2.0, 3.0}}, arma::mat());
+        quadriga_lib::qrt_file_init<double>(fn, arma::vec{3.0e9}, arma::mat{{1.0, 2.0, 3.0}}, arma::mat());
         std::vector<quadriga_lib::path> pd(1);
         quadriga_lib::qrt_file_append<double>(fn, pd, arma::vec{0.0, 0.0, 10.0});
         std::ifstream i(fn, std::ios::binary);

@@ -14,8 +14,8 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (a 1x1 struct and no `frequency`): up to 8 outputs. Multi-frequency mode (a struct array with
-  more than one entry, or `frequency` given): for each target frequency, the two entries whose center frequencies
+- Single-frequency mode (a 1x1 struct and no `freq_new`): up to 8 outputs. Multi-frequency mode (a struct array with
+  more than one entry, or `freq_new` given): for each target frequency, the two entries whose center frequencies
   bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
 - `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
 - NaN or infinite angles give NaN in all outputs of that angle and output, without an error
@@ -32,7 +32,7 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 
 % Multi-frequency mode
 [ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
-    element, orientation, element_pos, frequency, use_kernel );
+    element, orientation, element_pos, freq_new, use_kernel );
 ```
 
 ## Inputs:
@@ -46,7 +46,7 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
   `[3, n_out, n_ang]`; default: no rotation
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
   positions of the arrayant
-- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
+- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `[n_freq]`; default: the `center_freq`
   of the entries
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
@@ -88,7 +88,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     const auto orientation = (nrhs < 5) ? arma::cube() : qd_mex_get_Cube<double>(prhs[4], false, "orientation");
     const auto element_pos = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5], false, "element_pos");
-    const auto frequency = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "frequency");
+    const auto freq_new = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "freq_new");
     const int use_kernel = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "use_kernel", 0);
 
     const arma::uvec *p_element = element.is_empty() ? nullptr : &element;
@@ -98,12 +98,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_out = element.is_empty() ? ant[0].n_elements() : element.n_elem;
     const arma::uword n_ang = az.n_cols;
 
-    if (ant.size() > 1 || !frequency.is_empty()) // Multi-frequency mode
+    if (ant.size() > 1 || !freq_new.is_empty()) // Multi-frequency mode
     {
         if (nlhs > 4)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency mode supports at most 4 outputs (V_re, V_im, H_re, H_im).");
 
-        const arma::uword n_freq = frequency.is_empty() ? (arma::uword)ant.size() : frequency.n_elem;
+        const arma::uword n_freq = freq_new.is_empty() ? (arma::uword)ant.size() : freq_new.n_elem;
         arma::cube V_re, V_im, H_re, H_im;
         if (nlhs > 0)
             plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang, n_freq);
@@ -115,7 +115,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             plhs[3] = qd_mex_init_output(&H_im, n_out, n_ang, n_freq);
 
         CALL_QD(quadriga_lib::arrayant_interpolate_multi<double>(ant, az, el, V_re, V_im, H_re, H_im,
-                                                                 frequency.is_empty() ? nullptr : &frequency,
+                                                                 freq_new.is_empty() ? nullptr : &freq_new,
                                                                  p_element, p_orientation, p_element_pos, nullptr, nullptr, use_kernel));
         return;
     }

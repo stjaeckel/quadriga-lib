@@ -80,7 +80,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                    arma::Col<dtype> *azimuth_grid, arma::Col<dtype> *elevation_grid,
                                    arma::Mat<dtype> *element_pos,
                                    arma::Mat<dtype> *coupling_re, arma::Mat<dtype> *coupling_im,
-                                   dtype *center_frequency,
+                                   dtype *center_freq,
                                    arma::Mat<unsigned> *layout)
 {
     pugi::xml_document doc;
@@ -173,7 +173,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     // Read center frequency
     node_name = pfx + "CenterFrequency";
     node = node_arrayant.child(node_name.c_str());
-    *center_frequency = node.empty() ? dtype(299792458.0) : dtype(node.text().as_double());
+    *center_freq = node.empty() ? dtype(299792458.0) : dtype(node.text().as_double());
 
     // Read the number of elements
     node_name = pfx + "NoElements";
@@ -396,7 +396,7 @@ template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                             arma::Col<float> *azimuth_grid, arma::Col<float> *elevation_grid,
                                             arma::Mat<float> *element_pos,
                                             arma::Mat<float> *coupling_re, arma::Mat<float> *coupling_im,
-                                            float *center_frequency,
+                                            float *center_freq,
                                             arma::Mat<unsigned> *layout);
 
 template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
@@ -406,7 +406,7 @@ template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                             arma::Col<double> *azimuth_grid, arma::Col<double> *elevation_grid,
                                             arma::Mat<double> *element_pos,
                                             arma::Mat<double> *coupling_re, arma::Mat<double> *coupling_im,
-                                            double *center_frequency,
+                                            double *center_freq,
                                             arma::Mat<unsigned> *layout);
 
 // The number formatters below use snprintf / strtof instead of the std::to_chars float overloads, which need
@@ -655,7 +655,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                     const arma::Col<dtype> *azimuth_grid, const arma::Col<dtype> *elevation_grid,
                                     const arma::Mat<dtype> *element_pos,
                                     const arma::Mat<dtype> *coupling_re, const arma::Mat<dtype> *coupling_im,
-                                    const dtype *center_frequency,
+                                    const dtype *center_freq,
                                     const arma::Mat<unsigned> *layout,
                                     unsigned *id_in_file)
 {
@@ -757,7 +757,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
     // Write data
     node_arrayant.append_child((pfx + "name").c_str()).text().set(name->c_str());
-    node_arrayant.append_child((pfx + "CenterFrequency").c_str()).text().set(*center_frequency);
+    node_arrayant.append_child((pfx + "CenterFrequency").c_str()).text().set(*center_freq);
 
     arma::uword NoElements = e_theta_re->n_slices;
     if (NoElements > 1)
@@ -1000,7 +1000,7 @@ template std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                              const arma::Col<float> *azimuth_grid, const arma::Col<float> *elevation_grid,
                                              const arma::Mat<float> *element_pos,
                                              const arma::Mat<float> *coupling_re, const arma::Mat<float> *coupling_im,
-                                             const float *center_frequency,
+                                             const float *center_freq,
                                              const arma::Mat<unsigned> *layout,
                                              unsigned *id_in_file);
 
@@ -1011,6 +1011,6 @@ template std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                              const arma::Col<double> *azimuth_grid, const arma::Col<double> *elevation_grid,
                                              const arma::Mat<double> *element_pos,
                                              const arma::Mat<double> *coupling_re, const arma::Mat<double> *coupling_im,
-                                             const double *center_frequency,
+                                             const double *center_freq,
                                              const arma::Mat<unsigned> *layout,
                                              unsigned *id_in_file);

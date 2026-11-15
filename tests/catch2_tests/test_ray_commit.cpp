@@ -970,7 +970,7 @@ TEST_CASE("ray_commit - input validation")
         CHECK_THROWS_AS(C.commit(big, P, out), std::invalid_argument);
     }
 
-    SECTION("center_frequency")
+    SECTION("center_freq")
     {
         Cfg X = C;
         X.freq.reset();

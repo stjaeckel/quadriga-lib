@@ -449,7 +449,7 @@ class test_case(unittest.TestCase):
     # "1-based sub_mesh cannot be 0" check) do not apply to the Python binding.
 
     def test_error_missing_required_arg(self):
-        # center_frequency is required (no default).
+        # center_freq is required (no default).
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
                 self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop)

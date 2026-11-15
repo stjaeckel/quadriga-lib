@@ -42,19 +42,19 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("d").none(false));
 
     m.def("val", &sos_val,
-          py::arg("freq").none(false),
+          py::arg("spatial_freq").none(false),
           py::arg("phase").none(false),
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
           py::arg("phase_b") = py::none(),
           py::arg("acf") = py::none(),
           py::arg("dist") = py::none(),
-          py::arg("freq_scale_b") = 1.0,
+          py::arg("spatial_freq_scale_b") = 1.0,
           py::arg("uniform") = false,
           py::arg("use_kernel") = 0);
 
     m.def("map", &sos_map,
-          py::arg("freq").none(false),
+          py::arg("spatial_freq").none(false),
           py::arg("phase").none(false),
           py::arg("x").none(false),
           py::arg("y") = py::none(),
@@ -88,31 +88,31 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("seed") = -1);
 
     m.def("remove_bias", &sos_remove_bias,
-          py::arg("freq").none(false),
+          py::arg("spatial_freq").none(false),
           py::arg("phase_in").none(false),
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
           py::arg("phase_b_in") = py::none(),
           py::arg("acf") = py::none(),
           py::arg("dist") = py::none(),
-          py::arg("freq_scale_b") = 1.0);
+          py::arg("spatial_freq_scale_b") = 1.0);
 
     m.def("acf_2d", &sos_acf_2d,
           py::arg("acf").none(false),
           py::arg("dist").none(false));
 
     m.def("acf_approx", &sos_acf_approx,
-          py::arg("freq").none(false),
+          py::arg("spatial_freq").none(false),
           py::arg("dist").none(false));
 
     m.def("calc_mse", &sos_calc_mse,
-          py::arg("freq").none(false),
+          py::arg("spatial_freq").none(false),
           py::arg("acf").none(false),
           py::arg("dist").none(false),
           py::arg("n_dir") = 10);
 
     m.def("acf_estimate", &sos_acf_estimate,
-          py::arg("freq").none(false),
+          py::arg("spatial_freq").none(false),
           py::arg("phase").none(false),
           py::arg("bins").none(false),
           py::arg("n_pos"),
@@ -128,7 +128,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("uniform_smp") = true,
           py::arg("n_dir") = 10,
           py::arg("random_init") = true,
-          py::arg("freq_min") = 0.0,
-          py::arg("freq_max") = 0.0,
+          py::arg("spatial_freq_min") = 0.0,
+          py::arg("spatial_freq_max") = 0.0,
           py::arg("seed") = -1);
 }

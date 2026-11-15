@@ -186,10 +186,10 @@ Advance a ray set by one interaction, spawning reflected, transmitted, and subdi
   subdivision flag together — before the expensive passes, and dead intermediates are released as the
   function proceeds, so peak footprint stays close to one generation.
   Designed for `n_ray` up to ~10^8; the ray index is 32-bit, so `n_ray` is capped at 2^32-1.
-- Geometry is traced once, at the reference frequency `center_frequency[0]`. For the remaining frequencies
+- Geometry is traced once, at the reference frequency `center_freq[0]`. For the remaining frequencies
   only the polarization/gain coefficient is recomputed and folded into each [[path]]; the per-frequency
   refracted direction and in-medium distance are approximated by the reference-frequency values (see the
-  note on `center_frequency`).
+  note on `center_freq`).
 - Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
   otherwise rays are traced as infinitesimal.
 - The ray-mesh intersection can be delegated: pass `no_interact_in`, `fbs_ind_in` and `sbs_ind_in`
@@ -208,7 +208,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     const arma::fmat &mesh,
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-    const arma::fvec &center_frequency,
+    const arma::fvec &center_freq,
     float Ox, float Oy, float Oz,
     arma::fmat &orig,
     arma::fmat &dest,
@@ -241,7 +241,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`. 0 = air
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl` (max 16383)
-- **`center_frequency`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_frequency[0]` is the reference frequency that defines the traced geometry
+- **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
 - **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins
 - **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [[ray_triangle_intersect]]; `[n_sub]`. NULL → no partitioning
@@ -284,7 +284,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   medium both include the relaunch offset of the last event (a few float ulp of the coordinate, about 1 µm
   per metre), so the leg the next event measures from `orig` adds up to the leg from the hit point
 - **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Frequency count and layout must match
-  `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
+  `center_freq` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`. Must be supplied together with `tridir`; empty / NULL disables beam tracing
 - **`tridir`** *(optional)* — Vertex-ray directions, Cartesian; `[n_ray, 9]`
@@ -312,7 +312,7 @@ MD!*/
 std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    const arma::uvec &mtl_ind,
                                                    const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-                                                   const arma::fvec &center_frequency,
+                                                   const arma::fvec &center_freq,
                                                    float Ox, float Oy, float Oz,
                                                    arma::fmat &orig,
                                                    arma::fmat &dest,
@@ -342,7 +342,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
 {
     // The in/out arguments must be distinct and must not share memory with an input
     qd_check_alias_list({&orig, &dest, &acc_dist, trivec, tridir}, {"orig", "dest", "acc_dist", "trivec", "tridir"},
-                        &mesh, &center_frequency, aabb);
+                        &mesh, &center_freq, aabb);
     qd_check_alias_list({&mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer},
                         {"mtl_ind_prev", "mtl_ind_current", "mtl_ind_buffer"});
 
@@ -374,14 +374,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
     // Frequencies; the path storage layout supports 1 to 127 frequencies
-    const arma::uword n_freq = center_frequency.n_elem;
+    const arma::uword n_freq = center_freq.n_elem;
     if (n_freq == 0)
-        throw std::invalid_argument("Input 'center_frequency' cannot be empty.");
+        throw std::invalid_argument("Input 'center_freq' cannot be empty.");
     if (n_freq > 127)
-        throw std::invalid_argument("Input 'center_frequency' cannot have more than 127 elements.");
-    if (center_frequency.min() <= 0.0f)
-        throw std::invalid_argument("Input 'center_frequency' must be > 0.");
-    float fRef_Hz = center_frequency[0];
+        throw std::invalid_argument("Input 'center_freq' cannot have more than 127 elements.");
+    if (center_freq.min() <= 0.0f)
+        throw std::invalid_argument("Input 'center_freq' must be > 0.");
+    float fRef_Hz = center_freq[0];
     float fRef_GHz = fRef_Hz * 1e-9f;
 
     // Ray count is defined by 'orig'; all other per-ray inputs must match it
@@ -417,7 +417,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         throw std::invalid_argument("Input 'paths' must have n_ray elements.");
 
     if (paths[0].n_freq() != n_freq) // Quick check first path, deep check later
-        throw std::invalid_argument("Number of frequencies in 'paths' must match 'center_frequency'.");
+        throw std::invalid_argument("Number of frequencies in 'paths' must match 'center_freq'.");
     if (paths[0].is_scalar() != scalar_mode)
         throw std::invalid_argument("Layout of 'paths' must match 'scalar_mode'.");
     const arma::uword nXPR = scalar_mode ? 2 : 8;
@@ -1067,7 +1067,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         {
             // Note: fbsN, sbsN, fbs_angleN, normal_vecN are re-used from the reflection / subdivision pass
             // trivec and tridir are needed as input to evaluate TIR conditions for the entire ray tube and not just he spine
-            quadriga_lib::ray_mesh_interact<float>(interaction_type, center_frequency[i_freq], &orig, &dest,
+            quadriga_lib::ray_mesh_interact<float>(interaction_type, center_freq[i_freq], &orig, &dest,
                                                    &mesh, &mtl_ind, &mtl_prop, &fbs_ind, &sbs_ind,
                                                    (beam_mode ? trivec : nullptr), (beam_mode ? tridir : nullptr),
                                                    nullptr, nullptr, nullptr, nullptr, nullptr, &xprmatN, nullptr, nullptr,
@@ -1079,7 +1079,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             const arma::fmat dir_f(dir_prev.memptr() + 3 * i_freq * n_interact, n_interact, 3, false, true);
             const arma::fvec acc_ref_f(acc_dist.memptr() + (1 + i_freq) * n_interact, n_interact, false, true);
 
-            quadriga_lib::ray_state_update<float>(interaction_type, center_frequency[i_freq], &orig, &dest,
+            quadriga_lib::ray_state_update<float>(interaction_type, center_freq[i_freq], &orig, &dest,
                                                   &fbsN, &sbsN, &no_interact, &fbs_angleN, &normal_vecN,
                                                   &interact_type, &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                                   &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,

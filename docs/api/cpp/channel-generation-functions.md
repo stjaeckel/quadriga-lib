@@ -121,7 +121,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · No
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
-- Setting `center_frequency = 0.0` disables phase computation
+- Setting `center_freq = 0.0` disables phase computation
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
@@ -152,7 +152,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *delay,
     arma::uword i_irs = 0,
     dtype threshold_dB = -140.0,
-    dtype center_frequency = 0.0,
+    dtype center_freq = 0.0,
     bool use_absolute_delays = false,
     arma::Cube<dtype> *aod = nullptr,
     arma::Cube<dtype> *eod = nullptr,
@@ -186,7 +186,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
 - **`i_irs`** *(optional)* — IRS codebook port index
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
-- **`center_frequency`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](array-antenna-class.md#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
@@ -218,7 +218,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_multifreq)
 
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (from `tx_array[i].center_frequency`), RX array, input samples (`freq_in`), and output (`freq_out`)
+- Aligns four frequency grids: TX array (from `tx_array[i].center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
 - TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [arrayant_interpolate_multi](array-antenna-functions.md#arrayant_interpolate_multi))
 - `path_gain` interpolated linearly; `M` interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to nearest frequency entry on all four grids
@@ -244,8 +244,8 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_multifreq)
   0.75 m. Use `use_absolute_delays = true` in that case
 - The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
   [baseband_freq_response_multi](channel-functions.md#baseband_freq_response_multi) with `remove_delay_phase = true` removes the phase of `delay` before it
-  interpolates across `freq_in`, so it needs channels generated with `use_absolute_delays = true`; with relative
-  delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the `freq_in` grid and
+  interpolates across `freq`, so it needs channels generated with `use_absolute_delays = true`; with relative
+  delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the `freq` grid and
   gives wrong phases
 
 ### Declaration:
@@ -262,8 +262,8 @@ void quadriga_lib::get_channels_multifreq(
     const arma::Mat<dtype> &path_gain,
     const arma::Col<dtype> &path_length,
     const arma::Cube<dtype> &M,
-    const arma::Col<dtype> &freq_in,
-    const arma::Col<dtype> &freq_out,
+    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &freq_new,
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
@@ -282,20 +282,20 @@ void quadriga_lib::get_channels_multifreq(
 - **`Rb, Rt, Rh`** — RX orientation, Euler angles (bank, tilt, heading), finite
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_gain`** — Linear-scale path gains; `[n_path, n_freq_in]`
+- **`path_gain`** — Linear-scale path gains; `[n_path, n_freq]`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path]`
-- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq_in]` (full pol) or
-  `[2, n_path, n_freq_in]` (scalar)
-- **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in]`
-- **`freq_out`** — Target output frequencies; `[n_freq_out]`
+- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
+  `[2, n_path, n_freq]` (scalar)
+- **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq]`
+- **`freq_new`** — Target output frequencies; `[n_freq_new]`
 - **`use_absolute_delays`** *(optional)* — Include LOS delay in all paths if true
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
 
 ### Outputs:
-- **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
+- **`coeff_re`** — Real part of coefficients; vector length `n_freq_new`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
 - **`coeff_im`** — Imaginary part; same structure as `coeff_re`
 - **`delay`** — Propagation delays [s]; same structure as `coeff_re`
 - **`coeff`** *(optional)* — Coefficients as complex values, replacing `coeff_re` and `coeff_im` (then left empty);
@@ -328,7 +328,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_planar) ·
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- Setting `center_frequency = 0` disables phase calculation (delays still computed).
+- Setting `center_freq = 0` disables phase calculation (delays still computed).
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
   centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [quantize_delays](channel-functions.md#quantize_delays) rejects
@@ -354,7 +354,7 @@ void quadriga_lib::get_channels_planar(
     arma::Cube<dtype> *coeff_re,
     arma::Cube<dtype> *coeff_im,
     arma::Cube<dtype> *delay,
-    dtype center_frequency = dtype(0.0),
+    dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Col<dtype> *rx_Doppler = nullptr);
@@ -374,7 +374,7 @@ void quadriga_lib::get_channels_planar(
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`center_frequency`** *(optional)* — Center frequency; 0 disables phase calculation
+- **`center_freq`** *(optional)* — Center frequency; 0 disables phase calculation
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
@@ -408,7 +408,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_spherical)
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
   [coord2path](site-specific-simulation-tools.md#coord2path) or [qrt_file_read](channel-functions.md#qrt_file_read) with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry (spherical waves).
-- If `center_frequency == 0`, phase calculation is disabled and only delays are computed.
+- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -438,7 +438,7 @@ void quadriga_lib::get_channels_spherical(
     arma::Cube<dtype> *coeff_re,
     arma::Cube<dtype> *coeff_im,
     arma::Cube<dtype> *delay,
-    dtype center_frequency = dtype(0.0),
+    dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Cube<dtype> *aod = nullptr,
@@ -462,7 +462,7 @@ void quadriga_lib::get_channels_spherical(
   (e.g. 0) use the polyline length; `[n_path]`
 - **`M`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); `[8, n_path]`
-- **`center_frequency`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot

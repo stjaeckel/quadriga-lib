@@ -196,7 +196,7 @@ TEST_CASE("Arrayant remove_zeros - name and the azimuth spacing at the wrap-arou
     a.e_theta_re.slice(0).col(0).fill(1.0);
     a.e_theta_im.zeros(3, 7, 1), a.e_phi_re.zeros(3, 7, 1), a.e_phi_im.zeros(3, 7, 1);
     a.element_pos.zeros(3, 1), a.coupling_re.ones(1, 1), a.coupling_im.zeros(1, 1);
-    a.center_frequency = 1.0e9;
+    a.center_freq = 1.0e9;
     REQUIRE(a.is_valid().empty());
 
     quadriga_lib::arrayant<double> o = a;

@@ -79,15 +79,15 @@ namespace quadriga_lib
     channel<double> gbsm_single_link_channel(const arrayant<double> &tx_array,          // Tx array antenna, n_tx ports
                                              const arrayant<double> &rx_array,          // Rx array antenna, n_rx ports
                                              const gbsm_rays &rays,                     // Ray data of the link
-                                             const arma::vec &link_gain_dB,             // Link gain -PL - O2I + 10·lg(SF) at rays.center_frequency(i_freq) in [dB], [n_snap] or [1]
+                                             const arma::vec &link_gain_dB,             // Link gain -PL - O2I + 10·lg(SF) at rays.center_freq(i_freq) in [dB], [n_snap] or [1]
                                              const std::string &mobility = "auto",      // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
                                              const std::string &output = "taps",        // "taps" or "rays"
-                                             arma::uword i_freq = 0,                    // Frequency index in rays.center_frequency, 0-based; TR methods: 0 (one entry)
+                                             arma::uword i_freq = 0,                    // Frequency index in rays.center_freq, 0-based; TR methods: 0 (one entry)
                                              const arma::mat *tx_pos = nullptr,         // Optional: Tx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.tx_pos
                                              const arma::mat *rx_pos = nullptr,         // Optional: Rx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.rx_pos
                                              const arma::mat *tx_orientation = nullptr, // Optional: Tx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
                                              const arma::mat *rx_orientation = nullptr, // Optional: Rx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
-                                             const arma::vec *kf_ratio = nullptr,       // Optional: K(snapshot) / K(drop) at rays.center_frequency(i_freq), [n_snap] or [1]; nullptr = 1
+                                             const arma::vec *kf_ratio = nullptr,       // Optional: K(snapshot) / K(drop) at rays.center_freq(i_freq), [n_snap] or [1]; nullptr = 1
                                              bool oxygen = false,                       // TR 7.6.1 oxygen absorption from each path's own length
                                              bool use_absolute_delays = false);         // Include the LOS delay in all delays, as get_channels_*
 
@@ -136,7 +136,7 @@ namespace quadriga_lib
         const arma::fmat &mesh,                                              // Faces of the triangular mesh, [n_mesh, 9]
         const arma::uvec &mtl_ind,                                           // 1-based material index per face, [n_mesh]
         const std::unordered_map<std::string, std::vector<float>> &mtl_prop, // Material properties
-        const arma::fvec &center_frequency,                                  // Center frequencies in Hz, [n_freq]
+        const arma::fvec &center_freq,                                       // Center frequencies in Hz, [n_freq]
         float Ox, float Oy, float Oz,                                        // Global origin position
         arma::fmat &orig,                                                    // Ray origins in GCS, updated in-place, [n_ray, 3]
         arma::fmat &dest,                                                    // Ray destinations in GCS, updated in-place, [n_ray, 3]
@@ -168,13 +168,13 @@ namespace quadriga_lib
     // - Adds committed paths to the provided paths_commit vector
     // - Returns the number of newly committed paths
     // - Only includes points that are not shaded by the mesh at the next FBS location
-    // - Drops rays that fall below the minimum gain (@ center_frequency[0]) or exceed the maximum length
+    // - Drops rays that fall below the minimum gain (@ center_freq[0]) or exceed the maximum length
     arma::uword ray_commit(
         const std::vector<quadriga_lib::path> &paths,                        // In-flight path data storage, [n_ray]
         std::vector<quadriga_lib::path> &paths_commit,                       // Committed data storage, extended by [n_ray_commit]
         const arma::fmat &mesh,                                              // Faces of the triangular mesh, [n_mesh, 9]
         const std::unordered_map<std::string, std::vector<float>> &mtl_prop, // Material properties
-        const arma::fvec &center_frequency,                                  // Center frequencies in Hz, [n_freq]
+        const arma::fvec &center_freq,                                       // Center frequencies in Hz, [n_freq]
         const arma::fmat &orig,                                              // Ray origins in GCS, [n_ray, 3]
         const arma::u32_vec &fbs_ind,                                        // 1-based FBS face index, 0 = no hit, [n_ray]
         const arma::fmat &trivec,                                            // Beam wavefront vertices relative to ray origin, [n_ray, 9]

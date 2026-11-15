@@ -55,12 +55,12 @@ Approximation error of the ACF of a set of sinusoids
 
 ## Usage:
 ```
-[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( freq, acf, dist, ...
+[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( spatial_freq, acf, dist, ...
     n_dir );
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
 - **`dist`** — Sample points of the ACF; must start at 0, be equally spaced and finite; `[n_acf]`
 - **`n_dir`** — Number of test directions; must be > 0; ignored for `n_dim = 1`; default: 10
@@ -87,7 +87,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat freq = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
     const arma::vec acf = qd_mex_get_Col<double>(prhs[1]);
     const arma::vec dist = qd_mex_get_Col<double>(prhs[2]);
     const arma::uword n_dir = (nrhs < 4) ? 10 : qd_mex_sos_count(prhs[3], "n_dir", 10.0);
@@ -102,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_test_dir = (nlhs > 4) ? &test_dir : nullptr;
 
     // Call library function
-    CALL_QD(mse = quadriga_lib::sos_calc_mse<double>(freq, acf, dist, p_mse_core, p_mse_all, p_acf_tail, p_test_dir, n_dir));
+    CALL_QD(mse = quadriga_lib::sos_calc_mse<double>(spatial_freq, acf, dist, p_mse_core, p_mse_all, p_acf_tail, p_test_dir, n_dir));
 
     // Copy to MATLAB
     if (nlhs > 0)

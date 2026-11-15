@@ -145,11 +145,11 @@ def read_slot(group):
 
     n_tx, n_rx = int(attr(group, 'NumTx')), int(attr(group, 'NumRx'))
     if is_dset('CenterFrequency'):
-        chan['center_frequency'] = f32(group['CenterFrequency'][()]).reshape(-1)
+        chan['center_freq'] = f32(group['CenterFrequency'][()]).reshape(-1)
     elif 'CenterFrequency' in group.attrs:
         cf = f32(group.attrs['CenterFrequency']).reshape(-1)[:1]
         if not np.isnan(cf[0]):
-            chan['center_frequency'] = cf
+            chan['center_freq'] = cf
     for key in ('tx_position', 'rx_position', 'tx_orientation', 'rx_orientation'):
         if is_dset(key):
             chan[key] = f32(group[key][()]).T

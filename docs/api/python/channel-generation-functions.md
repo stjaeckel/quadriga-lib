@@ -18,7 +18,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (`ant_tx['center_freq']`), RX array (`ant_rx['center_freq']`), input samples (`freq_in`), and output (`freq_out`)
+- Aligns four frequency grids: TX array (`ant_tx['center_freq']`), RX array (`ant_rx['center_freq']`), input samples (`freq`), and output (`freq_new`)
 - Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
@@ -35,7 +35,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 0 and leaves a zero-power path in its original slot
   (input index + 1); all other paths keep their order, shifted by one slot
-- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0, n_freq_out)`; with
+- With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0, n_freq_new)`; with
   `add_fake_los_path = True` they hold only this zero-power LOS path, with the LOS delays per antenna pair
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
@@ -45,7 +45,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
   0.75 m. Use `use_absolute_delays = true` in that case
 - The coefficients always carry the phase of the absolute path length, also when `use_absolute_delays` is false.
   [baseband_freq_response](channel-functions.md#baseband_freq_response) with multi-frequency input and `remove_delay_phase = True` removes the phase of `delay`
-  before it interpolates across `freq_in`, so it needs channels generated with `use_absolute_delays = True`; with
+  before it interpolates across `freq`, so it needs channels generated with `use_absolute_delays = True`; with
   relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
   grid and gives wrong phases
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
@@ -55,8 +55,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 ### Usage:
 ```python
 coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ant_tx, ant_rx, fbs_pos, \
-    lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq_in, \
-    freq_out, use_absolute_delays, add_fake_los_path, propagation_speed )
+    lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq, \
+    freq_new, use_absolute_delays, add_fake_los_path, propagation_speed )
 
 coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=False )
 ```
@@ -67,17 +67,17 @@ coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., c
 - **`ant_rx`** — RX arrayant dict; same format as `ant_tx`
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
-- **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq_in)`
+- **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq)`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
-- **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq_in)` full pol or
-  `(2, n_path, n_freq_in)` scalar pressure
+- **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
+  `(2, n_path, n_freq)` scalar pressure
 - **`tx_pos`** — Transmitter position, finite; `(3,)`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
 - **`rx_pos`** — Receiver position, finite; `(3,)`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
-- **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `(n_freq_in,)`
-- **`freq_out`** — Target output frequencies; `(n_freq_out,)`
+- **`freq`** — Input sample frequencies for `path_gain` and `M`; `(n_freq,)`
+- **`freq_new`** — Target output frequencies; `(n_freq_new,)`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
@@ -86,10 +86,10 @@ coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., c
   separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
-- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)`
+- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)
@@ -111,7 +111,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
-- The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
+- The scalar argument `i_freq` selects the frequency index that is processed; a single frequency is returned per call.
 - If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == False`, the straight-line TX-RX delay between the phase centres (LOS delay) is subtracted
   from all paths; per-element delays of pairs that are closer to each other than the phase centres are then
@@ -136,7 +136,7 @@ coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ant_tx, a
 
 coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=False )
 
-coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq=1 )
+coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., i_freq=1 )
 ```
 
 ### Inputs:
@@ -160,7 +160,7 @@ coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., freq
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `True`
-- **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
 
 ### Outputs:
@@ -194,7 +194,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
   [qrt_file_read](channel-functions.md#qrt_file_read) with more than two interactions) is added to the FBS-LBS segment. Delays and phases follow this
   length; the per-element offsets follow the FBS / LBS geometry.
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
-- The scalar argument `freq` selects the frequency index that is processed; a single frequency is returned per call.
+- The scalar argument `i_freq` selects the frequency index that is processed; a single frequency is returned per call.
 - If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
@@ -236,7 +236,7 @@ coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., 
 
 coeff, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
 
-coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., freq=1 )
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., i_freq=1 )
 
 coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
 ```
@@ -262,7 +262,7 @@ coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 
 - **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `True`
-- **`freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate);
@@ -360,7 +360,7 @@ chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, C
   | `coeff`            | Channel coefficients, complex valued                                     | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
   | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
   | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`            | `(n_path, n_snap)`             |
-  | `center_frequency` | Center Frequency in Hz                                                   | `(1,)`                           | `(1,)`                         |
+  | `center_freq` | Center Frequency in Hz                                                   | `(1,)`                           | `(1,)`                         |
   | `initial_position` | 0-based index of the reference snapshot                                  | int                              | int                            |
 
 See also:

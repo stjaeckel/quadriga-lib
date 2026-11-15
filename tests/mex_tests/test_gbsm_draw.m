@@ -252,9 +252,9 @@ assertTrue( all( all( rr(:, 107:114) > 0 & rr(:, 107:114) < 1 ) ) );            
 assertTrue( max(max(abs(rr(:, 1:106)))) < 6 && std(rr(:)) > 0.1 );
 assertFalse( isequal( quadriga_lib.gbsm_draw( sr, 'ray', pr, tx_pos, rx_pos, 0, [], [], 28e9 ), rr ) );
 assert_throws( @() quadriga_lib.gbsm_draw( sr, 'ray', pr, tx_pos, rx_pos ), ...
-    'Input ''center_frequency'' is required for the shared ''ray'' set.' );                       % C++
+    'Input ''center_freq'' is required for the shared ''ray'' set.' );                       % C++
 assert_throws( @() quadriga_lib.gbsm_draw( sr, 'ray', pr, tx_pos, rx_pos, 0, [], [], -1 ), ...
-    'Input ''center_frequency'' must be finite and > 0.' );                                      % C++
+    'Input ''center_freq'' must be finite and > 0.' );                                      % C++
 pk = quadriga_lib.gbsm_init_phases( sr, 'ray', 7, 2 );
 rk = quadriga_lib.gbsm_draw( sr, 'ray', pk, tx_pos, rx_pos, 2 );                         % k >= 1
 assertEqual( size(rk), [n_link, 114] );

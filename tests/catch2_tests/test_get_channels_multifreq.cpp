@@ -74,7 +74,7 @@ TEST_CASE("Multifreq - Empty RX array throws")
         std::invalid_argument);
 }
 
-TEST_CASE("Multifreq - Empty freq_in throws")
+TEST_CASE("Multifreq - Empty freq throws")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
     auto rx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -91,7 +91,7 @@ TEST_CASE("Multifreq - Empty freq_in throws")
         std::invalid_argument);
 }
 
-TEST_CASE("Multifreq - Empty freq_out throws")
+TEST_CASE("Multifreq - Empty freq_new throws")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
     auto rx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -225,7 +225,7 @@ TEST_CASE("Multifreq - Output vector and cube dimensions")
                                           10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl);
 
-    REQUIRE(cr.size() == 4); // n_freq_out = 4
+    REQUIRE(cr.size() == 4); // n_freq_new = 4
     REQUIRE(ci.size() == 4);
     REQUIRE(dl.size() == 4);
     for (int f = 0; f < 4; ++f)
@@ -463,8 +463,8 @@ TEST_CASE("Multifreq - M interpolated with SLERP (phase rotation)")
     arma::mat pg(1, 2, arma::fill::ones);
 
     arma::cube M(2, 1, 2, arma::fill::zeros);
-    M(0, 0, 0) = 1.0; // ReVV = 1 at freq_in[0]
-    M(1, 0, 1) = 1.0; // ImVV = 1 at freq_in[1] (90° phase)
+    M(0, 0, 0) = 1.0; // ReVV = 1 at freq[0]
+    M(1, 0, 1) = 1.0; // ImVV = 1 at freq[1] (90° phase)
 
     arma::vec fi = {1e9, 2e9}, fo = {1.5e9}; // midpoint
     std::vector<arma::cube> cr, ci, dl;
@@ -560,7 +560,7 @@ TEST_CASE("Multifreq - GHz antenna with frequency-dependent pattern")
         auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
         double scale = 1.0 + 0.5 * (double)i;
         ant.e_theta_re *= scale;
-        ant.center_frequency = ghz_freqs[i];
+        ant.center_freq = ghz_freqs[i];
         tx_vec.push_back(ant);
     }
     auto rx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -611,19 +611,19 @@ TEST_CASE("Multifreq - Acoustic 2-way speaker with omni microphone (documentatio
     arma::vec path_length = {1.0};
 
     // Frequency-flat path gain and scalar Jones matrix
-    arma::vec freq_in = {100.0, 10000.0};
+    arma::vec freq = {100.0, 10000.0};
     arma::mat path_gain_mat(1, 2, arma::fill::ones);
     arma::cube M_cube(2, 1, 2, arma::fill::zeros);
     M_cube(0, 0, 0) = 1.0; M_cube(0, 0, 1) = 1.0;
 
-    arma::vec freq_out = {200.0, 1000.0, 5000.0};
+    arma::vec freq_new = {200.0, 1000.0, 5000.0};
     std::vector<arma::cube> coeff_re, coeff_im, delays;
 
     quadriga_lib::get_channels_multifreq(tx, rx,
                                           0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                           1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                           fbs, lbs, path_gain_mat, path_length, M_cube,
-                                          freq_in, freq_out, coeff_re, coeff_im, delays,
+                                          freq, freq_new, coeff_re, coeff_im, delays,
                                           false, false, 343.0);
 
     REQUIRE(coeff_re.size() == 3);
@@ -905,7 +905,7 @@ TEST_CASE("Multifreq - Float template compiles and runs")
 }
 
 // ================================================================================================
-// SECTION 17: Zero center_frequency (phase disabled)
+// SECTION 17: Zero center_freq (phase disabled)
 // ================================================================================================
 
 TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
@@ -918,7 +918,7 @@ TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
     arma::vec pl = {10.0};
     arma::cube M(2, 1, 1, arma::fill::zeros); M(0, 0, 0) = 1.0;
 
-    // freq_out = 0 should disable phase (wave_number = 0)
+    // freq_new = 0 should disable phase (wave_number = 0)
     arma::vec fi = {1e9}, fo = {0.0};
     std::vector<arma::cube> cr, ci, dl;
     quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -932,10 +932,10 @@ TEST_CASE("Multifreq - Zero output frequency disables phase rotation")
 }
 
 // ================================================================================================
-// SECTION 18: Multiple freq_in entries
+// SECTION 18: Multiple freq entries
 // ================================================================================================
 
-TEST_CASE("Multifreq - Multiple freq_in entries with varying path gain")
+TEST_CASE("Multifreq - Multiple freq entries with varying path gain")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
     auto rx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -943,7 +943,7 @@ TEST_CASE("Multifreq - Multiple freq_in entries with varying path gain")
     fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
     arma::vec pl = {10.0};
 
-    // 3 freq_in: gain increases linearly
+    // 3 freq: gain increases linearly
     arma::vec fi = {1e9, 2e9, 3e9};
     arma::mat pg = {{1.0, 4.0, 9.0}};
     arma::cube M(2, 1, 3, arma::fill::zeros);
@@ -955,7 +955,7 @@ TEST_CASE("Multifreq - Multiple freq_in entries with varying path gain")
                                           10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                           fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl, true);
 
-    // At exact freq_in entries: amplitude = sqrt(gain)
+    // At exact freq entries: amplitude = sqrt(gain)
     double a0 = std::sqrt(cr[0](0, 0, 0) * cr[0](0, 0, 0) + ci[0](0, 0, 0) * ci[0](0, 0, 0));
     double a1 = std::sqrt(cr[1](0, 0, 0) * cr[1](0, 0, 0) + ci[1](0, 0, 0) * ci[1](0, 0, 0));
     double a2 = std::sqrt(cr[2](0, 0, 0) * cr[2](0, 0, 0) + ci[2](0, 0, 0) * ci[2](0, 0, 0));
@@ -997,7 +997,7 @@ TEST_CASE("Multifreq - Absolute delay includes LOS, relative subtracts it")
 }
 
 // ================================================================================================
-// SECTION 20: Consistency across freq_out (amplitude stable, phase varies)
+// SECTION 20: Consistency across freq_new (amplitude stable, phase varies)
 // ================================================================================================
 
 TEST_CASE("Multifreq - Sweep: amplitude stable, phase varies with frequency")
@@ -1145,7 +1145,7 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
     {
         auto ant = quadriga_lib::generate_arrayant_omni<double>();
         quadriga_lib::arrayant_copy_element(ant, 0, {1});
-        ant.center_frequency = (i == 0) ? 1e9 : 2e9;
+        ant.center_freq = (i == 0) ? 1e9 : 2e9;
 
         // Coupling: mix elements differently at each frequency
         // At 1 GHz: port 0 = elem0 + 0.5*elem1, port 1 = 0.5*elem0 + elem1
@@ -1181,10 +1181,10 @@ TEST_CASE("Multifreq - Frequency-dependent coupling produces different coefficie
 }
 
 // ================================================================================================
-// SECTION 25: Reversed freq_out order
+// SECTION 25: Reversed freq_new order
 // ================================================================================================
 
-TEST_CASE("Multifreq - Reversed freq_out order gives consistent results")
+TEST_CASE("Multifreq - Reversed freq_new order gives consistent results")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
     auto rx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -1214,14 +1214,14 @@ TEST_CASE("Multifreq - Reversed freq_out order gives consistent results")
     CHECK(arma::approx_equal(dl_f[1], dl_r[0], "absdiff", 1e-14));
 }
 
-// SECTION 26: Unsorted freq_in / freq_out (reference-first ordering)
+// SECTION 26: Unsorted freq / freq_new (reference-first ordering)
 //
-// Regression guard: get_channels_multifreq must not assume freq_in / freq_out are sorted.
+// Regression guard: get_channels_multifreq must not assume freq / freq_new are sorted.
 // Acoustic ray tracing puts the path-culling reference frequency first, so the grid is
 // intentionally unordered, e.g. {125, 16, 31.5, 63, 250} where entries 1..3 fall BELOW
-// entry 0. An earlier frequency-bracket implementation clamped everything <= freq_in[0]
+// entry 0. An earlier frequency-bracket implementation clamped everything <= freq[0]
 // to column 0, silently collapsing the sub-reference bands onto the reference value.
-TEST_CASE("Multifreq - Unsorted freq_in is not clamped to first entry")
+TEST_CASE("Multifreq - Unsorted freq is not clamped to first entry")
 {
     auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
     auto rx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
@@ -1236,7 +1236,7 @@ TEST_CASE("Multifreq - Unsorted freq_in is not clamped to first entry")
     arma::vec fi = {125.0, 16.0, 31.5, 63.0, 250.0};
 
     // Distinct, identifiable gains per input frequency (perfect squares for clean sqrt)
-    arma::mat pg = {{4.0, 9.0, 16.0, 25.0, 36.0}}; // [1 x n_freq_in]
+    arma::mat pg = {{4.0, 9.0, 16.0, 25.0, 36.0}}; // [1 x n_freq]
 
     // Frequency-independent scalar pressure transfer (ReVV = 1) at every input frequency
     arma::cube M(2, 1, 5, arma::fill::zeros);
@@ -1374,7 +1374,7 @@ TEST_CASE("Multifreq - 0 paths with add_fake_los_path")
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
     tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
-    tx.center_frequency = 3e9;
+    tx.center_freq = 3e9;
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
     rx.coupling_im = arma::vec({0.0, 0.2});
@@ -1431,7 +1431,7 @@ TEST_CASE("Multifreq - 0 paths without add_fake_los_path")
     // Empty outputs of size [n_rx_ports, n_tx_ports, 0] for every output frequency
     auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
     quadriga_lib::arrayant_copy_element(tx, 0, {1});
-    tx.center_frequency = 3e9;
+    tx.center_freq = 3e9;
     auto rx = tx;
     rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
     rx.coupling_im = arma::vec({0.0, 0.2});
@@ -1548,7 +1548,7 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
         for (dtype f : {dtype(1.0e9), dtype(2.0e9)})
         {
             auto a = quadriga_lib::generate_arrayant_3GPP<dtype>(1, 2, dtype(1.0e9), 3, 0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10);
-            a.center_frequency = f;
+            a.center_freq = f;
             a.e_theta_re *= f / dtype(1.0e9);
             if (coupling == 1)
                 a.coupling_re = {{1.0, 0.5, 0.0, 0.2}, {0.5, 1.0, 0.1, 0.0}, {0.0, 0.3, 1.0, 0.5}, {0.2, 0.0, 0.5, 1.0}},
@@ -1557,7 +1557,7 @@ TEST_CASE("Multifreq - complex output equals the split output bit for bit")
                 a.coupling_re = {{1.0, 0.0}, {0.5, 0.0}, {0.0, 1.0}, {0.0, -0.5}}, a.coupling_im.zeros(4, 2);
             tx.push_back(a);
             rx.push_back(quadriga_lib::generate_arrayant_3GPP<dtype>(1, 1, dtype(1.0e9), 3, 0, 0.5, 1, 1, 0.5, 0.5, nullptr, 10));
-            rx.back().center_frequency = f;
+            rx.back().center_freq = f;
         }
         arma::Mat<dtype> fbs = {{20.0, 25.0, 30.0}, {20.0, 0.0, -25.0}, {0.0, 0.0, 5.0}}; // Path 1 is the LOS path
         arma::Mat<dtype> pg = {{0.5, 0.4}, {1.0, 0.9}, {0.25, 0.3}};

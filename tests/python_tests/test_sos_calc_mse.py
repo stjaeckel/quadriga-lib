@@ -25,7 +25,7 @@ class test_case(unittest.TestCase):
 
     def setUp(self):
         # 1-D, two sinusoids; the target is their own ACF, so there is no error inside the range
-        self.freq = np.array([[0.04], [0.13]])
+        self.spatial_freq = np.array([[0.04], [0.13]])
         self.dist = np.arange(0.0, 20.5, 0.5)
         self.acf = 0.5 * (np.cos(2 * np.pi * 0.04 * self.dist) + np.cos(2 * np.pi * 0.13 * self.dist))
 
@@ -34,7 +34,7 @@ class test_case(unittest.TestCase):
         self.f3 = np.array([[0.03, 0.05, -0.02], [-0.07, 0.01, 0.04]])
 
     def test_basic_call(self):
-        out = quadriga_lib.sos.calc_mse(self.freq, self.acf, self.dist)
+        out = quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf, self.dist)
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 5)
         mse, mse_core, mse_all, acf_tail, test_dir = out
@@ -56,12 +56,12 @@ class test_case(unittest.TestCase):
         self.assertEqual(test_dir.dtype, np.float64)
 
         # A wrong target: the error follows from the definition
-        mse2 = quadriga_lib.sos.calc_mse(self.freq, self.other, self.dist)[0]
+        mse2 = quadriga_lib.sos.calc_mse(self.spatial_freq, self.other, self.dist)[0]
         npt.assert_allclose(mse2, -10.0 * np.log10(np.mean(np.square(self.other - self.acf))), atol=1e-9, rtol=0)
 
     def test_keyword_arguments(self):
         ref = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, 7)
-        out = quadriga_lib.sos.calc_mse(freq=self.f3, acf=self.other, dist=self.dist, n_dir=7)
+        out = quadriga_lib.sos.calc_mse(spatial_freq=self.f3, acf=self.other, dist=self.dist, n_dir=7)
         self.assertEqual(out[:3], ref[:3])
         npt.assert_array_equal(out[3], ref[3])
         npt.assert_array_equal(out[4], ref[4])
@@ -118,22 +118,22 @@ class test_case(unittest.TestCase):
     def test_errors(self):
         # Thrown by C++: std::invalid_argument -> ValueError
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.calc_mse(self.freq, self.acf, self.dist[:5])
+            quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf, self.dist[:5])
         self.assertIn("dist", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.calc_mse(self.freq, self.acf, self.dist, 0)
+            quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf, self.dist, 0)
         self.assertIn("n_dir", str(ctx.exception))
 
         # Rejected by pybind11
         with self.assertRaises(TypeError):
-            quadriga_lib.sos.calc_mse(self.freq, self.acf)
+            quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf)
         with self.assertRaises(TypeError):
-            quadriga_lib.sos.calc_mse(self.freq, self.acf, self.dist, no_such_argument=1)
+            quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf, self.dist, no_such_argument=1)
 
     def test_none_for_mandatory_arrays(self):
         # None for a mandatory array is rejected by pybind11; it must not be read as one value of NaN
-        args = [self.freq, self.acf, self.dist]
+        args = [self.spatial_freq, self.acf, self.dist]
         quadriga_lib.sos.calc_mse(*args)
         for i in range(3):
             bad = list(args)

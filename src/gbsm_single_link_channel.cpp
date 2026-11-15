@@ -28,7 +28,7 @@ SECTION!*/
 Channel coefficients of one link at one frequency over one segment
 
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
-  `rays.center_frequency(i_freq)`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
+  `rays.center_freq(i_freq)`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (power > 0 at `i_freq`, plus LOS and GR)
 - `"phase"`: [[get_channels_planar]] with the arrays at the positions of `rays` and the orientations of the snapshot;
   delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [[get_channels_spherical]] with the
@@ -72,10 +72,10 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ## Inputs:
 - **`tx_array`**, **`rx_array`** — Tx and Rx array antenna with `n_tx` and `n_rx` ports
 - **`rays`** — Ray data of the link, see [[gbsm_rays]]
-- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_frequency(i_freq)` in [dB]; `[n_snap]` or `[1]`
+- **`link_gain_dB`** — Link gain (see Terms) at `rays.center_freq(i_freq)` in [dB]; `[n_snap]` or `[1]`
 - **`mobility`** *(optional)* — `"phase"`, `"drift"` or `"auto"` (see Terms)
 - **`output`** *(optional)* — `"taps"` or `"rays"`
-- **`i_freq`** *(optional)* — Frequency index in `rays.center_frequency`, 0-based; ray data of the TR methods hold
+- **`i_freq`** *(optional)* — Frequency index in `rays.center_freq`, 0-based; ray data of the TR methods hold
   one frequency: 0
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in [m]; omitted: the positions of `rays`;
   `[n_snap, 3]` or `[1, 3]` (a `[3]` vector is rejected)
@@ -86,7 +86,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays (`"phase"`: of the ray-data positions)
 
 ## Returns:
-- Channel object: `center_frequency` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
+- Channel object: `center_freq` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
   `rx_orientation` `[3, n_snap]`; per snapshot `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap]` (`"taps"`) or
   `[n_rx, n_tx, n_path]` (`"rays"`); `"rays"` also `path_gain`, `path_length`, `path_polarization`, `path_angles`
   and in `"drift"` `path_fbs_pos`, `path_lbs_pos`; `par_names`, `par_data` with the entries below
@@ -178,7 +178,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         throw std::invalid_argument("Mobility 'drift' needs 'rays.fbs_pos' and 'rays.lbs_pos'; solve the scatterers "
                                     "first.");
     const bool taps = output == "taps";
-    const double c0 = 299792458.0, fc = rays.center_frequency(i_freq), k0 = 6.283185307179586 * fc / c0;
+    const double c0 = 299792458.0, fc = rays.center_freq(i_freq), k0 = 6.283185307179586 * fc / c0;
 
     // The rays kept at i_freq (LOS, GR, NLOS with power > 0 there) as ray data of one frequency: ssf_paths keeps
     // all of them in ray order and returns the same values as for all frequencies (the dropped rays add 0 to the
@@ -190,7 +190,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     const arma::uvec kept(kv), fi = {i_freq};
     const arma::uword n_kept = kept.n_elem;
     gbsm_rays rr;
-    rr.method = rays.method, rr.tx_pos = rays.tx_pos, rr.rx_pos = rays.rx_pos, rr.center_frequency = {fc};
+    rr.method = rays.method, rr.tx_pos = rays.tx_pos, rr.rx_pos = rays.rx_pos, rr.center_freq = {fc};
     rr.delay = rays.delay.elem(kept), rr.power = rays.power.submat(kept, fi);
     rr.aod = rays.aod.elem(kept), rr.eod = rays.eod.elem(kept), rr.aoa = rays.aoa.elem(kept);
     rr.eoa = rays.eoa.elem(kept), rr.path_type = rays.path_type.elem(kept), rr.tap = rays.tap.elem(kept);
@@ -204,7 +204,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
 
     // Output object: positions and orientations as columns [3, n_snap]
     channel<double> c;
-    c.center_frequency = {fc};
+    c.center_freq = {fc};
     const std::pair<arma::mat *, const arma::mat *> col[4] = {{&c.tx_pos, tx_pos},
                                                               {&c.rx_pos, rx_pos},
                                                               {&c.tx_orientation, tx_orientation},

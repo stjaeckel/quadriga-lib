@@ -56,15 +56,15 @@ assertElementsAlmostEqual( hmat_im3, hmat_im, 'absolute', 1e-12 );
 
 % ---- Common multi-frequency setup -------------------------------------
 % Replicate envelope (= coeff) across 3 input frequencies and bake in the
-% delay phase exp(-j 2pi freq_in tau), simulating get_channels_multifreq output.
-freq_in  = [1e9 ; 2e9 ; 3e9];
+% delay phase exp(-j 2pi freq tau), simulating get_channels_multifreq output.
+freq  = [1e9 ; 2e9 ; 3e9];
 
 coeff_re_4d = zeros(4, 3, 2, 3);
 coeff_im_4d = zeros(4, 3, 2, 3);
 delay_4d    = repmat(delay, [1 1 1 3]);  % [1, 1, 2, 3]
 for f = 1:3
     for p = 1:2
-        rot = exp(-1j*2*pi*freq_in(f)*delay(1,1,p));
+        rot = exp(-1j*2*pi*freq(f)*delay(1,1,p));
         c   = (real(coeff(:,:,p)) + 1j*imag(coeff(:,:,p))) * rot;
         coeff_re_4d(:,:,p,f) = real(c);
         coeff_im_4d(:,:,p,f) = imag(c);
@@ -105,53 +105,53 @@ assertElementsAlmostEqual( hmat_re_s3, T, 'absolute', 1e-6 );
 assertElementsAlmostEqual( hmat_im_s3, T, 'absolute', 1e-6 );
 
 % ---- Test 4: multi-freq output, cross-check against single-freq ------
-% Constant envelope across freq_in -> SLERP is identity. Multi-freq H must
-% match a single-freq call with pilot*bandwidth = absolute freq_out.
-freq_out = linspace(1e9, 3e9, 11)';
+% Constant envelope across freq -> SLERP is identity. Multi-freq H must
+% match a single-freq call with pilot*bandwidth = absolute freq_new.
+freq_new = linspace(1e9, 3e9, 11)';
 
-[ hmat_re_m,  hmat_im_m  ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq_in, freq_out );
-[ hmat_re_sf, hmat_im_sf ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, freq_out/fc, fc );
+[ hmat_re_m,  hmat_im_m  ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq, freq_new );
+[ hmat_re_sf, hmat_im_sf ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, freq_new/fc, fc );
 
 assertEqual( size(hmat_re_m), [4 3 11] );
 assertElementsAlmostEqual( hmat_re_m, hmat_re_sf, 'absolute', 1e-4 );
 assertElementsAlmostEqual( hmat_im_m, hmat_im_sf, 'absolute', 1e-4 );
 
 % ---- Test 5: multi-freq via derived carrier (pilot+bw+center) --------
-% carrier = center_freq(1) + pilot*bw  must reproduce freq_out
-pilot_d = (freq_out - freq_in(1)) / (freq_out(end) - freq_in(1));
-bw_d    = freq_out(end) - freq_in(1);
+% carrier = center_freq(1) + pilot*bw  must reproduce freq_new
+pilot_d = (freq_new - freq(1)) / (freq_new(end) - freq(1));
+bw_d    = freq_new(end) - freq(1);
 
-[ hmat_re_d, hmat_im_d ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, pilot_d, bw_d, freq_in );
+[ hmat_re_d, hmat_im_d ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, pilot_d, bw_d, freq );
 
 assertElementsAlmostEqual( hmat_re_d, hmat_re_m, 'absolute', 1e-6 );
 assertElementsAlmostEqual( hmat_im_d, hmat_im_m, 'absolute', 1e-6 );
 
-% ---- Test 6: SLERP magnitude interpolation across freq_in ------------
-% Envelope amplitude ramps 1, 2, 3 across freq_in; expect linear interp.
+% ---- Test 6: SLERP magnitude interpolation across freq ------------
+% Envelope amplitude ramps 1, 2, 3 across freq; expect linear interp.
 ramp_re = zeros(1, 1, 1, 3);
 ramp_im = zeros(1, 1, 1, 3);
 ramp_dl = zeros(1, 1, 1, 3);
 amps  = [1 2 3];
 tau_r = 100e-9;
 for f = 1:3
-    rot = exp(-1j*2*pi*freq_in(f)*tau_r);
+    rot = exp(-1j*2*pi*freq(f)*tau_r);
     c   = amps(f) * rot;
     ramp_re(1,1,1,f) = real(c);
     ramp_im(1,1,1,f) = imag(c);
     ramp_dl(1,1,1,f) = tau_r;
 end
 
-[ hmat_re_r, hmat_im_r ] = quadriga_lib.baseband_freq_response( ramp_re, ramp_im, ramp_dl, [], [], freq_in, freq_out );
+[ hmat_re_r, hmat_im_r ] = quadriga_lib.baseband_freq_response( ramp_re, ramp_im, ramp_dl, [], [], freq, freq_new );
 
 mags = squeeze( sqrt(hmat_re_r.^2 + hmat_im_r.^2) );
-expected_mags = interp1(freq_in, amps, freq_out);
+expected_mags = interp1(freq, amps, freq_new);
 assertElementsAlmostEqual( mags, expected_mags, 'absolute', 1e-5 );
 
 % ---- Test 4b: multi-freq with a single output carrier ----------------
 % Same setup as Test 4 (constant envelope -> SLERP is identity).
 % Multi-freq H at one carrier must match single-freq H at pilot*bw = carrier.
 fx = 1.5e9;
-[ hmat_re_m1, hmat_im_m1 ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq_in, fx );
+[ hmat_re_m1, hmat_im_m1 ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq, fx );
 [ hmat_re_r1, hmat_im_r1 ] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, fx/fc, fc );
 
 assertEqual( size(hmat_re_m1), [4 3] );
@@ -221,7 +221,7 @@ assertElementsAlmostEqual( hmat_re_o, hmat_re_ms, 'absolute', 1e-12 );
 
 
 % Same via derived carrier (pilot+bw+center, single pilot)
-[ hmat_re_m2, hmat_im_m2 ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, (fx-freq_in(1))/fc, fc, freq_in );
+[ hmat_re_m2, hmat_im_m2 ] = quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, (fx-freq(1))/fc, fc, freq );
 
 assertEqual( size(hmat_re_m2), [4 3] );
 assertElementsAlmostEqual( hmat_re_m2, hmat_re_m1, 'absolute', 1e-6 );
@@ -240,7 +240,7 @@ end
 
 % ---- Error: 4D coeff with center_freq but no carrier source ----------
 try
-    quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq_in );
+    quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], freq );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Provide pilot_grid+bandwidth or carrier_freq';
@@ -274,7 +274,7 @@ end
 
 % ---- Error: center_freq length does not match 4th dim of coeff -------
 try
-    quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], [1e9; 2e9], freq_out );
+    quadriga_lib.baseband_freq_response( coeff_re_4d, coeff_im_4d, delay_4d, [], [], [1e9; 2e9], freq_new );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Length of center_freq';

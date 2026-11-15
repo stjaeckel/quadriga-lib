@@ -103,7 +103,7 @@ namespace
         quadriga_lib::channel<double> c;
         c.name = "full";
         c.initial_position = 1;
-        c.center_frequency = filled(arma::vec(n_snap), 1.0);
+        c.center_freq = filled(arma::vec(n_snap), 1.0);
         c.tx_pos = filled(arma::mat(3, n_snap), 1.0);
         c.rx_pos = filled(arma::mat(3, n_snap), 10.0);
         c.tx_orientation = filled(arma::mat(3, 1), -1.0);
@@ -463,7 +463,7 @@ namespace
         quadriga_lib::hdf5_create(fn, 4);
         quadriga_lib::channel<double> c0;
         c0.name = "test";
-        c0.center_frequency = {3e9};
+        c0.center_freq = {3e9};
         c0.tx_pos = arma::mat(3, 1, arma::fill::ones);
         c0.rx_pos = arma::mat(3, 1, arma::fill::zeros);
         c0.coeff_re.push_back(arma::cube(4, 2, 50, arma::fill::value(0.5)));

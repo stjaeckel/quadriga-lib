@@ -24,7 +24,7 @@ Class for storing and managing MIMO channel data and metadata across multiple sn
 | Attribute                                         | Size                                                            | Description                                                 |
 | ------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
 | `std::string name`                                | —                                                               | Name of the channel object                                  |
-| `arma::Col<dtype> center_frequency`               | `[1]`; `[n_snap]`, or `[]`                                      | Center frequency                                            |
+| `arma::Col<dtype> center_freq`               | `[1]`; `[n_snap]`, or `[]`                                      | Center frequency                                            |
 | `arma::Mat<dtype> tx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Transmitter positions                                       |
 | `arma::Mat<dtype> rx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Receiver positions                                          |
 | `arma::Mat<dtype> tx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Transmitter orientation (Euler angles)                      |
@@ -66,8 +66,8 @@ arma::uword quadriga_lib::channel<dtype>::n_snap() const
 {
     arma::uword s_arma = 0ULL;
 
-    if (center_frequency.n_elem > s_arma) // 1 or s
-        s_arma = center_frequency.n_elem;
+    if (center_freq.n_elem > s_arma) // 1 or s
+        s_arma = center_freq.n_elem;
 
     if (tx_orientation.n_cols > s_arma) // 1 or s
         s_arma = tx_orientation.n_cols;
@@ -175,7 +175,7 @@ arma::uvec quadriga_lib::channel<dtype>::n_path() const
 template <typename dtype>
 bool quadriga_lib::channel<dtype>::empty() const
 {
-    if (center_frequency.n_elem != 0ULL)
+    if (center_freq.n_elem != 0ULL)
         return false;
 
     if (tx_pos.n_elem != 0ULL)
@@ -254,8 +254,8 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     if (tx_pos.n_cols != 1ULL && tx_pos.n_cols != n_snap_arma)
         return std::string("Number of columns in 'tx_pos' must be 1 or match the number of snapshots.");
 
-    if (center_frequency.n_elem != 0ULL && center_frequency.n_elem != 1ULL && center_frequency.n_elem != n_snap_arma)
-        return std::string("Number of entries in 'center_frequency' must be 0, 1 or match the number of snapshots.");
+    if (center_freq.n_elem != 0ULL && center_freq.n_elem != 1ULL && center_freq.n_elem != n_snap_arma)
+        return std::string("Number of entries in 'center_freq' must be 0, 1 or match the number of snapshots.");
 
     if (tx_orientation.n_elem != 0ULL && tx_orientation.n_rows != 3ULL)
         return std::string("'tx_orientation' must be empty or have 3 rows.");
@@ -701,9 +701,9 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const
     bool use_coeff = !coeff_re.empty();
     bool has_path_gain = !path_gain.empty();
     bool has_path_length = !path_length.empty();
-    bool has_multi_freq = center_frequency.n_elem == n_snap_arma;
+    bool has_multi_freq = center_freq.n_elem == n_snap_arma;
 
-    dtype fGHz_PG = !center_frequency.is_empty() ? center_frequency.at(0) * (dtype)1.0e-9 : (dtype)1.0;
+    dtype fGHz_PG = !center_freq.is_empty() ? center_freq.at(0) * (dtype)1.0e-9 : (dtype)1.0;
     fGHz_PG = -(dtype)32.45 - (dtype)20.0 * std::log10(fGHz_PG);
 
     auto n_paths = this->n_path();
@@ -729,7 +729,7 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const
                 const dtype *p_length = has_path_length ? path_length[iS].memptr() : nullptr;
 
                 if (has_multi_freq)
-                    fGHz_PG = -(dtype)32.45 - (dtype)20.0 * std::log10(center_frequency.at(iS) * (dtype)1.0e-9);
+                    fGHz_PG = -(dtype)32.45 - (dtype)20.0 * std::log10(center_freq.at(iS) * (dtype)1.0e-9);
 
                 for (arma::uword iP = 0ULL; iP < p_path[iS]; ++iP)
                 {
@@ -812,7 +812,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
     if (this->empty())
         throw std::invalid_argument("Channel contains no data.");
 
-    if (this->center_frequency.empty())
+    if (this->center_freq.empty())
         throw std::invalid_argument("Center frequency is missing.");
 
     if (this->no_interact.empty() || this->interact_coord.empty())
@@ -910,7 +910,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
         dtype ty = moving_tx ? this->tx_pos(1ULL, i_snap_in) : this->tx_pos(1ULL, 0ULL);
         dtype tz = moving_tx ? this->tx_pos(2ULL, i_snap_in) : this->tx_pos(2ULL, 0ULL);
 
-        dtype gainF = (this->center_frequency.n_elem > 1ULL) ? this->center_frequency(i_snap_in) : this->center_frequency(0ULL);
+        dtype gainF = (this->center_freq.n_elem > 1ULL) ? this->center_freq(i_snap_in) : this->center_freq(0ULL);
         gainF = (dtype)-32.45 - (dtype)20.0 * std::log10(gainF * (dtype)1.0e-9);
 
         dtype rx = moving_rx ? this->rx_pos(0ULL, i_snap_in) : this->rx_pos(0ULL, 0ULL);

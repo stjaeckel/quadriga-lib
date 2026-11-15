@@ -328,7 +328,7 @@ TEST_CASE("o2i_loss - input validation")
         arma::mat r = rnd5;
         arma::vec f = fc, ww = w;
         CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, r, models, w, r), std::invalid_argument);                // loss is 'rnd'
-        CHECK_THROWS_AS(quadriga_lib::o2i_loss(f, rnd5, models, w, loss, 25.0, &f), std::invalid_argument); // d2d_in is 'center_frequency'
+        CHECK_THROWS_AS(quadriga_lib::o2i_loss(f, rnd5, models, w, loss, 25.0, &f), std::invalid_argument); // d2d_in is 'center_freq'
         CHECK_THROWS_AS(quadriga_lib::o2i_loss(fc, rnd5, models, ww, loss, 25.0, &ww), std::invalid_argument); // d2d_in is 'weights'
         CHECK_NOTHROW(quadriga_lib::o2i_loss(fc, rnd5, models, w, loss));
         arma::vec on_loss(loss.memptr(), 5, false, true);
@@ -350,12 +350,12 @@ TEST_CASE("o2i_loss - input validation")
     SECTION("fc")
     {
         CHECK_THROWS_MATCHES(call(arma::vec(), rnd5, models, w, 25.0), std::invalid_argument,
-                             Message("Input 'center_frequency' cannot be empty."));
+                             Message("Input 'center_freq' cannot be empty."));
         for (double v : {0.0, -1.0, double(NAN), inf_o2i})
         {
             INFO("value " << v);
             CHECK_THROWS_MATCHES(call(arma::vec{3.5e9, v}, rnd5, models, w, 25.0), std::invalid_argument,
-                                 Message("Input 'center_frequency' must be finite and > 0."));
+                                 Message("Input 'center_freq' must be finite and > 0."));
         }
     }
     SECTION("rnd")

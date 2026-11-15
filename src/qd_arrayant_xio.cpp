@@ -22,7 +22,7 @@ Write a vector of arrayant objects to a single QDANT file
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
 - All entries are validated first; an existing file is deleted only after the validation passed, then rewritten.
   Invalid input throws and leaves an existing file unchanged.
-- Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_frequency`.
+- Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_freq`.
 
 ## Declaration:
 ```
@@ -126,7 +126,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned 
         error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
                                                &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
                                                &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
-                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
+                                               &ant.coupling_re, &ant.coupling_im, &ant.center_freq,
                                                &tmp_layout);
         tmp_layout.reset();
     }
@@ -134,7 +134,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned 
         error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
                                                &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
                                                &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
-                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
+                                               &ant.coupling_re, &ant.coupling_im, &ant.center_freq,
                                                layout);
 
     // Throw parsing errors
@@ -157,7 +157,7 @@ Read all arrayant objects from a QDANT file into a vector
 
 - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
 - Each unique ID is read exactly once regardless of how many times it appears in the layout.
-- Counterpart to [[qdant_write_multi]]; primary mechanism for loading frequency-dependent models where `center_frequency` on each entry identifies the corresponding frequency.
+- Counterpart to [[qdant_write_multi]]; primary mechanism for loading frequency-dependent models where `center_freq` on each entry identifies the corresponding frequency.
 
 ## Declaration:
 ```
@@ -249,7 +249,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
                                                            &ant.azimuth_grid, &ant.elevation_grid,
                                                            &ant.element_pos,
                                                            &ant.coupling_re, &ant.coupling_im,
-                                                           &ant.center_frequency,
+                                                           &ant.center_freq,
                                                            &tmp_layout);
 
         if (!error_message.empty())
@@ -280,7 +280,7 @@ Validate a vector of arrayant objects for multi-frequency consistency
 
 - Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
 - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
-- Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
+- Pattern data, `center_freq`, and coupling matrix values are not compared (expected to vary).
 - All entries must use the same form for `element_pos`, `coupling_re` and `coupling_im`: all empty or all given; a
   mix of empty members and explicit zeros / identity is rejected.
 - Stops at first error and returns a message identifying the failing entry and property.
@@ -668,10 +668,10 @@ template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_l
 # arrayant_concat_multi
 Concatenate two multi-frequency arrayant vectors into a single multi-element model
 
-- Both inputs must have equal entry counts, identical angular grids, and matching `center_frequency` values at each index.
+- Both inputs must have equal entry counts, identical angular grids, and matching `center_freq` values at each index.
 - Per frequency entry: pattern cubes are joined along the element (slice) dimension; `element_pos` matrices are horizontally concatenated (empty positions treated as zeros).
 - Both inputs are validated with [[arrayant_is_valid_multi]] before processing; each output entry is validated before returning.
-- Output inherits name, azimuth/elevation grids, and `center_frequency` from `arrayant_vec1`.
+- Output inherits name, azimuth/elevation grids, and `center_freq` from `arrayant_vec1`.
 
 ## Declaration:
 ```
@@ -759,10 +759,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
         const quadriga_lib::arrayant<dtype> &a2 = arrayant_vec2[i];
 
         // Check center frequency match
-        if (std::abs((double)a1.center_frequency - (double)a2.center_frequency) > 1.0e-6 * std::abs((double)a1.center_frequency))
+        if (std::abs((double)a1.center_freq - (double)a2.center_freq) > 1.0e-6 * std::abs((double)a1.center_freq))
             throw std::invalid_argument("arrayant_concat_multi: Center frequency mismatch at index " +
-                                        std::to_string(i) + " (" + std::to_string((double)a1.center_frequency) +
-                                        " vs " + std::to_string((double)a2.center_frequency) + ").");
+                                        std::to_string(i) + " (" + std::to_string((double)a1.center_freq) +
+                                        " vs " + std::to_string((double)a2.center_freq) + ").");
 
         quadriga_lib::arrayant<dtype> &out = output[i];
 
@@ -770,7 +770,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
         out.name = a1.name;
         out.azimuth_grid = a1.azimuth_grid;
         out.elevation_grid = a1.elevation_grid;
-        out.center_frequency = a1.center_frequency;
+        out.center_freq = a1.center_freq;
 
         // Concatenate patterns along the element (slice) dimension
         out.e_theta_re = arma::join_slices(a1.e_theta_re, a2.e_theta_re);
@@ -812,7 +812,7 @@ Combine element patterns, positions, and coupling weights into effective radiati
 
 - Multi-frequency counterpart to [[arrayant_combine_pattern]]
 - Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
-- Output length = `freq_grid_new->n_elem` if provided; otherwise one entry per input arrayant
+- Output length = `freq_new->n_elem` if provided; otherwise one entry per input arrayant
 - Field interpolation across frequency is delegated to [[arrayant_interpolate_multi]] (SLERP with linear-interpolation fallback)
 - Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
 - Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
@@ -825,7 +825,7 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
     const std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Col<dtype> *azimuth_grid_new = nullptr,
     const arma::Col<dtype> *elevation_grid_new = nullptr,
-    const arma::Col<dtype> *freq_grid_new = nullptr,
+    const arma::Col<dtype> *freq_new = nullptr,
     dtype propagation_speed = 299792458.0);
 ```
 
@@ -833,12 +833,12 @@ std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects (must pass [[arrayant_is_valid_multi]])
 - **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], strictly increasing; defaults to `arrayant_vec[0].azimuth_grid`
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], strictly increasing; defaults to `arrayant_vec[0].elevation_grid`
-- **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz, positive and finite; defaults to per-entry
-  `center_frequency`
+- **`freq_new`** *(optional)* — Alternative frequency grid in Hz, positive and finite; defaults to per-entry
+  `center_freq`
 - **`propagation_speed`** *(optional)* — Wave propagation speed in m/s; positive and finite; use about 343 for acoustics
 
 ## Returns:
-- Vector of arrayant objects (length = `n_freq_out`), each with `n_ports` elements equal to the number of columns in the coupling matrix
+- Vector of arrayant objects (length = `n_freq_new`), each with `n_ports` elements equal to the number of columns in the coupling matrix
 
 ## See also:
 - [[arrayant_combine_pattern]] (single-frequency counterpart)
@@ -851,7 +851,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     const std::vector<arrayant<dtype>> &arrayant_vec,
     const arma::Col<dtype> *azimuth_grid_new,
     const arma::Col<dtype> *elevation_grid_new,
-    const arma::Col<dtype> *freq_grid_new,
+    const arma::Col<dtype> *freq_new,
     dtype propagation_speed)
 {
     if (arrayant_vec.empty())
@@ -861,12 +861,12 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
         throw std::invalid_argument("arrayant_combine_pattern_multi: Input 'propagation_speed' must be positive and finite.");
 
     // The entries are validated by arrayant_interpolate_multi below, before their pattern data is used
-    arma::uword n_freq_in = (arma::uword)arrayant_vec.size();
+    arma::uword n_freq = (arma::uword)arrayant_vec.size();
 
     // Validate optional output grids
     bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
     bool new_elgrid = elevation_grid_new != nullptr && elevation_grid_new->n_elem != 0;
-    bool new_fgrid = freq_grid_new != nullptr && freq_grid_new->n_elem != 0;
+    bool new_fgrid = freq_new != nullptr && freq_new->n_elem != 0;
 
     if (new_azgrid && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
         throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'azimuth_grid_new' must be sorted and in [-pi, pi].");
@@ -876,10 +876,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
 
     if (new_fgrid)
     {
-        const dtype *p_freq = freq_grid_new->memptr();
-        for (arma::uword i = 0; i < freq_grid_new->n_elem; ++i)
+        const dtype *p_freq = freq_new->memptr();
+        for (arma::uword i = 0; i < freq_new->n_elem; ++i)
             if (!(p_freq[i] > dtype(0.0)) || !std::isfinite(p_freq[i]))
-                throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'freq_grid_new' must be positive and finite.");
+                throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'freq_new' must be positive and finite.");
     }
 
     // Output grids
@@ -889,17 +889,17 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     arma::uword n_elevation_out = new_elgrid ? elevation_grid_new->n_elem : arrayant_vec[0].elevation_grid.n_elem;
     arma::uword n_ang = n_azimuth_out * n_elevation_out;
 
-    // Output frequency grid: default = per-entry center_frequency in input order
+    // Output frequency grid: default = per-entry center_freq in input order
     arma::Col<dtype> freq_grid;
     if (new_fgrid)
-        freq_grid = *freq_grid_new;
+        freq_grid = *freq_new;
     else
     {
-        freq_grid.set_size(n_freq_in);
-        for (arma::uword i = 0; i < n_freq_in; ++i)
-            freq_grid(i) = arrayant_vec[i].center_frequency;
+        freq_grid.set_size(n_freq);
+        for (arma::uword i = 0; i < n_freq; ++i)
+            freq_grid(i) = arrayant_vec[i].center_freq;
     }
-    arma::uword n_freq_out = freq_grid.n_elem;
+    arma::uword n_freq_new = freq_grid.n_elem;
 
     // Build flat (azimuth, elevation) pair list (elevation varies fastest)
     arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
@@ -948,22 +948,22 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
     arma::uword n_ports_out = no_coupling ? n_elements : arrayant_vec[0].coupling_re.n_cols;
 
     // Input center frequencies and sort order (for coupling interpolation)
-    arma::Col<double> f_in_d(n_freq_in);
-    for (arma::uword i = 0; i < n_freq_in; ++i)
-        f_in_d(i) = (double)arrayant_vec[i].center_frequency;
+    arma::Col<double> f_in_d(n_freq);
+    for (arma::uword i = 0; i < n_freq; ++i)
+        f_in_d(i) = (double)arrayant_vec[i].center_freq;
     arma::uvec sort_idx = arma::sort_index(f_in_d);
-    arma::Col<double> f_in_sorted(n_freq_in);
-    for (arma::uword i = 0; i < n_freq_in; ++i)
+    arma::Col<double> f_in_sorted(n_freq);
+    for (arma::uword i = 0; i < n_freq; ++i)
         f_in_sorted(i) = f_in_d(sort_idx(i));
 
     // Build output entries
-    std::vector<quadriga_lib::arrayant<dtype>> output(n_freq_out);
+    std::vector<quadriga_lib::arrayant<dtype>> output(n_freq_new);
     const double C0 = (double)propagation_speed;
 
-    for (arma::uword f = 0; f < n_freq_out; ++f)
+    for (arma::uword f = 0; f < n_freq_new; ++f)
     {
-        double freq_out = (double)freq_grid(f);
-        dtype wave_no = dtype(2.0 * arma::datum::pi * freq_out / C0);
+        double f_new = (double)freq_grid(f);
+        dtype wave_no = dtype(2.0 * arma::datum::pi * f_new / C0);
 
         // Coupling for this output frequency (linear interp of complex coupling, clamped)
         arma::Mat<std::complex<dtype>> coupling;
@@ -977,18 +977,18 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
         {
             arma::uword i_lo = sort_idx(0), i_hi = sort_idx(0);
             double w = 0.0;
-            if (freq_out <= f_in_sorted(0))
+            if (f_new <= f_in_sorted(0))
                 i_lo = i_hi = sort_idx(0), w = 0.0;
-            else if (freq_out >= f_in_sorted(n_freq_in - 1))
-                i_lo = i_hi = sort_idx(n_freq_in - 1), w = 0.0;
+            else if (f_new >= f_in_sorted(n_freq - 1))
+                i_lo = i_hi = sort_idx(n_freq - 1), w = 0.0;
             else
-                for (arma::uword i = 1; i < n_freq_in; ++i)
-                    if (f_in_sorted(i) >= freq_out)
+                for (arma::uword i = 1; i < n_freq; ++i)
+                    if (f_in_sorted(i) >= f_new)
                     {
                         i_lo = sort_idx(i - 1);
                         i_hi = sort_idx(i);
                         double f_lo = f_in_sorted(i - 1), f_hi = f_in_sorted(i);
-                        w = (freq_out - f_lo) / (f_hi - f_lo);
+                        w = (f_new - f_lo) / (f_hi - f_lo);
                         break;
                     }
 
@@ -1060,7 +1060,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
         out.element_pos.zeros();
         out.coupling_re.eye();
         out.coupling_im.zeros();
-        out.center_frequency = dtype(freq_out);
+        out.center_freq = dtype(f_new);
         out.name = arrayant_vec[0].name;
 
         // Quick-check pointers

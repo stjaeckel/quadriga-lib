@@ -34,8 +34,8 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("snap") = py::none(),
           py::arg("coeff_re") = py::none(),
           py::arg("coeff_im") = py::none(),
-          py::arg("freq_in") = py::none(),
-          py::arg("freq_out") = py::none(),
+          py::arg("freq") = py::none(),
+          py::arg("freq_new") = py::none(),
           py::arg("remove_delay_phase") = true);
 
     m.def("channel_export_obj_file", &channel_export_obj_file,

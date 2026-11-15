@@ -559,7 +559,7 @@ TEST_CASE("ray_progress - the reported hit count is independent of subdivision",
 
 TEST_CASE("ray_progress - multi-frequency", "[wave]")
 {
-    // Geometry is traced once at center_frequency[0]; the remaining bands only recompute the
+    // Geometry is traced once at center_freq[0]; the remaining bands only recompute the
     // polarization coefficient, which a frequency-dependent conductivity must actually move.
     Scene S = one_cube(5.0f, 0.0f, 0.0f, mtl_concrete());
 

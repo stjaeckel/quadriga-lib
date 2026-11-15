@@ -9,10 +9,10 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-sum-of
 | [sos_acf_estimate](#sos_acf_estimate) | Monte-Carlo estimate of the ACF of one generator |
 | [sos_acfi](#sos_acfi) | Target ACF at given distances |
 | [sos_calc_mse](#sos_calc_mse) | Approximation error of the ACF of a set of sinusoids |
-| [sos_generate](#sos_generate) | Find the frequencies of a sum-of-sinusoids generator for a given ACF |
+| [sos_generate](#sos_generate) | Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF |
 | [sos_init_phases](#sos_init_phases) | Draw random phases for a set of sum-of-sinusoids generators |
 | [sos_map](#sos_map) | Spatially correlated random values on a regular grid |
-| [sos_preset](#sos_preset) | Frequencies and ACF of a predefined sum-of-sinusoids generator |
+| [sos_preset](#sos_preset) | Spatial frequencies and ACF of a predefined sum-of-sinusoids generator |
 | [sos_rand](#sos_rand) | Spatially correlated Uniform distributed random numbers |
 | [sos_randi](#sos_randi) | Spatially correlated integer random numbers |
 | [sos_randn](#sos_randn) | Spatially correlated Normal distributed random numbers |
@@ -71,30 +71,30 @@ positions are shared: 20 generators take less than twice as long as one.
 
 ```cpp
 // Frequencies of a predefined generator for a decorrelation distance of 10 m
-arma::mat freq;
+arma::mat spatial_freq;
 arma::vec acf, dist;
-quadriga_lib::sos_preset<double>("Comb256", freq, &acf, &dist, 10.0);
+quadriga_lib::sos_preset<double>("Comb256", spatial_freq, &acf, &dist, 10.0);
 
 // Phases of 20 generators; each column is one independent random field
 arma::mat phase;
-quadriga_lib::sos_init_phases<double>(freq.n_rows, 20, phase, 42);
+quadriga_lib::sos_init_phases<double>(spatial_freq.n_rows, 20, phase, 42);
 
 // Values of all 20 generators at the positions, size [1000, 20]
 arma::mat val_all;
-quadriga_lib::sos_val(freq, phase, pos, val_all);
+quadriga_lib::sos_val(spatial_freq, phase, pos, val_all);
 
 // The same fields at other positions, at any later time
 arma::mat pos_new = pos + 2.5, val_new;
-quadriga_lib::sos_val(freq, phase, pos_new, val_new);
+quadriga_lib::sos_val(spatial_freq, phase, pos_new, val_new);
 
 // Uniform distributed output
 arma::mat val_uni;
-quadriga_lib::sos_val<double>(freq, phase, pos, val_uni, nullptr, nullptr, nullptr, nullptr, 1.0, true);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos, val_uni, nullptr, nullptr, nullptr, nullptr, 1.0, true);
 
 // Map on a regular grid, one cube of size [n_y, n_x, 1] per generator
 arma::vec x = arma::regspace(0.0, 0.5, 250.0), y = arma::regspace(0.0, 0.5, 100.0);
 std::vector<arma::cube> grid;
-quadriga_lib::sos_map<double>(freq, phase, x, grid, &y);
+quadriga_lib::sos_map<double>(spatial_freq, phase, x, grid, &y);
 ```
 
 - **Presets:** `Exp`, `Gauss` and `Comb`, each with 128, 256, 512 or 1024 sinusoids, e.g. `"Exp512"`. `Exp`
@@ -110,7 +110,7 @@ quadriga_lib::sos_map<double>(freq, phase, x, grid, &y);
 // Positions of the two ends of 1000 links; one value per link and generator, size [1000, 20]
 arma::mat pos_tx = pos, pos_rx(1000, 3, arma::fill::randu), val_link;
 pos_rx *= 100.0;
-quadriga_lib::sos_val<double>(freq, phase, pos_tx, val_link, &pos_rx, nullptr, &acf, &dist);
+quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, &pos_rx, nullptr, &acf, &dist);
 ```
 
 - **Mean over an area:** the values at positions that lie within a few decorrelation distances of each
@@ -219,14 +219,14 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acf_app
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_acf_approx(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &dist,
     arma::Cube<dtype> &acf_approx,
     arma::Col<dtype> *dist_2d = nullptr);
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; at least
   2 elements; `[n_acf]`
 
@@ -268,7 +268,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_acf_est
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_acf_estimate(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &phase,
     const arma::Col<dtype> &bins,
     arma::uword n_pos,
@@ -281,7 +281,7 @@ void quadriga_lib::sos_acf_estimate(
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, 3]`
 - **`phase`** — Phases of the generator in [rad]; `[n_coeff]`
 - **`bins`** — Bin centers in [m]; must be >= 0, increase strictly and be finite; at least 2 elements;
   `[n_bin]`
@@ -365,7 +365,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_calc_ms
 ### Declaration:
 ```cpp
 dtype quadriga_lib::sos_calc_mse(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
     dtype *mse_core = nullptr,
@@ -376,7 +376,7 @@ dtype quadriga_lib::sos_calc_mse(
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`acf`** — Target ACF; at least 2 elements; `[n_acf]`
 - **`dist`** — Sample points of the ACF in [m]; must start at 0, be equally spaced and finite; `[n_acf]`
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
@@ -398,7 +398,7 @@ dtype quadriga_lib::sos_calc_mse(
 ---
 <a id="sos_generate"></a>
 ## sos_generate
-Find the frequencies of a sum-of-sinusoids generator for a given ACF
+Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
 
 Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_generate) · [Python](../python/sum-of-sinusoids-random-number-generator.md#sos.generate)
 
@@ -418,15 +418,15 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_generat
   sinusoid in the first pass
 - The fit covers the range of `dist` only. The ACF of the result beyond the last sample point is not
   controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
-  (see `acf_tail` of [sos_calc_mse](#sos_calc_mse)). To prevent this, set `freq_min`; the tables of [sos_preset](#sos_preset) use
+  (see `acf_tail` of [sos_calc_mse](#sos_calc_mse)). To prevent this, set `spatial_freq_min`; the tables of [sos_preset](#sos_preset) use
   `0.05 / d` with the decorrelation distance `d`
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse in
   others; the tables of [sos_preset](#sos_preset) were made with 300
-- `freq_min` and `freq_max` limit the magnitude of the frequency along the direction of each sinusoid;
+- `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each sinusoid;
   0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
-- The search grid has `( freq_max - freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are stored for
+- The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are stored for
   all sample points. It must not have more than 100000 points (the default has 151), which limits
-  `freq_max - freq_min` to less than `10000 / max(dist)`
+  `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
 - `test_dir` and the reported error use the same test directions as [sos_calc_mse](#sos_calc_mse) with the same `n_dir`
 - All computations are done in double precision for both instantiations
@@ -440,15 +440,15 @@ void quadriga_lib::sos_generate(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
     arma::uword n_coeff,
-    arma::Mat<dtype> &freq,
+    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *ase = nullptr,
     arma::Mat<dtype> *test_dir = nullptr,
     arma::uword n_dim = 3,
     bool uniform_smp = true,
     arma::uword n_dir = 10,
     bool random_init = true,
-    dtype freq_min = 0.0,
-    dtype freq_max = 0.0,
+    dtype spatial_freq_min = 0.0,
+    dtype spatial_freq_max = 0.0,
     arma::sword seed = -1);
 ```
 
@@ -461,13 +461,13 @@ void quadriga_lib::sos_generate(
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
 - **`random_init`** *(optional)* — Start from random frequencies (`true`) or build up sinusoid by sinusoid
   (`false`)
-- **`freq_min`** *(optional)* — Lower limit of the frequency magnitude in [1/m]; must be >= 0; 0 = none
-- **`freq_max`** *(optional)* — Upper limit of the frequency magnitude in [1/m]; must be >= 0 and, if not 0,
-  larger than `freq_min`; 0 = `15 / max(dist)`; limited by the size of the search grid, see above
+- **`spatial_freq_min`** *(optional)* — Lower limit of the spatial-frequency magnitude in [1/m]; must be >= 0; 0 = none
+- **`spatial_freq_max`** *(optional)* — Upper limit of the spatial-frequency magnitude in [1/m]; must be >= 0 and, if not 0,
+  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search grid, see above
 - **`seed`** *(optional)* — Seed; must be >= -1; `-1` seeds from the system random device
 
 ### Outputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, n_dim]`
 - **`ase`** *(optional)* — Mean squared error over the test directions after each pass, linear scale;
   `[n_pass]`
 - **`test_dir`** *(optional)* — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}`
@@ -529,9 +529,9 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_map) ·
 - Evaluates the generators of [sos_val](#sos_val) for one device at all combinations of the grid vectors
 - Output in meshgrid order: element `(iy, ix, iz)` of a cube belongs to the position `{x(ix), y(iy), z(iz)}`
 - One cube per generator, i.e. per column of `phase`
-- The number of grid vectors given must not exceed the number of columns of `freq`; an omitted or empty
+- The number of grid vectors given must not exceed the number of columns of `spatial_freq`; an omitted or empty
   `y` or `z` means a single sample at 0 on that axis
-- `z` can be given without `y` if `freq` has 3 columns
+- `z` can be given without `y` if `spatial_freq` has 3 columns
 - The values are those of [sos_val](#sos_val) at the grid points, bit for bit; kernels, accuracy and the Uniform
   mapping are described there
 - Cubes of the correct size keep their memory. If they lie one after the other in memory (one block of
@@ -541,7 +541,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_map) ·
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_map(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Mat<dtype> &phase,
     const arma::Col<dtype> &x,
     std::vector<arma::Cube<dtype>> &map,
@@ -552,7 +552,7 @@ void quadriga_lib::sos_map(
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases in [rad]; one column per generator; `[n_coeff, n_gen]`
 - **`x`** — Grid points on the x-axis in [m]; `[nx]`
 - **`y`** *(optional)* — Grid points on the y-axis in [m]; requires `n_dim >= 2`; omitted = one sample at 0,
@@ -572,7 +572,7 @@ void quadriga_lib::sos_map(
 ---
 <a id="sos_preset"></a>
 ## sos_preset
-Frequencies and ACF of a predefined sum-of-sinusoids generator
+Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
 
 Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_preset) · [Python](../python/sum-of-sinusoids-random-number-generator.md#sos.preset)
 
@@ -588,7 +588,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_preset)
   `d/10` and the frequencies by `10/d`
 - All tables are 3-dimensional and can be used with positions of 1, 2 or 3 columns
 - How the tables were made: [sos_generate](#sos_generate) with the 200-sample ACF for 10 m, `n_dim = 3`,
-  `uniform_smp = true`, `n_dir = 300`, `random_init = true`, `freq_min = 0.005`, `freq_max = 15 / 49.75`,
+  `uniform_smp = true`, `n_dir = 300`, `random_init = true`, `spatial_freq_min = 0.005`, `spatial_freq_max = 15 / 49.75`,
   and the seeds 39, 3, 2, 5 (Exp), 13, 32, 6, 21 (Gauss), 13, 25, 37, 47 (Comb) for 128, 256, 512 and 1024
   sinusoids. Sinusoid `n` points in direction `n` of the spiral lattice described in [sos_calc_mse](#sos_calc_mse)
 - The lower frequency limit means that no sinusoid has a wavelength above 20 decorrelation distances. The
@@ -600,7 +600,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_preset)
 ```cpp
 void quadriga_lib::sos_preset(
     const std::string &name,
-    arma::Mat<dtype> &freq,
+    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *acf = nullptr,
     arma::Col<dtype> *dist = nullptr,
     dtype dist_decorr = 10.0);
@@ -611,7 +611,7 @@ void quadriga_lib::sos_preset(
 - **`dist_decorr`** *(optional)* — Decorrelation distance in [m]; must be > 0
 
 ### Outputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, 3]`
 - **`acf`** *(optional)* — Target ACF; `[200]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; `[200]`
 
@@ -833,7 +833,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_remove_
 - Two devices on the same map (`pos_b` given, `phase_b` omitted): one offset per generator that zeroes the
   mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b` given): each device is treated on its own, `phase`
-  with `pos` and `phase_b` with `pos_b` and the frequencies `freq · freq_scale_b`; two offsets per generator.
+  with `pos` and `phase_b` with `pos_b` and the frequencies `spatial_freq · spatial_freq_scale_b`; two offsets per generator.
   The mean of the combined value is then zero as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions. The
   variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the sample mean and
@@ -856,7 +856,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_remove_
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_remove_bias(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
     const arma::Mat<dtype> *pos_b = nullptr,
@@ -865,15 +865,15 @@ void quadriga_lib::sos_remove_bias(
     const arma::Col<dtype> *dist = nullptr,
     arma::Mat<dtype> *offset = nullptr,
     arma::Mat<dtype> *mean_before = nullptr,
-    dtype freq_scale_b = 1.0);
+    dtype spatial_freq_scale_b = 1.0);
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases in [rad]; one column per generator; updated in-place; `[n_coeff, n_gen]`
 - **`pos`** — Positions of the first device in [m]; one row per position; the number of columns sets the
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device in [m]; omitted or empty = one device;
   `[n_pos_b, 1]`, `[n_pos_b, 2]` or `[n_pos_b, 3]` as for `pos`; `n_pos_b = n_pos` for the same map, any
   number for different maps
@@ -883,7 +883,7 @@ void quadriga_lib::sos_remove_bias(
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`freq_scale_b`** *(optional)* — Frequency scale of the second device, i.e. decorrelation distance of
+- **`spatial_freq_scale_b`** *(optional)* — Spatial-frequency scale of the second device, i.e. decorrelation distance of
   the first device divided by that of the second; must be > 0; other than 1 requires `phase_b`
 
 ### Outputs:
@@ -904,14 +904,14 @@ Spatially correlated random values at given positions
 Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_val) · [Python](../python/sum-of-sinusoids-random-number-generator.md#sos.val)
 
 - Sum-of-sinusoids generator: at position `x` a generator with `n_coeff` sinusoids produces
-  `s(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )`, with the frequencies `f_n` (rows of `freq`)
+  `s(x) = sqrt(2/n_coeff) · sum_n cos( 2·pi · f_n·x + phi_n )`, with the frequencies `f_n` (rows of `spatial_freq`)
   and the phases `phi_n` (one column of `phase`)
 - For uniformly random phases, `s` has zero mean, unit variance and the autocorrelation function (ACF)
   `(1/n_coeff) · sum_n cos( 2·pi · f_n·dx )`, which approximates the target ACF the frequencies were
   fitted to; with many sinusoids the values are approximately Normal distributed
 - All generators of one call share the frequencies; each column of `phase` is one generator. The sines and
   cosines of the positions are computed once and reused for all generators
-- Positions may have fewer columns than `freq`; missing coordinates are 0
+- Positions may have fewer columns than `spatial_freq`; missing coordinates are 0
 - One device (`pos_b` omitted): `val = s(pos)`
 - Two devices on the same map (`pos_b` given, `phase_b` omitted): both devices use `phase`;
   `val = ( s(pos) + s(pos_b) ) / sqrt( 2 + 2·A(D) )`, where `D` is the distance between `pos` and `pos_b`
@@ -919,10 +919,10 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_val) ·
   not change when the two devices swap their positions
 - Two devices on different maps (`pos_b` and `phase_b` given):
   `val = ( s_a(pos) + s_b(pos_b) ) / sqrt(2)`; `s_b` uses `phase_b` and the frequencies
-  `freq · freq_scale_b`; `acf` and `dist` are ignored
+  `spatial_freq · spatial_freq_scale_b`; `acf` and `dist` are ignored
 - The mode follows from the arguments only; phase values are never compared. Passing the same matrix as
   `phase` and `phase_b` selects the two-map formula
-- `freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
+- `spatial_freq_scale_b` other than 1 requires `phase_b`: one map with two decorrelation distances has no
   consistent ACF
 - Two devices on the same map need an ACF above -1 at all sample points, because the value is divided by
   `sqrt( 2 + 2·A(D) )`
@@ -946,7 +946,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_val) ·
 ### Declaration:
 ```cpp
 void quadriga_lib::sos_val(
-    const arma::Mat<dtype> &freq,
+    const arma::Mat<dtype> &spatial_freq,
     const arma::Mat<dtype> &phase,
     const arma::Mat<dtype> &pos,
     arma::Mat<dtype> &val,
@@ -954,17 +954,17 @@ void quadriga_lib::sos_val(
     const arma::Mat<dtype> *phase_b = nullptr,
     const arma::Col<dtype> *acf = nullptr,
     const arma::Col<dtype> *dist = nullptr,
-    dtype freq_scale_b = 1.0,
+    dtype spatial_freq_scale_b = 1.0,
     bool uniform = false,
     int use_kernel = 0);
 ```
 
 ### Inputs:
-- **`freq`** — Frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `n_dim` = 1, 2 or 3; `[n_coeff, n_dim]`
 - **`phase`** — Phases in [rad]; one column per generator; `[n_coeff, n_gen]`
 - **`pos`** — Positions of the first device in [m]; one row per position; the number of columns sets the
   number of dimensions: `[n_pos, 1]` = `{x}`, `[n_pos, 2]` = `{x, y}` or `[n_pos, 3]` = `{x, y, z}`;
-  coordinates that are not given are 0; not more columns than `freq`
+  coordinates that are not given are 0; not more columns than `spatial_freq`
 - **`pos_b`** *(optional)* — Positions of the second device in [m]; omitted or empty = one device;
   `[n_pos, 1]`, `[n_pos, 2]` or `[n_pos, 3]` as for `pos`; the number of columns may differ from `pos`
 - **`phase_b`** *(optional)* — Phases of the second device in [rad]; requires `pos_b`; omitted or empty =
@@ -973,7 +973,7 @@ void quadriga_lib::sos_val(
   `[n_acf]`
 - **`dist`** *(optional)* — Sample points of the ACF in [m]; must start at 0, increase strictly and be
   finite; `[n_acf]`
-- **`freq_scale_b`** *(optional)* — Frequency scale of the second device, i.e. decorrelation distance of
+- **`spatial_freq_scale_b`** *(optional)* — Spatial-frequency scale of the second device, i.e. decorrelation distance of
   the first device divided by that of the second; must be > 0
 - **`uniform`** *(optional)* — Output distribution: `false` = Normal(0,1), `true` = Uniform between 0 and 1
 - **`use_kernel`** *(optional)* — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2;

@@ -113,13 +113,13 @@ class TestSpeakerGenerate(unittest.TestCase):
     def test_custom_frequencies(self):
         """Explicit frequency vector is used and reflected in center_freq."""
         freqs = np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0])
-        data = arrayant.generate_speaker(frequencies=freqs)
+        data = arrayant.generate_speaker(center_freq=freqs)
         npt.assert_array_almost_equal(data['center_freq'], freqs)
         self.assertEqual(data['e_theta_re'].shape[3], 5)
 
     def test_single_frequency_returns_3d_pattern(self):
         """Single frequency produces a 3D pattern (no 4th dim) and scalar center_freq."""
-        data = arrayant.generate_speaker(frequencies=np.array([1000.0]))
+        data = arrayant.generate_speaker(center_freq=np.array([1000.0]))
         # With one entry, arrayant2dict_multi delegates to single-freq version
         self.assertEqual(data['e_theta_re'].ndim, 3)
         self.assertIsInstance(data['center_freq'], float)
@@ -127,7 +127,7 @@ class TestSpeakerGenerate(unittest.TestCase):
     def test_two_frequencies(self):
         """Two frequencies produce 4D patterns with shape[-1] == 2."""
         freqs = np.array([500.0, 5000.0])
-        data = arrayant.generate_speaker(frequencies=freqs)
+        data = arrayant.generate_speaker(center_freq=freqs)
         self.assertEqual(data['e_theta_re'].ndim, 4)
         self.assertEqual(data['e_theta_re'].shape[3], 2)
         npt.assert_array_almost_equal(data['center_freq'], freqs)
@@ -161,7 +161,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         freqs = np.array([100.0])
         data = arrayant.generate_speaker(driver_type='omni', radius=0.165,
                                          lower_cutoff=30.0, upper_cutoff=300.0,
-                                         radiation_type='monopole', frequencies=freqs,
+                                         radiation_type='monopole', center_freq=freqs,
                                          angular_resolution=10.0)
         pat = data['e_theta_re'][:, :, 0]
         # All values should be approximately equal for monopole omni
@@ -175,25 +175,25 @@ class TestSpeakerGenerate(unittest.TestCase):
     def test_radiation_monopole(self):
         """Monopole radiation produces finite output."""
         data = arrayant.generate_speaker(radiation_type='monopole',
-                                         frequencies=np.array([1000.0]))
+                                         center_freq=np.array([1000.0]))
         self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
 
     def test_radiation_hemisphere(self):
         """Hemisphere radiation produces finite output."""
         data = arrayant.generate_speaker(radiation_type='hemisphere',
-                                         frequencies=np.array([1000.0]))
+                                         center_freq=np.array([1000.0]))
         self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
 
     def test_radiation_dipole(self):
         """Dipole radiation produces finite output."""
         data = arrayant.generate_speaker(radiation_type='dipole',
-                                         frequencies=np.array([1000.0]))
+                                         center_freq=np.array([1000.0]))
         self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
 
     def test_radiation_cardioid(self):
         """Cardioid radiation produces finite output."""
         data = arrayant.generate_speaker(radiation_type='cardioid',
-                                         frequencies=np.array([1000.0]))
+                                         center_freq=np.array([1000.0]))
         self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
 
     def test_dipole_has_rear_null(self):
@@ -201,7 +201,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         freqs = np.array([1000.0])
         data = arrayant.generate_speaker(driver_type='omni', radiation_type='dipole',
                                          lower_cutoff=30.0, upper_cutoff=20000.0,
-                                         frequencies=freqs, angular_resolution=5.0)
+                                         center_freq=freqs, angular_resolution=5.0)
         pat = data['e_theta_re'][:, :, 0]  # 2D: (elevation, azimuth)
         el_grid = data['elevation_grid']
         az_grid = data['azimuth_grid']
@@ -219,7 +219,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         freqs = np.array([2000.0])
         data = arrayant.generate_speaker(driver_type='omni', radiation_type='cardioid',
                                          lower_cutoff=30.0, upper_cutoff=20000.0,
-                                         frequencies=freqs, angular_resolution=5.0)
+                                         center_freq=freqs, angular_resolution=5.0)
         pat = data['e_theta_re'][:, :, 0]
         el_grid = data['elevation_grid']
         az_grid = data['azimuth_grid']
@@ -239,7 +239,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         """Maximum on-axis response should occur within the passband."""
         freqs = np.array([20.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0, 18000.0])
         data = arrayant.generate_speaker(lower_cutoff=80.0, upper_cutoff=12000.0,
-                                         frequencies=freqs, angular_resolution=10.0)
+                                         center_freq=freqs, angular_resolution=10.0)
         pat = data['e_theta_re']
         el_grid = data['elevation_grid']
         az_grid = data['azimuth_grid']
@@ -257,7 +257,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         """On-axis response at 20 Hz should be much less than at 500 Hz."""
         freqs = np.array([20.0, 500.0])
         data = arrayant.generate_speaker(lower_cutoff=80.0, upper_cutoff=12000.0,
-                                         frequencies=freqs, angular_resolution=10.0)
+                                         center_freq=freqs, angular_resolution=10.0)
         pat = data['e_theta_re']
         el_mid = pat.shape[0] // 2
         az_mid = pat.shape[1] // 2
@@ -270,7 +270,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         """On-axis response at 18 kHz should be less than at 5 kHz."""
         freqs = np.array([5000.0, 18000.0])
         data = arrayant.generate_speaker(lower_cutoff=80.0, upper_cutoff=12000.0,
-                                         frequencies=freqs, angular_resolution=10.0)
+                                         center_freq=freqs, angular_resolution=10.0)
         pat = data['e_theta_re']
         el_mid = pat.shape[0] // 2
         az_mid = pat.shape[1] // 2
@@ -286,9 +286,9 @@ class TestSpeakerGenerate(unittest.TestCase):
     def test_sensitivity_scaling(self):
         """Higher sensitivity produces larger pattern amplitudes."""
         freqs = np.array([1000.0])
-        d85 = arrayant.generate_speaker(sensitivity=85.0, frequencies=freqs,
+        d85 = arrayant.generate_speaker(sensitivity=85.0, center_freq=freqs,
                                         angular_resolution=10.0)
-        d95 = arrayant.generate_speaker(sensitivity=95.0, frequencies=freqs,
+        d95 = arrayant.generate_speaker(sensitivity=95.0, center_freq=freqs,
                                         angular_resolution=10.0)
         max_85 = np.max(np.abs(d85['e_theta_re']))
         max_95 = np.max(np.abs(d95['e_theta_re']))
@@ -305,7 +305,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         freqs = np.array([200.0, 8000.0])
         data = arrayant.generate_speaker(driver_type='piston', radius=0.05,
                                          lower_cutoff=50.0, upper_cutoff=20000.0,
-                                         radiation_type='monopole', frequencies=freqs,
+                                         radiation_type='monopole', center_freq=freqs,
                                          angular_resolution=5.0)
         pat = data['e_theta_re']
         el_grid = data['elevation_grid']
@@ -329,7 +329,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         data = arrayant.generate_speaker(driver_type='horn', radius=0.025,
                                          lower_cutoff=1500.0, upper_cutoff=20000.0,
                                          hor_coverage=90.0, ver_coverage=60.0,
-                                         frequencies=np.array([4000.0]),
+                                         center_freq=np.array([4000.0]),
                                          angular_resolution=5.0)
         self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
         self.assertGreater(np.max(np.abs(data['e_theta_re'])), 0)
@@ -339,7 +339,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         data = arrayant.generate_speaker(driver_type='horn', radius=0.025,
                                          lower_cutoff=1500.0, upper_cutoff=20000.0,
                                          hor_coverage=0.0, ver_coverage=0.0,
-                                         frequencies=np.array([4000.0]),
+                                         center_freq=np.array([4000.0]),
                                          angular_resolution=5.0)
         self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
 
@@ -352,10 +352,10 @@ class TestSpeakerGenerate(unittest.TestCase):
         freqs = np.array([1000.0])
         d_small = arrayant.generate_speaker(radiation_type='hemisphere',
                                             baffle_width=0.10, baffle_height=0.10,
-                                            frequencies=freqs, angular_resolution=10.0)
+                                            center_freq=freqs, angular_resolution=10.0)
         d_large = arrayant.generate_speaker(radiation_type='hemisphere',
                                             baffle_width=0.40, baffle_height=0.40,
-                                            frequencies=freqs, angular_resolution=10.0)
+                                            center_freq=freqs, angular_resolution=10.0)
         # Patterns should differ (different baffle step frequencies)
         self.assertFalse(np.allclose(d_small['e_theta_re'], d_large['e_theta_re']),
                          "Different baffle sizes should produce different patterns")
@@ -368,9 +368,9 @@ class TestSpeakerGenerate(unittest.TestCase):
         """Steeper lower rolloff should attenuate out-of-band frequencies more."""
         freqs = np.array([20.0, 500.0])
         d12 = arrayant.generate_speaker(lower_cutoff=80.0, lower_rolloff_slope=12.0,
-                                        frequencies=freqs, angular_resolution=10.0)
+                                        center_freq=freqs, angular_resolution=10.0)
         d48 = arrayant.generate_speaker(lower_cutoff=80.0, lower_rolloff_slope=48.0,
-                                        frequencies=freqs, angular_resolution=10.0)
+                                        center_freq=freqs, angular_resolution=10.0)
         el = d12['e_theta_re'].shape[0] // 2
         az = d12['e_theta_re'].shape[1] // 2
         amp_20_12 = np.abs(d12['e_theta_re'][el, az, 0, 0])
@@ -409,14 +409,14 @@ class TestSpeakerGenerate(unittest.TestCase):
 
     def test_e_phi_is_zero(self):
         """For loudspeakers, e_phi fields should be zero (scalar pressure, no polarization)."""
-        data = arrayant.generate_speaker(frequencies=np.array([1000.0]))
+        data = arrayant.generate_speaker(center_freq=np.array([1000.0]))
         npt.assert_array_equal(data['e_phi_re'], np.zeros_like(data['e_phi_re']))
         npt.assert_array_equal(data['e_phi_im'], np.zeros_like(data['e_phi_im']))
 
     def test_e_theta_im_is_zero_for_piston_monopole(self):
         """Piston + monopole: real-valued directivity, imaginary part should be zero."""
         data = arrayant.generate_speaker(driver_type='piston', radiation_type='monopole',
-                                         frequencies=np.array([1000.0]))
+                                         center_freq=np.array([1000.0]))
         npt.assert_array_almost_equal(data['e_theta_im'],
                                       np.zeros_like(data['e_theta_im']), decimal=14)
 
@@ -426,7 +426,7 @@ class TestSpeakerGenerate(unittest.TestCase):
 
     def test_single_driver_identity_coupling(self):
         """Single driver should have identity coupling (1x1 real, 0 imaginary)."""
-        data = arrayant.generate_speaker(frequencies=np.array([1000.0]))
+        data = arrayant.generate_speaker(center_freq=np.array([1000.0]))
         npt.assert_almost_equal(data['coupling_re'], np.array([[1.0]]), decimal=14)
         npt.assert_almost_equal(data['coupling_im'], np.array([[0.0]]), decimal=14)
 
@@ -463,11 +463,11 @@ class TestSpeakerGenerate(unittest.TestCase):
         freqs = np.array([5000.0])
         d_small = arrayant.generate_speaker(driver_type='piston', radius=0.03,
                                             lower_cutoff=50.0, upper_cutoff=20000.0,
-                                            radiation_type='monopole', frequencies=freqs,
+                                            radiation_type='monopole', center_freq=freqs,
                                             angular_resolution=5.0)
         d_large = arrayant.generate_speaker(driver_type='piston', radius=0.10,
                                             lower_cutoff=50.0, upper_cutoff=20000.0,
-                                            radiation_type='monopole', frequencies=freqs,
+                                            radiation_type='monopole', center_freq=freqs,
                                             angular_resolution=5.0)
         el_mid = d_small['e_theta_re'].shape[0] // 2
         az_grid = d_small['azimuth_grid']
@@ -486,9 +486,9 @@ class TestSpeakerGenerate(unittest.TestCase):
         """Shifting cutoffs should shift where the response peaks."""
         freqs = np.array([200.0, 2000.0, 10000.0])
         d_low = arrayant.generate_speaker(lower_cutoff=50.0, upper_cutoff=1000.0,
-                                          frequencies=freqs, angular_resolution=10.0)
+                                          center_freq=freqs, angular_resolution=10.0)
         d_high = arrayant.generate_speaker(lower_cutoff=3000.0, upper_cutoff=18000.0,
-                                           frequencies=freqs, angular_resolution=10.0)
+                                           center_freq=freqs, angular_resolution=10.0)
         el = d_low['e_theta_re'].shape[0] // 2
         az = d_low['e_theta_re'].shape[1] // 2
 
@@ -505,12 +505,12 @@ class TestSpeakerGenerate(unittest.TestCase):
 
     def test_single_frequency_shapes(self):
         """A single frequency gives 3D pattern fields and a float center_freq."""
-        s = arrayant.generate_speaker(frequencies=np.array([1000.0]), angular_resolution=10)
+        s = arrayant.generate_speaker(center_freq=np.array([1000.0]), angular_resolution=10)
         self.assertEqual(s['e_theta_re'].ndim, 3)
         self.assertEqual(s['e_theta_re'].shape, (19, 37, 1))
         self.assertIsInstance(s['center_freq'], float)
         self.assertEqual(s['center_freq'], 1000.0)
-        s = arrayant.generate_speaker(frequencies=np.array([1000.0, 2000.0]), angular_resolution=10)
+        s = arrayant.generate_speaker(center_freq=np.array([1000.0, 2000.0]), angular_resolution=10)
         self.assertEqual(s['e_theta_re'].shape, (19, 37, 1, 2))
         self.assertEqual(s['center_freq'].shape, (2,))
 

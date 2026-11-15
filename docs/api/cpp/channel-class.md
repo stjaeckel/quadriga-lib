@@ -24,7 +24,7 @@ Not in: MATLAB, Python
 | Attribute                                         | Size                                                            | Description                                                 |
 | ------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
 | `std::string name`                                | —                                                               | Name of the channel object                                  |
-| `arma::Col<dtype> center_frequency`               | `[1]`; `[n_snap]`, or `[]`                                      | Center frequency                                            |
+| `arma::Col<dtype> center_freq`               | `[1]`; `[n_snap]`, or `[]`                                      | Center frequency                                            |
 | `arma::Mat<dtype> tx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Transmitter positions                                       |
 | `arma::Mat<dtype> rx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Receiver positions                                          |
 | `arma::Mat<dtype> tx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Transmitter orientation (Euler angles)                      |

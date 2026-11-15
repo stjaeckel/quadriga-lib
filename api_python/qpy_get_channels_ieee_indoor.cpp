@@ -82,7 +82,7 @@ chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, C
   | `coeff`            | Channel coefficients, complex valued                                     | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
   | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
   | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`            | `(n_path, n_snap)`             |
-  | `center_frequency` | Center Frequency in Hz                                                   | `(1,)`                           | `(1,)`                         |
+  | `center_freq` | Center Frequency in Hz                                                   | `(1,)`                           | `(1,)`                         |
   | `initial_position` | 0-based index of the reference snapshot                                  | int                              | int                            |
 
 See also:

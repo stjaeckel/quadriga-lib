@@ -25,7 +25,7 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 void generate_diffraction_paths(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &dest,
-    dtype center_frequency,
+    dtype center_freq,
     int lod,
     arma::Cube<dtype> &ray_x,
     arma::Cube<dtype> &ray_y,
@@ -36,7 +36,7 @@ void generate_diffraction_paths(
 ## Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_frequency`** — Center frequency
+- **`center_freq`** — Center frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
    | `lod` | `n_path` | `n_seg` | Note  |
    | ----- | -------- | ------- | ----- |
@@ -61,7 +61,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
                                               const arma::Mat<dtype> &dest,
-                                              dtype center_frequency,
+                                              dtype center_freq,
                                               int lod,
                                               arma::Cube<dtype> &ray_x,
                                               arma::Cube<dtype> &ray_y,
@@ -81,8 +81,8 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     if (dest.n_rows != n_pos)
         throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
 
-    if (center_frequency <= (dtype)0.0)
-        throw std::invalid_argument("Input 'center_frequency' must be larger that 0.");
+    if (center_freq <= (dtype)0.0)
+        throw std::invalid_argument("Input 'center_freq' must be larger that 0.");
 
     arma::uword n_path = 0; // Number of diffraction arcs
     arma::uword n_seg = 0;  // Number of segments per arc
@@ -214,7 +214,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     auto p_rx = ray_x.memptr(), p_ry = ray_y.memptr(), p_rz = ray_z.memptr(); // Output: scaled and rotated ellipsoid coordinates
 
     // Constants
-    double lambda_div_8 = 0.125 * 299792458.0 / (double)center_frequency; // lambda / 8
+    double lambda_div_8 = 0.125 * 299792458.0 / (double)center_freq; // lambda / 8
 
 // Iterate through positions
 #pragma omp parallel for schedule(static) if (n_pos >= 64)
@@ -274,8 +274,8 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     }
 }
 
-template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> &orig, const arma::Mat<float> &dest, float center_frequency, int lod,
+template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> &orig, const arma::Mat<float> &dest, float center_freq, int lod,
                                                        arma::Cube<float> &ray_x, arma::Cube<float> &ray_y, arma::Cube<float> &ray_z, arma::Cube<float> &weight);
 
-template void quadriga_lib::generate_diffraction_paths(const arma::Mat<double> &orig, const arma::Mat<double> &dest, double center_frequency, int lod,
+template void quadriga_lib::generate_diffraction_paths(const arma::Mat<double> &orig, const arma::Mat<double> &dest, double center_freq, int lod,
                                                        arma::Cube<double> &ray_x, arma::Cube<double> &ray_y, arma::Cube<double> &ray_z, arma::Cube<double> &weight);

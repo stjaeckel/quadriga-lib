@@ -37,7 +37,7 @@ Not in: MATLAB, Python
 | `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords                    |
 | `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]` or empty       | Coupling matrix, real part                                     |
 | `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]` or empty       | Coupling matrix, imaginary part                                |
-| `dtype center_frequency`          | scalar                                 | Center frequency                                               |
+| `dtype center_freq`          | scalar                                 | Center frequency                                               |
 | `std::string name`                | string                                 | Name of the array antenna object                               |
 
 ### Simple member functions:

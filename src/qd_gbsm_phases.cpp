@@ -547,7 +547,7 @@ void quadriga_lib::gbsm_draw(
     arma::sword set_id = -1,
     const std::string &preset = "Comb256",
     const arma::u32_vec *floor_id = nullptr,
-    const arma::vec *center_frequency = nullptr,
+    const arma::vec *center_freq = nullptr,
     bool dual_mobility = false,
     bool horizontal = true);
 ```
@@ -563,7 +563,7 @@ void quadriga_lib::gbsm_draw(
 - **`preset`** *(optional)* — Preset of [[gbsm_init_phases]]; another preset with the same `n_coeff` is not detected
 - **`floor_id`** *(optional)* — Floor number of the UT per link, ground floor 0 (`n_fl - 1` for the UT heights of
   TR 38.901 Table 7.2-1, 0 for outdoor UTs); omitted = floor 0; 2D mode only; `[n_link]`
-- **`center_frequency`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
+- **`center_freq`** *(optional)* — Carrier frequencies in [Hz]; required by the shared `"ray"` set, whose block 14
   uses their mean c_DS ([[ssf_rays]]): pass the same list as to [[ssf_rays]] (another list gives other `"quadriga"`
   rays); ignored and not checked for all other sets; `[n_freq]`
 - **`dual_mobility`** *(optional)* — `true`: Tx and Rx both move
@@ -589,11 +589,11 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
                              arma::sword set_id,
                              const std::string &preset,
                              const arma::u32_vec *floor_id,
-                             const arma::vec *center_frequency,
+                             const arma::vec *center_freq,
                              bool dual_mobility,
                              bool horizontal)
 {
-    // Validation, before any output is touched; 'center_frequency' is used by the shared "ray" set only
+    // Validation, before any output is touched; 'center_freq' is used by the shared "ray" set only
     const bool lsf = set_type == "lsf";
     if (!lsf && set_type != "cluster" && set_type != "ray")
         throw std::invalid_argument("Input 'set_type' must be 'lsf', 'cluster' or 'ray'.");
@@ -620,11 +620,11 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
     if (floor_id != nullptr && !horizontal)
         throw std::invalid_argument("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.");
     const bool shared_ray = set_type == "ray" && set_id == -1;
-    if (shared_ray && center_frequency == nullptr)
-        throw std::invalid_argument("Input 'center_frequency' is required for the shared 'ray' set.");
+    if (shared_ray && center_freq == nullptr)
+        throw std::invalid_argument("Input 'center_freq' is required for the shared 'ray' set.");
     if (shared_ray)
-        qd_gbsm_check_fc(*center_frequency);
-    qd_check_alias(&rnd, "rnd", &phase, &tx_pos, &rx_pos, center_frequency);
+        qd_gbsm_check_fc(*center_freq);
+    qd_check_alias(&rnd, "rnd", &phase, &tx_pos, &rx_pos, center_freq);
 
     if (n_link == 0 || n_gen == 0)
     {
@@ -641,9 +641,9 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
     if (shared_ray)
     {
         double cds = 0.0;
-        for (arma::uword k = 0; k < center_frequency->n_elem; ++k)
-            cds += qd_gbsm_cds(sp, center_frequency->at(k));
-        cds /= (double)center_frequency->n_elem;
+        for (arma::uword k = 0; k < center_freq->n_elem; ++k)
+            cds += qd_gbsm_cds(sp, center_freq->at(k));
+        cds /= (double)center_freq->n_elem;
         const double casa = sp.at("PerClusterAS_A") * 0.017453292519943295;
         if (cds <= 0.0)
             lambda_14 = 0.1;

@@ -12,7 +12,7 @@ SECTION!*/
 
 /*!MD
 # SOS_PRESET
-Frequencies and ACF of a predefined sum-of-sinusoids generator
+Spatial frequencies and ACF of a predefined sum-of-sinusoids generator
 
 - Returns a precomputed frequency table for [[sos_val]] together with the autocorrelation
   function (ACF) it was fitted to
@@ -32,7 +32,7 @@ Frequencies and ACF of a predefined sum-of-sinusoids generator
 
 ## Usage:
 ```
-[ freq, acf, dist ] = quadriga_lib.sos_preset( name, dist_decorr );
+[ spatial_freq, acf, dist ] = quadriga_lib.sos_preset( name, dist_decorr );
 ```
 
 ## Inputs:
@@ -40,7 +40,7 @@ Frequencies and ACF of a predefined sum-of-sinusoids generator
 - **`dist_decorr`** — Decorrelation distance; must be > 0; default: 10
 
 ## Outputs:
-- **`freq`** — Frequencies; `[n_coeff, 3]`
+- **`spatial_freq`** — Spatial frequencies; `[n_coeff, 3]`
 - **`acf`** — Target ACF; `[200]`
 - **`dist`** — Sample points of the ACF; `[200]`
 
@@ -63,7 +63,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double dist_decorr = (nrhs < 2) ? 10.0 : qd_mex_get_scalar<double>(prhs[1], "dist_decorr", 10.0);
 
     // Output allocation; the number of sinusoids is known only after the call
-    arma::mat freq;
+    arma::mat spatial_freq;
     arma::vec acf, dist;
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&acf, 200);
@@ -75,9 +75,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_dist = dist.empty() ? nullptr : &dist;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_preset<double>(name, freq, p_acf, p_dist, dist_decorr));
+    CALL_QD(quadriga_lib::sos_preset<double>(name, spatial_freq, p_acf, p_dist, dist_decorr));
 
     // Copy to MATLAB
     if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&freq);
+        plhs[0] = qd_mex_copy2matlab(&spatial_freq);
 }

@@ -23,13 +23,13 @@ SECTION!*/
 Generate a parametric frequency-dependent loudspeaker directivity model
 
 - Returns one [[arrayant]] object per frequency sample; each has a single element with the real-valued 
-  directivity pattern in `e_theta_re` and `center_frequency` set to the corresponding frequency.
+  directivity pattern in `e_theta_re` and `center_freq` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results 
   via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
-- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band below 
+- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
 - **Driver models** (`driver_type`):
@@ -59,7 +59,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype horn_control_freq = 0.0,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
-        arma::Col<dtype> frequencies = arma::Col<dtype>(),
+        arma::Col<dtype> center_freq = arma::Col<dtype>(),
         dtype angular_resolution = 5.0);
 ```
 
@@ -77,7 +77,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; `0` auto-derives from `radius`
 - **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
-- **`frequencies`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
 - **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 5°
 
 ## Returns:
@@ -111,7 +111,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
                                                                           dtype sensitivity, std::string radiation_type,
                                                                           dtype hor_coverage, dtype ver_coverage, dtype horn_control_freq,
                                                                           dtype baffle_width, dtype baffle_height,
-                                                                          arma::Col<dtype> frequencies, dtype angular_resolution)
+                                                                          arma::Col<dtype> center_freq, dtype angular_resolution)
 {
     // Constants
     const double c_sound = 344.0;        // Speed of sound in [m/s]
@@ -131,9 +131,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
     for (dtype v : scalars)
         if (!std::isfinite(v))
             throw std::invalid_argument("generate_speaker: radius, slopes, sensitivity, coverage, horn_control_freq and baffle size must be finite.");
-    for (dtype f : frequencies)
+    for (dtype f : center_freq)
         if (!std::isfinite(f) || f <= dtype(0.0))
-            throw std::invalid_argument("generate_speaker: frequencies must be finite and positive.");
+            throw std::invalid_argument("generate_speaker: center_freq must be finite and positive.");
 
     // --- Fix input ranges ---
     radius = (radius <= dtype(0.0)) ? dtype(0.05) : radius;
@@ -158,7 +158,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
     }
 
     // --- Generate third-octave frequency samples if not provided ---
-    if (frequencies.is_empty())
+    if (center_freq.is_empty())
     {
         // Third-octave bands: f_n = 1000 * 2^(n/3)
         double f_ref = 1000.0;
@@ -178,12 +178,12 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
         if (freq_vec.empty())
             throw std::invalid_argument("generate_speaker: Could not generate frequency samples in the audible range.");
 
-        frequencies.set_size((arma::uword)freq_vec.size());
+        center_freq.set_size((arma::uword)freq_vec.size());
         for (arma::uword i = 0; i < (arma::uword)freq_vec.size(); ++i)
-            frequencies[i] = freq_vec[i];
+            center_freq[i] = freq_vec[i];
     }
 
-    arma::uword n_freq = frequencies.n_elem;
+    arma::uword n_freq = center_freq.n_elem;
 
     // --- Build angular grids ---
     arma::uword no_az = arma::uword(360.0 / (double)angular_resolution) + 1ULL;
@@ -256,7 +256,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
 
     for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
     {
-        double freq = (double)frequencies[i_freq];
+        double freq = (double)center_freq[i_freq];
         double wavelength = c_sound / freq;
         double k = two_pi / wavelength;       // Wavenumber [rad/m]
         double ka = k * (double)radius;        // ka product (dimensionless)
@@ -281,7 +281,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
         ant.element_pos.zeros(3, 1);
         ant.coupling_re.ones(1, 1);
         ant.coupling_im.zeros(1, 1);
-        ant.center_frequency = dtype(freq);
+        ant.center_freq = dtype(freq);
 
         dtype *pat_re = ant.e_theta_re.memptr();
 

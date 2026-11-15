@@ -29,7 +29,7 @@ from quadriga_lib import channel
 
 def minimal_channel(name='c'):
     return {'name': name, 'tx_position': np.zeros((3, 1)), 'rx_position': np.ones((3, 1)),
-            'center_frequency': np.array([1e9]), 'coeff': [np.ones((1, 1, 1), complex)],
+            'center_freq': np.array([1e9]), 'coeff': [np.ones((1, 1, 1), complex)],
             'delay': [np.zeros((1, 1, 1))]}
 
 
@@ -57,7 +57,7 @@ def full_channel(n_path=(3, 2)):
         'lbs_pos': [q(3, n) for n in n_path],
         'no_interact': [np.arange(n, dtype=np.int64) for n in n_path],
         'interact_coord': [q(3, n * (n - 1) // 2) for n in n_path],
-        'center_frequency': 1e9 * np.arange(1.0, len(n_path) + 1.0),
+        'center_freq': 1e9 * np.arange(1.0, len(n_path) + 1.0),
         'initial_position': 2,
     }
 
@@ -444,7 +444,7 @@ class test_case(unittest.TestCase):
             ref = np.zeros(shape[:-1], dtype=c[key].dtype)  # snapshot 1: 2 paths, 1 interaction, zero-padded
             ref[tuple(slice(0, n) for n in chan_ref[key][1].shape)] = chan_ref[key][1]
             npt.assert_array_equal(c[key][..., 1], ref, err_msg=key)
-        for key in ['name', 'tx_position', 'rx_position', 'tx_orientation', 'rx_orientation', 'center_frequency',
+        for key in ['name', 'tx_position', 'rx_position', 'tx_orientation', 'rx_orientation', 'center_freq',
                     'initial_position']:
             self.assert_same(c[key], chan_ref[key], key)
 
@@ -453,7 +453,7 @@ class test_case(unittest.TestCase):
         ref = full_channel(n_path=(3, 3))
         f32 = {k: [x.astype(np.complex64 if np.iscomplexobj(x) else np.float32) for x in v]
                if isinstance(v, list) and k != 'no_interact' else v for k, v in ref.items()}
-        f32.update({k: ref[k].astype(np.float32) for k in ['tx_position', 'rx_position', 'center_frequency']})
+        f32.update({k: ref[k].astype(np.float32) for k in ['tx_position', 'rx_position', 'center_freq']})
         variants = [
             ref,                                                                      # list model
             stack_model(ref),                                                         # stack model
@@ -516,7 +516,7 @@ class test_case(unittest.TestCase):
             self.assert_same(c[key], [ref[key][1], ref[key][0]], key)
         self.assert_same(c['tx_position'], ref['tx_position'][:, [1, 0]])  # per-snapshot columns follow
         self.assert_same(c['rx_position'], ref['rx_position'])             # a shared column stays
-        self.assert_same(c['center_frequency'], ref['center_frequency'][[1, 0]])
+        self.assert_same(c['center_freq'], ref['center_freq'][[1, 0]])
 
         for snap in [1, [1], np.array([1], dtype=np.int32), np.uint64(1)]:
             chan, _ = channel.hdf5_read_channel(fn, snap=snap)

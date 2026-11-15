@@ -29,7 +29,7 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
   zeroes the mean of the combined, normalised value; `acf` and `dist` are required
 - Two devices on different maps (`pos_b` and `phase_b_in` given): each device is treated on its
   own, `phase_in` with `pos` and `phase_b_in` with `pos_b` and the frequencies
-  `freq · freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
+  `spatial_freq · spatial_freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
   as well
 - Effect on the statistics: the result is the field conditioned on a zero mean over the positions.
   The variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the
@@ -51,16 +51,16 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 
 ## Usage:
 ```
-phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( freq, phase_in, pos, \
-    pos_b, phase_b_in, acf, dist, freq_scale_b )
+phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, pos, \
+    pos_b, phase_b_in, acf, dist, spatial_freq_scale_b )
 ```
 
 ## Inputs:
-- **`freq`** — Frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
 - **`phase_in`** — Phases; one column per generator; `(n_coeff, n_gen)`
 - **`pos`** — Positions of the first device; one row per position; the number of columns sets the
   number of dimensions: `(n_pos, 1)` = `(x)`, `(n_pos, 2)` = `(x, y)` or `(n_pos, 3)` = `(x, y, z)`;
-  coordinates that are not given are 0; not more columns than `freq`; a 1-D array is one column,
+  coordinates that are not given are 0; not more columns than `spatial_freq`; a 1-D array is one column,
   i.e. one x-coordinate per position
 - **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos_b, 1)`, `(n_pos_b, 2)`
   or `(n_pos_b, 3)` as for `pos`; `n_pos_b = n_pos` for the same map, any number for different
@@ -71,7 +71,7 @@ phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( freq
   default: `None`
 - **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`;
   default: `None`
-- **`freq_scale_b`** — Frequency scale of the second device, i.e. decorrelation distance of the
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
   first device divided by that of the second; must be > 0; other than 1 requires `phase_b_in`;
   default: 1.0
 
@@ -89,17 +89,17 @@ phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( freq
 - [[sos.val]] (the values whose mean is removed)
 MD!*/
 
-py::tuple sos_remove_bias(const py::array_t<double> &freq,
+py::tuple sos_remove_bias(const py::array_t<double> &spatial_freq,
                           const py::array_t<double> &phase_in,
                           const py::array_t<double> &pos,
                           py::handle pos_b,
                           py::handle phase_b_in,
                           py::handle acf,
                           py::handle dist,
-                          double freq_scale_b)
+                          double spatial_freq_scale_b)
 {
     // Read inputs; the phases are modified by the library and therefore copied
-    const auto freq_a = qd_python_numpy2arma_Mat<double>(freq, true);
+    const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     arma::mat phase_out = qd_python_numpy2arma_Mat<double>(phase_in, false);
     const auto pos_a = qd_python_numpy2arma_Mat<double>(pos, true);
     const auto pos_b_a = qd_python_numpy2arma_Mat<double>(pos_b, true);
@@ -116,7 +116,7 @@ py::tuple sos_remove_bias(const py::array_t<double> &freq,
 
     // Call library function
     quadriga_lib::sos_remove_bias<double>(freq_a, phase_out, pos_a, p_pos_b, p_phase_b, p_acf, p_dist,
-                                          &offset, &mean_before, freq_scale_b);
+                                          &offset, &mean_before, spatial_freq_scale_b);
 
     // Copy to python
     auto phase_out_py = qd_python_copy2numpy(&phase_out);
@@ -131,11 +131,11 @@ py::tuple sos_remove_bias(const py::array_t<double> &freq,
 
 // pybind11 declaration:
 // m.def("remove_bias", &sos_remove_bias,
-//       py::arg("freq").none(false),
+//       py::arg("spatial_freq").none(false),
 //       py::arg("phase_in").none(false),
 //       py::arg("pos").none(false),
 //       py::arg("pos_b") = py::none(),
 //       py::arg("phase_b_in") = py::none(),
 //       py::arg("acf") = py::none(),
 //       py::arg("dist") = py::none(),
-//       py::arg("freq_scale_b") = 1.0);
+//       py::arg("spatial_freq_scale_b") = 1.0);

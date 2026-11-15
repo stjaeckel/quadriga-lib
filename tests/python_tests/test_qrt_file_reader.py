@@ -54,9 +54,9 @@ class test_case(unittest.TestCase):
         self.assertEqual(orig_names, ["TX1", "TX2", "TX3"])
         self.assertEqual(dest_names, ["RX1", "RX2"])
 
-        # qrt_file_parse returns frequencies as stored in the file (GHz for v4/v5)
+        # qrt_file_parse returns the center frequencies in Hz (the file stores GHz for v4/v5)
         self.assertEqual(len(center_freq), no_freq)
-        npt.assert_allclose(center_freq[0], 3.75, atol=1e-6, rtol=0)
+        npt.assert_allclose(center_freq[0], 3.75e9, rtol=1e-6)
 
         self.assertEqual(cir_pos.shape, (no_cir, 3))
         self.assertEqual(cir_orientation.shape, (no_cir, 3))
@@ -87,8 +87,8 @@ class test_case(unittest.TestCase):
         self.assertEqual(cir_offset[1], 1)
 
         self.assertEqual(len(center_freq), no_freq)
-        npt.assert_allclose(center_freq[0], 1.0, atol=1e-6, rtol=0)
-        npt.assert_allclose(center_freq[1], 1.5, atol=1e-6, rtol=0)
+        npt.assert_allclose(center_freq[0], 1.0e9, rtol=1e-6)
+        npt.assert_allclose(center_freq[1], 1.5e9, rtol=1e-6)
 
         self.assertEqual(cir_pos.shape, (no_cir, 3))
         self.assertEqual(cir_orientation.shape, (no_cir, 3))

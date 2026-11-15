@@ -120,7 +120,7 @@ TEST_CASE("ssf_rays - quadriga matches the algorithm at one and several frequenc
         REQUIRE(rays.size() == 5);
         for (arma::uword l = 0; l < 5; ++l)
         {
-            CHECK(arma::all(rays[l].center_frequency == in.fc));
+            CHECK(arma::all(rays[l].center_freq == in.fc));
             check_qd(rays[l], in, l);
         }
     }

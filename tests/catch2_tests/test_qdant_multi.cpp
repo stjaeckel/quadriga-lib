@@ -56,7 +56,7 @@ TEST_CASE("QDANT Multi - Write/Read roundtrip with speaker model")
         CHECK(spk_read[i].n_ports() == spk[i].n_ports());
 
         // Center frequency
-        CHECK(std::abs(spk_read[i].center_frequency - spk[i].center_frequency) < tol_d);
+        CHECK(std::abs(spk_read[i].center_freq - spk[i].center_freq) < tol_d);
 
         // Name
         CHECK(spk_read[i].name == spk[i].name);
@@ -103,7 +103,7 @@ TEST_CASE("QDANT Multi - Single entry roundtrip")
     REQUIRE(layout.n_cols == 1);
     CHECK(layout(0, 0) == 1);
 
-    CHECK(std::abs(spk_read[0].center_frequency - 1000.0) < tol_d);
+    CHECK(std::abs(spk_read[0].center_freq - 1000.0) < tol_d);
     CHECK(arma::approx_equal(spk_read[0].e_theta_re, spk[0].e_theta_re, "absdiff", tol_d));
 
     std::filesystem::remove(fn);
@@ -126,7 +126,7 @@ TEST_CASE("QDANT Multi - Float template roundtrip")
 
     for (size_t i = 0; i < spk.size(); ++i)
     {
-        CHECK(std::abs(spk_read[i].center_frequency - spk[i].center_frequency) < tol_f);
+        CHECK(std::abs(spk_read[i].center_freq - spk[i].center_freq) < tol_f);
         CHECK(arma::approx_equal(spk_read[i].e_theta_re, spk[i].e_theta_re, "absdiff", tol_f));
     }
 
@@ -158,8 +158,8 @@ TEST_CASE("QDANT Multi - Overwrite existing file")
 
     // Should have 2 entries, not 3 or 5
     REQUIRE(read2.size() == 2);
-    CHECK(std::abs(read2[0].center_frequency - 2000.0) < tol_d);
-    CHECK(std::abs(read2[1].center_frequency - 8000.0) < tol_d);
+    CHECK(std::abs(read2[0].center_freq - 2000.0) < tol_d);
+    CHECK(std::abs(read2[1].center_freq - 8000.0) < tol_d);
 
     std::filesystem::remove(fn);
 }
@@ -215,7 +215,7 @@ TEST_CASE("QDANT Multi - Roundtrip preserves frequency ordering")
 
     // Frequencies should come back in the same order
     for (size_t i = 0; i < 5; ++i)
-        CHECK(std::abs(spk_read[i].center_frequency - freqs[i]) < tol_d);
+        CHECK(std::abs(spk_read[i].center_freq - freqs[i]) < tol_d);
 
     std::filesystem::remove(fn);
 }
@@ -237,7 +237,7 @@ TEST_CASE("QDANT Multi - Read with existing qdant_read for individual entries")
         unsigned id = (unsigned)(i + 1);
         auto ant = quadriga_lib::qdant_read<double>(fn, id);
 
-        CHECK(std::abs(ant.center_frequency - spk[i].center_frequency) < tol_d);
+        CHECK(std::abs(ant.center_freq - spk[i].center_freq) < tol_d);
         CHECK(arma::approx_equal(ant.e_theta_re, spk[i].e_theta_re, "absdiff", tol_d));
         CHECK(ant.name == spk[i].name);
     }
@@ -250,7 +250,7 @@ TEST_CASE("QDANT Multi - Read with existing qdant_read for individual entries")
     {
         auto ant_single = quadriga_lib::qdant_read<double>(fn, (unsigned)(i + 1));
         CHECK(arma::approx_equal(spk_multi[i].e_theta_re, ant_single.e_theta_re, "absdiff", 1e-12));
-        CHECK(std::abs(spk_multi[i].center_frequency - ant_single.center_frequency) < 1e-12);
+        CHECK(std::abs(spk_multi[i].center_freq - ant_single.center_freq) < 1e-12);
     }
 
     std::filesystem::remove(fn);
@@ -271,8 +271,8 @@ TEST_CASE("QDANT Multi - Write with auto-generated frequencies")
     REQUIRE(spk_read.size() == spk.size());
 
     // Spot-check first and last entries
-    CHECK(std::abs(spk_read.front().center_frequency - spk.front().center_frequency) < tol_d);
-    CHECK(std::abs(spk_read.back().center_frequency - spk.back().center_frequency) < tol_d);
+    CHECK(std::abs(spk_read.front().center_freq - spk.front().center_freq) < tol_d);
+    CHECK(std::abs(spk_read.back().center_freq - spk.back().center_freq) < tol_d);
     CHECK(arma::approx_equal(spk_read.front().e_theta_re, spk.front().e_theta_re, "absdiff", tol_d));
     CHECK(arma::approx_equal(spk_read.back().e_theta_re, spk.back().e_theta_re, "absdiff", tol_d));
 
@@ -325,8 +325,8 @@ TEST_CASE("QDANT Multi - Read without layout pointer")
     auto spk_read = quadriga_lib::qdant_read_multi<double>(fn);
 
     REQUIRE(spk_read.size() == 2);
-    CHECK(std::abs(spk_read[0].center_frequency - 500.0) < tol_d);
-    CHECK(std::abs(spk_read[1].center_frequency - 2000.0) < tol_d);
+    CHECK(std::abs(spk_read[0].center_freq - 500.0) < tol_d);
+    CHECK(std::abs(spk_read[1].center_freq - 2000.0) < tol_d);
 
     std::filesystem::remove(fn);
 }
@@ -339,15 +339,15 @@ TEST_CASE("QDANT Multi - Non-speaker arrayant roundtrip")
     std::vector<quadriga_lib::arrayant<double>> vec;
 
     auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    omni.center_frequency = 1000.0;
+    omni.center_freq = 1000.0;
     vec.push_back(omni);
 
     auto dipole = quadriga_lib::generate_arrayant_dipole<double>(10.0);
-    dipole.center_frequency = 2000.0;
+    dipole.center_freq = 2000.0;
     vec.push_back(dipole);
 
     auto hw = quadriga_lib::generate_arrayant_half_wave_dipole<double>(10.0);
-    hw.center_frequency = 3000.0;
+    hw.center_freq = 3000.0;
     vec.push_back(hw);
 
     quadriga_lib::qdant_write_multi(fn, vec);
@@ -359,9 +359,9 @@ TEST_CASE("QDANT Multi - Non-speaker arrayant roundtrip")
     CHECK(vec_read[1].name == "dipole");
     CHECK(vec_read[2].name == "half-wave-dipole");
 
-    CHECK(std::abs(vec_read[0].center_frequency - 1000.0) < tol_d);
-    CHECK(std::abs(vec_read[1].center_frequency - 2000.0) < tol_d);
-    CHECK(std::abs(vec_read[2].center_frequency - 3000.0) < tol_d);
+    CHECK(std::abs(vec_read[0].center_freq - 1000.0) < tol_d);
+    CHECK(std::abs(vec_read[1].center_freq - 2000.0) < tol_d);
+    CHECK(std::abs(vec_read[2].center_freq - 3000.0) < tol_d);
 
     CHECK(arma::approx_equal(vec_read[0].e_theta_re, omni.e_theta_re, "absdiff", tol_d));
     CHECK(arma::approx_equal(vec_read[1].e_theta_re, dipole.e_theta_re, "absdiff", tol_d));
@@ -396,7 +396,7 @@ TEST_CASE("QDANT Multi - Large number of entries")
 
     // Spot-check middle entry
     size_t mid = spk.size() / 2;
-    CHECK(std::abs(spk_read[mid].center_frequency - spk[mid].center_frequency) < tol_d);
+    CHECK(std::abs(spk_read[mid].center_freq - spk[mid].center_freq) < tol_d);
     CHECK(arma::approx_equal(spk_read[mid].e_theta_re, spk[mid].e_theta_re, "absdiff", tol_d));
 
     std::filesystem::remove(fn);

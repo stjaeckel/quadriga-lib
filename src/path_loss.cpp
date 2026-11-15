@@ -100,7 +100,7 @@ Path loss and shadow-fading standard deviation of a set of links
   frequency; the TR 38.901 v19.5.0 conf files of the library reproduce Table 7.4.1-1 with them. The O2I
   penetration loss is not included (see [[o2i_loss]]). The models are evaluated as written for any positive
   frequency, also outside their validity range
-- Notation: `f = center_frequency/1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance, at
+- Notation: `f = center_freq/1e9` in GHz (not limited by `LSP_fc_min`); `d3`, `d2` the 3D and 2D distance, at
   least 0.1 m; `hBS`, `hUT` the z coordinates of Tx and Rx; `lg = log10`; `PL1(x) = A1·lg(x) + B + C·lg(f) + D·x`;
   `sf` the shadow-fading std. Keys in parentheses: the required ones, after the semicolon the optional ones (`X = v`:
   default)
@@ -147,7 +147,7 @@ void quadriga_lib::path_loss(
     const std::string &pl_model,
     const std::unordered_map<std::string, std::vector<double>> &plpar,
     const std::unordered_map<std::string, double> &scenpar,
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
     arma::mat &pl,
@@ -160,7 +160,7 @@ void quadriga_lib::path_loss(
 - **`pl_model`** — Path-loss model, value of `PL_model` from [[conf_file_read]]; empty = zero loss
 - **`plpar`** — Path-loss parameters, keys without "PL_", from [[conf_file_read]]; keys not read are ignored
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
-- **`center_frequency`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [[o2i_loss]]), finite
@@ -180,7 +180,7 @@ MD!*/
 void quadriga_lib::path_loss(const std::string &pl_model,
                              const std::unordered_map<std::string, std::vector<double>> &plpar,
                              const std::unordered_map<std::string, double> &scenpar,
-                             const arma::vec &center_frequency,
+                             const arma::vec &center_freq,
                              const arma::mat &tx_pos,
                              const arma::mat &rx_pos,
                              arma::mat &pl,
@@ -190,8 +190,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
 {
     // Validation, before any output is touched
     qd_gbsm_check_links(&tx_pos, &rx_pos);
-    qd_gbsm_check_fc(center_frequency);
-    const arma::uword n_link = rx_pos.n_rows, n_freq = center_frequency.n_elem;
+    qd_gbsm_check_fc(center_freq);
+    const arma::uword n_link = rx_pos.n_rows, n_freq = center_freq.n_elem;
     if (d2d_in != nullptr && d2d_in->n_elem != n_link)
         throw std::invalid_argument("Number of elements in 'd2d_in' does not match number of rows in 'rx_pos'.");
     if (rnd_he != nullptr && rnd_he->n_elem != n_link)
@@ -202,8 +202,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         for (arma::uword l = 0; l < n_link; ++l)
             if (!((*rnd_he)(l) >= 0.0 && (*rnd_he)(l) <= 1.0))
                 throw std::invalid_argument("Input 'rnd_he' must be in the range from 0 to 1.");
-    qd_check_alias(&pl, "pl", &center_frequency, &tx_pos, &rx_pos, d2d_in, rnd_he);
-    qd_check_alias(sf_sigma, "sf_sigma", &center_frequency, &tx_pos, &rx_pos, d2d_in, rnd_he);
+    qd_check_alias(&pl, "pl", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
+    qd_check_alias(sf_sigma, "sf_sigma", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
     qd_check_alias_outputs(&pl, "pl", sf_sigma, "sf_sigma");
 
     // Model, index into 'names'; the empty name is "no model"
@@ -376,7 +376,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
 
     // Default shadow-fading std: the SF std of the LSP formula (only SF evaluated and checked, only if requested)
-    qd_gbsm_lsp_stats sf_stats(sp, center_frequency, (sf_sigma != nullptr) ? 1u << 2 : 0u);
+    qd_gbsm_lsp_stats sf_stats(sp, center_freq, (sf_sigma != nullptr) ? 1u << 2 : 0u);
 
     // UMa environment height of TR 38.901 Table 7.4.1-1, note 1, from a Uniform(0,1) value u
     // - d: 2D distance in [m], hUT: raw UT height in [m]
@@ -438,7 +438,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
 
         for (arma::uword k = 0; k < n_freq; ++k)
         {
-            const double f = center_frequency(k) / 1.0e9, lf = std::log10(f);
+            const double f = center_freq(k) / 1.0e9, lf = std::log10(f);
             double loss = 0.0, sf = 0.0;
             bool set_sf = false; // false: keep the default
             switch (model)

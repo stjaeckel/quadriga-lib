@@ -146,17 +146,17 @@ TEST_CASE("sos_acf_2d - long tables in single precision count as equally spaced"
             dist_d(i) = 0.01 * (double)i, acf_d(i) = std::exp(-0.01 * (double)i / 10.0);
 
         // sos_calc_mse and sos_acf_approx use the same test and are cheap for one sinusoid in 1-D
-        arma::fmat freq(1, 1);
-        freq(0, 0) = 0.01f;
+        arma::fmat spatial_freq(1, 1);
+        spatial_freq(0, 0) = 0.01f;
         arma::mat freq_d(1, 1);
-        freq_d(0, 0) = (double)freq(0, 0);
+        freq_d(0, 0) = (double)spatial_freq(0, 0);
         INFO("n_acf " << n);
         float mse = 0.0f;
-        CHECK_NOTHROW(mse = quadriga_lib::sos_calc_mse(freq, acf, dist));
+        CHECK_NOTHROW(mse = quadriga_lib::sos_calc_mse(spatial_freq, acf, dist));
         double mse_d = quadriga_lib::sos_calc_mse(freq_d, acf_d, dist_d);
         CHECK(std::abs((double)mse - mse_d) < 1e-3);
         arma::fcube approx;
-        CHECK_NOTHROW(quadriga_lib::sos_acf_approx(freq, dist, approx));
+        CHECK_NOTHROW(quadriga_lib::sos_acf_approx(spatial_freq, dist, approx));
         CHECK(approx.n_rows == 4 * n - 3);
         if (n == 501)
         {
@@ -174,8 +174,8 @@ TEST_CASE("sos_acf_2d - long tables in single precision count as equally spaced"
     for (arma::uword i = 0; i < 5001; ++i)
         bad(i) = (float)(0.01 * (double)i);
     bad(2500) += 0.003f;
-    arma::fmat freq(1, 1, arma::fill::ones);
-    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(freq, acf, bad), std::invalid_argument);
+    arma::fmat spatial_freq(1, 1, arma::fill::ones);
+    CHECK_THROWS_AS(quadriga_lib::sos_calc_mse(spatial_freq, acf, bad), std::invalid_argument);
 }
 
 TEST_CASE("sos_acf_2d - outputs that alias inputs")

@@ -71,7 +71,7 @@ TEST_CASE("QRT Write - init writes a parseable header")
 {
     std::string fn = "tests/data/test_write_init.qrt";
 
-    arma::fvec freq = {3.75f};
+    arma::fvec freq = {3.75e9f};
     arma::fmat cir_pos(4, 3, arma::fill::zeros);
     for (arma::uword i = 0; i < 4; ++i)
         cir_pos(i, 0) = (float)(10 * (i + 1));
@@ -83,13 +83,13 @@ TEST_CASE("QRT Write - init writes a parseable header")
 
     arma::uword no_cir, no_orig, no_dest, no_freq;
     int version;
-    arma::fvec fGHz;
+    arma::fvec center_freq_f;
     arma::fmat rd_cir_pos, rd_cir_orient, rd_orig_pos, rd_orig_orient;
     arma::uvec rd_offset;
     std::vector<std::string> orig_names, rd_dest_names;
 
     quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &rd_offset,
-                                 &orig_names, &rd_dest_names, &version, &fGHz,
+                                 &orig_names, &rd_dest_names, &version, &center_freq_f,
                                  &rd_cir_pos, &rd_cir_orient, &rd_orig_pos, &rd_orig_orient);
 
     CHECK(version == 5); // EM
@@ -97,8 +97,8 @@ TEST_CASE("QRT Write - init writes a parseable header")
     CHECK(no_cir == 4ULL);
     CHECK(no_dest == 2ULL);
     CHECK(no_freq == 1ULL);
-    REQUIRE(fGHz.n_elem == 1);
-    CHECK(std::abs(fGHz(0) - 3.75f) < 1e-6f);
+    REQUIRE(center_freq_f.n_elem == 1);
+    CHECK(std::abs(center_freq_f(0) / 3.75e9f - 1.0f) < 1.0e-6f); // Hz in, Hz out; the file stores GHz
 
     // CIR positions round-trip.
     REQUIRE(rd_cir_pos.n_rows == 4);
@@ -133,10 +133,12 @@ TEST_CASE("QRT Write - scalar init selects v6")
 
     arma::uword no_freq;
     int version;
+    arma::fvec center_freq;
     quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, &no_freq, nullptr,
-                                 nullptr, nullptr, &version);
+                                 nullptr, nullptr, &version, &center_freq);
     CHECK(version == 6);
     CHECK(no_freq == 3ULL);
+    CHECK(arma::approx_equal(center_freq, freq, "reldiff", 1.0e-6)); // Scalar files store Hz, no conversion
 
     std::remove(fn.c_str());
 }
@@ -153,13 +155,13 @@ TEST_CASE("QRT Write - init argument validation")
     CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec(), cir_pos, cir_orient, names, off, 1, false),
                     std::invalid_argument);
     // no_orig == 0.
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient, names, off, 0, false),
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, names, off, 0, false),
                     std::invalid_argument);
     // cir_pos wrong shape.
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, arma::fmat(2, 2), cir_orient, names, off, 1, false),
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, arma::fmat(2, 2), cir_orient, names, off, 1, false),
                     std::invalid_argument);
     // names / offset length mismatch.
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient,
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient,
                                                        std::vector<std::string>{"a", "b"}, off, 1, false),
                     std::invalid_argument);
 }
@@ -184,21 +186,21 @@ TEST_CASE("QRT Write - init leaves an existing file unchanged when an input is i
     // RX name with 256 characters (the second of two names)
     std::vector<std::string> names = {"RX", std::string(256, 'a')};
     arma::u32_vec off = {0u, 1u};
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient, names, off, 1, false),
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, names, off, 1, false),
                     std::invalid_argument);
     CHECK(slurp() == content);
 
     // The first CIR offset must be 0 (the reader rejects other files)
     names = {"RX1", "RX2"};
     off = {1u, 1u};
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient, names, off, 1, false),
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, names, off, 1, false),
                     std::invalid_argument);
     CHECK(slurp() == content);
 
     // A name with 255 characters is valid and reads back
     names = {std::string(255, 'b')};
     off = {0u};
-    quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0f}, cir_pos, cir_orient, names, off, 1, false);
+    quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, names, off, 1, false);
     std::vector<std::string> names_read;
     quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &names_read);
     CHECK(names_read == names);
@@ -210,7 +212,7 @@ TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
     std::string fn = "tests/data/test_write_rt.qrt";
     unsigned nFreq = 2, nCir = 3, nOrig = 2;
 
-    arma::fvec freq = {3.75f, 5.0f};
+    arma::fvec freq = {3.75e9f, 5.0e9f};
     arma::fmat cir_pos(nCir, 3, arma::fill::zeros);
     arma::fmat cir_orient;
     std::vector<std::string> dest_names = {"RX"};
@@ -334,7 +336,7 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     std::string fn = "tests/data/test_write_reserved.qrt";
     unsigned nOrig = 3;
 
-    arma::fvec freq = {3.75f};
+    arma::fvec freq = {3.75e9f};
     arma::fmat cir_pos(2, 3, arma::fill::zeros);
     arma::fmat cir_orient;
     std::vector<std::string> dest_names = {"RX"};
@@ -377,7 +379,7 @@ TEST_CASE("QRT Write - append throws when all slots are full")
 {
     std::string fn = "tests/data/test_write_full.qrt";
 
-    arma::fvec freq = {3.75f};
+    arma::fvec freq = {3.75e9f};
     arma::fmat cir_pos(1, 3, arma::fill::zeros);
     arma::fmat cir_orient;
     std::vector<std::string> dest_names = {"RX"};
@@ -401,7 +403,7 @@ TEST_CASE("QRT Write - append validates path against file")
 {
     std::string fn = "tests/data/test_write_validate.qrt";
 
-    arma::fvec freq = {3.75f, 5.0f}; // nFreq = 2, EM
+    arma::fvec freq = {3.75e9f, 5.0e9f}; // nFreq = 2, EM
     arma::fmat cir_pos(2, 3, arma::fill::zeros);
     arma::fmat cir_orient;
     std::vector<std::string> dest_names = {"RX"};
@@ -434,7 +436,7 @@ TEST_CASE("QRT Write - read_raw with shared stream and cache")
     std::string fn = "tests/data/test_write_cache.qrt";
     unsigned nOrig = 2;
 
-    arma::fvec freq = {3.75f};
+    arma::fvec freq = {3.75e9f};
     arma::fmat cir_pos(2, 3, arma::fill::zeros);
     arma::fmat cir_orient;
     std::vector<std::string> dest_names = {"RX"};
@@ -470,7 +472,7 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
     for (bool scalar : {false, true})
     {
         std::string fn = scalar ? "tests/data/test_write_tiny_ori_v6.qrt" : "tests/data/test_write_tiny_ori_v5.qrt";
-        arma::vec freq = scalar ? arma::vec{1000.0, 2000.0} : arma::vec{3.5, 28.0};
+        arma::vec freq = scalar ? arma::vec{1000.0, 2000.0} : arma::vec{3.5e9, 28.0e9};
         arma::mat cir_pos = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
         arma::mat cir_ori(3, 3, arma::fill::zeros);
         cir_ori.col(0).fill(1e-50); // bank: non-zero in double, 0.0f in float
@@ -545,7 +547,7 @@ TEST_CASE("QRT Write - uplink read returns the transposed M")
     for (bool scalar : {false, true})
     {
         std::string fn = scalar ? "tests/data/test_write_uplink_v6.qrt" : "tests/data/test_write_uplink_v5.qrt";
-        arma::vec freq = scalar ? arma::vec{1000.0, 2000.0} : arma::vec{3.5, 28.0};
+        arma::vec freq = scalar ? arma::vec{1000.0, 2000.0} : arma::vec{3.5e9, 28.0e9};
         arma::mat cir_pos = {{1.0, 2.0, 3.0}};
         quadriga_lib::qrt_file_init<double>(fn, freq, cir_pos, arma::mat(), {"RX"}, {0}, 1, scalar);
 

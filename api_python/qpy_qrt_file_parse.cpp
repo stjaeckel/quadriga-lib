@@ -36,7 +36,7 @@ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, 
 - **`orig_names`** — Names of the origin points (TX); list of strings; length `no_orig`
 - **`dest_names`** — Names of the destination points (RX); list of strings; length `no_dest`
 - **`version`** — QRT file version number
-- **`center_freq`** — Frequencies as stored in the file; GHz for EM mode (v4/v5), Hz for scalar mode (v6); `(no_freq,)`
+- **`center_freq`** — Center frequencies in Hz; `(no_freq,)`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `(no_cir, 3)`
 - **`cir_orientation`** — CIR orientations as Euler angles; `(no_cir, 3)`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; `(no_orig, 3)`

@@ -107,7 +107,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_combine_pattern) · [M
   identity coupling matrix
 - Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
 - Accepts a frequency-dependent antenna (4D pattern fields); the pattern is then combined per frequency
-- `freq` may recompute (interpolate) the combined pattern at one or more requested frequencies
+- `freq_new` may recompute (interpolate) the combined pattern at one or more requested frequencies
 - The element positions add a phase that depends on frequency and `propagation_speed`; the default speed of light
   applies to radio waves, use about 343 m/s for acoustic arrays (e.g. from [generate_speaker](#generate_speaker))
 
@@ -115,10 +115,10 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_combine_pattern) · [M
 ```python
 # Single frequency
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant )
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
 
-# Multiple frequencies (freq as a 1D array, or a frequency-dependent input antenna)
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq, azimuth_grid, elevation_grid )
+# Multiple frequencies (freq_new as a 1D array, or a frequency-dependent input antenna)
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
 
 # Acoustic array (speed of sound)
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_speed=343.0 )
@@ -127,7 +127,7 @@ arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_spee
 ### Inputs:
 - **`arrayant`** — Dict with the array antenna data; keys as documented in [generate](#generate); 4D pattern fields
   require `center_freq` with one value per frequency entry `(n_freq,)`
-- **`freq`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
+- **`freq_new`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
   recomputed at each value; if `None`, each input entry's `center_freq` is used; a scalar `<= 0`
   is treated as not given; default: `None`
 - **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; strictly increasing; `(n_azimuth_out,)`;
@@ -361,7 +361,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [MATLAB](.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`
-- If `frequencies` is None or empty, third-octave band centers are auto-generated from one band below
+- If `center_freq` is None or empty, third-octave band centers are auto-generated from one band below
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz
 - Speed of sound assumed to be 343 m/s
 - Driver models (`driver_type`):
@@ -390,7 +390,7 @@ speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.16
     sensitivity=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, \
+speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, \
     10000.0]), angular_resolution=5.0)
 ```
 
@@ -414,7 +414,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 5
   default: 0
 - **`baffle_width`** — Baffle width in m; used by `hemisphere` model; default: 0.15
 - **`baffle_height`** — Baffle height in m; used by `hemisphere` model; default: 0.25
-- **`frequencies`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
+- **`center_freq`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
   `(n_freq,)` or None; default: None
 - **`angular_resolution`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
 
@@ -444,8 +444,8 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [MATLA
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (3D pattern arrays and no `frequency`): outputs `(n_out, n_ang)`; `dist` and `local_angles`
-  add outputs. Multi-frequency mode (4D pattern arrays, or `frequency` given): for each target frequency, the two
+- Single-frequency mode (3D pattern arrays and no `freq_new`): outputs `(n_out, n_ang)`; `dist` and `local_angles`
+  add outputs. Multi-frequency mode (4D pattern arrays, or `freq_new` given): for each target frequency, the two
   entries whose center frequencies bracket it are interpolated and blended; frequencies outside the entries take the
   nearest entry; outputs `(n_out, n_ang, n_freq)`; a 3D pattern is the same at every frequency
 - `azimuth` of shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
@@ -468,7 +468,7 @@ V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolat
     elevation, ..., dist=True, local_angles=True )
 
 # Multi-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., frequency=freqs )
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
 
 # Real and imaginary parts as separate arrays
 V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=False )
@@ -485,7 +485,7 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
   `(3, n_out, n_ang)`; default: `None` (no rotation)
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `(3, n_out)`; default: `None`
   (the positions of the arrayant)
-- **`frequency`** — Target frequencies in Hz; selects the multi-frequency mode; `(n_freq,)`; default: `None` (the
+- **`freq_new`** — Target frequencies in Hz; selects the multi-frequency mode; `(n_freq,)`; default: `None` (the
   `center_freq` of the entries)
 - **`dist`** — Also return the projected distance; single-frequency mode only; default: `False`
 - **`local_angles`** — Also return the local angles and the polarization rotation angle; single-frequency mode only;

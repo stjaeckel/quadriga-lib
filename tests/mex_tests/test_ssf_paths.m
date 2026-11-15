@@ -97,7 +97,7 @@ s = rays;
 for f = { 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', 'path_type', 'tap', 'fallback' }
     s.(f{1}) = s.(f{1})( [], : );
 end
-s.center_frequency = [ fc; 2 * fc ];
+s.center_freq = [ fc; 2 * fc ];
 s.power = zeros( 0, 2 );
 s.M = zeros( 8, 0, 2 );
 s.gr_eps_re = [ gre; gre ];

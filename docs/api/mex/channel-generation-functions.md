@@ -82,7 +82,7 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
   | `coeff_im`         | Channel coefficients, imaginary part                                     | Size: `[n_rx, n_tx, n_path, n_snap]`  |
   | `delay`            | Propagation delays in seconds                                            | Size: `[n_rx, n_tx, n_path, n_snap]`  |
   | `path_gain`        | Path gain before antenna, linear scale                                   | Size: `[n_path, n_snap]`              |
-  | `center_frequency` | Center Frequency in Hz                                                   | Scalar                                |
+  | `center_freq` | Center Frequency in Hz                                                   | Scalar                                |
 
 ### See also:
 - [IEEE 802.11-03/940r4 - TGn Channel Models](https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc)
@@ -179,7 +179,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq_in`), and output (`freq_out`)
+- Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to the nearest frequency entry on all four grids
@@ -195,7 +195,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
   (zero power if no LOS path was found; LOS = the path whose length is closest to the TX-RX distance, within 0.1 mm);
   a LOS path found in the input is moved to slot 1 and leaves a zero-power path in its original slot
   (input index + 1); all other paths keep their order, shifted by one slot
-- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0, n_freq_out]`; with
+- With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0, n_freq_new]`; with
   `add_fake_los_path = true` they hold only this zero-power LOS path, with the LOS delays per antenna pair
 - If `use_absolute_delays` is false, the LOS delay between the TX and RX phase centres is subtracted from all paths;
   per-element delays can then be negative, down to about -(half the TX array size + half the RX array size) /
@@ -212,7 +212,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 ```matlab
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    freq_in, freq_out, use_absolute_delays, add_fake_los_path, propagation_speed );
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed );
 ```
 
 ### Inputs:
@@ -220,26 +220,26 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 - **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq_in]`
+- **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq]`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq_in]` (full pol) or
-  `[2, n_path, n_freq_in]` (scalar pressure)
+- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
+  `[2, n_path, n_freq]` (scalar pressure)
 - **`tx_pos`** — Transmitter position, finite; `[3, 1]`
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`rx_pos`** — Receiver position, finite; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in, 1]`
-- **`freq_out`** — Target output frequencies; `[n_freq_out, 1]`
+- **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq, 1]`
+- **`freq_new`** — Target output frequencies; `[n_freq_new, 1]`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 
 ### Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_out]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_out]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_out, n_freq_out]`
+- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
+- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_out, n_freq_new]`
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)

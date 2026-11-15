@@ -229,7 +229,7 @@ py::dict arrayant_generate(const std::string &type,
     else
         throw std::invalid_argument("Array type not supported!");
 
-    arrayant.center_frequency = freq;
+    arrayant.center_freq = freq;
     return qd_python_arrayant2dict(arrayant);
 }
 

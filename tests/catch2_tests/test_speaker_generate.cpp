@@ -46,7 +46,7 @@ TEST_CASE("Speaker - Default call, basic structure")
         CHECK(spk[i].n_elements() == 1);
         CHECK(spk[i].n_ports() == 1);
         CHECK(spk[i].name == "speaker_piston");
-        CHECK(spk[i].center_frequency > 0.0);
+        CHECK(spk[i].center_freq > 0.0);
 
         // Validate arrayant structure
         std::string err = spk[i].is_valid();
@@ -65,10 +65,10 @@ TEST_CASE("Speaker - Custom frequencies and angular resolution")
     CHECK(spk[0].n_elevation() == 19);
 
     // Verify center frequencies match input
-    CHECK(std::abs(spk[0].center_frequency - 100.0) < 1e-6);
-    CHECK(std::abs(spk[1].center_frequency - 500.0) < 1e-6);
-    CHECK(std::abs(spk[2].center_frequency - 1000.0) < 1e-6);
-    CHECK(std::abs(spk[3].center_frequency - 5000.0) < 1e-6);
+    CHECK(std::abs(spk[0].center_freq - 100.0) < 1e-6);
+    CHECK(std::abs(spk[1].center_freq - 500.0) < 1e-6);
+    CHECK(std::abs(spk[2].center_freq - 1000.0) < 1e-6);
+    CHECK(std::abs(spk[3].center_freq - 5000.0) < 1e-6);
 }
 
 TEST_CASE("Speaker - Float template works")
@@ -80,7 +80,7 @@ TEST_CASE("Speaker - Float template works")
     REQUIRE(spk.size() == 1);
     CHECK(spk[0].n_azimuth() == 37);
     CHECK(spk[0].n_elevation() == 19);
-    CHECK(std::abs(spk[0].center_frequency - 1000.0f) < 1e-3f);
+    CHECK(std::abs(spk[0].center_freq - 1000.0f) < 1e-3f);
 
     // On-axis value should be near 1.0 (passband, default sensitivity)
     float on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -616,14 +616,14 @@ TEST_CASE("Speaker - Third-octave auto-generation covers passband")
     CHECK(spk.size() <= 40);
 
     // First frequency should be at or below lower_cutoff
-    CHECK(spk.front().center_frequency <= 200.0);
+    CHECK(spk.front().center_freq <= 200.0);
 
     // Last frequency should be at or above upper_cutoff
-    CHECK(spk.back().center_frequency >= 8000.0);
+    CHECK(spk.back().center_freq >= 8000.0);
 
     // Frequencies should be monotonically increasing
     for (size_t i = 1; i < spk.size(); ++i)
-        CHECK(spk[i].center_frequency > spk[i - 1].center_frequency);
+        CHECK(spk[i].center_freq > spk[i - 1].center_freq);
 }
 
 // ================================================================================================
@@ -890,7 +890,7 @@ TEST_CASE("Speaker - is_valid_multi: different center frequencies are allowed")
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
 
-    CHECK(std::abs(spk[0].center_frequency - spk[1].center_frequency) > 1000.0);
+    CHECK(std::abs(spk[0].center_freq - spk[1].center_freq) > 1000.0);
 
     std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
@@ -1011,7 +1011,7 @@ TEST_CASE("Speaker - concat_multi: basic two-driver concatenation")
         CHECK(combined[i].n_ports() == 2);
         CHECK(combined[i].n_azimuth() == drv1[i].n_azimuth());
         CHECK(combined[i].n_elevation() == drv1[i].n_elevation());
-        CHECK(std::abs(combined[i].center_frequency - drv1[i].center_frequency) < 1e-12);
+        CHECK(std::abs(combined[i].center_freq - drv1[i].center_freq) < 1e-12);
     }
 }
 
@@ -1198,7 +1198,7 @@ TEST_CASE("Speaker - concat_multi: documentation example 2-way speaker")
     {
         CHECK(speaker_2way[i].n_elements() == 2);
         CHECK(speaker_2way[i].n_ports() == 2);
-        CHECK(std::abs(speaker_2way[i].center_frequency - freqs[i]) < 1e-6);
+        CHECK(std::abs(speaker_2way[i].center_freq - freqs[i]) < 1e-6);
     }
 
     // Element positions correct
@@ -1845,7 +1845,7 @@ TEST_CASE("Speaker - Non-finite and too fine inputs")
                                                           0.0, 0.0, 0.0, 0.15, 0.25, arma::vec(), 90.0);
         arma::vec out(spk.size());
         for (size_t i = 0; i < spk.size(); ++i)
-            out[i] = spk[i].center_frequency;
+            out[i] = spk[i].center_freq;
         return out;
     };
     const arma::vec ref = freqs(80.0, 12000.0);

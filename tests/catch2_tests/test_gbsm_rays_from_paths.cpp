@@ -59,7 +59,7 @@ namespace
     in_t in_of(const quadriga_lib::gbsm_rays &r)
     {
         in_t in;
-        in.cf = r.center_frequency, in.T = r.tx_pos, in.R = r.rx_pos, in.fbs = r.fbs_pos, in.lbs = r.lbs_pos;
+        in.cf = r.center_freq, in.T = r.tx_pos, in.R = r.rx_pos, in.fbs = r.fbs_pos, in.lbs = r.lbs_pos;
         in.pg = r.power, in.M = r.M, in.method = r.method, in.type = r.path_type, in.tap = r.tap;
         in.er = r.gr_eps_re, in.ei = r.gr_eps_im, in.has_eps = !r.gr_eps_re.empty();
         in.pl.set_size(r.n_ray());
@@ -110,7 +110,7 @@ TEST_CASE("gbsm_rays_from_paths - delays, angles and powers from the path data")
 
     CHECK(o.is_valid().empty());
     CHECK(o.method == "38.901");
-    CHECK(arma::approx_equal(o.center_frequency, r.center_frequency, "absdiff", 0.0));
+    CHECK(arma::approx_equal(o.center_freq, r.center_freq, "absdiff", 0.0));
     CHECK(arma::approx_equal(o.tx_pos, r.tx_pos, "absdiff", 0.0));
     CHECK(arma::approx_equal(o.rx_pos, r.rx_pos, "absdiff", 0.0));
     REQUIRE(o.n_ray() == n_path);
@@ -228,11 +228,10 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
     const arma::uword n_path = r.n_ray();
     const std::string fn = "test_gbsm_rays_from_paths_round_trip.qrt";
 
-    const arma::vec f_GHz = r.center_frequency * 1.0e-9;
     const arma::mat cir_pos = r.rx_pos.t(), cir_ori(1, 3, arma::fill::zeros);
-    quadriga_lib::qrt_file_init<double>(fn, f_GHz, cir_pos, cir_ori);
+    quadriga_lib::qrt_file_init<double>(fn, r.center_freq, cir_pos, cir_ori);
     quadriga_lib::qrt_file_append<double>(
-        fn, quadriga_lib::qrt_paths_from_scatterers(r.center_frequency, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
+        fn, quadriga_lib::qrt_paths_from_scatterers(r.center_freq, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
                                                     r.power, r.M, r.path_type),
         r.tx_pos);
 
@@ -303,9 +302,9 @@ TEST_CASE("gbsm_rays_from_paths - no_int of qrt_file_read passes as path_type")
     const quadriga_lib::gbsm_rays r = make_rays(41, true, true, 5, 1, "quadriga", true);
     const std::string fn = "test_gbsm_rays_from_paths_no_int.qrt";
     const arma::mat cir_pos = r.rx_pos.t(), cir_ori(1, 3, arma::fill::zeros);
-    quadriga_lib::qrt_file_init<double>(fn, r.center_frequency * 1.0e-9, cir_pos, cir_ori);
+    quadriga_lib::qrt_file_init<double>(fn, r.center_freq, cir_pos, cir_ori);
     quadriga_lib::qrt_file_append<double>(
-        fn, quadriga_lib::qrt_paths_from_scatterers(r.center_frequency, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
+        fn, quadriga_lib::qrt_paths_from_scatterers(r.center_freq, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
                                                     r.power, r.M, r.path_type),
         r.tx_pos);
     arma::vec cf, T, R, pl;
@@ -435,11 +434,11 @@ TEST_CASE("gbsm_rays_from_paths - input validation")
         CHECK_THROWS_MATCHES(run(in, out), std::invalid_argument, Message(msg));
     };
 
-    SECTION("center_frequency")
+    SECTION("center_freq")
     {
-        fails([](in_t &in) { in.cf.reset(); }, "Input 'center_frequency' cannot be empty.");
-        fails([](in_t &in) { in.cf(1) = -1.0; }, "Input 'center_frequency' must be finite and > 0.");
-        fails([&](in_t &in) { in.cf(0) = nan; }, "Input 'center_frequency' must be finite and > 0.");
+        fails([](in_t &in) { in.cf.reset(); }, "Input 'center_freq' cannot be empty.");
+        fails([](in_t &in) { in.cf(1) = -1.0; }, "Input 'center_freq' must be finite and > 0.");
+        fails([&](in_t &in) { in.cf(0) = nan; }, "Input 'center_freq' must be finite and > 0.");
     }
     SECTION("tx_pos, rx_pos")
     {
@@ -532,7 +531,7 @@ TEST_CASE("gbsm_rays_from_paths - outputs that alias inputs")
     auto call = [&](const arma::vec &cf, const arma::mat &pg, const arma::vec &pl, const arma::u32_vec &type)
     { quadriga_lib::gbsm_rays_from_paths(cf, in.T, in.R, in.fbs, in.lbs, pg, pl, in.M, o, "quadriga", &type); };
 
-    CHECK_THROWS_AS(call(o.center_frequency, in.pg, in.pl, in.type), std::invalid_argument); // center_frequency is 'rays.center_frequency'
+    CHECK_THROWS_AS(call(o.center_freq, in.pg, in.pl, in.type), std::invalid_argument); // center_freq is 'rays.center_freq'
     o = r;
     CHECK_THROWS_AS(call(in.cf, o.power, in.pl, in.type), std::invalid_argument); // path_gain is 'rays.power'
     o = r;

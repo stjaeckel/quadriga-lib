@@ -245,10 +245,9 @@ py::object qd_python_any2numpy(const std::any &dset);
 | `element_pos` | `element_pos` | `(3, n_elements)` | no; default: zeros |
 | `coupling_re` | `coupling_re` | `(n_elements, n_ports)` | no; default: identity |
 | `coupling_im` | `coupling_im` | `(n_elements, n_ports)` | no; default: zeros |
-| `center_freq` | `center_frequency` | scalar | no; default: 299792458 |
+| `center_freq` | `center_freq` | scalar | no; default: 299792458 |
 | `name` | `name` | `str` | no |
 
-- Note the name difference: the dict key is `center_freq`, the C++ member is `center_frequency`.
 - The field patterns stay split into `_re` / `_im` arrays (not complex), in both directions.
 - A frequency-dependent (multi-frequency) arrayant is ONE dict (not a list of dicts, unlike the MATLAB struct array): the four pattern arrays are 4D `(n_elevation, n_azimuth, n_elements, n_freq)`, `center_freq` is a 1D array `(n_freq,)`, the coupling matrices are 2D (shared by all frequencies) or 3D `(n_elements, n_ports, n_freq)`; grids, `element_pos` and `name` are shared. It maps to `std::vector<quadriga_lib::arrayant<double>>`.
 - Reading:
@@ -284,7 +283,7 @@ py::object qd_python_any2numpy(const std::any &dset);
 | `lbs_pos` | `path_lbs_pos` | `(3, n_path)` | float |
 | `no_interact` | `no_interact` | `(n_path,)` | int |
 | `interact_coord` | `interact_coord` | `(3, sum(no_interact))` | float |
-| `center_frequency` | `center_frequency` | scalar or `(n_snap,)`; plain array in both models | float |
+| `center_freq` | `center_freq` | scalar or `(n_snap,)`; plain array in both models | float |
 | `initial_position` | `initial_position` | — | `int` |
 
 - Note the name differences: `tx_position` / `rx_position` and `fbs_pos` / `lbs_pos` in Python vs. `tx_pos` / `rx_pos` and `path_fbs_pos` / `path_lbs_pos` in C++; the coefficients are one complex key `coeff`.

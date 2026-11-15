@@ -914,7 +914,7 @@ static quadriga_lib::arrayant<double> rotate_pattern_two_element_one_port()
     a.element_pos = {{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}};
     a.coupling_re = arma::mat(arma::colvec{0.6, 0.8}); // -> 1 port
     a.coupling_im = arma::mat(arma::colvec{0.1, -0.2});
-    a.center_frequency = 3.5e9;
+    a.center_freq = 3.5e9;
     a.name = "myant";
     return a;
 }
@@ -930,7 +930,7 @@ TEST_CASE("Rotate Pattern - Keeps coupling, centre frequency and name")
         CHECK(out.n_ports() == 1);
         CHECK(arma::approx_equal(out.coupling_re, a.coupling_re, "absdiff", 0.0));
         CHECK(arma::approx_equal(out.coupling_im, a.coupling_im, "absdiff", 0.0));
-        CHECK(out.center_frequency == 3.5e9);
+        CHECK(out.center_freq == 3.5e9);
         CHECK(out.name == "myant");
         CHECK(out.is_valid().empty());
     }
@@ -947,7 +947,7 @@ TEST_CASE("Rotate Pattern - In place with a grid update keeps the coupling")
     CHECK(c.n_ports() == 1);
     CHECK(arma::approx_equal(c.coupling_re, a.coupling_re, "absdiff", 0.0));
     CHECK(arma::approx_equal(c.coupling_im, a.coupling_im, "absdiff", 0.0));
-    CHECK(c.center_frequency == 3.5e9);
+    CHECK(c.center_freq == 3.5e9);
     CHECK(c.name == "myant");
     CHECK(c.is_valid().empty());
 }

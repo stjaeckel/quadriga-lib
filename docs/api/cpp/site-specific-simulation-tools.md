@@ -59,7 +59,7 @@ void calc_diffraction_gain(
     const arma::Mat<dtype> &mesh,
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-    dtype center_frequency,
+    dtype center_freq,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
     arma::Mat<dtype> *xprmat = nullptr,
@@ -80,7 +80,7 @@ void calc_diffraction_gain(
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
-- **`center_frequency`** — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic)
+- **`center_freq`** — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic)
   mode the EM-equivalent frequency `f_eq = f_acoustic · c_light / c_sound` (c_light = 299 792 458 m/s,
   c_sound = 342.76271 m/s), so that `c_light / f_eq` is the acoustic wavelength; this is the frequency unit of
   [ray_mesh_interact](#ray_mesh_interact), [ray_progress](#ray_progress) and [generate_diffraction_paths](#generate_diffraction_paths) in scalar mode. Passing the acoustic
@@ -101,10 +101,10 @@ void calc_diffraction_gain(
   the direct TX-RX distance, matching the `path_length` definition used by [qrt_file_read](channel-functions.md#qrt_file_read) for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
   `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at the
-  acoustic frequency `f = center_frequency · c_sound / c_light`.
+  acoustic frequency `f = center_freq · c_sound / c_light`.
 - **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
-  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c_light / center_frequency` in both
-  modes; in scalar mode this is the acoustic wavelength because `center_frequency` is the EM-equivalent
+  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c_light / center_freq` in both
+  modes; in scalar mode this is the acoustic wavelength because `center_freq` is the EM-equivalent
   frequency (see above). Since the term has unit
   magnitude, `xprmat` stays normalized. This is the phase contribution that
   [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from `path_length`; enabling it here gives the complete
@@ -298,7 +298,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#generate_diffraction_
 void generate_diffraction_paths(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &dest,
-    dtype center_frequency,
+    dtype center_freq,
     int lod,
     arma::Cube<dtype> &ray_x,
     arma::Cube<dtype> &ray_y,
@@ -309,7 +309,7 @@ void generate_diffraction_paths(
 ### Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_frequency`** — Center frequency
+- **`center_freq`** — Center frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:
    | `lod` | `n_path` | `n_seg` | Note  |
    | ----- | -------- | ------- | ----- |
@@ -386,13 +386,13 @@ Not in: MATLAB, Python
 dtype quadriga_lib::interface_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_frequency);
+    dtype center_freq);
 ```
 
 ### Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
-- **`center_frequency`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]
 
 ### Returns:
 - Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
@@ -430,14 +430,14 @@ dtype quadriga_lib::medium_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
     dtype dist,
-    dtype center_frequency);
+    dtype center_freq);
 ```
 
 ### Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** —  1-based material index (0 = no material / air)
 - **`dist`** — Path length of the ray inside the medium in [m]
-- **`center_frequency`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]
 
 ### Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
@@ -918,7 +918,7 @@ Not in: MATLAB, Python
 - Intersects the current beam set with the receive point cloud ([ray_point_intersect](#ray_point_intersect)) and appends one
   [path](channel-functions.md#path) object to `paths_commit` for every ray-point pair that survives the gates below.
 - A pair is committed when the receiver is not shaded by the ray's own first-bounce face, the total path
-  length stays below `max_path_length`, and the gain at `center_frequency[0]` stays above `min_gain_dB`.
+  length stays below `max_path_length`, and the gain at `center_freq[0]` stays above `min_gain_dB`.
 - Shading is a half-space test against the plane of the first-bounce face: the receiver must lie on the
   same side of that plane as the ray origin. The face is treated as an infinite plane, so a receiver just
   past the edge of a small face is conservatively dropped.
@@ -946,7 +946,7 @@ arma::uword quadriga_lib::ray_commit(
     std::vector<quadriga_lib::path> &paths_commit,
     const arma::fmat &mesh,
     const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-    const arma::fvec &center_frequency,
+    const arma::fvec &center_freq,
     const arma::fmat &orig,
     const arma::u32_vec &fbs_ind,
     const arma::fmat &trivec,
@@ -968,8 +968,8 @@ arma::uword quadriga_lib::ray_commit(
   faces named by `fbs_ind` are read, for the shading plane
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read));
   each value has length `n_mtl` (max 16383)
-- **`center_frequency`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries, must match the layout of
-  `paths`. `center_frequency[0]` is the reference frequency for the gain gate
+- **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries, must match the layout of
+  `paths`. `center_freq[0]` is the reference frequency for the gain gate
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from
   [ray_triangle_intersect](#ray_triangle_intersect) for the same launch configuration
@@ -989,7 +989,7 @@ arma::uword quadriga_lib::ray_commit(
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [ray_subdivide_flag](#ray_subdivide_flag) for the
   same launch configuration. NULL / empty → no ray is excluded on these grounds
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
-- **`min_gain_dB`** *(optional)* — Gain at `center_frequency[0]` below which a path is not committed, in dB;
+- **`min_gain_dB`** *(optional)* — Gain at `center_freq[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
 - **`min_no_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
   before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
@@ -1146,7 +1146,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#ray_mesh_interact) ·
 ```cpp
 void quadriga_lib::ray_mesh_interact(
     int interaction_type,
-    dtype center_frequency,
+    dtype center_freq,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *mesh,
@@ -1176,7 +1176,7 @@ void quadriga_lib::ray_mesh_interact(
 
 ### Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_frequency`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`.
@@ -1341,10 +1341,10 @@ Not in: MATLAB, Python
   subdivision flag together — before the expensive passes, and dead intermediates are released as the
   function proceeds, so peak footprint stays close to one generation.
   Designed for `n_ray` up to ~10^8; the ray index is 32-bit, so `n_ray` is capped at 2^32-1.
-- Geometry is traced once, at the reference frequency `center_frequency[0]`. For the remaining frequencies
+- Geometry is traced once, at the reference frequency `center_freq[0]`. For the remaining frequencies
   only the polarization/gain coefficient is recomputed and folded into each [path](channel-functions.md#path); the per-frequency
   refracted direction and in-medium distance are approximated by the reference-frequency values (see the
-  note on `center_frequency`).
+  note on `center_freq`).
 - Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
   otherwise rays are traced as infinitesimal.
 - The ray-mesh intersection can be delegated: pass `no_interact_in`, `fbs_ind_in` and `sbs_ind_in`
@@ -1363,7 +1363,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     const arma::fmat &mesh,
     const arma::uvec &mtl_ind,
     const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
-    const arma::fvec &center_frequency,
+    const arma::fvec &center_freq,
     float Ox, float Oy, float Oz,
     arma::fmat &orig,
     arma::fmat &dest,
@@ -1396,7 +1396,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`. 0 = air
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl` (max 16383)
-- **`center_frequency`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_frequency[0]` is the reference frequency that defines the traced geometry
+- **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
 - **`Ox`**, **`Oy`**, **`Oz`** — Point-source (transmitter) position in GCS [m]; used to recompute path length at new sub-beam origins
 - **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
@@ -1439,7 +1439,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   medium both include the relaunch offset of the last event (a few float ulp of the coordinate, about 1 µm
   per metre), so the leg the next event measures from `orig` adds up to the leg from the hit point
 - **`paths`** — Per-ray [path](channel-functions.md#path) objects; `n_ray` entries. Frequency count and layout must match
-  `center_frequency` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
+  `center_freq` and `scalar_mode`. Terminated paths are freed; surviving paths carry the appended
   interaction segment and the updated polarization product
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`. Must be supplied together with `tridir`; empty / NULL disables beam tracing
 - **`tridir`** *(optional)* — Vertex-ray directions, Cartesian; `[n_ray, 9]`
@@ -1491,7 +1491,7 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::ray_state_update(
     int interaction_type,
-    dtype center_frequency,
+    dtype center_freq,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *fbsN,
@@ -1530,7 +1530,7 @@ void quadriga_lib::ray_state_update(
 
 ### Inputs:
 - **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission, 5 scalar refraction
-- **`center_frequency`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]
 - **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
 - **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
 - **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
@@ -1559,7 +1559,7 @@ void quadriga_lib::ray_state_update(
 - **`acc_dist_geometric`** — Accumulated geometric in-layer distance carried into this call, full ray set; `[n_ray]`.
   NULL reads as 0. Frequency-independent, so a multi-frequency caller keeps one instance.
 - **`acc_dist_refracted`** — Accumulated refracted (VBS) in-layer distance carried into this call, full ray set; `[n_ray]`.
-  NULL reads as 0. Frequency-dependent (the bend follows the material at `center_frequency`), so a
+  NULL reads as 0. Frequency-dependent (the bend follows the material at `center_freq`), so a
   multi-frequency caller keeps one instance per frequency.
 - **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 - **`eps`** *(optional)* — Threshold on the round-trip amplitude `ρ` (`ρ ≥ 0`, not bounded by one: next to a lossy or
@@ -1813,13 +1813,13 @@ Not in: MATLAB, Python
 dtype quadriga_lib::refractive_index(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_frequency);
+    dtype center_freq);
 ```
 
 ### Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
-- **`center_frequency`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]
 
 ### Returns:
 - Real refractive index of the medium relative to air

@@ -29,20 +29,20 @@ def module_dir():
 # Helpers
 # ==========================================================================================
 
-def bake_delay_phase(coeff_4d, delay_3d, freq_in):
-    """Bake exp(-j*2*pi*freq_in[f]*delay) into 4D coefficient array."""
+def bake_delay_phase(coeff_4d, delay_3d, freq):
+    """Bake exp(-j*2*pi*freq[f]*delay) into 4D coefficient array."""
     n_rx, n_tx, n_path, n_freq = coeff_4d.shape
     out = coeff_4d.copy()
     for f in range(n_freq):
         for p in range(n_path):
             if delay_3d.shape[0] == 1 and delay_3d.shape[1] == 1:
                 dl = delay_3d[0, 0, p]
-                out[:, :, p, f] *= np.exp(-1j * 2.0 * np.pi * freq_in[f] * dl)
+                out[:, :, p, f] *= np.exp(-1j * 2.0 * np.pi * freq[f] * dl)
             else:
                 for r in range(n_rx):
                     for t in range(n_tx):
                         dl = delay_3d[r, t, p]
-                        out[r, t, p, f] *= np.exp(-1j * 2.0 * np.pi * freq_in[f] * dl)
+                        out[r, t, p, f] *= np.exp(-1j * 2.0 * np.pi * freq[f] * dl)
     return out
 
 
@@ -165,36 +165,36 @@ class test_case(unittest.TestCase):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1), dtype=complex)],
                                            delay=[np.zeros((1, 1, 1))])
 
-    def test_error_bandwidth_and_freq_out(self):
+    def test_error_bandwidth_and_freq_new(self):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1), dtype=complex)],
                                            delay=[np.zeros((1, 1, 1))],
-                                           bandwidth=1e6, freq_out=np.array([1e9]))
+                                           bandwidth=1e6, freq_new=np.array([1e9]))
 
-    def test_error_4d_no_freq_in(self):
+    def test_error_4d_no_freq(self):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1, 2), dtype=complex)],
                                            delay=[np.zeros((1, 1, 1))],
-                                           freq_out=np.array([1e9, 2e9]))
+                                           freq_new=np.array([1e9, 2e9]))
 
-    def test_error_4d_no_freq_out(self):
+    def test_error_4d_no_freq_new(self):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1, 2), dtype=complex)],
                                            delay=[np.zeros((1, 1, 1))],
-                                           freq_in=np.array([1e9, 2e9]))
+                                           freq=np.array([1e9, 2e9]))
 
     def test_error_4d_with_bandwidth(self):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1, 2), dtype=complex)],
                                            delay=[np.zeros((1, 1, 1))], bandwidth=1e6,
-                                           freq_in=np.array([1e9, 2e9]), freq_out=np.array([1e9]))
+                                           freq=np.array([1e9, 2e9]), freq_new=np.array([1e9]))
 
     def test_error_4d_with_pilot_grid(self):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1, 2), dtype=complex)],
                                            delay=[np.zeros((1, 1, 1))],
                                            pilot_grid=np.array([0.0, 1.0]),
-                                           freq_in=np.array([1e9, 2e9]), freq_out=np.array([1e9]))
+                                           freq=np.array([1e9, 2e9]), freq_new=np.array([1e9]))
 
     def test_error_n_rx_mismatch(self):
         c = [np.zeros((2, 1, 1), dtype=complex), np.zeros((3, 1, 1), dtype=complex)]
@@ -213,12 +213,12 @@ class test_case(unittest.TestCase):
                                            delay=[np.zeros((1, 1, 1))], bandwidth=1e6,
                                            snap=np.array([5]))
 
-    def test_error_4d_freq_in_dim_mismatch(self):
+    def test_error_4d_freq_dim_mismatch(self):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1, 3), dtype=complex)],
                                            delay=[np.zeros((1, 1, 1))],
-                                           freq_in=np.array([1e9, 2e9]),
-                                           freq_out=np.array([1e9]))
+                                           freq=np.array([1e9, 2e9]),
+                                           freq_new=np.array([1e9]))
 
     def test_error_re_im_shape_mismatch(self):
         with self.assertRaises(Exception):
@@ -246,17 +246,17 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(hmat_cx, hmat_ri, atol=1e-6, rtol=0)
 
     # ==================================================================================
-    # Single-freq: freq_out instead of bandwidth
+    # Single-freq: freq_new instead of bandwidth
     # ==================================================================================
 
-    def test_single_freq_with_freq_out(self):
+    def test_single_freq_with_freq_new(self):
         coeff = np.ones((1, 1, 1), dtype=complex)
         delay = np.zeros((1, 1, 1)); delay[0, 0, 0] = 10e-9
         bw = 100e6; n_c = 16; pilot = np.linspace(0, 1, n_c)
         hmat_ref = channel.baseband_freq_response(coeff=[coeff], delay=[delay], bandwidth=bw, pilot_grid=pilot)
 
-        freq_out = np.linspace(0.0, bw, n_c)
-        hmat_test = channel.baseband_freq_response(coeff=[coeff], delay=[delay], freq_out=freq_out)
+        freq_new = np.linspace(0.0, bw, n_c)
+        hmat_test = channel.baseband_freq_response(coeff=[coeff], delay=[delay], freq_new=freq_new)
         npt.assert_allclose(hmat_ref, hmat_test, atol=1e-6, rtol=0)
 
     # ==================================================================================
@@ -289,7 +289,7 @@ class test_case(unittest.TestCase):
     def test_mf_single_path_zero_delay(self):
         c = np.full((1, 1, 1, 1), 0.7 + 0j)
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
-                                               freq_in=np.array([1e9]), freq_out=np.array([0.5e9, 1e9, 2e9]),
+                                               freq=np.array([1e9]), freq_new=np.array([0.5e9, 1e9, 2e9]),
                                                remove_delay_phase=False)
         self.assertEqual(hmat.shape, (1, 1, 3, 1))
         for k in range(3):
@@ -299,7 +299,7 @@ class test_case(unittest.TestCase):
         tau = 10e-9; fout = np.array([1e9, 1.5e9, 2e9])
         dl = np.zeros((1, 1, 1)); dl[0, 0, 0] = tau
         hmat = channel.baseband_freq_response(coeff=[np.ones((1, 1, 1, 1), dtype=complex)],
-                                               delay=[dl], freq_in=np.array([1e9]), freq_out=fout,
+                                               delay=[dl], freq=np.array([1e9]), freq_new=fout,
                                                remove_delay_phase=False)
         for k in range(3):
             npt.assert_allclose(hmat[0, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau), atol=1e-6, rtol=0)
@@ -309,8 +309,8 @@ class test_case(unittest.TestCase):
         fout = np.array([1e9, 1.25e9, 1.5e9, 2e9])
         c = np.zeros((1, 1, 2, 1), dtype=complex); c[0, 0, 0, 0] = A1; c[0, 0, 1, 0] = A2
         dl = np.zeros((1, 1, 2)); dl[0, 0, 0] = tau1; dl[0, 0, 1] = tau2
-        hmat = channel.baseband_freq_response(coeff=[c], delay=[dl], freq_in=np.array([1e9]),
-                                               freq_out=fout, remove_delay_phase=False)
+        hmat = channel.baseband_freq_response(coeff=[c], delay=[dl], freq=np.array([1e9]),
+                                               freq_new=fout, remove_delay_phase=False)
         for k in range(4):
             expected = A1 * np.exp(-1j * 2 * np.pi * fout[k] * tau1) + A2 * np.exp(-1j * 2 * np.pi * fout[k] * tau2)
             npt.assert_allclose(hmat[0, 0, k, 0], expected, atol=1e-6, rtol=0)
@@ -319,7 +319,7 @@ class test_case(unittest.TestCase):
         fin = np.array([1e9, 2e9]); fout = np.array([1e9, 1.25e9, 1.5e9, 1.75e9, 2e9])
         c = np.zeros((1, 1, 1, 2), dtype=complex); c[0, 0, 0, 0] = 1.0; c[0, 0, 0, 1] = 3.0
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
-                                               freq_in=fin, freq_out=fout, remove_delay_phase=False)
+                                               freq=fin, freq_new=fout, remove_delay_phase=False)
         for k in range(5):
             npt.assert_allclose(hmat[0, 0, k, 0].real, 1.0 + (fout[k] - 1e9) / 1e9 * 2.0, atol=1e-6, rtol=0)
 
@@ -327,7 +327,7 @@ class test_case(unittest.TestCase):
         fin = np.array([1e9, 2e9]); fout = np.array([0.5e9, 1e9, 1.5e9, 2e9, 3e9])
         c = np.zeros((1, 1, 1, 2), dtype=complex); c[0, 0, 0, 0] = 1.0; c[0, 0, 0, 1] = 2.0
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
-                                               freq_in=fin, freq_out=fout, remove_delay_phase=False)
+                                               freq=fin, freq_new=fout, remove_delay_phase=False)
         expected = [1.0, 1.0, 1.5, 2.0, 2.0]
         for k in range(5):
             npt.assert_allclose(hmat[0, 0, k, 0].real, expected[k], atol=1e-6, rtol=0)
@@ -336,10 +336,10 @@ class test_case(unittest.TestCase):
         fin = np.array([1e9, 2e9, 3e9]); fout = np.linspace(1e9, 3e9, 32); tau = 50e-9
         env = np.full((1, 1, 1, 3), 0.8 * np.exp(1j * 0.5))
         dl = np.zeros((1, 1, 1)); dl[0, 0, 0] = tau
-        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq_in=fin, freq_out=fout,
+        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq=fin, freq_new=fout,
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
-                                                    freq_in=fin, freq_out=fout, remove_delay_phase=True)
+                                                    freq=fin, freq_new=fout, remove_delay_phase=True)
         npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
     def test_mf_remove_delay_phase_multipath(self):
@@ -348,10 +348,10 @@ class test_case(unittest.TestCase):
         env = np.zeros((1, 1, 3, 3), dtype=complex)
         for p in range(3): env[0, 0, p, :] = amps[p] * np.exp(1j * phis[p])
         dl = np.zeros((1, 1, 3)); dl[0, 0, :] = taus
-        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq_in=fin, freq_out=fout,
+        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq=fin, freq_new=fout,
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
-                                                    freq_in=fin, freq_out=fout, remove_delay_phase=True)
+                                                    freq=fin, freq_new=fout, remove_delay_phase=True)
         npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
     def test_mf_envelope_ramp_large_delay(self):
@@ -359,10 +359,10 @@ class test_case(unittest.TestCase):
         env = np.zeros((1, 1, 1, 3), dtype=complex)
         for f in range(3): env[0, 0, 0, f] = [1.0, 2.0, 3.0][f]
         dl = np.zeros((1, 1, 1)); dl[0, 0, 0] = tau
-        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq_in=fin, freq_out=fout,
+        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq=fin, freq_new=fout,
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
-                                                    freq_in=fin, freq_out=fout, remove_delay_phase=True)
+                                                    freq=fin, freq_new=fout, remove_delay_phase=True)
         npt.assert_allclose(np.abs(hmat_test) ** 2, np.abs(hmat_ref) ** 2, atol=1e-6, rtol=0)
         npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
@@ -373,10 +373,10 @@ class test_case(unittest.TestCase):
         c[0, 0, 0, 1] = 0.8 + 0.4j; c[0, 0, 1, 1] = 0.6 - 0.1j
         dl = np.zeros((1, 1, 2)); dl[0, 0, 0] = 10e-9; dl[0, 0, 1] = 30e-9
 
-        hmat_cx = channel.baseband_freq_response(coeff=[c], delay=[dl], freq_in=fin, freq_out=fout,
+        hmat_cx = channel.baseband_freq_response(coeff=[c], delay=[dl], freq=fin, freq_new=fout,
                                                   remove_delay_phase=False)
         hmat_ri = channel.baseband_freq_response(coeff_re=[np.real(c)], coeff_im=[np.imag(c)],
-                                                  delay=[dl], freq_in=fin, freq_out=fout,
+                                                  delay=[dl], freq=fin, freq_new=fout,
                                                   remove_delay_phase=False)
         npt.assert_allclose(hmat_cx, hmat_ri, atol=1e-6, rtol=0)
 
@@ -384,7 +384,7 @@ class test_case(unittest.TestCase):
         c = np.zeros((2, 2, 1, 1), dtype=complex)
         c[0, 0, 0, 0] = 1.0; c[1, 0, 0, 0] = 2.0; c[0, 1, 0, 0] = 3.0; c[1, 1, 0, 0] = 4.0
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
-                                               freq_in=np.array([1e9]), freq_out=np.array([1e9]),
+                                               freq=np.array([1e9]), freq_new=np.array([1e9]),
                                                remove_delay_phase=False)
         self.assertEqual(hmat.shape, (2, 2, 1, 1))
         npt.assert_allclose(hmat[0, 0, 0, 0].real, 1.0, atol=1e-6, rtol=0)
@@ -396,7 +396,7 @@ class test_case(unittest.TestCase):
         fout = np.array([1e9, 2e9]); tau0, tau1 = 5e-9, 15e-9
         dl = np.zeros((2, 1, 1)); dl[0, 0, 0] = tau0; dl[1, 0, 0] = tau1
         hmat = channel.baseband_freq_response(coeff=[np.ones((2, 1, 1, 1), dtype=complex)],
-                                               delay=[dl], freq_in=np.array([1e9]), freq_out=fout,
+                                               delay=[dl], freq=np.array([1e9]), freq_new=fout,
                                                remove_delay_phase=False)
         for k in range(2):
             npt.assert_allclose(hmat[0, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau0), atol=1e-6, rtol=0)
@@ -408,7 +408,7 @@ class test_case(unittest.TestCase):
         c1 = np.ones((1, 1, 3, 2), dtype=complex)
         hmat = channel.baseband_freq_response(coeff=[c0, c1],
                                                delay=[np.zeros((1, 1, 1)), np.zeros((1, 1, 3))],
-                                               freq_in=fin, freq_out=fout, remove_delay_phase=False)
+                                               freq=fin, freq_new=fout, remove_delay_phase=False)
         self.assertEqual(hmat.shape, (1, 1, 1, 2))
         npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 1.0, atol=1e-6, rtol=0)
         npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 3.0, atol=1e-6, rtol=0)
@@ -417,7 +417,7 @@ class test_case(unittest.TestCase):
         fin = np.array([1e9, 2e9]); fout = np.array([1.5e9])
         cs = [np.ones((1, 1, 1, 2), dtype=complex) * v for v in [1, 2, 3]]
         dl = [np.zeros((1, 1, 1))] * 3
-        hmat = channel.baseband_freq_response(coeff=cs, delay=dl, freq_in=fin, freq_out=fout,
+        hmat = channel.baseband_freq_response(coeff=cs, delay=dl, freq=fin, freq_new=fout,
                                                snap=np.array([2, 0]), remove_delay_phase=False)
         self.assertEqual(hmat.shape, (1, 1, 1, 2))
         npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 3.0, atol=1e-6, rtol=0)
@@ -428,9 +428,9 @@ class test_case(unittest.TestCase):
         c = np.ones((1, 1, 1, 2), dtype=complex)
         dl3 = np.zeros((1, 1, 1)); dl3[0, 0, 0] = tau
         dl4 = np.zeros((1, 1, 1, 2)); dl4[0, 0, 0, :] = tau
-        h3 = channel.baseband_freq_response(coeff=[c], delay=[dl3], freq_in=fin, freq_out=fout,
+        h3 = channel.baseband_freq_response(coeff=[c], delay=[dl3], freq=fin, freq_new=fout,
                                              remove_delay_phase=False)
-        h4 = channel.baseband_freq_response(coeff=[c], delay=[dl4], freq_in=fin, freq_out=fout,
+        h4 = channel.baseband_freq_response(coeff=[c], delay=[dl4], freq=fin, freq_new=fout,
                                              remove_delay_phase=False)
         npt.assert_allclose(h3, h4, atol=1e-6, rtol=0)
 
@@ -438,7 +438,7 @@ class test_case(unittest.TestCase):
         fin = np.array([1e9, 2e9, 4e9]); fout = np.array([1.5e9, 2e9, 3e9])
         c = np.zeros((1, 1, 1, 3), dtype=complex); c[0, 0, 0, :] = [1.0, 3.0, 7.0]
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
-                                               freq_in=fin, freq_out=fout, remove_delay_phase=False)
+                                               freq=fin, freq_new=fout, remove_delay_phase=False)
         npt.assert_allclose(hmat[0, 0, 0, 0].real, 2.0, atol=1e-6, rtol=0)
         npt.assert_allclose(hmat[0, 0, 1, 0].real, 3.0, atol=1e-6, rtol=0)
         npt.assert_allclose(hmat[0, 0, 2, 0].real, 5.0, atol=1e-6, rtol=0)
@@ -448,7 +448,7 @@ class test_case(unittest.TestCase):
         fin = np.array([500.0, 1000.0, 2000.0]); fout = np.array([500.0, 750.0, 1000.0, 1500.0, 2000.0])
         dl = np.zeros((1, 1, 1)); dl[0, 0, 0] = tau
         hmat = channel.baseband_freq_response(coeff=[np.ones((1, 1, 1, 3), dtype=complex)],
-                                               delay=[dl], freq_in=fin, freq_out=fout,
+                                               delay=[dl], freq=fin, freq_new=fout,
                                                remove_delay_phase=False)
         npt.assert_allclose(np.abs(hmat[0, 0, :, 0]) ** 2, np.ones(5), atol=1e-6, rtol=0)
         npt.assert_allclose(hmat[0, 0, 2, 0], np.exp(-1j * 2 * np.pi * 1000.0 * tau), atol=1e-6, rtol=0)
@@ -457,17 +457,17 @@ class test_case(unittest.TestCase):
         fin = np.array([1e9, 2e9]); fout = np.linspace(1e9, 2e9, 8)
         env = np.ones((2, 1, 1, 2), dtype=complex)
         dl = np.zeros((2, 1, 1)); dl[0, 0, 0] = 10e-9; dl[1, 0, 0] = 40e-9
-        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq_in=fin, freq_out=fout,
+        hmat_ref = channel.baseband_freq_response(coeff=[env], delay=[dl], freq=fin, freq_new=fout,
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
-                                                    freq_in=fin, freq_out=fout, remove_delay_phase=True)
+                                                    freq=fin, freq_new=fout, remove_delay_phase=True)
         npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
     def test_mf_phase_unwrap(self):
         c = np.zeros((1, 1, 1, 2), dtype=complex)
         c[0, 0, 0, 0] = np.exp(1j * 2.8); c[0, 0, 0, 1] = np.exp(-1j * 2.8)
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
-                                               freq_in=np.array([1e9, 2e9]), freq_out=np.array([1.5e9]),
+                                               freq=np.array([1e9, 2e9]), freq_new=np.array([1.5e9]),
                                                remove_delay_phase=False)
         self.assertLess(hmat[0, 0, 0, 0].real, -0.99)
 
@@ -483,8 +483,8 @@ class test_case(unittest.TestCase):
     def test_output_shape_multi_freq(self):
         hmat = channel.baseband_freq_response(coeff=[np.ones((2, 3, 5, 2), dtype=complex)],
                                                delay=[np.zeros((1, 1, 5))],
-                                               freq_in=np.array([1e9, 2e9]),
-                                               freq_out=np.linspace(1e9, 2e9, 64))
+                                               freq=np.array([1e9, 2e9]),
+                                               freq_new=np.linspace(1e9, 2e9, 64))
         self.assertEqual(hmat.shape, (2, 3, 64, 1))
 
 
@@ -501,7 +501,7 @@ class test_case(unittest.TestCase):
             "delay = [rng.random((2, 2, 3)) * 1e-7 for _ in range(5)]\n"
             "for kw in ({'coeff': coeff}, {'coeff_re': [c.real.copy() for c in coeff], 'coeff_im': [c.imag.copy() for c in coeff]}):\n"
             "    try:\n"
-            "        q.channel.baseband_freq_response(delay=delay, freq_in=np.array([2e9, 1e9]), freq_out=np.array([1.5e9]), **kw)\n"
+            "        q.channel.baseband_freq_response(delay=delay, freq=np.array([2e9, 1e9]), freq_new=np.array([1.5e9]), **kw)\n"
             "        print('no exception')\n"
             "    except ValueError as e:\n"
             "        print('ValueError:', e)\n"
@@ -515,13 +515,13 @@ class test_case(unittest.TestCase):
             lines = r.stdout.splitlines()
             self.assertEqual(len(lines), 3, r.stdout)
             for line in lines[:2]:
-                self.assertIn("ValueError: Input 'freq_in' must be sorted in strictly ascending order.", line)
+                self.assertIn("ValueError: Input 'freq' must be sorted in strictly ascending order.", line)
             self.assertEqual(lines[2], 'alive')
 
 
 class test_carrier_frequencies(unittest.TestCase):
 
-    # Carriers as frequencies: span = max - min, reference = freq_in when given, else min(freq_out), output in
+    # Carriers as frequencies: span = max - min, reference = freq when given, else min(freq_new), output in
     # input order, more than one carrier with a zero span is an error. Same closed form as in the MATLAB test.
     def test(self):
         cre = np.array([1.0, 0.5]); tau = np.array([10e-9, 35e-9])
@@ -530,8 +530,8 @@ class test_carrier_frequencies(unittest.TestCase):
         def H(f, fr):
             return (cre[:, None] * np.exp(-2j * np.pi * (np.atleast_1d(f)[None, :] - fr) * tau[:, None])).sum(0)
         def run(fo, fi=None):
-            kw = {} if fi is None else {'freq_in': np.array([fi])}
-            return channel.baseband_freq_response(coeff=c, delay=d, freq_out=np.atleast_1d(fo), **kw).ravel()
+            kw = {} if fi is None else {'freq': np.array([fi])}
+            return channel.baseband_freq_response(coeff=c, delay=d, freq_new=np.atleast_1d(fo), **kw).ravel()
         npt.assert_allclose(run(fa, f0), H(fa, f0), atol=1e-5)
         npt.assert_allclose(run(fa[::-1], f0), H(fa[::-1], f0), atol=1e-5)
         fu = f0 + np.array([10e6, 0, 20e6])

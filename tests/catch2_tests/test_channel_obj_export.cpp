@@ -69,7 +69,7 @@ TEST_CASE("Channel - OBJ Export")
     c.path_polarization.push_back(M);
     c.path_polarization.push_back(M);
 
-    c.center_frequency = 1.0e9;
+    c.center_freq = 1.0e9;
 
     // This is the minimum data required from the RT simulation:
     // - TX and RX positions, Polarization Matrix and Path interaction coordinates
@@ -91,7 +91,7 @@ TEST_CASE("Channel - OBJ Export skips paths with non-finite coordinates")
     quadriga_lib::channel<double> c;
     c.tx_pos = arma::mat({0.0, 0.0, 1.0}).t();
     c.rx_pos = arma::mat({20.0, 0.0, 1.0}).t();
-    c.center_frequency = 1.0e9;
+    c.center_freq = 1.0e9;
 
     // 2 paths: LOS and a single-bounce path with a NaN interaction point
     c.no_interact.push_back(arma::u32_vec({0, 1}));

@@ -25,7 +25,7 @@ void fuzz_seeds(const fz::seeds &s)
     quadriga_lib::hdf5_write(&c, fn, 0);
 
     c.name = "second";
-    c.center_frequency = {3.5e9};
+    c.center_freq = {3.5e9};
     c.path_gain.push_back(arma::vec({0.1, 0.01}));
     c.path_length.push_back(arma::vec({3.0, 7.5}));
     c.par_names = {"note", "gain", "grid"};

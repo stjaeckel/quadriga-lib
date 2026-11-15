@@ -113,8 +113,8 @@ deliberate library choices: the SOS preset `Comb256` with bias removal ([[gbsm.i
 `method = "quadriga"` of [[gbsm.rays_from_paths]]; QuaDRiGa variants are options. Units: frequencies in Hz, path loss
 in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file keys and
 `scenpar` keys have the units of the file comments (e.g. `PerClusterDS` in ns). Flags take a `bool` or `numpy.bool_`;
-`None` selects the default, any other type raises `TypeError`. Messages name the argument `center_freq`
-`center_frequency` and the real and imaginary part of `gr_eps` `gr_eps_re` and `gr_eps_im`.
+`None` selects the default, any other type raises `TypeError`. Messages name the real and
+imaginary part of `gr_eps` `gr_eps_re` and `gr_eps_im`.
 SECTION_DESC!*/
 
 /*!MD

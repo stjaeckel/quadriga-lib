@@ -16,12 +16,12 @@ TEST_CASE("QRT Reader")
     std::vector<std::string> orig_names, dest_names;
     int version;
 
-    arma::fvec fGHz;
+    arma::fvec center_freq_f;
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
     // Check parser
     quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version,
-                                 &fGHz, &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
+                                 &center_freq_f, &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 
     REQUIRE(no_orig == 3ULL);
     REQUIRE(no_dest == 2ULL);
@@ -43,8 +43,8 @@ TEST_CASE("QRT Reader")
     CHECK(dest_names[0] == "RX1");
     CHECK(dest_names[1] == "RX2");
 
-    REQUIRE(fGHz.n_elem == 1);
-    CHECK(fGHz[0] == 3.75f);
+    REQUIRE(center_freq_f.n_elem == 1);
+    CHECK(center_freq_f[0] == 3.75e9f);
 
     REQUIRE(cir_pos.n_rows == 7);
     REQUIRE(cir_pos.n_cols == 3);
@@ -90,7 +90,7 @@ TEST_CASE("QRT Reader")
     REQUIRE(cache.no_cir == 7);
     REQUIRE(cache.no_freq == 1);
 
-    CHECK(arma::approx_equal(cache.freq, fGHz, "absdiff", 1.5e-10));
+    CHECK(arma::approx_equal(cache.freq * 1.0e9f, center_freq_f, "reldiff", 1.0e-7)); // The cache holds the stored GHz
     CHECK(arma::approx_equal(cache.cir_pos, cir_pos, "absdiff", 1.5e-10));
     CHECK(arma::approx_equal(cache.cir_orientation, cir_orientation, "absdiff", 1.5e-10));
     CHECK(arma::approx_equal(cache.orig_pos_all, orig_pos, "absdiff", 1.5e-10));
@@ -108,22 +108,22 @@ TEST_CASE("QRT Reader")
         arma::vec tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa;
         arma::cube M;
         arma::mat fbs_pos, lbs_pos, path_gain;
-        arma::vec path_length, center_frequency;
+        arma::vec path_length, center_freq;
         std::vector<arma::mat> path_coord;
 
         // Check positions and orientations of first link
         // Normalization: path gain = FSPL, Jones matrix M = material losses
         if (xxx == 0) // Open / close file
-            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &center_frequency, &tx_pos, &tx_orientation,
+            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &center_freq, &tx_pos, &tx_orientation,
                                                 &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos, &path_gain,
                                                 &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord, 0);
         else // Use cache
-            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &center_frequency, &tx_pos, &tx_orientation,
+            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &center_freq, &tx_pos, &tx_orientation,
                                                 &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos, &path_gain,
                                                 &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord, 0,
                                                 nullptr, nullptr, nullptr, &stream, &cache);
 
-        CHECK(center_frequency[0] == 3.75e9);
+        CHECK(center_freq[0] == 3.75e9);
         arma::vec O = {-12.9607, 59.6906, 2.0};
         CHECK(arma::approx_equal(tx_pos, O, "absdiff", 1.5e-4));
         arma::vec T = {0.0, 0.0, 0.0};
@@ -153,7 +153,7 @@ TEST_CASE("QRT Reader")
         double eoa_calc = -std::asin(dir_rx[2]);
 
         // Calculate FSPL as linear gain: (lambda / (4*pi*d))^2
-        double wavelength = 299792458.0 / center_frequency[0]; // c/f
+        double wavelength = 299792458.0 / center_freq[0]; // c/f
         double path_gain_calc = wavelength / (4.0 * M_PI * total_length);
         path_gain_calc = path_gain_calc * path_gain_calc; // Square it
 
@@ -285,7 +285,7 @@ TEST_CASE("QRT Reader")
         }
 
         // Check positions and orientations of second link
-        quadriga_lib::qrt_file_read<double>(fn, 1, 1, true, &center_frequency, &tx_pos, &tx_orientation,
+        quadriga_lib::qrt_file_read<double>(fn, 1, 1, true, &center_freq, &tx_pos, &tx_orientation,
                                             &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos, &path_gain,
                                             &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord);
 
@@ -305,7 +305,7 @@ TEST_CASE("QRT Reader")
         const arma::cube M_dl = M;
         const arma::mat path_gain_dl = path_gain;
         arma::mat B, C;
-        quadriga_lib::qrt_file_read<double>(fn, 1, 1, false, &center_frequency, &tx_pos, &tx_orientation,
+        quadriga_lib::qrt_file_read<double>(fn, 1, 1, false, &center_freq, &tx_pos, &tx_orientation,
                                             &rx_pos, &rx_orientation, &B, &C, &path_gain,
                                             &path_length, &M, &aod, &eod);
 
@@ -356,16 +356,16 @@ TEST_CASE("QRT Reader v5")
 
     arma::cube M;
     arma::mat path_gain;
-    arma::vec center_frequency;
+    arma::vec center_freq;
 
     // Check positions and orientations of first link
-    quadriga_lib::qrt_file_read<double>(fn, 1, 0, true, &center_frequency, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, 1, 0, true, &center_freq, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &path_gain,
                                         nullptr, &M, nullptr, nullptr, nullptr, nullptr, nullptr, 0);
 
-    REQUIRE(center_frequency.n_elem == 2);
-    CHECK(center_frequency[0] == 1.0e9);
-    CHECK(center_frequency[1] == 1.5e9);
+    REQUIRE(center_freq.n_elem == 2);
+    CHECK(center_freq[0] == 1.0e9);
+    CHECK(center_freq[1] == 1.5e9);
 
     CHECK(M.n_rows == 8);
     CHECK(M.n_slices == 2);
@@ -381,7 +381,7 @@ TEST_CASE("QRT Reader v5")
     CHECK(arma::approx_equal(B, T, "absdiff", 1.5e-4));
 
     // Check positions and orientations of first link
-    quadriga_lib::qrt_file_read<double>(fn, 1, 0, true, &center_frequency, nullptr, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, 1, 0, true, &center_freq, nullptr, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &path_gain,
                                         nullptr, &M);
 
@@ -420,7 +420,7 @@ TEST_CASE("QRT Reader - angles with 0 paths")
     // An origin without paths returns empty angle vectors (no memcpy from an empty matrix)
     std::string fn = "tests/data/test_read_zero_paths.qrt";
 
-    arma::fvec freq = {3.75f};
+    arma::fvec freq = {3.75e9f};
     arma::fmat cir_pos(2, 3, arma::fill::zeros);
     arma::fmat cir_orient;
     std::vector<std::string> dest_names = {"RX"};

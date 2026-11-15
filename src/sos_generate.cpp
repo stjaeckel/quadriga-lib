@@ -18,7 +18,7 @@ SECTION!*/
 
 /*!MD
 # sos_generate
-Find the frequencies of a sum-of-sinusoids generator for a given ACF
+Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
 
 - Searches `n_coeff` frequencies such that the autocorrelation function (ACF) of the sinusoids,
   `R(dx) = (1/n_coeff) · sum_n cos( 2·pi · f_n·dx )`, approximates the target ACF in all directions
@@ -36,15 +36,15 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
   sinusoid in the first pass
 - The fit covers the range of `dist` only. The ACF of the result beyond the last sample point is not
   controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
-  (see `acf_tail` of [[sos_calc_mse]]). To prevent this, set `freq_min`; the tables of [[sos_preset]] use
+  (see `acf_tail` of [[sos_calc_mse]]). To prevent this, set `spatial_freq_min`; the tables of [[sos_preset]] use
   `0.05 / d` with the decorrelation distance `d`
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse in
   others; the tables of [[sos_preset]] were made with 300
-- `freq_min` and `freq_max` limit the magnitude of the frequency along the direction of each sinusoid;
+- `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each sinusoid;
   0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
-- The search grid has `( freq_max - freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are stored for
+- The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are stored for
   all sample points. It must not have more than 100000 points (the default has 151), which limits
-  `freq_max - freq_min` to less than `10000 / max(dist)`
+  `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
 - `test_dir` and the reported error use the same test directions as [[sos_calc_mse]] with the same `n_dir`
 - All computations are done in double precision for both instantiations
@@ -58,15 +58,15 @@ void quadriga_lib::sos_generate(
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
     arma::uword n_coeff,
-    arma::Mat<dtype> &freq,
+    arma::Mat<dtype> &spatial_freq,
     arma::Col<dtype> *ase = nullptr,
     arma::Mat<dtype> *test_dir = nullptr,
     arma::uword n_dim = 3,
     bool uniform_smp = true,
     arma::uword n_dir = 10,
     bool random_init = true,
-    dtype freq_min = 0.0,
-    dtype freq_max = 0.0,
+    dtype spatial_freq_min = 0.0,
+    dtype spatial_freq_max = 0.0,
     arma::sword seed = -1);
 ```
 
@@ -79,13 +79,13 @@ void quadriga_lib::sos_generate(
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
 - **`random_init`** *(optional)* — Start from random frequencies (`true`) or build up sinusoid by sinusoid
   (`false`)
-- **`freq_min`** *(optional)* — Lower limit of the frequency magnitude in [1/m]; must be >= 0; 0 = none
-- **`freq_max`** *(optional)* — Upper limit of the frequency magnitude in [1/m]; must be >= 0 and, if not 0,
-  larger than `freq_min`; 0 = `15 / max(dist)`; limited by the size of the search grid, see above
+- **`spatial_freq_min`** *(optional)* — Lower limit of the spatial-frequency magnitude in [1/m]; must be >= 0; 0 = none
+- **`spatial_freq_max`** *(optional)* — Upper limit of the spatial-frequency magnitude in [1/m]; must be >= 0 and, if not 0,
+  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search grid, see above
 - **`seed`** *(optional)* — Seed; must be >= -1; `-1` seeds from the system random device
 
 ## Outputs:
-- **`freq`** — Frequencies in [1/m]; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies in [1/m]; `[n_coeff, n_dim]`
 - **`ase`** *(optional)* — Mean squared error over the test directions after each pass, linear scale;
   `[n_pass]`
 - **`test_dir`** *(optional)* — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}`
@@ -100,23 +100,23 @@ template <typename dtype>
 void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
                                 const arma::Col<dtype> &dist,
                                 arma::uword n_coeff,
-                                arma::Mat<dtype> &freq,
+                                arma::Mat<dtype> &spatial_freq,
                                 arma::Col<dtype> *ase,
                                 arma::Mat<dtype> *test_dir,
                                 arma::uword n_dim,
                                 bool uniform_smp,
                                 arma::uword n_dir,
                                 bool random_init,
-                                dtype freq_min,
-                                dtype freq_max,
+                                dtype spatial_freq_min,
+                                dtype spatial_freq_max,
                                 arma::sword seed)
 {
     qd_sos_check_acf(acf, dist);
-    qd_check_alias(&freq, "freq", &acf, &dist);
+    qd_check_alias(&spatial_freq, "spatial_freq", &acf, &dist);
     qd_check_alias(ase, "ase", &acf, &dist);
     qd_check_alias(test_dir, "test_dir", &acf, &dist);
-    qd_check_alias_outputs(&freq, "freq", ase, "ase");
-    qd_check_alias_outputs(&freq, "freq", test_dir, "test_dir");
+    qd_check_alias_outputs(&spatial_freq, "spatial_freq", ase, "ase");
+    qd_check_alias_outputs(&spatial_freq, "spatial_freq", test_dir, "test_dir");
     qd_check_alias_outputs(ase, "ase", test_dir, "test_dir");
     if (n_coeff == 0)
         throw std::invalid_argument("Input 'n_coeff' cannot be 0.");
@@ -124,18 +124,18 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
         throw std::invalid_argument("Input 'n_dim' must be 1, 2 or 3.");
     if (n_dir == 0)
         throw std::invalid_argument("Input 'n_dir' cannot be 0.");
-    if (!(freq_min >= (dtype)0.0) || !std::isfinite((double)freq_min))
-        throw std::invalid_argument("Input 'freq_min' must be >= 0.");
-    if (!(freq_max >= (dtype)0.0) || !std::isfinite((double)freq_max))
-        throw std::invalid_argument("Input 'freq_max' must be >= 0.");
+    if (!(spatial_freq_min >= (dtype)0.0) || !std::isfinite((double)spatial_freq_min))
+        throw std::invalid_argument("Input 'spatial_freq_min' must be >= 0.");
+    if (!(spatial_freq_max >= (dtype)0.0) || !std::isfinite((double)spatial_freq_max))
+        throw std::invalid_argument("Input 'spatial_freq_max' must be >= 0.");
     const double d_max = (double)dist.at(dist.n_elem - 1);
-    const double f_hi = (freq_max != (dtype)0.0) ? (double)freq_max : 15.0 / d_max, f_lo = (double)freq_min;
+    const double f_hi = (spatial_freq_max != (dtype)0.0) ? (double)spatial_freq_max : 15.0 / d_max, f_lo = (double)spatial_freq_min;
     if (!(f_hi > f_lo))
-        throw std::invalid_argument("Input 'freq_max' (or its default) must be larger than 'freq_min'.");
+        throw std::invalid_argument("Input 'spatial_freq_max' (or its default) must be larger than 'spatial_freq_min'.");
     // The cosines of the search grid are stored for all sample points; the presets use 150 grid points
     const double n_grid_d = std::floor((f_hi * d_max - f_lo * d_max) / 0.1 + 1.0e-9) + 1.0;
     if (!(n_grid_d <= 100000.0))
-        throw std::invalid_argument("Input 'freq_max' is too large: the search grid of ( freq_max - freq_min ) · max(dist) / 0.1 points cannot exceed 100000.");
+        throw std::invalid_argument("Input 'spatial_freq_max' is too large: the search grid of ( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 points cannot exceed 100000.");
     if (seed < -1)
         throw std::invalid_argument("Input 'seed' must be >= -1.");
 
@@ -339,15 +339,15 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
         converged = cost_start - cost < 1.0e-6 * cost_start;
     }
 
-    if (freq.n_rows != n_coeff || freq.n_cols != n_dim)
-        freq.set_size(n_coeff, n_dim);
+    if (spatial_freq.n_rows != n_coeff || spatial_freq.n_cols != n_dim)
+        spatial_freq.set_size(n_coeff, n_dim);
     for (arma::uword n = 0; n < n_coeff; ++n)
     {
-        freq.at(n, 0) = (dtype)(fn[n] * ux[n] / d_max);
+        spatial_freq.at(n, 0) = (dtype)(fn[n] * ux[n] / d_max);
         if (n_dim > 1)
-            freq.at(n, 1) = (dtype)(fn[n] * uy[n] / d_max);
+            spatial_freq.at(n, 1) = (dtype)(fn[n] * uy[n] / d_max);
         if (n_dim > 2)
-            freq.at(n, 2) = (dtype)(fn[n] * uz[n] / d_max);
+            spatial_freq.at(n, 2) = (dtype)(fn[n] * uz[n] / d_max);
     }
 
     if (ase != nullptr)
@@ -372,9 +372,9 @@ void quadriga_lib::sos_generate(const arma::Col<dtype> &acf,
     }
 }
 
-template void quadriga_lib::sos_generate(const arma::Col<float> &acf, const arma::Col<float> &dist, arma::uword n_coeff, arma::Mat<float> &freq, arma::Col<float> *ase,
+template void quadriga_lib::sos_generate(const arma::Col<float> &acf, const arma::Col<float> &dist, arma::uword n_coeff, arma::Mat<float> &spatial_freq, arma::Col<float> *ase,
                                          arma::Mat<float> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
-                                         float freq_min, float freq_max, arma::sword seed);
-template void quadriga_lib::sos_generate(const arma::Col<double> &acf, const arma::Col<double> &dist, arma::uword n_coeff, arma::Mat<double> &freq, arma::Col<double> *ase,
+                                         float spatial_freq_min, float spatial_freq_max, arma::sword seed);
+template void quadriga_lib::sos_generate(const arma::Col<double> &acf, const arma::Col<double> &dist, arma::uword n_coeff, arma::Mat<double> &spatial_freq, arma::Col<double> *ase,
                                          arma::Mat<double> *test_dir, arma::uword n_dim, bool uniform_smp, arma::uword n_dir, bool random_init,
-                                         double freq_min, double freq_max, arma::sword seed);
+                                         double spatial_freq_min, double spatial_freq_max, arma::sword seed);

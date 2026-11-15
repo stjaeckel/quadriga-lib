@@ -68,10 +68,10 @@ TEST_CASE("gbsm_rays - is_valid reports each failed check")
     fails([](R &r) { r.rx_pos.resize(2); }, "Input 'rays.rx_pos' must have 3 elements.");
     SECTION("2 rx_pos finite")
     fails([&](R &r) { r.rx_pos(2) = inf; }, "Input 'rays.rx_pos' must be finite.");
-    SECTION("3 center_frequency empty")
-    fails([](R &r) { r.center_frequency.reset(); }, "Input 'rays.center_frequency' cannot be empty.");
-    SECTION("3 center_frequency value")
-    fails([](R &r) { r.center_frequency(1) = 0.0; }, "Input 'rays.center_frequency' must be finite and > 0.");
+    SECTION("3 center_freq empty")
+    fails([](R &r) { r.center_freq.reset(); }, "Input 'rays.center_freq' cannot be empty.");
+    SECTION("3 center_freq value")
+    fails([](R &r) { r.center_freq(1) = 0.0; }, "Input 'rays.center_freq' must be finite and > 0.");
     SECTION("4 delay finite")
     fails([&](R &r) { r.delay(3) = nan; }, "Input 'rays.delay' must be finite.");
     SECTION("5 power size")

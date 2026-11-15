@@ -33,14 +33,14 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 ```
 [ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
     edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
-    quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, orig, dest, mesh, ...
+    quadriga_lib.ray_mesh_interact( interaction_type, center_freq, orig, dest, mesh, ...
     mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
 ```
 
 ## Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction,
   3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_frequency`** — Center frequency
+- **`center_freq`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of
@@ -120,7 +120,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read input data
     const auto interaction_type = qd_mex_get_scalar<int>(prhs[0], "interaction_type", 0);
-    const auto center_frequency = qd_mex_get_scalar<double>(prhs[1], "center_frequency", 0.0);
+    const auto center_freq = qd_mex_get_scalar<double>(prhs[1], "center_freq", 0.0);
     const auto orig = qd_mex_get_Mat<double>(prhs[2]);
     const auto dest = qd_mex_get_Mat<double>(prhs[3]);
     const auto mesh = qd_mex_get_Mat<double>(prhs[4]);
@@ -203,7 +203,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call library function
     CALL_QD(quadriga_lib::ray_mesh_interact<double>(
-        interaction_type, center_frequency,
+        interaction_type, center_freq,
         &orig, &dest, &mesh, p_mtl_ind, p_mtl_prop, &fbs_ind, &sbs_ind,
         p_trivec, p_tridir,
         p_origN, p_destN, p_fbsN, p_sbsN, p_gainN, p_xprmatN,

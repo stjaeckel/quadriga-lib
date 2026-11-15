@@ -269,7 +269,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Array type not supported!");
 
     // Set center frequency for all types
-    arrayant.center_frequency = freq;
+    arrayant.center_freq = freq;
 
     plhs[0] = qd_mex_arrayant2struct(arrayant); // Also without output argument: the struct goes to ans
 }

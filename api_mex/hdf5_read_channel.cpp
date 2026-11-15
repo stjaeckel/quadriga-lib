@@ -59,7 +59,7 @@ Read one or more channel objects from an HDF5 file
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
   | `no_interact`      | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
   | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(no_interact)), n_snap]`|
-  | `center_frequency` | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
+  | `center_freq`      | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
   | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
 - **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
   **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
@@ -189,9 +189,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         sub_mat(channel.rx_orientation, sub.rx_orientation);
         sub_mat(channel.tx_orientation, sub.tx_orientation);
 
-        sub.center_frequency = (channel.center_frequency.n_elem <= 1)
-                                   ? channel.center_frequency
-                                   : arma::Col<double>(channel.center_frequency.elem(snap));
+        sub.center_freq = (channel.center_freq.n_elem <= 1)
+                                   ? channel.center_freq
+                                   : arma::Col<double>(channel.center_freq.elem(snap));
 
         auto sub_vec = [&](const auto &src, auto &dst)
         {

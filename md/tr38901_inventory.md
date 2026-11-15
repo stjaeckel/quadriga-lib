@@ -155,7 +155,7 @@ Rows per clause (a "Yes" row may still carry a drift; see the comments):
 | Step 1b–c: positions, LOS angles | 7.5 step 1b, 1c | Yes | `ssf_clusters` (`src/ssf_clusters.cpp:455`; LOS geometry `:609`) | Tx is the BS (downlink). Wrap-around copies are the caller's. |
 | Step 1d–e: patterns, arrays, orientations | 7.5 step 1d, 1e | Yes | `gbsm_single_link_channel` (`src/gbsm_single_link_channel.cpp:114`) | `arrayant` in the LCS, Euler orientations (see 7.1). |
 | Step 1f: UT speed and direction | 7.5 step 1f | Yes | `gbsm_single_link_channel` (`src/gbsm_single_link_channel.cpp:114`) | Positions per snapshot (`mobility` `phase` or `drift`). |
-| Step 1g: carrier frequency | 7.5 step 1g | Yes | `center_frequency` [Hz] in all GBSM functions | The bandwidth matters only for 7.6.2. |
+| Step 1g: carrier frequency | 7.5 step 1g | Yes | `center_freq` [Hz] in all GBSM functions | The bandwidth matters only for 7.6.2. |
 | Step 2: LOS/NLOS and indoor state | 7.5 step 2 | Partial | `los_probability` (`src/los_probability.cpp:163`); workflow in section doc `src/qd_scenpar.cpp:718` | The library gives p_LOS. The caller draws the states (spatially consistent with the SOS generators at `LOS_state_lambda`, `IO_state_lambda`) and picks the scenario file. The LOS condition is a property of the file: LOS when `KF_mu > −30` dB (ssf_notes W1). |
 | Step 3: path loss | 7.5 step 3 | Yes | `path_loss` (`src/path_loss.cpp:180`) | See 3.4.1. |
 | Step 4: log-normal LSPs, frequency terms, fc floors | 7.5 step 4, Table 7.5-6 notes | Yes | `lsp_generate` (`src/lsp_generate.cpp:175`; per-link loop `:314`); `qd_gbsm_lsp_stats` (`src/quadriga_gbsm_helpers.hpp:194`; fc floor `:236`) | μ = P_μ + P_γ·lg(P_ω + max(fc, `LSP_fc_min`)), floors UMa 6, UMi 2, InH 6 GHz as in the notes. Output `lsp`: DS in s, spreads in deg, K, SF, XPR linear; `lsp_mu`/`lsp_sigma` in the log domain. NLOS K "N/A" is `KF_mu` = −100 dB. |
@@ -210,7 +210,7 @@ The scenario files hold the values of Table 7.5-6 and Tables 7.5-7 to 7.5-12; th
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Oxygen loss per cluster | 7.6.1, eq. 7.6-1, Table 7.6.1-1 | Yes | `ssf_paths` (`src/ssf_paths.cpp:102`; table `:211`, applied `:303`); switch `oxygen` of `gbsm_single_link_channel` | Off by default. Table at 52–68 GHz, linear interpolation, 0 outside (W27). Loss from each path's own length (sub-cluster rays up to +0.13 dB, A24). **Drift:** τ_Δ = min τ′_n is not added: in NLOS without absolute TOA the loss is too low (60 GHz p99: UMi 0.71 dB, UMa 1.28 dB; ssf_notes A19, section 14). |
-| Oxygen loss across a large bandwidth | 7.6.1, eq. 7.6-2 | No | – | Evaluated at each `center_frequency` only (A24). |
+| Oxygen loss across a large bandwidth | 7.6.1, eq. 7.6-2 | No | – | Evaluated at each `center_freq` only (A24). |
 
 #### 3.6.2 Large bandwidth and large antenna array (7.6.2)
 

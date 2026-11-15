@@ -28,7 +28,7 @@ SECTION!*/
 
 /*!MD
 # SOS_GENERATE
-Find the frequencies of a sum-of-sinusoids generator for a given ACF
+Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
 
 - Searches `n_coeff` frequencies such that the autocorrelation function (ACF) of the sinusoids,
   `R(dx) = (1/n_coeff) · sum_n cos( 2·pi · f_n·dx )`, approximates the target ACF in all directions
@@ -46,12 +46,12 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
   sinusoid by sinusoid in the first pass
 - The fit covers the range of `dist` only. The ACF of the result beyond the last sample point is
   not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
-  (see `acf_tail` of [[sos_calc_mse]]). To prevent this, set `freq_min`
-- `freq_min` and `freq_max` limit the magnitude of the frequency along the direction of each
+  (see `acf_tail` of [[sos_calc_mse]]). To prevent this, set `spatial_freq_min`
+- `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each
   sinusoid; 0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
-- The search grid has `( freq_max - freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
+- The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
   stored for all sample points. It must not have more than 100000 points (the default has 151),
-  which limits `freq_max - freq_min` to less than `10000 / max(dist)`
+  which limits `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
 - The function runs on one thread
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse
   in others; the predefined tables of [[sos_preset]] were made with 300
@@ -61,8 +61,8 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
 
 ## Usage:
 ```
-[ freq, ase, test_dir ] = quadriga_lib.sos_generate( acf, dist, n_coeff, n_dim, uniform_smp, ...
-    n_dir, random_init, freq_min, freq_max, seed );
+[ spatial_freq, ase, test_dir ] = quadriga_lib.sos_generate( acf, dist, n_coeff, n_dim, uniform_smp, ...
+    n_dir, random_init, spatial_freq_min, spatial_freq_max, seed );
 ```
 
 ## Inputs:
@@ -74,15 +74,15 @@ Find the frequencies of a sum-of-sinusoids generator for a given ACF
 - **`n_dir`** — Number of test directions; must be > 0; ignored for `n_dim = 1`; default: 10
 - **`random_init`** — Start from random frequencies (true) or build up sinusoid by sinusoid
   (false); default: true
-- **`freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
+- **`spatial_freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
   default: 0
-- **`freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
-  larger than `freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
+- **`spatial_freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
+  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
   grid, see above; default: 0
 - **`seed`** — Seed; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1
 
 ## Outputs:
-- **`freq`** — Frequencies; `[n_coeff, n_dim]`
+- **`spatial_freq`** — Spatial frequencies; `[n_coeff, n_dim]`
 - **`ase`** — Mean squared error over the test directions after each pass, linear scale; column
   vector; `[n_pass]`
 - **`test_dir`** — Test directions; `[n_dir, 2]` with columns `{azimuth, elevation}` for
@@ -109,22 +109,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool uniform_smp = (nrhs < 5) ? true : qd_mex_get_scalar<bool>(prhs[4], "uniform_smp", true);
     const arma::uword n_dir = (nrhs < 6) ? 10 : qd_mex_sos_count(prhs[5], "n_dir", 10.0);
     const bool random_init = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "random_init", true);
-    const double freq_min = (nrhs < 8) ? 0.0 : qd_mex_get_scalar<double>(prhs[7], "freq_min", 0.0);
-    const double freq_max = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "freq_max", 0.0);
+    const double spatial_freq_min = (nrhs < 8) ? 0.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_min", 0.0);
+    const double spatial_freq_max = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "spatial_freq_max", 0.0);
     const arma::sword seed = (nrhs < 10) ? -1 : qd_mex_get_seed(prhs[9]);
 
     // Wrap optional pointers; the number of passes is known only after the call
-    arma::mat freq, test_dir;
+    arma::mat spatial_freq, test_dir;
     arma::vec ase;
     arma::vec *p_ase = (nlhs > 1) ? &ase : nullptr;
     arma::mat *p_test_dir = (nlhs > 2) ? &test_dir : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::sos_generate<double>(acf, dist, n_coeff, freq, p_ase, p_test_dir, n_dim, uniform_smp, n_dir, random_init, freq_min, freq_max, seed));
+    CALL_QD(quadriga_lib::sos_generate<double>(acf, dist, n_coeff, spatial_freq, p_ase, p_test_dir, n_dim, uniform_smp, n_dir, random_init, spatial_freq_min, spatial_freq_max, seed));
 
     // Copy to MATLAB
     if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&freq);
+        plhs[0] = qd_mex_copy2matlab(&spatial_freq);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&ase);
     if (nlhs > 2)

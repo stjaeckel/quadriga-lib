@@ -43,7 +43,7 @@ void fuzz_seeds(const fz::seeds &s)
     for (bool scalar : {false, true})
     {
         std::string fn = s.path(scalar ? "scalar.qrt" : "em.qrt");
-        arma::fvec freq = {3.5f, 28.0f};
+        arma::fvec freq = {3.5e9f, 28.0e9f};
         arma::fmat cir_pos = {{5.0f, 0.0f, 1.5f}, {6.0f, 1.0f, 1.5f}};
         arma::fmat cir_orientation = {{0.0f, 0.0f, 0.1f}, {0.0f, 0.0f, 0.2f}};
         quadriga_lib::qrt_file_init<float>(fn, freq, cir_pos, cir_orientation, {"RX0", "RX1"}, {0, 1}, 2, scalar);
@@ -81,14 +81,14 @@ void fuzz_one(const uint8_t *data, size_t size)
             for (bool downlink : {true, false})
                 fz::clean([&]
                           {
-                    arma::vec center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation, path_length, aod, eod, aoa, eoa;
+                    arma::vec center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, path_length, aod, eod, aoa, eoa;
                     arma::mat fbs_pos, lbs_pos, path_gain;
                     arma::cube M;
                     std::vector<arma::mat> path_coord;
                     arma::u32_vec no_int;
                     arma::fmat coord;
                     std::vector<uint8_t> interact_type;
-                    quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, downlink, &center_frequency, &tx_pos,
+                    quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, downlink, &center_freq, &tx_pos,
                                                         &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
                                                         &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
                                                         &path_coord, downlink ? 1 : 0, &no_int, &coord, &interact_type); });

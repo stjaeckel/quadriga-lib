@@ -146,13 +146,13 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#generate_diffraction_pat
 
 ### Usage:
 ```matlab
-[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_frequency, lod );
+[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_freq, lod );
 ```
 
 ### Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_frequency`** — Center frequency in Hz
+- **`center_freq`** — Center frequency in Hz
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:
    | `lod` | `n_path` | `n_seg` | Note  |
    | :---: | -------: | ------: | ----: |
@@ -478,14 +478,14 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
 ```matlab
 [ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
     edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
-    quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, orig, dest, mesh, ...
+    quadriga_lib.ray_mesh_interact( interaction_type, center_freq, orig, dest, mesh, ...
     mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
 ```
 
 ### Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction,
   3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_frequency`** — Center frequency
+- **`center_freq`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of

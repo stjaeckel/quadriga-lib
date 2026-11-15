@@ -30,12 +30,12 @@ class test_case(unittest.TestCase):
 
         # The documented composition: preset, phases, evaluation; here for generator 1 (20 m). A second device
         # on its own map draws its phases from a second stream with the seed + 2^62.
-        self.freq, self.acf, self.dist = quadriga_lib.sos.preset("Comb256", 20.0)
+        self.spatial_freq, self.acf, self.dist = quadriga_lib.sos.preset("Comb256", 20.0)
         self.phase = quadriga_lib.sos.init_phases(256, 6, 7)
 
-    def oracle(self, col, freq=None, **kwargs):
-        freq = self.freq if freq is None else freq
-        val = quadriga_lib.sos.val(freq, self.phase[:, col], self.pos, uniform=True, **kwargs)
+    def oracle(self, col, spatial_freq=None, **kwargs):
+        spatial_freq = self.spatial_freq if spatial_freq is None else spatial_freq
+        val = quadriga_lib.sos.val(spatial_freq, self.phase[:, col], self.pos, uniform=True, **kwargs)
         return np.ceil(6.0 * val[:, 0])
 
     def test_basic_call(self):
@@ -95,7 +95,7 @@ class test_case(unittest.TestCase):
         phase_b = quadriga_lib.sos.init_phases(256, 3, 7 + 2**62)
         val6 = quadriga_lib.sos.randi(self.dd, self.pos, 6, self.pos_b, [5.0, 8.0, 0.0], seed=7)
         npt.assert_allclose(val6[:, 1], self.oracle(1, pos_b=self.pos_b, phase_b=phase_b[:, 1],
-                                                    freq_scale_b=20.0 / 8.0), atol=1e-12, rtol=0)
+                                                    spatial_freq_scale_b=20.0 / 8.0), atol=1e-12, rtol=0)
         npt.assert_array_equal(val6[:, [0, 2]], val4[:, [0, 2]])
 
     def test_imax(self):

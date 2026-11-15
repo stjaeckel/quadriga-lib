@@ -29,7 +29,7 @@ inline mxArray *qd_mex_arrayant2struct(const quadriga_lib::arrayant<double> &ant
     qd_mex_set_field(output, fields[6], qd_mex_copy2matlab(&ant.element_pos));
     qd_mex_set_field(output, fields[7], qd_mex_copy2matlab(&ant.coupling_re));
     qd_mex_set_field(output, fields[8], qd_mex_copy2matlab(&ant.coupling_im));
-    qd_mex_set_field(output, fields[9], qd_mex_copy2matlab(&ant.center_frequency));
+    qd_mex_set_field(output, fields[9], qd_mex_copy2matlab(&ant.center_freq));
     qd_mex_set_field(output, fields[10], mxCreateString(ant.name.c_str()));
     return output;
 }
@@ -52,7 +52,7 @@ inline mxArray *qd_mex_arrayant2struct_multi(const std::vector<quadriga_lib::arr
         qd_mex_set_field(output, fields[6], qd_mex_copy2matlab(&ant[n].element_pos), n);
         qd_mex_set_field(output, fields[7], qd_mex_copy2matlab(&ant[n].coupling_re), n);
         qd_mex_set_field(output, fields[8], qd_mex_copy2matlab(&ant[n].coupling_im), n);
-        qd_mex_set_field(output, fields[9], qd_mex_copy2matlab(&ant[n].center_frequency), n);
+        qd_mex_set_field(output, fields[9], qd_mex_copy2matlab(&ant[n].center_freq), n);
         qd_mex_set_field(output, fields[10], mxCreateString(ant[n].name.c_str()), n);
     }
     return output;
@@ -92,7 +92,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
         ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
 
     if (qd_mex_has_field(input, "center_freq") && !mxIsEmpty(qd_mex_get_field(input, "center_freq")))
-        ant.center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq"), "center_freq", 299792458.0);
+        ant.center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq"), "center_freq", 299792458.0);
 
     if (qd_mex_has_field(input, "name") && !mxIsEmpty(qd_mex_get_field(input, "name")))
         ant.name = qd_mex_get_string(qd_mex_get_field(input, "name"));
@@ -133,7 +133,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
         arma::uword n_elements = ant[n].e_theta_re.n_slices;
 
         if (has_center_freq && !mxIsEmpty(qd_mex_get_field(input, "center_freq", n)))
-            ant[n].center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", n), "center_freq", 299792458.0);
+            ant[n].center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", n), "center_freq", 299792458.0);
 
         if (has_element_pos && !mxIsEmpty(qd_mex_get_field(input, "element_pos", n)))
             ant[n].element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos", n), copy, "element_pos");
@@ -192,7 +192,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     const bool h_lbs = !c0.path_lbs_pos.empty();
     const bool h_ni = !c0.no_interact.empty();
     const bool h_ic = !c0.interact_coord.empty();
-    const bool h_cf = !c0.center_frequency.is_empty();
+    const bool h_cf = !c0.center_freq.is_empty();
     const bool h_ini = c0.initial_position != 0;
 
     // Build the field list (name is always present)
@@ -229,7 +229,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     if (h_ic)
         fields.push_back("interact_coord");
     if (h_cf)
-        fields.push_back("center_frequency");
+        fields.push_back("center_freq");
     if (h_ini)
         fields.push_back("initial_position");
 
@@ -278,7 +278,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         if (h_ic)
             qd_mex_set_field(output, "interact_coord", qd_mex_vector2matlab(&c.interact_coord), n);
         if (h_cf)
-            qd_mex_set_field(output, "center_frequency", qd_mex_copy2matlab(&c.center_frequency), n);
+            qd_mex_set_field(output, "center_freq", qd_mex_copy2matlab(&c.center_freq), n);
         if (h_ini)
             qd_mex_set_field(output, "initial_position", qd_mex_copy2matlab(&c.initial_position), n);
     }
@@ -339,8 +339,8 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "interact_coord"))
             c.interact_coord = qd_mex_matlab2vector_Mat<double>(fp, 2, "interact_coord");
 
-        if (mxArray *fp = mxGetField(input, (mwIndex)i, "center_frequency"))
-            c.center_frequency = qd_mex_get_Col<double>(fp, copy, "center_frequency");
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "center_freq"))
+            c.center_freq = qd_mex_get_Col<double>(fp, copy, "center_freq");
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "initial_position"))
             c.initial_position = qd_mex_get_scalar<int>(fp, "initial_position", 0);
@@ -585,7 +585,7 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
 // Field names of the gbsm_rays struct in their order; the first qd_mex_gbsm_rays_n_required are required as input,
 // the others optional (missing = empty), also any field appended later
 inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
-    "method", "tx_pos", "rx_pos", "center_frequency", "delay", "power", "aod", "eod", "aoa",
+    "method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa",
     "eoa", "M", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
 inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
 
@@ -637,7 +637,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
         if ((a = get(f)) != nullptr)
             x = qd_mex_get_Mat<double>(a, copy, var_name + "." + f);
     };
-    col("tx_pos", r.tx_pos), col("rx_pos", r.rx_pos), col("center_frequency", r.center_frequency);
+    col("tx_pos", r.tx_pos), col("rx_pos", r.rx_pos), col("center_freq", r.center_freq);
     col("delay", r.delay), col("aod", r.aod), col("eod", r.eod), col("aoa", r.aoa), col("eoa", r.eoa);
     col("path_type", r.path_type), col("tap", r.tap), col("gr_eps_re", r.gr_eps_re), col("gr_eps_im", r.gr_eps_im);
     col("fallback", r.fallback);
@@ -648,7 +648,7 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
 }
 
 // Creates the 1 x n_link gbsm_rays struct array with all fields and aliases the attributes of 'rays' (resized to
-// n_link) whose size is known: positions [3, 1], 'center_frequency', 'delay', 'power', angles, 'M', 'path_type',
+// n_link) whose size is known: positions [3, 1], 'center_freq', 'delay', 'power', angles, 'M', 'path_type',
 // 'tap', 'gr_eps_re' and 'gr_eps_im' if 'has_gr', 'fbs_pos' and 'lbs_pos' [3, n_ray] if 'has_scatterers'
 // - The other fields are empty ('fallback' uint32); 'method' is left unset for the caller to fill after the call
 inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
@@ -666,7 +666,7 @@ inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arm
         { return mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL); };
         set("tx_pos", qd_mex_init_output(&r.tx_pos, 3));
         set("rx_pos", qd_mex_init_output(&r.rx_pos, 3));
-        set("center_frequency", qd_mex_init_output(&r.center_frequency, n_freq));
+        set("center_freq", qd_mex_init_output(&r.center_freq, n_freq));
         set("delay", qd_mex_init_output(&r.delay, n_ray));
         set("power", qd_mex_init_output(&r.power, n_ray, n_freq));
         set("aod", qd_mex_init_output(&r.aod, n_ray));

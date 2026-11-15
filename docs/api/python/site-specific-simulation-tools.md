@@ -39,12 +39,12 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) �
 ```python
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 ```
 
@@ -54,7 +54,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 - **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]`; `(n_mesh, 9)`
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [obj_file_read](#obj_file_read)); `(n_mesh,)`
 - **`mtl_prop`** — Material properties as a `dict`; each key is one column (the `csv_prop` output of [obj_file_read](#obj_file_read)) mapping to a 1D array of length `n_mtl`
-- **`center_frequency`** — Center frequency
+- **`center_freq`** — Center frequency
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`: 0 = direct ray only (1 path, 1 segment);
   1 / 2 = 7 / 19 paths with 3 segments; 3 = 37 paths, 4 segments; 4 = 61 paths, 5 segments; 5 / 6 = 1 / 2 paths
   with 2 segments (debug); 7 = direct line in 10 segments; default: 2
@@ -73,7 +73,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.;
   default: `False`
 - **`apply_phase`** — If `True`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
-  using the same direct TX-RX distance. The wavelength follows from `center_frequency` and the medium
+  using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium
   wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude,
   so `xprmat` stays normalized. This is the phase [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from
   `path_length`; default: `False`

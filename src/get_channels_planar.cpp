@@ -34,7 +34,7 @@ Calculate MIMO channel coefficients for planar wave paths
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- Setting `center_frequency = 0` disables phase calculation (delays still computed).
+- Setting `center_freq = 0` disables phase calculation (delays still computed).
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
   centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
@@ -60,7 +60,7 @@ void quadriga_lib::get_channels_planar(
     arma::Cube<dtype> *coeff_re,
     arma::Cube<dtype> *coeff_im,
     arma::Cube<dtype> *delay,
-    dtype center_frequency = dtype(0.0),
+    dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     arma::Col<dtype> *rx_Doppler = nullptr);
@@ -80,7 +80,7 @@ void quadriga_lib::get_channels_planar(
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`center_frequency`** *(optional)* — Center frequency; 0 disables phase calculation
+- **`center_freq`** *(optional)* — Center frequency; 0 disables phase calculation
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
@@ -107,7 +107,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
                                        const arma::Col<dtype> *aod, const arma::Col<dtype> *eod, const arma::Col<dtype> *aoa, const arma::Col<dtype> *eoa,
                                        const arma::Col<dtype> *path_gain, const arma::Col<dtype> *path_length, const arma::Mat<dtype> *M,
                                        arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
-                                       dtype center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                       dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                        arma::Col<dtype> *rx_Doppler)
 {
     // Constants
@@ -115,8 +115,8 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     constexpr dtype zero = dtype(0.0);
     constexpr dtype one = dtype(1.0);
     constexpr dtype rC = dtype(1.0 / 299792458.0); // 1 / (Speed of light)
-    dtype wavelength = center_frequency > zero ? dtype(299792458.0) / center_frequency : one;
-    dtype wave_number = dtype(2.095845021951682e-08) * center_frequency; // 2 * pi / C
+    dtype wavelength = center_freq > zero ? dtype(299792458.0) / center_freq : one;
+    dtype wave_number = dtype(2.095845021951682e-08) * center_freq; // 2 * pi / C
 
     // Catch NULL-Pointers
     std::string error_message;
@@ -153,7 +153,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         arma::Col<dtype> doppler;
         quadriga_lib::get_channels_planar<dtype>(tx_array, rx_array, Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
                                                  &aod_d, &eod_d, &aoa_d, &eoa_d, &gain_d, &length_d, &M_d,
-                                                 &cr, &ci, &dl, center_frequency, use_absolute_delays, true,
+                                                 &cr, &ci, &dl, center_freq, use_absolute_delays, true,
                                                  rx_Doppler == nullptr ? nullptr : &doppler);
 
         const arma::uword n_ports = cr.n_rows * cr.n_cols;
@@ -449,7 +449,7 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<flo
                                                 const arma::Col<float> *aod, const arma::Col<float> *eod, const arma::Col<float> *aoa, const arma::Col<float> *eoa,
                                                 const arma::Col<float> *path_gain, const arma::Col<float> *path_length, const arma::Mat<float> *M,
                                                 arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
-                                                float center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                                float center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<float> *rx_Doppler);
 
 template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<double> *tx_array, const quadriga_lib::arrayant<double> *rx_array,
@@ -458,5 +458,5 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dou
                                                 const arma::Col<double> *aod, const arma::Col<double> *eod, const arma::Col<double> *aoa, const arma::Col<double> *eoa,
                                                 const arma::Col<double> *path_gain, const arma::Col<double> *path_length, const arma::Mat<double> *M,
                                                 arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
-                                                double center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                                double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<double> *rx_Doppler);

@@ -154,7 +154,7 @@ namespace
         arma::cube cr, ci, dl;
         const arma::vec g = o.gain.col(k);
         const arma::mat M = o.M.slice(k);
-        const double f = r.center_frequency(k);
+        const double f = r.center_freq(k);
         if (spherical)
             quadriga_lib::get_channels_spherical<double>(&a, &a, T(0), T(1), T(2), 0.0, 0.0, 0.0, R(0), R(1), R(2),
                                                          0.0, 0.0, 0.0, &o.fbs, &o.lbs, &g, &o.len, &M, &cr, &ci,
@@ -227,7 +227,7 @@ TEST_CASE("ssf_paths - phase rotation follows TR 7.5-22 for Rx and Tx displaceme
             for (arma::uword k = 0; k < 2; ++k)
             {
                 const arma::uword i = ind(p);
-                const double kw = 2.0 * pi * r.center_frequency(k) / c0;
+                const double kw = 2.0 * pi * r.center_freq(k) / c0;
                 const double dL = exact_len(r, i, dT2, dR2) - exact_len(r, i, z3, z3);
                 const double bound = phase_bound(r, i, dT2, dR2, kw);
                 CHECK(std::abs(disp_phase(r, i, dT2, dR2, kw) + kw * dL) <= bound); // oracles agree
@@ -257,7 +257,7 @@ TEST_CASE("ssf_paths - phase rotation follows TR 7.5-22 for Rx and Tx displaceme
             for (arma::uword k = 0; k < 2; ++k)
             {
                 const arma::uword i = ind(p);
-                const double kw = 2.0 * pi * r.center_frequency(k) / c0;
+                const double kw = 2.0 * pi * r.center_freq(k) / c0;
                 const double ph = disp_phase(r, i, eT, eR, kw);
                 INFO("path " << p << ", frequency " << k);
                 for (arma::uword e = 0; e < 4; ++e)
@@ -503,7 +503,7 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
 {
     // TR Table 7.6.1-1 interpolated at the test frequencies: 0.5, 15, 14.8, 8.65, 0.5, 0 dB/km
     rays_t r = make_rays(19, true, true, 6, 6, "38.901");
-    r.center_frequency = {52.5e9, 60.0e9, 60.5e9, 63.5e9, 67.5e9, 70.0e9};
+    r.center_freq = {52.5e9, 60.0e9, 60.5e9, 63.5e9, 67.5e9, 70.0e9};
     const double alpha[6] = {0.5, 15.0, 14.8, 8.65, 0.5, 0.0};
     rays_t s = r;
     s.solve_scatterers();
@@ -532,7 +532,7 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
         const double node[15] = {1.0, 2.2, 4.0, 6.6, 9.7, 12.6, 14.6, 15.0, 14.6, 14.3, 10.5, 6.8, 3.9, 1.9, 1.0};
         rays_t q = make_rays(19, true, true, 6, 15, "38.901");
         for (arma::uword k = 0; k < 15; ++k)
-            q.center_frequency(k) = (53.0 + (double)k) * 1e9;
+            q.center_freq(k) = (53.0 + (double)k) * 1e9;
         const po_t a = pth(q, "phase", nullptr, &R), b = pth(q, "phase", nullptr, &R, nullptr, true);
         for (arma::uword p = 0; p < a.len.n_elem; ++p)
             for (arma::uword k = 0; k < 15; ++k)
@@ -546,7 +546,7 @@ TEST_CASE("ssf_paths - oxygen loss from each path's own length")
     // The table ends at 52 and 68 GHz (0 dB/km) and far outside the table (fc·1e-9 - 52 beyond the int range): no
     // loss, with and without oxygen
     rays_t h = r;
-    h.center_frequency(0) = 52e9, h.center_frequency(4) = 68e9, h.center_frequency(5) = 1e300;
+    h.center_freq(0) = 52e9, h.center_freq(4) = 68e9, h.center_freq(5) = 1e300;
     const po_t c = pth(h, "phase", nullptr, &R), d = pth(h, "phase", nullptr, &R, nullptr, true);
     for (arma::uword k : {0, 4, 5})
         CHECK(arma::approx_equal(c.gain.col(k), d.gain.col(k), "absdiff", 0.0));
@@ -644,7 +644,7 @@ TEST_CASE("ssf_paths - phase and drift agree for millimetre displacements")
             {
                 const arma::cx_vec cp = coeff(omni, r, op, k, false, r.tx_pos, r.rx_pos);
                 const arma::cx_vec cd = coeff(omni, r, od, k, true, T, R);
-                const double kw = 2.0 * pi * r.center_frequency(k) / c0;
+                const double kw = 2.0 * pi * r.center_freq(k) / c0;
                 for (arma::uword p = 0; p < op.ind.n_elem; ++p)
                 {
                     const arma::uword i = op.ind(p);
@@ -708,7 +708,7 @@ TEST_CASE("ssf_paths - n_ray = 0, NLOS scenario and data-from-paths rays")
     s.solve_scatterers();
     const po_t o = pth(s, "drift");
     rays_t d;
-    quadriga_lib::gbsm_rays_from_paths(s.center_frequency, s.tx_pos, s.rx_pos, o.fbs, o.lbs, o.gain, o.len, o.M, d,
+    quadriga_lib::gbsm_rays_from_paths(s.center_freq, s.tx_pos, s.rx_pos, o.fbs, o.lbs, o.gain, o.len, o.M, d,
                                        "quadriga", &o.type, nullptr, &s.gr_eps_re, &s.gr_eps_im);
     const po_t od = pth(d, "auto");
     REQUIRE(od.ind.n_elem == o.ind.n_elem);

@@ -95,7 +95,7 @@ Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10
   ESD), or `PerClusterES_D` if the scale is 0; coupling (step 8): within a cluster or sub-cluster, the ray with the k-th
   smallest value of a quantity's rank block gets the k-th smallest offset, separately for AOD, AOA, EOD and EOA
 - c_DS, the cluster DS of Table 7.5-6: `max(PerClusterDS_min, PerClusterDS + PerClusterDS_gamma·lg f')` ns with
-  `f' = max(center_frequency/1e9, PerClusterDS_fc_min)`; 3.91 ns where `PerClusterDS` = 0
+  `f' = max(center_freq/1e9, PerClusterDS_fc_min)`; 3.91 ns where `PerClusterDS` = 0
 - `NumSubPaths` other than 20: the offsets of QuaDRiGa-NG (the MATLAB QuaDRiGa fork that uses this library) below 20
   (mean 0, rms 1), Laplacian quantiles at the rms of Table 7.5-3 above 20; no sub-clusters
 
@@ -124,7 +124,7 @@ void quadriga_lib::ssf_rays(
     const std::unordered_map<std::string, double> &scenpar,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::cube &lsp,
     const arma::cube &lsp_mu,
     const arma::cube &lsp_sigma,
@@ -151,7 +151,7 @@ void quadriga_lib::ssf_rays(
   `PolVar_sigma`
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
-- **`center_frequency`** — Carrier frequencies in [Hz]; `[n_freq]`
+- **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
 - **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]]; used: the ESD
   mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`
 - **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [[ssf_clusters]]
@@ -160,7 +160,7 @@ void quadriga_lib::ssf_rays(
 - **`rnd_ray`** — `"ray"` sets from [[gbsm_draw]] (`n_gen` columns); TR methods: slice `k` = set `k`,
   `[n_link, n_gen, n_freq]`; `"quadriga"`: the shared set, `[n_link, n_gen, 1]`
 - **`method`** *(optional)* — Method of [[ssf_clusters]]: `"38.901"`, `"38.901_MF"` or `"quadriga"`
-- **`i_freq`** *(optional)* — TR methods: index into `center_frequency`, 0-based; `"quadriga"`: must be 0
+- **`i_freq`** *(optional)* — TR methods: index into `center_freq`, 0-based; `"quadriga"`: must be 0
 - **`angle_model`**, **`pol_model`** *(optional)* — See the option table
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Ground permittivity from [[lsp_generate]]; required if
   `GR_enabled`, else ignored; `[n_link, n_freq]`
@@ -180,7 +180,7 @@ MD!*/
 void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenpar,
                             const arma::mat &tx_pos,
                             const arma::mat &rx_pos,
-                            const arma::vec &center_frequency,
+                            const arma::vec &center_freq,
                             const arma::cube &lsp,
                             const arma::cube &lsp_mu,
                             const arma::cube &lsp_sigma,
@@ -218,8 +218,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     arma::uword N, M, G, n_ray, n_gen;
     qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
     qd_gbsm_check_links(&tx_pos, &rx_pos);
-    qd_gbsm_check_fc(center_frequency);
-    const arma::uword n_link = rx_pos.n_rows, F = center_frequency.n_elem, n_slot = 1 + G + N;
+    qd_gbsm_check_fc(center_freq);
+    const arma::uword n_link = rx_pos.n_rows, F = center_freq.n_elem, n_slot = 1 + G + N;
     if (m_tr && F > 1)
         throw std::invalid_argument(
             "Method '38.901' supports one frequency only; use '38.901_MF' or 'quadriga' for several frequencies.");
@@ -298,11 +298,11 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     }
     auto check = [&](const auto &m)
     {
-        qd_check_alias(&m, "rays", &tx_pos, &rx_pos, &center_frequency, &lsp, &lsp_mu, &lsp_sigma, &delay, &power, &aod,
+        qd_check_alias(&m, "rays", &tx_pos, &rx_pos, &center_freq, &lsp, &lsp_mu, &lsp_sigma, &delay, &power, &aod,
                        &eod, &aoa, &eoa, &rnd_ray, gr_eps_re, gr_eps_im);
     };
     for (const gbsm_rays &r : rays)
-        check(r.tx_pos), check(r.rx_pos), check(r.center_frequency), check(r.delay), check(r.power), check(r.aod),
+        check(r.tx_pos), check(r.rx_pos), check(r.center_freq), check(r.delay), check(r.power), check(r.aod),
             check(r.eod), check(r.aoa), check(r.eoa), check(r.M), check(r.path_type), check(r.tap),
             check(r.gr_eps_re), check(r.gr_eps_im), check(r.fbs_pos), check(r.lbs_pos), check(r.fallback);
 
@@ -335,7 +335,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     const double pv_sigma = sp.at("PolVar_sigma");
     double c_ds = 0.0;
     for (arma::uword k = k0; k <= k1; ++k)
-        c_ds += qd_gbsm_cds(sp, center_frequency(k));
+        c_ds += qd_gbsm_cds(sp, center_freq(k));
     c_ds /= (double)(k1 - k0 + 1);
     const bool tx_single = tx_pos.n_rows != n_link, rotation = angle_model == "rotation";
     const arma::uword Fo = k1 - k0 + 1, r_slice = m_qd ? 0 : i_freq; // output frequencies, slice of rnd_ray
@@ -373,7 +373,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
             if (x.n_elem != n)
                 x.set_size(n);
         };
-        fit(r.tx_pos, 3), fit(r.rx_pos, 3), fit(r.center_frequency, Fo), fit(r.delay, n_ray);
+        fit(r.tx_pos, 3), fit(r.rx_pos, 3), fit(r.center_freq, Fo), fit(r.delay, n_ray);
         fit(r.aod, n_ray), fit(r.eod, n_ray), fit(r.aoa, n_ray), fit(r.eoa, n_ray), fit(r.path_type, n_ray);
         fit(r.tap, n_ray);
         if (r.power.n_rows != n_ray || r.power.n_cols != Fo)
@@ -397,7 +397,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         for (arma::uword i = 0; i < 3; ++i)
             r.tx_pos(i) = tx_pos(t, i), r.rx_pos(i) = rx_pos(l, i);
         for (arma::uword k = k0; k <= k1; ++k)
-            r.center_frequency(k - k0) = center_frequency(k);
+            r.center_freq(k - k0) = center_freq(k);
         r.M.zeros();
 
         // LOS and GR rays: the slot values; Jones matrices diag(1, -1) (TR 38.901 eq. (7.5-29)) and

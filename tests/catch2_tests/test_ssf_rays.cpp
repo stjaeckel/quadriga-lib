@@ -138,7 +138,7 @@ TEST_CASE("ssf_rays - output layout: entries, sizes, path types, taps and empty 
                 CHECK(r.method == method);
                 CHECK(arma::all(r.tx_pos == in.f.tx.row(l).t()));
                 CHECK(arma::all(r.rx_pos == in.f.rx.row(l).t()));
-                CHECK(arma::all(r.center_frequency == (qd ? in.fc : arma::vec{in.fc(F - 1)})));
+                CHECK(arma::all(r.center_freq == (qd ? in.fc : arma::vec{in.fc(F - 1)})));
                 CHECK(r.n_ray() == n_ray);
                 CHECK(arma::size(r.power) == arma::size(n_ray, Fo));
                 CHECK(arma::size(r.M) == arma::size(8, n_ray, Fo));
@@ -448,8 +448,8 @@ TEST_CASE("ssf_rays - 38.901_MF computes frequency i_freq with its own slices")
     {
         INFO("link " << l);
         CHECK(same(r1[l], r1b[l]));
-        CHECK(r1[l].center_frequency(0) == 28e9);
-        CHECK(r0[l].center_frequency(0) == 3.5e9);
+        CHECK(r1[l].center_freq(0) == 28e9);
+        CHECK(r0[l].center_freq(0) == 3.5e9);
         n_diff += arma::any(r0[l].tap != r1[l].tap) ? 1 : 0;
         check_link(r0[l], in, l);
     }
@@ -561,7 +561,7 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
     { x.~Col(), new (&x) arma::u32_vec(u, n, false, true), ptr.push_back(u), u += n; };
     for (auto &r : rays)
     {
-        vec(r.tx_pos, 3), vec(r.rx_pos, 3), vec(r.center_frequency, 1), vec(r.delay, n_ray);
+        vec(r.tx_pos, 3), vec(r.rx_pos, 3), vec(r.center_freq, 1), vec(r.delay, n_ray);
         r.power.~Mat(), new (&r.power) arma::mat(p, n_ray, 1, false, true), ptr.push_back(p), p += n_ray;
         vec(r.aod, n_ray), vec(r.eod, n_ray), vec(r.aoa, n_ray), vec(r.eoa, n_ray);
         r.M.~Cube(), new (&r.M) arma::cube(p, 8, n_ray, 1, false, true), ptr.push_back(p), p += 8 * n_ray;
@@ -573,7 +573,7 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
     {
         const auto &r = rays[l];
         for (const void *q : {(const void *)r.tx_pos.memptr(), (const void *)r.rx_pos.memptr(),
-                              (const void *)r.center_frequency.memptr(), (const void *)r.delay.memptr(),
+                              (const void *)r.center_freq.memptr(), (const void *)r.delay.memptr(),
                               (const void *)r.power.memptr(), (const void *)r.aod.memptr(),
                               (const void *)r.eod.memptr(), (const void *)r.aoa.memptr(), (const void *)r.eoa.memptr(),
                               (const void *)r.M.memptr(), (const void *)r.gr_eps_re.memptr(),
@@ -756,8 +756,8 @@ TEST_CASE("ssf_rays - input validation")
             {[](rays_in_t &x) { x.f.rx = x.f.rx.cols(0, 1); }, "Input 'rx_pos' must have 3 columns."},
             {[](rays_in_t &x) { x.f.tx = x.f.tx.rows(0, 1); },
              "Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."},
-            {[](rays_in_t &x) { x.fc.reset(); }, "Input 'center_frequency' cannot be empty."},
-            {[](rays_in_t &x) { x.fc(0) = 0.0; }, "Input 'center_frequency' must be finite and > 0."},
+            {[](rays_in_t &x) { x.fc.reset(); }, "Input 'center_freq' cannot be empty."},
+            {[](rays_in_t &x) { x.fc(0) = 0.0; }, "Input 'center_freq' must be finite and > 0."},
             {[](rays_in_t &x) { x.i_freq = x.fc.n_elem; },
              is_qd ? "Input 'i_freq' must select the first frequency for method 'quadriga'."
                    : "Input 'i_freq' is out of range for " + std::to_string(base.fc.n_elem) + " frequencies."},
@@ -889,14 +889,14 @@ TEST_CASE("ssf_rays - outputs that alias inputs")
     CHECK_NOTHROW(call(in, rays));
     REQUIRE(rays.size() == 2);
 
-    // 'center_frequency' is the member of the first entry
-    const arma::vec fc = rays[0].center_frequency;
-    CHECK_THROWS_AS(quadriga_lib::ssf_rays(in.sp, in.f.tx, in.f.rx, rays[0].center_frequency, in.f.lsp, in.st.mu,
+    // 'center_freq' is the member of the first entry
+    const arma::vec fc = rays[0].center_freq;
+    CHECK_THROWS_AS(quadriga_lib::ssf_rays(in.sp, in.f.tx, in.f.rx, rays[0].center_freq, in.f.lsp, in.st.mu,
                                            in.st.sigma, in.cl.delay, in.cl.power, in.cl.aod, in.cl.eod, in.cl.aoa,
                                            in.cl.eoa, in.rnd, rays, in.method, 0, "additive", "38.901", &in.f.eps_re,
                                            &in.f.eps_im),
                     std::invalid_argument);
-    CHECK(arma::approx_equal(rays[0].center_frequency, fc, "absdiff", 0.0));
+    CHECK(arma::approx_equal(rays[0].center_freq, fc, "absdiff", 0.0));
 
     // A member on the memory of 'rx_pos'
     const arma::mat rx = in.f.rx;

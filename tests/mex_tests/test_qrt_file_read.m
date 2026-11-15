@@ -5,7 +5,7 @@ fn = 'data/test.qrt';
 
 % ---------- qrt_file_parse: v4 file ----------
 [no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
-    fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation] = ...
+    center_freq, cir_pos, cir_orientation, orig_pos, orig_orientation] = ...
     quadriga_lib.qrt_file_parse(fn);
 
 assertEqual(no_orig, uint64(3));
@@ -29,8 +29,8 @@ assertEqual(dest_names{1}, 'RX1');
 assertEqual(dest_names{2}, 'RX2');
 
 % Frequency
-assertEqual(numel(fGHz), double(no_freq));
-assertElementsAlmostEqual(fGHz(1), single(3.75), 'absolute', 1e-6);
+assertEqual(numel(center_freq), double(no_freq));
+assertElementsAlmostEqual(center_freq(1), single(3.75e9), 'relative', 1e-6);
 
 % CIR positions and orientations
 assertEqual(size(cir_pos), [double(no_cir), 3]);
@@ -137,16 +137,16 @@ assertElementsAlmostEqual(path_gain_ul{1}, path_gain_dl, 'relative', 1e-12);
 fn5 = 'data/test_v5.qrt';
 
 [no_cir5, no_orig5, no_dest5, no_freq5, cir_offset5, ~, ~, version5, ...
-    fGHz5, cir_pos5, cir_orientation5, orig_pos5, orig_orientation5] = ...
+    center_freq5, cir_pos5, cir_orientation5, orig_pos5, orig_orientation5] = ...
     quadriga_lib.qrt_file_parse(fn5);
 
 assertEqual(version5, int32(5));
 assertEqual(no_freq5, uint64(2));
 
 % Frequencies
-assertEqual(numel(fGHz5), double(no_freq5));
-assertElementsAlmostEqual(fGHz5(1), single(1.0), 'absolute', 1e-6);
-assertElementsAlmostEqual(fGHz5(2), single(1.5), 'absolute', 1e-6);
+assertEqual(numel(center_freq5), double(no_freq5));
+assertElementsAlmostEqual(center_freq5(1), single(1.0e9), 'relative', 1e-6);
+assertElementsAlmostEqual(center_freq5(2), single(1.5e9), 'relative', 1e-6);
 
 % Shape checks
 assertEqual(size(cir_pos5), [double(no_cir5), 3]);

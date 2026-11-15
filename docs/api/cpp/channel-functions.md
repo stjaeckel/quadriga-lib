@@ -125,14 +125,14 @@ Compute the wideband frequency response of a MIMO channel with frequency-depende
 
 Not in: MATLAB, Python
 
-- Interpolates complex channel coefficients from a coarse input frequency grid (`freq_in`) to a dense
-  output grid (`freq_out`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
-- Applies delay-induced phase rotation `exp(-j·2·pi·freq_out·delay)` per output carrier in double
+- Interpolates complex channel coefficients from a coarse input frequency grid (`freq`) to a dense
+  output grid (`freq_new`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
+- Applies delay-induced phase rotation `exp(-j·2·pi·freq_new·delay)` per output carrier in double
   precision to preserve accuracy at high carrier frequencies
 - Only `delay[0]` is used; all entries in the `delay` vector should be identical
   (path geometry is frequency-independent)
 - `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
-- Output frequencies outside the range of `freq_in` use constant extrapolation from the nearest endpoint
+- Output frequencies outside the range of `freq` use constant extrapolation from the nearest endpoint
 - At least one of `hmat_re`/`hmat_im` or `hmat` must be non-null
 
 ### Declaration:
@@ -141,8 +141,8 @@ void quadriga_lib::baseband_freq_response_multi(
     const std::vector<arma::Cube<dtype>> &coeff_re,
     const std::vector<arma::Cube<dtype>> &coeff_im,
     const std::vector<arma::Cube<dtype>> &delay,
-    const arma::Col<dtype> &freq_in,
-    const arma::Col<dtype> &freq_out,
+    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &freq_new,
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
@@ -150,17 +150,17 @@ void quadriga_lib::baseband_freq_response_multi(
 ```
 
 ### Inputs:
-- **`coeff_re`** — Real part of channel coefficients at each input frequency, vector of `n_freq_in` cubes `[n_rx, n_tx, n_path]`
+- **`coeff_re`** — Real part of channel coefficients at each input frequency, vector of `n_freq` cubes `[n_rx, n_tx, n_path]`
 - **`coeff_im`** — Imaginary part of channel coefficients at each input frequency, same structure as `coeff_re`
-- **`delay`** — Path delays in seconds, vector of `n_freq_in` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`freq_in`** — Input sample frequencies, sorted ascending; `[n_freq_in]`
-- **`freq_out`** — Output carrier frequencies (absolute); `[n_carrier]`
-- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq_in[f]·delay)` before SLERP and re-applies
+- **`delay`** — Path delays in seconds, vector of `n_freq` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
+- **`freq`** — Input sample frequencies, sorted ascending; `[n_freq]`
+- **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
+- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq[f]·delay)` before SLERP and re-applies
   analytically at output frequencies; must be `true` for output from [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq) or
   [get_channels_spherical](channel-generation-functions.md#get_channels_spherical), `false` for pure envelope coefficients. These channels must be generated with
   `use_absolute_delays = true`: their coefficients carry the phase of the absolute path length also when `delay` holds
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
-  across the `freq_in` grid, which gives wrong phases (magnitudes stay right) unless the `freq_in` spacing is far
+  across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
 
 ### Outputs:
@@ -264,8 +264,8 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_channel) · [Python](../
 - Unstructured fields (`std::any`) retain their original stored type without conversion; see [hdf5_read_dset](#hdf5_read_dset)
   for the returned types.
 - Round trip with [hdf5_write](#hdf5_write): every per-snapshot field comes back with one entry per snapshot, also for
-  snapshots without paths (empty entries keep their shape); a channel written without `center_frequency` comes back
-  with an empty `center_frequency`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
+  snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
+  with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
 - Throws `std::invalid_argument` if the file is malformed (e.g. a dataset does not have the size given by the
   attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3
   written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified
@@ -722,7 +722,7 @@ Not in: MATLAB, Python
 template <typename dtype>
 void quadriga_lib::qrt_file_init(
     const std::string &fn,
-    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &center_freq,
     const arma::Mat<dtype> &cir_pos,
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
@@ -734,7 +734,7 @@ void quadriga_lib::qrt_file_init(
 ### Inputs:
 - **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
   opened, so an invalid input throws and leaves an existing file unchanged)
-- **`freq`** — Frequencies in GHz (EM) or Hz (scalar); `[n_freq]`, 1 to 127 entries
+- **`center_freq`** — Center frequencies in Hz; `[n_freq]`, 1 to 127 entries; an EM file stores them in GHz
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[no_cir, 3]` or empty for none
 - **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[no_dest]`
@@ -771,7 +771,7 @@ void quadriga_lib::qrt_file_parse(
     std::vector<std::string> *orig_names = nullptr,
     std::vector<std::string> *dest_names = nullptr,
     int *version = nullptr,
-    arma::fvec *freq = nullptr,
+    arma::fvec *center_freq = nullptr,
     arma::fmat *cir_pos = nullptr,
     arma::fmat *cir_orientation = nullptr,
     arma::fmat *orig_pos = nullptr,
@@ -792,7 +792,7 @@ void quadriga_lib::qrt_file_parse(
 - **`orig_names`** *(optional)* — Names of origin points; `[no_orig]`
 - **`dest_names`** *(optional)* — Names of destination points; `[no_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`freq`** *(optional)* — Frequencies as stored in the file; usually in GHz; `[no_freq]`
+- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[no_freq]`
 - **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[no_cir, 3]`
 - **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[no_orig, 3]`
@@ -824,7 +824,7 @@ void quadriga_lib::qrt_file_read(
     arma::uword i_cir = 0,
     arma::uword i_orig = 0,
     bool downlink = true,
-    arma::Col<dtype> *center_frequency = nullptr,
+    arma::Col<dtype> *center_freq = nullptr,
     arma::Col<dtype> *tx_pos = nullptr,
     arma::Col<dtype> *tx_orientation = nullptr,
     arma::Col<dtype> *rx_pos = nullptr,
@@ -866,7 +866,7 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 
 ### Outputs:
-- **`center_frequency`** — Center frequency in Hz; `[n_freq]`
+- **`center_freq`** — Center frequency in Hz; `[n_freq]`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3]`
 - **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3]`
@@ -972,7 +972,7 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
-    const arma::vec &center_frequency,
+    const arma::vec &center_freq,
     const arma::vec &tx_pos,
     const arma::vec &rx_pos,
     const arma::mat &fbs_pos,
@@ -984,7 +984,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 ```
 
 ### Inputs:
-- **`center_frequency`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
+- **`center_freq`** — Frequencies in [Hz], 1 to 127 entries; `[n_freq]`
 - **`tx_pos`** — Tx (origin) position in [m]; `[3]`
 - **`rx_pos`** — Rx position of the CIR in [m]; `[3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
