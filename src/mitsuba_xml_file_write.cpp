@@ -106,7 +106,7 @@ void quadriga_lib::mitsuba_xml_file_write(
     const arma::uvec &mtl_ind,
     const std::vector<std::string> &obj_names,
     const std::vector<std::string> &mtl_names,
-    const arma::Mat<dtype> &bsdf = {},
+    const arma::Mat<dtype> *bsdf = nullptr,
     bool map_to_itu_materials = false);
 ```
 
@@ -119,7 +119,7 @@ void quadriga_lib::mitsuba_xml_file_write(
   material — 0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
 - **`mtl_names`** — Material names; length must equal `max(mtl_ind)` (mtl_ind is 1-based)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `[mtl_names.size(), 17]`
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `[mtl_names.size(), 17]`; nullptr or empty: none
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ## See also:
@@ -132,7 +132,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
                                           const arma::uvec &obj_ind, const arma::uvec &mtl_ind,
                                           const std::vector<std::string> &obj_names,
                                           const std::vector<std::string> &mtl_names,
-                                          const arma::Mat<dtype> &bsdf,
+                                          const arma::Mat<dtype> *bsdf_in,
                                           bool map_to_itu_materials)
 {
     if (face_ind.n_cols != 3)
@@ -205,6 +205,8 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
             throw std::invalid_argument("Duplicate material name: '" + name + "'");
     }
 
+    const arma::Mat<dtype> empty_bsdf;
+    const arma::Mat<dtype> &bsdf = (bsdf_in == nullptr) ? empty_bsdf : *bsdf_in;
     bool use_bsdf = false;
     if (bsdf.n_rows != 0)
     {
@@ -616,7 +618,7 @@ template void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
                                                    const arma::uvec &obj_ind, const arma::uvec &mtl_ind,
                                                    const std::vector<std::string> &obj_names,
                                                    const std::vector<std::string> &mtl_names,
-                                                   const arma::Mat<float> &bsdf,
+                                                   const arma::Mat<float> *bsdf,
                                                    bool map_to_itu_materials);
 
 template void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
@@ -624,5 +626,5 @@ template void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
                                                    const arma::uvec &obj_ind, const arma::uvec &mtl_ind,
                                                    const std::vector<std::string> &obj_names,
                                                    const std::vector<std::string> &mtl_names,
-                                                   const arma::Mat<double> &bsdf,
+                                                   const arma::Mat<double> *bsdf,
                                                    bool map_to_itu_materials);

@@ -234,7 +234,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_create_file) · [Python](../p
 ### Declaration:
 ```cpp
 void quadriga_lib::hdf5_create(
-    std::string fn,
+    const std::string &fn,
     unsigned nx = 65536,
     unsigned ny = 1,
     unsigned nz = 1,
@@ -277,7 +277,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_channel) · [Python](../
 ### Declaration:
 ```cpp
 quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
-    std::string fn,
+    const std::string &fn,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -319,13 +319,13 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_dset) · [Python](../pyt
 ### Declaration:
 ```cpp
 std::any quadriga_lib::hdf5_read_dset(
-    std::string fn,
-    std::string par_name,
+    const std::string &fn,
+    const std::string &par_name,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ### Inputs:
@@ -357,13 +357,13 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_dset_names) · [Python](
 ### Declaration:
 ```cpp
 arma::uword quadriga_lib::hdf5_read_dset_names(
-    std::string fn,
+    const std::string &fn,
     std::vector<std::string> *par_names,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ### Inputs:
@@ -397,7 +397,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_layout) · [Python](../p
 ### Declaration:
 ```cpp
 arma::u32_vec quadriga_lib::hdf5_read_layout(
-    std::string fn,
+    const std::string &fn,
     arma::u32_vec *channel_id = nullptr);
 ```
 
@@ -427,7 +427,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_reshape_layout) · [Python](.
 ### Declaration:
 ```cpp
 void quadriga_lib::hdf5_reshape_layout(
-    std::string fn,
+    const std::string &fn,
     unsigned nx,
     unsigned ny = 1,
     unsigned nz = 1,
@@ -471,7 +471,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_channel) · [Python](..
 ```cpp
 int quadriga_lib::hdf5_write(
     const quadriga_lib::channel<dtype> *ch,
-    std::string fn,
+    const std::string &fn,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -516,14 +516,14 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_dset) · [Python](../py
 ### Declaration:
 ```cpp
 void quadriga_lib::hdf5_write_dset(
-    std::string fn,
-    std::string par_name,
+    const std::string &fn,
+    const std::string &par_name,
     const std::any *par_data,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ### Inputs:

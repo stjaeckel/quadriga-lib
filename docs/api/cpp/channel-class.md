@@ -135,12 +135,12 @@ Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Pytho
 ### Declaration:
 ```cpp
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
-    std::string fn,
+    const std::string &fn,
     arma::uword max_paths = 0,
     dtype gain_max = -60.0,
     dtype gain_min = -140.0,
-    std::string colormap = "jet",
-    arma::uvec i_snap = {},
+    const std::string &colormap = "jet",
+    const arma::uvec *i_snap = nullptr,
     dtype radius_max = 0.05,
     dtype radius_min = 0.01,
     arma::uword n_edges = 5) const;
@@ -152,7 +152,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
 - **`radius_min`** *(optional)* — Tube radius at minimum gain
 - **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3

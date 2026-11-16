@@ -212,7 +212,7 @@ static void run(fz::input &in)
                 i = in.index(n_e);
             arma::Mat<T> pos = in.ConsumeBool() ? in.mat<T>(3, i_el.is_empty() ? n_e : i_el.n_elem)
                                                 : in.mat<T>(in.size(4), in.size(7));
-            fz::clean([&] { quadriga_lib::arrayant_set_element_pos_multi(vec, pos, i_el); });
+            fz::clean([&] { quadriga_lib::arrayant_set_element_pos_multi(vec, pos, &i_el); });
             break;
         }
         case 18:

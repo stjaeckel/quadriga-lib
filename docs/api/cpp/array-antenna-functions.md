@@ -406,7 +406,7 @@ void quadriga_lib::arrayant_copy_element_multi(
 arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+    0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
@@ -754,8 +754,8 @@ Set element positions for all entries in a multi-frequency arrayant vector
 Not in: MATLAB, Python
 
 - Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
-- If `i_element` is provided, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
+- If `i_element` is nullptr or empty, all positions are replaced and `element_pos` must have `n_elements` columns.
+- If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
 ### Declaration:
@@ -763,13 +763,13 @@ Not in: MATLAB, Python
 void quadriga_lib::arrayant_set_element_pos_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        arma::uvec i_element = arma::uvec());
+        const arma::uvec *i_element = nullptr);
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; if empty, all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; nullptr or empty: all elements are replaced
 
 ### See also:
 - [arrayant_copy_element_multi](#arrayant_copy_element_multi) (replicate elements before setting positions)
@@ -1038,7 +1038,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
-- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
+- If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
 - **Driver models** (`driver_type`):
@@ -1056,20 +1056,20 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
 ### Declaration:
 ```cpp
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
-        std::string driver_type = "piston",
+        const std::string &driver_type = "piston",
         dtype radius = 0.05,
         dtype lower_cutoff = 80.0,
         dtype upper_cutoff = 12000.0,
         dtype lower_rolloff_slope = 12.0,
         dtype upper_rolloff_slope = 12.0,
         dtype sensitivity = 85.0,
-        std::string radiation_type = "hemisphere",
+        const std::string &radiation_type = "hemisphere",
         dtype hor_coverage = NAN,
         dtype ver_coverage = NAN,
         dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
-        arma::Col<dtype> center_freq = arma::Col<dtype>(),
+        const arma::Col<dtype> *center_freq = nullptr,
         dtype angular_resolution = 5.0);
 ```
 
@@ -1087,7 +1087,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
 - **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
-- **`center_freq`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; nullptr or empty: third-octave bands
 - **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
@@ -1097,10 +1097,11 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 ```cpp
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker<double>("horn");
+arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
-               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, {30.,50.,80.,120.,200.}, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &sub_freqs, 10.0);
 ```
 
 ---
@@ -1121,7 +1122,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#qdant_read) · [Python](../p
 ### Declaration:
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
-        std::string fn,
+        const std::string &fn,
         unsigned id = 1,
         arma::u32_mat *layout = nullptr);
 ```

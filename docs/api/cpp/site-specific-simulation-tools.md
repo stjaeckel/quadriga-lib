@@ -144,7 +144,7 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false);
+arma::uchar_mat quadriga_lib::colormap(const std::string &map, bool high_res = false);
 ```
 
 ### Inputs:
@@ -474,7 +474,7 @@ void quadriga_lib::mitsuba_xml_file_write(
     const arma::uvec &mtl_ind,
     const std::vector<std::string> &obj_names,
     const std::vector<std::string> &mtl_names,
-    const arma::Mat<dtype> &bsdf = {},
+    const arma::Mat<dtype> *bsdf = nullptr,
     bool map_to_itu_materials = false);
 ```
 
@@ -487,7 +487,7 @@ void quadriga_lib::mitsuba_xml_file_write(
   material — 0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
 - **`mtl_names`** — Material names; length must equal `max(mtl_ind)` (mtl_ind is 1-based)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`; nullptr or empty: none
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ### See also:
@@ -2058,8 +2058,8 @@ Also in: [MATLAB](../mex/miscellaneous-tools.md#write_png) · [Python](../python
 ```cpp
 void quadriga_lib::write_png(
     const arma::Mat<dtype> &data,
-    std::string fn,
-    std::string colormap = "jet",
+    const std::string &fn,
+    const std::string &colormap = "jet",
     dtype min_val = NAN,
     dtype max_val = NAN,
     bool log_transform = false);

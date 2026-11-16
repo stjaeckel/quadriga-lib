@@ -73,7 +73,7 @@ static bool qd_qdant_has_id(const pugi::xml_node &node)
 
 // Read from QDANT file
 template <typename dtype> // float or double
-std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                    std::string *name,
                                    arma::Cube<dtype> *e_theta_re, arma::Cube<dtype> *e_theta_im,
                                    arma::Cube<dtype> *e_phi_re, arma::Cube<dtype> *e_phi_im,
@@ -389,7 +389,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
 }
 
 // Declare templates
-template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+template std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                             std::string *name,
                                             arma::Cube<float> *e_theta_re, arma::Cube<float> *e_theta_im,
                                             arma::Cube<float> *e_phi_re, arma::Cube<float> *e_phi_im,
@@ -399,7 +399,7 @@ template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                             float *center_freq,
                                             arma::Mat<unsigned> *layout);
 
-template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+template std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                             std::string *name,
                                             arma::Cube<double> *e_theta_re, arma::Cube<double> *e_theta_im,
                                             arma::Cube<double> *e_phi_re, arma::Cube<double> *e_phi_im,
@@ -648,7 +648,7 @@ static std::string qd_qdant_float_columns(const arma::Mat<dtype> &values)
 
 // Write to QDANT file
 template <typename dtype> // float or double
-std::string qd_arrayant_qdant_write(const std::string fn, const int id,
+std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                     const std::string *name,
                                     const arma::Cube<dtype> *e_theta_re, const arma::Cube<dtype> *e_theta_im,
                                     const arma::Cube<dtype> *e_phi_re, const arma::Cube<dtype> *e_phi_im,
@@ -903,7 +903,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         }
     }
 
-    auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName, bool is_theta)
+    auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string &eName, bool is_theta)
     {
         pugi::xml_node node_pat;
         for (auto i = 0ULL; i < NoElements; ++i)
@@ -993,7 +993,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 }
 
 // Declare templates
-template std::string qd_arrayant_qdant_write(const std::string fn, const int id,
+template std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                              const std::string *name,
                                              const arma::Cube<float> *e_theta_re, const arma::Cube<float> *e_theta_im,
                                              const arma::Cube<float> *e_phi_re, const arma::Cube<float> *e_phi_im,
@@ -1004,7 +1004,7 @@ template std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                              const arma::Mat<unsigned> *layout,
                                              unsigned *id_in_file);
 
-template std::string qd_arrayant_qdant_write(const std::string fn, const int id,
+template std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                              const std::string *name,
                                              const arma::Cube<double> *e_theta_re, const arma::Cube<double> *e_theta_im,
                                              const arma::Cube<double> *e_phi_re, const arma::Cube<double> *e_phi_im,

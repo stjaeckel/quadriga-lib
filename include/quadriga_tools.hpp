@@ -104,7 +104,7 @@ namespace quadriga_lib
     // Generate colormap
     // - Returns a 64 x 3 matrix of unsigned chars
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
-    arma::uchar_mat colormap(std::string map, bool high_res = false);
+    arma::uchar_mat colormap(const std::string &map, bool high_res = false);
 
     // Calculate diffraction gain for multiple transmit and receive positions
     template <typename dtype>                                                                       // Supported types: float or double
@@ -212,7 +212,7 @@ namespace quadriga_lib
                                 const arma::uvec &mtl_ind,                 // Material indices (1-based), size [n_mesh]
                                 const std::vector<std::string> &obj_names, // Object names, length = max(obj_ind)+1
                                 const std::vector<std::string> &mtl_names, // Material names, length = max(mtl_ind)
-                                const arma::Mat<dtype> &bsdf = {},         // BSDF data, size [mtl_names.size(), 17]
+                                const arma::Mat<dtype> *bsdf = nullptr,    // BSDF data, size [mtl_names.size(), 17]; nullptr or empty = none
                                 bool map_to_itu_materials = false);        // Optional mapping to ITU default materials used by Sionna
 
     // Read Wavefront .obj file — see obj_file_read documentation block for details
@@ -497,12 +497,12 @@ namespace quadriga_lib
 
     // Write data to PNG file
     template <typename dtype>
-    void write_png(const arma::Mat<dtype> &data, // Data matrix
-                   std::string fn,               // Filename of the PNG file, string
-                   std::string colormap = "jet", // Colormap
-                   dtype min_val = NAN,          // Lower clipping bound, NaN = data minimum
-                   dtype max_val = NAN,          // Upper clipping bound, NaN = data maximum
-                   bool log_transform = false);  // Transform data to log-domain (10*log10(data))
+    void write_png(const arma::Mat<dtype> &data,        // Data matrix
+                   const std::string &fn,               // Filename of the PNG file, string
+                   const std::string &colormap = "jet", // Colormap
+                   dtype min_val = NAN,                 // Lower clipping bound, NaN = data minimum
+                   dtype max_val = NAN,                 // Upper clipping bound, NaN = data maximum
+                   bool log_transform = false);         // Transform data to log-domain (10*log10(data))
 
     // Polarization transfer (Jones) matrix threading along a ray path
     template <typename dtype>

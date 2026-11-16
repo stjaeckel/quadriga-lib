@@ -386,7 +386,7 @@ TEST_CASE("arrayant_interpolate_multi - loudspeaker entries: center frequencies 
     // frequency: the ratio of the on-axis to the 90 degree off-axis field grows
     const arma::vec entry_freqs = {200.0, 1000.0, 5000.0, 15000.0};
     const auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0, "hemisphere",
-                                                            0.0, 0.0, 0.0, 0.15, 0.25, entry_freqs, 10.0);
+                                                            0.0, 0.0, 0.0, 0.15, 0.25, &entry_freqs, 10.0);
     const arma::mat az = {{0.0, 0.5 * pi}}, el(1, 2, arma::fill::zeros);
     const auto r = run(spk, az, el, &entry_freqs);
     for (arma::uword f = 0; f < 4; ++f)
@@ -406,9 +406,9 @@ TEST_CASE("arrayant_interpolate_multi - two-way loudspeaker example")
     // tweeter at 12 kHz (above the last entry of 16 kHz the model is clamped, below it blended)
     const arma::vec entry_freqs = {100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 16000.0};
     const auto woofer = quadriga_lib::generate_speaker<double>("piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-                                                               0.0, 0.0, 0.0, 0.20, 0.30, entry_freqs, 10.0);
+                                                               0.0, 0.0, 0.0, 0.20, 0.30, &entry_freqs, 10.0);
     const auto tweeter = quadriga_lib::generate_speaker<double>("piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-                                                                0.0, 0.0, 0.0, 0.20, 0.30, entry_freqs, 10.0);
+                                                                0.0, 0.0, 0.0, 0.20, 0.30, &entry_freqs, 10.0);
     const auto speaker = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
 
     const arma::mat az = {0.0, 1.5708, -1.5708, 3.14159};

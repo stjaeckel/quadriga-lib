@@ -81,7 +81,8 @@ TEST_CASE("Channel - OBJ Export")
     REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "bla"), std::invalid_argument);
 
     c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "turbo");
-    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "jet", {1, 0, 0, 1}, 0.5, 0.2, 12);
+    const arma::uvec i_snap = {1, 0, 0, 1};
+    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "jet", &i_snap, 0.5, 0.2, 12);
 
     std::remove("test_chan.obj");
     std::remove("test_chan.mtl");

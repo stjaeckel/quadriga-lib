@@ -169,7 +169,7 @@ static void run(fz::input &in)
         arma::uvec i_snap(in.size(3));
         for (auto &i : i_snap)
             i = in.index(c.n_snap());
-        fz::clean([&] { c.write_paths_to_obj_file(obj, max_paths, g_max, g_min, "jet", i_snap, r_max, r_min, n_edges); });
+        fz::clean([&] { c.write_paths_to_obj_file(obj, max_paths, g_max, g_min, "jet", &i_snap, r_max, r_min, n_edges); });
     }
 
     // HDF5: a new file, written at a fuzzed index (inside or outside the layout), then read back

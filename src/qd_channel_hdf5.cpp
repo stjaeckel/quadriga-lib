@@ -510,7 +510,7 @@ Create a new HDF5 channel file with a defined storage layout
 ## Declaration:
 ```
 void quadriga_lib::hdf5_create(
-    std::string fn,
+    const std::string &fn,
     unsigned nx = 65536,
     unsigned ny = 1,
     unsigned nz = 1,
@@ -529,7 +529,7 @@ void quadriga_lib::hdf5_create(
 - [[hdf5_write]] (write channel data into a slot)
 MD!*/
 
-void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
+void quadriga_lib::hdf5_create(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
     if (nx == 0 || ny == 0 || nz == 0 || nw == 0)
         throw std::invalid_argument("Storage layout dimension sizes cannot be 0.");
@@ -587,7 +587,7 @@ Read the storage layout of an HDF5 channel file
 ## Declaration:
 ```
 arma::u32_vec quadriga_lib::hdf5_read_layout(
-    std::string fn,
+    const std::string &fn,
     arma::u32_vec *channel_id = nullptr);
 ```
 
@@ -603,7 +603,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 - [[hdf5_reshape_layout]] (change layout dimensions of an existing file)
 MD!*/
 
-arma::u32_vec quadriga_lib::hdf5_read_layout(std::string fn, arma::u32_vec *channel_id)
+arma::u32_vec quadriga_lib::hdf5_read_layout(const std::string &fn, arma::u32_vec *channel_id)
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
@@ -764,7 +764,7 @@ Write a channel object to an HDF5 file at a specified 4D index
 ```
 int quadriga_lib::hdf5_write(
     const quadriga_lib::channel<dtype> *ch,
-    std::string fn,
+    const std::string &fn,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -788,7 +788,7 @@ int quadriga_lib::hdf5_write(
 MD!*/
 
 template <typename dtype>
-int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string fn,
+int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, const std::string &fn,
                              unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
     // Validate the channel data
@@ -856,10 +856,10 @@ int quadriga_lib::hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string
     return old != 0 ? 1 : 0;
 }
 
-template int quadriga_lib::hdf5_write(const quadriga_lib::channel<float> *ch, std::string fn,
+template int quadriga_lib::hdf5_write(const quadriga_lib::channel<float> *ch, const std::string &fn,
                                       unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
-template int quadriga_lib::hdf5_write(const quadriga_lib::channel<double> *ch, std::string fn,
+template int quadriga_lib::hdf5_write(const quadriga_lib::channel<double> *ch, const std::string &fn,
                                       unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
 /*!MD
@@ -884,7 +884,7 @@ Read a channel object from an HDF5 file at a specified 4D index
 ## Declaration:
 ```
 quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
-    std::string fn,
+    const std::string &fn,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -907,7 +907,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 MD!*/
 
 template <typename dtype>
-quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw)
+quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
@@ -1173,9 +1173,9 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     return c;
 }
 
-template quadriga_lib::channel<float> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
+template quadriga_lib::channel<float> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
-template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
+template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(const std::string &fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
 /*!MD
 # hdf5_reshape_layout
@@ -1189,7 +1189,7 @@ Reshape the 4D storage layout of an existing HDF5 channel file
 ## Declaration:
 ```
 void quadriga_lib::hdf5_reshape_layout(
-    std::string fn,
+    const std::string &fn,
     unsigned nx,
     unsigned ny = 1,
     unsigned nz = 1,
@@ -1208,7 +1208,7 @@ void quadriga_lib::hdf5_reshape_layout(
 - [[hdf5_read_layout]] (query current layout)
 MD!*/
 
-void quadriga_lib::hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
+void quadriga_lib::hdf5_reshape_layout(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
     if (!h5::file::exists(fn))
         throw std::invalid_argument("File does not exist.");
@@ -1248,13 +1248,13 @@ Read an unstructured dataset from an HDF5 file at a specified 4D index
 ## Declaration:
 ```
 std::any quadriga_lib::hdf5_read_dset(
-    std::string fn,
-    std::string par_name,
+    const std::string &fn,
+    const std::string &par_name,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ## Inputs:
@@ -1275,9 +1275,9 @@ std::any quadriga_lib::hdf5_read_dset(
 MD!*/
 
 // Read unstructured data from HDF5 file
-std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
+std::any quadriga_lib::hdf5_read_dset(const std::string &fn, const std::string &par_name,
                                       unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                      std::string prefix)
+                                      const std::string &prefix)
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
@@ -1300,13 +1300,13 @@ Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 ## Declaration:
 ```
 arma::uword quadriga_lib::hdf5_read_dset_names(
-    std::string fn,
+    const std::string &fn,
     std::vector<std::string> *par_names,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ## Inputs:
@@ -1327,9 +1327,9 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 MD!*/
 
 // Read names of the unstructured data fields from the HDF file
-arma::uword quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::string> *par_names,
+arma::uword quadriga_lib::hdf5_read_dset_names(const std::string &fn, std::vector<std::string> *par_names,
                                                unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                               std::string prefix)
+                                               const std::string &prefix)
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
@@ -1369,14 +1369,14 @@ Write a single unstructured dataset to an HDF5 file at a specified 4D index
 ## Declaration:
 ```
 void quadriga_lib::hdf5_write_dset(
-    std::string fn,
-    std::string par_name,
+    const std::string &fn,
+    const std::string &par_name,
     const std::any *par_data,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ## Inputs:
@@ -1396,9 +1396,9 @@ void quadriga_lib::hdf5_write_dset(
 MD!*/
 
 // Writes unstructured data to a hdf5 file
-void quadriga_lib::hdf5_write_dset(std::string fn, std::string par_name, const std::any *par_data,
+void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &par_name, const std::any *par_data,
                                    unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                   std::string prefix)
+                                   const std::string &prefix)
 {
     // Name and type are checked before the file is changed
     const std::string name = prefix + par_name;

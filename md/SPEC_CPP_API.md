@@ -88,6 +88,7 @@ The conventions a declaration follows, for writing one in the plan or the spec a
 - Argument passing — the rule for new declarations:
   - **Mandatory** inputs and outputs (and in-place updated data) are passed by **reference**: `const arma::Mat<dtype> &input`, `arma::Mat<dtype> &output`. No `nullptr` check is needed or possible.
   - **Optional** inputs and outputs are passed by **pointer**, default-initialized to `nullptr`: `const arma::Mat<dtype> *input = nullptr`, `arma::Mat<dtype> *output = nullptr`. A `nullptr` input means "not provided"; a `nullptr` output is not allocated and not computed.
+  - Strings and Armadillo containers are never passed by value: `const &` when mandatory, a pointer when optional. A string option with a literal default stays a reference (`const std::string &colormap = "jet"`). `std::string_view` is not used for arguments of public functions.
   - Many existing declarations (most of `quadriga_tools.hpp`) pass mandatory arguments by pointer as well. That is the older style: follow an existing declaration as it is, but declare the mandatory arguments of a *new* function by reference.
 - Results are returned through output arguments; the return value is used for a single natural result (a count, a mesh, a status vector) and documented under "Returns".
 - Default values exist only in the header, never in the definition.

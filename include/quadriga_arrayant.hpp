@@ -233,18 +233,18 @@ namespace quadriga_lib
 
     // Set element positions for all entries in a multi-frequency arrayant vector
     // - Updates element_pos in-place on every entry in the vector identically.
-    // - If i_element is empty, all positions are replaced and element_pos must have n_elements columns.
-    // - If i_element is provided, only those indexed columns are updated; element_pos column count must match i_element length.
+    // - If i_element is nullptr or empty, all positions are replaced and element_pos must have n_elements columns.
+    // - If i_element is non-empty, only those indexed columns are updated; element_pos column count must match i_element length.
     // - All entries must have the same element count; uninitialized element_pos fields are zero-initialized before update.
     template <typename dtype>
     void arrayant_set_element_pos_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
                                         const arma::Mat<dtype> &element_pos,        // New (x, y, z) positions; [3, n_update]
-                                        arma::uvec i_element = arma::uvec());       // Indices of elements to update; if empty, all elements are replaced
+                                        const arma::uvec *i_element = nullptr);     // Indices of elements to update; nullptr or empty = all elements are replaced
 
     // Read an arrayant object from a QDANT file
     // - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
     template <typename dtype>
-    arrayant<dtype> qdant_read(std::string fn,                   // Path to the QDANT file; must not be empty
+    arrayant<dtype> qdant_read(const std::string &fn,            // Path to the QDANT file; must not be empty
                                unsigned id = 1,                  // 1-based ID of the antenna entry to read
                                arma::u32_mat *layout = nullptr); // Output pointer filled with the file's layout matrix of element IDs
 
@@ -356,23 +356,23 @@ namespace quadriga_lib
     // - Supported driver types: "piston" (cone/dome), "horn" (constant directivity), "omni" (subwoofer)
     // - Supported radiation types: "monopole" (4pi), "hemisphere" (2pi, sealed box), "dipole" (figure-8), "cardioid"
     // - Horn parameters that are NaN (the default) or <= 0: hor_coverage and ver_coverage default to 90 and 60 deg, horn_control_freq is derived from radius
-    // - Frequency samples are in Hz; if empty, third-octave bands from lower_cutoff to upper_cutoff are used
+    // - Frequency samples are in Hz; if nullptr or empty, third-octave bands from lower_cutoff to upper_cutoff are used
     // - Angular resolution is in degrees; used to generate azimuth_grid and elevation_grid
     template <typename dtype>
-    std::vector<arrayant<dtype>> generate_speaker(std::string driver_type = "piston",                // Driver type: "piston", "horn", "omni"
+    std::vector<arrayant<dtype>> generate_speaker(const std::string &driver_type = "piston",         // Driver type: "piston", "horn", "omni"
                                                   dtype radius = 0.05,                               // Effective radiating radius in [m] (piston: cone, horn: mouth)
                                                   dtype lower_cutoff = 80.0,                         // Lower -3 dB frequency in [Hz]
                                                   dtype upper_cutoff = 12000.0,                      // Upper -3 dB frequency in [Hz]
                                                   dtype lower_rolloff_slope = 12.0,                  // Low-frequency rolloff in [dB/octave]
                                                   dtype upper_rolloff_slope = 12.0,                  // High-frequency rolloff in [dB/octave]
                                                   dtype sensitivity = 85.0,                          // On-axis sensitivity in [dB SPL] at 1W/1m
-                                                  std::string radiation_type = "hemisphere",         // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
+                                                  const std::string &radiation_type = "hemisphere",  // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
                                                   dtype hor_coverage = NAN,                          // Horizontal coverage angle in [deg], horn only, NaN or <= 0 = 90
                                                   dtype ver_coverage = NAN,                          // Vertical coverage angle in [deg], horn only, NaN or <= 0 = 60
                                                   dtype horn_control_freq = NAN,                     // Horn pattern control frequency in [Hz], NaN or <= 0 = c / (2 pi radius)
                                                   dtype baffle_width = 0.15,                         // Enclosure baffle width in [m], piston only
                                                   dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
-                                                  arma::Col<dtype> center_freq = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
+                                                  const arma::Col<dtype> *center_freq = nullptr,     // Frequency sample points in [Hz]; nullptr or empty = auto third-octave
                                                   dtype angular_resolution = 5.0);                   // Angular grid resolution in [deg]
 
     // ---- Channel generation functions ----

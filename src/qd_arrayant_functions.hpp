@@ -32,7 +32,7 @@ inline dtype qd_arrayant_grid_resolution(dtype res, dtype res_default, const cha
 
 // Returns empty string if there was no error or an error message otherwise
 template <typename dtype> // float or double
-std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                    std::string *name,
                                    arma::Cube<dtype> *e_theta_re,
                                    arma::Cube<dtype> *e_theta_im,
@@ -48,7 +48,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
 
 // Returns empty string if there was no error or an error message otherwise
 template <typename dtype> // float or double
-std::string qd_arrayant_qdant_write(const std::string fn, const int id,
+std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                     const std::string *name,
                                     const arma::Cube<dtype> *e_theta_re,
                                     const arma::Cube<dtype> *e_theta_im,

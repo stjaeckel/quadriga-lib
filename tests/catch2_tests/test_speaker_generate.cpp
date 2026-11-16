@@ -58,7 +58,7 @@ TEST_CASE("Speaker - Custom frequencies and angular resolution")
 {
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     REQUIRE(spk.size() == 4);
     CHECK(spk[0].n_azimuth() == 37);
@@ -75,7 +75,7 @@ TEST_CASE("Speaker - Float template works")
 {
     arma::fvec freqs = {1000.0f};
     auto spk = quadriga_lib::generate_speaker<float>("omni", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
-                                                     "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                     "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
 
     REQUIRE(spk.size() == 1);
     CHECK(spk[0].n_azimuth() == 37);
@@ -92,7 +92,7 @@ TEST_CASE("Speaker - Omni + Monopole: flat pattern")
     // Omni driver + monopole radiation = uniform pattern at all angles
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     // At 1000 Hz with default params, freq_response ≈ 1.0, sens_lin = 1.0
@@ -122,7 +122,7 @@ TEST_CASE("Speaker - Omni + Dipole: figure-8 pattern")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "dipole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "dipole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     // Dipole: R = |cos(theta_off)|, rear has phase flip
@@ -151,7 +151,7 @@ TEST_CASE("Speaker - Omni + Cardioid: null at rear")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "cardioid", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "cardioid", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     // Cardioid: R = 0.5*(1 + cos(theta_off))
@@ -180,7 +180,7 @@ TEST_CASE("Speaker - Omni + Hemisphere: frequency-dependent front/back ratio")
 
     arma::vec freqs = {50.0, 1000.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 20.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 3);
 
     // --- 50 Hz: well below f_baffle, nearly omnidirectional ---
@@ -219,7 +219,7 @@ TEST_CASE("Speaker - Piston + Monopole: low freq near-omni")
     // Very small ka → pattern is nearly omnidirectional
     arma::vec freqs = {200.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     double on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -237,7 +237,7 @@ TEST_CASE("Speaker - Piston + Monopole: high freq directional")
     // Large ka → strongly directional
     arma::vec freqs = {10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     double on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -264,7 +264,7 @@ TEST_CASE("Speaker - Piston directivity increases with frequency")
     // Compare on-axis to side ratio at two frequencies
     arma::vec freqs = {500.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 2);
 
     // At 500 Hz (ka=0.457): nearly omni
@@ -287,7 +287,7 @@ TEST_CASE("Speaker - Horn + Monopole: controlled directivity")
 
     arma::vec freqs = {100.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 2);
 
     // --- 100 Hz: well below horn_control_freq → nearly omnidirectional ---
@@ -324,7 +324,7 @@ TEST_CASE("Speaker - Horn coverage angles check")
 
     arma::vec freqs = {10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 90.0, 60.0, 500.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 90.0, 60.0, 500.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     double on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -351,14 +351,14 @@ TEST_CASE("Speaker - Horn auto-derivation of parameters")
     // Call with explicit values that match the auto-derived ones
     double expected_ctrl = 344.0 / (2.0 * arma::datum::pi * 0.1);
     auto spk_explicit = quadriga_lib::generate_speaker<double>("horn", 0.1, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                               "monopole", 90.0, 60.0, expected_ctrl, 0.15, 0.25, freqs, 10.0);
+                                                               "monopole", 90.0, 60.0, expected_ctrl, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk_explicit.size() == 2);
 
     const double nan = std::numeric_limits<double>::quiet_NaN();
     for (double v : {nan, 0.0, -1.0})
     {
         auto spk_auto = quadriga_lib::generate_speaker<double>("horn", 0.1, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                               "monopole", v, v, v, 0.15, 0.25, freqs, 10.0);
+                                                               "monopole", v, v, v, 0.15, 0.25, &freqs, 10.0);
         REQUIRE(spk_auto.size() == 2);
         for (arma::uword i = 0; i < 2; ++i)
             CHECK(arma::approx_equal(spk_auto[i].e_theta_re, spk_explicit[i].e_theta_re, "absdiff", 1e-10));
@@ -371,7 +371,7 @@ TEST_CASE("Speaker - Frequency response: -3 dB at cutoff frequencies")
     // Use omni + monopole to isolate the frequency response from directivity
     arma::vec freqs = {80.0, 1000.0, 12000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 3);
 
     // On-axis values (all grid points are equal for omni+monopole)
@@ -395,7 +395,7 @@ TEST_CASE("Speaker - Frequency response: rolloff slope")
     // ratio_low = 80/40 = 2, pow(2, 4) = 16, H = 1/sqrt(1+16) = 1/sqrt(17) = 0.2425
     arma::vec freqs = {40.0, 1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 2);
 
     double val_at_40 = spk[0].e_theta_re(9, 18, 0);
@@ -412,7 +412,7 @@ TEST_CASE("Speaker - Frequency response: different rolloff slopes")
     // At one octave below (40 Hz): ratio=2, pow(2, 8) = 256, H = 1/sqrt(257) = 0.0624
     arma::vec freqs = {40.0, 80.0, 1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 24.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 3);
 
     double val_40 = spk[0].e_theta_re(9, 18, 0);
@@ -433,11 +433,11 @@ TEST_CASE("Speaker - Sensitivity scaling")
 
     // Default sensitivity: 85 dB → sens_lin = 1.0
     auto spk_85 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                         "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                         "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Higher sensitivity: 95 dB → sens_lin = 10^(10/20) = sqrt(10) ≈ 3.1623
     auto spk_95 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 95.0,
-                                                         "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                         "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     REQUIRE(spk_85.size() == 1);
     REQUIRE(spk_95.size() == 1);
@@ -455,7 +455,7 @@ TEST_CASE("Speaker - Piston + Dipole combined")
     // Combines piston beaming with figure-8 radiation
     arma::vec freqs = {5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "dipole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "dipole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     double on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -479,7 +479,7 @@ TEST_CASE("Speaker - Piston + Cardioid combined")
 {
     arma::vec freqs = {5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "cardioid", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "cardioid", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     double on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -499,7 +499,7 @@ TEST_CASE("Speaker - Horn + Cardioid combined")
 {
     arma::vec freqs = {5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "cardioid", 90.0, 60.0, 500.0, 0.15, 0.25, freqs, 10.0);
+                                                      "cardioid", 90.0, 60.0, 500.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     double on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -519,7 +519,7 @@ TEST_CASE("Speaker - Horn + Hemisphere combined")
 {
     arma::vec freqs = {5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     double on_axis = spk[0].e_theta_re(9, 18, 0);
@@ -550,7 +550,7 @@ TEST_CASE("Speaker - All 12 driver x radiation combinations produce valid output
         for (const auto &rad : radiations)
         {
             auto spk = quadriga_lib::generate_speaker<double>(drv, 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                              rad, 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                              rad, 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
             REQUIRE(spk.size() == 2);
 
@@ -581,7 +581,7 @@ TEST_CASE("Speaker - Piston rotational symmetry")
     // Piston pattern should be rotationally symmetric around the forward axis
     arma::vec freqs = {3000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     // Points at the same off-axis angle should have the same value
@@ -636,7 +636,7 @@ TEST_CASE("Speaker - is_valid_multi: generated speaker passes")
     // A freshly generated speaker model should always pass validation
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
@@ -653,7 +653,7 @@ TEST_CASE("Speaker - is_valid_multi: all driver/radiation combos pass")
         for (const auto &rad : radiations)
         {
             auto spk = quadriga_lib::generate_speaker<double>(drv, 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                              rad, 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                              rad, 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
             std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
             INFO("driver=" << drv << " radiation=" << rad << " error=" << err);
             CHECK(err.empty());
@@ -665,7 +665,7 @@ TEST_CASE("Speaker - is_valid_multi: float template passes")
 {
     arma::fvec freqs = {500.0f, 2000.0f};
     auto spk = quadriga_lib::generate_speaker<float>("piston", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
-                                                     "hemisphere", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                     "hemisphere", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
 
     std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
@@ -675,7 +675,7 @@ TEST_CASE("Speaker - is_valid_multi: single entry passes")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(err.empty());
@@ -694,9 +694,9 @@ TEST_CASE("Speaker - is_valid_multi: mismatched azimuth grid size fails")
     // Generate two speakers with different angular resolutions
     arma::vec freqs = {1000.0};
     auto spk5 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 5.0);
     auto spk10 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Combine them into one vector: entry 0 at 5°, entry 1 at 10°
     std::vector<quadriga_lib::arrayant<double>> mixed;
@@ -713,7 +713,7 @@ TEST_CASE("Speaker - is_valid_multi: mismatched elevation grid size fails")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Create a copy with a different elevation grid
     std::vector<quadriga_lib::arrayant<double>> vec;
@@ -740,7 +740,7 @@ TEST_CASE("Speaker - is_valid_multi: shifted azimuth grid values fails")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Shift the azimuth grid of entry 1 by a tiny amount
     spk[1].azimuth_grid[0] += 0.001;
@@ -755,7 +755,7 @@ TEST_CASE("Speaker - is_valid_multi: shifted elevation grid values fails")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Shift the elevation grid of entry 1
     spk[1].elevation_grid[5] += 0.001;
@@ -770,7 +770,7 @@ TEST_CASE("Speaker - is_valid_multi: mismatched element count fails")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Create a second entry with 2 elements by duplicating the pattern slice
     quadriga_lib::arrayant<double> two_elem = spk[0];
@@ -798,7 +798,7 @@ TEST_CASE("Speaker - is_valid_multi: modified element position fails")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Move the element position in entry 1
     spk[1].element_pos(0, 0) = 1.5;
@@ -813,7 +813,7 @@ TEST_CASE("Speaker - is_valid_multi: mismatched coupling shape fails")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Change coupling to have 2 columns (2 ports) in entry 1
     spk[1].coupling_re.ones(1, 2);
@@ -829,7 +829,7 @@ TEST_CASE("Speaker - is_valid_multi: invalid individual entry caught")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Corrupt entry 1: clear the pattern data
     spk[1].e_theta_re.reset();
@@ -843,7 +843,7 @@ TEST_CASE("Speaker - is_valid_multi: invalid first entry caught")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Corrupt entry 0
     spk[0].e_theta_re.reset();
@@ -858,7 +858,7 @@ TEST_CASE("Speaker - is_valid_multi: error at middle entry")
     // Three entries, corrupt the middle one's grid
     arma::vec freqs = {200.0, 1000.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 3);
 
     // Shift elevation grid of the middle entry
@@ -875,7 +875,7 @@ TEST_CASE("Speaker - is_valid_multi: different pattern values are allowed")
     // Pattern data SHOULD differ between frequencies; only structural properties must match
     arma::vec freqs = {500.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Patterns should actually differ (piston beams more at higher freq)
     CHECK(!arma::approx_equal(spk[0].e_theta_re, spk[1].e_theta_re, "absdiff", 1e-3));
@@ -889,7 +889,7 @@ TEST_CASE("Speaker - is_valid_multi: different center frequencies are allowed")
 {
     arma::vec freqs = {100.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     CHECK(std::abs(spk[0].center_freq - spk[1].center_freq) > 1000.0);
 
@@ -905,7 +905,7 @@ TEST_CASE("Speaker - set_element_pos_multi: update all elements")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 2);
 
     arma::mat pos = arma::mat({1.5, -0.3, 0.7}).t();
@@ -926,9 +926,9 @@ TEST_CASE("Speaker - set_element_pos_multi: update selected elements")
     // Build a 2-element model by concatenating two single-element speakers
     arma::vec freqs = {1000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto spk = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
     REQUIRE(spk[0].n_elements() == 2);
@@ -936,7 +936,7 @@ TEST_CASE("Speaker - set_element_pos_multi: update selected elements")
     // Update only element 1 (second element, 0-based)
     arma::mat pos1 = arma::mat({0.0, 0.0, 0.12}).t();
     arma::uvec idx = {1};
-    quadriga_lib::arrayant_set_element_pos_multi(spk, pos1, idx);
+    quadriga_lib::arrayant_set_element_pos_multi(spk, pos1, &idx);
 
     CHECK(std::abs(spk[0].element_pos(0, 0)) < 1e-12); // Element 0 unchanged
     CHECK(std::abs(spk[0].element_pos(1, 0)) < 1e-12);
@@ -957,7 +957,7 @@ TEST_CASE("Speaker - set_element_pos_multi: wrong row count throws")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     arma::mat bad_pos(2, 1, arma::fill::zeros); // 2 rows instead of 3
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, bad_pos), std::invalid_argument);
 }
@@ -966,7 +966,7 @@ TEST_CASE("Speaker - set_element_pos_multi: wrong column count throws")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     arma::mat bad_pos(3, 5, arma::fill::zeros); // 5 columns but only 1 element
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, bad_pos), std::invalid_argument);
 }
@@ -975,17 +975,17 @@ TEST_CASE("Speaker - set_element_pos_multi: out-of-range index throws")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     arma::mat pos = arma::mat({0.0, 0.0, 0.0}).t();
     arma::uvec idx = {5}; // Only 1 element, index 5 is out of range
-    REQUIRE_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, pos, idx), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, pos, &idx), std::invalid_argument);
 }
 
 TEST_CASE("Speaker - set_element_pos_multi: float template")
 {
     arma::fvec freqs = {1000.0f};
     auto spk = quadriga_lib::generate_speaker<float>("omni", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
-                                                     "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                     "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
     arma::fmat pos = arma::fmat({0.5f, -0.5f, 1.0f}).t();
     REQUIRE_NOTHROW(quadriga_lib::arrayant_set_element_pos_multi(spk, pos));
     CHECK(std::abs(spk[0].element_pos(0, 0) - 0.5f) < 1e-6f);
@@ -999,9 +999,9 @@ TEST_CASE("Speaker - concat_multi: basic two-driver concatenation")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     auto combined = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
@@ -1020,9 +1020,9 @@ TEST_CASE("Speaker - concat_multi: pattern data preserved")
 {
     arma::vec freqs = {1000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     auto combined = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
@@ -1039,9 +1039,9 @@ TEST_CASE("Speaker - concat_multi: element positions preserved")
 {
     arma::vec freqs = {1000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Set positions before concatenation
     arma::mat pos1 = arma::mat({0.0, 0.0, -0.10}).t();
@@ -1060,9 +1060,9 @@ TEST_CASE("Speaker - concat_multi: block-diagonal coupling matrix")
 {
     arma::vec freqs = {1000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     auto combined = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
@@ -1079,9 +1079,9 @@ TEST_CASE("Speaker - concat_multi: output passes arrayant_is_valid_multi")
 {
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("piston", 0.08, 50.0, 3000.0, 12.0, 24.0, 87.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
 
     auto combined = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
@@ -1093,11 +1093,11 @@ TEST_CASE("Speaker - concat_multi: three-driver chained concatenation")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("omni", 0.10, 30.0, 200.0, 12.0, 24.0, 92.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 3000.0, 12.0, 24.0, 87.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv3 = quadriga_lib::generate_speaker<double>("horn", 0.025, 1500.0, 20000.0, 24.0, 12.0, 95.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     auto two_way = quadriga_lib::arrayant_concat_multi(drv1, drv2);
     auto three_way = quadriga_lib::arrayant_concat_multi(two_way, drv3);
@@ -1125,9 +1125,9 @@ TEST_CASE("Speaker - concat_multi: mismatched frequency count throws")
     arma::vec freqs2 = {500.0, 2000.0};
     arma::vec freqs3 = {500.0, 2000.0, 8000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs2, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs2, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs3, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs3, 10.0);
 
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_concat_multi(drv1, drv2), std::invalid_argument);
 }
@@ -1136,9 +1136,9 @@ TEST_CASE("Speaker - concat_multi: mismatched angular resolution throws")
 {
     arma::vec freqs = {1000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 5.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_concat_multi(drv1, drv2), std::invalid_argument);
 }
@@ -1148,9 +1148,9 @@ TEST_CASE("Speaker - concat_multi: mismatched center frequency throws")
     arma::vec freqs1 = {1000.0};
     arma::vec freqs2 = {1001.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs1, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs1, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs2, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs2, 10.0);
 
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_concat_multi(drv1, drv2), std::invalid_argument);
 }
@@ -1159,9 +1159,9 @@ TEST_CASE("Speaker - concat_multi: float template")
 {
     arma::fvec freqs = {1000.0f};
     auto drv1 = quadriga_lib::generate_speaker<float>("omni", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
-                                                      "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                      "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
     auto drv2 = quadriga_lib::generate_speaker<float>("omni", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
-                                                      "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                      "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
 
     auto combined = quadriga_lib::arrayant_concat_multi(drv1, drv2);
     REQUIRE(combined.size() == 1);
@@ -1177,12 +1177,12 @@ TEST_CASE("Speaker - concat_multi: documentation example 2-way speaker")
     // Generate woofer: 6.5" piston, sealed box, 50-3000 Hz passband
     auto woofer = quadriga_lib::generate_speaker<double>(
         "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
 
     // Generate tweeter: 1" dome, sealed box, 1500-20000 Hz passband
     auto tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
 
     // Position the drivers: woofer centered, tweeter 12 cm above
     arma::mat woofer_pos = arma::mat({0.0, 0.0, 0.0}).t();
@@ -1229,7 +1229,7 @@ TEST_CASE("Speaker - copy_element_multi: single destination")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk[0].n_elements() == 1);
 
     // Copy element 0 to element 1 (enlarges)
@@ -1255,7 +1255,7 @@ TEST_CASE("Speaker - copy_element_multi: multiple destinations")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk[0].n_elements() == 1);
 
     arma::uvec dest = {1, 2, 3};
@@ -1273,7 +1273,7 @@ TEST_CASE("Speaker - copy_element_multi: coupling matrix structure after enlarge
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Original: 1 element, 1 port, coupling = [1]
     REQUIRE(spk[0].coupling_re.n_rows == 1);
@@ -1300,7 +1300,7 @@ TEST_CASE("Speaker - copy_element_multi: consistent across frequencies")
 {
     arma::vec freqs = {200.0, 1000.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     quadriga_lib::arrayant_copy_element_multi(spk, 0, {1});
 
@@ -1321,9 +1321,9 @@ TEST_CASE("Speaker - copy_element_multi: overwrite existing element")
 {
     arma::vec freqs = {1000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto spk = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
     REQUIRE(spk[0].n_elements() == 2);
@@ -1342,7 +1342,7 @@ TEST_CASE("Speaker - copy_element_multi: valid after operation")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     arma::uvec dest = {1, 2, 3};
     quadriga_lib::arrayant_copy_element_multi(spk, 0, dest);
@@ -1369,7 +1369,7 @@ TEST_CASE("Speaker - copy_element_multi: empty destination throws")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     arma::uvec empty_dest;
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_copy_element_multi(spk, 0, empty_dest), std::invalid_argument);
 }
@@ -1378,7 +1378,7 @@ TEST_CASE("Speaker - copy_element_multi: source out of range throws")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     // Only 1 element, source index 5 is out of range
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_copy_element_multi(spk, 5, {1}), std::invalid_argument);
 }
@@ -1387,7 +1387,7 @@ TEST_CASE("Speaker - copy_element_multi: float template")
 {
     arma::fvec freqs = {1000.0f};
     auto spk = quadriga_lib::generate_speaker<float>("omni", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
-                                                     "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                     "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
 
     quadriga_lib::arrayant_copy_element_multi(spk, 0, {1});
 
@@ -1400,7 +1400,7 @@ TEST_CASE("Speaker - copy_element_multi: set positions after copy")
     // Common workflow: copy elements then reposition them
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     arma::uvec dest = {1, 2};
     quadriga_lib::arrayant_copy_element_multi(spk, 0, dest);
@@ -1430,7 +1430,7 @@ TEST_CASE("Speaker - copy_element_multi: documentation example line array")
     arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
     auto driver = quadriga_lib::generate_speaker<double>(
         "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Replicate element 0 to create elements 1, 2, 3
     arma::uvec dest = {1, 2, 3};
@@ -1490,7 +1490,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: z-rotation shifts on-axis direction")
     // A piston facing +x rotated 90° around z should now face +y
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     double on_axis_before = spk[0].e_theta_re(9, 18, 0); // az=0, el=0 → +x
     double side_before = spk[0].e_theta_re(9, 27, 0);     // az=90, el=0 → +y
@@ -1511,7 +1511,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: 360° rotation is identity")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, &freqs, 10.0);
 
     // Save original patterns
     std::vector<arma::cube> orig_theta_re, orig_theta_im;
@@ -1535,7 +1535,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: consistent across frequencies")
 {
     arma::vec freqs = {200.0, 1000.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 1);
 
@@ -1554,7 +1554,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: grid preserved (no adjustment)")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     arma::vec az_orig = spk[0].azimuth_grid;
     arma::vec el_orig = spk[0].elevation_grid;
@@ -1574,9 +1574,9 @@ TEST_CASE("Speaker - rotate_pattern_multi: usage 0 pattern+polarization")
 {
     arma::vec freqs = {1000.0};
     auto spk0 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto spk1 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Usage 0 rotates both pattern and polarization
     qd_rotate_multi(spk0, 0.0, 0.0, arma::datum::pi / 4.0, 0);
@@ -1595,7 +1595,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: usage 2 polarization only")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     arma::cube theta_orig = spk[0].e_theta_re;
 
@@ -1616,9 +1616,9 @@ TEST_CASE("Speaker - rotate_pattern_multi: selected elements only")
 {
     arma::vec freqs = {1000.0};
     auto drv1 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto drv2 = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                        "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto spk = quadriga_lib::arrayant_concat_multi(drv1, drv2);
 
     arma::mat elem0_before = spk[0].e_theta_re.slice(0);
@@ -1639,7 +1639,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: multiple selected elements")
 {
     arma::vec freqs = {1000.0};
     auto drv = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     quadriga_lib::arrayant_copy_element_multi(drv, 0, arma::uvec({1, 2}));
     REQUIRE(drv[0].n_elements() == 3);
 
@@ -1660,7 +1660,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: omni pattern stays omni after rotatio
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     double val_before = spk[0].e_theta_re(9, 18, 0);
 
@@ -1678,7 +1678,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: y-rotation tilts beam")
     // Piston facing +x, tilt 90° around y → should now face -z (el=-90°)
     arma::vec freqs = {5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     double on_axis_before = spk[0].e_theta_re(9, 18, 0); // az=0, el=0
 
@@ -1702,7 +1702,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: invalid usage throws")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE_THROWS_AS(qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 3), std::invalid_argument);
     REQUIRE_THROWS_AS(qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 4), std::invalid_argument);
 }
@@ -1711,7 +1711,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: out-of-range element throws")
 {
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     arma::uvec idx = {5};
     REQUIRE_THROWS_AS(qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 4.0, 1, idx), std::invalid_argument);
 }
@@ -1720,7 +1720,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: float template")
 {
     arma::fvec freqs = {1000.0f};
     auto spk = quadriga_lib::generate_speaker<float>("piston", 0.05f, 80.0f, 12000.0f, 12.0f, 12.0f, 85.0f,
-                                                      "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                      "monopole", 0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
 
     float on_axis_before = spk[0].e_theta_re(9, 18, 0);
     qd_rotate_multi(spk, 0.0, 0.0, arma::datum::pi / 2.0, 1);
@@ -1733,7 +1733,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: valid after rotation")
 {
     arma::vec freqs = {200.0, 1000.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 90.0, 60.0, 500.0, 0.15, 0.25, &freqs, 10.0);
 
     qd_rotate_multi(spk, arma::datum::pi / 12.0, arma::datum::pi / 6.0, arma::datum::pi / 4.0, 1);
 
@@ -1752,7 +1752,7 @@ TEST_CASE("Speaker - rotate_pattern_multi: two opposite rotations cancel")
 {
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Save original
     std::vector<arma::cube> orig;
@@ -1774,10 +1774,10 @@ TEST_CASE("Speaker - rotate_pattern_multi: documentation example 2-way speaker")
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
     auto woofer = quadriga_lib::generate_speaker<double>(
         "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
     auto tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
     auto speaker = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
 
     REQUIRE(speaker.size() == 5);
@@ -1815,17 +1815,17 @@ TEST_CASE("Speaker - set_element_pos_multi: positions that are an entry's own el
 {
     arma::vec freqs = {1000.0, 2000.0};
     auto drv = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
-                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                      "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     auto spk = quadriga_lib::arrayant_concat_multi(drv, drv); // 2 entries with 2 elements
     quadriga_lib::arrayant_set_element_pos_multi(spk, arma::mat({{0.0, 1.0}, {0.0, 0.0}, {0.0, 0.0}}));
     arma::uvec swap = {1, 0};
 
     arma::mat pos = spk[0].element_pos;
-    CHECK_NOTHROW(quadriga_lib::arrayant_set_element_pos_multi(spk, pos, swap));
-    CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, spk[0].element_pos, swap), std::invalid_argument);
+    CHECK_NOTHROW(quadriga_lib::arrayant_set_element_pos_multi(spk, pos, &swap));
+    CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, spk[0].element_pos, &swap), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, spk[1].element_pos), std::invalid_argument);
     arma::mat pos_on_entry(spk[1].element_pos.memptr(), 3, 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, pos_on_entry, swap), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::arrayant_set_element_pos_multi(spk, pos_on_entry, &swap), std::invalid_argument);
 }
 
 TEST_CASE("Speaker - Non-finite and too fine inputs")
@@ -1836,14 +1836,15 @@ TEST_CASE("Speaker - Non-finite and too fine inputs")
     // Resolution: NaN, infinite or below 0.1 deg throws
     for (double res : {nan, inf, 0.09})
         REQUIRE_THROWS_AS(quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
-                                                                 0.0, 0.0, 0.0, 0.15, 0.25, f, res),
+                                                                 0.0, 0.0, 0.0, 0.15, 0.25, &f, res),
                           std::invalid_argument);
 
     // Cutoffs: the lower one must be finite and > 0, the upper one finite and above the lower one
+    const arma::vec no_freq; // Given but empty: third-octave bands
     auto freqs = [&](double lo, double hi)
     {
         auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, lo, hi, 12.0, 12.0, 85.0, "monopole",
-                                                          nan, nan, nan, 0.15, 0.25, arma::vec(), 90.0);
+                                                          nan, nan, nan, 0.15, 0.25, &no_freq, 90.0);
         arma::vec out(spk.size());
         for (size_t i = 0; i < spk.size(); ++i)
             out[i] = spk[i].center_freq;
@@ -1864,7 +1865,7 @@ TEST_CASE("Speaker - Non-finite and too fine inputs")
         double a[9] = {0.05, 12.0, 12.0, 85.0, nan, nan, nan, 0.15, 0.25};
         a[i] = v;
         return quadriga_lib::generate_speaker<double>("horn", a[0], 80.0, 12000.0, a[1], a[2], a[3], "hemisphere",
-                                                      a[4], a[5], a[6], a[7], a[8], f, 90.0);
+                                                      a[4], a[5], a[6], a[7], a[8], &f, 90.0);
     };
     for (int i = 0; i < 9; ++i)
     {
@@ -1884,7 +1885,10 @@ TEST_CASE("Speaker - Non-finite and too fine inputs")
     const double a85 = arma::abs(call(3, 85.0)[0].e_theta_re).max(), a0 = arma::abs(call(3, 0.0)[0].e_theta_re).max();
     CHECK(std::abs(a0 / a85 - std::pow(10.0, -85.0 / 20.0)) < 1e-12);
     for (double v : {nan, inf, 0.0, -1.0})
+    {
+        const arma::vec f_bad = {1000.0, v};
         CHECK_THROWS_AS(quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
-                                                               0.0, 0.0, 0.0, 0.15, 0.25, arma::vec({1000.0, v}), 90.0),
+                                                               0.0, 0.0, 0.0, 0.15, 0.25, &f_bad, 90.0),
                         std::invalid_argument);
+    }
 }

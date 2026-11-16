@@ -24,7 +24,7 @@ TEST_CASE("QDANT Multi - Write/Read roundtrip with speaker model")
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
                                                        12.0, 12.0, 85.0, "hemisphere",
-                                                       0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 5);
 
     // Write to file
@@ -90,7 +90,7 @@ TEST_CASE("QDANT Multi - Single entry roundtrip")
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0,
                                                        12.0, 12.0, 85.0, "monopole",
-                                                       0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk.size() == 1);
 
     quadriga_lib::qdant_write_multi(fn, spk);
@@ -116,7 +116,7 @@ TEST_CASE("QDANT Multi - Float template roundtrip")
     arma::fvec freqs = {200.0f, 2000.0f};
     auto spk = quadriga_lib::generate_speaker<float>("horn", 0.05f, 80.0f, 12000.0f,
                                                       12.0f, 12.0f, 85.0f, "monopole",
-                                                      0.0f, 0.0f, 0.0f, 0.15f, 0.25f, freqs, 10.0f);
+                                                      0.0f, 0.0f, 0.0f, 0.15f, 0.25f, &freqs, 10.0f);
     REQUIRE(spk.size() == 2);
 
     quadriga_lib::qdant_write_multi(fn, spk);
@@ -141,7 +141,7 @@ TEST_CASE("QDANT Multi - Overwrite existing file")
     arma::vec freqs3 = {100.0, 500.0, 1000.0};
     auto spk3 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0,
                                                         12.0, 12.0, 85.0, "monopole",
-                                                        0.0, 0.0, 0.0, 0.15, 0.25, freqs3, 10.0);
+                                                        0.0, 0.0, 0.0, 0.15, 0.25, &freqs3, 10.0);
     quadriga_lib::qdant_write_multi(fn, spk3);
 
     auto read3 = quadriga_lib::qdant_read_multi<double>(fn);
@@ -151,7 +151,7 @@ TEST_CASE("QDANT Multi - Overwrite existing file")
     arma::vec freqs2 = {2000.0, 8000.0};
     auto spk2 = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0,
                                                         12.0, 12.0, 85.0, "monopole",
-                                                        0.0, 0.0, 0.0, 0.15, 0.25, freqs2, 10.0);
+                                                        0.0, 0.0, 0.0, 0.15, 0.25, &freqs2, 10.0);
     quadriga_lib::qdant_write_multi(fn, spk2);
 
     auto read2 = quadriga_lib::qdant_read_multi<double>(fn);
@@ -180,7 +180,7 @@ TEST_CASE("QDANT Multi - All driver/radiation types survive roundtrip")
 
             auto spk = quadriga_lib::generate_speaker<double>(drv, 0.05, 80.0, 12000.0,
                                                                12.0, 12.0, 85.0, rad,
-                                                               0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                               0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
             quadriga_lib::qdant_write_multi(fn, spk);
             auto spk_read = quadriga_lib::qdant_read_multi<double>(fn);
@@ -206,7 +206,7 @@ TEST_CASE("QDANT Multi - Roundtrip preserves frequency ordering")
     arma::vec freqs = {63.0, 250.0, 1000.0, 4000.0, 16000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 30.0, 20000.0,
                                                        12.0, 12.0, 85.0, "hemisphere",
-                                                       0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     quadriga_lib::qdant_write_multi(fn, spk);
     auto spk_read = quadriga_lib::qdant_read_multi<double>(fn);
@@ -227,7 +227,7 @@ TEST_CASE("QDANT Multi - Read with existing qdant_read for individual entries")
     arma::vec freqs = {100.0, 1000.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
                                                        12.0, 12.0, 85.0, "hemisphere",
-                                                       0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     quadriga_lib::qdant_write_multi(fn, spk);
 
@@ -295,7 +295,7 @@ TEST_CASE("QDANT Multi - Write empty filename throws")
     arma::vec freqs = {1000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0,
                                                        12.0, 12.0, 85.0, "monopole",
-                                                       0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     REQUIRE_THROWS_AS(quadriga_lib::qdant_write_multi("", spk), std::invalid_argument);
 }
@@ -317,7 +317,7 @@ TEST_CASE("QDANT Multi - Read without layout pointer")
     arma::vec freqs = {500.0, 2000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0,
                                                        12.0, 12.0, 85.0, "monopole",
-                                                       0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+                                                       0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     quadriga_lib::qdant_write_multi(fn, spk);
 
@@ -377,7 +377,7 @@ TEST_CASE("QDANT Multi - Large number of entries")
     // Generate many frequency samples via auto third-octave over a wide range
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 30.0, 16000.0,
                                                        12.0, 12.0, 85.0, "monopole",
-                                                       0.0, 0.0, 0.0, 0.15, 0.25, {}, 10.0);
+                                                       0.0, 0.0, 0.0, 0.15, 0.25, nullptr, 10.0);
 
     CHECK(spk.size() >= 20); // Expect ~28 third-octave bands
 

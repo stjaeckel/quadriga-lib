@@ -691,7 +691,7 @@ void quadriga_lib::arrayant_copy_element_multi(
 arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+    0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
@@ -1039,8 +1039,8 @@ Set element positions for all entries in a multi-frequency arrayant vector
 Not in: MATLAB, Python
 
 - Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
-- If `i_element` is provided, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
+- If `i_element` is nullptr or empty, all positions are replaced and `element_pos` must have `n_elements` columns.
+- If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
 ### Declaration:
@@ -1048,13 +1048,13 @@ Not in: MATLAB, Python
 void quadriga_lib::arrayant_set_element_pos_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        arma::uvec i_element = arma::uvec());
+        const arma::uvec *i_element = nullptr);
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; if empty, all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; nullptr or empty: all elements are replaced
 
 ### See also:
 - [arrayant_copy_element_multi](#arrayant_copy_element_multi) (replicate elements before setting positions)
@@ -1323,7 +1323,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
-- If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band below 
+- If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
 - **Driver models** (`driver_type`):
@@ -1341,20 +1341,20 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
 ### Declaration:
 ```cpp
 std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
-        std::string driver_type = "piston",
+        const std::string &driver_type = "piston",
         dtype radius = 0.05,
         dtype lower_cutoff = 80.0,
         dtype upper_cutoff = 12000.0,
         dtype lower_rolloff_slope = 12.0,
         dtype upper_rolloff_slope = 12.0,
         dtype sensitivity = 85.0,
-        std::string radiation_type = "hemisphere",
+        const std::string &radiation_type = "hemisphere",
         dtype hor_coverage = NAN,
         dtype ver_coverage = NAN,
         dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
-        arma::Col<dtype> center_freq = arma::Col<dtype>(),
+        const arma::Col<dtype> *center_freq = nullptr,
         dtype angular_resolution = 5.0);
 ```
 
@@ -1372,7 +1372,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
 - **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
-- **`center_freq`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; nullptr or empty: third-octave bands
 - **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
@@ -1382,10 +1382,11 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 ```cpp
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker<double>("horn");
+arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
-               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, {30.,50.,80.,120.,200.}, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, &sub_freqs, 10.0);
 ```
 
 ---
@@ -1406,7 +1407,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_a
 ### Declaration:
 ```cpp
 quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
-        std::string fn,
+        const std::string &fn,
         unsigned id = 1,
         arma::u32_mat *layout = nullptr);
 ```
@@ -1659,12 +1660,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](q
 ### Declaration:
 ```cpp
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
-    std::string fn,
+    const std::string &fn,
     arma::uword max_paths = 0,
     dtype gain_max = -60.0,
     dtype gain_min = -140.0,
-    std::string colormap = "jet",
-    arma::uvec i_snap = {},
+    const std::string &colormap = "jet",
+    const arma::uvec *i_snap = nullptr,
     dtype radius_max = 0.05,
     dtype radius_min = 0.01,
     arma::uword n_edges = 5) const;
@@ -1676,7 +1677,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
-- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
 - **`radius_min`** *(optional)* — Tube radius at minimum gain
 - **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
@@ -1898,7 +1899,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_create_file) · [Python](quadriga
 ### Declaration:
 ```cpp
 void quadriga_lib::hdf5_create(
-    std::string fn,
+    const std::string &fn,
     unsigned nx = 65536,
     unsigned ny = 1,
     unsigned nz = 1,
@@ -1941,7 +1942,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_channel) · [Python](quadrig
 ### Declaration:
 ```cpp
 quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
-    std::string fn,
+    const std::string &fn,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -1983,13 +1984,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset) · [Python](quadriga_l
 ### Declaration:
 ```cpp
 std::any quadriga_lib::hdf5_read_dset(
-    std::string fn,
-    std::string par_name,
+    const std::string &fn,
+    const std::string &par_name,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ### Inputs:
@@ -2021,13 +2022,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset_names) · [Python](quad
 ### Declaration:
 ```cpp
 arma::uword quadriga_lib::hdf5_read_dset_names(
-    std::string fn,
+    const std::string &fn,
     std::vector<std::string> *par_names,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ### Inputs:
@@ -2061,7 +2062,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_layout) · [Python](quadriga
 ### Declaration:
 ```cpp
 arma::u32_vec quadriga_lib::hdf5_read_layout(
-    std::string fn,
+    const std::string &fn,
     arma::u32_vec *channel_id = nullptr);
 ```
 
@@ -2091,7 +2092,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_reshape_layout) · [Python](quadr
 ### Declaration:
 ```cpp
 void quadriga_lib::hdf5_reshape_layout(
-    std::string fn,
+    const std::string &fn,
     unsigned nx,
     unsigned ny = 1,
     unsigned nz = 1,
@@ -2135,7 +2136,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel) · [Python](quadri
 ```cpp
 int quadriga_lib::hdf5_write(
     const quadriga_lib::channel<dtype> *ch,
-    std::string fn,
+    const std::string &fn,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2180,14 +2181,14 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset) · [Python](quadriga_
 ### Declaration:
 ```cpp
 void quadriga_lib::hdf5_write_dset(
-    std::string fn,
-    std::string par_name,
+    const std::string &fn,
+    const std::string &par_name,
     const std::any *par_data,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
     unsigned iw = 0,
-    std::string prefix = "par_");
+    const std::string &prefix = "par_");
 ```
 
 ### Inputs:
@@ -5232,7 +5233,7 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false);
+arma::uchar_mat quadriga_lib::colormap(const std::string &map, bool high_res = false);
 ```
 
 ### Inputs:
@@ -5562,7 +5563,7 @@ void quadriga_lib::mitsuba_xml_file_write(
     const arma::uvec &mtl_ind,
     const std::vector<std::string> &obj_names,
     const std::vector<std::string> &mtl_names,
-    const arma::Mat<dtype> &bsdf = {},
+    const arma::Mat<dtype> *bsdf = nullptr,
     bool map_to_itu_materials = false);
 ```
 
@@ -5575,7 +5576,7 @@ void quadriga_lib::mitsuba_xml_file_write(
   material — 0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
 - **`mtl_names`** — Material names; length must equal `max(mtl_ind)` (mtl_ind is 1-based)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`; nullptr or empty: none
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ### See also:
@@ -7146,8 +7147,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#write_png) · [Python](quadriga_lib_ap
 ```cpp
 void quadriga_lib::write_png(
     const arma::Mat<dtype> &data,
-    std::string fn,
-    std::string colormap = "jet",
+    const std::string &fn,
+    const std::string &colormap = "jet",
     dtype min_val = NAN,
     dtype max_val = NAN,
     bool log_transform = false);

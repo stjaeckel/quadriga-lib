@@ -597,10 +597,10 @@ TEST_CASE("Multifreq - Acoustic 2-way speaker with omni microphone (documentatio
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
     auto tx_woofer = quadriga_lib::generate_speaker<double>(
         "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
     auto tx_tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
     auto tx = quadriga_lib::arrayant_concat_multi(tx_woofer, tx_tweeter);
 
     // Omnidirectional microphone as RX (single entry, clamped for all frequencies)
@@ -651,10 +651,10 @@ TEST_CASE("Multifreq - Acoustic woofer dominates at low freq, tweeter at high fr
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
     auto tx_woofer = quadriga_lib::generate_speaker<double>(
         "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
     auto tx_tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &freqs, 10.0);
     auto tx = quadriga_lib::arrayant_concat_multi(tx_woofer, tx_tweeter);
     std::vector<quadriga_lib::arrayant<double>> rx = {quadriga_lib::generate_arrayant_omni<double>()};
 

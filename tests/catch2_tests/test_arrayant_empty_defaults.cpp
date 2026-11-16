@@ -260,8 +260,9 @@ TEST_CASE("Arrayant multi-frequency functions - Empty element_pos and coupling e
     {
         auto f = F, e = E;
         const arma::mat p = arma::vec{0.1, 0.2, 0.3};
-        quadriga_lib::arrayant_set_element_pos_multi(f, p, arma::uvec{1});
-        quadriga_lib::arrayant_set_element_pos_multi(e, p, arma::uvec{1});
+        const arma::uvec i_el = {1};
+        quadriga_lib::arrayant_set_element_pos_multi(f, p, &i_el);
+        quadriga_lib::arrayant_set_element_pos_multi(e, p, &i_el);
         check_same_multi(f, e);
     }
 

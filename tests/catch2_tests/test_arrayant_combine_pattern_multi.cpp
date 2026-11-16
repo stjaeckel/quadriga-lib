@@ -827,7 +827,7 @@ TEST_CASE("Combine multi - Single speaker generate_speaker workflow")
     arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>(
         "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+        0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
     // Combine without changing the frequency grid — output should be 1:1 with input
     auto out = quadriga_lib::arrayant_combine_pattern_multi(spk);
@@ -848,10 +848,10 @@ TEST_CASE("Combine multi - 2-way speaker workflow with arrayant_concat_multi")
     arma::vec entry_freqs = {100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 16000.0};
     auto woofer = quadriga_lib::generate_speaker<double>(
         "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, entry_freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &entry_freqs, 10.0);
     auto tweeter = quadriga_lib::generate_speaker<double>(
         "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-        0.0, 0.0, 0.0, 0.20, 0.30, entry_freqs, 10.0);
+        0.0, 0.0, 0.0, 0.20, 0.30, &entry_freqs, 10.0);
     auto speaker = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
     // speaker has 2 elements; default coupling is [[1,0],[0,1]] (2 ports)
     REQUIRE(speaker[0].n_elements() == 2);
@@ -1032,8 +1032,9 @@ TEST_CASE("Combine multi - Default freq grid recovers per-entry combine_pattern 
 TEST_CASE("Combine multi - Propagation speed")
 {
     // Two omni "speakers" 0.2 m apart at 1 kHz (lambda = 0.344 m in air), summed into one port
+    const arma::vec f_1k = {1000.0};
     auto s = quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
-                                                    0, 0, 0, 0.15, 0.25, arma::vec{1000.0}, 10.0);
+                                                    0, 0, 0, 0.15, 0.25, &f_1k, 10.0);
     auto two = quadriga_lib::arrayant_concat_multi(s, s);
     quadriga_lib::arrayant_set_element_pos_multi(two, arma::mat({{0.0, 0.0}, {-0.1, 0.1}, {0.0, 0.0}}));
     two[0].coupling_re = arma::mat(2, 1, arma::fill::ones);

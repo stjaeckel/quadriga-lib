@@ -95,7 +95,7 @@ Read an arrayant object from a QDANT file
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
-        std::string fn,
+        const std::string &fn,
         unsigned id = 1,
         arma::u32_mat *layout = nullptr);
 ```
@@ -115,7 +115,7 @@ MD!*/
 
 // Read array antenna object and layout from QDANT file
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::u32_mat *layout)
+quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(const std::string &fn, unsigned id, arma::u32_mat *layout)
 {
     quadriga_lib::arrayant<dtype> ant;
     std::string error_message;
@@ -148,8 +148,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned 
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
-template quadriga_lib::arrayant<double> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
+template quadriga_lib::arrayant<float> quadriga_lib::qdant_read(const std::string &fn, unsigned id, arma::Mat<unsigned> *layout);
+template quadriga_lib::arrayant<double> quadriga_lib::qdant_read(const std::string &fn, unsigned id, arma::Mat<unsigned> *layout);
 
 /*!MD
 # qdant_read_multi
@@ -463,7 +463,7 @@ void quadriga_lib::arrayant_copy_element_multi(
 arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
 auto driver = quadriga_lib::generate_speaker<double>(
     "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+    0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 quadriga_lib::arrayant_copy_element_multi(driver, 0, {1, 2, 3});
 ```
 
@@ -506,8 +506,8 @@ template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib
 Set element positions for all entries in a multi-frequency arrayant vector
 
 - Updates `element_pos` in-place on every entry in the vector identically.
-- If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
-- If `i_element` is provided, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
+- If `i_element` is nullptr or empty, all positions are replaced and `element_pos` must have `n_elements` columns.
+- If `i_element` is non-empty, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
 ## Declaration:
@@ -515,13 +515,13 @@ Set element positions for all entries in a multi-frequency arrayant vector
 void quadriga_lib::arrayant_set_element_pos_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
         const arma::Mat<dtype> &element_pos,
-        arma::uvec i_element = arma::uvec());
+        const arma::uvec *i_element = nullptr);
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — Indices of elements to update; if empty, all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; nullptr or empty: all elements are replaced
 
 ## See also:
 - [[arrayant_copy_element_multi]] (replicate elements before setting positions)
@@ -531,8 +531,11 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
                                                   const arma::Mat<dtype> &element_pos,
-                                                  arma::uvec i_element)
+                                                  const arma::uvec *i_element_in)
 {
+    const arma::uvec empty_index;
+    const arma::uvec &i_element = (i_element_in == nullptr) ? empty_index : *i_element_in;
+
     if (arrayant_vec.empty())
         throw std::invalid_argument("arrayant_set_element_pos_multi: Input vector is empty.");
 
@@ -597,8 +600,8 @@ void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arra
     }
 }
 
-template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, arma::uvec);
-template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, arma::uvec);
+template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<float>> &, const arma::Mat<float> &, const arma::uvec *);
+template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arrayant<double>> &, const arma::Mat<double> &, const arma::uvec *);
 
 /*!MD
 # arrayant_rotate_pattern_multi

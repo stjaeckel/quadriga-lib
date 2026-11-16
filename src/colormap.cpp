@@ -17,7 +17,7 @@ Generate a colormap matrix with RGB values
 
 ## Declaration:
 ```
-arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false);
+arma::uchar_mat quadriga_lib::colormap(const std::string &map, bool high_res = false);
 ```
 
 ## Inputs:
@@ -29,7 +29,7 @@ arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false);
 MD!*/
 
 // Generate colormap
-arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res)
+arma::uchar_mat quadriga_lib::colormap(const std::string &map, bool high_res)
 {
 
     if (high_res)

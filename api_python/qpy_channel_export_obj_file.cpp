@@ -156,5 +156,5 @@ void channel_export_obj_file(const std::string &fn,
     arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, true);
 
     // Call library function
-    c.write_paths_to_obj_file(fn, max_paths, gain_max, gain_min, colormap, i_snap_a, radius_max, radius_min, n_edges);
+    c.write_paths_to_obj_file(fn, max_paths, gain_max, gain_min, colormap, &i_snap_a, radius_max, radius_min, n_edges);
 }

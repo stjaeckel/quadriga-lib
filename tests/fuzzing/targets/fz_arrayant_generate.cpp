@@ -127,7 +127,7 @@ static void run(fz::input &in)
             f_low = in.ConsumeFloatingPointInRange<T>(T(10), T(30000)), f_high = in.ConsumeFloatingPointInRange<T>(T(10), T(30000));
         arma::Col<T> freq = in.col<T>(in.size(6));
         fz::clean([&] { quadriga_lib::generate_speaker<T>(driver, radius, f_low, f_high, s_low, s_high, sens, type, hor, ver,
-                                                          f_ctrl, bw, bh, freq, res); });
+                                                          f_ctrl, bw, bh, &freq, res); });
     }
     }
 }
