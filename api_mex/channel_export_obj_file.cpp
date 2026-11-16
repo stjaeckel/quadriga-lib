@@ -16,20 +16,20 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
-- Paths below `gain_min` are excluded; `max_no_paths` limits the total number of exported paths
+- Paths below `gain_min` are excluded; `max_paths` limits the total number of exported paths
 - Paths with non-finite coordinates are skipped
 - The function takes raw channel data fields directly; no MATLAB channel struct is needed
 
 ## Usage:
 ```
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
-     radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, ...
+quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colormap, radius_max, ...
+     radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff_re, ...
     coeff_im, i_snap );
 ```
 
 ## Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_no_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
+- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
 - **`gain_max`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
@@ -38,8 +38,8 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
 - **`rx_pos`** — Receiver positions; `[3, n_snap]` or `[3, 1]`
 - **`tx_pos`** — Transmitter positions; `[3, n_snap]` or `[3, 1]`
-- **`no_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
-- **`interact_coord`** — Interaction coordinates; `[3, max(sum(no_interact)), n_snap]`; fewer than `sum(no_interact)`
+- **`n_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
+- **`interact_coord`** — Interaction coordinates; `[3, max(sum(n_interact)), n_snap]`; fewer than `sum(n_interact)`
   columns in a snapshot raise an error
 - **`center_freq`** — Center frequency in Hz; `[n_snap]` or scalar
 - **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
@@ -62,7 +62,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read inputs
     const auto fn = qd_mex_get_string(prhs[0]);
 
-    const auto max_no_paths = qd_mex_get_scalar<arma::uword>(prhs[1], "max_no_paths", 0);
+    const auto max_paths = qd_mex_get_scalar<arma::uword>(prhs[1], "max_paths", 0);
     const auto gain_max = qd_mex_get_scalar<double>(prhs[2], "gain_max", -60.0);
     const auto gain_min = qd_mex_get_scalar<double>(prhs[3], "gain_min", -140.0);
     const auto colormap = qd_mex_get_string(prhs[4], "jet");
@@ -75,7 +75,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     c.rx_pos = qd_mex_get_Mat<double>(prhs[8]);
     c.tx_pos = qd_mex_get_Mat<double>(prhs[9]);
-    c.no_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[10], 1, "no_interact");
+    c.n_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[10], 1, "n_interact");
     c.interact_coord = qd_mex_matlab2vector_Mat<double>(prhs[11], 2, "interact_coord");
     c.center_freq = qd_mex_get_Col<double>(prhs[12], false, "center_freq");
     c.coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[13], 3, "coeff_re");
@@ -87,9 +87,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_snap' cannot be 0 (1-based index).");
     i_snap -= 1;
 
-    // The loop below reads one entry of no_interact and interact_coord per snapshot of the coefficients
-    if (c.no_interact.size() != c.coeff_re.size())
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Number of snapshots in no_interact must match coefficients.");
+    // The loop below reads one entry of n_interact and interact_coord per snapshot of the coefficients
+    if (c.n_interact.size() != c.coeff_re.size())
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Number of snapshots in n_interact must match coefficients.");
     if (c.interact_coord.size() != c.coeff_re.size())
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Number of snapshots in interact_coord must match coefficients.");
 
@@ -102,15 +102,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         c.delay.push_back(delays);
 
         // Remove trailing zeros from interact_coord; too few columns are an error, not padded with zeros
-        arma::uword sum_no_int = arma::accu(arma::conv_to<arma::uvec>::from(c.no_interact[i_snap_a]));
+        arma::uword sum_no_int = arma::accu(arma::conv_to<arma::uvec>::from(c.n_interact[i_snap_a]));
         if (sum_no_int != 0 && (c.interact_coord[i_snap_a].n_rows != 3 || c.interact_coord[i_snap_a].n_cols < sum_no_int))
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Snapshot " + std::to_string(i_snap_a + 1) +
-                              ": 'interact_coord' must have 3 rows and at least sum(no_interact) = " +
+                              ": 'interact_coord' must have 3 rows and at least sum(n_interact) = " +
                               std::to_string(sum_no_int) + " columns.").c_str());
         c.interact_coord[i_snap_a] = arma::resize(c.interact_coord[i_snap_a], 3, sum_no_int);
     }
 
     // Call quadriga-lib function
-    CALL_QD(c.write_paths_to_obj_file(fn, max_no_paths, gain_max, gain_min, colormap,
+    CALL_QD(c.write_paths_to_obj_file(fn, max_paths, gain_max, gain_min, colormap,
                                       i_snap, radius_max, radius_min, n_edges));
 }

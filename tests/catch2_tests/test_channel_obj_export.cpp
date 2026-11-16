@@ -51,9 +51,9 @@ TEST_CASE("Channel - OBJ Export")
     REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan.obj"), std::invalid_argument);
 
     // 2 Paths: LOS and 1 single-bounce
-    arma::u32_vec no_interact = {0, 1};
-    c.no_interact.push_back(no_interact);
-    c.no_interact.push_back(no_interact);
+    arma::u32_vec n_interact = {0, 1};
+    c.n_interact.push_back(n_interact);
+    c.n_interact.push_back(n_interact);
 
     arma::mat interact_coord = {0.0, 10.0, 1.0};
     c.interact_coord.push_back(interact_coord.t());
@@ -94,7 +94,7 @@ TEST_CASE("Channel - OBJ Export skips paths with non-finite coordinates")
     c.center_freq = 1.0e9;
 
     // 2 paths: LOS and a single-bounce path with a NaN interaction point
-    c.no_interact.push_back(arma::u32_vec({0, 1}));
+    c.n_interact.push_back(arma::u32_vec({0, 1}));
     c.interact_coord.push_back(arma::mat({arma::datum::nan, 10.0, 1.0}).t());
     c.coeff_re.push_back(arma::cube(1, 1, 2, arma::fill::value(1.0e-3)));
     c.coeff_im.push_back(arma::cube(1, 1, 2, arma::fill::zeros));

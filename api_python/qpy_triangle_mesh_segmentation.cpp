@@ -17,7 +17,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
   than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with
   zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; real entries in `mesh_index` are
+- Dummy triangles are placed at the AABB center of their sub-mesh; real entries in `mesh_ind` are
   1-based, with 0 reserved to mark padding entries
 - If `mtl_ind` is provided, material indices are reordered and padded in the same way; padding
   entries get index 0
@@ -28,7 +28,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
 
 # Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
+triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
     quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
 ```
 
@@ -42,8 +42,8 @@ triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
-- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
-- **`mesh_index`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_triangles_out,)`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
+- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_triangles_out,)`
 - **`mtl_ind_out`** — Reordered and padded material indices; `(n_triangles_out,)`; empty if `mtl_ind` is not provided
 MD!*/
 
@@ -57,18 +57,18 @@ py::tuple triangle_mesh_segmentation(const py::array_t<double> &triangles,
 
     arma::mat triangles_out;
     arma::uvec mtl_ind_out;
-    arma::u32_vec sub_mesh_index, mesh_index;
+    arma::u32_vec sub_mesh_ind, mesh_ind;
 
     const arma::uvec *p_mtl_ind = mtl_ind_a.is_empty() ? nullptr : &mtl_ind_a;
     arma::uvec *p_mtl_ind_out = mtl_ind_a.is_empty() ? nullptr : &mtl_ind_out;
 
-    quadriga_lib::triangle_mesh_segmentation<double>(&triangles_a, &triangles_out, &sub_mesh_index,
+    quadriga_lib::triangle_mesh_segmentation<double>(&triangles_a, &triangles_out, &sub_mesh_ind,
                                                      target_size, vec_size,
-                                                     p_mtl_ind, p_mtl_ind_out, &mesh_index);
+                                                     p_mtl_ind, p_mtl_ind_out, &mesh_ind);
 
     return py::make_tuple(
         qd_python_copy2numpy(&triangles_out),
-        qd_python_copy2numpy<unsigned, py::ssize_t>(&sub_mesh_index),
-        qd_python_copy2numpy<unsigned, py::ssize_t>(&mesh_index),
+        qd_python_copy2numpy<unsigned, py::ssize_t>(&sub_mesh_ind),
+        qd_python_copy2numpy<unsigned, py::ssize_t>(&mesh_ind),
         qd_python_copy2numpy<arma::uword, py::ssize_t>(&mtl_ind_out));
 }

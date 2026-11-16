@@ -37,17 +37,17 @@ class test_case(unittest.TestCase):
     # qrt_file_parse
     # ------------------------------------------------------------------
     def test_parse_v4(self):
-        (no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version,
+        (n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version,
          center_freq, cir_pos, cir_orientation, orig_pos, orig_orientation) = \
             channel.qrt_file_parse(FN_V4)
 
-        self.assertEqual(no_orig, 3)
-        self.assertEqual(no_dest, 2)
-        self.assertEqual(no_cir, 7)
-        self.assertEqual(no_freq, 1)
+        self.assertEqual(n_orig, 3)
+        self.assertEqual(n_dest, 2)
+        self.assertEqual(n_cir, 7)
+        self.assertEqual(n_freq, 1)
         self.assertEqual(version, 4)
 
-        self.assertEqual(len(cir_offset), no_dest)
+        self.assertEqual(len(cir_offset), n_dest)
         self.assertEqual(cir_offset[0], 0)
         self.assertEqual(cir_offset[1], 1)
 
@@ -55,45 +55,45 @@ class test_case(unittest.TestCase):
         self.assertEqual(dest_names, ["RX1", "RX2"])
 
         # qrt_file_parse returns the center frequencies in Hz (the file stores GHz for v4/v5)
-        self.assertEqual(len(center_freq), no_freq)
+        self.assertEqual(len(center_freq), n_freq)
         npt.assert_allclose(center_freq[0], 3.75e9, rtol=1e-6)
 
-        self.assertEqual(cir_pos.shape, (no_cir, 3))
-        self.assertEqual(cir_orientation.shape, (no_cir, 3))
+        self.assertEqual(cir_pos.shape, (n_cir, 3))
+        self.assertEqual(cir_orientation.shape, (n_cir, 3))
         npt.assert_allclose(cir_pos[0, :], [-8.83498, 57.1893, 1.0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(cir_pos[1, :], [-5.86144, 53.8124, 1.0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(cir_orientation[1, :], [0.0, 0.0, 1.2753], atol=1.5e-4, rtol=0)
 
-        self.assertEqual(orig_pos.shape, (no_orig, 3))
-        self.assertEqual(orig_orientation.shape, (no_orig, 3))
+        self.assertEqual(orig_pos.shape, (n_orig, 3))
+        self.assertEqual(orig_orientation.shape, (n_orig, 3))
         npt.assert_allclose(orig_pos[0, :], [-12.9607, 59.6906, 2.0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(orig_pos[1, :], [-2.67888, 60.257, 2.0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(orig_orientation[0, :], [0.0, 0.0, 0.0], atol=1.5e-4, rtol=0)
         npt.assert_allclose(orig_orientation[1, :], [0.0, 0.0, np.pi], atol=1.5e-4, rtol=0)
 
     def test_parse_v5(self):
-        (no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version,
+        (n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version,
          center_freq, cir_pos, cir_orientation, orig_pos, orig_orientation) = \
             channel.qrt_file_parse(FN_V5)
 
-        self.assertEqual(no_orig, 1)
-        self.assertEqual(no_dest, 2)
-        self.assertEqual(no_cir, 2)
-        self.assertEqual(no_freq, 2)
+        self.assertEqual(n_orig, 1)
+        self.assertEqual(n_dest, 2)
+        self.assertEqual(n_cir, 2)
+        self.assertEqual(n_freq, 2)
         self.assertEqual(version, 5)
 
-        self.assertEqual(len(cir_offset), no_dest)
+        self.assertEqual(len(cir_offset), n_dest)
         self.assertEqual(cir_offset[0], 0)
         self.assertEqual(cir_offset[1], 1)
 
-        self.assertEqual(len(center_freq), no_freq)
+        self.assertEqual(len(center_freq), n_freq)
         npt.assert_allclose(center_freq[0], 1.0e9, rtol=1e-6)
         npt.assert_allclose(center_freq[1], 1.5e9, rtol=1e-6)
 
-        self.assertEqual(cir_pos.shape, (no_cir, 3))
-        self.assertEqual(cir_orientation.shape, (no_cir, 3))
-        self.assertEqual(orig_pos.shape, (no_orig, 3))
-        self.assertEqual(orig_orientation.shape, (no_orig, 3))
+        self.assertEqual(cir_pos.shape, (n_cir, 3))
+        self.assertEqual(cir_orientation.shape, (n_cir, 3))
+        self.assertEqual(orig_pos.shape, (n_orig, 3))
+        self.assertEqual(orig_orientation.shape, (n_orig, 3))
 
     # ------------------------------------------------------------------
     # qrt_file_read - single snapshot, downlink / uplink
@@ -102,7 +102,7 @@ class test_case(unittest.TestCase):
         # --- downlink, first link: i_cir=0, i_orig=0 ---
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
-         aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type) = \
+         aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [0], 0, True, 1)
 
         # qrt_file_read returns center_freq in Hz
@@ -116,14 +116,14 @@ class test_case(unittest.TestCase):
 
         # Variable-per-snapshot outputs are lists of length n_out
         self.assertEqual(len(fbs_pos), 1)
-        self.assertEqual(len(no_int), 1)
+        self.assertEqual(len(n_interact), 1)
         self.assertEqual(len(coord), 1)
         self.assertIsInstance(path_coord[0], list)
 
         # --- downlink, second link: i_cir=1, i_orig=1 ---
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_dl, lbs_dl, path_gain, path_length, M,
-         aod, eod, aoa_dl, eoa_dl, path_coord, no_int, coord, interact_type) = \
+         aod, eod, aoa_dl, eoa_dl, path_coord, n_interact, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [1], 1, True, 1)
 
         npt.assert_allclose(tx_pos[:, 0], [-2.67888, 60.257, 2.0], atol=1.5e-4, rtol=0)
@@ -136,7 +136,7 @@ class test_case(unittest.TestCase):
         # --- uplink: i_cir=1, i_orig=1, downlink=False ---
         (center_freq, tx_pos_ul, tx_ori_ul, rx_pos_ul, rx_ori_ul,
          fbs_ul, lbs_ul, path_gain, path_length, M,
-         aod_ul, eod_ul, aoa, eoa, path_coord, no_int, coord, interact_type) = \
+         aod_ul, eod_ul, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [1], 1, False, 1)
 
         # TX / RX swap between downlink and uplink
@@ -165,7 +165,7 @@ class test_case(unittest.TestCase):
         # normalize_M = 0: M and path_gain as stored in the QRT file
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
-         aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type) = \
+         aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
             channel.qrt_file_read(FN_V5, [1], 0, True, 0)
 
         self.assertEqual(len(center_freq), 2)
@@ -191,7 +191,7 @@ class test_case(unittest.TestCase):
     def test_read_multi_cir(self):
         (center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation,
          fbs_pos, lbs_pos, path_gain, path_length, M,
-         aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type) = \
+         aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type) = \
             channel.qrt_file_read(FN_V4, [0, 1, 2], 0, True, 1)
 
         # Scalar-per-snapshot outputs: (3, n_out) matrices
@@ -202,17 +202,17 @@ class test_case(unittest.TestCase):
 
         # Variable-per-snapshot outputs: lists of length n_out
         for lst in (fbs_pos, lbs_pos, path_gain, path_length, M,
-                    aod, eod, aoa, eoa, path_coord, no_int, coord):
+                    aod, eod, aoa, eoa, path_coord, n_interact, coord):
             self.assertEqual(len(lst), 3)
 
         # path_coord is a list (per snapshot) of lists (per path)
         self.assertIsInstance(path_coord[0], list)
         self.assertEqual(len(path_coord[0]), len(aod[0]))
 
-        # coord entries are (3, sum(no_int)) per snapshot
+        # coord entries are (3, sum(n_interact)) per snapshot
         for i in range(3):
             self.assertEqual(coord[i].shape[0], 3)
-            self.assertEqual(coord[i].shape[1], int(np.sum(no_int[i])))
+            self.assertEqual(coord[i].shape[1], int(np.sum(n_interact[i])))
 
         # Cross-check the cached multi-read against individual single-snapshot reads
         r0 = channel.qrt_file_read(FN_V4, [0], 0, True, 1)
@@ -243,7 +243,7 @@ class test_case(unittest.TestCase):
     # qrt_file_read - default arguments
     # ------------------------------------------------------------------
     def test_read_defaults(self):
-        # Default i_cir (omitted) reads ALL snapshots in the file (no_cir = 7)
+        # Default i_cir (omitted) reads ALL snapshots in the file (n_cir = 7)
         res = channel.qrt_file_read(FN_V4)
         tx_pos = res[1]
         self.assertEqual(tx_pos.shape, (3, 7))

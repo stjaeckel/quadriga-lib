@@ -51,7 +51,7 @@ void qd_RPI_CUDA(const float *Px, const float *Py, const float *Pz,    // Point 
                  const float *D3x, const float *D3y, const float *D3z, // Third ray direction in GCS, length n_ray
                  const float *rD1, const float *rD2, const float *rD3, // Inverse Dot product of ray direction and normal vector
                  const size_t n_ray,                                   // Number of rays
-                 std::vector<unsigned> *hit_index,                     // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
+                 std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                  unsigned *hit_offset,                                 // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
                  int gpu_id = 0);
 

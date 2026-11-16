@@ -175,7 +175,7 @@ def read_slot(group):
     empty = {'path_gain': np.zeros(0, np.float32), 'path_length': np.zeros(0, np.float32),
              'path_angles': np.zeros((0, 4), np.float32), 'fbs_pos': np.zeros((3, 0), np.float32),
              'lbs_pos': np.zeros((3, 0), np.float32), 'interact_coord': np.zeros((3, 0), np.float32),
-             'path_polarization': np.zeros((8, 0), np.float32), 'no_interact': np.zeros(0, np.uint32),
+             'path_polarization': np.zeros((8, 0), np.float32), 'n_interact': np.zeros(0, np.uint32),
              'coeff_re': np.zeros((n_rx, n_tx, 0), np.float32), 'coeff_im': np.zeros((n_rx, n_tx, 0), np.float32)}
     for i, s in snaps:
         if 'coeff_re' in s:
@@ -194,9 +194,9 @@ def read_slot(group):
             if v2 in s:
                 put(key, i, f32(s[v2][()]).T, empty[key])
         if 'no_interact' in s:
-            no_interact = np.asarray(s['no_interact'][()], dtype=np.uint32)
-            put('no_interact', i, no_interact, empty['no_interact'])
-            coord = f32(s['interact_coord'][()]).T if no_interact.sum() > 0 else empty['interact_coord']
+            n_interact = np.asarray(s['no_interact'][()], dtype=np.uint32)
+            put('n_interact', i, n_interact, empty['n_interact'])
+            coord = f32(s['interact_coord'][()]).T if n_interact.sum() > 0 else empty['interact_coord']
             put('interact_coord', i, coord, empty['interact_coord'])
 
     # Trailing delays: (n_rx, n_tx, 0) as 0.12.4 with coefficients; without them (1, 1, 0), which is valid

@@ -28,7 +28,7 @@ Thread a polarization transfer (Jones) matrix along a ray path
   gain extraction, normalization, and gain application. They are selected independently through
   `initialize`, `update`, `normalize`, `gain`, and `apply_gain`, so a call can do any combination
   (see Usage)
-- An optional `ray_index` lets the update set be a subset of the global state, scattered into
+- An optional `ray_ind` lets the update set be a subset of the global state, scattered into
   `xprmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
 - Storage is interleaved complex, column-major, matching the `xprmat` output of
   [[calc_diffraction_gain]]. EM mode carries the full 2x2 Jones matrix; scalar mode carries a
@@ -43,14 +43,14 @@ void xpr_update(
     bool initialize = false,
     bool normalize = false,
     bool apply_gain = false,
-    const arma::uvec *ray_index = nullptr);
+    const arma::uvec *ray_ind = nullptr);
 ```
 
 ## Arguments:
 - **`xprmat`** — Global XPR state, updated in place. EM mode `[8, n_ray]`, scalar mode
   `[2, n_ray]`. If empty on entry it is sized from `update` and seeded to unity (see Usage). A
   pre-sized (non-empty) buffer is treated as accumulated state unless `initialize` is set. When
-  `ray_index` is given, `xprmat` must already exist, because the extent of the global set cannot be
+  `ray_ind` is given, `xprmat` must already exist, because the extent of the global set cannot be
   inferred from a subset.
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `xprmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
@@ -69,7 +69,7 @@ void xpr_update(
 - **`normalize`** — If `true`, each touched column is scaled to unit gain after the update.
   Untouched columns of `xprmat` are left alone.
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
-- **`ray_index`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
+- **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
   Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
   `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
   in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
@@ -79,7 +79,7 @@ void xpr_update(
 ## Usage:
 The flags are composable in one call; the per-column order is always
 initialize -> update -> normalize -> apply_gain. Argument order is
-`(xprmat, update, gain, initialize, normalize, apply_gain, ray_index)`.
+`(xprmat, update, gain, initialize, normalize, apply_gain, ray_ind)`.
 ```
 arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 
@@ -322,7 +322,7 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
                               bool initialize,
                               bool normalize,
                               bool apply_gain,
-                              const arma::uvec *ray_index)
+                              const arma::uvec *ray_ind)
 {
     qd_check_alias(&xprmat, "xprmat", update);
     qd_check_alias(gain, "gain", &xprmat, update);
@@ -353,23 +353,23 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
     }
 
     // Resolve the two index-space sizes: n_ray (columns of the global 'xprmat') and n_rayU (the
-    // update set, i.e. the loop length and the length of 'ray_index' / 'gain').
+    // update set, i.e. the loop length and the length of 'ray_ind' / 'gain').
     arma::uword n_ray = 0, n_rayU = 0;
 
-    if (ray_index)
+    if (ray_ind)
     {
         // Scatter into an existing global buffer. The buffer must already exist because a subset
         // does not reveal the global extent.
         if (!have_state)
-            throw std::invalid_argument("'ray_index' requires an existing (non-empty) 'xprmat'.");
+            throw std::invalid_argument("'ray_ind' requires an existing (non-empty) 'xprmat'.");
         n_ray = xprmat.n_cols;
-        n_rayU = ray_index->n_elem;
+        n_rayU = ray_ind->n_elem;
 
         if (have_update && !broadcast && update->n_cols != n_rayU)
-            throw std::invalid_argument("'update' must have 'ray_index' columns (or 1 to broadcast).");
+            throw std::invalid_argument("'update' must have 'ray_ind' columns (or 1 to broadcast).");
 
-        if (n_rayU > 0 && ray_index->max() >= n_ray) // guard: max() on an empty uvec is undefined
-            throw std::invalid_argument("'ray_index' contains a column index outside 'xprmat'.");
+        if (n_rayU > 0 && ray_ind->max() >= n_ray) // guard: max() on an empty uvec is undefined
+            throw std::invalid_argument("'ray_ind' contains a column index outside 'xprmat'.");
     }
     else if (have_state)
     {
@@ -381,7 +381,7 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
     }
     else
     {
-        // Empty 'xprmat', no 'ray_index': size the global buffer from a per-column update.
+        // Empty 'xprmat', no 'ray_ind': size the global buffer from a per-column update.
         if (!have_update)
             throw std::invalid_argument("Cannot size an empty 'xprmat' without a per-column 'update'; pre-size it to use 'initialize' on its own.");
         if (broadcast)
@@ -417,7 +417,7 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
 
     dtype *p_xpr = xprmat.memptr();
     const dtype *p_upd = have_update ? update->memptr() : nullptr;
-    const arma::uword *p_idx = ray_index ? ray_index->memptr() : nullptr;
+    const arma::uword *p_idx = ray_ind ? ray_ind->memptr() : nullptr;
     dtype *p_gain = (gain != nullptr) ? gain->memptr() : nullptr;
 
     const bool write_gain = (p_gain != nullptr) && !apply_gain; // gain is an output
@@ -458,7 +458,7 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
 
     // Single OMP region, guarded so small update sets (including the 1-ray-in-a-loop case) run
     // serially with no team setup. Updates of distinct columns are independent, so the loop is
-    // embarrassingly parallel. Duplicate entries in 'ray_index' would make two threads read-modify-write
+    // embarrassingly parallel. Duplicate entries in 'ray_ind' would make two threads read-modify-write
     // the same column; they run serially instead, in update order (the single-thread result). One thread
     // runs the updates in order anyway, so the check is skipped then.
     // Signed counter for OpenMP 2.0 (MSVC), which forbids an unsigned loop variable.
@@ -483,8 +483,8 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
 
 template void quadriga_lib::xpr_update(arma::Mat<float> &xprmat, const arma::Mat<float> *update,
                                        arma::Col<float> *gain, bool initialize, bool normalize,
-                                       bool apply_gain, const arma::uvec *ray_index);
+                                       bool apply_gain, const arma::uvec *ray_ind);
 
 template void quadriga_lib::xpr_update(arma::Mat<double> &xprmat, const arma::Mat<double> *update,
                                        arma::Col<double> *gain, bool initialize, bool normalize,
-                                       bool apply_gain, const arma::uvec *ray_index);
+                                       bool apply_gain, const arma::uvec *ray_ind);

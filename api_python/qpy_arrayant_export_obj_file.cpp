@@ -14,13 +14,13 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 - The pattern is mapped onto an icosphere; a higher `icosphere_n_div` gives a finer mesh
 - The OBJ file is written to `fn`; the function returns nothing
-- Accepts a frequency-dependent antenna (4D pattern fields); `freq_ind` selects which frequency
+- Accepts a frequency-dependent antenna (4D pattern fields); `i_freq` selects which frequency
   entry is exported
 
 ## Usage:
 ```
 quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius, \
-    icosphere_n_div, element, freq_ind )
+    icosphere_n_div, i_element, i_freq )
 ```
 
 ## Inputs:
@@ -30,8 +30,8 @@ quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object in meters; default: 1.0
 - **`icosphere_n_div`** — Icosphere subdivision count; higher gives a finer mesh; see [[icosphere]]; default: 4
-- **`element`** — Element indices to export; 1D list or array of int; `None` or empty exports all elements; default: `None`
-- **`freq_ind`** — Frequency index to export from a frequency-dependent antenna; must satisfy `0 <= freq_ind < n_freq`; default: 0
+- **`i_element`** — Element indices to export; 1D list or array of int; `None` or empty exports all elements; default: `None`
+- **`i_freq`** — Frequency index to export from a frequency-dependent antenna; must satisfy `0 <= i_freq < n_freq`; default: 0
 MD!*/
 
 void arrayant_export_obj_file(const std::string &fn,
@@ -40,17 +40,17 @@ void arrayant_export_obj_file(const std::string &fn,
                               const std::string &colormap,
                               double object_radius,
                               arma::uword icosphere_n_div,
-                              py::handle element,
-                              arma::uword freq_ind)
+                              py::handle i_element,
+                              arma::uword i_freq)
 {
     // Element indices (0-based); empty uvec = export all elements
-    const arma::uvec element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
+    const arma::uvec i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
 
     // Parse the (possibly frequency-dependent) input antenna
     const auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true, false);
 
-    if (freq_ind >= ant.size())
-        throw std::invalid_argument("'freq_ind' is out of bound.");
+    if (i_freq >= ant.size())
+        throw std::invalid_argument("'i_freq' is out of bound.");
 
-    quadriga_lib::arrayant_export_obj_file(fn, ant[freq_ind], directivity_range, colormap, object_radius, icosphere_n_div, &element_a);
+    quadriga_lib::arrayant_export_obj_file(fn, ant[i_freq], directivity_range, colormap, object_radius, icosphere_n_div, &i_element_a);
 }

@@ -55,7 +55,7 @@ def full_channel(n_path=(3, 2)):
         'path_angles': [q(n, 4) for n in n_path],
         'fbs_pos': [q(3, n) for n in n_path],
         'lbs_pos': [q(3, n) for n in n_path],
-        'no_interact': [np.arange(n, dtype=np.int64) for n in n_path],
+        'n_interact': [np.arange(n, dtype=np.int64) for n in n_path],
         'interact_coord': [q(3, n * (n - 1) // 2) for n in n_path],
         'center_freq': 1e9 * np.arange(1.0, len(n_path) + 1.0),
         'initial_position': 2,
@@ -436,7 +436,7 @@ class test_case(unittest.TestCase):
         c = chan[0]
         shapes = {'coeff': (2, 3, 3, 2), 'delay': (2, 3, 3, 2), 'path_gain': (3, 2), 'path_length': (3, 2),
                   'path_polarization': (8, 3, 2), 'path_angles': (3, 4, 2), 'fbs_pos': (3, 3, 2),
-                  'lbs_pos': (3, 3, 2), 'no_interact': (3, 2), 'interact_coord': (3, 3, 2)}
+                  'lbs_pos': (3, 3, 2), 'n_interact': (3, 2), 'interact_coord': (3, 3, 2)}
         for key, shape in shapes.items():
             self.assertEqual(c[key].shape, shape, key)
             self.assertEqual(c[key].dtype, chan_ref[key][0].dtype, key)
@@ -452,7 +452,7 @@ class test_case(unittest.TestCase):
         fn = self.fn('forms.hdf5')
         ref = full_channel(n_path=(3, 3))
         f32 = {k: [x.astype(np.complex64 if np.iscomplexobj(x) else np.float32) for x in v]
-               if isinstance(v, list) and k != 'no_interact' else v for k, v in ref.items()}
+               if isinstance(v, list) and k != 'n_interact' else v for k, v in ref.items()}
         f32.update({k: ref[k].astype(np.float32) for k in ['tx_position', 'rx_position', 'center_freq']})
         variants = [
             ref,                                                                      # list model
@@ -464,7 +464,7 @@ class test_case(unittest.TestCase):
             f32,                                                                      # single precision
             dict({k: v for k, v in ref.items() if k != 'coeff'},                      # split coefficients
                  coeff_re=[x.real for x in ref['coeff']], coeff_im=[x.imag for x in ref['coeff']]),
-            dict(ref, no_interact=[x.astype(np.uint32) for x in ref['no_interact']],  # other integer types
+            dict(ref, n_interact=[x.astype(np.uint32) for x in ref['n_interact']],  # other integer types
                  initial_position=np.int32(2)),
         ]
         channel.hdf5_write_channel(fn, variants)
@@ -497,7 +497,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(names(ix=1, iy=1, iz=[0, 0], iw=1), ['c', 'c'])
 
         # A single slot gives one par dict; keywords reach their dimension
-        chan, par = channel.hdf5_read_channel(fn=fn, ix=1, iy=1, iz=0, iw=1, snap=None, stack=False)
+        chan, par = channel.hdf5_read_channel(fn=fn, ix=1, iy=1, iz=0, iw=1, i_snap=None, stack=False)
         self.assertEqual(chan[0]['name'], 'c')
         self.assertEqual(par, {'p': 'c'})
 
@@ -512,17 +512,17 @@ class test_case(unittest.TestCase):
 
         chan, _ = channel.hdf5_read_channel(fn, 0, 0, 0, 0, [1, 0])  # 0-based, reversed order
         c = chan[0]
-        for key in ['coeff', 'delay', 'path_gain', 'path_polarization', 'no_interact', 'interact_coord']:
+        for key in ['coeff', 'delay', 'path_gain', 'path_polarization', 'n_interact', 'interact_coord']:
             self.assert_same(c[key], [ref[key][1], ref[key][0]], key)
         self.assert_same(c['tx_position'], ref['tx_position'][:, [1, 0]])  # per-snapshot columns follow
         self.assert_same(c['rx_position'], ref['rx_position'])             # a shared column stays
         self.assert_same(c['center_freq'], ref['center_freq'][[1, 0]])
 
         for snap in [1, [1], np.array([1], dtype=np.int32), np.uint64(1)]:
-            chan, _ = channel.hdf5_read_channel(fn, snap=snap)
+            chan, _ = channel.hdf5_read_channel(fn, i_snap=snap)
             self.assert_same(chan[0]['coeff'], [ref['coeff'][1]])
 
-        chan, _ = channel.hdf5_read_channel(fn, snap=[1], stack=True)
+        chan, _ = channel.hdf5_read_channel(fn, i_snap=[1], stack=True)
         self.assertEqual(chan[0]['coeff'].shape, (2, 3, 2, 1))
 
     def test_read_channel_errors(self):
@@ -537,8 +537,8 @@ class test_case(unittest.TestCase):
                             ({'iy': [0, 2]}, "Slot index 'iy' is out of bound."),
                             ({'iz': 1}, "Slot index 'iz' is out of bound."),
                             ({'iw': 2}, "Slot index 'iw' is out of bound."),
-                            ({'snap': 0}, "'snap' is only allowed when a single slot is selected."),
-                            ({'ix': 0, 'iy': 0, 'iw': 0, 'snap': 2}, 'Snapshot index out of bound.')]:
+                            ({'i_snap': 0}, "'i_snap' is only allowed when a single slot is selected."),
+                            ({'ix': 0, 'iy': 0, 'iw': 0, 'i_snap': 2}, 'Snapshot index out of bound.')]:
             with self.assertRaises(ValueError, msg=msg) as ctx:
                 channel.hdf5_read_channel(fn, **kwargs)
             self.assertIn(msg, str(ctx.exception))

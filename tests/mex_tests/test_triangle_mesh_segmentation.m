@@ -18,12 +18,12 @@ mtl_ind = (1:12)';   % 1-based per-face material index (each face its own materi
 [mesh_sub, mtl_ind_sub] = quadriga_lib.subdivide_triangles(mesh, 3, mtl_ind);
 
 % Test 1: Mesh size is already below threshold, test padding
-[mesh_seg, sub_mesh_index, mesh_index, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 1024, 8, mtl_ind_sub);
+[mesh_seg, sub_mesh_ind, mesh_ind, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 1024, 8, mtl_ind_sub);
 
 assertTrue( size(mesh_seg,1) == 112 );
 assertTrue( numel(mtl_ind_seg) == 112 );
-assertTrue( numel(sub_mesh_index) == 1 );
-assertTrue( sub_mesh_index == uint32(1) );
+assertTrue( numel(sub_mesh_ind) == 1 );
+assertTrue( sub_mesh_ind == uint32(1) );
 
 assertElementsAlmostEqual( mesh_seg(1:108,:), mesh_sub, 'absolute', 1e-14 );
 assertElementsAlmostEqual( mesh_seg(109:end,:), zeros(4,9), 'absolute', 1e-14 );
@@ -33,22 +33,22 @@ assertEqual( mtl_ind_seg(109:end), zeros(4,1, 'like', mtl_ind_seg) );  % padding
 
 % Material indices are 1-based in C++ as well (0 = no material): they pass through unchanged
 mtl_in = mtl_ind_sub; mtl_in(2) = 0;
-[~, ~, mesh_index, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 1024, 8, mtl_in);
+[~, ~, mesh_ind, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 1024, 8, mtl_in);
 assertEqual( mtl_ind_seg(1:108), mtl_in );
 assertEqual( mtl_ind_seg(2), uint64(0) );
 assertEqual( mtl_ind_seg(109:end), zeros(4,1, 'like', mtl_ind_seg) );
 [~, ~, ~, mtlR] = quadriga_lib.triangle_mesh_segmentation(quadriga_lib.cube(), 1024, 8, (1:12)');
 assertEqual( double(mtlR(:)'), [1:12, 0, 0, 0, 0] );
 
-assertEqual( mesh_index(1:108), uint32(1:108)' );
+assertEqual( mesh_ind(1:108), uint32(1:108)' );
 
 % Test 2: Subdivide, no padding
-[mesh_seg, sub_mesh_index, mesh_index, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64, 1, mtl_ind_sub);
+[mesh_seg, sub_mesh_ind, mesh_ind, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64, 1, mtl_ind_sub);
 
-assertTrue( numel(sub_mesh_index) == 3 );
+assertTrue( numel(sub_mesh_ind) == 3 );
 assertTrue( size(mesh_seg,1) == 108 );
 assertTrue( numel(mtl_ind_seg) == 108 );
-assertTrue( sub_mesh_index(1) == uint32(1) );
+assertTrue( sub_mesh_ind(1) == uint32(1) );
 
 % No outputs
 quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64, 1, mtl_ind_sub);

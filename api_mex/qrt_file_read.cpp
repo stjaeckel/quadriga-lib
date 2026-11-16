@@ -17,14 +17,14 @@ Read ray-tracing CIR data from a QRT file
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
 - If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 
 ## Usage:
 ```
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type ] = ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
 
@@ -62,12 +62,12 @@ Read ray-tracing CIR data from a QRT file
 - **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path]`
 - **`path_coord`** — Interaction coordinates per path; Cell of length `n_out`;
   elements Cell of length `n_path`, each `[3, n_interact + 2]`
-- **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
+- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
   Cell of length `n_out`; elements `[n_path]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
-  Cell of length `n_out`; elements `[3, sum(no_int)]`
+  Cell of length `n_out`; elements `[3, sum(n_interact)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  Cell of length `n_out`; elements `[sum(n_interact)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ## See also:
@@ -192,7 +192,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec path_length, aod, eod, aoa, eoa;
     arma::cube M;
     std::vector<arma::mat> path_coord;
-    arma::u32_vec no_int;
+    arma::u32_vec n_interact;
     arma::fmat coord;
     std::vector<uint8_t> interact_type;
 
@@ -211,7 +211,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_aoa = (nlhs > 12) ? &aoa : nullptr;
     arma::vec *p_eoa = (nlhs > 13) ? &eoa : nullptr;
     std::vector<arma::mat> *p_path_coord = (nlhs > 14) ? &path_coord : nullptr;
-    arma::u32_vec *p_no_int = (nlhs > 15) ? &no_int : nullptr;
+    arma::u32_vec *p_no_int = (nlhs > 15) ? &n_interact : nullptr;
     arma::fmat *p_coord = (nlhs > 16) ? &coord : nullptr;
     std::vector<uint8_t> *p_interact_type = (nlhs > 17) ? &interact_type : nullptr;
 
@@ -262,7 +262,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             mxSetCell(plhs[14], i_out, out);
         }
         if (nlhs > 15)
-            mxSetCell(plhs[15], i_out, qd_mex_copy2matlab(&no_int));
+            mxSetCell(plhs[15], i_out, qd_mex_copy2matlab(&n_interact));
         if (nlhs > 16)
             mxSetCell(plhs[16], i_out, qd_mex_copy2matlab(&coord));
         if (nlhs > 17)

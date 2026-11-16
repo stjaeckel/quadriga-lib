@@ -47,12 +47,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read input
     const std::string fn = qd_mex_get_string(prhs[0]);
 
-    // Read storage layout (and channelIDs when requested)
+    // Read storage layout (and channel IDs when requested)
     arma::Col<unsigned> storage_space;
-    arma::Col<unsigned> channelID;
-    arma::Col<unsigned> *p_channelID = (nlhs > 1) ? &channelID : nullptr;
+    arma::Col<unsigned> channel_id;
+    arma::Col<unsigned> *p_channel_id = (nlhs > 1) ? &channel_id : nullptr;
 
-    CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn, p_channelID));
+    CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn, p_channel_id));
 
     // Return storage space as 1x4 row vector
     if (nlhs > 0)
@@ -67,13 +67,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                  nw = storage_space.at(3);
 
         unsigned n_data = nx * ny * nz * nw;
-        if (channelID.n_elem != (arma::uword)n_data)
+        if (channel_id.n_elem != (arma::uword)n_data)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Corrupted storage index.");
 
         mwSize dims[4] = {(mwSize)nx, (mwSize)ny, (mwSize)nz, (mwSize)nw};
         plhs[1] = mxCreateLogicalArray(4, dims);
         mxLogical *ptrO = mxGetLogicals(plhs[1]);
-        const unsigned *ptrI = channelID.memptr();
+        const unsigned *ptrI = channel_id.memptr();
 
         for (unsigned n = 0; n < n_data; ++n)
             if (ptrI[n] != 0)

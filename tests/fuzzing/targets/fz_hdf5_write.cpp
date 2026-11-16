@@ -108,13 +108,13 @@ static void run(fz::input &in)
             c.path_fbs_pos.push_back(in.mat<T>(sz(3), sz(n_path))), c.path_lbs_pos.push_back(in.mat<T>(sz(3), sz(n_path)));
         if (mask & 256)
         {
-            arma::Col<unsigned> no_int(sz(n_path));
-            for (auto &v : no_int)
+            arma::Col<unsigned> n_interact(sz(n_path));
+            for (auto &v : n_interact)
                 v = in.ConsumeIntegralInRange<int>(0, 15) == 0 ? in.ConsumeIntegral<unsigned>() : in.ConsumeIntegralInRange<unsigned>(0, 3);
             arma::uword total = 0;
-            for (auto v : no_int)
+            for (auto v : n_interact)
                 total += v < 4 ? v : 0;
-            c.no_interact.push_back(no_int);
+            c.n_interact.push_back(n_interact);
             c.interact_coord.push_back(in.mat<T>(sz(3), sz(total)));
         }
     }
@@ -130,7 +130,7 @@ static void run(fz::input &in)
             c.delay.resize(n);
             break;
         case 2:
-            c.no_interact.resize(n);
+            c.n_interact.resize(n);
             break;
         default:
             c.path_gain.resize(n);

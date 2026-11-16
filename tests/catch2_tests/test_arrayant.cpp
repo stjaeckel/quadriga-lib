@@ -230,7 +230,7 @@ TEST_CASE("Arrayant copy_element - Empty destination")
     }
     catch (const std::invalid_argument &e)
     {
-        CHECK(std::string(e.what()).find("destination") != std::string::npos);
+        CHECK(std::string(e.what()).find("i_target") != std::string::npos);
     }
     CHECK(a.n_elements() == 1);
 

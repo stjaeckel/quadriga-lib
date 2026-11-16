@@ -28,14 +28,14 @@ static void run(fz::input &in)
 
     // Segmentation; vec_size is small or the largest value
     arma::Mat<T> pointsR(in.size(3), 3);
-    arma::u32_vec sub_cloud_index, forward_index(in.size(3)), reverse_index;
+    arma::u32_vec sub_cloud_ind, forward_ind(in.size(3)), reverse_ind;
     const arma::uword target_size = in.size(70);
     const arma::uword vec_size = in.ConsumeIntegralInRange<int>(0, 15) == 0 ? std::numeric_limits<arma::uword>::max() : in.size(33);
     const int seg_mask = in.ConsumeIntegralInRange<int>(0, 15);
     fz::clean([&]
-              { quadriga_lib::point_cloud_segmentation<T>(&points, (seg_mask & 1) ? &pointsR : nullptr, (seg_mask & 2) ? &sub_cloud_index : nullptr,
-                                                          target_size, vec_size, (seg_mask & 4) ? &forward_index : nullptr,
-                                                          (seg_mask & 8) ? &reverse_index : nullptr); });
+              { quadriga_lib::point_cloud_segmentation<T>(&points, (seg_mask & 1) ? &pointsR : nullptr, (seg_mask & 2) ? &sub_cloud_ind : nullptr,
+                                                          target_size, vec_size, (seg_mask & 4) ? &forward_ind : nullptr,
+                                                          (seg_mask & 8) ? &reverse_ind : nullptr); });
 
     // AABB of fuzzed or segmented sub-clouds
     arma::u32_vec sci(in.size(8));
@@ -45,7 +45,7 @@ static void run(fz::input &in)
         sci = arma::sort(sci);
     const arma::Mat<T> &aabb_points = (in.ConsumeBool() && pointsR.n_rows != 0) ? pointsR : points;
     const int aabb_mode = in.ConsumeIntegralInRange<int>(0, 2);
-    const arma::u32_vec *aabb_sci = aabb_mode == 0 ? nullptr : (aabb_mode == 1 ? &sci : &sub_cloud_index);
+    const arma::u32_vec *aabb_sci = aabb_mode == 0 ? nullptr : (aabb_mode == 1 ? &sci : &sub_cloud_ind);
     const arma::uword vec_size_aabb = in.size(9);
     fz::clean([&] { quadriga_lib::point_cloud_aabb<T>(&aabb_points, aabb_sci, vec_size_aabb); });
 

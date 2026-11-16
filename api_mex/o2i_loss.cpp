@@ -31,7 +31,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 ## Usage:
 ```
-[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
+[ loss, d2d_in, model_ind ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
 ```
 
 ## Inputs:
@@ -49,7 +49,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 ## Outputs:
 - **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** — Indoor 2D distance in [m], 0 for the car models; `[n_ut, 1]`
-- **`model_index`** — Chosen model per UT, 1-based index into `models`; uint64; `[n_ut, 1]`
+- **`model_ind`** — Chosen model per UT, 1-based index into `models`; uint64; `[n_ut, 1]`
 
 ## See also:
 - [[los_probability]] (uses the outdoor distance `d2D - d2d_in`)
@@ -74,22 +74,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Output allocation
     arma::mat loss;
     arma::vec d2d_in;
-    arma::uvec model_index;
+    arma::uvec model_ind;
     if (nlhs > 0)
         plhs[0] = qd_mex_init_output(&loss, rnd.n_rows, center_freq.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&d2d_in, rnd.n_rows);
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&model_index, rnd.n_rows);
+        plhs[2] = qd_mex_init_output(&model_ind, rnd.n_rows);
 
     // Wrap optional pointers
     arma::vec *p_d2d_in = (nlhs > 1) ? &d2d_in : nullptr;
-    arma::uvec *p_model_index = (nlhs > 2) ? &model_index : nullptr;
+    arma::uvec *p_model_index = (nlhs > 2) ? &model_ind : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::o2i_loss(center_freq, rnd, models, weights, loss, d2d_in_max, p_d2d_in, p_model_index));
 
     // Model index: 0-based (C++) -> 1-based (MATLAB)
     if (nlhs > 2)
-        model_index += 1;
+        model_ind += 1;
 }

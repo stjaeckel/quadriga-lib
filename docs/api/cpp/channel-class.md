@@ -38,8 +38,8 @@ Not in: MATLAB, Python
 | `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
 | `std::vector<arma::Mat<dtype>> path_fbs_pos`      | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
 | `std::vector<arma::Mat<dtype>> path_lbs_pos`      | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
-| `std::vector<arma::Col<unsigned>> no_interact`    | per snap `[n_path]`                                             | Number of interactions per path                             |
-| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(no_interact)]`                                | Interaction point coordinates                               |
+| `std::vector<arma::Col<unsigned>> n_interact`     | per snap `[n_path]`                                             | Number of interactions per path                             |
+| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(n_interact)]`                                 | Interaction point coordinates                               |
 | `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
 | `std::vector<std::any> par_data`                  | —                                                               | Unstructured metadata values (string, scalar, matrix, etc.) |
 | `int initial_position`                            | scalar                                                          | 0-based index of the reference snapshot                     |
@@ -77,7 +77,7 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Cube<dtype> *coeff_re_add = nullptr,
     const arma::Cube<dtype> *coeff_im_add = nullptr,
     const arma::Cube<dtype> *delay_add = nullptr,
-    const arma::u32_vec *no_interact_add = nullptr,
+    const arma::u32_vec *n_interact_add = nullptr,
     const arma::Mat<dtype> *interact_coord_add = nullptr,
     const arma::Col<dtype> *path_gain_add = nullptr,
     const arma::Col<dtype> *path_length_add = nullptr,
@@ -92,8 +92,8 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`coeff_re_add`** *(optional)* — Real part of channel coefficients; `[n_rx, n_tx, n_path_add]`
 - **`coeff_im_add`** *(optional)* — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_add]`
 - **`delay_add`** *(optional)* — Propagation delays in seconds; `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`
-- **`no_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
-- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(no_interact)]`
+- **`n_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
+- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(n_interact)]`
 - **`path_gain_add`** *(optional)* — Path gains before antenna effects; `[n_path_add]`
 - **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
 - **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
@@ -129,14 +129,14 @@ Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Pytho
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min` are excluded; `max_no_paths` limits total count
+- Paths below `gain_min` are excluded; `max_paths` limits total count
 - Paths with non-finite coordinates are skipped
 
 ### Declaration:
 ```cpp
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     std::string fn,
-    arma::uword max_no_paths = 0,
+    arma::uword max_paths = 0,
     dtype gain_max = -60.0,
     dtype gain_min = -140.0,
     std::string colormap = "jet",
@@ -148,7 +148,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_no_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options

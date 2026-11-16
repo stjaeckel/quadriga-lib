@@ -82,22 +82,22 @@ TEST_CASE("QRT Write - init writes a parseable header")
 
     quadriga_lib::qrt_file_init<float>(fn, freq, cir_pos, cir_orient, dest_names, cir_offset, 3, false);
 
-    arma::uword no_cir, no_orig, no_dest, no_freq;
+    arma::uword n_cir, n_orig, n_dest, n_freq;
     int version;
     arma::fvec center_freq_f;
     arma::fmat rd_cir_pos, rd_cir_orient, rd_orig_pos, rd_orig_orient;
     arma::uvec rd_offset;
     std::vector<std::string> orig_names, rd_dest_names;
 
-    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &rd_offset,
+    quadriga_lib::qrt_file_parse(fn, &n_cir, &n_orig, &n_dest, &n_freq, &rd_offset,
                                  &orig_names, &rd_dest_names, &version, &center_freq_f,
                                  &rd_cir_pos, &rd_cir_orient, &rd_orig_pos, &rd_orig_orient);
 
     CHECK(version == 5); // EM
-    CHECK(no_orig == 3ULL);
-    CHECK(no_cir == 4ULL);
-    CHECK(no_dest == 2ULL);
-    CHECK(no_freq == 1ULL);
+    CHECK(n_orig == 3ULL);
+    CHECK(n_cir == 4ULL);
+    CHECK(n_dest == 2ULL);
+    CHECK(n_freq == 1ULL);
     REQUIRE(center_freq_f.n_elem == 1);
     CHECK(std::abs(center_freq_f(0) / 3.75e9f - 1.0f) < 1.0e-6f); // Hz in, Hz out; the file stores GHz
 
@@ -132,13 +132,13 @@ TEST_CASE("QRT Write - scalar init selects v6")
 
     quadriga_lib::qrt_file_init<float>(fn, freq, cir_pos, cir_orient, dest_names, cir_offset, 1, true);
 
-    arma::uword no_freq;
+    arma::uword n_freq;
     int version;
     arma::fvec center_freq;
-    quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, &no_freq, nullptr,
+    quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, &n_freq, nullptr,
                                  nullptr, nullptr, &version, &center_freq);
     CHECK(version == 6);
-    CHECK(no_freq == 3ULL);
+    CHECK(n_freq == 3ULL);
     CHECK(arma::approx_equal(center_freq, freq, "reldiff", 1.0e-6)); // Scalar files store Hz, no conversion
 
     std::remove(fn.c_str());
@@ -155,7 +155,7 @@ TEST_CASE("QRT Write - init argument validation")
     // Empty frequency vector.
     CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec(), cir_pos, cir_orient, names, off, 1, false),
                     std::invalid_argument);
-    // no_orig == 0.
+    // n_orig == 0.
     CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, names, off, 0, false),
                     std::invalid_argument);
     // cir_pos wrong shape.
@@ -362,12 +362,12 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     // qrt_file_read on the unwritten origin returns empty outputs (no throw).
     arma::Col<double> tx_pos_out, path_length;
     arma::Mat<double> path_gain;
-    arma::u32_vec no_int;
+    arma::u32_vec n_interact;
     quadriga_lib::qrt_file_read<double>(fn, 0, 1, true, nullptr, &tx_pos_out, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &path_gain,
                                         &path_length, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                        nullptr, 0, &no_int, nullptr, nullptr);
-    CHECK(no_int.n_elem == 0);
+                                        nullptr, 0, &n_interact, nullptr, nullptr);
+    CHECK(n_interact.n_elem == 0);
     CHECK(path_length.n_elem == 0);
 
     // Out-of-range origin still throws.
@@ -532,12 +532,12 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
         for (unsigned c = 0; c < 3; ++c)
         {
             arma::vec rx_pos, rx_ori;
-            arma::u32_vec no_int;
+            arma::u32_vec n_interact;
             quadriga_lib::qrt_file_read<double>(fn, c, 0, true, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
-                                                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &no_int);
+                                                nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
             CHECK(arma::approx_equal(rx_pos, cir_pos.row(c).t(), "absdiff", 0.0));
             CHECK(rx_ori(2) == (c == 1 ? 0.25 : 0.0));
-            CHECK(no_int.n_elem == (c == 0 ? 2u : c == 2 ? 1u : 0u));
+            CHECK(n_interact.n_elem == (c == 0 ? 2u : c == 2 ? 1u : 0u));
         }
         std::remove(fn.c_str());
     }

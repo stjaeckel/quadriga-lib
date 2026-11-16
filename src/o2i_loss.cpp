@@ -44,7 +44,7 @@ void quadriga_lib::o2i_loss(
     arma::mat &loss,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
-    arma::uvec *model_index = nullptr);
+    arma::uvec *model_ind = nullptr);
 ```
 
 ## Inputs:
@@ -59,7 +59,7 @@ void quadriga_lib::o2i_loss(
 ## Outputs:
 - **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
-- **`model_index`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
+- **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
 
 ## See also:
 - [[los_probability]] (uses the outdoor distance `d2D - d2d_in`)
@@ -73,7 +73,7 @@ void quadriga_lib::o2i_loss(const arma::vec &center_freq,
                             arma::mat &loss,
                             double d2d_in_max,
                             arma::vec *d2d_in,
-                            arma::uvec *model_index)
+                            arma::uvec *model_ind)
 {
     // Carrier frequencies
     qd_gbsm_check_fc(center_freq);
@@ -156,8 +156,8 @@ void quadriga_lib::o2i_loss(const arma::vec &center_freq,
         loss.set_size(n_ut, n_freq);
     if (d2d_in != nullptr && d2d_in->n_elem != n_ut)
         d2d_in->set_size(n_ut);
-    if (model_index != nullptr && model_index->n_elem != n_ut)
-        model_index->set_size(n_ut);
+    if (model_ind != nullptr && model_ind->n_elem != n_ut)
+        model_ind->set_size(n_ut);
 
     for (arma::uword u = 0; u < n_ut; ++u)
     {
@@ -195,7 +195,7 @@ void quadriga_lib::o2i_loss(const arma::vec &center_freq,
 
         if (d2d_in != nullptr)
             d2d_in->at(u) = din;
-        if (model_index != nullptr)
-            model_index->at(u) = j;
+        if (model_ind != nullptr)
+            model_ind->at(u) = j;
     }
 }

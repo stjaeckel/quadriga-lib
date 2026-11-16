@@ -143,16 +143,16 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
         arma::vec cf, tx, rx, pl;
         arma::mat fbs, lbs, pg;
         arma::cube M;
-        arma::u32_vec no_int;
+        arma::u32_vec n_interact;
         std::vector<uint8_t> itype;
         quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &cf, &tx, nullptr, &rx, nullptr, &fbs, &lbs, &pg, &pl, &M,
-                                            nullptr, nullptr, nullptr, nullptr, nullptr, norm, &no_int, nullptr, &itype);
+                                            nullptr, nullptr, nullptr, nullptr, nullptr, norm, &n_interact, nullptr, &itype);
         REQUIRE(pg.n_rows == n_path);
         REQUIRE(pg.n_cols == n_freq);
         REQUIRE(M.n_rows == 8);
         REQUIRE(M.n_cols == n_path);
         REQUIRE(M.n_slices == n_freq);
-        REQUIRE(no_int.n_elem == n_path);
+        REQUIRE(n_interact.n_elem == n_path);
         CHECK(arma::approx_equal(cf, r.center_freq, "reldiff", 1e-6));
 
         std::vector<uint8_t> codes;
@@ -160,7 +160,7 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
         {
             const arma::uword t = r.path_type(p);
             INFO("path " << p << ", type " << t);
-            CHECK(no_int(p) == t);
+            CHECK(n_interact(p) == t);
             if (t == 1)
                 codes.push_back(129);
             if (t == 2)

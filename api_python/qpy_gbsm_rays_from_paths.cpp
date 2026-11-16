@@ -19,7 +19,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
-  GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `no_int` of
+  GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `n_interact` of
   [[qrt_file_read]] (interaction count = path type); for ray-traced files the user sets it (values > 2 raise
   `ValueError`)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0

@@ -173,31 +173,31 @@ TEST_CASE("Tools - Combine IRS Coord")
 {
     double Ix = 10.0, Iy = 10.0, Iz = 0.0;
 
-    arma::u32_vec no_interact_1 = {2, 0};
+    arma::u32_vec n_interact_1 = {2, 0};
     arma::mat interact_coord_1 = {{2.0, 8.0}, {2.0, 2.0}, {2.0, 2.0}};
 
-    arma::u32_vec no_interact_2 = {0, 2};
+    arma::u32_vec n_interact_2 = {0, 2};
     arma::mat interact_coord_2 = {{12.0, 12.0}, {2.0, 8.0}, {-2.0, -2.0}};
 
-    arma::u32_vec no_interact;
+    arma::u32_vec n_interact;
     arma::mat interact_coord;
 
     std::vector active_path(3, true);
     REQUIRE_THROWS_AS(quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
-                                                      &no_interact_1, &interact_coord_1, &no_interact_2, &interact_coord_2,
-                                                      &no_interact, &interact_coord, 1, 1, &active_path),
+                                                      &n_interact_1, &interact_coord_1, &n_interact_2, &interact_coord_2,
+                                                      &n_interact, &interact_coord, 1, 1, &active_path),
                       std::invalid_argument);
 
     active_path = std::vector(4, true);
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
-                                    &no_interact_1, &interact_coord_1, &no_interact_2, &interact_coord_2,
-                                    &no_interact, &interact_coord);
+                                    &n_interact_1, &interact_coord_1, &n_interact_2, &interact_coord_2,
+                                    &n_interact, &interact_coord);
 
-    CHECK(no_interact.n_elem == 4);
-    CHECK(no_interact(0) == 3);
-    CHECK(no_interact(1) == 5);
-    CHECK(no_interact(2) == 1);
-    CHECK(no_interact(3) == 3);
+    CHECK(n_interact.n_elem == 4);
+    CHECK(n_interact(0) == 3);
+    CHECK(n_interact(1) == 5);
+    CHECK(n_interact(2) == 1);
+    CHECK(n_interact(3) == 3);
 
     arma::mat T = {{2, 8, 10, 2, 8, 10, 12, 12, 10, 10, 12, 12},
                    {2, 2, 10, 2, 2, 10, 2, 8, 10, 10, 2, 8},
@@ -206,8 +206,8 @@ TEST_CASE("Tools - Combine IRS Coord")
 
     // Reverse first segment
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
-                                    &no_interact_1, &interact_coord_1, &no_interact_2, &interact_coord_2,
-                                    &no_interact, &interact_coord, 1, 0);
+                                    &n_interact_1, &interact_coord_1, &n_interact_2, &interact_coord_2,
+                                    &n_interact, &interact_coord, 1, 0);
 
     T = {{8, 2, 10, 8, 2, 10, 12, 12, 10, 10, 12, 12},
          {2, 2, 10, 2, 2, 10, 2, 8, 10, 10, 2, 8},
@@ -216,8 +216,8 @@ TEST_CASE("Tools - Combine IRS Coord")
 
     // Reverse both segment2
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
-                                    &no_interact_1, &interact_coord_1, &no_interact_2, &interact_coord_2,
-                                    &no_interact, &interact_coord, 1, 1);
+                                    &n_interact_1, &interact_coord_1, &n_interact_2, &interact_coord_2,
+                                    &n_interact, &interact_coord, 1, 1);
 
     T = {{8, 2, 10, 8, 2, 10, 12, 12, 10, 10, 12, 12},
          {2, 2, 10, 2, 2, 10, 8, 2, 10, 10, 8, 2},
@@ -227,13 +227,13 @@ TEST_CASE("Tools - Combine IRS Coord")
     // Disable first path
     active_path[0] = false;
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
-                                    &no_interact_1, &interact_coord_1, &no_interact_2, &interact_coord_2,
-                                    &no_interact, &interact_coord, 0, 1, &active_path);
+                                    &n_interact_1, &interact_coord_1, &n_interact_2, &interact_coord_2,
+                                    &n_interact, &interact_coord, 0, 1, &active_path);
 
-    CHECK(no_interact.n_elem == 3);
-    CHECK(no_interact(0) == 5);
-    CHECK(no_interact(1) == 1);
-    CHECK(no_interact(2) == 3);
+    CHECK(n_interact.n_elem == 3);
+    CHECK(n_interact(0) == 5);
+    CHECK(n_interact(1) == 1);
+    CHECK(n_interact(2) == 3);
 
     T = {{2, 8, 10, 12, 12, 10, 10, 12, 12},
          {2, 2, 10, 8, 2, 10, 10, 8, 2},
@@ -244,11 +244,11 @@ TEST_CASE("Tools - Combine IRS Coord")
     active_path[1] = false;
     active_path[3] = false;
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
-                                    &no_interact_1, &interact_coord_1, &no_interact_2, &interact_coord_2,
-                                    &no_interact, &interact_coord, 0, 0, &active_path);
+                                    &n_interact_1, &interact_coord_1, &n_interact_2, &interact_coord_2,
+                                    &n_interact, &interact_coord, 0, 0, &active_path);
 
-    CHECK(no_interact.n_elem == 1);
-    CHECK(no_interact(0) == 1);
+    CHECK(n_interact.n_elem == 1);
+    CHECK(n_interact(0) == 1);
 
     T = {10, 10, 0};
     CHECK(arma::approx_equal(interact_coord, T.t(), "absdiff", 1e-14));
@@ -321,31 +321,31 @@ TEST_CASE("Channel - Add Paths")
     CHECK(n_paths[1] == 9ULL);
 
     // Create IRS
-    arma::u32_vec no_interact_irs = {1, 2, 3};
+    arma::u32_vec n_interact_irs = {1, 2, 3};
     arma::mat interact_coord_irs = arma::mat(3, 6, arma::fill::randn);
     auto coeff_irs = arma::cube(2, 3, 3, arma::fill::randn);
     auto delay_irs = arma::cube(1, 1, 3, arma::fill::randn);
 
     // Try to add IRS to channel without coords
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_irs, &coeff_irs, &delay_irs, &no_interact_irs, &interact_coord_irs), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_irs, &coeff_irs, &delay_irs, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
 
     // Add interaction coordinates to channel
-    arma::u32_vec no_interact_add = {0, 1, 2, 3, 4, 5, 6, 7, 8};
-    c.no_interact.push_back(no_interact_add);
-    c.no_interact.push_back(no_interact_add);
-    auto sum_no_interact = (arma::uword)arma::sum(no_interact_add);
+    arma::u32_vec n_interact_add = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    c.n_interact.push_back(n_interact_add);
+    c.n_interact.push_back(n_interact_add);
+    auto sum_no_interact = (arma::uword)arma::sum(n_interact_add);
     c.interact_coord.push_back(arma::mat(3, sum_no_interact, arma::fill::randn));
     c.interact_coord.push_back(c.interact_coord[0]);
 
     // Missing Coord
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, &no_interact_irs), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, &n_interact_irs), std::invalid_argument);
     REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, nullptr, &interact_coord_irs), std::invalid_argument);
 
     // Mismatching number of paths
-    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, &no_interact_irs, &interact_coord_irs), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.add_paths(0, &coeff_new, &coeff_new, &coeff_alt, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
 
     // Correct
-    c.add_paths(0, &coeff_irs, &coeff_irs, &delay_irs, &no_interact_irs, &interact_coord_irs);
+    c.add_paths(0, &coeff_irs, &coeff_irs, &delay_irs, &n_interact_irs, &interact_coord_irs);
     CHECK(c.is_valid().size() == 0);
     CHECK(arma::approx_equal(c.interact_coord[0].cols(0, sum_no_interact - 1), c.interact_coord[1], "absdiff", 1e-14));
     CHECK(arma::approx_equal(c.interact_coord[0].cols(sum_no_interact, sum_no_interact + 5), interact_coord_irs, "absdiff", 1e-14));
@@ -354,14 +354,14 @@ TEST_CASE("Channel - Add Paths")
     CHECK(n_paths[1] == 9ULL);
 
     // Adding coords without coefficients should fail
-    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, &no_interact_irs, &interact_coord_irs), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
 
     // Add coords to a channel without coefficients
     c.coeff_re.clear();
     c.coeff_im.clear();
     c.delay.clear();
-    REQUIRE_THROWS_AS(c.add_paths(1, &coeff_irs, &coeff_irs, &delay_irs, &no_interact_irs, &interact_coord_irs), std::invalid_argument);
-    c.add_paths(1, nullptr, nullptr, nullptr, &no_interact_irs, &interact_coord_irs);
+    REQUIRE_THROWS_AS(c.add_paths(1, &coeff_irs, &coeff_irs, &delay_irs, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
+    c.add_paths(1, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs);
     CHECK(c.is_valid().size() == 0);
     CHECK(arma::approx_equal(c.interact_coord[1].cols(sum_no_interact, sum_no_interact + 5), interact_coord_irs, "absdiff", 1e-14));
     n_paths = c.n_path();
@@ -372,17 +372,17 @@ TEST_CASE("Channel - Add Paths")
     auto path_gain = arma::vec(3, arma::fill::randn);
     c.path_gain.push_back(arma::vec(12, arma::fill::randn));
     c.path_gain.push_back(arma::vec(12, arma::fill::randn));
-    c.add_paths(0, nullptr, nullptr, nullptr, &no_interact_irs, &interact_coord_irs, &path_gain);
+    c.add_paths(0, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs, &path_gain);
     CHECK(c.is_valid().size() == 0);
     n_paths = c.n_path();
     CHECK(n_paths[0] == 15ULL);
     CHECK(n_paths[1] == 12ULL);
 
     // The channel object has 'path_gain', but no 'path_gain_add' are added!
-    REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, nullptr, &no_interact_irs, &interact_coord_irs), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.add_paths(0, nullptr, nullptr, nullptr, &n_interact_irs, &interact_coord_irs), std::invalid_argument);
 
     // Add path_length
-    c.no_interact.clear();
+    c.n_interact.clear();
     c.interact_coord.clear();
     auto path_length = arma::vec(1, arma::fill::randn);
 
@@ -491,13 +491,13 @@ TEST_CASE("Tools - Combine IRS Coord inactive")
 
     float Ix = 1.0f, Iy = 2.0f, Iz = 3.0f;
 
-    arma::u32_vec no_interact_1 = {1};
+    arma::u32_vec n_interact_1 = {1};
     arma::Mat<float> interact_coord_1(3, 1, arma::fill::zeros);
     interact_coord_1(0, 0) = 10.0f;
     interact_coord_1(1, 0) = 11.0f;
     interact_coord_1(2, 0) = 12.0f;
 
-    arma::u32_vec no_interact_2 = {1, 2, 1};
+    arma::u32_vec n_interact_2 = {1, 2, 1};
     arma::Mat<float> interact_coord_2(3, 4, arma::fill::zeros);
     interact_coord_2(0, 0) = 20.0f;
     interact_coord_2(1, 0) = 21.0f;
@@ -514,19 +514,19 @@ TEST_CASE("Tools - Combine IRS Coord inactive")
 
     std::vector<bool> active_path = {true, false, true};
 
-    arma::u32_vec no_interact;
+    arma::u32_vec n_interact;
     arma::Mat<float> interact_coord;
 
     quadriga_lib::combine_irs_coord({Ix, Iy, Iz},
-                                    &no_interact_1, &interact_coord_1,
-                                    &no_interact_2, &interact_coord_2,
-                                    &no_interact, &interact_coord,
+                                    &n_interact_1, &interact_coord_1,
+                                    &n_interact_2, &interact_coord_2,
+                                    &n_interact, &interact_coord,
                                     false, false, &active_path);
 
     // Two active paths, each with 3 interaction points: seg1 + IRS + seg2
-    REQUIRE(no_interact.n_elem == 2);
-    CHECK(no_interact(0) == 3);
-    CHECK(no_interact(1) == 3);
+    REQUIRE(n_interact.n_elem == 2);
+    CHECK(n_interact(0) == 3);
+    CHECK(n_interact(1) == 3);
 
     REQUIRE(interact_coord.n_cols == 6);
 
@@ -703,21 +703,21 @@ TEST_CASE("Get Channels IRS - A segment without paths gives empty outputs")
 
 TEST_CASE("combine_irs_coord - outputs that alias inputs")
 {
-    arma::u32_vec n1 = {1, 0}, n2 = {1}, no_interact;
+    arma::u32_vec n1 = {1, 0}, n2 = {1}, n_interact;
     arma::mat c1 = arma::vec({1.0, 2.0, 3.0}), c2 = arma::vec({4.0, 5.0, 6.0}), coord;
-    CHECK_NOTHROW(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &c1, &n2, &c2, &no_interact, &coord));
+    CHECK_NOTHROW(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &c1, &n2, &c2, &n_interact, &coord));
 
     arma::u32_vec m1 = n1, m2 = n2;
     arma::mat d1 = c1, d2 = c2;
     CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &m1, &c1, &n2, &c2, &m1, &coord), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &c1, &m2, &c2, &m2, &coord), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &d1, &n2, &c2, &no_interact, &d1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &c1, &n2, &d2, &no_interact, &d2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &d1, &n2, &c2, &n_interact, &d1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &c1, &n2, &d2, &n_interact, &d2), std::invalid_argument);
     CHECK(arma::all(m1 == n1));
     CHECK(arma::approx_equal(d1, c1, "absdiff", 0.0));
 
     arma::mat view(d2.memptr(), 3, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &c1, &n2, &d2, &no_interact, &view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::combine_irs_coord({0.0, 0.0, 0.0}, &n1, &c1, &n2, &d2, &n_interact, &view), std::invalid_argument);
 }
 
 TEST_CASE("Get Channels IRS - outputs that alias inputs")

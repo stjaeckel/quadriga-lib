@@ -59,7 +59,7 @@ static void compute_ray_tube_data(const arma::Mat<dtype> &orig,    // [n_ray, 3]
     rD3 = dtype(1.0) / (D3x % Nx + D3y % Ny + D3z % Nz);
 }
 
-// --- Helper: Compute AABBs from pointsR and sub_cloud_index ---
+// --- Helper: Compute AABBs from pointsR and sub_cloud_ind ---
 // Allocates AABB arrays of size n_sub_s (padded to vec_size) and fills them
 // by scanning points within each sub-cloud range.
 template <typename dtype>
@@ -112,18 +112,18 @@ static inline unsigned long long rpi_record(unsigned i_point, unsigned i_ray)
 }
 
 // --- Helper: Rebuild the per-ray point lists from the CSR output ---
-// The qd_RPI kernels now produce a point-major CSR list: hit_index holds ray
+// The qd_RPI kernels now produce a point-major CSR list: hit_ind holds ray
 // indices grouped by point, hit_offset marks the start of each point's block.
 // The checks below were written against the older ray-major layout, so this
 // transposes the CSR back into that form and leaves the checks untouched.
-static std::vector<std::vector<unsigned>> hit_lists_from_csr(const std::vector<unsigned> &hit_index,
+static std::vector<std::vector<unsigned>> hit_lists_from_csr(const std::vector<unsigned> &hit_ind,
                                                              const arma::u32_vec &hit_offset,
                                                              size_t n_ray, size_t n_point)
 {
     std::vector<std::vector<unsigned>> hit_lists(n_ray);
     for (size_t i_point = 0; i_point < n_point; ++i_point)
         for (unsigned i = hit_offset.at(i_point); i < hit_offset.at(i_point + 1); ++i)
-            hit_lists[hit_index[i]].push_back((unsigned)i_point);
+            hit_lists[hit_ind[i]].push_back((unsigned)i_point);
     return hit_lists;
 }
 
@@ -158,14 +158,14 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
 
     // Create sub-cloud index with vec_size=8
     arma::fmat pointsR;
-    arma::u32_vec sub_cloud_index;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 4, 8);
+    arma::u32_vec sub_cloud_ind;
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
     // Compute AABBs
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
-    compute_aabb(pointsR, sub_cloud_index, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
+    compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
     // Generate ray beams from icosphere
     arma::fmat orig, trivec, tridir;
@@ -187,12 +187,12 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
                           rD1, rD2, rD3);
 
     // Allocate output
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
 
     // Call GENERIC implementation
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
-                          sub_cloud_index.memptr(),
+                          sub_cloud_ind.memptr(),
                           Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
                           n_sub,
                           T1x.memptr(), T1y.memptr(), T1z.memptr(),
@@ -203,19 +203,19 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
                           D2x.memptr(), D2y.memptr(), D2z.memptr(),
                           D3x.memptr(), D3y.memptr(), D3z.memptr(),
                           rD1.memptr(), rD2.memptr(), rD3.memptr(),
-                          n_ray, &hit_index, hit_offset.memptr());
+                          n_ray, &hit_ind, hit_offset.memptr());
 
-    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_index, hit_offset, n_ray, n_point);
+    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_ind, hit_offset, n_ray, n_point);
 
     // Every point should be hit exactly once
     arma::u32_vec hit_count = count_hits_per_point(hit_lists.data(), n_ray, n_point);
 
     // The original 16 points must each be hit; padded points may or may not be hit
-    // Use reverse_index to check only the original points
-    arma::u32_vec reverse_index;
-    quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 4, 8, nullptr, &reverse_index);
+    // Use reverse_ind to check only the original points
+    arma::u32_vec reverse_ind;
+    quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8, nullptr, &reverse_ind);
     for (arma::uword i = 0; i < points.n_rows; ++i)
-        CHECK(hit_count.at(reverse_index.at(i)) >= 1);
+        CHECK(hit_count.at(reverse_ind.at(i)) >= 1);
 }
 
 // ============================================================================
@@ -272,7 +272,7 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
                           rD1, rD2, rD3);
 
     // Allocate output and call
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
     qd_RPI_GENERIC<double>(points.colptr(0), points.colptr(1), points.colptr(2), n_point,
                            sci.memptr(),
@@ -286,9 +286,9 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
                            D2x.memptr(), D2y.memptr(), D2z.memptr(),
                            D3x.memptr(), D3y.memptr(), D3z.memptr(),
                            rD1.memptr(), rD2.memptr(), rD3.memptr(),
-                           n_ray, &hit_index, hit_offset.memptr());
+                           n_ray, &hit_ind, hit_offset.memptr());
 
-    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_index, hit_offset, n_ray, n_point);
+    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_ind, hit_offset, n_ray, n_point);
 
     // Every point should be hit exactly once
     arma::u32_vec hit_count = count_hits_per_point(hit_lists.data(), n_ray, n_point);
@@ -317,13 +317,13 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
     points.col(1) *= 0.1f;
 
     arma::fmat pointsR;
-    arma::u32_vec sub_cloud_index;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 4, 8);
+    arma::u32_vec sub_cloud_ind;
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
-    compute_aabb(pointsR, sub_cloud_index, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
+    compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
     // Generate ray beams
     arma::fmat orig, trivec, tridir;
@@ -347,7 +347,7 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
     std::vector<unsigned> hit_index_generic;
     arma::u32_vec hit_offset_generic(n_point + 1);
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
-                          sub_cloud_index.memptr(),
+                          sub_cloud_ind.memptr(),
                           Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
                           n_sub,
                           T1x.memptr(), T1y.memptr(), T1z.memptr(),
@@ -366,7 +366,7 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
     std::vector<unsigned> hit_index_avx2;
     arma::u32_vec hit_offset_avx2(n_point + 1);
     qd_RPI_AVX2(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
-                sub_cloud_index.memptr(),
+                sub_cloud_ind.memptr(),
                 Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
                 n_sub,
                 T1x.memptr(), T1y.memptr(), T1z.memptr(),
@@ -420,13 +420,13 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
     points.col(1) *= 0.1f;
 
     arma::fmat pointsR;
-    arma::u32_vec sub_cloud_index;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 4, 8);
+    arma::u32_vec sub_cloud_ind;
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
-    compute_aabb(pointsR, sub_cloud_index, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
+    compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
     // Generate ray beams
     arma::fmat orig, trivec, tridir;
@@ -450,7 +450,7 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
     std::vector<unsigned> hit_index_generic;
     arma::u32_vec hit_offset_generic(n_point + 1);
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
-                          sub_cloud_index.memptr(),
+                          sub_cloud_ind.memptr(),
                           Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
                           n_sub,
                           T1x.memptr(), T1y.memptr(), T1z.memptr(),
@@ -469,7 +469,7 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
     std::vector<unsigned> hit_index_cuda;
     arma::u32_vec hit_offset_cuda(n_point + 1);
     qd_RPI_CUDA(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
-                sub_cloud_index.memptr(),
+                sub_cloud_ind.memptr(),
                 Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
                 n_sub,
                 T1x.memptr(), T1y.memptr(), T1z.memptr(),
@@ -557,7 +557,7 @@ TEST_CASE("RPI Internal - Dense Grid (double, GENERIC)")
                           rD1, rD2, rD3);
 
     // Call GENERIC
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
     qd_RPI_GENERIC<double>(points.colptr(0), points.colptr(1), points.colptr(2), n_point,
                            sci.memptr(),
@@ -571,9 +571,9 @@ TEST_CASE("RPI Internal - Dense Grid (double, GENERIC)")
                            D2x.memptr(), D2y.memptr(), D2z.memptr(),
                            D3x.memptr(), D3y.memptr(), D3z.memptr(),
                            rD1.memptr(), rD2.memptr(), rD3.memptr(),
-                           n_ray, &hit_index, hit_offset.memptr());
+                           n_ray, &hit_ind, hit_offset.memptr());
 
-    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_index, hit_offset, n_ray, n_point);
+    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_ind, hit_offset, n_ray, n_point);
 
     // Every point should be hit exactly once
     arma::u32_vec hit_count = count_hits_per_point(hit_lists.data(), n_ray, n_point);
@@ -609,13 +609,13 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
 
     // Segment with vec_size=8
     arma::fmat pointsR;
-    arma::u32_vec sub_cloud_index;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 128, 8);
+    arma::u32_vec sub_cloud_ind;
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 128, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
     arma::fvec Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
-    compute_aabb(pointsR, sub_cloud_index, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
+    compute_aabb(pointsR, sub_cloud_ind, n_sub, n_sub_s, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
 
     // Generate ray beams
     arma::fmat orig, trivec, tridir;
@@ -639,7 +639,7 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
     std::vector<unsigned> hit_index_generic;
     arma::u32_vec hit_offset_generic(n_point + 1);
     qd_RPI_GENERIC<float>(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
-                          sub_cloud_index.memptr(),
+                          sub_cloud_ind.memptr(),
                           Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
                           n_sub,
                           T1x.memptr(), T1y.memptr(), T1z.memptr(),
@@ -658,7 +658,7 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
     std::vector<unsigned> hit_index_avx2;
     arma::u32_vec hit_offset_avx2(n_point + 1);
     qd_RPI_AVX2(pointsR.colptr(0), pointsR.colptr(1), pointsR.colptr(2), n_point,
-                sub_cloud_index.memptr(),
+                sub_cloud_ind.memptr(),
                 Xmin.memptr(), Xmax.memptr(), Ymin.memptr(), Ymax.memptr(), Zmin.memptr(), Zmax.memptr(),
                 n_sub,
                 T1x.memptr(), T1y.memptr(), T1z.memptr(),
@@ -746,7 +746,7 @@ TEST_CASE("RPI Internal - No Hits")
     arma::fvec rD2 = 1.0f / (D2x % Nx + D2y % Ny + D2z % Nz);
     arma::fvec rD3 = 1.0f / (D3x % Nx + D3y % Ny + D3z % Nz);
 
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
     qd_RPI_GENERIC<float>(points.colptr(0), points.colptr(1), points.colptr(2), n_point,
                           sci.memptr(),
@@ -760,9 +760,9 @@ TEST_CASE("RPI Internal - No Hits")
                           D2x.memptr(), D2y.memptr(), D2z.memptr(),
                           D3x.memptr(), D3y.memptr(), D3z.memptr(),
                           rD1.memptr(), rD2.memptr(), rD3.memptr(),
-                          n_ray, &hit_index, hit_offset.memptr());
+                          n_ray, &hit_ind, hit_offset.memptr());
 
-    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_index, hit_offset, n_ray, n_point);
+    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_ind, hit_offset, n_ray, n_point);
 
     // All hit lists should be empty
     for (size_t r = 0; r < n_ray; ++r)
@@ -835,7 +835,7 @@ TEST_CASE("RPI Internal - Sub-cloud AABB Filtering")
     arma::fvec rD2 = 1.0f / (D2x % Nx + D2y % Ny + D2z % Nz);
     arma::fvec rD3 = 1.0f / (D3x % Nx + D3y % Ny + D3z % Nz);
 
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
     qd_RPI_GENERIC<float>(points.colptr(0), points.colptr(1), points.colptr(2), n_point,
                           sci.memptr(),
@@ -849,9 +849,9 @@ TEST_CASE("RPI Internal - Sub-cloud AABB Filtering")
                           D2x.memptr(), D2y.memptr(), D2z.memptr(),
                           D3x.memptr(), D3y.memptr(), D3z.memptr(),
                           rD1.memptr(), rD2.memptr(), rD3.memptr(),
-                          n_ray, &hit_index, hit_offset.memptr());
+                          n_ray, &hit_ind, hit_offset.memptr());
 
-    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_index, hit_offset, n_ray, n_point);
+    std::vector<std::vector<unsigned>> hit_lists = hit_lists_from_csr(hit_ind, hit_offset, n_ray, n_point);
 
     // No hits should reference cluster B points (indices 8..15)
     for (size_t r = 0; r < n_ray; ++r)
@@ -880,11 +880,11 @@ TEST_CASE("RPI Internal - Assemble (single buffer)")
     const unsigned long long *p_buf[1] = {buf.data()};
     size_t n_hit[1] = {buf.size()};
 
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
-    qd_RPI_assemble(p_buf, n_hit, 1, n_point, &hit_index, hit_offset.memptr());
+    qd_RPI_assemble(p_buf, n_hit, 1, n_point, &hit_ind, hit_offset.memptr());
 
-    REQUIRE(hit_index.size() == 3);
+    REQUIRE(hit_ind.size() == 3);
 
     CHECK(hit_offset.at(0) == 0); // point 0 starts at 0, has no hits
     CHECK(hit_offset.at(1) == 0); // point 1 starts at 0, has two hits
@@ -893,9 +893,9 @@ TEST_CASE("RPI Internal - Assemble (single buffer)")
     CHECK(hit_offset.at(4) == 3); // point 4 starts at 3, has no hits
     CHECK(hit_offset.at(5) == 3); // total hit count
 
-    CHECK(hit_index[0] == 0); // point 1, ray 0
-    CHECK(hit_index[1] == 1); // point 1, ray 1
-    CHECK(hit_index[2] == 0); // point 3, ray 0
+    CHECK(hit_ind[0] == 0); // point 1, ray 0
+    CHECK(hit_ind[1] == 1); // point 1, ray 1
+    CHECK(hit_ind[2] == 0); // point 3, ray 0
 }
 
 // ============================================================================
@@ -912,21 +912,21 @@ TEST_CASE("RPI Internal - Assemble (buffer order)")
     const unsigned long long *p_buf[2] = {buf0.data(), buf1.data()};
     size_t n_hit[2] = {buf0.size(), buf1.size()};
 
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
-    qd_RPI_assemble(p_buf, n_hit, 2, n_point, &hit_index, hit_offset.memptr());
+    qd_RPI_assemble(p_buf, n_hit, 2, n_point, &hit_ind, hit_offset.memptr());
 
-    REQUIRE(hit_index.size() == 4);
+    REQUIRE(hit_ind.size() == 4);
 
     CHECK(hit_offset.at(0) == 0);
     CHECK(hit_offset.at(1) == 3); // point 0 collected three hits
     CHECK(hit_offset.at(2) == 3); // point 1 has none
     CHECK(hit_offset.at(3) == 4); // point 2 has one
 
-    CHECK(hit_index[0] == 7); // point 0, from buffer 0
-    CHECK(hit_index[1] == 3); // point 0, from buffer 1
-    CHECK(hit_index[2] == 5); // point 0, from buffer 1
-    CHECK(hit_index[3] == 9); // point 2, from buffer 0
+    CHECK(hit_ind[0] == 7); // point 0, from buffer 0
+    CHECK(hit_ind[1] == 3); // point 0, from buffer 1
+    CHECK(hit_ind[2] == 5); // point 0, from buffer 1
+    CHECK(hit_ind[3] == 9); // point 2, from buffer 0
 }
 
 // ============================================================================
@@ -935,38 +935,38 @@ TEST_CASE("RPI Internal - Assemble (buffer order)")
 TEST_CASE("RPI Internal - Assemble (edge cases)")
 {
     const size_t n_point = 4;
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
 
     // No buffers at all
-    hit_index.assign(3, 99u);
-    qd_RPI_assemble(nullptr, nullptr, 0, n_point, &hit_index, hit_offset.memptr());
-    CHECK(hit_index.empty());
+    hit_ind.assign(3, 99u);
+    qd_RPI_assemble(nullptr, nullptr, 0, n_point, &hit_ind, hit_offset.memptr());
+    CHECK(hit_ind.empty());
     CHECK(arma::all(hit_offset == 0));
 
     // Buffers that hold no records
     std::vector<unsigned long long> empty_buf;
     const unsigned long long *p_buf[2] = {empty_buf.data(), empty_buf.data()};
     size_t n_hit[2] = {0, 0};
-    hit_index.assign(3, 99u);
-    qd_RPI_assemble(p_buf, n_hit, 2, n_point, &hit_index, hit_offset.memptr());
-    CHECK(hit_index.empty());
+    hit_ind.assign(3, 99u);
+    qd_RPI_assemble(p_buf, n_hit, 2, n_point, &hit_ind, hit_offset.memptr());
+    CHECK(hit_ind.empty());
     CHECK(arma::all(hit_offset == 0));
 
     // A single point cloud entry with a single hit
     std::vector<unsigned long long> one = {rpi_record(0, 0)};
     const unsigned long long *p_one[1] = {one.data()};
     size_t n_one[1] = {1};
-    qd_RPI_assemble(p_one, n_one, 1, 1, &hit_index, hit_offset.memptr());
-    CHECK(hit_index.size() == 1);
-    CHECK(hit_index[0] == 0);
+    qd_RPI_assemble(p_one, n_one, 1, 1, &hit_ind, hit_offset.memptr());
+    CHECK(hit_ind.size() == 1);
+    CHECK(hit_ind[0] == 0);
     CHECK(hit_offset.at(0) == 0);
     CHECK(hit_offset.at(1) == 1);
 
     // Missing outputs are rejected
     CHECK_THROWS_AS(qd_RPI_assemble(p_one, n_one, 1, n_point, nullptr, hit_offset.memptr()),
                     std::invalid_argument);
-    CHECK_THROWS_AS(qd_RPI_assemble(p_one, n_one, 1, n_point, &hit_index, nullptr),
+    CHECK_THROWS_AS(qd_RPI_assemble(p_one, n_one, 1, n_point, &hit_ind, nullptr),
                     std::invalid_argument);
 }
 
@@ -998,11 +998,11 @@ TEST_CASE("RPI Internal - Assemble (many buffers)")
         n_hit[b] = buffers[b].size();
     }
 
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
-    qd_RPI_assemble(p_buf.data(), n_hit.data(), n_buffer, n_point, &hit_index, hit_offset.memptr());
+    qd_RPI_assemble(p_buf.data(), n_hit.data(), n_buffer, n_point, &hit_ind, hit_offset.memptr());
 
-    REQUIRE(hit_index.size() == n_total);
+    REQUIRE(hit_ind.size() == n_total);
     CHECK(hit_offset.at(0) == 0);
     CHECK(hit_offset.at(n_point) == (unsigned)n_total);
 
@@ -1011,15 +1011,15 @@ TEST_CASE("RPI Internal - Assemble (many buffers)")
     {
         monotone &= (hit_offset.at(i + 1) >= hit_offset.at(i));
         for (unsigned k = hit_offset.at(i) + 1; k < hit_offset.at(i + 1); ++k)
-            ascending &= (hit_index[k] > hit_index[k - 1]);
+            ascending &= (hit_ind[k] > hit_ind[k - 1]);
     }
     CHECK(monotone);
     CHECK(ascending);
 
     // Every input record must appear exactly once in the output
     std::vector<unsigned> seen(n_total, 0);
-    for (size_t k = 0; k < hit_index.size(); ++k)
-        ++seen[hit_index[k]];
+    for (size_t k = 0; k < hit_ind.size(); ++k)
+        ++seen[hit_ind[k]];
     bool each_once = true;
     for (size_t k = 0; k < n_total; ++k)
         each_once &= (seen[k] == 1);
@@ -1082,7 +1082,7 @@ TEST_CASE("RPI Internal - Chunk Boundary (GENERIC)")
     arma::fvec rD3 = 1.0f / (D3x % Nx + D3y % Ny + D3z % Nz);
 
     size_t n_ray = 1;
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset(n_point + 1);
 
     qd_RPI_GENERIC<float>(points.colptr(0), points.colptr(1), points.colptr(2), n_point,
@@ -1097,14 +1097,14 @@ TEST_CASE("RPI Internal - Chunk Boundary (GENERIC)")
                           D2x.memptr(), D2y.memptr(), D2z.memptr(),
                           D3x.memptr(), D3y.memptr(), D3z.memptr(),
                           rD1.memptr(), rD2.memptr(), rD3.memptr(),
-                          n_ray, &hit_index, hit_offset.memptr());
+                          n_ray, &hit_ind, hit_offset.memptr());
 
     // The grid lies entirely inside the tube, so every point is hit once
-    REQUIRE(hit_index.size() == n_point);
+    REQUIRE(hit_ind.size() == n_point);
     CHECK(hit_offset.at(n_point) == (unsigned)n_point);
 
     bool ok = true;
     for (size_t i = 0; i < n_point; ++i)
-        ok &= (hit_offset.at(i) == (unsigned)i) && (hit_index[i] == 0u);
+        ok &= (hit_offset.at(i) == (unsigned)i) && (hit_ind[i] == 0u);
     CHECK(ok);
 }

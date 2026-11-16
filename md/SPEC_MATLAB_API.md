@@ -276,10 +276,10 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 | `path_angles` | `path_angles` | `[n_path, 4, n_snap]` |
 | `fbs_pos` | `path_fbs_pos` | `[3, n_path, n_snap]` |
 | `lbs_pos` | `path_lbs_pos` | `[3, n_path, n_snap]` |
-| `no_interact` | `no_interact` | `[n_path, n_snap]`; uint32 |
-| `interact_coord` | `interact_coord` | `[3, max(sum(no_interact)), n_snap]` |
+| `n_interact` | `n_interact` | `[n_path, n_snap]`; uint32 |
+| `interact_coord` | `interact_coord` | `[3, max(sum(n_interact)), n_snap]` |
 | `center_freq` | `center_freq` | scalar or `[n_snap]` |
-| `initial_position` | `initial_position` | scalar; int32 |
+| `initial_position` | `initial_position` | scalar; int32; 1-based (0-based in C++); absent = 1 |
 
 - Note the name differences: `tx_position` / `rx_position` and `fbs_pos` / `lbs_pos` in MATLAB vs. `tx_pos` / `rx_pos` and `path_fbs_pos` / `path_lbs_pos` in C++.
 - Reading: `qd_mex_struct2channel(prhs[i], validate, copy)` always returns a `std::vector`; all fields are optional, missing fields leave the member empty. Wrap the call in `CALL_QD` when `validate = true`.

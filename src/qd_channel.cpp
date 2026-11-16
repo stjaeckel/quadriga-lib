@@ -38,8 +38,8 @@ Class for storing and managing MIMO channel data and metadata across multiple sn
 | `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
 | `std::vector<arma::Mat<dtype>> path_fbs_pos`      | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
 | `std::vector<arma::Mat<dtype>> path_lbs_pos`      | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
-| `std::vector<arma::Col<unsigned>> no_interact`    | per snap `[n_path]`                                             | Number of interactions per path                             |
-| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(no_interact)]`                                | Interaction point coordinates                               |
+| `std::vector<arma::Col<unsigned>> n_interact`     | per snap `[n_path]`                                             | Number of interactions per path                             |
+| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(n_interact)]`                                 | Interaction point coordinates                               |
 | `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
 | `std::vector<std::any> par_data`                  | —                                                               | Unstructured metadata values (string, scalar, matrix, etc.) |
 | `int initial_position`                            | scalar                                                          | 0-based index of the reference snapshot                     |
@@ -107,8 +107,8 @@ arma::uword quadriga_lib::channel<dtype>::n_snap() const
     if (path_lbs_pos.size() > s_vector)
         s_vector = path_lbs_pos.size();
 
-    if (no_interact.size() > s_vector)
-        s_vector = no_interact.size();
+    if (n_interact.size() > s_vector)
+        s_vector = n_interact.size();
 
     return (arma::uword)s_vector;
 }
@@ -143,9 +143,9 @@ arma::uvec quadriga_lib::channel<dtype>::n_path() const
     if (coeff_re.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
             p_path[i] = coeff_re[i].n_slices;
-    else if (no_interact.size() == n_snap)
+    else if (n_interact.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
-            p_path[i] = no_interact[i].n_elem;
+            p_path[i] = n_interact[i].n_elem;
     else if (path_gain.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
             p_path[i] = path_gain[i].n_elem;
@@ -214,7 +214,7 @@ bool quadriga_lib::channel<dtype>::empty() const
     if (path_lbs_pos.size() != 0)
         return false;
 
-    if (no_interact.size() != 0)
+    if (n_interact.size() != 0)
         return false;
 
     if (interact_coord.size() != 0)
@@ -355,27 +355,27 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
             if (path_lbs_pos[i].n_rows != 3ULL || path_lbs_pos[i].n_cols != n_pth[i])
                 return std::string("Size mismatch in 'path_lbs_pos[" + std::to_string(i) + "]'.");
 
-    if (no_interact.size() != 0 && no_interact.size() != n_snap_vector)
-        return std::string("'no_interact' must be empty or match the number of snapshots.");
-    else if (no_interact.size() == 0 && interact_coord.size() != 0)
-        return std::string("'interact_coord' is provided but 'no_interact' is missing.");
-    else if (no_interact.size() == n_snap_vector && interact_coord.size() != n_snap_vector)
-        return std::string("'no_interact' is provided but 'interact_coord' is missing or has wrong number of snapshots.");
-    else if (no_interact.size() == n_snap_vector && interact_coord.size() == n_snap_vector)
+    if (n_interact.size() != 0 && n_interact.size() != n_snap_vector)
+        return std::string("'n_interact' must be empty or match the number of snapshots.");
+    else if (n_interact.size() == 0 && interact_coord.size() != 0)
+        return std::string("'interact_coord' is provided but 'n_interact' is missing.");
+    else if (n_interact.size() == n_snap_vector && interact_coord.size() != n_snap_vector)
+        return std::string("'n_interact' is provided but 'interact_coord' is missing or has wrong number of snapshots.");
+    else if (n_interact.size() == n_snap_vector && interact_coord.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
         {
-            if (no_interact[i].n_elem != n_pth[i])
-                return std::string("Size mismatch in 'no_interact[" + std::to_string(i) + "]'.");
+            if (n_interact[i].n_elem != n_pth[i])
+                return std::string("Size mismatch in 'n_interact[" + std::to_string(i) + "]'.");
 
             if (interact_coord[i].n_rows != 3ULL)
                 return std::string("'interact_coord[" + std::to_string(i) + "]' must have 3 rows.");
 
             arma::uword cnt = 0;
-            for (const unsigned *p = no_interact[i].begin(); p < no_interact[i].end(); ++p)
+            for (const unsigned *p = n_interact[i].begin(); p < n_interact[i].end(); ++p)
                 cnt += (arma::uword)*p;
 
             if (interact_coord[i].n_cols != cnt)
-                return std::string("Number of columns in 'interact_coord[" + std::to_string(i) + "]' must match the sum of 'no_interact'.");
+                return std::string("Number of columns in 'interact_coord[" + std::to_string(i) + "]' must match the sum of 'n_interact'.");
         }
 
     if (par_names.size() != par_data.size())
@@ -403,7 +403,7 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Cube<dtype> *coeff_re_add = nullptr,
     const arma::Cube<dtype> *coeff_im_add = nullptr,
     const arma::Cube<dtype> *delay_add = nullptr,
-    const arma::u32_vec *no_interact_add = nullptr,
+    const arma::u32_vec *n_interact_add = nullptr,
     const arma::Mat<dtype> *interact_coord_add = nullptr,
     const arma::Col<dtype> *path_gain_add = nullptr,
     const arma::Col<dtype> *path_length_add = nullptr,
@@ -418,8 +418,8 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`coeff_re_add`** *(optional)* — Real part of channel coefficients; `[n_rx, n_tx, n_path_add]`
 - **`coeff_im_add`** *(optional)* — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_add]`
 - **`delay_add`** *(optional)* — Propagation delays in seconds; `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`
-- **`no_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
-- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(no_interact)]`
+- **`n_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
+- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(n_interact)]`
 - **`path_gain_add`** *(optional)* — Path gains before antenna effects; `[n_path_add]`
 - **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
 - **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
@@ -431,7 +431,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
                                              const arma::Cube<dtype> *coeff_re_add, const arma::Cube<dtype> *coeff_im_add, const arma::Cube<dtype> *delay_add,
-                                             const arma::u32_vec *no_interact_add, const arma::Mat<dtype> *interact_coord_add,
+                                             const arma::u32_vec *n_interact_add, const arma::Mat<dtype> *interact_coord_add,
                                              const arma::Col<dtype> *path_gain_add, const arma::Col<dtype> *path_length_add,
                                              const arma::Mat<dtype> *path_polarization_add, const arma::Mat<dtype> *path_angles_add,
                                              const arma::Mat<dtype> *path_fbs_pos_add, const arma::Mat<dtype> *path_lbs_pos_add)
@@ -482,31 +482,31 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
 
     // Check interaction coordinates
     bool add_interact_coord = false;
-    if (no_interact_add != nullptr)
+    if (n_interact_add != nullptr)
     {
-        if (this->no_interact.size() == 0)
+        if (this->n_interact.size() == 0)
             throw std::invalid_argument("Channel object requires existing interaction coordinates.");
 
         if (interact_coord_add == nullptr)
-            throw std::invalid_argument("'no_interact_add' is given but 'interact_coord_add' is missing.");
+            throw std::invalid_argument("'n_interact_add' is given but 'interact_coord_add' is missing.");
 
         if (!n_path_set)
-            n_path_add = no_interact_add->n_elem, n_path_set = true;
-        if (no_interact_add->n_elem != n_path_add)
-            throw std::invalid_argument("Size of 'no_interact_add' does not match size of 'coeff_re_add'");
+            n_path_add = n_interact_add->n_elem, n_path_set = true;
+        if (n_interact_add->n_elem != n_path_add)
+            throw std::invalid_argument("Size of 'n_interact_add' does not match size of 'coeff_re_add'");
 
         // 64-bit sum: arma::sum of a u32_vec is a 32-bit sum and can wrap
         arma::uword sum_no_interact = 0;
-        for (const unsigned *p = no_interact_add->begin(); p < no_interact_add->end(); ++p)
+        for (const unsigned *p = n_interact_add->begin(); p < n_interact_add->end(); ++p)
             sum_no_interact += (arma::uword)*p;
         if (interact_coord_add->n_cols != sum_no_interact)
-            throw std::invalid_argument("Number of columns in 'interact_coord_add' must match sum of 'no_interact_add'.");
+            throw std::invalid_argument("Number of columns in 'interact_coord_add' must match sum of 'n_interact_add'.");
 
         add_interact_coord = true;
     }
     if (!add_interact_coord && interact_coord_add != nullptr)
-        throw std::invalid_argument("'interact_coord_add' is given but 'no_interact_add' is missing.");
-    if (!add_interact_coord && this->no_interact.size() != 0)
+        throw std::invalid_argument("'interact_coord_add' is given but 'n_interact_add' is missing.");
+    if (!add_interact_coord && this->n_interact.size() != 0)
         throw std::invalid_argument("The channel object has interaction coordinates, but no coordinates are added!");
 
     // Check path gain
@@ -615,7 +615,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     }
     if (add_interact_coord)
     {
-        qd_check_alias(&this->no_interact[i_snap], "no_interact[i_snap]", no_interact_add);
+        qd_check_alias(&this->n_interact[i_snap], "n_interact[i_snap]", n_interact_add);
         check_mat(&this->interact_coord[i_snap], "interact_coord[i_snap]");
     }
     if (path_gain_add != nullptr)
@@ -641,7 +641,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
 
     if (add_interact_coord)
     {
-        this->no_interact[i_snap] = arma::join_cols(this->no_interact[i_snap], *no_interact_add);
+        this->n_interact[i_snap] = arma::join_cols(this->n_interact[i_snap], *n_interact_add);
         this->interact_coord[i_snap] = arma::join_rows(this->interact_coord[i_snap], *interact_coord_add);
     }
 
@@ -761,14 +761,14 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min` are excluded; `max_no_paths` limits total count
+- Paths below `gain_min` are excluded; `max_paths` limits total count
 - Paths with non-finite coordinates are skipped
 
 ## Declaration:
 ```
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     std::string fn,
-    arma::uword max_no_paths = 0,
+    arma::uword max_paths = 0,
     dtype gain_max = -60.0,
     dtype gain_min = -140.0,
     std::string colormap = "jet",
@@ -780,7 +780,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 
 ## Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_no_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
@@ -796,7 +796,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
-                                                           arma::uword max_no_paths,
+                                                           arma::uword max_paths,
                                                            dtype gain_max, dtype gain_min,
                                                            std::string colormap,
                                                            arma::uvec i_snap,
@@ -815,8 +815,8 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
     if (this->center_freq.empty())
         throw std::invalid_argument("Center frequency is missing.");
 
-    if (this->no_interact.empty() || this->interact_coord.empty())
-        throw std::invalid_argument("Ray tracing data (no_interact, interact_coord) is missing.");
+    if (this->n_interact.empty() || this->interact_coord.empty())
+        throw std::invalid_argument("Ray tracing data (n_interact, interact_coord) is missing.");
 
     if (this->path_polarization.empty() && this->coeff_re.empty())
         throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
@@ -920,7 +920,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
         // Calculate path coordinates
         arma::Col<dtype> path_length;
         std::vector<arma::Mat<dtype>> path_coord;
-        quadriga_lib::coord2path<dtype>(arma::Col<dtype>{tx, ty, tz}, arma::Col<dtype>{rx, ry, rz}, &this->no_interact[i_snap_in], &this->interact_coord[i_snap_in],
+        quadriga_lib::coord2path<dtype>(arma::Col<dtype>{tx, ty, tz}, arma::Col<dtype>{rx, ry, rz}, &this->n_interact[i_snap_in], &this->interact_coord[i_snap_in],
                                         &path_length, nullptr, nullptr, nullptr, &path_coord);
 
         // Calculate path power
@@ -974,8 +974,8 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
         arma::uword *i_pow_sorted = pow_indices.memptr();
 
         // Limit the number of paths that should be shown
-        if (max_no_paths != 0ULL)
-            for (arma::uword i = max_no_paths; i < n_path; ++i)
+        if (max_paths != 0ULL)
+            for (arma::uword i = max_paths; i < n_path; ++i)
                 color_index(i_pow_sorted[i]) = -1;
 
         // Write some descriptive information

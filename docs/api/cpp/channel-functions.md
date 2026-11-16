@@ -392,18 +392,18 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_layout) · [Python](../p
 - Returns `{nx, ny, nz, nw}` describing the 4D slot grid of the file.
 - Returns `{0, 0, 0, 0}` if the file does not exist; throws if the file exists but is not a channel file of
   version 3 (see [hdf5_read_channel](#hdf5_read_channel)).
-- `channelID` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
+- `channel_id` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
 
 ### Declaration:
 ```cpp
 arma::u32_vec quadriga_lib::hdf5_read_layout(
     std::string fn,
-    arma::u32_vec *channelID = nullptr);
+    arma::u32_vec *channel_id = nullptr);
 ```
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`channelID`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
+- **`channel_id`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ### Returns:
 - Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
@@ -674,7 +674,7 @@ Not in: MATLAB, Python
 - Writes the path data for a single TX into the next free slot reserved by [qrt_file_init](#qrt_file_init), and records the TX name, position, and orientation.
 - Paths are grouped by their CIR index (`path::iC`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
 - Validates every path before writing: `iC` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
-- Throws when all TX slots are already filled — the file holds at most the `no_orig` slots reserved at init.
+- Throws when all TX slots are already filled — the file holds at most the `n_orig` slots reserved at init.
 - Only v5/6 files can be appended to. Positional data is converted to `float` on write.
 - Returns the total number of paths written.
 
@@ -714,7 +714,7 @@ Not in: MATLAB, Python
 - Writes no path data. The BS position/orientation rows and the BS index table are reserved as zeros; each [qrt_file_append](#qrt_file_append) call fills the next free slot.
 - CIR orientation is stored compressed: only the angle columns that carry a nonzero value after conversion to `float` are written,
   encoded in a per-file format byte. [qrt_file_append](#qrt_file_append) reads this byte from the file.
-- `no_orig` fixes the number of TX slots; the file can hold at most that many appended TX blocks.
+- `n_orig` fixes the number of TX slots; the file can hold at most that many appended TX blocks.
 - Positional data is converted to `float` on write regardless of `dtype`.
 
 ### Declaration:
@@ -727,7 +727,7 @@ void quadriga_lib::qrt_file_init(
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
     const arma::u32_vec &cir_offset = {0},
-    unsigned no_orig = 1,
+    unsigned n_orig = 1,
     bool scalar_mode = false);
 ```
 
@@ -735,11 +735,11 @@ void quadriga_lib::qrt_file_init(
 - **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
   opened, so an invalid input throws and leaves an existing file unchanged)
 - **`center_freq`** — Center frequencies in Hz; `[n_freq]`, 1 to 127 entries; an EM file stores them in GHz
-- **`cir_pos`** — CIR positions in Cartesian coordinates; `[no_cir, 3]`
-- **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[no_cir, 3]` or empty for none
-- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[no_dest]`
-- **`cir_offset`** — CIR offset for each receiver, 0-based, the first entry 0; `[no_dest]`, must equal `dest_names` in length
-- **`no_orig`** — Number of origin (TX) slots to reserve; at least 1
+- **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
+- **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
+- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[n_dest]`
+- **`cir_offset`** — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
+- **`n_orig`** — Number of origin (TX) slots to reserve; at least 1
 - **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
 
 ### See also:
@@ -756,17 +756,17 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_parse) · [Python](../pyt
 - Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR offsets, names, positions, orientations, and file version.
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
-- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
+- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
 - Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp
 void quadriga_lib::qrt_file_parse(
     const std::string &fn,
-    arma::uword *no_cir = nullptr,
-    arma::uword *no_orig = nullptr,
-    arma::uword *no_dest = nullptr,
-    arma::uword *no_freq = nullptr,
+    arma::uword *n_cir = nullptr,
+    arma::uword *n_orig = nullptr,
+    arma::uword *n_dest = nullptr,
+    arma::uword *n_freq = nullptr,
     arma::uvec *cir_offset = nullptr,
     std::vector<std::string> *orig_names = nullptr,
     std::vector<std::string> *dest_names = nullptr,
@@ -784,19 +784,19 @@ void quadriga_lib::qrt_file_parse(
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
 ### Outputs:
-- **`no_cir`** *(optional)* — Number of channel snapshots per origin point
-- **`no_orig`** *(optional)* — Number of origin points (TX)
-- **`no_dest`** *(optional)* — Number of destination points (RX)
-- **`no_freq`** *(optional)* — Number of frequency bands
-- **`cir_offset`** *(optional)* — CIR offset per destination; `[no_dest]`
-- **`orig_names`** *(optional)* — Names of origin points; `[no_orig]`
-- **`dest_names`** *(optional)* — Names of destination points; `[no_dest]`
+- **`n_cir`** *(optional)* — Number of channel snapshots per origin point
+- **`n_orig`** *(optional)* — Number of origin points (TX)
+- **`n_dest`** *(optional)* — Number of destination points (RX)
+- **`n_freq`** *(optional)* — Number of frequency bands
+- **`cir_offset`** *(optional)* — Number of CIRs before each destination (offset of its first CIR), the first entry 0; `[n_dest]`
+- **`orig_names`** *(optional)* — Names of origin points; `[n_orig]`
+- **`dest_names`** *(optional)* — Names of destination points; `[n_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[no_freq]`
-- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[no_cir, 3]`
-- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[no_cir, 3]`
-- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[no_orig, 3]`
-- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles; `[no_orig, 3]`
+- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[n_freq]`
+- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[n_cir, 3]`
+- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[n_cir, 3]`
+- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[n_orig, 3]`
+- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles; `[n_orig, 3]`
 
 ---
 <a id="qrt_file_read"></a>
@@ -808,7 +808,7 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_read) · [Python](../pyth
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
@@ -840,7 +840,7 @@ void quadriga_lib::qrt_file_read(
     arma::Col<dtype> *eoa = nullptr,
     std::vector<arma::Mat<dtype>> *path_coord = nullptr,
     int normalize_M = 1,
-    arma::u32_vec *no_int = nullptr,
+    arma::u32_vec *n_interact = nullptr,
     arma::fmat *coord = nullptr,
     std::vector<uint8_t> *interact_type = nullptr,
     std::ifstream *file = nullptr,
@@ -881,9 +881,9 @@ void quadriga_lib::qrt_file_read(
 - **`aoa`** — Arrival azimuth angles; `[n_path]`
 - **`eoa`** — Arrival elevation angles; `[n_path]`
 - **`path_coord`** — Interaction coordinates per path; vector of length `n_path`, each `[3, n_interact + 2]`
-- **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
-- **`coord`** — Interaction coordinates; `[3, sum(no_int)]`
-- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `no_int`; `[sum(no_int)]`.
+- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
+- **`coord`** — Interaction coordinates; `[3, sum(n_interact)]`
+- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `n_interact`; `[sum(n_interact)]`.
   Empty for v4 legacy files. GBSM paths of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) carry 129 (GR) and 193 (NLOS); LOS and GR
   paths are not marked as GBSM.
 
@@ -935,7 +935,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are supplied
-- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `no_orig`
+- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 - **`cache`** *(optional)* — Pre-parsed metadata from [qrt_read_cache_init](#qrt_read_cache_init); pass `nullptr` to parse the header on this call
 
@@ -961,9 +961,9 @@ Not in: MATLAB, Python
   and `length` exist on the returned objects only ([qrt_file_read_raw](#qrt_file_read_raw) returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
   [qrt_file_read](#qrt_file_read) (`downlink = true`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
-  within float32 accuracy, the polyline as `path_length` and `path_type` as `no_int`
-- `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init) (which
-  takes GHz): `qrt_file_read` recomputes the lengths from the stored positions; not checked
+  within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
+- `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init):
+  `qrt_file_read` recomputes the lengths from the stored positions; not checked
 - Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
   0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
 - Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
@@ -1082,7 +1082,7 @@ void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<dtype>> *coeff_im_quant,
     std::vector<arma::Cube<dtype>> *delay_quant,
     dtype tap_spacing = (dtype)5.0e-9,
-    arma::uword max_no_taps = 48,
+    arma::uword max_taps = 48,
     dtype power_exponent = (dtype)1.0,
     int fix_taps = 0);
 ```
@@ -1093,7 +1093,7 @@ void quadriga_lib::quantize_delays(
 - **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`;
   non-negative with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
 - **`tap_spacing`** *(optional)* — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate
-- **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
+- **`max_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
 - **`fix_taps`** *(optional)* — Delay grid sharing mode:
   | Value | Meaning                                                                                                                               |

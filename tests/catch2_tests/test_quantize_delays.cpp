@@ -253,7 +253,7 @@ TEST_CASE("quantize_delays - Already quantized input passes through")
     }
 }
 
-TEST_CASE("quantize_delays - max_no_taps limits output")
+TEST_CASE("quantize_delays - max_taps limits output")
 {
     // 5 paths on grid, limit to 3 taps — weakest should be dropped
     std::vector<arma::Cube<double>> cre(1), cim(1), dl(1);
@@ -643,7 +643,7 @@ TEST_CASE("quantize_delays - Zero delay (tap 0)")
     CHECK(std::abs(dl_q[0](0, 0, 0) - 0.0) < 1e-20);
 }
 
-TEST_CASE("quantize_delays - Unlimited taps (max_no_taps=0)")
+TEST_CASE("quantize_delays - Unlimited taps (max_taps=0)")
 {
     std::vector<arma::Cube<double>> cre(1), cim(1), dl(1);
     cre[0].set_size(1, 1, 3);
@@ -820,9 +820,9 @@ TEST_CASE("quantize_delays - Non-finite and too large delays throw")
     d1[0] = arma::cube(1, 1, 2);
     d1[0](0, 0, 0) = 0.0;
     d1[0](0, 0, 1) = 2147483000.0 * ts; // integer tap index below 2^31
-    for (arma::uword max_no_taps : {0, 48})
+    for (arma::uword max_taps : {0, 48})
     {
-        REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&c1, &i1, &d1, &cre_q, &cim_q, &dl_q, ts, max_no_taps, 1.0, 0));
+        REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&c1, &i1, &d1, &cre_q, &cim_q, &dl_q, ts, max_taps, 1.0, 0));
         REQUIRE(dl_q[0].n_elem == 2);
         CHECK(dl_q[0](0, 0, 0) == 0.0);
         CHECK(std::abs(dl_q[0](0, 0, 1) - 2147483000.0 * ts) < 1e-6 * ts);
@@ -855,12 +855,12 @@ TEST_CASE("quantize_delays - Delay offset gives the same taps")
     }
     for (int shared = 0; shared < 2; ++shared)
         for (int fix_taps = 0; fix_taps < 4; ++fix_taps)
-            for (arma::uword max_no_taps : {8, 48})
+            for (arma::uword max_taps : {8, 48})
                 for (double pe : {1.0, 0.5})
                 {
                     std::vector<arma::Cube<double>> re0, im0, d0, re1, im1, d1;
-                    quadriga_lib::quantize_delays(&cre, &cim, shared ? &dls : &dl, &re0, &im0, &d0, ts, max_no_taps, pe, fix_taps);
-                    quadriga_lib::quantize_delays(&cre, &cim, shared ? &dls_off : &dl_off, &re1, &im1, &d1, ts, max_no_taps, pe, fix_taps);
+                    quadriga_lib::quantize_delays(&cre, &cim, shared ? &dls : &dl, &re0, &im0, &d0, ts, max_taps, pe, fix_taps);
+                    quadriga_lib::quantize_delays(&cre, &cim, shared ? &dls_off : &dl_off, &re1, &im1, &d1, ts, max_taps, pe, fix_taps);
                     CHECK(qd_same(re0, re1));
                     CHECK(qd_same(im0, im1));
                     REQUIRE(d0.size() == d1.size());

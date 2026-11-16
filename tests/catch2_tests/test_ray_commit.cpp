@@ -23,7 +23,7 @@
 // count past that so the prefix sum over more than one block is exercised; a single-block suite
 // would never touch it.
 //
-// Index map: most point_index cases use a hand-built map so the expected iC is exact. One case runs
+// Index map: most point_ind cases use a hand-built map so the expected iC is exact. One case runs
 // the real point_cloud_segmentation and compares against the unsegmented result, which is the only
 // oracle that catches a change in the padding convention.
 //
@@ -235,9 +235,9 @@ namespace
     }
 
     // Every committed path is well formed and its receiver index is in range.
-    // "n_index" bounds iC: the point count without point_index, the original cloud size with it.
+    // "n_index" bounds iC: the point count without point_ind, the original cloud size with it.
     // Point-major output means iC never decreases within one call, but only while iC and the
-    // storage order agree; a point_index permutes them, so that check is opt-out.
+    // storage order agree; a point_ind permutes them, so that check is opt-out.
     void check_commit_shape(const std::vector<quadriga_lib::path> &out, size_t from,
                             arma::uword n_index, arma::uword n_freq, bool scalar,
                             bool monotonic_iC = true)
@@ -258,7 +258,7 @@ namespace
         }
     }
 
-    // Append one interaction segment to a ray's path, so it clears a min_no_segments gate.
+    // Append one interaction segment to a ray's path, so it clears a min_segments gate.
     // The vertex is placed at the ray origin, which leaves the accumulated length untouched
     // and keeps the committed leg identical to the zero-segment case.
     void add_segment(Cfg &C, arma::uword i_ray)
@@ -739,10 +739,10 @@ TEST_CASE("ray_commit - sub-cloud partitioning does not change the result")
 // Point index mapping
 // ===========================================================================================
 
-TEST_CASE("ray_commit - point_index drops padding rows")
+TEST_CASE("ray_commit - point_ind drops padding rows")
 {
     // A hand-built stand-in for a segmented cloud: row 1 is padding, the other two are real.
-    // point_index is 1-based into the caller's original list, 0 marks padding.
+    // point_ind is 1-based into the caller's original list, 0 marks padding.
     Scene S = one_cube(50.0f, 0.0f, 0.0f);
     Cfg C = one_ray();
 
@@ -768,7 +768,7 @@ TEST_CASE("ray_commit - point_index drops padding rows")
     CHECK(C.commit(S, P, out, o) == 3);
 }
 
-TEST_CASE("ray_commit - point_index remaps iC into the original ordering")
+TEST_CASE("ray_commit - point_ind remaps iC into the original ordering")
 {
     // A reversing map: the segmented row order is the opposite of the caller's, so a correct
     // implementation returns descending iC while the storage order stays point-major
@@ -791,10 +791,10 @@ TEST_CASE("ray_commit - point_index remaps iC into the original ordering")
     check_commit_shape(out, 0, P.n_rows, 1, false, false);
 }
 
-TEST_CASE("ray_commit - point_index agrees with point_cloud_segmentation")
+TEST_CASE("ray_commit - point_ind agrees with point_cloud_segmentation")
 {
     // The real integration: segment a cloud with SIMD alignment, then check that committing
-    // against the segmented cloud with its forward_index reproduces the unsegmented result.
+    // against the segmented cloud with its forward_ind reproduces the unsegmented result.
     Scene S = one_cube(200.0f, 0.0f, 0.0f);
     Cfg C = one_ray(200.0f, 20.0f);
 
@@ -826,7 +826,7 @@ TEST_CASE("ray_commit - point_index agrees with point_cloud_segmentation")
     check_commit_shape(b, 0, n_pt, 1, false, false);
 }
 
-TEST_CASE("ray_commit - padding is committed when point_index is omitted")
+TEST_CASE("ray_commit - padding is committed when point_ind is omitted")
 {
     // Padding points sit at the centre of their sub-cloud AABB, so they are hit as readily as
     // any real point. This pins the failure mode the map exists to prevent.
@@ -855,10 +855,10 @@ TEST_CASE("ray_commit - padding is committed when point_index is omitted")
 }
 
 // ===========================================================================================
-// min_no_segments
+// min_segments
 // ===========================================================================================
 
-TEST_CASE("ray_commit - min_no_segments gate")
+TEST_CASE("ray_commit - min_segments gate")
 {
     Scene S = one_cube(50.0f, 0.0f, 0.0f);
     Cfg C = one_ray();
@@ -888,7 +888,7 @@ TEST_CASE("ray_commit - min_no_segments gate")
     CHECK(C.commit(S, P, out, o) == 0);
 }
 
-TEST_CASE("ray_commit - min_no_segments and ignore_direct_path are independent gates")
+TEST_CASE("ray_commit - min_segments and ignore_direct_path are independent gates")
 {
     // A once-reflected ray passes ignore_direct_path but not a two-segment threshold, and a
     // two-segment transmission-only ray passes the threshold but not ignore_direct_path
@@ -1036,7 +1036,7 @@ TEST_CASE("ray_commit - input validation")
         CHECK_THROWS_AS(C.commit(S, P, out, o), std::invalid_argument);
     }
 
-    SECTION("point_index length")
+    SECTION("point_ind length")
     {
         // P has one row, so a two-element map does not describe it
         arma::u32_vec bad = {1u, 2u};

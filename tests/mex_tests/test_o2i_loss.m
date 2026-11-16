@@ -10,11 +10,11 @@ models = { 'low', 'car', 'high' };
 weights = [ 0.5, 0.3, 0.2 ];                                                    % UT 1: low, UT 2: car, UT 3: high
 
 %% Basic call and values
-[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( fc, rnd, models, weights );
+[ loss, d2d_in, model_ind ] = quadriga_lib.o2i_loss( fc, rnd, models, weights );
 assertEqual( size(loss), [3, 3] );
 assertEqual( size(d2d_in), [3, 1] );
 assertTrue( isa(loss, 'double') && isa(d2d_in, 'double') );
-assertEqual( model_index, uint64( [1; 2; 3] ) );                               % 1-based
+assertEqual( model_ind, uint64( [1; 2; 3] ) );                               % 1-based
 assertElementsAlmostEqual( d2d_in, [ 0.3 * 25; 0; 0.2 * 25 ], 'absolute', 1e-14 );
 assertElementsAlmostEqual( loss(2, :), [3, 3, 3], 'absolute', 1e-14 );          % car: 9 + 5·N, N = -1.2
 f = fc / 1e9;                                                                   % low-loss model of UT 1
@@ -50,7 +50,7 @@ assertEqual( d2d_in4, d2d_in );
 assertTrue( isa(l_t, 'double') && isa(i_t, 'uint64') );
 assertElementsAlmostEqual( l_t, loss, 'absolute', 1e-5 );                      % rnd rounded to single
 assertElementsAlmostEqual( d_t, d2d_in, 'absolute', 1e-5 );
-assertEqual( i_t, model_index );
+assertEqual( i_t, model_ind );
 
 %% Errors
 assert_throws( @() quadriga_lib.o2i_loss( fc, rnd, models ), 'Wrong number of input arguments.' );

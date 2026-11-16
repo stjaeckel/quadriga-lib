@@ -102,20 +102,20 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [Python](../
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
-- Paths below `gain_min` are excluded; `max_no_paths` limits the total number of exported paths
+- Paths below `gain_min` are excluded; `max_paths` limits the total number of exported paths
 - Paths with non-finite coordinates are skipped
 - The function takes raw channel data fields directly; no MATLAB channel struct is needed
 
 ### Usage:
 ```matlab
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
-     radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, ...
+quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colormap, radius_max, ...
+     radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff_re, ...
     coeff_im, i_snap );
 ```
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_no_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
+- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
 - **`gain_max`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
@@ -124,8 +124,8 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
 - **`rx_pos`** — Receiver positions; `[3, n_snap]` or `[3, 1]`
 - **`tx_pos`** — Transmitter positions; `[3, n_snap]` or `[3, 1]`
-- **`no_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
-- **`interact_coord`** — Interaction coordinates; `[3, max(sum(no_interact)), n_snap]`; fewer than `sum(no_interact)`
+- **`n_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
+- **`interact_coord`** — Interaction coordinates; `[3, max(sum(n_interact)), n_snap]`; fewer than `sum(n_interact)`
   columns in a snapshot raise an error
 - **`center_freq`** — Center frequency in Hz; `[n_snap]` or scalar
 - **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
@@ -189,7 +189,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [Python](../pyt
 
 ### Usage:
 ```matlab
-[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
+[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap );
 ```
 
 ### Inputs:
@@ -198,7 +198,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [Python](../pyt
 - **`iy`** — 1-based slot indices along dimension Y; scalar or vector; default: `1:ny`
 - **`iz`** — 1-based slot indices along dimension Z; scalar or vector; default: `1:nz`
 - **`iw`** — 1-based slot indices along dimension W; scalar or vector; default: `1:nw`
-- **`snap`** — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
+- **`i_snap`** — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
   when the total selection is a single slot.
 
 ### Outputs:
@@ -219,10 +219,10 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [Python](../pyt
   | `path_angles`      | Departure and arrival angles [AOD, EOD, AOA, EOA] in rad                 | `[n_path, 4, n_snap]`               |
   | `fbs_pos`          | First-bounce scatterer positions                                         | `[3, n_path, n_snap]`               |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
-  | `no_interact`      | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
-  | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(no_interact)), n_snap]`|
+  | `n_interact`       | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
+  | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(n_interact)), n_snap]`|
   | `center_freq`      | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
-  | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
+  | `initial_position` | Reference snapshot (start of the current segment); 1-based; absent = 1   | int32, scalar                       |
 - **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
   **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
   do not contain a given field, the corresponding element is left empty. If no unstructured data is present anywhere,
@@ -455,12 +455,12 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_parse) · [Python](../python
 
 - Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count,
   CIR offsets, names, positions, orientations, and file version
-- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
+- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
   `cir_offset` reflect this
 
 ### Usage:
 ```matlab
-[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
+[ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
      cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 ```
 
@@ -468,19 +468,20 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_parse) · [Python](../python
 - **`fn`** — Path to the QRT file; string
 
 ### Outputs:
-- **`no_cir`** — Number of channel snapshots per origin point; uint64 scalar
-- **`no_orig`** — Number of origin points (TX); uint64 scalar
-- **`no_dest`** — Number of destination points (RX); uint64 scalar
-- **`no_freq`** — Number of frequency bands; uint64 scalar
-- **`cir_offset`** — CIR offset per destination; uint64; `[no_dest]`
-- **`orig_names`** — Names of origin points; cell array of strings; `[no_orig]`
-- **`dest_names`** — Names of destination points; cell array of strings; `[no_dest]`
+- **`n_cir`** — Number of channel snapshots per origin point; uint64 scalar
+- **`n_orig`** — Number of origin points (TX); uint64 scalar
+- **`n_dest`** — Number of destination points (RX); uint64 scalar
+- **`n_freq`** — Number of frequency bands; uint64 scalar
+- **`cir_offset`** — Number of CIRs before each destination (an offset, not an index; the first entry is 0); the CIRs of
+  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest]`
+- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig]`
+- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz; single; `[no_freq]`
-- **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[no_cir, 3]`
-- **`cir_orientation`** — CIR orientations as Euler angles; single; `[no_cir, 3]`
-- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[no_orig, 3]`
-- **`orig_orientation`** — Origin (TX) orientations as Euler angles; single; `[no_orig, 3]`
+- **`center_freq`** — Center frequencies in Hz; single; `[n_freq]`
+- **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
+- **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
+- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`
+- **`orig_orientation`** — Origin (TX) orientations as Euler angles; single; `[n_orig, 3]`
 
 ---
 <a id="qrt_file_read"></a>
@@ -492,14 +493,14 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [Python](../python/
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
 - If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 
 ### Usage:
 ```matlab
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type ] = ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
 
@@ -537,12 +538,12 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [Python](../python/
 - **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path]`
 - **`path_coord`** — Interaction coordinates per path; Cell of length `n_out`;
   elements Cell of length `n_path`, each `[3, n_interact + 2]`
-- **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
+- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
   Cell of length `n_out`; elements `[n_path]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
-  Cell of length `n_out`; elements `[3, sum(no_int)]`
+  Cell of length `n_out`; elements `[3, sum(n_interact)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  Cell of length `n_out`; elements `[sum(n_interact)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
@@ -582,7 +583,7 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [Python](../pytho
 ### Usage:
 ```matlab
 [ coeff_re_q, coeff_im_q, delay_q ] = quadriga_lib.quantize_delays( coeff_re, coeff_im, delay, ...
-    tap_spacing, max_no_taps, power_exponent, fix_taps );
+    tap_spacing, max_taps, power_exponent, fix_taps );
 ```
 
 ### Inputs:
@@ -591,7 +592,7 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [Python](../pytho
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; non-negative
   with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
 - **`tap_spacing`** — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9
-- **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
+- **`max_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; default: 0
   | Value | Meaning                                                                                         |

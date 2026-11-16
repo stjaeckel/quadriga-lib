@@ -16,12 +16,12 @@ Read metadata from a QRT file
 
 - Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count,
   CIR offsets, names, positions, orientations, and file version
-- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
+- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
   `cir_offset` reflect this
 
 ## Usage:
 ```
-[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
+[ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
      cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 ```
 
@@ -29,19 +29,20 @@ Read metadata from a QRT file
 - **`fn`** — Path to the QRT file; string
 
 ## Outputs:
-- **`no_cir`** — Number of channel snapshots per origin point; uint64 scalar
-- **`no_orig`** — Number of origin points (TX); uint64 scalar
-- **`no_dest`** — Number of destination points (RX); uint64 scalar
-- **`no_freq`** — Number of frequency bands; uint64 scalar
-- **`cir_offset`** — CIR offset per destination; uint64; `[no_dest]`
-- **`orig_names`** — Names of origin points; cell array of strings; `[no_orig]`
-- **`dest_names`** — Names of destination points; cell array of strings; `[no_dest]`
+- **`n_cir`** — Number of channel snapshots per origin point; uint64 scalar
+- **`n_orig`** — Number of origin points (TX); uint64 scalar
+- **`n_dest`** — Number of destination points (RX); uint64 scalar
+- **`n_freq`** — Number of frequency bands; uint64 scalar
+- **`cir_offset`** — Number of CIRs before each destination (an offset, not an index; the first entry is 0); the CIRs of
+  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest]`
+- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig]`
+- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz; single; `[no_freq]`
-- **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[no_cir, 3]`
-- **`cir_orientation`** — CIR orientations as Euler angles; single; `[no_cir, 3]`
-- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[no_orig, 3]`
-- **`orig_orientation`** — Origin (TX) orientations as Euler angles; single; `[no_orig, 3]`
+- **`center_freq`** — Center frequencies in Hz; single; `[n_freq]`
+- **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
+- **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
+- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`
+- **`orig_orientation`** — Origin (TX) orientations as Euler angles; single; `[n_orig, 3]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -56,7 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::string fn = qd_mex_get_string(prhs[0]);
 
     // Declare outputs
-    arma::uword no_cir, no_orig, no_dest, no_freq;
+    arma::uword n_cir, n_orig, n_dest, n_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
     int version;
@@ -64,10 +65,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
     // Wrap optional output pointers based on nlhs
-    arma::uword *p_no_cir = (nlhs > 0) ? &no_cir : nullptr;
-    arma::uword *p_no_orig = (nlhs > 1) ? &no_orig : nullptr;
-    arma::uword *p_no_dest = (nlhs > 2) ? &no_dest : nullptr;
-    arma::uword *p_no_freq = (nlhs > 3) ? &no_freq : nullptr;
+    arma::uword *p_no_cir = (nlhs > 0) ? &n_cir : nullptr;
+    arma::uword *p_no_orig = (nlhs > 1) ? &n_orig : nullptr;
+    arma::uword *p_no_dest = (nlhs > 2) ? &n_dest : nullptr;
+    arma::uword *p_no_freq = (nlhs > 3) ? &n_freq : nullptr;
     arma::uvec *p_cir_offset = (nlhs > 4) ? &cir_offset : nullptr;
     std::vector<std::string> *p_orig_names = (nlhs > 5) ? &orig_names : nullptr;
     std::vector<std::string> *p_dest_names = (nlhs > 6) ? &dest_names : nullptr;
@@ -86,13 +87,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Copy to MATLAB
     if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&no_cir);
+        plhs[0] = qd_mex_copy2matlab(&n_cir);
     if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&no_orig);
+        plhs[1] = qd_mex_copy2matlab(&n_orig);
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&no_dest);
+        plhs[2] = qd_mex_copy2matlab(&n_dest);
     if (nlhs > 3)
-        plhs[3] = qd_mex_copy2matlab(&no_freq);
+        plhs[3] = qd_mex_copy2matlab(&n_freq);
     if (nlhs > 4)
         plhs[4] = qd_mex_copy2matlab(&cir_offset);
     if (nlhs > 5)

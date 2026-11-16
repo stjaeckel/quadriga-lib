@@ -88,25 +88,25 @@ static void run(fz::input &in)
                 mesh(i, 3 + c) = mesh(i, c);
 
     // Sub-meshes and AABBs: none, fuzzed, or computed by the library
-    arma::u32_vec sub_mesh_index;
+    arma::u32_vec sub_mesh_ind;
     arma::Mat<T> aabb;
     int smi_mode = in.ConsumeIntegralInRange<int>(0, 2), aabb_mode = in.ConsumeIntegralInRange<int>(0, 2);
     if (smi_mode == 1)
-        sub_mesh_index = starts(in, n_mesh);
+        sub_mesh_ind = starts(in, n_mesh);
     if (smi_mode == 2)
         fz::clean([&]
                   { arma::Mat<T> meshR;
-                    quadriga_lib::triangle_mesh_segmentation<T>(&mesh, &meshR, &sub_mesh_index, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
+                    quadriga_lib::triangle_mesh_segmentation<T>(&mesh, &meshR, &sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
                     mesh = meshR; });
     if (aabb_mode == 1)
-        aabb = geo<T>(in, near(in, std::max(sub_mesh_index.n_elem, (arma::uword)1)), near(in, 6));
+        aabb = geo<T>(in, near(in, std::max(sub_mesh_ind.n_elem, (arma::uword)1)), near(in, 6));
     if (aabb_mode == 2)
-        fz::clean([&] { aabb = quadriga_lib::triangle_mesh_aabb<T>(&mesh, &sub_mesh_index, in.ConsumeIntegralInRange<arma::uword>(1, 8)); });
+        fz::clean([&] { aabb = quadriga_lib::triangle_mesh_aabb<T>(&mesh, &sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 8)); });
 
     // Outputs: missing, pre-sized wrongly, or the same objects as the inputs
     const int kernel = in.ConsumeIntegralInRange<int>(-1, 4);
     arma::Mat<T> fbs_own = geo<T>(in, in.size(3), in.size(4)), sbs_own;
-    arma::u32_vec no_interact(in.size(2)), fbs_ind, sbs_ind;
+    arma::u32_vec n_interact(in.size(2)), fbs_ind, sbs_ind;
     arma::Mat<T> orig_copy = orig, dest_copy = dest;
     arma::Mat<T> *fbs = nullptr, *sbs = nullptr;
     switch (in.ConsumeIntegralInRange<int>(0, 3))
@@ -123,30 +123,30 @@ static void run(fz::input &in)
     }
     const bool all = in.ConsumeBool();
     fz::clean([&]
-              { quadriga_lib::ray_triangle_intersect<T>(&orig_copy, &dest_copy, &mesh, fbs, sbs, all ? &no_interact : nullptr,
-                                                        all ? &fbs_ind : nullptr, &sbs_ind, smi_mode ? &sub_mesh_index : nullptr,
+              { quadriga_lib::ray_triangle_intersect<T>(&orig_copy, &dest_copy, &mesh, fbs, sbs, all ? &n_interact : nullptr,
+                                                        all ? &fbs_ind : nullptr, &sbs_ind, smi_mode ? &sub_mesh_ind : nullptr,
                                                         aabb_mode ? &aabb : nullptr, kernel); });
 
     // Point cloud: fuzzed, or reorganized by the library
     arma::Mat<T> points = geo<T>(in, in.size(64), near(in, 3));
-    arma::u32_vec sub_cloud_index;
+    arma::u32_vec sub_cloud_ind;
     int sci_mode = in.ConsumeIntegralInRange<int>(0, 2);
     if (sci_mode == 1)
-        sub_cloud_index = starts(in, points.n_rows);
+        sub_cloud_ind = starts(in, points.n_rows);
     if (sci_mode == 2)
         fz::clean([&]
                   { arma::Mat<T> pointsR;
-                    quadriga_lib::point_cloud_segmentation<T>(&points, &pointsR, &sub_cloud_index, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
+                    quadriga_lib::point_cloud_segmentation<T>(&points, &pointsR, &sub_cloud_ind, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
                     points = pointsR; });
 
-    std::vector<unsigned> hit_index(in.size(3));
+    std::vector<unsigned> hit_ind(in.size(3));
     arma::u32_vec hit_offset(in.size(3)), hit_count;
     std::vector<arma::u32_vec> hits_per_point(in.size(3));
     const int kernel_p = in.ConsumeIntegralInRange<int>(-1, 4), out_mask = in.ConsumeIntegralInRange<int>(0, 15);
     fz::clean([&]
-              { quadriga_lib::ray_point_intersect<T>(points, orig, trivec, tridir, (out_mask & 1) ? &hit_index : nullptr,
+              { quadriga_lib::ray_point_intersect<T>(points, orig, trivec, tridir, (out_mask & 1) ? &hit_ind : nullptr,
                                                      (out_mask & 2) ? &hit_offset : nullptr, (out_mask & 4) ? &hit_count : nullptr,
-                                                     (out_mask & 8) ? &hits_per_point : nullptr, sci_mode ? &sub_cloud_index : nullptr, kernel_p); });
+                                                     (out_mask & 8) ? &hits_per_point : nullptr, sci_mode ? &sub_cloud_ind : nullptr, kernel_p); });
 
     // Subdivision: spherical or Cartesian directions, fuzzed indices, outputs of fuzzed sizes
     arma::Mat<T> tridir_s = in.ConsumeBool() ? tridir : geo<T>(in, near(in, orig.n_rows), near(in, 6));

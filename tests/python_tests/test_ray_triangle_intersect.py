@@ -376,7 +376,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         fbs_ref, _, _, _, _ = RTtools.ray_triangle_intersect(
             self.orig, self.dest, self.cube)
 
-        # Pass no sub_mesh_index, no aabb, explicit kernel=1, gpu_id=0
+        # Pass no sub_mesh_ind, no aabb, explicit kernel=1, gpu_id=0
         fbs, _, _, _, _ = RTtools.ray_triangle_intersect(
             self.orig, self.dest, self.cube, use_kernel=1, gpu_id=0)
 

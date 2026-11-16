@@ -22,8 +22,8 @@ def make_single_freq_ant(n_el=19, n_az=37, n_elem=1, freq=1e9, res=10.0):
     ant = arrayant.generate('omni', res, freq=freq)
     if n_elem > 1:
         for i in range(1, n_elem):
-            ant = arrayant.copy_element(ant, source_element=np.array([0], dtype=np.uint64),
-                                        dest_element=np.array([i], dtype=np.uint64))
+            ant = arrayant.copy_element(ant, i_source=np.array([0], dtype=np.uint64),
+                                        i_target=np.array([i], dtype=np.uint64))
     return ant
 
 

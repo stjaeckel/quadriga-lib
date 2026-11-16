@@ -43,8 +43,8 @@ def _make_inputs(n_rx=3, n_tx=2, n_path=5, n_snap=3, seed=1):
         'tx_pos': rng.random((3, 1)),
         'coeff_re': rng.random((n_rx, n_tx, n_path, n_snap)),
         'coeff_im': rng.random((n_rx, n_tx, n_path, n_snap)),
-        # one interaction point per path -> sum(no_interact) == n_path per snapshot
-        'no_interact': np.ones((n_path, n_snap), dtype=np.uint32),
+        # one interaction point per path -> sum(n_interact) == n_path per snapshot
+        'n_interact': np.ones((n_path, n_snap), dtype=np.uint32),
         'interact_coord': rng.random((3, n_path, n_snap)),
         'center_freq': np.full(n_snap, 3.0e9),
     }
@@ -52,10 +52,10 @@ def _make_inputs(n_rx=3, n_tx=2, n_path=5, n_snap=3, seed=1):
 
 def _to_lists(data):
     """Convert the per-snapshot nD fields of _make_inputs() into ragged lists."""
-    n_snap = data['no_interact'].shape[1]
+    n_snap = data['n_interact'].shape[1]
     coeff = data['coeff_re'] + 1j * data['coeff_im']
     return {
-        'no_interact': [np.ascontiguousarray(data['no_interact'][:, j]) for j in range(n_snap)],
+        'n_interact': [np.ascontiguousarray(data['n_interact'][:, j]) for j in range(n_snap)],
         'interact_coord': [np.ascontiguousarray(data['interact_coord'][:, :, j]) for j in range(n_snap)],
         'coeff': [np.ascontiguousarray(coeff[:, :, :, j]) for j in range(n_snap)],
     }
@@ -84,7 +84,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         coeff = d['coeff_re'] + 1j * d['coeff_im']
         fn = self._export('basic.obj',
                           rx_pos=d['rx_pos'], tx_pos=d['tx_pos'],
-                          no_interact=d['no_interact'], interact_coord=d['interact_coord'],
+                          n_interact=d['n_interact'], interact_coord=d['interact_coord'],
                           center_freq=d['center_freq'], coeff=coeff)
 
         self.assertTrue(os.path.isfile(fn))
@@ -100,7 +100,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         d = _make_inputs()
         coeff = d['coeff_re'] + 1j * d['coeff_im']
         common = dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'],
-                      no_interact=d['no_interact'], interact_coord=d['interact_coord'],
+                      n_interact=d['n_interact'], interact_coord=d['interact_coord'],
                       center_freq=d['center_freq'])
 
         fn_c = self._export('cplx.obj', coeff=coeff, **common)
@@ -117,9 +117,9 @@ class test_channel_export_obj_file(unittest.TestCase):
         lst = _to_lists(d)
         common = dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'], center_freq=d['center_freq'])
 
-        fn_nd = self._export('nd.obj', no_interact=d['no_interact'],
+        fn_nd = self._export('nd.obj', n_interact=d['n_interact'],
                              interact_coord=d['interact_coord'], coeff=coeff, **common)
-        fn_li = self._export('list.obj', no_interact=lst['no_interact'],
+        fn_li = self._export('list.obj', n_interact=lst['n_interact'],
                              interact_coord=lst['interact_coord'], coeff=lst['coeff'], **common)
 
         self.assertEqual(_significant_lines(fn_nd), _significant_lines(fn_li))
@@ -131,10 +131,10 @@ class test_channel_export_obj_file(unittest.TestCase):
         coeff = d['coeff_re'] + 1j * d['coeff_im']
         common = dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'], center_freq=d['center_freq'])
 
-        fn_ref = self._export('ref.obj', no_interact=d['no_interact'],
+        fn_ref = self._export('ref.obj', n_interact=d['n_interact'],
                               interact_coord=d['interact_coord'], coeff=coeff, **common)
-        # no_interact as list, interact_coord as ndarray, coefficients as split real
-        fn_mix = self._export('mix.obj', no_interact=lst['no_interact'],
+        # n_interact as list, interact_coord as ndarray, coefficients as split real
+        fn_mix = self._export('mix.obj', n_interact=lst['n_interact'],
                               interact_coord=d['interact_coord'],
                               coeff_re=d['coeff_re'], coeff_im=d['coeff_im'], **common)
 
@@ -142,15 +142,15 @@ class test_channel_export_obj_file(unittest.TestCase):
 
     def test_padded_ndarray_trim(self):
         # Snapshots with different interaction counts: the nD interact_coord is padded
-        # to max(sum(no_interact)); the wrapper must trim it back per snapshot. The
+        # to max(sum(n_interact)); the wrapper must trim it back per snapshot. The
         # ragged list carries exactly the valid columns, so both must match.
         rng = np.random.default_rng(7)
         n_rx, n_tx, n_path, n_snap = 2, 2, 4, 2
-        no_interact = np.array([[1, 1],
+        n_interact = np.array([[1, 1],
                                 [2, 1],
                                 [1, 1],
                                 [1, 1]], dtype=np.uint32)   # column sums: snap0=5, snap1=4
-        sums = no_interact.sum(axis=0)
+        sums = n_interact.sum(axis=0)
         max_int = int(sums.max())
 
         interact_coord_nd = np.zeros((3, max_int, n_snap))
@@ -165,28 +165,28 @@ class test_channel_export_obj_file(unittest.TestCase):
         coeff_re = rng.random((n_rx, n_tx, n_path, n_snap))
         coeff_im = rng.random((n_rx, n_tx, n_path, n_snap))
         coeff = coeff_re + 1j * coeff_im
-        ni_list = [np.ascontiguousarray(no_interact[:, j]) for j in range(n_snap)]
+        ni_list = [np.ascontiguousarray(n_interact[:, j]) for j in range(n_snap)]
         cf_list = [np.ascontiguousarray(coeff[:, :, :, j]) for j in range(n_snap)]
 
         common = dict(rx_pos=rng.random((3, 1)), tx_pos=rng.random((3, 1)),
                       center_freq=np.full(n_snap, 3.0e9))
 
-        fn_nd = self._export('pad_nd.obj', no_interact=no_interact,
+        fn_nd = self._export('pad_nd.obj', n_interact=n_interact,
                              interact_coord=interact_coord_nd, coeff=coeff, **common)
-        fn_li = self._export('pad_li.obj', no_interact=ni_list,
+        fn_li = self._export('pad_li.obj', n_interact=ni_list,
                              interact_coord=ic_list, coeff=cf_list, **common)
 
         self.assertEqual(_significant_lines(fn_nd), _significant_lines(fn_li))
 
-    def test_max_no_paths_limits(self):
+    def test_max_paths_limits(self):
         d = _make_inputs()
         coeff = d['coeff_re'] + 1j * d['coeff_im']
         common = dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'],
-                      no_interact=d['no_interact'], interact_coord=d['interact_coord'],
+                      n_interact=d['n_interact'], interact_coord=d['interact_coord'],
                       center_freq=d['center_freq'], coeff=coeff)
 
-        fn_all = self._export('all.obj', max_no_paths=0, **common)
-        fn_one = self._export('one.obj', max_no_paths=1, **common)
+        fn_all = self._export('all.obj', max_paths=0, **common)
+        fn_one = self._export('one.obj', max_paths=1, **common)
 
         self.assertLess(len(_significant_lines(fn_one)), len(_significant_lines(fn_all)))
 
@@ -194,7 +194,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         d = _make_inputs()
         coeff = d['coeff_re'] + 1j * d['coeff_im']
         common = dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'],
-                      no_interact=d['no_interact'], interact_coord=d['interact_coord'],
+                      n_interact=d['n_interact'], interact_coord=d['interact_coord'],
                       center_freq=d['center_freq'], coeff=coeff)
 
         # i_snap is 0-based; a subset of snapshots yields fewer paths than the full set
@@ -211,7 +211,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         d = _make_inputs()
         coeff = d['coeff_re'] + 1j * d['coeff_im']
         common = dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'],
-                      no_interact=d['no_interact'], interact_coord=d['interact_coord'],
+                      n_interact=d['n_interact'], interact_coord=d['interact_coord'],
                       center_freq=d['center_freq'], coeff=coeff)
 
         self.assertTrue(os.path.isfile(self._export('gain.obj', gain_max=10.0, gain_min=6.0, **common)))
@@ -223,7 +223,7 @@ class test_channel_export_obj_file(unittest.TestCase):
     def _valid_kwargs(self):
         d = _make_inputs()
         return dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'],
-                    no_interact=d['no_interact'], interact_coord=d['interact_coord'],
+                    n_interact=d['n_interact'], interact_coord=d['interact_coord'],
                     center_freq=d['center_freq'],
                     coeff=d['coeff_re'] + 1j * d['coeff_im']), d
 
@@ -285,19 +285,19 @@ class test_channel_export_obj_file(unittest.TestCase):
 
 
     def test_interact_coord_too_few_columns(self):
-        """interact_coord needs at least sum(no_interact) columns of 3 rows."""
+        """interact_coord needs at least sum(n_interact) columns of 3 rows."""
         common = dict(rx_pos=np.array([[1.0], [0], [0]]), tx_pos=np.zeros((3, 1)), center_freq=np.array([1e9]),
                       coeff=[np.ones((1, 1, 3), complex) * 1e-4], gain_min=-300)
         ni = [np.array([1, 0, 2], dtype=np.uint32)]
         for ic in ([np.zeros((3, 0))], [np.zeros((3, 2))], [np.zeros((2, 3))], np.zeros((3, 2, 1))):
             with self.assertRaises(ValueError):
-                quadriga_lib.channel.channel_export_obj_file(self._path('bad.obj'), no_interact=ni,
+                quadriga_lib.channel.channel_export_obj_file(self._path('bad.obj'), n_interact=ni,
                                                             interact_coord=ic, **common)
-        quadriga_lib.channel.channel_export_obj_file(self._path('ok.obj'), no_interact=ni,
+        quadriga_lib.channel.channel_export_obj_file(self._path('ok.obj'), n_interact=ni,
                                                     interact_coord=[np.ones((3, 3))], **common)
-        quadriga_lib.channel.channel_export_obj_file(self._path('ok4.obj'), no_interact=ni,
+        quadriga_lib.channel.channel_export_obj_file(self._path('ok4.obj'), n_interact=ni,
                                                     interact_coord=np.ones((3, 4, 1)), **common)
-        quadriga_lib.channel.channel_export_obj_file(self._path('ok0.obj'), no_interact=[np.zeros(3, dtype=np.uint32)],
+        quadriga_lib.channel.channel_export_obj_file(self._path('ok0.obj'), n_interact=[np.zeros(3, dtype=np.uint32)],
                                                     interact_coord=[np.zeros((3, 0))], **common)
 
 
@@ -307,7 +307,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '4294967302'):
             quadriga_lib.channel.channel_export_obj_file(
                 self._path('wrap.obj'), rx_pos=np.array([[10.0], [0], [1]]), tx_pos=np.array([[0.0], [0], [10]]),
-                no_interact=ni, interact_coord=np.ones((3, 6, 1)), center_freq=np.array([3e9]),
+                n_interact=ni, interact_coord=np.ones((3, 6, 1)), center_freq=np.array([3e9]),
                 coeff_re=np.ones((1, 1, 2, 1)), coeff_im=np.zeros((1, 1, 2, 1)), gain_min=-500.0, gain_max=0.0)
 
 if __name__ == '__main__':

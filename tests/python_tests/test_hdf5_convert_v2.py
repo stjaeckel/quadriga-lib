@@ -42,7 +42,7 @@ data_dir = os.path.join(current_dir, '../data')
 fixtures = ('hdf5_v2_written.hdf5', 'hdf5_v2_edited.hdf5', 'hdf5_v2_lossy.hdf5')
 
 # Channel dict keys renamed since release 0.12.4, which wrote the oracle: {current key: oracle key}
-oracle_key = {'center_freq': 'center_frequency'}
+oracle_key = {'center_freq': 'center_frequency', 'n_interact': 'no_interact'}
 
 
 def slot_index(s, dims):

@@ -18,7 +18,7 @@
 namespace
 {
     // A valid 136-byte v5 file: 1 frequency, 1 CIR, 1 RX, 1 TX with one LOS path.
-    // Byte offsets: no_orig 11, no_cir 15, no_dest 19, no_freq 23, orig_index 76, path_data_index 91, no_path 99.
+    // Byte offsets: n_orig 11, n_cir 15, n_dest 19, n_freq 23, orig_index 76, path_data_index 91, n_path 99.
     static std::vector<char> qrt_small_file(const std::string &fn)
     {
         quadriga_lib::qrt_file_init<double>(fn, arma::vec{3.0e9}, arma::mat{{1.0, 2.0, 3.0}}, arma::mat());
@@ -93,15 +93,15 @@ TEST_CASE("QRT Reader - counts and offsets that do not fit the file")
         bool header; // false: only the path readers see it
     };
     const std::vector<patch> patches = {
-        {"no_orig", 11, 100000000ULL, 4, true},
-        {"no_orig max", 11, 0xFFFFFFFFULL, 4, true},
-        {"no_cir", 15, 100000000ULL, 4, true},
-        {"no_dest", 19, 100000000ULL, 4, true},
-        {"no_dest max", 19, 0xFFFFFFFFULL, 4, true},
-        {"no_freq", 23, 100000000ULL, 4, true},
+        {"n_orig", 11, 100000000ULL, 4, true},
+        {"n_orig max", 11, 0xFFFFFFFFULL, 4, true},
+        {"n_cir", 15, 100000000ULL, 4, true},
+        {"n_dest", 19, 100000000ULL, 4, true},
+        {"n_dest max", 19, 0xFFFFFFFFULL, 4, true},
+        {"n_freq", 23, 100000000ULL, 4, true},
         {"orig_index", 76, 1000000000000ULL, 8, true},
-        {"no_path", 99, 100000000ULL, 4, false},
-        {"no_path max", 99, 0xFFFFFFFFULL, 4, false},
+        {"n_path", 99, 100000000ULL, 4, false},
+        {"n_path max", 99, 0xFFFFFFFFULL, 4, false},
         {"data_offset", 91, 1000000000000ULL, 8, false}};
 
     for (const auto &p : patches)
@@ -169,9 +169,9 @@ TEST_CASE("QRT Reader - truncated files")
 TEST_CASE("QRT Reader - v4 file without origins")
 {
     // A v4 file stores its frequency in the first origin block. Without origins, the cache holds one
-    // frequency of 0 Hz, as qrt_file_read does for an unfilled v4 slot, so that freq.n_elem == no_freq.
+    // frequency of 0 Hz, as qrt_file_read does for an unfilled v4 slot, so that freq.n_elem == n_freq.
     const std::string fn = "tests/data/test_qrt_v4_no_orig.qrt";
-    std::vector<char> data(23, 0); // "#QRT-BINv04", then no_orig = no_cir = no_dest = 0
+    std::vector<char> data(23, 0); // "#QRT-BINv04", then n_orig = n_cir = n_dest = 0
     std::memcpy(data.data(), "#QRT-BINv04", 11);
     qrt_write_bytes(fn, data, data.size());
 

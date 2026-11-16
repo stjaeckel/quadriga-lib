@@ -17,20 +17,20 @@ Create copies of array antenna elements
 - Coupling matrix entries for newly added elements are set to identity; existing coupling is preserved
 - Supports multi-frequency arrayant models: when `arrayant_in` is a struct array, the same copy is
   applied to every entry and a struct array of equal size is returned
-- If `source_element` is a vector, `dest_element` must have the same length; copies are performed
-  pairwise as `source_element(i)` to `dest_element(i)`
+- If `i_source` is a vector, `i_target` must have the same length; copies are performed
+  pairwise as `i_source(i)` to `i_target(i)`
 
 ## Usage:
 ```
-arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, source_element, dest_element );
+arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_target );
 ```
 
 ## Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
   [[arrayant_generate]]; a struct array may contain a frequency-dependent model
-- **`source_element`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
-- **`dest_element`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
-  if `source_element` is a vector, must have the same length
+- **`i_source`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
+- **`i_target`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
+  if `i_source` is a vector, must have the same length
 
 ## Outputs:
 - **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
@@ -59,20 +59,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         ant = qd_mex_struct2arrayant(prhs[0], true, true);
 
     // Read source and destination indices (1-based -> 0-based)
-    arma::uvec source = qd_mex_get_Col<arma::uword>(prhs[1], true, "source_element");
-    arma::uvec dest = qd_mex_get_Col<arma::uword>(prhs[2], true, "dest_element");
+    arma::uvec source = qd_mex_get_Col<arma::uword>(prhs[1], true, "i_source");
+    arma::uvec dest = qd_mex_get_Col<arma::uword>(prhs[2], true, "i_target");
 
     if (source.n_elem == 0 || dest.n_elem == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'source_element' and 'dest_element' cannot be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'i_source' and 'i_target' cannot be empty.");
 
     if (arma::any(source == 0) || arma::any(dest == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'source_element' / 'dest_element' cannot be 0 (1-based index).");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_source' / 'i_target' cannot be 0 (1-based index).");
 
     source -= 1;
     dest -= 1;
 
     if (source.n_elem > 1 && source.n_elem != dest.n_elem)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "When copying multiple elements, 'source_element' and 'dest_element' must have the same length.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "When copying multiple elements, 'i_source' and 'i_target' must have the same length.");
 
     // Dispatch
     if (n_freq > 1)

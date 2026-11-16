@@ -117,7 +117,7 @@ TEST_CASE("Channel - Effective Path Gain")
 TEST_CASE("Channel - Interaction count sum does not wrap at 32 bits")
 {
     // The two counts add up to 2^32 + 6; a 32-bit sum would wrap to 6 and accept 6 columns
-    const arma::u32_vec no_interact_huge = {0xFFFFFFFFu, 7u};
+    const arma::u32_vec n_interact_huge = {0xFFFFFFFFu, 7u};
     const arma::mat coord_6(3, 6, arma::fill::ones);
 
     quadriga_lib::channel<double> c;
@@ -126,18 +126,18 @@ TEST_CASE("Channel - Interaction count sum does not wrap at 32 bits")
     c.coeff_re.push_back(arma::cube(1, 1, 2, arma::fill::ones));
     c.coeff_im.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
     c.delay.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
-    c.no_interact.push_back(arma::u32_vec{1u, 5u});
+    c.n_interact.push_back(arma::u32_vec{1u, 5u});
     c.interact_coord.push_back(coord_6);
     REQUIRE(c.is_valid().empty());
 
     // is_valid must report the mismatch
     auto c_huge = c;
-    c_huge.no_interact[0] = no_interact_huge;
+    c_huge.n_interact[0] = n_interact_huge;
     CHECK(!c_huge.is_valid().empty());
 
     // add_paths must reject the counts before anything is appended
     const arma::cube cre(1, 1, 2, arma::fill::ones), cim(1, 1, 2, arma::fill::zeros), dl(1, 1, 2, arma::fill::zeros);
-    CHECK_THROWS_AS(c.add_paths(0, &cre, &cim, &dl, &no_interact_huge, &coord_6), std::invalid_argument);
+    CHECK_THROWS_AS(c.add_paths(0, &cre, &cim, &dl, &n_interact_huge, &coord_6), std::invalid_argument);
     CHECK(c.n_path().at(0) == 2);
 }
 
@@ -217,8 +217,8 @@ TEST_CASE("Channel - Delays without coefficients")
     // Interaction coordinates without interaction counts, also when nothing else sets the snapshot count
     quadriga_lib::channel<double> f;
     f.interact_coord.push_back(arma::mat(3, 1, arma::fill::zeros));
-    CHECK(f.is_valid() == "'interact_coord' is provided but 'no_interact' is missing.");
+    CHECK(f.is_valid() == "'interact_coord' is provided but 'n_interact' is missing.");
     f.tx_pos = arma::mat(3, 1, arma::fill::zeros);
     f.rx_pos = arma::mat(3, 1, arma::fill::ones);
-    CHECK(f.is_valid() == "'interact_coord' is provided but 'no_interact' is missing.");
+    CHECK(f.is_valid() == "'interact_coord' is provided but 'n_interact' is missing.");
 }

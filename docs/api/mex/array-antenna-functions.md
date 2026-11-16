@@ -175,20 +175,20 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_copy_element) · [Pyth
 - Coupling matrix entries for newly added elements are set to identity; existing coupling is preserved
 - Supports multi-frequency arrayant models: when `arrayant_in` is a struct array, the same copy is
   applied to every entry and a struct array of equal size is returned
-- If `source_element` is a vector, `dest_element` must have the same length; copies are performed
-  pairwise as `source_element(i)` to `dest_element(i)`
+- If `i_source` is a vector, `i_target` must have the same length; copies are performed
+  pairwise as `i_source(i)` to `i_target(i)`
 
 ### Usage:
 ```matlab
-arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, source_element, dest_element );
+arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_target );
 ```
 
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
   [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
-- **`source_element`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
-- **`dest_element`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
-  if `source_element` is a vector, must have the same length
+- **`i_source`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
+- **`i_target`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
+  if `i_source` is a vector, must have the same length
 
 ### Outputs:
 - **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
@@ -377,11 +377,11 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [Pytho
 ```matlab
 % Single-frequency mode
 [ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.arrayant_interpolate( ...
-    arrayant, azimuth, elevation, element, orientation, element_pos, [], use_kernel );
+    arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
 
 % Multi-frequency mode
 [ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
-    element, orientation, element_pos, freq_new, use_kernel );
+    i_element, orientation, element_pos, freq_new, use_kernel );
 ```
 
 ### Inputs:
@@ -390,7 +390,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [Pytho
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` (same angles for all outputs) or `[n_out, n_ang]` (one angle per
   output)
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 - **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or
   `[3, n_out, n_ang]`; default: no rotation
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the

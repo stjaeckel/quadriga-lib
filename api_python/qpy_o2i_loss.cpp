@@ -29,7 +29,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 ## Usage:
 ```
-loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
+loss, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
 ```
 
 ## Inputs:
@@ -45,7 +45,7 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models
 ## Outputs:
 - **`loss`** — Penetration loss in dB; `(n_ut, n_freq)`
 - **`d2d_in`** — Indoor 2D distance in m, 0 for the car models; `(n_ut,)`
-- **`model_index`** — Chosen model per UT, 0-based index into `models`; uint64; `(n_ut,)`
+- **`model_ind`** — Chosen model per UT, 0-based index into `models`; uint64; `(n_ut,)`
 
 ## See also:
 - [[los_probability]] (uses the outdoor distance `d2D - d2d_in`)
@@ -67,13 +67,13 @@ py::tuple o2i_loss(const py::array_t<double> &center_freq,
     // Output allocation
     arma::mat loss;
     arma::vec d2d_in;
-    arma::uvec model_index;
+    arma::uvec model_ind;
     auto loss_py = qd_python_init_output(rnd_a.n_rows, center_freq_a.n_elem, &loss);
     auto d2d_in_py = qd_python_init_output(rnd_a.n_rows, &d2d_in);
-    auto model_index_py = qd_python_init_output(rnd_a.n_rows, &model_index);
+    auto model_index_py = qd_python_init_output(rnd_a.n_rows, &model_ind);
 
     // Call library function
-    quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, loss, d2d_in_max, &d2d_in, &model_index);
+    quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, loss, d2d_in_max, &d2d_in, &model_ind);
 
     return py::make_tuple(loss_py, d2d_in_py, model_index_py);
 }

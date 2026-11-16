@@ -500,7 +500,7 @@ TEST_CASE("ray_subdivide_flag - state gates")
         B.cur(0) = (short)0x8000;
         CHECK(B.flag(S, tol)[0] == false);
     }
-    SECTION("the subdivision counter stops at max_no_subdivisions")
+    SECTION("the subdivision counter stops at max_subdivisions")
     {
         Beams B = one_beam(1.0f);
         intersect(B, S);
@@ -512,7 +512,7 @@ TEST_CASE("ray_subdivide_flag - state gates")
         B.paths[0].nSUB = 3;
         CHECK(B.flag(S, tol, 20, 2)[0] == false);
     }
-    SECTION("the segment count stops at max_no_interactions")
+    SECTION("the segment count stops at max_interactions")
     {
         Beams B = one_beam(1.0f);
         intersect(B, S);
@@ -524,7 +524,7 @@ TEST_CASE("ray_subdivide_flag - state gates")
         B.paths[0].init(4, 1, false);
         CHECK(B.flag(S, tol, 3, 2)[0] == false);
     }
-    SECTION("max_no_subdivisions = 0 disables the whole function")
+    SECTION("max_subdivisions = 0 disables the whole function")
     {
         Beams B = one_beam(1.0f);
         intersect(B, S);
@@ -532,7 +532,7 @@ TEST_CASE("ray_subdivide_flag - state gates")
         REQUIRE(f.size() == 1u);
         CHECK(f[0] == false);
     }
-    SECTION("max_no_interactions = 0 disables the whole function")
+    SECTION("max_interactions = 0 disables the whole function")
     {
         Beams B = one_beam(1.0f);
         intersect(B, S);
@@ -717,7 +717,7 @@ TEST_CASE("ray_subdivide_flag - input validation")
     }
     SECTION("a disabled limit still validates its inputs")
     {
-        // The early return for max_no_subdivisions = 0 must not bypass the shape checks
+        // The early return for max_subdivisions = 0 must not bypass the shape checks
         Beams B = ref;
         B.cur.zeros(2);
         CHECK_THROWS_AS(B.flag(S, 3.0f, 20, 0), std::invalid_argument);

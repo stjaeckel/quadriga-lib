@@ -113,15 +113,15 @@ static void run(fz::input &in)
 
     // Segmentation; vec_size is small or the largest value
     arma::Mat<T> meshR;
-    arma::u32_vec sub_mesh_index, mesh_index;
+    arma::u32_vec sub_mesh_ind, mesh_ind;
     arma::uvec mtl_ind_seg;
     const arma::uword target_size = in.size(70);
     const arma::uword vec_size = in.ConsumeIntegralInRange<int>(0, 15) == 0 ? std::numeric_limits<arma::uword>::max() : in.size(33);
     const int seg_mask = in.ConsumeIntegralInRange<int>(0, 7);
     fz::clean([&]
-              { quadriga_lib::triangle_mesh_segmentation<T>(&mesh, (seg_mask & 1) ? &meshR : nullptr, &sub_mesh_index, target_size, vec_size,
+              { quadriga_lib::triangle_mesh_segmentation<T>(&mesh, (seg_mask & 1) ? &meshR : nullptr, &sub_mesh_ind, target_size, vec_size,
                                                             (seg_mask & 2) ? &mtl_ind : nullptr, (seg_mask & 2) ? &mtl_ind_seg : nullptr,
-                                                            (seg_mask & 4) ? &mesh_index : nullptr); });
+                                                            (seg_mask & 4) ? &mesh_ind : nullptr); });
 
     // AABB of fuzzed or segmented sub-meshes
     arma::u32_vec smi(in.size(8));
@@ -130,7 +130,7 @@ static void run(fz::input &in)
     if (in.ConsumeBool())
         smi = arma::sort(smi);
     const arma::Mat<T> &aabb_mesh = (in.ConsumeBool() && meshR.n_rows != 0) ? meshR : mesh;
-    const arma::u32_vec *aabb_smi = in.ConsumeBool() ? &smi : (in.ConsumeBool() ? &sub_mesh_index : nullptr);
+    const arma::u32_vec *aabb_smi = in.ConsumeBool() ? &smi : (in.ConsumeBool() ? &sub_mesh_ind : nullptr);
     const arma::uword vec_size_aabb = in.size(9);
     fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(&aabb_mesh, aabb_smi, vec_size_aabb); });
 

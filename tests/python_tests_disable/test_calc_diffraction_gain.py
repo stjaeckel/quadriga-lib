@@ -173,7 +173,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
         )
         self.assertEqual(coord.shape, (3, 1, 2))  # n_seg=1
 
-    # Empty sub_mesh_index
+    # Empty sub_mesh_ind
     def test_empty_sub_mesh_index(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=0
@@ -187,11 +187,11 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.mtl_dict,
             1e9,
             lod=0,
-            sub_mesh_index=np.array([], dtype=np.uint32),
+            sub_mesh_ind=np.array([], dtype=np.uint32),
         )
         npt.assert_allclose(gain, gain_ref, atol=1e-14)
 
-    #  Valid sub_mesh_index (single sub-mesh covering all triangles)
+    #  Valid sub_mesh_ind (single sub-mesh covering all triangles)
     def test_single_submesh(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=0
@@ -206,11 +206,11 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.mtl_dict,
             1e9,
             lod=0,
-            sub_mesh_index=smi,
+            sub_mesh_ind=smi,
         )
         npt.assert_allclose(gain, gain_ref, atol=1e-14)
 
-    # sub_mesh_index dtype variants
+    # sub_mesh_ind dtype variants
     def test_submesh_index_int32(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
             self.orig,
@@ -220,7 +220,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.mtl_dict,
             1e9,
             lod=0,
-            sub_mesh_index=np.zeros(1, dtype=np.uint32),
+            sub_mesh_ind=np.zeros(1, dtype=np.uint32),
         )
 
         gain, _ = RTtools.calc_diffraction_gain(
@@ -231,7 +231,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.mtl_dict,
             1e9,
             lod=0,
-            sub_mesh_index=np.zeros(1, dtype=np.int32),
+            sub_mesh_ind=np.zeros(1, dtype=np.int32),
         )
         npt.assert_allclose(gain, gain_ref, atol=1e-14)
 
@@ -244,7 +244,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.mtl_dict,
             1e9,
             lod=0,
-            sub_mesh_index=np.zeros(1, dtype=np.uint32),
+            sub_mesh_ind=np.zeros(1, dtype=np.uint32),
         )
 
         gain, _ = RTtools.calc_diffraction_gain(
@@ -255,7 +255,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.mtl_dict,
             1e9,
             lod=0,
-            sub_mesh_index=np.zeros(1, dtype=np.int64),
+            sub_mesh_ind=np.zeros(1, dtype=np.int64),
         )
         npt.assert_allclose(gain, gain_ref, atol=1e-14)
 
@@ -309,7 +309,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
             1e9,
             lod=2,
             verbose=0,
-            sub_mesh_index=np.array([], dtype=np.uint32),
+            sub_mesh_ind=np.array([], dtype=np.uint32),
             use_kernel=1,
             gpu_id=0,
         )
@@ -363,7 +363,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
             )
         self.assertIn("mesh", str(ctx.exception).lower())
 
-    #  Error: sub_mesh_index first element not 0
+    #  Error: sub_mesh_ind first element not 0
     def test_error_submesh_not_starting_at_zero(self):
         with self.assertRaises(ValueError) as ctx:
             RTtools.calc_diffraction_gain(
@@ -374,11 +374,11 @@ class TestCalcDiffractionGain(unittest.TestCase):
                 self.mtl_dict,
                 1e9,
                 lod=0,
-                sub_mesh_index=np.array([1], dtype=np.uint32),
+                sub_mesh_ind=np.array([1], dtype=np.uint32),
             )
         self.assertIn("sub-mesh", str(ctx.exception).lower())
 
-    #  Error: sub_mesh_index exceeds mesh count
+    #  Error: sub_mesh_ind exceeds mesh count
     def test_error_submesh_exceeds_mesh(self):
         with self.assertRaises(ValueError) as ctx:
             RTtools.calc_diffraction_gain(
@@ -389,7 +389,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
                 self.mtl_dict,
                 1e9,
                 lod=0,
-                sub_mesh_index=np.array([0, 32], dtype=np.uint32),
+                sub_mesh_ind=np.array([0, 32], dtype=np.uint32),
             )
         self.assertIn("sub-mesh", str(ctx.exception).lower())
 

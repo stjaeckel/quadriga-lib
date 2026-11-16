@@ -391,7 +391,7 @@ static inline std::complex<double> close_at(int m, double L, double f = FRQ)
 // Call harness. Owns every argument of ray_state_update; has_* switches turn each optional
 // (and, for the validation group, required) pointer into nullptr. run() snapshots the incoming
 // gain / xprmat so factor checks can compare out against in.
-//   Full ray set  [n_ray]  : orig, dest, no_interact, prev_in, cur_in, buf_in, path_dir_prev,
+//   Full ray set  [n_ray]  : orig, dest, n_interact, prev_in, cur_in, buf_in, path_dir_prev,
 //                            acc_dist_geometric, acc_dist_refracted
 //   Compact set   [n_rayN] : fbs, sbs, fbs_angle, normals, out_type, m1, m2, and every output
 template <typename dtype>
@@ -403,7 +403,7 @@ struct Rsu
 
     arma::Mat<dtype> orig, dest;   // full  [n_ray, 3]
     arma::Mat<dtype> fbs, sbs;     // compact [n_rayN, 3]
-    arma::u32_vec no_interact;     // full  [n_ray]
+    arma::u32_vec n_interact;      // full  [n_ray]
     arma::Col<dtype> fbs_angle;    // compact [n_rayN]
     arma::Mat<dtype> normals;      // compact [n_rayN, 6]
     std::vector<uint8_t> out_type; // compact [n_rayN]
@@ -449,7 +449,7 @@ struct Rsu
             has_dest ? &dest : nullptr,
             has_fbs ? &fbs : nullptr,
             has_sbs ? &sbs : nullptr,
-            has_ni ? &no_interact : nullptr,
+            has_ni ? &n_interact : nullptr,
             has_angle ? &fbs_angle : nullptr,
             has_normals ? &normals : nullptr,
             has_otype ? &out_type : nullptr,
@@ -503,8 +503,8 @@ static inline Rsu<dtype> make1(const std::unordered_map<std::string, std::vector
     C.dest.zeros(1, 3);
     C.dest(0, 0) = (dtype)(d_orig_fbs + d_fbs_dest);
 
-    C.no_interact.set_size(1);
-    C.no_interact(0) = nH;
+    C.n_interact.set_size(1);
+    C.n_interact(0) = nH;
     C.fbs_angle.set_size(1);
     C.fbs_angle(0) = (dtype)theta_graz_rad;
     C.out_type.assign(1, otype);
@@ -650,7 +650,7 @@ static Rsu<double> merge_rows(const std::vector<Rsu<double>> &v)
         B.dest = arma::join_vert(B.dest, r.dest);
         B.fbs = arma::join_vert(B.fbs, r.fbs);
         B.sbs = arma::join_vert(B.sbs, r.sbs);
-        B.no_interact = arma::join_vert(B.no_interact, r.no_interact);
+        B.n_interact = arma::join_vert(B.n_interact, r.n_interact);
         B.fbs_angle = arma::join_vert(B.fbs_angle, r.fbs_angle);
         B.normals = arma::join_vert(B.normals, r.normals);
         B.out_type.insert(B.out_type.end(), r.out_type.begin(), r.out_type.end());
@@ -746,7 +746,7 @@ static Rsu<double> make_valid()
     auto C = make1<double>(base_palette<double>(), 4, OT_ENTRY, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 10.0, QPI / 2.0, 0.15);
     C.orig = arma::join_vert(C.orig, C.orig); // full set -> 2 rows
     C.dest = arma::join_vert(C.dest, C.dest);
-    C.no_interact = arma::join_vert(C.no_interact, C.no_interact);
+    C.n_interact = arma::join_vert(C.n_interact, C.n_interact);
     C.prev_in = arma::join_vert(C.prev_in, C.prev_in);
     C.cur_in = arma::join_vert(C.cur_in, C.cur_in);
     C.buf_in = arma::join_vert(C.buf_in, C.buf_in);
@@ -2616,7 +2616,7 @@ struct QdSheetFace
 // namely the bookkeeping between three index spaces:
 //
 //   full set     [n_ray]      -> the launch configuration handed in
-//   compact set  [n_interact] -> rays that hit the mesh (gated on no_interact != 0)
+//   compact set  [n_hit]      -> rays that hit the mesh (gated on n_interact != 0)
 //   per-stage    [n_subdiv], [n_reflect], [n_transmit] -> subsets addressed through index arrays
 //
 // What is checked: the per-stage return counts, the layout and column counts of every returned
@@ -2636,7 +2636,7 @@ struct QdSheetFace
 // handle from an output row back to the input ray it came from. That is what makes the
 // cross-branch comparison possible.
 //
-// Delegated intersection: the optional no_interact_in / fbs_ind_in / sbs_ind_in inputs let a caller
+// Delegated intersection: the optional n_interact_in / fbs_ind_in / sbs_ind_in inputs let a caller
 // hand in a ray_triangle_intersect result instead of having ray_progress compute it. Those cases
 // assert bit-identical output against the internal path rather than mere equivalence, since the two
 // routes feed the same arrays into the same per-ray kernels in the same order; anything less would
@@ -2868,14 +2868,14 @@ namespace
     // Intersection results, computed exactly the way a caller delegating the work would
     struct Hits
     {
-        arma::u32_vec no_interact, fbs_ind, sbs_ind;
+        arma::u32_vec n_interact, fbs_ind, sbs_ind;
     };
 
     Hits intersect(const Cfg &C, const Scene &S, const arma::u32_vec *smi = nullptr)
     {
         Hits H;
         quadriga_lib::ray_triangle_intersect<float>(&C.orig, &C.dest, &S.mesh, nullptr, nullptr,
-                                                    &H.no_interact, &H.fbs_ind, &H.sbs_ind,
+                                                    &H.n_interact, &H.fbs_ind, &H.sbs_ind,
                                                     smi, nullptr);
         return H;
     }
@@ -2884,7 +2884,7 @@ namespace
     Opt with_hits(const Opt &base, const Hits &H)
     {
         Opt o = base;
-        o.ni_in = &H.no_interact;
+        o.ni_in = &H.n_interact;
         o.fi_in = &H.fbs_ind;
         o.si_in = &H.sbs_ind;
         return o;
@@ -2969,7 +2969,7 @@ namespace
     }
 
     // Map input ray id (path::iC) -> output row. Requires the ids to be unique, which holds when
-    // only one continuation class is launched (e.g. reflections with max_no_transmissions = 0).
+    // only one continuation class is launched (e.g. reflections with max_transmissions = 0).
     std::map<unsigned, arma::uword> id_map(const Cfg &C)
     {
         std::map<unsigned, arma::uword> m;

@@ -21,7 +21,7 @@ Reads channel data from HDF5 files
 - Per-snapshot data is returned as a `list` of arrays, one per snapshot, since `n_path` may differ between snapshots
 - Structured fields are stored in single precision in the file and returned in double.
 - Unstructured datasets keep their stored type and shape.
-- `snap` selects a subset of snapshots; if `None`, all snapshots are read
+- `i_snap` selects a subset of snapshots; if `None`, all snapshots are read
 - Errors if the file is not a quadriga-lib channel file of version 3: files written by quadriga-lib 0.12.4 and
   earlier are rejected; files modified with other HDF5 tools are not supported and may be rejected.
 - Convert files of quadriga-lib 0.12.4 and earlier with `tools/hdf5_convert_v2.py` of the quadriga-lib sources
@@ -29,7 +29,7 @@ Reads channel data from HDF5 files
 
 ## Usage:
 ```
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, stack )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, stack )
 ```
 
 ## Inputs:
@@ -38,7 +38,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, st
 - **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
-- **`snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
+- **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
 - **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
 
 ## Outputs:
@@ -58,10 +58,10 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, st
   | `path_angles`      | Departure and arrival angles (AOD, EOD, AOA, EOA) in rad                 | list of `(n_path_s, 4)`           | `(n_path, 4, n_snap)`                |
   | `fbs_pos`          | First-bounce scatterer positions                                         | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
-  | `no_interact`      | Number of interaction points per path; int64                             | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
-  | `interact_coord`   | Interaction coordinates                                                  | list of `(3, sum(no_interact_s))` | `(3, max(sum(no_interact)), n_snap)` |
+  | `n_interact`       | Number of interaction points per path; int64                             | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
+  | `interact_coord`   | Interaction coordinates                                                  | list of `(3, sum(n_interact_s))`  | `(3, max(sum(n_interact)), n_snap)`  |
   | `center_freq`      | Center Frequency in Hz                                                   | `(n_snap,)` or scalar             | `(n_snap,)` or scalar                |
-  | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                     | int32, scalar                        |
+  | `initial_position` | Reference snapshot (start of the current segment); 0-based               | int32, scalar                     | int32, scalar                        |
 
 - **`par`** — Dict (single slot) or list of dicts (multiple slots) containing the unstructured data in the file.
 
@@ -95,11 +95,11 @@ static arma::u32_vec parse_idx(const py::handle &h, unsigned n, const char *name
 
 py::tuple hdf5_read_channel(const std::string &fn,
                             py::handle ix, py::handle iy, py::handle iz, py::handle iw,
-                            py::handle snap, bool stack)
+                            py::handle i_snap, bool stack)
 {
-    // Read the storage layout: 4D slot grid + per-slot occupancy (channelID == 0 -> empty)
-    arma::u32_vec channelID;
-    const arma::u32_vec storage = quadriga_lib::hdf5_read_layout(fn, &channelID);
+    // Read the storage layout: 4D slot grid + per-slot occupancy (channel_id == 0 -> empty)
+    arma::u32_vec channel_id;
+    const arma::u32_vec storage = quadriga_lib::hdf5_read_layout(fn, &channel_id);
 
     const unsigned nx = storage.at(0), ny = storage.at(1),
                    nz = storage.at(2), nw = storage.at(3);
@@ -107,7 +107,7 @@ py::tuple hdf5_read_channel(const std::string &fn,
     if (nx == 0)
         throw std::runtime_error("HDF5 file does not exist or has no layout.");
 
-    if (channelID.n_elem != (arma::uword)nx * (arma::uword)ny * (arma::uword)nz * (arma::uword)nw)
+    if (channel_id.n_elem != (arma::uword)nx * (arma::uword)ny * (arma::uword)nz * (arma::uword)nw)
         throw std::runtime_error("Corrupted storage index.");
 
     // Resolve the per-dimension slot selectors (None -> full dimension, bounds-checked)
@@ -119,9 +119,9 @@ py::tuple hdf5_read_channel(const std::string &fn,
     const arma::uword n_sel = sx.n_elem * sy.n_elem * sz.n_elem * sw.n_elem;
 
     // Snapshot selection is only meaningful for a single addressed slot
-    const arma::uvec snap_a = qd_python_numpy2arma_Col<arma::uword>(snap, false);
-    if (!snap_a.is_empty() && n_sel != 1)
-        throw std::invalid_argument("'snap' is only allowed when a single slot is selected.");
+    const arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, false);
+    if (!i_snap_a.is_empty() && n_sel != 1)
+        throw std::invalid_argument("'i_snap' is only allowed when a single slot is selected.");
 
     // Visit the selected slots in column-major order (ix varies fastest); skip empty slots
     py::list chan;
@@ -132,7 +132,7 @@ py::tuple hdf5_read_channel(const std::string &fn,
                 for (const auto x : sx)
                 {
                     const unsigned lin = x + nx * (y + ny * (z + nz * w));
-                    if (channelID.at(lin) == 0) // empty slot -> skip
+                    if (channel_id.at(lin) == 0) // empty slot -> skip
                         continue;
 
                     const auto channel = quadriga_lib::hdf5_read_channel<double>(fn, x, y, z, w);
@@ -150,7 +150,7 @@ py::tuple hdf5_read_channel(const std::string &fn,
                     }
 
                     // Structured channel data -> dict
-                    chan.append(qd_python_channel2dict(channel, snap_a, false, stack));
+                    chan.append(qd_python_channel2dict(channel, i_snap_a, false, stack));
 
                     // Unstructured datasets -> dict
                     py::dict par;

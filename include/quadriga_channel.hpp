@@ -40,8 +40,8 @@ namespace quadriga_lib
         std::vector<arma::Mat<dtype>> path_angles;       // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
         std::vector<arma::Mat<dtype>> path_fbs_pos;      // First-bounce scatterer positions, matrices of size [3, n_path]
         std::vector<arma::Mat<dtype>> path_lbs_pos;      // Last-bounce scatterer positions, matrices of size [3, n_path]
-        std::vector<arma::Col<unsigned>> no_interact;    // Number interaction points of a path with the environment, 0 = LOS, vector (n_snap) of vectors of length [n_path]
-        std::vector<arma::Mat<dtype>> interact_coord;    // Interaction coordinates of paths with the environment, matrices of size [3, sum(no_interact)]
+        std::vector<arma::Col<unsigned>> n_interact;     // Number interaction points of a path with the environment, 0 = LOS, vector (n_snap) of vectors of length [n_path]
+        std::vector<arma::Mat<dtype>> interact_coord;    // Interaction coordinates of paths with the environment, matrices of size [3, sum(n_interact)]
         std::vector<std::string> par_names;              // Names of unstructured data fields
         std::vector<std::any> par_data;                  // Unstructured data of types {string, float, double, int, long int, arma::Col<dtype>, arma::Mat<dtype>, arma::Cube<dtype>}
         int initial_position = 0;                        // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
@@ -63,8 +63,8 @@ namespace quadriga_lib
                        const arma::Cube<dtype> *coeff_re_add = nullptr,         // Channel coefficients, real part, Cube of size [n_rx, n_tx, n_path_add]
                        const arma::Cube<dtype> *coeff_im_add = nullptr,         // Channel coefficients, imaginary part, Cube of size [n_rx, n_tx, n_path_add]
                        const arma::Cube<dtype> *delay_add = nullptr,            // Path delays in seconds, Cube of size [n_rx, n_tx, n_path_add] or [1, 1, n_path_add]
-                       const arma::u32_vec *no_interact_add = nullptr,          // Number of interaction coordinates, vector of length [n_path_add]
-                       const arma::Mat<dtype> *interact_coord_add = nullptr,    // Interaction coordinates, matrix of size [3, sum(no_interact)]
+                       const arma::u32_vec *n_interact_add = nullptr,           // Number of interaction coordinates, vector of length [n_path_add]
+                       const arma::Mat<dtype> *interact_coord_add = nullptr,    // Interaction coordinates, matrix of size [3, sum(n_interact)]
                        const arma::Col<dtype> *path_gain_add = nullptr,         // Path gain before antenna patterns, vector of length [n_path_add]
                        const arma::Col<dtype> *path_length_add = nullptr,       // Absolute path length from TX to RX phase center, vector of length [n_path_add]
                        const arma::Mat<dtype> *path_polarization_add = nullptr, // Polarization transfer function, Matrix of size [8, n_path_add], interleaved complex
@@ -82,7 +82,7 @@ namespace quadriga_lib
         // Write propagation paths to a Wavefront OBJ file
         // - e.g. for visualization in Blender
         void write_paths_to_obj_file(std::string fn,                 // Filename of the OBJ file
-                                     arma::uword max_no_paths = 0,   // Maximum number of paths to be shown, Default: all
+                                     arma::uword max_paths = 0,      // Maximum number of paths to be shown, Default: all
                                      dtype gain_max = -60.0,         // Maximum path gain in dB (only for color-coding)
                                      dtype gain_min = -140.0,        // Minimum path gain in dB (only for color-coding and path selection)
                                      std::string colormap = "jet",   // Colormap for the visualization
@@ -239,9 +239,9 @@ namespace quadriga_lib
     // Read the storage layout of channel data inside an HDF5 file
     // - Returns 4-element vector with storage layout in form: {nx, ny, nz, nw}
     // - If file does not exist, output will be {0,0,0,0}, no error-message
-    // - Optional output: ChannelID = vector containing the ChannelID in the file, serialized, length nx × ny × nz × nw
-    // - channelIDs with value 0 indicate that there is no data stored at this index
-    arma::u32_vec hdf5_read_layout(std::string fn, arma::u32_vec *channelID = nullptr);
+    // - Optional output: channel_id = vector containing the channel ID of each slot in the file, serialized, length nx × ny × nz × nw
+    // - Channel IDs with value 0 indicate that there is no data stored at this index
+    arma::u32_vec hdf5_read_layout(std::string fn, arma::u32_vec *channel_id = nullptr);
 
     // Reshapes the storage layout inside an existing HDF5 file
     // - Total number of elements in the HDF5 file is fixed when calling hdf5_create
@@ -379,7 +379,7 @@ namespace quadriga_lib
                          std::vector<arma::Cube<dtype>> *delay_quant,    // Output delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps], or [1, 1, n_taps]
                                                                          //   for delay input [1, 1, n_path] with fix_taps 1 or 2
                          dtype tap_spacing = 5.0e-9,                     // Tap spacing in seconds
-                         arma::uword max_no_taps = 48,                   // 0 = unlimited
+                         arma::uword max_taps = 48,                      // 0 = unlimited
                          dtype power_exponent = 1.0,                     // Interpolation exponent (0.5=wideband, 1.0=narrowband)
                          int fix_taps = 0);                              // 0-3, delay sharing mode
 
@@ -415,7 +415,7 @@ namespace quadriga_lib
                        const arma::Mat<dtype> &cir_orientation,             // CIR orientations; [ n_cir, 3 ]
                        const std::vector<std::string> &dest_names = {"RX"}, // Receiver names; length [ n_rx ]
                        const arma::u32_vec &cir_offset = {0},               // CIR offset for each receiver; length [ n_rx ]
-                       unsigned no_orig = 1,                                // Number transmitters
+                       unsigned n_orig = 1,                                 // Number transmitters
                        bool scalar_mode = false);                           // Flag for scalar layout
 
     // Append new TX path data to exisiting QRT file, throws when storage capacity is reached
@@ -428,19 +428,19 @@ namespace quadriga_lib
 
     // Read metadata from a QRT file
     void qrt_file_parse(const std::string &fn,                          // Path to the QRT file
-                        arma::uword *no_cir = nullptr,                  // Number of channel snapshots per origin point
-                        arma::uword *no_orig = nullptr,                 // Number of origin points (TX)
-                        arma::uword *no_dest = nullptr,                 // Number of destinations (RX)
-                        arma::uword *no_freq = nullptr,                 // Number of frequency bands
+                        arma::uword *n_cir = nullptr,                   // Number of channel snapshots per origin point
+                        arma::uword *n_orig = nullptr,                  // Number of origin points (TX)
+                        arma::uword *n_dest = nullptr,                  // Number of destinations (RX)
+                        arma::uword *n_freq = nullptr,                  // Number of frequency bands
                         arma::uvec *cir_offset = nullptr,               // CIR offset for each destination
                         std::vector<std::string> *orig_names = nullptr, // Names of the origin points (TXs)
                         std::vector<std::string> *dest_names = nullptr, // Names of the destination points (RXs)
                         int *version = nullptr,                         // QRT file version
-                        arma::fvec *center_freq = nullptr,              // Center frequencies in [Hz], length [ no_freq ]
-                        arma::fmat *cir_pos = nullptr,                  // CIR positions in Cartesian coordinates, size [no_cir, 3]
-                        arma::fmat *cir_orientation = nullptr,          // CIR orientation in Euler angles in rad, size [no_cir, 3]
-                        arma::fmat *orig_pos = nullptr,                 // Origin (TX) positions, size [no_orig, 3]
-                        arma::fmat *orig_orientation = nullptr,         // Origin (TX) orientations, Euler angels in rad, size [no_orig, 3]
+                        arma::fvec *center_freq = nullptr,              // Center frequencies in [Hz], length [ n_freq ]
+                        arma::fmat *cir_pos = nullptr,                  // CIR positions in Cartesian coordinates, size [n_cir, 3]
+                        arma::fmat *cir_orientation = nullptr,          // CIR orientation in Euler angles in rad, size [n_cir, 3]
+                        arma::fmat *orig_pos = nullptr,                 // Origin (TX) positions, size [n_orig, 3]
+                        arma::fmat *orig_orientation = nullptr,         // Origin (TX) orientations, Euler angels in rad, size [n_orig, 3]
                         std::ifstream *file = nullptr);                 // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
 
     // Read ray-tracing data from QRT file
@@ -468,9 +468,9 @@ namespace quadriga_lib
                        arma::Col<dtype> *eoa = nullptr,                     // Arrival elevation angles in [rad], vector of length 'n_path'
                        std::vector<arma::Mat<dtype>> *path_coord = nullptr, // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
                        int normalize_M = 1,                                 // Normalize M options
-                       arma::u32_vec *no_int = nullptr,                     // Number of mesh interactions per path of current RX, vector of length [no_path], 0=LOS
-                       arma::fmat *coord = nullptr,                         // Interaction coordinates, size [3, sum(no_int)]
-                       std::vector<uint8_t> *interact_type = nullptr,       // Interaction type codes, length [ sum(no_int) ]
+                       arma::u32_vec *n_interact = nullptr,                     // Number of mesh interactions per path of current RX, vector of length [n_path], 0=LOS
+                       arma::fmat *coord = nullptr,                         // Interaction coordinates, size [3, sum(n_interact)]
+                       std::vector<uint8_t> *interact_type = nullptr,       // Interaction type codes, length [ sum(n_interact) ]
                        std::ifstream *file = nullptr,                       // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
                        const qrt_read_cache *cache = nullptr);              // Optional pre-parsed metadata cache for maximum performance in tight loops
 

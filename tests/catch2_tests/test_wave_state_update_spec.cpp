@@ -1103,7 +1103,7 @@ TEST_CASE("ray_state_update - type parity between double and float", "[wave]")
 
 TEST_CASE("ray_state_update - ray_ind mapping and read-only inputs", "[wave]")
 {
-    // Full-set arrays (orig, dest, no_interact, state) are read at g = ray_ind[i]; compact-set
+    // Full-set arrays (orig, dest, n_interact, state) are read at g = ray_ind[i]; compact-set
     // arrays (fbs, sbs, angle, normals, materials, out_type) at i. No input array is modified.
     auto mtl = base_palette<double>();
 
@@ -1118,8 +1118,8 @@ TEST_CASE("ray_state_update - ray_ind mapping and read-only inputs", "[wave]")
     C.dest.zeros(n_ray, 3);
     for (arma::uword g = 0; g < n_ray; ++g)
         C.dest(g, 0) = (double)(g + 1);
-    C.no_interact.set_size(n_ray);
-    C.no_interact.fill(1u);
+    C.n_interact.set_size(n_ray);
+    C.n_interact.fill(1u);
     C.prev_in = sv({5, 6, 5, 7, 5});
     C.cur_in = sv({7, 3, 7, 1, 7}); // FOG3 at g = 1, FOG1 at g = 3
     C.buf_in = sv({0, 0, 0, 0, 0});
@@ -1462,7 +1462,7 @@ TEST_CASE("ray_state_update - input validation", "[wave]")
         C.dest.set_size(0, 3);
         C.fbs.set_size(0, 3);
         C.sbs.set_size(0, 3);
-        C.no_interact.set_size(0);
+        C.n_interact.set_size(0);
         C.fbs_angle.set_size(0);
         C.normals.set_size(0, 6);
         C.out_type.clear();
@@ -1491,14 +1491,14 @@ struct RsuAliasCase
     std::unordered_map<std::string, std::vector<double>> air;
     arma::mat orig = {{-1.5, 0.0, 0.0}}, dest = {{0.0, 0.0, 1.5}};
     arma::mat fbs, sbs, fbsN, sbsN, xprmatN, normal_vecN, path_dirN;
-    arma::u32_vec no_interact, fbs_ind, sbs_ind;
+    arma::u32_vec n_interact, fbs_ind, sbs_ind;
     arma::vec gainN, fbs_angleN, acc_geo = {0.5};
     std::vector<uint8_t> out_typeN;
     arma::Col<short> m1 = {0}, m2 = {0}, prev = {0}, cur = {0}, buf = {0};
     RsuAliasCase()
     {
         mtl_ind.zeros(cube.n_rows);
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &cube, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &cube, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
         quadriga_lib::ray_mesh_interact<double>(1, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, nullptr, nullptr,
                                         nullptr, nullptr, &fbsN, &sbsN, &gainN, &xprmatN, nullptr, nullptr, &fbs_angleN, nullptr,
                                         nullptr, &normal_vecN, &out_typeN, &path_dirN);
@@ -1506,7 +1506,7 @@ struct RsuAliasCase
     void run(arma::Col<short> *prev_out, arma::Col<short> *cur_out, arma::vec *acc_geoN, std::vector<uint8_t> *rtype,
              arma::vec *gain, const arma::vec *fang)
     {
-        quadriga_lib::ray_state_update<double>(1, 1.0e9, &orig, &dest, &fbsN, &sbsN, &no_interact, fang, &normal_vecN, &out_typeN,
+        quadriga_lib::ray_state_update<double>(1, 1.0e9, &orig, &dest, &fbsN, &sbsN, &n_interact, fang, &normal_vecN, &out_typeN,
                                                &air, &m1, &m2, &prev, &cur, &buf, nullptr, &acc_geo, nullptr,
                                                prev_out, cur_out, nullptr, gain, &xprmatN, &path_dirN, acc_geoN, nullptr, rtype);
     }

@@ -53,7 +53,7 @@ void calc_diffraction_gain(
     arma::Mat<dtype> *xprmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
@@ -77,7 +77,7 @@ void calc_diffraction_gain(
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [[generate_diffraction_paths]]
 - **`verbose`** — Verbosity level
-- **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
+- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
@@ -114,7 +114,7 @@ void calc_diffraction_gain(
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
-- [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
+- [[triangle_mesh_segmentation]] (generates `sub_mesh_ind`)
 - [[obj_file_read]] (defines mtl_prop format)
 - [[ray_mesh_interact]] (used for media interactions)
 - [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)
@@ -133,7 +133,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          arma::Mat<dtype> *xprmat,
                                          arma::Cube<dtype> *coord,
                                          int verbose,
-                                         const arma::u32_vec *sub_mesh_index,
+                                         const arma::u32_vec *sub_mesh_ind,
                                          int use_kernel,
                                          int gpu_id,
                                          bool scalar_mode,
@@ -233,7 +233,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     dtype *p_weight = weight.memptr();
 
     // Pre-compute the AABB of the mesh
-    arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb<dtype>(&mesh, sub_mesh_index);
+    arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb<dtype>(&mesh, sub_mesh_ind);
 
     // Lambda for vector normalization
     auto NORMALIZE = [](double &x, double &y, double &z) -> double
@@ -353,12 +353,12 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 std::cout << std::endl;
 
             // Calculate interaction points of rays and 3D mesh
-            arma::Col<unsigned> no_interact, fbs_ind, sbs_ind;
+            arma::Col<unsigned> n_interact, fbs_ind, sbs_ind;
             quadriga_lib::ray_triangle_intersect<dtype>(&s_orig, &s_dest, &mesh, nullptr, nullptr,
-                                                        &no_interact, &fbs_ind, &sbs_ind,
-                                                        sub_mesh_index, &aabb, use_kernel, gpu_id);
+                                                        &n_interact, &fbs_ind, &sbs_ind,
+                                                        sub_mesh_ind, &aabb, use_kernel, gpu_id);
 
-            unsigned *p_no_interact = no_interact.memptr(); // Pointer to 'no_interact'
+            unsigned *p_no_interact = n_interact.memptr(); // Pointer to 'n_interact'
             unsigned *p_fbs_ind = fbs_ind.memptr();         // Pointer to 'fbs_ind'
             unsigned *p_sbs_ind = sbs_ind.memptr();         // Pointer to 'fbs_ind'
 
@@ -420,12 +420,12 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                     p_acc_ref_in[iR] = g_acc_ref[iG];                                         // Refracted distance
                     p_acc_geo_in[iR] = g_acc_geo[iG];                                         // Geometric distance
 
-                    if (no_interact[iR] == 0) // Overwrite zero-hit normal vectors with the buffered ones
+                    if (n_interact[iR] == 0) // Overwrite zero-hit normal vectors with the buffered ones
                         normal_vec(iR, 0) = g_normal(iG, 0), normal_vec(iR, 1) = g_normal(iG, 1), normal_vec(iR, 2) = g_normal(iG, 2);
                 }
 
                 quadriga_lib::ray_state_update<dtype>(interaction_type, center_freq,
-                                                      &s_orig, &s_dest, &fbsN, &sbsN, &no_interact, // RT geometry
+                                                      &s_orig, &s_dest, &fbsN, &sbsN, &n_interact,  // RT geometry
                                                       &fbs_angle, &normal_vec,                      // Incidence angle, normal vector
                                                       &hit_type,                                    // Hit type code
                                                       &mtl_prop, &mtl_fbs, &mtl_sbs,                // FBS/SBS materials
@@ -537,9 +537,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
             // Left-multiply the compacted spine transitions into xprmat
             if (xprmat && n_spine != 0)
             {
-                arma::uvec ray_index(p_iSPINE, n_spine, false, true);           // Ray index view
+                arma::uvec ray_ind(p_iSPINE, n_spine, false, true);             // Ray index view
                 arma::Mat<dtype> update(p_xprmatN, nXPR, n_spine, false, true); // Xprmat update view
-                quadriga_lib::xpr_update<dtype>(*xprmat, &update, nullptr, false, false, false, &ray_index);
+                quadriga_lib::xpr_update<dtype>(*xprmat, &update, nullptr, false, false, false, &ray_ind);
             }
 
             // Add multi-hits to a new launch config
@@ -698,7 +698,7 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, 
                                                   const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
                                                   float center_freq, int lod,
                                                   arma::Col<float> *gain, arma::Mat<float> *xprmat, arma::Cube<float> *coord,
-                                                  int verbose, const arma::u32_vec *sub_mesh_index,
+                                                  int verbose, const arma::u32_vec *sub_mesh_ind,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
                                                   bool apply_fspl, bool apply_phase);
 
@@ -707,6 +707,6 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> &orig,
                                                   const std::unordered_map<std::string, std::vector<double>> &mtl_prop,
                                                   double center_freq, int lod,
                                                   arma::Col<double> *gain, arma::Mat<double> *xprmat, arma::Cube<double> *coord,
-                                                  int verbose, const arma::u32_vec *sub_mesh_index,
+                                                  int verbose, const arma::u32_vec *sub_mesh_ind,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
                                                   bool apply_fspl, bool apply_phase);

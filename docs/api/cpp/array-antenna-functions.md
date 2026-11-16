@@ -351,21 +351,21 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_copy_element) · [P
 - Added elements get their own port with identity coupling; positions of added elements that are not copied are zero
 - When the array grows, an empty `element_pos` and an empty coupling are written out first (zeros, identity), so
   that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for an empty `destination`, a source index out of bound, or a destination index
+- Throws `std::invalid_argument` for an empty `i_target`, a source index out of bound, or a destination index
   equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
 
 ### Declaration:
 ```cpp
 void quadriga_lib::arrayant_copy_element(
     arrayant<dtype> &ant,
-    arma::uword source,
-    const arma::uvec &destination);
+    arma::uword i_source,
+    const arma::uvec &i_target);
 ```
 
 ### Inputs:
 - **`ant`** — Valid arrayant; updated in-place
-- **`source`** — Index of the element to copy, 0-based
-- **`destination`** — Target indices, 0-based; a single index is passed as `{i}`
+- **`i_source`** — Index of the element to copy, 0-based
+- **`i_target`** — Target indices, 0-based; a single index is passed as `{i}`
 
 ### Example:
 ```cpp
@@ -392,14 +392,14 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_copy_element) · [P
 ```cpp
 void quadriga_lib::arrayant_copy_element_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        arma::uword source,
-        const arma::uvec &destination);
+        arma::uword i_source,
+        const arma::uvec &i_target);
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
-- **`source`** — Index of the element to copy from; must be within current element count
-- **`destination`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
+- **`i_source`** — Index of the element to copy from; must be within current element count
+- **`i_target`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
 
 ### Example:
 ```cpp

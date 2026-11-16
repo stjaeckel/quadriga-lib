@@ -26,7 +26,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ## Usage:
 ```
 [ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
-    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
+    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
     apply_fspl, apply_phase );
 ```
 
@@ -42,7 +42,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [[generate_diffraction_paths]]; default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
-- **`sub_mesh_index`** — 1-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]];  `[n_mesh, 1]`;
+- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]];  `[n_mesh, 1]`;
   default: `[]` (not using sub-meshes)
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
@@ -74,7 +74,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
-- [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
+- [[triangle_mesh_segmentation]] (generates `sub_mesh_ind`)
 - [[obj_file_read]] (defines `mtl_prop` format)
 - [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)
 - [[get_channels_spherical]] (applies the same propagation phase as `apply_phase`)
@@ -102,12 +102,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_freq");
     int lod = (nrhs < 7) ? 2 : qd_mex_get_scalar<int>(prhs[6], "lod", 2);
     int verbose = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "verbose", 0);
-    arma::u32_vec sub_mesh_index = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true, "sub_mesh_index");
+    arma::u32_vec sub_mesh_ind = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true, "sub_mesh_ind");
 
-    if (!sub_mesh_index.empty() && arma::any(sub_mesh_index == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'sub_mesh_index' cannot be 0 (1-based index).");
+    if (!sub_mesh_ind.empty() && arma::any(sub_mesh_ind == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'sub_mesh_ind' cannot be 0 (1-based index).");
     else // Convert to 0-based
-        sub_mesh_index -= 1;
+        sub_mesh_ind -= 1;
 
     int use_kernel = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "use_kernel", 0);
     int gpu_id = (nrhs < 11) ? 0 : qd_mex_get_scalar<int>(prhs[10], "gpu_id", 0);
@@ -136,7 +136,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_gain = gain.empty() ? nullptr : &gain;
     arma::mat *p_xprmat = xprmat.empty() ? nullptr : &xprmat;
     arma::cube *p_coord = (nlhs > 2) ? &coord : nullptr; // Size depends on lod, set by C++
-    arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
+    arma::u32_vec *p_sub_mesh_index = sub_mesh_ind.empty() ? nullptr : &sub_mesh_ind;
 
     CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
                                                 center_freq_core, lod, p_gain, p_xprmat, p_coord, verbose,

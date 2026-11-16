@@ -273,20 +273,20 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_copy_element) · [Python](quadri
 - Coupling matrix entries for newly added elements are set to identity; existing coupling is preserved
 - Supports multi-frequency arrayant models: when `arrayant_in` is a struct array, the same copy is
   applied to every entry and a struct array of equal size is returned
-- If `source_element` is a vector, `dest_element` must have the same length; copies are performed
-  pairwise as `source_element(i)` to `dest_element(i)`
+- If `i_source` is a vector, `i_target` must have the same length; copies are performed
+  pairwise as `i_source(i)` to `i_target(i)`
 
 ### Usage:
 ```matlab
-arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, source_element, dest_element );
+arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, i_source, i_target );
 ```
 
 ### Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
   [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
-- **`source_element`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
-- **`dest_element`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
-  if `source_element` is a vector, must have the same length
+- **`i_source`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
+- **`i_target`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
+  if `i_source` is a vector, must have the same length
 
 ### Outputs:
 - **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
@@ -475,11 +475,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadrig
 ```matlab
 % Single-frequency mode
 [ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.arrayant_interpolate( ...
-    arrayant, azimuth, elevation, element, orientation, element_pos, [], use_kernel );
+    arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
 
 % Multi-frequency mode
 [ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
-    element, orientation, element_pos, freq_new, use_kernel );
+    i_element, orientation, element_pos, freq_new, use_kernel );
 ```
 
 ### Inputs:
@@ -488,7 +488,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadrig
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` (same angles for all outputs) or `[n_out, n_ang]` (one angle per
   output)
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 - **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or
   `[3, n_out, n_ang]`; default: no rotation
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
@@ -790,20 +790,20 @@ Also in: [C++](quadriga_lib_api_cpp.md#.write_paths_to_obj_file) · [Python](qua
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
-- Paths below `gain_min` are excluded; `max_no_paths` limits the total number of exported paths
+- Paths below `gain_min` are excluded; `max_paths` limits the total number of exported paths
 - Paths with non-finite coordinates are skipped
 - The function takes raw channel data fields directly; no MATLAB channel struct is needed
 
 ### Usage:
 ```matlab
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
-     radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, ...
+quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colormap, radius_max, ...
+     radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff_re, ...
     coeff_im, i_snap );
 ```
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_no_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
+- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
 - **`gain_max`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
@@ -812,8 +812,8 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
 - **`rx_pos`** — Receiver positions; `[3, n_snap]` or `[3, 1]`
 - **`tx_pos`** — Transmitter positions; `[3, n_snap]` or `[3, 1]`
-- **`no_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
-- **`interact_coord`** — Interaction coordinates; `[3, max(sum(no_interact)), n_snap]`; fewer than `sum(no_interact)`
+- **`n_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
+- **`interact_coord`** — Interaction coordinates; `[3, max(sum(n_interact)), n_snap]`; fewer than `sum(n_interact)`
   columns in a snapshot raise an error
 - **`center_freq`** — Center frequency in Hz; `[n_snap]` or scalar
 - **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
@@ -877,7 +877,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [Python](quadriga_l
 
 ### Usage:
 ```matlab
-[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
+[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap );
 ```
 
 ### Inputs:
@@ -886,7 +886,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [Python](quadriga_l
 - **`iy`** — 1-based slot indices along dimension Y; scalar or vector; default: `1:ny`
 - **`iz`** — 1-based slot indices along dimension Z; scalar or vector; default: `1:nz`
 - **`iw`** — 1-based slot indices along dimension W; scalar or vector; default: `1:nw`
-- **`snap`** — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
+- **`i_snap`** — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
   when the total selection is a single slot.
 
 ### Outputs:
@@ -907,10 +907,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [Python](quadriga_l
   | `path_angles`      | Departure and arrival angles [AOD, EOD, AOA, EOA] in rad                 | `[n_path, 4, n_snap]`               |
   | `fbs_pos`          | First-bounce scatterer positions                                         | `[3, n_path, n_snap]`               |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
-  | `no_interact`      | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
-  | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(no_interact)), n_snap]`|
+  | `n_interact`       | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
+  | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(n_interact)), n_snap]`|
   | `center_freq`      | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
-  | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
+  | `initial_position` | Reference snapshot (start of the current segment); 1-based; absent = 1   | int32, scalar                       |
 - **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
   **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
   do not contain a given field, the corresponding element is left empty. If no unstructured data is present anywhere,
@@ -1143,12 +1143,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_parse) · [Python](quadriga_lib_
 
 - Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count,
   CIR offsets, names, positions, orientations, and file version
-- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
+- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
   `cir_offset` reflect this
 
 ### Usage:
 ```matlab
-[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
+[ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
      cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 ```
 
@@ -1156,19 +1156,20 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_parse) · [Python](quadriga_lib_
 - **`fn`** — Path to the QRT file; string
 
 ### Outputs:
-- **`no_cir`** — Number of channel snapshots per origin point; uint64 scalar
-- **`no_orig`** — Number of origin points (TX); uint64 scalar
-- **`no_dest`** — Number of destination points (RX); uint64 scalar
-- **`no_freq`** — Number of frequency bands; uint64 scalar
-- **`cir_offset`** — CIR offset per destination; uint64; `[no_dest]`
-- **`orig_names`** — Names of origin points; cell array of strings; `[no_orig]`
-- **`dest_names`** — Names of destination points; cell array of strings; `[no_dest]`
+- **`n_cir`** — Number of channel snapshots per origin point; uint64 scalar
+- **`n_orig`** — Number of origin points (TX); uint64 scalar
+- **`n_dest`** — Number of destination points (RX); uint64 scalar
+- **`n_freq`** — Number of frequency bands; uint64 scalar
+- **`cir_offset`** — Number of CIRs before each destination (an offset, not an index; the first entry is 0); the CIRs of
+  destination `d` start at `i_cir = cir_offset(d) + 1`; uint64; `[n_dest]`
+- **`orig_names`** — Names of origin points; cell array of strings; `[n_orig]`
+- **`dest_names`** — Names of destination points; cell array of strings; `[n_dest]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz; single; `[no_freq]`
-- **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[no_cir, 3]`
-- **`cir_orientation`** — CIR orientations as Euler angles; single; `[no_cir, 3]`
-- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[no_orig, 3]`
-- **`orig_orientation`** — Origin (TX) orientations as Euler angles; single; `[no_orig, 3]`
+- **`center_freq`** — Center frequencies in Hz; single; `[n_freq]`
+- **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
+- **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
+- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`
+- **`orig_orientation`** — Origin (TX) orientations as Euler angles; single; `[n_orig, 3]`
 
 ---
 <a id="qrt_file_read"></a>
@@ -1180,14 +1181,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
 - If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 
 ### Usage:
 ```matlab
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, interact_type ] = ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
 
@@ -1225,12 +1226,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 - **`eoa`** — Arrival elevation angles; Cell of length `n_out`; elements `[n_path]`
 - **`path_coord`** — Interaction coordinates per path; Cell of length `n_out`;
   elements Cell of length `n_path`, each `[3, n_interact + 2]`
-- **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
+- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; uint32;
   Cell of length `n_out`; elements `[n_path]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
-  Cell of length `n_out`; elements `[3, sum(no_int)]`
+  Cell of length `n_out`; elements `[3, sum(n_interact)]`
 - **`interact_type`** — Interaction type codes (flat, concatenated across paths, matching `coord`); uint8;
-  Cell of length `n_out`; elements `[sum(no_int)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
+  Cell of length `n_out`; elements `[sum(n_interact)]`. Empty for v4 legacy files. GBSM paths written with the C++ API
   carry 129 (GR) and 193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ### See also:
@@ -1270,7 +1271,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [Python](quadriga_lib
 ### Usage:
 ```matlab
 [ coeff_re_q, coeff_im_q, delay_q ] = quadriga_lib.quantize_delays( coeff_re, coeff_im, delay, ...
-    tap_spacing, max_no_taps, power_exponent, fix_taps );
+    tap_spacing, max_taps, power_exponent, fix_taps );
 ```
 
 ### Inputs:
@@ -1279,7 +1280,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [Python](quadriga_lib
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; non-negative
   with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
 - **`tap_spacing`** — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9
-- **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
+- **`max_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; default: 0
   | Value | Meaning                                                                                         |
@@ -2278,7 +2279,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [Python](quadrig
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
-  GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `no_int` of
+  GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `n_interact` of
   [qrt_file_read](#qrt_file_read) (interaction count = path type); for ray-traced files the user sets it (values > 2 are an error)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
@@ -2555,7 +2556,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#o2i_loss) · [Python](quadriga_lib_api_py
 
 ### Usage:
 ```matlab
-[ loss, d2d_in, model_index ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
+[ loss, d2d_in, model_ind ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
 ```
 
 ### Inputs:
@@ -2573,7 +2574,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#o2i_loss) · [Python](quadriga_lib_api_py
 ### Outputs:
 - **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** — Indoor 2D distance in [m], 0 for the car models; `[n_ut, 1]`
-- **`model_index`** — Chosen model per UT, 1-based index into `models`; uint64; `[n_ut, 1]`
+- **`model_ind`** — Chosen model per UT, 1-based index into `models`; uint64; `[n_ut, 1]`
 
 ### See also:
 - [los_probability](#los_probability) (uses the outdoor distance `d2D - d2d_in`)
@@ -3265,7 +3266,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [Python](quadri
 ### Usage:
 ```matlab
 [ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
-    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
+    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
     apply_fspl, apply_phase );
 ```
 
@@ -3281,7 +3282,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [Python](quadri
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths); default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
-- **`sub_mesh_index`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation);  `[n_mesh, 1]`;
+- **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation);  `[n_mesh, 1]`;
   default: `[]` (not using sub-meshes)
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
@@ -3313,7 +3314,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [Python](quadri
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
 - [qrt_file_read](#qrt_file_read) (same path-loss model, used by `apply_fspl`)
 - [get_channels_spherical](#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
@@ -3471,8 +3472,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_read) · [Python](quadriga_lib_a
 - **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
 - **`obj_names`** — Object names; cell array of strings; length `max(obj_ind)`
 - **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh]`
-- **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `no_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
+- **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `n_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
 - **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh]`
 - **`csv_names`** — Material names from the table; cell array of strings; length `n_csv`
 - **`csv_prop`** — Material properties as a struct; each field is one CSV column (excluding `name`)
@@ -3592,18 +3593,18 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 Also in: [C++](quadriga_lib_api_cpp.md#point_cloud_aabb) · [Python](quadriga_lib_api_python.md#point_cloud_aabb)
 
 - Each row of the output contains `{x_min, x_max, y_min, y_max, z_min, z_max}` for one sub-cloud
-- If `sub_cloud_index` is empty or omitted, the entire input is treated as a single cloud; last
+- If `sub_cloud_ind` is empty or omitted, the entire input is treated as a single cloud; last
   index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
 ### Usage:
 ```matlab
-aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, vec_size );
+aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind, vec_size );
 ```
 
 ### Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) 
+- **`sub_cloud_ind`** — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) 
   to generate; uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`vec_size`** — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
@@ -3629,7 +3630,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#point_cloud_segmentation) · [Python](qua
 
 ### Usage:
 ```matlab
-[ pointsR, sub_cloud_index, forward_index, reverse_index ] = ...
+[ pointsR, sub_cloud_ind, forward_ind, reverse_ind ] = ...
     quadriga_lib.point_cloud_segmentation( points, target_size, vec_size );
 ```
 
@@ -3641,9 +3642,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#point_cloud_segmentation) · [Python](qua
 
 ### Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_index`** — 1-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_index`** — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_index`** — 1-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
+- **`forward_ind`** — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_ind`** — 1-based row in `pointsR` of each row of `points`; `[n_points]`
 
 ---
 <a id="point_inside_mesh"></a>
@@ -3794,7 +3795,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_point_intersect) · [Python](quadriga
 ### Usage:
 ```matlab
 [ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, ...
-    sub_cloud_index, use_kernel, gpu_id );
+    sub_cloud_ind, use_kernel, gpu_id );
 ```
 
 ### Inputs:
@@ -3804,7 +3805,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_point_intersect) · [Python](quadriga
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
 - **`points`** — 3D point cloud coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** — Segment boundary indices for the point cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate;
+- **`sub_cloud_ind`** — Segment boundary indices for the point cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate;
   sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
   uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable
@@ -3840,15 +3841,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_triangle_intersect) · [Python](quadr
 
 ### Usage:
 ```matlab
-[ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( ...
-    orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id );
+[ fbs, sbs, n_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( ...
+    orig, dest, mesh, sub_mesh_ind, aabb, use_kernel, gpu_id );
 ```
 
 ### Inputs:
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_index`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 
+- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 
   use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate; `[n_sub]`; default: `[]` (not using sub-meshes)
 - **`aabb`** — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; 
   if empty or omitted, AABBs are computed from `mesh`; `[n_sub, 6]`
@@ -3859,7 +3860,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_triangle_intersect) · [Python](quadr
 ### Outputs:
 - **`fbs`** — First-bounce intersection points in GCS; `[n_ray, 3]`
 - **`sbs`** — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`no_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray]`
+- **`n_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray]`
 - **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray]`
 - **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray]`
 
@@ -3912,12 +3913,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_aabb) · [Python](quadriga_
 
 ### Usage:
 ```matlab
-aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
+aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size );
 ```
 
 ### Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
-- **`sub_mesh_index`** — Start indices of sub-meshes in `mesh`; use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate; 
+- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; use [triangle_mesh_segmentation](#triangle_mesh_segmentation) to generate; 
   `[n_sub]` or empty; default: `[]` (returns AABB of the entire mesh)
 - **`vec_size`** — Alignment size for SIMD/CUDA padding (e.g., 8 for AVX2); default: 1
 
@@ -3938,13 +3939,13 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_segmentation) · [Python](q
   than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with
   zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_ind` uses 0 to mark
   padding entries
 - If `mtl_ind_in` is provided, material indices are reordered and padded in the same way
 
 ### Usage:
 ```matlab
-[ triangles_out, sub_mesh_index, mesh_index, mtl_ind_out ] = ...
+[ triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out ] = ...
     quadriga_lib.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_ind_in );
 ```
 
@@ -3958,8 +3959,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_segmentation) · [Python](q
 
 ### Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_index`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
-- **`mesh_index`** — 1-based row in `triangles_in` of each row of `triangles_out` (0 = padding); uint32; `[n_meshR]`
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
+- **`mesh_ind`** — 1-based row in `triangles_in` of each row of `triangles_out` (0 = padding); uint32; `[n_meshR]`
 - **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
   `[n_meshR]`; only populated if `mtl_ind_in` is given
 

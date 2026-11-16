@@ -16,20 +16,20 @@ if package_path not in sys.path:
 
 from quadriga_lib import RTtools
 
-def aabb_numpy(triangles, sub_mesh_index=None):
+def aabb_numpy(triangles, sub_mesh_ind=None):
     """
     Reference AABB in NumPy (always float64).
     triangles: (N, 9)
-    sub_mesh_index: 1-D start indices (0-based). If empty or None => whole mesh.
+    sub_mesh_ind: 1-D start indices (0-based). If empty or None => whole mesh.
     """
     t = np.asarray(triangles, dtype=np.float64)
-    if sub_mesh_index is None or len(sub_mesh_index) == 0:
+    if sub_mesh_ind is None or len(sub_mesh_ind) == 0:
         xs = t[:, [0, 3, 6]].ravel()
         ys = t[:, [1, 4, 7]].ravel()
         zs = t[:, [2, 5, 8]].ravel()
         return np.array([[xs.min(), xs.max(), ys.min(), ys.max(), zs.min(), zs.max()]], dtype=np.float64)
 
-    idx = np.asarray(sub_mesh_index).astype(np.int64, copy=False)
+    idx = np.asarray(sub_mesh_ind).astype(np.int64, copy=False)
     ends = np.r_[idx[1:], t.shape[0]]
     out = []
     for s, e in zip(idx, ends):
@@ -59,7 +59,7 @@ class test_case(unittest.TestCase):
         ], dtype=np.float64)
 
         self.triangles = np.vstack([tri1, tri2])  # (4, 9)
-        self.sub_mesh_index = np.array([0, 2], dtype=int)  # dtype flexible
+        self.sub_mesh_ind = np.array([0, 2], dtype=int)  # dtype flexible
 
     def test_entire_mesh_aabb_single_triangle(self):
         tri = np.array([[0, 0, 0, 2, 0, 0, 1, 3, -1]], dtype=np.float64)
@@ -77,30 +77,30 @@ class test_case(unittest.TestCase):
         self.assertEqual(got.shape, (1, 6))
 
     def test_submesh_indices(self):
-        expected = aabb_numpy(self.triangles, self.sub_mesh_index)
-        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_index, 1)
+        expected = aabb_numpy(self.triangles, self.sub_mesh_ind)
+        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_ind, 1)
         self.assertEqual(got.dtype, np.float64)
         npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
         self.assertEqual(got.shape, (2, 6))
 
     def test_vec_size_padding(self):
         vec_size = 8
-        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_index, vec_size)
+        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_ind, vec_size)
         self.assertEqual(got.dtype, np.float64)
         self.assertEqual(got.shape[0] % vec_size, 0)
         self.assertEqual(got.shape, (vec_size, 6))
-        expected = aabb_numpy(self.triangles, self.sub_mesh_index)
+        expected = aabb_numpy(self.triangles, self.sub_mesh_ind)
         npt.assert_allclose(got[:2], expected, rtol=0, atol=1e-12)
         npt.assert_allclose(got[2:], 0.0, rtol=0, atol=0.0)
 
     def test_output_always_float64(self):
         # Inputs as float32 should still yield float64 output
-        got = RTtools.triangle_mesh_aabb(self.triangles.astype(np.float32), self.sub_mesh_index, 1)
+        got = RTtools.triangle_mesh_aabb(self.triangles.astype(np.float32), self.sub_mesh_ind, 1)
         self.assertEqual(got.dtype, np.float64)
 
     def test_submesh_index_dtype_flexibility(self):
         """
-        The API converts sub_mesh_index to uint32 internally; accept different integer dtypes.
+        The API converts sub_mesh_ind to uint32 internally; accept different integer dtypes.
         """
         variants = [
             np.array([0, 2], dtype=int),

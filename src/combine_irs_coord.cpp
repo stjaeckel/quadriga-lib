@@ -16,7 +16,7 @@ SECTION!*/
 Combine path interaction coordinates for IRS-assisted TX → RX channels
 
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
-- Interaction coordinates use a compressed format: `no_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
+- Interaction coordinates use a compressed format: `n_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
 - Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [[get_channels_irs]]) reduces this to active combinations only
 - Typically used after [[get_channels_irs]] to produce interaction data for path visualization (e.g. in Blender) via [[coord2path]]
@@ -25,11 +25,11 @@ Combine path interaction coordinates for IRS-assisted TX → RX channels
 ```
 void quadriga_lib::combine_irs_coord(
     const arma::Mat<dtype> &irs_pos,
-    const arma::u32_vec *no_interact_1,
+    const arma::u32_vec *n_interact_1,
     const arma::Mat<dtype> *interact_coord_1,
-    const arma::u32_vec *no_interact_2,
+    const arma::u32_vec *n_interact_2,
     const arma::Mat<dtype> *interact_coord_2,
-    arma::u32_vec *no_interact,
+    arma::u32_vec *n_interact,
     arma::Mat<dtype> *interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
@@ -38,19 +38,19 @@ void quadriga_lib::combine_irs_coord(
 
 ## Inputs:
 - **`irs_pos`** — IRS position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
-- **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
-- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`; any other size throws
-  `std::invalid_argument` (an empty matrix is accepted when `sum(no_interact_1)` is 0)
-- **`no_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
-- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(no_interact_2)]`; same check as for
+- **`n_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
+- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(n_interact_1)]`; any other size throws
+  `std::invalid_argument` (an empty matrix is accepted when `sum(n_interact_1)` is 0)
+- **`n_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
+- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(n_interact_2)]`; same check as for
   `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
 - **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [[get_channels_irs]] directly; `[n_path_1 × n_path_2]`
 
 ## Outputs:
-- **`no_interact`** — Number of interaction points per combined path; `[n_path_irs]`
-- **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(no_interact)]`
+- **`n_interact`** — Number of interaction points per combined path; `[n_path_irs]`
+- **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(n_interact)]`
 
 ## See also:
 - [[get_channels_irs]] (generates `active_path` and channel coefficients for IRS channels)
@@ -60,53 +60,53 @@ MD!*/
 // Combine path interaction coordinates for Intelligent Reflective Surfaces (IRS)
 template <typename dtype>
 void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
-                                     const arma::u32_vec *no_interact_1, const arma::Mat<dtype> *interact_coord_1,
-                                     const arma::u32_vec *no_interact_2, const arma::Mat<dtype> *interact_coord_2,
-                                     arma::u32_vec *no_interact, arma::Mat<dtype> *interact_coord,
+                                     const arma::u32_vec *n_interact_1, const arma::Mat<dtype> *interact_coord_1,
+                                     const arma::u32_vec *n_interact_2, const arma::Mat<dtype> *interact_coord_2,
+                                     arma::u32_vec *n_interact, arma::Mat<dtype> *interact_coord,
                                      bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path)
 {
     const dtype *p_irs = qd_xyz(irs_pos, "irs_pos");
     const dtype Ix = p_irs[0], Iy = p_irs[1], Iz = p_irs[2];
 
-    if (no_interact_1 == nullptr)
-        throw std::invalid_argument("Input 'no_interact_1' cannot be NULL.");
+    if (n_interact_1 == nullptr)
+        throw std::invalid_argument("Input 'n_interact_1' cannot be NULL.");
     if (interact_coord_1 == nullptr)
         throw std::invalid_argument("Input 'interact_coord_1' cannot be NULL.");
-    if (no_interact_2 == nullptr)
-        throw std::invalid_argument("Input 'no_interact_2' cannot be NULL.");
+    if (n_interact_2 == nullptr)
+        throw std::invalid_argument("Input 'n_interact_2' cannot be NULL.");
     if (interact_coord_2 == nullptr)
         throw std::invalid_argument("Input 'interact_coord_2' cannot be NULL.");
-    if (no_interact == nullptr)
-        throw std::invalid_argument("Output 'no_interact' cannot be NULL.");
+    if (n_interact == nullptr)
+        throw std::invalid_argument("Output 'n_interact' cannot be NULL.");
     if (interact_coord == nullptr)
         throw std::invalid_argument("Output 'interact_coord' cannot be NULL.");
-    qd_check_alias(no_interact, "no_interact", no_interact_1, no_interact_2);
+    qd_check_alias(n_interact, "n_interact", n_interact_1, n_interact_2);
     qd_check_alias(interact_coord, "interact_coord", interact_coord_1, interact_coord_2);
 
-    arma::uword n_path_1 = no_interact_1->n_elem;
-    arma::uword n_path_2 = no_interact_2->n_elem;
+    arma::uword n_path_1 = n_interact_1->n_elem;
+    arma::uword n_path_2 = n_interact_2->n_elem;
     arma::uword n_path = n_path_1 * n_path_2;
 
-    // The coordinates must hold exactly the interactions counted in 'no_interact_1' / '_2'
+    // The coordinates must hold exactly the interactions counted in 'n_interact_1' / '_2'
     // - With no interactions an empty matrix is accepted
     // - The interaction count of a combined path, max_1 + max_2 + 1, must fit its 32-bit output
     arma::uword sum_1 = 0ULL, sum_2 = 0ULL, max_1 = 0ULL, max_2 = 0ULL;
     for (arma::uword i = 0ULL; i < n_path_1; ++i)
     {
-        const arma::uword v = (arma::uword)no_interact_1->at(i);
+        const arma::uword v = (arma::uword)n_interact_1->at(i);
         sum_1 += v, max_1 = v > max_1 ? v : max_1;
     }
     for (arma::uword i = 0ULL; i < n_path_2; ++i)
     {
-        const arma::uword v = (arma::uword)no_interact_2->at(i);
+        const arma::uword v = (arma::uword)n_interact_2->at(i);
         sum_2 += v, max_2 = v > max_2 ? v : max_2;
     }
     if (max_1 + max_2 + 1ULL > (arma::uword)UINT_MAX)
         throw std::invalid_argument("The interaction count of a combined path exceeds the 32-bit range.");
     if (interact_coord_1->n_cols != sum_1 || (sum_1 != 0ULL && interact_coord_1->n_rows != 3ULL))
-        throw std::invalid_argument("Input 'interact_coord_1' must have 3 rows and sum(no_interact_1) = " + std::to_string(sum_1) + " columns.");
+        throw std::invalid_argument("Input 'interact_coord_1' must have 3 rows and sum(n_interact_1) = " + std::to_string(sum_1) + " columns.");
     if (interact_coord_2->n_cols != sum_2 || (sum_2 != 0ULL && interact_coord_2->n_rows != 3ULL))
-        throw std::invalid_argument("Input 'interact_coord_2' must have 3 rows and sum(no_interact_2) = " + std::to_string(sum_2) + " columns.");
+        throw std::invalid_argument("Input 'interact_coord_2' must have 3 rows and sum(n_interact_2) = " + std::to_string(sum_2) + " columns.");
     arma::uword n_path_irs = n_path;
 
     bool get_subset = active_path != nullptr;
@@ -125,16 +125,16 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
 
     if (n_path_irs == 0ULL)
     {
-        no_interact->reset();
+        n_interact->reset();
         interact_coord->reset();
         return;
     }
 
     // Get the number of interactions in the output
-    no_interact->set_size(n_path_irs);
-    const unsigned *pI1 = no_interact_1->memptr();
-    const unsigned *pI2 = no_interact_2->memptr();
-    unsigned *pI = no_interact->memptr();
+    n_interact->set_size(n_path_irs);
+    const unsigned *pI1 = n_interact_1->memptr();
+    const unsigned *pI2 = n_interact_2->memptr();
+    unsigned *pI = n_interact->memptr();
 
     arma::uword i_path_irs = 0ULL, i_path = 0ULL, sum_no_interact = 0ULL;
     for (arma::uword i_path_1 = 0ULL; i_path_1 < n_path_1; ++i_path_1)
@@ -211,13 +211,13 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
 }
 
 template void quadriga_lib::combine_irs_coord(const arma::Mat<float> &irs_pos,
-                                              const arma::u32_vec *no_interact_1, const arma::Mat<float> *interact_coord_1,
-                                              const arma::u32_vec *no_interact_2, const arma::Mat<float> *interact_coord_2,
-                                              arma::u32_vec *no_interact, arma::Mat<float> *interact_coord,
+                                              const arma::u32_vec *n_interact_1, const arma::Mat<float> *interact_coord_1,
+                                              const arma::u32_vec *n_interact_2, const arma::Mat<float> *interact_coord_2,
+                                              arma::u32_vec *n_interact, arma::Mat<float> *interact_coord,
                                               bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path);
 
 template void quadriga_lib::combine_irs_coord(const arma::Mat<double> &irs_pos,
-                                              const arma::u32_vec *no_interact_1, const arma::Mat<double> *interact_coord_1,
-                                              const arma::u32_vec *no_interact_2, const arma::Mat<double> *interact_coord_2,
-                                              arma::u32_vec *no_interact, arma::Mat<double> *interact_coord,
+                                              const arma::u32_vec *n_interact_1, const arma::Mat<double> *interact_coord_1,
+                                              const arma::u32_vec *n_interact_2, const arma::Mat<double> *interact_coord_2,
+                                              arma::u32_vec *n_interact, arma::Mat<double> *interact_coord,
                                               bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path);

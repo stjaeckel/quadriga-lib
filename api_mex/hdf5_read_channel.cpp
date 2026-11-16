@@ -27,7 +27,7 @@ Read one or more channel objects from an HDF5 file
 
 ## Usage:
 ```
-[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
+[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap );
 ```
 
 ## Inputs:
@@ -36,7 +36,7 @@ Read one or more channel objects from an HDF5 file
 - **`iy`** — 1-based slot indices along dimension Y; scalar or vector; default: `1:ny`
 - **`iz`** — 1-based slot indices along dimension Z; scalar or vector; default: `1:nz`
 - **`iw`** — 1-based slot indices along dimension W; scalar or vector; default: `1:nw`
-- **`snap`** — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
+- **`i_snap`** — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
   when the total selection is a single slot.
 
 ## Outputs:
@@ -57,10 +57,10 @@ Read one or more channel objects from an HDF5 file
   | `path_angles`      | Departure and arrival angles [AOD, EOD, AOA, EOA] in rad                 | `[n_path, 4, n_snap]`               |
   | `fbs_pos`          | First-bounce scatterer positions                                         | `[3, n_path, n_snap]`               |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
-  | `no_interact`      | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
-  | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(no_interact)), n_snap]`|
+  | `n_interact`       | Number of interaction points per path; uint32                            | `[n_path, n_snap]`                  |
+  | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(n_interact)), n_snap]`|
   | `center_freq`      | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
-  | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
+  | `initial_position` | Reference snapshot (start of the current segment); 1-based; absent = 1   | int32, scalar                       |
 - **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
   **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
   do not contain a given field, the corresponding element is left empty. If no unstructured data is present anywhere,
@@ -121,12 +121,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::Col<unsigned> iz_vec = parse_idx(3, nz, "iz");
     arma::Col<unsigned> iw_vec = parse_idx(4, nw, "iw");
 
-    // Parse snap
-    arma::uvec snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true, "snap");
+    // Parse i_snap
+    arma::uvec i_snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true, "i_snap");
 
     const arma::uword n_sel = ix_vec.n_elem * iy_vec.n_elem * iz_vec.n_elem * iw_vec.n_elem;
-    if (!snap.is_empty() && n_sel > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'snap' is only allowed when a single slot is requested.");
+    if (!i_snap.is_empty() && n_sel > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_snap' is only allowed when a single slot is requested.");
 
     // Iterate Cartesian product in column-major order, skipping empty slots.
     std::vector<quadriga_lib::channel<double>> channels;
@@ -165,11 +165,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 }
 
     // Snap subsetting (only valid for a single loaded channel)
-    if (!snap.is_empty() && !channels.empty())
+    if (!i_snap.is_empty() && !channels.empty())
     {
         quadriga_lib::channel<double> &channel = channels[0];
         const arma::uword n_snap_full = channel.n_snap();
-        for (auto &s : snap)
+        for (auto &s : i_snap)
         {
             if (s == 0 || s > n_snap_full)
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Snapshot index out of bounds.");
@@ -182,7 +182,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         auto sub_mat = [&](const arma::Mat<double> &src, arma::Mat<double> &dst)
         {
-            dst = (src.n_cols <= 1) ? src : arma::Mat<double>(src.cols(snap));
+            dst = (src.n_cols <= 1) ? src : arma::Mat<double>(src.cols(i_snap));
         };
         sub_mat(channel.rx_pos, sub.rx_pos);
         sub_mat(channel.tx_pos, sub.tx_pos);
@@ -191,14 +191,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         sub.center_freq = (channel.center_freq.n_elem <= 1)
                                    ? channel.center_freq
-                                   : arma::Col<double>(channel.center_freq.elem(snap));
+                                   : arma::Col<double>(channel.center_freq.elem(i_snap));
 
         auto sub_vec = [&](const auto &src, auto &dst)
         {
             if (src.empty())
                 return;
-            dst.reserve(snap.n_elem);
-            for (arma::uword i : snap)
+            dst.reserve(i_snap.n_elem);
+            for (arma::uword i : i_snap)
                 dst.push_back(src[i]);
         };
         sub_vec(channel.coeff_re, sub.coeff_re);
@@ -210,7 +210,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         sub_vec(channel.path_angles, sub.path_angles);
         sub_vec(channel.path_fbs_pos, sub.path_fbs_pos);
         sub_vec(channel.path_lbs_pos, sub.path_lbs_pos);
-        sub_vec(channel.no_interact, sub.no_interact);
+        sub_vec(channel.n_interact, sub.n_interact);
         sub_vec(channel.interact_coord, sub.interact_coord);
 
         sub.par_names = std::move(channel.par_names);

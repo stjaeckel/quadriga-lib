@@ -15,18 +15,18 @@ SECTION!*/
 Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
 - Each row of the output contains `{x_min, x_max, y_min, y_max, z_min, z_max}` for one sub-cloud
-- If `sub_cloud_index` is empty or omitted, the entire input is treated as a single cloud; last
+- If `sub_cloud_ind` is empty or omitted, the entire input is treated as a single cloud; last
   index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
 ## Usage:
 ```
-aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, vec_size );
+aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind, vec_size );
 ```
 
 ## Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** — Row indices marking the start of each sub-cloud; use [[point_cloud_segmentation]] 
+- **`sub_cloud_ind`** — Row indices marking the start of each sub-cloud; use [[point_cloud_segmentation]] 
   to generate; uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`vec_size`** — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
@@ -48,19 +48,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read input data
     const arma::mat points = qd_mex_get_Mat<double>(prhs[0]);
-    arma::u32_vec sub_cloud_index = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true, "sub_cloud_index");
+    arma::u32_vec sub_cloud_ind = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true, "sub_cloud_ind");
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    // Convert sub_mesh_index to 0-based
-    for (unsigned &val : sub_cloud_index)
+    // Convert sub_mesh_ind to 0-based
+    for (unsigned &val : sub_cloud_ind)
     {
         if (val == 0)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_cloud_index' cannot be 0.");
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_cloud_ind' cannot be 0.");
         --val;
     }
 
     // Wrap optional input pointer
-    const arma::u32_vec *p_sub_cloud_index = sub_cloud_index.empty() ? nullptr : &sub_cloud_index;
+    const arma::u32_vec *p_sub_cloud_index = sub_cloud_ind.empty() ? nullptr : &sub_cloud_ind;
 
     // Output (returned by value, size determined at runtime)
     arma::mat aabb;

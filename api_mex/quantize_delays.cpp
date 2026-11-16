@@ -38,7 +38,7 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 ## Usage:
 ```
 [ coeff_re_q, coeff_im_q, delay_q ] = quadriga_lib.quantize_delays( coeff_re, coeff_im, delay, ...
-    tap_spacing, max_no_taps, power_exponent, fix_taps );
+    tap_spacing, max_taps, power_exponent, fix_taps );
 ```
 
 ## Inputs:
@@ -47,7 +47,7 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`; non-negative
   with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
 - **`tap_spacing`** — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9
-- **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
+- **`max_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; default: 0<br><br>
   | Value | Meaning                                                                                         |
@@ -80,7 +80,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Optional scalar parameters
     double tap_spacing = (nrhs < 4) ? 5.0e-9 : qd_mex_get_scalar<double>(prhs[3], "tap_spacing", 5.0e-9);
-    arma::uword max_no_taps = (nrhs < 5) ? 48 : qd_mex_get_scalar<arma::uword>(prhs[4], "max_no_taps", 48);
+    arma::uword max_taps = (nrhs < 5) ? 48 : qd_mex_get_scalar<arma::uword>(prhs[4], "max_taps", 48);
     double power_exponent = (nrhs < 6) ? 1.0 : qd_mex_get_scalar<double>(prhs[5], "power_exponent", 1.0);
     int fix_taps = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "fix_taps", 0);
 
@@ -91,7 +91,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::quantize_delays<double>(
         &coeff_re, &coeff_im, &delay,
         &coeff_re_q, &coeff_im_q, &delay_q,
-        tap_spacing, max_no_taps, power_exponent, fix_taps));
+        tap_spacing, max_taps, power_exponent, fix_taps));
 
     // Write outputs — convert std::vector<Cube> back to 4D MATLAB arrays
     if (nlhs > 0)

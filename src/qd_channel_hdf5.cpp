@@ -582,18 +582,18 @@ Read the storage layout of an HDF5 channel file
 - Returns `{nx, ny, nz, nw}` describing the 4D slot grid of the file.
 - Returns `{0, 0, 0, 0}` if the file does not exist; throws if the file exists but is not a channel file of
   version 3 (see [[hdf5_read_channel]]).
-- `channelID` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
+- `channel_id` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
 
 ## Declaration:
 ```
 arma::u32_vec quadriga_lib::hdf5_read_layout(
     std::string fn,
-    arma::u32_vec *channelID = nullptr);
+    arma::u32_vec *channel_id = nullptr);
 ```
 
 ## Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`channelID`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
+- **`channel_id`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ## Returns:
 - Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
@@ -603,16 +603,16 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 - [[hdf5_reshape_layout]] (change layout dimensions of an existing file)
 MD!*/
 
-arma::u32_vec quadriga_lib::hdf5_read_layout(std::string fn, arma::u32_vec *channelID)
+arma::u32_vec quadriga_lib::hdf5_read_layout(std::string fn, arma::u32_vec *channel_id)
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
         return arma::u32_vec(4, arma::fill::zeros);
-    if (channelID != nullptr)
+    if (channel_id != nullptr)
     {
-        if (channelID->n_elem != (arma::uword)h.n_slot)
-            channelID->set_size((arma::uword)h.n_slot);
-        h.f.read(h.order_addr, channelID->memptr(), (size_t)(4 * h.n_slot));
+        if (channel_id->n_elem != (arma::uword)h.n_slot)
+            channel_id->set_size((arma::uword)h.n_slot);
+        h.f.read(h.order_addr, channel_id->memptr(), (size_t)(4 * h.n_slot));
     }
     return arma::u32_vec({h.dims[0], h.dims[1], h.dims[2], h.dims[3]});
 }
@@ -660,7 +660,7 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
                write_path_angles = ch->path_angles.size() == n_snap,
                write_path_fbs_pos = ch->path_fbs_pos.size() == n_snap,
                write_path_lbs_pos = ch->path_lbs_pos.size() == n_snap,
-               write_no_interact = ch->no_interact.size() == n_snap,
+               write_no_interact = ch->n_interact.size() == n_snap,
                write_interact_coord = ch->interact_coord.size() == n_snap;
     const bool snapshot_data = n_snap != 0 &&
                                (write_coeff || write_delay || write_path_gain || write_path_length || write_path_polarization ||
@@ -693,8 +693,8 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
             mat("path_lbs_pos", ch->path_lbs_pos[i]);
         if (write_no_interact)
         {
-            const uint64_t n = ch->no_interact[i].n_elem;
-            dst.push_back({"no_interact", h5::emit_dataset(out, h5::uint32, 1, &n, ch->no_interact[i].memptr(), 4 * n)});
+            const uint64_t n = ch->n_interact[i].n_elem;
+            dst.push_back({"no_interact", h5::emit_dataset(out, h5::uint32, 1, &n, ch->n_interact[i].memptr(), 4 * n)});
         }
         if (write_interact_coord)
             mat("interact_coord", ch->interact_coord[i]);
@@ -1156,17 +1156,17 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         // Number of interaction points of a path with the environment, 0 = LOS, and their coordinates [3, sum]
         if (find_dataset(*sg, "no_interact", h5::uint32, {np}))
         {
-            arma::u32_vec no_interact(n_path, arma::fill::none);
-            h5::read_raw(h.f, d, no_interact.memptr());
+            arma::u32_vec n_interact(n_path, arma::fill::none);
+            h5::read_raw(h.f, d, n_interact.memptr());
             uint64_t n_coord = 0;
-            for (unsigned v : no_interact)
+            for (unsigned v : n_interact)
                 n_coord += v;
             if (n_coord != 0 && !find_dataset(*sg, "interact_coord", h5::float32, {n_coord, 3})) // Checked first
                 h5::malformed("dataset 'interact_coord' is missing");
             arma::Mat<dtype> coord(3, (arma::uword)n_coord, arma::fill::none);
             if (n_coord != 0)
                 read_float(coord.memptr());
-            c.no_interact.push_back(std::move(no_interact));
+            c.n_interact.push_back(std::move(n_interact));
             c.interact_coord.push_back(std::move(coord));
         }
     }

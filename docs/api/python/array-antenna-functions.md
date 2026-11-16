@@ -191,9 +191,9 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_copy_element) · [MATL
 - Coupling-matrix entries for newly added elements are set to identity; existing coupling is kept
 - Works on single-frequency dicts (3D pattern fields) and frequency-dependent dicts (4D pattern
   fields); the same copy is applied to every frequency and a matching dict is returned
-- If `source_element` has one entry, that element is copied to every index in `dest_element`
-- If `source_element` has several entries, `dest_element` must have the same length and copies
-  are performed pairwise as `source_element[i]` to `dest_element[i]`
+- If `i_source` has one entry, that element is copied to every index in `i_target`
+- If `i_source` has several entries, `i_target` must have the same length and copies
+  are performed pairwise as `i_source[i]` to `i_target[i]`
 
 ### Usage:
 ```python
@@ -203,16 +203,16 @@ arrayant_out = quadriga_lib.arrayant.copy_element( arrayant, 0, 1 )
 # Copy element 0 to several positions
 arrayant_out = quadriga_lib.arrayant.copy_element( arrayant, 0, [2, 3] )
 
-# Pairwise copy — source_element and dest_element must have equal length
+# Pairwise copy — i_source and i_target must have equal length
 arrayant_out = quadriga_lib.arrayant.copy_element( arrayant, [0, 1], [2, 3] )
 ```
 
 ### Inputs:
 - **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may
   be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`source_element`** — Index of the source element(s); scalar int or 1D list or array of int; `(n_copy,)`
-- **`dest_element`** — Index of the destination element(s); scalar int  1D list or array of int; `(n_copy,)`;
-  must have the same length as `source_element` unless `source_element` is a single index
+- **`i_source`** — Index of the source element(s); scalar int or 1D list or array of int; `(n_copy,)`
+- **`i_target`** — Index of the destination element(s); scalar int or 1D list or array of int; `(n_copy,)`;
+  must have the same length as `i_source` unless `i_source` is a single index
 
 ### Outputs:
 - **`arrayant_out`** — Dict with the modified array antenna data; same keys and layout as
@@ -227,13 +227,13 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_export_obj_file) · [M
 
 - The pattern is mapped onto an icosphere; a higher `icosphere_n_div` gives a finer mesh
 - The OBJ file is written to `fn`; the function returns nothing
-- Accepts a frequency-dependent antenna (4D pattern fields); `freq_ind` selects which frequency
+- Accepts a frequency-dependent antenna (4D pattern fields); `i_freq` selects which frequency
   entry is exported
 
 ### Usage:
 ```python
 quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius, \
-    icosphere_n_div, element, freq_ind )
+    icosphere_n_div, i_element, i_freq )
 ```
 
 ### Inputs:
@@ -243,8 +243,8 @@ quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object in meters; default: 1.0
 - **`icosphere_n_div`** — Icosphere subdivision count; higher gives a finer mesh; see [icosphere](site-specific-simulation-tools.md#icosphere); default: 4
-- **`element`** — Element indices to export; 1D list or array of int; `None` or empty exports all elements; default: `None`
-- **`freq_ind`** — Frequency index to export from a frequency-dependent antenna; must satisfy `0 <= freq_ind < n_freq`; default: 0
+- **`i_element`** — Element indices to export; 1D list or array of int; `None` or empty exports all elements; default: `None`
+- **`i_freq`** — Frequency index to export from a frequency-dependent antenna; must satisfy `0 <= i_freq < n_freq`; default: 0
 
 ---
 <a id="generate"></a>
@@ -460,7 +460,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [MATLA
 ### Usage:
 ```python
 # Single-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, orientation, element_pos, \
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, i_element, orientation, element_pos, \
     use_kernel=0 )
 
 # Single-frequency mode with the projected distance and the local angles
@@ -480,7 +480,7 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
 - **`azimuth`** — Azimuth angles in GCS; `(1, n_ang)` (same angles for all outputs) or `(n_out, n_ang)` (one angle
   per output)
 - **`elevation`** — Elevation angles in GCS; same shape as `azimuth`
-- **`element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
+- **`i_element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
 - **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `(3, 1)`, `(3, n_out)`, `(3, 1, n_ang)` or
   `(3, n_out, n_ang)`; default: `None` (no rotation)
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `(3, n_out)`; default: `None`

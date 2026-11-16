@@ -108,7 +108,7 @@ namespace quadriga_lib
         arma::fmat *acc_dist = nullptr,                   // Accumulated in-layer distance, [n_ray, 2]
         std::vector<quadriga_lib::path> *paths = nullptr, // Path data storage, 64 byte + overflow, [n_ray]
         const arma::fmat *mesh = nullptr,                 // Optional: faces of the triangular mesh for sphere size detection, [ n_mesh, 9 ]
-        const arma::u32_vec *sub_mesh_index = nullptr,    // Optional: Sub-mesh index, 0-based, [n_sub]
+        const arma::u32_vec *sub_mesh_ind = nullptr,      // Optional: Sub-mesh index, 0-based, [n_sub]
         const arma::fmat *aabb = nullptr,                 // Axis-aligned bounding boxes for the sub-meshes, Size [ n_sub, 6 ]
         const arma::fmat *rx_points = nullptr,            // Receive points in 3D Space, Size: [n_points, 3]
         bool scalar_mode = false);                        // Switch for EM mode or scalar mode
@@ -123,8 +123,8 @@ namespace quadriga_lib
         const arma::fmat &tridir,                     // Vertex-ray directions, Cartesian [n_ray, 9]
         const std::vector<quadriga_lib::path> &paths, // Path data storage, [n_ray]
         const arma::Col<short> &mtl_ind_current,      // Current medium (0 = outside), [n_ray]
-        uint8_t max_no_interactions = 20,             // Total number of interactions per ray, 0-255
-        uint8_t max_no_subdivisions = 2,              // Number of subdivisions, 0-255
+        uint8_t max_interactions = 20,                // Total number of interactions per ray, 0-255
+        uint8_t max_subdivisions = 2,                 // Number of subdivisions, 0-255
         float subdivision_tolerance_m = 3.0f);        // Max. beam edge length before subdivision
 
     // Progress rays to next iteration step
@@ -148,18 +148,18 @@ namespace quadriga_lib
         std::vector<quadriga_lib::path> &paths,                              // Path data storage, 64 byte + overflow, updated in-place, [n_ray]
         arma::fmat *trivec = nullptr,                                        // Optional: Beam wavefront vertices relative to origin, updated in-place, [n_ray, 9]
         arma::fmat *tridir = nullptr,                                        // Optional: Vertex-ray directions, updated in-place, Cartesian [n_ray, 9]
-        const arma::u32_vec *sub_mesh_index = nullptr,                       // Optional: Sub-mesh index, 0-based, [n_sub]
+        const arma::u32_vec *sub_mesh_ind = nullptr,                         // Optional: Sub-mesh index, 0-based, [n_sub]
         const arma::fmat *aabb = nullptr,                                    // Optional: Bounding box matrix; [n_sub, 6]
-        uint8_t max_no_interactions = 20,                                    // Total number of interactions per ray, 0-255
-        uint8_t max_no_reflections = 10,                                     // Number of reflections, 0-255
-        uint8_t max_no_transmissions = 10,                                   // Number of transmissions / refractions, 0-255
-        uint8_t max_no_subdivisions = 2,                                     // Number of subdivisions, 0-255
+        uint8_t max_interactions = 20,                                       // Total number of interactions per ray, 0-255
+        uint8_t max_reflections = 10,                                        // Number of reflections, 0-255
+        uint8_t max_transmissions = 10,                                      // Number of transmissions / refractions, 0-255
+        uint8_t max_subdivisions = 2,                                        // Number of subdivisions, 0-255
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated
         float subdivision_tolerance_m = 3.0f,                                // Max. beam edge length before subdivision
         float thin_slab_threshold = 0.15f,                                   // Resolve threshold on the round-trip in-slab amplitude
         bool refraction_mode = true,                                         // Switch for straight-path / refraction
         bool scalar_mode = false,                                            // Switch for EM mode or scalar mode
-        const arma::u32_vec *no_interact_in = nullptr,                       // Optional: Externally computed intersection count per ray, skips the internal intersector, [n_ray]
+        const arma::u32_vec *n_interact_in = nullptr,                        // Optional: Externally computed intersection count per ray, skips the internal intersector, [n_ray]
         const arma::u32_vec *fbs_ind_in = nullptr,                           // Optional: Externally computed 1-based FBS face index, 0 = no hit, [n_ray]
         const arma::u32_vec *sbs_ind_in = nullptr,                           // Optional: Externally computed 1-based SBS face index, 0 = no hit, [n_ray]
         const std::vector<bool> *subdiv_flag_in = nullptr);                  // Optional: List of beam to subdivide, [n_ray]
@@ -181,12 +181,12 @@ namespace quadriga_lib
         const arma::fmat &tridir,                                            // Vertex-ray directions, Cartesian [n_ray, 9]
         const arma::Col<short> &mtl_ind_current,                             // Current medium (0 = outside), [n_ray]
         const arma::fmat &points,                                            // Receive points in 3D Space, Size: [n_points, 3]
-        const arma::u32_vec *sub_cloud_index = nullptr,                      // Sub-cloud index, 0-based, Length: [n_sub]
-        const arma::u32_vec *point_index = nullptr,                          // Mapping "points" to "pointsR", 1-based, Length: [ n_pointsR ]
+        const arma::u32_vec *sub_cloud_ind = nullptr,                        // Sub-cloud index, 0-based, Length: [n_sub]
+        const arma::u32_vec *point_ind = nullptr,                            // Mapping "points" to "pointsR", 1-based, Length: [ n_pointsR ]
         const std::vector<bool> *subdiv_flag_in = nullptr,                   // Optional: List of beam to subdivide, [n_ray], NULL/empty = none
         float max_path_length = 10e3,                                        // Maximum path length
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated
-        uint8_t min_no_segments = 0,                                         // Minimum number of segment required to commit a path
+        uint8_t min_segments = 0,                                            // Minimum number of segment required to commit a path
         bool ignore_direct_path = false);                                    // Flag to ignore all paths that have no reflections (covered separately by calc_diffraction_gain)
 
 }

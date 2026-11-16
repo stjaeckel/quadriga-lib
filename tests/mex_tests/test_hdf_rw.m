@@ -385,7 +385,7 @@ path_polarization = rand(8, 5, 3);
 path_angles       = rand(5, 4, 3);
 fbs_pos           = rand(3, 5, 3);
 lbs_pos           = rand(3, 5, 3);
-no_interact       = [1 2 3 4 5 ; 5 4 3 2 1 ; 1 1 1 1 1]';
+n_interact       = [1 2 3 4 5 ; 5 4 3 2 1 ; 1 1 1 1 1]';
 interact_coord    = rand(3, 15, 3);
 interact_coord(:, 6:end, 3) = 0;   % only 5 interactions in snap 3
 rx_orientation    = rand(3, 3);
@@ -405,7 +405,7 @@ chan.path_polarization = path_polarization;
 chan.path_angles       = path_angles;
 chan.fbs_pos           = fbs_pos;
 chan.lbs_pos           = lbs_pos;
-chan.no_interact       = no_interact;
+chan.n_interact       = n_interact;
 chan.interact_coord    = interact_coord;
 chan.rx_orientation    = rx_orientation;
 chan.tx_orientation    = tx_orientation;
@@ -427,7 +427,7 @@ assertEqual(chanR.path_polarization, double(single(path_polarization)));
 assertEqual(chanR.path_angles,       double(single(path_angles)));
 assertEqual(chanR.fbs_pos,           double(single(fbs_pos)));
 assertEqual(chanR.lbs_pos,           double(single(lbs_pos)));
-assertEqual(chanR.no_interact,       uint32(no_interact));
+assertEqual(chanR.n_interact,       uint32(n_interact));
 assertEqual(chanR.interact_coord,    double(single(interact_coord)));
 assertEqual(chanR.rx_orientation,    double(single(rx_orientation)));
 assertEqual(chanR.tx_orientation,    double(single(tx_orientation)));
@@ -444,6 +444,15 @@ chan_ip.initial_position = int32(7);
 quadriga_lib.hdf5_write_channel(fn, chan_ip, [], 6);
 [chanR, ~] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 1);
 assertEqual(chanR.initial_position, int32(7));
+
+% initial_position is 1-based in MATLAB (0-based in C++ and in the file): 1 is the first snapshot, the default,
+% which the struct does not show; 0 is rejected
+chan_ip.initial_position = int32(1);
+quadriga_lib.hdf5_write_channel(fn, chan_ip, [], 6);
+[chanR, ~] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 1);
+assertFalse(isfield(chanR, 'initial_position'));
+chan_ip.initial_position = int32(0);
+assert_cpp_error(@() quadriga_lib.hdf5_write_channel(fn, chan_ip, [], 6), 'must be >= 1 (1-based index)');
 
 % Combined par + chan write with sparse field set
 rx_pos = rand(3, 3);
@@ -481,7 +490,7 @@ assertTrue(~isfield(chanR, 'path_polarization'));
 assertTrue(~isfield(chanR, 'path_angles'));
 assertTrue(~isfield(chanR, 'fbs_pos'));
 assertTrue(~isfield(chanR, 'lbs_pos'));
-assertTrue(~isfield(chanR, 'no_interact'));
+assertTrue(~isfield(chanR, 'n_interact'));
 assertTrue(~isfield(chanR, 'interact_coord'));
 
 % Writing to an occupied slot replaces it and issues a warning; evalc keeps the expected warning off the console

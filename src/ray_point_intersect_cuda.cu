@@ -702,7 +702,7 @@ void qd_RPI_CUDA(
     const float *D3x, const float *D3y, const float *D3z,
     const float *rD1, const float *rD2, const float *rD3,
     const size_t n_ray,
-    std::vector<unsigned> *hit_index,
+    std::vector<unsigned> *hit_ind,
     unsigned *hit_offset,
     int gpu_id)
 {
@@ -710,7 +710,7 @@ void qd_RPI_CUDA(
     // An empty run still has to produce a valid, all-zero CSR list
     if (n_ray == 0 || n_sub == 0 || n_point == 0)
     {
-        qd_RPI_assemble(nullptr, nullptr, 0, n_point, hit_index, hit_offset);
+        qd_RPI_assemble(nullptr, nullptr, 0, n_point, hit_ind, hit_offset);
         return;
     }
 
@@ -1408,7 +1408,7 @@ void qd_RPI_CUDA(
         for (size_t i = 0; i < stage.size(); ++i)
             p_buffer[i] = stage[i].data(), n_hit_buffer[i] = stage[i].size();
 
-        qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_index, hit_offset);
+        qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_ind, hit_offset);
     }
 
     // CudaBuffers destructor handles all cleanup (RAII)

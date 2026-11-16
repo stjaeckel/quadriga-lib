@@ -39,7 +39,7 @@ static void xpr_update_chunked(arma::mat &X, const arma::mat &U, arma::vec *gain
         *gain = g_out;
 }
 
-TEST_CASE("xpr_update - duplicate ray_index entries give the single-thread result for any thread count")
+TEST_CASE("xpr_update - duplicate ray_ind entries give the single-thread result for any thread count")
 {
     const int n_threads_before = omp_get_max_threads();
 
@@ -121,11 +121,11 @@ TEST_CASE("xpr_update - separate inputs that alias xprmat")
 {
     arma::mat xprmat(8, 2, arma::fill::ones), update(8, 1, arma::fill::ones);
     arma::vec gain;
-    arma::uvec ray_index = {1};
-    CHECK_NOTHROW(quadriga_lib::xpr_update(xprmat, &update, &gain, false, false, false, &ray_index));
+    arma::uvec ray_ind = {1};
+    CHECK_NOTHROW(quadriga_lib::xpr_update(xprmat, &update, &gain, false, false, false, &ray_ind));
 
     arma::mat x = xprmat;
-    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &x, &gain, false, false, false, &ray_index), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &x, &gain, false, false, false, &ray_ind), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &x), std::invalid_argument);
     CHECK(arma::approx_equal(x, xprmat, "absdiff", 0.0));
 

@@ -52,8 +52,8 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 - **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
 - **`obj_names`** — Object names; cell array of strings; length `max(obj_ind)`
 - **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh]`
-- **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `no_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
+- **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `n_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
 - **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh]`
 - **`csv_names`** — Material names from the table; cell array of strings; length `n_csv`
 - **`csv_prop`** — Material properties as a struct; each field is one CSV column (excluding `name`)

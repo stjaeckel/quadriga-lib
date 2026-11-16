@@ -18,13 +18,13 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
   than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with
   zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_ind` uses 0 to mark
   padding entries
 - If `mtl_ind_in` is provided, material indices are reordered and padded in the same way
 
 ## Usage:
 ```
-[ triangles_out, sub_mesh_index, mesh_index, mtl_ind_out ] = ...
+[ triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out ] = ...
     quadriga_lib.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_ind_in );
 ```
 
@@ -38,8 +38,8 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_index`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
-- **`mesh_index`** — 1-based row in `triangles_in` of each row of `triangles_out` (0 = padding); uint32; `[n_meshR]`
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
+- **`mesh_ind`** — 1-based row in `triangles_in` of each row of `triangles_out` (0 = padding); uint32; `[n_meshR]`
 - **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
   `[n_meshR]`; only populated if `mtl_ind_in` is given
 MD!*/
@@ -62,29 +62,29 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output containers (sizes are determined inside the C++ call)
     arma::mat meshR;
-    arma::u32_vec sub_mesh_index;
+    arma::u32_vec sub_mesh_ind;
     arma::uvec mtl_indR;
-    arma::u32_vec mesh_index;
+    arma::u32_vec mesh_ind;
 
     // Wrap optional pointers
     const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
     arma::uvec *p_mtl_indR = (nlhs > 3) ? &mtl_indR : nullptr;
-    arma::u32_vec *p_mesh_index = (nlhs > 2) ? &mesh_index : nullptr;
+    arma::u32_vec *p_mesh_index = (nlhs > 2) ? &mesh_ind : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::triangle_mesh_segmentation<double>(&mesh, &meshR, &sub_mesh_index,
+    CALL_QD(quadriga_lib::triangle_mesh_segmentation<double>(&mesh, &meshR, &sub_mesh_ind,
                                                              target_size, vec_size, p_mtl_ind, p_mtl_indR, p_mesh_index));
 
     // Convert indices from 0-based (C++) to 1-based (MATLAB); mtl_indR is 1-based in C++ (no shift intended)
-    sub_mesh_index += 1;
+    sub_mesh_ind += 1;
 
     // Copy outputs to MATLAB (sizes only known after the C++ call)
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&meshR);
     if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&sub_mesh_index);
+        plhs[1] = qd_mex_copy2matlab(&sub_mesh_ind);
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&mesh_index);
+        plhs[2] = qd_mex_copy2matlab(&mesh_ind);
     if (nlhs > 3)
         plhs[3] = qd_mex_copy2matlab(&mtl_indR);
 }

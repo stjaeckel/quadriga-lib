@@ -61,7 +61,7 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re
   `2^31 * tap_spacing`
 - **`tap_spacing`** — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz
   sampling rate; default: 5e-9
-- **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
+- **`max_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
   2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
@@ -88,7 +88,7 @@ py::tuple quantize_delays(const py::object &coeff_re,
                           const py::object &coeff_im,
                           const py::object &delay,
                           double tap_spacing,
-                          arma::uword max_no_taps,
+                          arma::uword max_taps,
                           double power_exponent,
                           int fix_taps,
                           bool stack,
@@ -140,7 +140,7 @@ py::tuple quantize_delays(const py::object &coeff_re,
     // Call library function
     quadriga_lib::quantize_delays<double>(&coeff_re_a, &coeff_im_a, &delay_a,
                                           &coeff_re_q, &coeff_im_q, &delay_q,
-                                          tap_spacing, max_no_taps, power_exponent, fix_taps);
+                                          tap_spacing, max_taps, power_exponent, fix_taps);
 
     // Delay output (always real); list (stack=False) or 4D array (stack=True)
     py::object delay_q_py;

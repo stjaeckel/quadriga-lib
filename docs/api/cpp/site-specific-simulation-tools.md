@@ -65,7 +65,7 @@ void calc_diffraction_gain(
     arma::Mat<dtype> *xprmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
@@ -89,7 +89,7 @@ void calc_diffraction_gain(
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths)
 - **`verbose`** — Verbosity level
-- **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
+- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
@@ -126,7 +126,7 @@ void calc_diffraction_gain(
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [obj_file_read](#obj_file_read) (defines mtl_prop format)
 - [ray_mesh_interact](#ray_mesh_interact) (used for media interactions)
 - [qrt_file_read](channel-functions.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
@@ -162,7 +162,7 @@ Combine path interaction coordinates for IRS-assisted TX → RX channels
 Not in: MATLAB, Python
 
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
-- Interaction coordinates use a compressed format: `no_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
+- Interaction coordinates use a compressed format: `n_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
 - Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [get_channels_irs](channel-generation-functions.md#get_channels_irs)) reduces this to active combinations only
 - Typically used after [get_channels_irs](channel-generation-functions.md#get_channels_irs) to produce interaction data for path visualization (e.g. in Blender) via [coord2path](#coord2path)
@@ -171,11 +171,11 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::combine_irs_coord(
     const arma::Mat<dtype> &irs_pos,
-    const arma::u32_vec *no_interact_1,
+    const arma::u32_vec *n_interact_1,
     const arma::Mat<dtype> *interact_coord_1,
-    const arma::u32_vec *no_interact_2,
+    const arma::u32_vec *n_interact_2,
     const arma::Mat<dtype> *interact_coord_2,
-    arma::u32_vec *no_interact,
+    arma::u32_vec *n_interact,
     arma::Mat<dtype> *interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
@@ -184,19 +184,19 @@ void quadriga_lib::combine_irs_coord(
 
 ### Inputs:
 - **`irs_pos`** — IRS position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
-- **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
-- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`; any other size throws
-  `std::invalid_argument` (an empty matrix is accepted when `sum(no_interact_1)` is 0)
-- **`no_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
-- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(no_interact_2)]`; same check as for
+- **`n_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
+- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(n_interact_1)]`; any other size throws
+  `std::invalid_argument` (an empty matrix is accepted when `sum(n_interact_1)` is 0)
+- **`n_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
+- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(n_interact_2)]`; same check as for
   `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
 - **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [get_channels_irs](channel-generation-functions.md#get_channels_irs) directly; `[n_path_1 × n_path_2]`
 
 ### Outputs:
-- **`no_interact`** — Number of interaction points per combined path; `[n_path_irs]`
-- **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(no_interact)]`
+- **`n_interact`** — Number of interaction points per combined path; `[n_path_irs]`
+- **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(n_interact)]`
 
 ### See also:
 - [get_channels_irs](channel-generation-functions.md#get_channels_irs) (generates `active_path` and channel coefficients for IRS channels)
@@ -209,9 +209,9 @@ Convert path interaction coordinates into FBS/LBS positions, path length, and an
 
 Not in: MATLAB, Python
 
-- `no_interact` is a vector of length `n_path` with the number of interactions per path
-- `interact_coord` stores all coordinates concatenated in path order, size `[3, sum(no_interact)]`
-- LOS paths (`no_interact[i] == 0`) get a virtual FBS/LBS at the midpoint between TX and RX
+- `n_interact` is a vector of length `n_path` with the number of interactions per path
+- `interact_coord` stores all coordinates concatenated in path order, size `[3, sum(n_interact)]`
+- LOS paths (`n_interact[i] == 0`) get a virtual FBS/LBS at the midpoint between TX and RX
 - Set `reverse_path = true` to swap TX/RX and reverse all interaction sequences
 
 ### Declaration:
@@ -219,7 +219,7 @@ Not in: MATLAB, Python
 void quadriga_lib::coord2path(
     const arma::Mat<dtype> &tx_pos,
     const arma::Mat<dtype> &rx_pos,
-    const arma::u32_vec *no_interact,
+    const arma::u32_vec *n_interact,
     const arma::Mat<dtype> *interact_coord,
     arma::Col<dtype> *path_length = nullptr,
     arma::Mat<dtype> *fbs_pos = nullptr,
@@ -232,8 +232,8 @@ void quadriga_lib::coord2path(
 ### Inputs:
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
-- **`no_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
-- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(no_interact)]`
+- **`n_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
+- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(n_interact)]`
 - **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 
 ### Outputs:
@@ -554,8 +554,8 @@ arma::uword quadriga_lib::obj_file_read(
 - **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
 - **`obj_names`** — Object names; length `max(obj_ind)+1`
 - **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
-- **`mtl_names`** — Visual material names (raw `usemtl`); length `no_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
+- **`mtl_names`** — Visual material names (raw `usemtl`); length `n_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
 - **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
 - **`csv_names`** — Material names from the table; length `n_csv` (the full table)
 - **`csv_prop`** — Material properties keyed by CSV column name (excluding `name`); each value has
@@ -763,20 +763,20 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_cloud_aabb) · [Python](../python/site-specific-simulation-tools.md#point_cloud_aabb)
 
 - Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
-- If `sub_cloud_index` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
+- If `sub_cloud_ind` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
 ### Declaration:
 ```cpp
 arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> *points,
-    const arma::u32_vec *sub_cloud_index = nullptr,
+    const arma::u32_vec *sub_cloud_ind = nullptr,
     arma::uword vec_size = 1);
 ```
 
 ### Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
+- **`sub_cloud_ind`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
 ### Returns:
@@ -803,11 +803,11 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_cloud_segmentat
 arma::uword quadriga_lib::point_cloud_segmentation(
     const arma::Mat<dtype> *points,
     arma::Mat<dtype> *pointsR,
-    arma::u32_vec *sub_cloud_index,
+    arma::u32_vec *sub_cloud_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
-    arma::u32_vec *forward_index = nullptr,
-    arma::u32_vec *reverse_index = nullptr);
+    arma::u32_vec *forward_ind = nullptr,
+    arma::u32_vec *reverse_ind = nullptr);
 ```
 
 ### Inputs:
@@ -818,9 +818,9 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 
 ### Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_index`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_index`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
+- **`forward_ind`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_ind`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
 
 ### Returns:
 - Number of generated sub-clouds `n_sub`
@@ -927,13 +927,13 @@ Not in: MATLAB, Python
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
   its coefficients, per frequency, via [medium_gain](#medium_gain) on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
-- The receiver index is written to the committed path's `iC`, 0-based. Without `point_index` it indexes
-  `points` as passed in; with `point_index` it indexes the caller's original, unsegmented point list, so a
+- The receiver index is written to the committed path's `iC`, 0-based. Without `point_ind` it indexes
+  `points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
   cloud reordered by [point_cloud_segmentation](#point_cloud_segmentation) needs no remapping afterwards.
 - Padding points inserted by [point_cloud_segmentation](#point_cloud_segmentation) for SIMD alignment sit at the center of their
-  sub-cloud AABB and are therefore hit often. They are dropped when `point_index` is supplied and committed
+  sub-cloud AABB and are therefore hit often. They are dropped when `point_ind` is supplied and committed
   as if they were receivers when it is not.
-- `min_no_segments` suppresses commits from rays that have not interacted often enough. The launch-sphere
+- `min_segments` suppresses commits from rays that have not interacted often enough. The launch-sphere
   beams of the first generation carry `nSEG = 0` and are far too wide for a point-in-tube test to be
   meaningful, so a beam-traced run passes 1 here.
 - The committed path is not extended by a segment: the receiver is not an interaction point, so `nSEG` and
@@ -953,12 +953,12 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &tridir,
     const arma::Col<short> &mtl_ind_current,
     const arma::fmat &rx_points,
-    const arma::u32_vec *sub_cloud_index = nullptr,
-    const arma::u32_vec *point_index = nullptr,
+    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec *point_ind = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
-    uint8_t min_no_segments = 0,
+    uint8_t min_segments = 0,
     bool ignore_direct_path = false);
 ```
 
@@ -978,11 +978,11 @@ arma::uword quadriga_lib::ray_commit(
 - **`mtl_ind_current`** — Current medium state word, 0 = outside (bit-masked: `mat = w & 0x3FFF`,
   flags in bits 14 and 15); `[n_ray]`
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
-- **`sub_cloud_index`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
+- **`sub_cloud_ind`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. NULL → no partitioning
-- **`point_index`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
-  list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_index` output of
-  [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_index`, which runs the other way and has
+- **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
+  list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
+  [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_ind`, which runs the other way and has
   length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `iC` is written in the original
   indexing. NULL → `points` is used as passed in and `iC` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
@@ -991,7 +991,7 @@ arma::uword quadriga_lib::ray_commit(
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
 - **`min_gain_dB`** *(optional)* — Gain at `center_freq[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
-- **`min_no_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
+- **`min_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
   before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
   generation, including the sub-beams they spawn, which keep `nSEG = 0` until their first interaction
 - **`ignore_direct_path`** *(optional)* — Drop every path that arrives by transmission only
@@ -1012,7 +1012,7 @@ arma::uword quadriga_lib::ray_commit(
 - [ray_point_intersect](#ray_point_intersect) (ray-point intersection, produces the pair list)
 - [ray_subdivide_flag](#ray_subdivide_flag) (produces `subdiv_flag_in`)
 - [ray_progress](#ray_progress) (advance the launch configuration to the next generation)
-- [point_cloud_segmentation](#point_cloud_segmentation) (generate `sub_cloud_index` and `point_index`)
+- [point_cloud_segmentation](#point_cloud_segmentation) (generate `sub_cloud_ind` and `point_ind`)
 - [calc_diffraction_gain](#calc_diffraction_gain) (covers the paths removed by `ignore_direct_path`)
 - [path](channel-functions.md#path) (the per-ray storage object)
 
@@ -1058,7 +1058,7 @@ arma::uword ray_init(
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
     const arma::fmat *mesh = nullptr,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     const arma::fmat *aabb = nullptr,
     const arma::fmat *rx_points = nullptr,
     bool scalar_mode = false);
@@ -1072,9 +1072,9 @@ arma::uword ray_init(
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
   the launch sphere `r0`. NULL → the mesh does not bound `r0`.
-- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
+- **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
   strictly increasing, first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
-- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
+- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Unlike [ray_progress](#ray_progress), boxes are *not* computed internally when omitted: the probe is a fixed 2880 rays,
   so building them here would usually cost more than it saves. Pass the [triangle_mesh_aabb](#triangle_mesh_aabb) result the
   caller already holds for the tracing loop.
@@ -1105,7 +1105,7 @@ arma::uword ray_init(
 ### See also:
 - [icosphere](#icosphere) (generates the ray fan, beam wavefront, and directions)
 - [ray_triangle_intersect](#ray_triangle_intersect) (launch-sphere sizing and per-segment intersection)
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [triangle_mesh_aabb](#triangle_mesh_aabb) (generates `aabb`)
 - [ray_mesh_interact](#ray_mesh_interact) (consumes `orig` / `dest` / `trivec` / `tridir`)
 - [ray_state_update](#ray_state_update) (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
@@ -1272,7 +1272,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#ray_point_intersect) 
 
 - Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.
 - Reports, for each point, the list of 0-based ray indices whose beam intersects that point.
-- The primary output is a flat CSR pair (`hit_index`, `hit_offset`); the ray indices of point `i` are `hit_index[hit_offset[i] .. hit_offset[i+1]-1]`.
+- The primary output is a flat CSR pair (`hit_ind`, `hit_offset`); the ray indices of point `i` are `hit_ind[hit_offset[i] .. hit_offset[i+1]-1]`.
 - All outputs are optional and are only computed when a non-NULL pointer is passed.
 - All internal computations use single precision.
 
@@ -1283,11 +1283,11 @@ void quadriga_lib::ray_point_intersect(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &trivec,
     const arma::Mat<dtype> &tridir,
-    std::vector<unsigned> *hit_index = nullptr,
+    std::vector<unsigned> *hit_ind = nullptr,
     arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
     std::vector<arma::u32_vec> *hits_per_point = nullptr,
-    const arma::u32_vec *sub_cloud_index = nullptr,
+    const arma::u32_vec *sub_cloud_ind = nullptr,
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -1297,14 +1297,14 @@ void quadriga_lib::ray_point_intersect(
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates (need not be normalized), order `[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]`; `[n_ray, 9]`
-- **`sub_cloud_index`** *(optional)* — Segment boundary indices for the point cloud (see [point_cloud_segmentation](#point_cloud_segmentation)); sub-clouds
+- **`sub_cloud_ind`** *(optional)* — Segment boundary indices for the point cloud (see [point_cloud_segmentation](#point_cloud_segmentation)); sub-clouds
   need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed); `[n_sub]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ### Optional outputs:
-- **`hit_index`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
-- **`hit_offset`** — Start of each point's block within `hit_index`, last element is `n_hit`; `[n_points + 1]`
+- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
+- **`hit_offset`** — Start of each point's block within `hit_ind`, last element is `n_hit`; `[n_points + 1]`
 - **`hit_count`** — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
 - **`hits_per_point`** — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
 
@@ -1347,8 +1347,8 @@ Not in: MATLAB, Python
   note on `center_freq`).
 - Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
   otherwise rays are traced as infinitesimal.
-- The ray-mesh intersection can be delegated: pass `no_interact_in`, `fbs_ind_in` and `sbs_ind_in`
-  to reuse a [ray_triangle_intersect](#ray_triangle_intersect) result. When the intersection is delegated, `sub_mesh_index` and `aabb` are unused —
+- The ray-mesh intersection can be delegated: pass `n_interact_in`, `fbs_ind_in` and `sbs_ind_in`
+  to reuse a [ray_triangle_intersect](#ray_triangle_intersect) result. When the intersection is delegated, `sub_mesh_ind` and `aabb` are unused —
   they only accelerate the internal intersector — validation is skipped in this case and the parameters may be omitted.
 - The subdivision decision can likewise be delegated via `subdiv_flag_in`, which a shading pass needs so it
   does not commit beams that reappear as sub-beams. When supplied it is the authority on what gets split;
@@ -1375,18 +1375,18 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     std::vector<quadriga_lib::path> &paths,
     arma::fmat *trivec = nullptr,
     arma::fmat *tridir = nullptr,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     const arma::fmat *aabb = nullptr,
-    uint8_t max_no_interactions = 20,
-    uint8_t max_no_reflections = 10,
-    uint8_t max_no_transmissions = 10,
-    uint8_t max_no_subdivisions = 2,
+    uint8_t max_interactions = 20,
+    uint8_t max_reflections = 10,
+    uint8_t max_transmissions = 10,
+    uint8_t max_subdivisions = 2,
     float min_gain_dB = -140.0f,
     float subdivision_tolerance_m = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
     bool scalar_mode = false,
-    const arma::u32_vec *no_interact_in = nullptr,
+    const arma::u32_vec *n_interact_in = nullptr,
     const arma::u32_vec *fbs_ind_in = nullptr,
     const arma::u32_vec *sbs_ind_in = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr);
@@ -1398,14 +1398,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl` (max 16383)
 - **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
-- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
+- **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
-- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
+- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   NULL with a partition present → boxes are computed internally via [triangle_mesh_aabb](#triangle_mesh_aabb)
-- **`max_no_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
-- **`max_no_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
-- **`max_no_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
-- **`max_no_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
+- **`max_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
+- **`max_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
+- **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
+- **`max_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
   counter `nSUB` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
@@ -1413,17 +1413,17 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
-- **`no_interact_in`** *(optional)* — Externally computed intersection count per ray from [ray_triangle_intersect](#ray_triangle_intersect); `[n_ray]`.
+- **`n_interact_in`** *(optional)* — Externally computed intersection count per ray from [ray_triangle_intersect](#ray_triangle_intersect); `[n_ray]`.
   When given, the internal intersector is skipped and `fbs_ind_in` and `sbs_ind_in` become mandatory
 - **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
-  Must be non-zero wherever `no_interact_in` is non-zero.
+  Must be non-zero wherever `n_interact_in` is non-zero.
 - **`sbs_ind_in`** *(optional)* — Externally computed 1-based index of the second intersected mesh element, 0 = none; `[n_ray]`
 - **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; `[n_ray]`, indexed in the full ray
   set (unlike everything else, which is compacted first). When supplied it is the authority on what gets
   subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been
   subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance_m` is unused. Pass the
   output of [ray_subdivide_flag](#ray_subdivide_flag) to reproduce the internal decision exactly; a hand-built list overrides it.
-  Requires beam mode; conflicts with `max_no_subdivisions` = 0
+  Requires beam mode; conflicts with `max_subdivisions` = 0
 
 ### In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
@@ -1445,14 +1445,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`tridir`** *(optional)* — Vertex-ray directions, Cartesian; `[n_ray, 9]`
 
 ### Returns:
-- Per-stage ray counts `{n_interact, n_subdiv, n_reflect, n_transmit}`:
-  - **`n_interact`** — rays that hit the mesh, i.e. `no_interact != 0`, counted before any compaction
+- Per-stage ray counts `{n_hit, n_subdiv, n_reflect, n_transmit}`:
+  - **`n_hit`** — rays that hit the mesh, i.e. `n_interact != 0`, counted before any compaction
   - **`n_subdiv`** — rays flagged for subdivision, each expanded into 4 sub-beams. Not a subset of
-    `n_interact`: a delegated flag may mark rays that missed the mesh, so the two counts are independent
+    `n_hit`: a delegated flag may mark rays that missed the mesh, so the two counts are independent
   - **`n_reflect`** — reflected continuations launched
   - **`n_transmit`** — transmitted / refracted continuations launched
 - Only rays that hit the mesh *and* were not subdivided reach the interaction passes, so
-  `n_reflect + n_transmit` is bounded by twice that number, not by `2·n_interact`.
+  `n_reflect + n_transmit` is bounded by twice that number, not by `2·n_hit`.
 
 ### See also:
 - [ray_init](#ray_init) (produces the initial launch configuration this function advances)
@@ -1496,7 +1496,7 @@ void quadriga_lib::ray_state_update(
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *fbsN,
     const arma::Mat<dtype> *sbsN,
-    const arma::u32_vec *no_interact,
+    const arma::u32_vec *n_interact,
     const arma::Col<dtype> *fbs_angleN,
     const arma::Mat<dtype> *normal_vecN,
     const std::vector<uint8_t> *out_typeN,
@@ -1533,7 +1533,7 @@ void quadriga_lib::ray_state_update(
 - **`center_freq`** — Center frequency in [Hz]
 - **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
 - **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
-- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
+- **`n_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
 - **`fbs_angleN`** — Incidence angle at FBS (the angle to the face, as [ray_mesh_interact](#ray_mesh_interact) writes it), compact set; `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`; required.
   The plane of the VBS, and the test whether the two faces of an entry are parallel.
@@ -1704,8 +1704,8 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::fmat &tridir,
     const std::vector<quadriga_lib::path> &paths,
     const arma::Col<short> &mtl_ind_current,
-    uint8_t max_no_interactions = 20,
-    uint8_t max_no_subdivisions = 2,
+    uint8_t max_interactions = 20,
+    uint8_t max_subdivisions = 2,
     float subdivision_tolerance_m = 3.0f);
 ```
 
@@ -1720,9 +1720,9 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
 - **`mtl_ind_current`** — Current medium state word, 0 = outside; `[n_ray]`. A ray inside a medium is
   never split: the sub-beams restart their in-layer accumulator and recompute their direction
   geometrically, which is only valid outside
-- **`max_no_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
+- **`max_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
-- **`max_no_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
+- **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
   the returned flags are all `false`
 - **`subdivision_tolerance_m`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
@@ -1763,10 +1763,10 @@ void quadriga_lib::ray_triangle_intersect(
     const arma::Mat<dtype> *mesh,
     arma::Mat<dtype> *fbs = nullptr,
     arma::Mat<dtype> *sbs = nullptr,
-    arma::u32_vec *no_interact = nullptr,
+    arma::u32_vec *n_interact = nullptr,
     arma::u32_vec *fbs_ind = nullptr,
     arma::u32_vec *sbs_ind = nullptr,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     const arma::Mat<dtype> *aabb = nullptr,
     int use_kernel = 0,
     int gpu_id = 0);
@@ -1776,7 +1776,7 @@ void quadriga_lib::ray_triangle_intersect(
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
+- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
@@ -1784,7 +1784,7 @@ void quadriga_lib::ray_triangle_intersect(
 ### Outputs:
 - **`fbs`** (optional) — First-bounce intersection points in GCS; `[n_ray, 3]`
 - **`sbs`** (optional) — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
+- **`n_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
 - **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
 - **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
 
@@ -1941,13 +1941,13 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#triangle_mesh_aabb) �
 ```cpp
 arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
     const arma::Mat<dtype> *mesh,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     arma::uword vec_size = 1);
 ```
 
 ### Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
-- **`sub_mesh_index`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
+- **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
 ### Returns:
@@ -1965,7 +1965,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#triangle_mesh_segment
 
 - Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_ind` uses 0 to mark padding entries
 - If `mtl_ind` is provided, material indices are reordered and padded the same way (padding uses index 0)
 
 ### Declaration:
@@ -1973,12 +1973,12 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#triangle_mesh_segment
 arma::uword triangle_mesh_segmentation(
     const arma::Mat<dtype> *mesh,
     arma::Mat<dtype> *meshR,
-    arma::u32_vec *sub_mesh_index,
+    arma::u32_vec *sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
     const arma::uvec *mtl_ind = nullptr,
     arma::uvec *mtl_ind_out = nullptr,
-    arma::u32_vec *mesh_index = nullptr);
+    arma::u32_vec *mesh_ind = nullptr);
 ```
 
 ### Inputs:
@@ -1989,15 +1989,15 @@ arma::uword triangle_mesh_segmentation(
 
 ### Outputs:
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
 - **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
-- **`mesh_index`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
+- **`mesh_ind`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
 
 ### Returns:
 - Number of created sub-meshes `n_sub`
 
 ### See also:
-- [calc_diffraction_gain](#calc_diffraction_gain) (uses `sub_mesh_index` for acceleration)
+- [calc_diffraction_gain](#calc_diffraction_gain) (uses `sub_mesh_ind` for acceleration)
 - [obj_file_read](#obj_file_read) (defines `mtl_ind` / `csv_ind`)
 
 ---
@@ -2086,7 +2086,7 @@ Not in: MATLAB, Python
   gain extraction, normalization, and gain application. They are selected independently through
   `initialize`, `update`, `normalize`, `gain`, and `apply_gain`, so a call can do any combination
   (see Usage)
-- An optional `ray_index` lets the update set be a subset of the global state, scattered into
+- An optional `ray_ind` lets the update set be a subset of the global state, scattered into
   `xprmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
 - Storage is interleaved complex, column-major, matching the `xprmat` output of
   [calc_diffraction_gain](#calc_diffraction_gain). EM mode carries the full 2x2 Jones matrix; scalar mode carries a
@@ -2101,14 +2101,14 @@ void xpr_update(
     bool initialize = false,
     bool normalize = false,
     bool apply_gain = false,
-    const arma::uvec *ray_index = nullptr);
+    const arma::uvec *ray_ind = nullptr);
 ```
 
 ### Arguments:
 - **`xprmat`** — Global XPR state, updated in place. EM mode `[8, n_ray]`, scalar mode
   `[2, n_ray]`. If empty on entry it is sized from `update` and seeded to unity (see Usage). A
   pre-sized (non-empty) buffer is treated as accumulated state unless `initialize` is set. When
-  `ray_index` is given, `xprmat` must already exist, because the extent of the global set cannot be
+  `ray_ind` is given, `xprmat` must already exist, because the extent of the global set cannot be
   inferred from a subset.
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `xprmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
@@ -2127,7 +2127,7 @@ void xpr_update(
 - **`normalize`** — If `true`, each touched column is scaled to unit gain after the update.
   Untouched columns of `xprmat` are left alone.
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
-- **`ray_index`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
+- **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
   Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
   `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
   in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
@@ -2137,7 +2137,7 @@ void xpr_update(
 ### Usage:
 The flags are composable in one call; the per-column order is always
 initialize -> update -> normalize -> apply_gain. Argument order is
-`(xprmat, update, gain, initialize, normalize, apply_gain, ray_index)`.
+`(xprmat, update, gain, initialize, normalize, apply_gain, ray_ind)`.
 ```cpp
 arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 

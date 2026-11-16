@@ -16,15 +16,15 @@ Calculate intersections of ray beams with points in 3D space
 - Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin,
   enabling energy spread simulation
 - Reports, for each point, the list of ray indices whose beam intersects that point
-- Results use a compressed sparse row layout: `hit_index` holds the ray indices grouped by point and
+- Results use a compressed sparse row layout: `hit_ind` holds the ray indices grouped by point and
   `hit_offset` marks where each point's block starts
-- The rays hitting point `i` are `hit_index[hit_offset[i]:hit_offset[i+1]]`, a zero-copy numpy view
-- `numpy.split(hit_index, hit_offset[1:-1])` produces a per-point list of arrays if that form is needed
+- The rays hitting point `i` are `hit_ind[hit_offset[i]:hit_offset[i+1]]`, a zero-copy numpy view
+- `numpy.split(hit_ind, hit_offset[1:-1])` produces a per-point list of arrays if that form is needed
 - All internal computations use single precision
 
 ## Usage:
 ```
-hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir,
+hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir,
     points, sub_cloud_ind, use_kernel, gpu_id )
 ```
 
@@ -46,8 +46,8 @@ hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect( ori
 ## Outputs:
 - **`hit_count`** — Number of beams intersecting each point; equals `numpy.diff(hit_offset)`; uint32;
   `(n_points,)`
-- **`hit_index`** — Flat list of 0-based ray indices, grouped by point; `(n_hit,)`
-- **`hit_offset`** — Start of each point's block within `hit_index`; the last element equals `n_hit`;
+- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; `(n_hit,)`
+- **`hit_offset`** — Start of each point's block within `hit_ind`; the last element equals `n_hit`;
   uint32; `(n_points + 1,)`
 
 ## See also:
@@ -79,18 +79,18 @@ py::tuple ray_point_intersect(const py::array_t<double> &orig,
     auto hit_offset_p = qd_python_init_output(points_arma.n_rows + 1, &hit_offset);
 
     // The flat hit list is sized by the library, so it cannot be pre-allocated
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
 
     quadriga_lib::ray_point_intersect<double>(points_arma, orig_arma, trivec_arma, tridir_arma,
-                                              &hit_index, &hit_offset, &hit_count, nullptr,
+                                              &hit_ind, &hit_offset, &hit_count, nullptr,
                                               &sub_cloud_ind_arma, use_kernel, gpu_id);
 
     // Copy the flat list into numpy, widening to the signed 64 bit index type.
     // The Armadillo wrapper only aliases the vector, it does not copy.
     py::array_t<py::ssize_t> hit_index_p;
-    if (!hit_index.empty())
+    if (!hit_ind.empty())
     {
-        const arma::u32_vec hit_index_arma(hit_index.data(), (arma::uword)hit_index.size(), false, true);
+        const arma::u32_vec hit_index_arma(hit_ind.data(), (arma::uword)hit_ind.size(), false, true);
         hit_index_p = qd_python_copy2numpy<unsigned, py::ssize_t>(&hit_index_arma);
     }
 

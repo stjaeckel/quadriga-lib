@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Tests of gbsm_rays_from_paths: delays, angles and powers from spherical path data, LOS detection and default
-// taps, GR paths, in-place writes, the round trip through a QRT file, `no_int` of a QRT file as path type,
+// taps, GR paths, in-place writes, the round trip through a QRT file, `n_interact` of a QRT file as path type,
 // validation. The writing side (qrt_paths_from_scatterers) is tested in test_qrt_paths_from_scatterers.cpp.
 // Oracles: the hand-made ray data of make_rays (qd_test_rays.hpp) with scatterers, whose delays and angles are built
 // from the scatterer positions (delay = (polyline - d3D) / c, angles towards the scatterers, GR angles towards the
@@ -236,12 +236,12 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
         r.tx_pos);
 
     in_t in;
-    arma::u32_vec no_int;
+    arma::u32_vec n_interact;
     quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &in.cf, &in.T, nullptr, &in.R, nullptr, &in.fbs, &in.lbs,
-                                        &in.pg, &in.pl, &in.M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &no_int);
+                                        &in.pg, &in.pl, &in.M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
     std::remove(fn.c_str());
-    REQUIRE(no_int.n_elem == n_path);
-    in.type = no_int, in.tap = r.tap, in.er = r.gr_eps_re, in.ei = r.gr_eps_im;
+    REQUIRE(n_interact.n_elem == n_path);
+    in.type = n_interact, in.tap = r.tap, in.er = r.gr_eps_re, in.ei = r.gr_eps_im;
 
     quadriga_lib::gbsm_rays o;
     run(in, o);
@@ -295,7 +295,7 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
     CHECK(arma::accu(o.path_type == 0) == 1);
 }
 
-TEST_CASE("gbsm_rays_from_paths - no_int of qrt_file_read passes as path_type")
+TEST_CASE("gbsm_rays_from_paths - n_interact of qrt_file_read passes as path_type")
 {
     // Files of qrt_paths_from_scatterers: the interaction count (LOS 0, GR 1, NLOS 2) is the path type, and the
     // u32 vector of qrt_file_read goes into gbsm_rays_from_paths without conversion
@@ -310,20 +310,20 @@ TEST_CASE("gbsm_rays_from_paths - no_int of qrt_file_read passes as path_type")
     arma::vec cf, T, R, pl;
     arma::mat fbs, lbs, pg;
     arma::cube M;
-    arma::u32_vec no_int;
+    arma::u32_vec n_interact;
     quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &cf, &T, nullptr, &R, nullptr, &fbs, &lbs, &pg, &pl, &M,
-                                        nullptr, nullptr, nullptr, nullptr, nullptr, 1, &no_int);
+                                        nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
     std::remove(fn.c_str());
 
     quadriga_lib::gbsm_rays o;
-    quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &no_int);
+    quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &n_interact);
     CHECK(o.is_valid().empty());
     CHECK(arma::all(o.path_type == r.path_type));
     CHECK(arma::accu(o.path_type == 1) == 1);
 
     // Ray-traced files count the interactions: a path with 3 throws
-    no_int(no_int.n_elem - 1) = 3;
-    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &no_int),
+    n_interact(n_interact.n_elem - 1) = 3;
+    CHECK_THROWS_MATCHES(quadriga_lib::gbsm_rays_from_paths(cf, T, R, fbs, lbs, pg, pl, M, o, "quadriga", &n_interact),
                          std::invalid_argument,
                          Message("Values of 'path_type' must be 0 (LOS), 1 (GR) or 2 (NLOS)."));
 }

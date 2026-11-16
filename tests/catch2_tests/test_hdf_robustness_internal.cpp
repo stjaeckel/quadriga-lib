@@ -120,11 +120,11 @@ namespace
             c.path_angles.push_back(filled(arma::mat(np, 4), o + 60.0));
             c.path_fbs_pos.push_back(filled(arma::mat(3, np), o + 70.0));
             c.path_lbs_pos.push_back(filled(arma::mat(3, np), o + 80.0));
-            arma::u32_vec no_interact(np);
+            arma::u32_vec n_interact(np);
             for (arma::uword p = 0; p < np; ++p)
-                no_interact(p) = (unsigned)(p % 3);
-            c.no_interact.push_back(no_interact);
-            c.interact_coord.push_back(filled(arma::mat(3, arma::accu(no_interact)), o + 90.0));
+                n_interact(p) = (unsigned)(p % 3);
+            c.n_interact.push_back(n_interact);
+            c.interact_coord.push_back(filled(arma::mat(3, arma::accu(n_interact)), o + 90.0));
         }
         return c;
     }
@@ -1036,9 +1036,9 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
             check_rejected(1);
         }
     }
-    SECTION("interact_coord with one row less than sum(no_interact)")
+    SECTION("interact_coord with one row less than sum(n_interact)")
     {
-        // Snapshot 0 has 3 paths with no_interact {0, 1, 2}: interact_coord [3, 3] is stored as {3, 3}
+        // Snapshot 0 has 3 paths with n_interact {0, 1, 2}: interact_coord [3, 3] is stored as {3, 3}
         edit_messages(fn, "channel_2/Snap_0/interact_coord", 0, [](std::vector<message> &m)
                       {
                           m[find(m, h5::msg_dataspace)] = dataspace_message({2, 3});
@@ -1229,7 +1229,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         c.coeff_re = {arma::cube(1, 1, 2, arma::fill::ones)};
         c.coeff_im = {arma::cube(1, 1, 2, arma::fill::zeros)};
         c.delay = {arma::cube(1, 1, 2, arma::fill::value(1e-6))};
-        c.no_interact = {arma::u32_vec({1, 0})};
+        c.n_interact = {arma::u32_vec({1, 0})};
         c.interact_coord = {arma::mat(3, 1, arma::fill::ones)};
         for (std::pair<uint32_t, uint32_t> counts : {std::pair<uint32_t, uint32_t>{0xFFFFFFFFu, 0xFFFFFFFFu}, {1u << 29, 0u}})
         {

@@ -191,7 +191,7 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         ant['e_phi_re'][:, :, 0] = 3.0
         ant['e_phi_im'][:, :, 0] = 4.0
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         npt.assert_array_almost_equal(out['e_theta_re'][:, :, 1], 1.0)
         npt.assert_array_almost_equal(out['e_theta_im'][:, :, 1], 2.0)
         npt.assert_array_almost_equal(out['e_phi_re'][:, :, 1], 3.0)
@@ -205,15 +205,15 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         """source and dest vectors of different lengths should throw."""
         ant = make_single_freq_ant(n_elem=3)
         with self.assertRaises(Exception):
-            arrayant.copy_element(ant, source_element=np.array([0, 1], dtype=np.uint64),
-                                  dest_element=np.array([2, 3, 4], dtype=np.uint64))
+            arrayant.copy_element(ant, i_source=np.array([0, 1], dtype=np.uint64),
+                                  i_target=np.array([2, 3, 4], dtype=np.uint64))
 
     def test_source_out_of_bounds_throws(self):
         """Source index beyond element count should throw."""
         ant = make_single_freq_ant(n_elem=1)
         with self.assertRaises(Exception):
-            arrayant.copy_element(ant, source_element=np.array([5], dtype=np.uint64),
-                                  dest_element=np.array([1], dtype=np.uint64))
+            arrayant.copy_element(ant, i_source=np.array([5], dtype=np.uint64),
+                                  i_target=np.array([1], dtype=np.uint64))
 
     def test_negative_dest_throws(self):
         """A destination of -1 becomes the largest unsigned index and must raise, not write memory."""
@@ -231,7 +231,7 @@ class TestCopyElementSingleFreq(unittest.TestCase):
         """Copy element on a generated omni antenna."""
         ant = arrayant.generate('omni', 10)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1, 2], dtype=np.uint64))
+                                    i_target=np.array([1, 2], dtype=np.uint64))
         self.assertEqual(out['e_theta_re'].shape[2], 3)
         npt.assert_array_almost_equal(out['e_theta_re'][:, :, 0],
                                       out['e_theta_re'][:, :, 1])
@@ -250,7 +250,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """Copy element 0 to index 1 — should expand from 1 to 2 elements across all freqs."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         self.assertEqual(out['e_theta_re'].ndim, 4)
         self.assertEqual(out['e_theta_re'].shape[2], 2)
         self.assertEqual(out['e_theta_re'].shape[3], 3)
@@ -259,7 +259,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """Copied element should have correct per-frequency values."""
         ant = make_multi_freq_ant(n_elem=2, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([2], dtype=np.uint64))
+                                    i_target=np.array([2], dtype=np.uint64))
         # Element 0 at freq 0 has value 11.0, freq 1 has 21.0, freq 2 has 31.0
         for f in range(3):
             expected = float((f + 1) * 10 + 1)
@@ -270,7 +270,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """Copy element 0 to element 1 — overwrites at all frequencies."""
         ant = make_multi_freq_ant(n_elem=2, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         self.assertEqual(out['e_theta_re'].shape[2], 2)
         for f in range(3):
             npt.assert_array_almost_equal(out['e_theta_re'][:, :, 0, f],
@@ -280,7 +280,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """Copy one source to multiple destinations across all frequencies."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=2)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1, 2], dtype=np.uint64))
+                                    i_target=np.array([1, 2], dtype=np.uint64))
         self.assertEqual(out['e_theta_re'].shape[2], 3)
         for f in range(2):
             for i in range(3):
@@ -290,8 +290,8 @@ class TestCopyElementMultiFreq(unittest.TestCase):
     def test_copy_multiple_sources_to_multiple_destinations(self):
         """Copy [0,1] to [2,3] — paired copy across all frequencies."""
         ant = make_multi_freq_ant(n_elem=2, n_freq=3)
-        out = arrayant.copy_element(ant, source_element=np.array([0, 1], dtype=np.uint64),
-                                    dest_element=np.array([2, 3], dtype=np.uint64))
+        out = arrayant.copy_element(ant, i_source=np.array([0, 1], dtype=np.uint64),
+                                    i_target=np.array([2, 3], dtype=np.uint64))
         self.assertEqual(out['e_theta_re'].shape[2], 4)
         for f in range(3):
             npt.assert_array_almost_equal(out['e_theta_re'][:, :, 2, f],
@@ -307,21 +307,21 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """Multi-freq input produces 4D output patterns."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         self.assertEqual(out['e_theta_re'].ndim, 4)
 
     def test_center_freq_preserved(self):
         """center_freq should be preserved as a 1D array."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         npt.assert_array_almost_equal(out['center_freq'], ant['center_freq'])
 
     def test_grids_unchanged(self):
         """Azimuth and elevation grids should be unchanged."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         npt.assert_array_almost_equal(out['azimuth_grid'], ant['azimuth_grid'])
         npt.assert_array_almost_equal(out['elevation_grid'], ant['elevation_grid'])
 
@@ -329,14 +329,14 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """element_pos should expand to match new element count."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         self.assertEqual(out['element_pos'].shape, (3, 2))
 
     def test_coupling_expanded(self):
         """Coupling matrix should expand for new elements."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         # Coupling is shared (2D) since all freq entries are identical
         self.assertGreaterEqual(out['coupling_re'].shape[0], 2)
 
@@ -344,7 +344,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """Name string should be preserved."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         self.assertEqual(out['name'], 'test_multi')
 
     def test_input_not_modified(self):
@@ -352,7 +352,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         ant = make_multi_freq_ant(n_elem=1, n_freq=3)
         original_shape = ant['e_theta_re'].shape
         _ = arrayant.copy_element(ant, 0,
-                                  dest_element=np.array([1], dtype=np.uint64))
+                                  i_target=np.array([1], dtype=np.uint64))
         self.assertEqual(ant['e_theta_re'].shape, original_shape)
 
     # ================================================================================
@@ -367,7 +367,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         ant['e_phi_re'][:, :, 0, :] = 3.0
         ant['e_phi_im'][:, :, 0, :] = 4.0
         out = arrayant.copy_element(ant, 0,
-                                    dest_element=np.array([1], dtype=np.uint64))
+                                    i_target=np.array([1], dtype=np.uint64))
         for f in range(2):
             npt.assert_array_almost_equal(out['e_theta_re'][:, :, 1, f], 1.0)
             npt.assert_array_almost_equal(out['e_theta_im'][:, :, 1, f], 2.0)
@@ -382,15 +382,15 @@ class TestCopyElementMultiFreq(unittest.TestCase):
         """source and dest vectors of different lengths should throw."""
         ant = make_multi_freq_ant(n_elem=3, n_freq=2)
         with self.assertRaises(Exception):
-            arrayant.copy_element(ant, source_element=np.array([0, 1], dtype=np.uint64),
-                                  dest_element=np.array([2, 3, 4], dtype=np.uint64))
+            arrayant.copy_element(ant, i_source=np.array([0, 1], dtype=np.uint64),
+                                  i_target=np.array([2, 3, 4], dtype=np.uint64))
 
     def test_source_out_of_bounds_throws(self):
         """Source index beyond element count should throw."""
         ant = make_multi_freq_ant(n_elem=1, n_freq=2)
         with self.assertRaises(Exception):
-            arrayant.copy_element(ant, source_element=np.array([5], dtype=np.uint64),
-                                  dest_element=np.array([1], dtype=np.uint64))
+            arrayant.copy_element(ant, i_source=np.array([5], dtype=np.uint64),
+                                  i_target=np.array([1], dtype=np.uint64))
 
     # ================================================================================
     # Integration with generate_speaker
@@ -402,7 +402,7 @@ class TestCopyElementMultiFreq(unittest.TestCase):
                                             angular_resolution=10.0)
         n_elem_before = speaker['e_theta_re'].shape[2]
         out = arrayant.copy_element(speaker, 0,
-                                    dest_element=np.array([n_elem_before], dtype=np.uint64))
+                                    i_target=np.array([n_elem_before], dtype=np.uint64))
         self.assertEqual(out['e_theta_re'].shape[2], n_elem_before + 1)
         # Copied element should match source at all frequencies
         for f in range(3):

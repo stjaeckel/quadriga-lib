@@ -125,23 +125,23 @@ class test_case(unittest.TestCase):
         # None (no sub-mesh) runs without error.
         quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
-            sub_mesh_index=None)
+            sub_mesh_ind=None)
 
         # A single whole-mesh sub-mesh at offset 0 matches the no-sub-mesh result.
         gain_smi, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
-            sub_mesh_index=np.array([0], dtype=np.uint32))
+            sub_mesh_ind=np.array([0], dtype=np.uint32))
         npt.assert_allclose(gain_ref, gain_smi, atol=1e-10, rtol=0)
 
     def test_sub_mesh_dtype_cast(self):
-        # Non-uint32 sub_mesh_index (e.g. numpy's default int64) is cast and
+        # Non-uint32 sub_mesh_ind (e.g. numpy's default int64) is cast and
         # gives an identical result.
         gain_u32, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
-            sub_mesh_index=np.array([0], dtype=np.uint32))
+            sub_mesh_ind=np.array([0], dtype=np.uint32))
         gain_i64, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
-            sub_mesh_index=np.array([0], dtype=np.int64))
+            sub_mesh_ind=np.array([0], dtype=np.int64))
         npt.assert_allclose(gain_u32, gain_i64, atol=1e-10, rtol=0)
 
     def test_kernel_selection(self):
@@ -469,13 +469,13 @@ class test_case(unittest.TestCase):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
                 self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
-                sub_mesh_index=np.array([1], dtype=np.uint32))
+                sub_mesh_ind=np.array([1], dtype=np.uint32))
 
     def test_error_sub_mesh_exceeds_faces(self):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
                 self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
-                sub_mesh_index=np.array([0, 32], dtype=np.uint32))
+                sub_mesh_ind=np.array([0, 32], dtype=np.uint32))
 
     def test_error_orig_not_three_cols(self):
         with self.assertRaises(Exception):

@@ -4,16 +4,16 @@ function test_qrt_file_read()
 fn = 'data/test.qrt';
 
 % ---------- qrt_file_parse: v4 file ----------
-[no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
+[n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, ...
     center_freq, cir_pos, cir_orientation, orig_pos, orig_orientation] = ...
     quadriga_lib.qrt_file_parse(fn);
 
-assertEqual(no_orig, uint64(3));
-assertEqual(no_dest, uint64(2));
-assertEqual(no_cir, uint64(7));
-assertEqual(no_freq, uint64(1));
+assertEqual(n_orig, uint64(3));
+assertEqual(n_dest, uint64(2));
+assertEqual(n_cir, uint64(7));
+assertEqual(n_freq, uint64(1));
 assertEqual(version, int32(4));
-assertEqual(numel(cir_offset), double(no_dest));
+assertEqual(numel(cir_offset), double(n_dest));
 
 assertEqual(cir_offset(1), uint64(0));
 assertEqual(cir_offset(2), uint64(1));
@@ -29,12 +29,12 @@ assertEqual(dest_names{1}, 'RX1');
 assertEqual(dest_names{2}, 'RX2');
 
 % Frequency
-assertEqual(numel(center_freq), double(no_freq));
+assertEqual(numel(center_freq), double(n_freq));
 assertElementsAlmostEqual(center_freq(1), single(3.75e9), 'relative', 1e-6);
 
 % CIR positions and orientations
-assertEqual(size(cir_pos), [double(no_cir), 3]);
-assertEqual(size(cir_orientation), [double(no_cir), 3]);
+assertEqual(size(cir_pos), [double(n_cir), 3]);
+assertEqual(size(cir_orientation), [double(n_cir), 3]);
 
 T = single([-8.83498, 57.1893, 1.0]);
 assertElementsAlmostEqual(cir_pos(1, :), T, 'absolute', 1.5e-4);
@@ -46,8 +46,8 @@ T = single([0, 0, 1.2753]);
 assertElementsAlmostEqual(cir_orientation(2, :), T, 'absolute', 1.5e-4);
 
 % Origin (TX) positions and orientations
-assertEqual(size(orig_pos), [double(no_orig), 3]);
-assertEqual(size(orig_orientation), [double(no_orig), 3]);
+assertEqual(size(orig_pos), [double(n_orig), 3]);
+assertEqual(size(orig_orientation), [double(n_orig), 3]);
 
 T = single([-12.9607, 59.6906, 2.0]);
 assertElementsAlmostEqual(orig_pos(1, :), T, 'absolute', 1.5e-4);
@@ -136,23 +136,23 @@ assertElementsAlmostEqual(path_gain_ul{1}, path_gain_dl, 'relative', 1e-12);
 % ---------- qrt_file_parse: v5 file ----------
 fn5 = 'data/test_v5.qrt';
 
-[no_cir5, no_orig5, no_dest5, no_freq5, cir_offset5, ~, ~, version5, ...
+[n_cir5, n_orig5, n_dest5, n_freq5, cir_offset5, ~, ~, version5, ...
     center_freq5, cir_pos5, cir_orientation5, orig_pos5, orig_orientation5] = ...
     quadriga_lib.qrt_file_parse(fn5);
 
 assertEqual(version5, int32(5));
-assertEqual(no_freq5, uint64(2));
+assertEqual(n_freq5, uint64(2));
 
 % Frequencies
-assertEqual(numel(center_freq5), double(no_freq5));
+assertEqual(numel(center_freq5), double(n_freq5));
 assertElementsAlmostEqual(center_freq5(1), single(1.0e9), 'relative', 1e-6);
 assertElementsAlmostEqual(center_freq5(2), single(1.5e9), 'relative', 1e-6);
 
 % Shape checks
-assertEqual(size(cir_pos5), [double(no_cir5), 3]);
-assertEqual(size(cir_orientation5), [double(no_cir5), 3]);
-assertEqual(size(orig_pos5), [double(no_orig5), 3]);
-assertEqual(size(orig_orientation5), [double(no_orig5), 3]);
+assertEqual(size(cir_pos5), [double(n_cir5), 3]);
+assertEqual(size(cir_orientation5), [double(n_cir5), 3]);
+assertEqual(size(orig_pos5), [double(n_orig5), 3]);
+assertEqual(size(orig_orientation5), [double(n_orig5), 3]);
 
 % ---------- qrt_file_read: v5, normalize_M=0 ----------
 [center_freq5, ~, ~, ~, ~, ~, ~, path_gain5, ~, M5] = ...
@@ -187,7 +187,7 @@ assertElementsAlmostEqual(M5n(:, 1, 2), T, 'absolute', 1.5e-4);
 
 % ---------- qrt_file_read: multiple CIRs in one call ----------
 [~, tx_pos_m, tx_ori_m, rx_pos_m, rx_ori_m, fbs_m, lbs_m, ...
-    pg_m, plen_m, M_m, aod_m, eod_m, aoa_m, eoa_m, pc_m, no_int_m, coord_m] = ...
+    pg_m, plen_m, M_m, aod_m, eod_m, aoa_m, eoa_m, pc_m, n_interact_m, coord_m] = ...
     quadriga_lib.qrt_file_read(fn, [1, 2, 3], 1, true, 1);
 
 % Scalar-per-CIR outputs: [3, n_out] matrices
@@ -207,7 +207,7 @@ assertEqual(numel(eod_m),    3);
 assertEqual(numel(aoa_m),    3);
 assertEqual(numel(eoa_m),    3);
 assertEqual(numel(pc_m),     3);
-assertEqual(numel(no_int_m), 3);
+assertEqual(numel(n_interact_m), 3);
 assertEqual(numel(coord_m),  3);
 
 % Cross-check vs individual single-CIR reads for i_cir = 1 and 2
@@ -237,13 +237,13 @@ assertTrue(iscell(pc_m{1}));
 assertEqual(numel(pc_m{1}), numel(aod_m{1}));   % one entry per path
 
 % ---------- qrt_file_read: default arguments ----------
-% Default i_cir reads ALL CIRs in the file (no_cir entries)
+% Default i_cir reads ALL CIRs in the file (n_cir entries)
 [~, tx_pos_d] = quadriga_lib.qrt_file_read(fn);
-assertEqual(size(tx_pos_d), [3, double(no_cir)]);
+assertEqual(size(tx_pos_d), [3, double(n_cir)]);
 assertElementsAlmostEqual(tx_pos_d(:, 1), tx1, 'absolute', 1e-6);
 
 [~, tx_pos_e] = quadriga_lib.qrt_file_read(fn, []);
-assertEqual(size(tx_pos_e), [3, double(no_cir)]);
+assertEqual(size(tx_pos_e), [3, double(n_cir)]);
 assertElementsAlmostEqual(tx_pos_e(:, 1), tx1, 'absolute', 1e-6);
 
 % ---------- qrt_file_read: out-of-range i_cir errors ----------
@@ -354,7 +354,7 @@ end
 assertTrue(failed);
 
 % ---------- qrt_file_read: a v4 file without origins stores no frequency ----------
-% (header "#QRT-BINv04" with no_orig = no_cir = no_dest = 0): one frequency of 0 Hz, empty outputs
+% (header "#QRT-BINv04" with n_orig = n_cir = n_dest = 0): one frequency of 0 Hz, empty outputs
 fn_v4 = [tempname, '.qrt'];
 fid = fopen(fn_v4, 'w'); fwrite(fid, [uint8('#QRT-BINv04'), zeros(1, 12, 'uint8')], 'uint8'); fclose(fid);
 out = cell(1, 18);

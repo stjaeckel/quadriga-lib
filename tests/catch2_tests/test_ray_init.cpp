@@ -39,14 +39,14 @@ namespace
     // with the same n_ray_target cancels that fraction exactly.
     float launch_radius(arma::uword n_ray_target, float max_path_length,
                         const arma::fmat *mesh, const arma::fmat *points,
-                        const arma::u32_vec *sub_mesh_index = nullptr,
+                        const arma::u32_vec *sub_mesh_ind = nullptr,
                         const arma::fmat *aabb = nullptr)
     {
         arma::fmat orig;
         arma::uword n = quadriga_lib::ray_init(n_ray_target, 1, {0.0f, 0.0f, 0.0f}, max_path_length,
                                                &orig, nullptr, nullptr, nullptr,
                                                nullptr, nullptr, nullptr, nullptr, nullptr,
-                                               nullptr, mesh, sub_mesh_index, aabb, points, false);
+                                               nullptr, mesh, sub_mesh_ind, aabb, points, false);
         REQUIRE(orig.n_rows == n);
         return row_norms(orig).max();
     }
@@ -410,7 +410,7 @@ TEST_CASE("ray_init - Points do not disturb the other outputs")
 }
 TEST_CASE("ray_init - Sub-mesh acceleration does not change the launch sphere")
 {
-    // sub_mesh_index and aabb only speed up the probe. The radius they produce must be bit-identical
+    // sub_mesh_ind and aabb only speed up the probe. The radius they produce must be bit-identical
     // to the unpartitioned run, otherwise the acceleration is dropping faces.
     const float maxpath = 40.0f;
     arma::fmat mesh = cube_grid();
@@ -483,13 +483,13 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
         CHECK_NOTHROW(call(nullptr, nullptr));
     }
 
-    SECTION("sub_mesh_index must start at 0")
+    SECTION("sub_mesh_ind must start at 0")
     {
         arma::u32_vec smi = {1u, 6u};
         CHECK_THROWS_AS(call(&smi, nullptr), std::invalid_argument);
     }
 
-    SECTION("sub_mesh_index must be strictly increasing")
+    SECTION("sub_mesh_ind must be strictly increasing")
     {
         arma::u32_vec bad = {0u, 6u, 6u};
         CHECK_THROWS_AS(call(&bad, nullptr), std::invalid_argument);
@@ -498,13 +498,13 @@ TEST_CASE("ray_init - Sub-mesh and aabb error cases")
         CHECK_THROWS_AS(call(&desc, nullptr), std::invalid_argument);
     }
 
-    SECTION("sub_mesh_index cannot exceed the face count")
+    SECTION("sub_mesh_ind cannot exceed the face count")
     {
         arma::u32_vec smi = {0u, (unsigned)n_face};
         CHECK_THROWS_AS(call(&smi, nullptr), std::invalid_argument);
     }
 
-    SECTION("aabb requires sub_mesh_index")
+    SECTION("aabb requires sub_mesh_ind")
     {
         arma::fmat box(1, 6, arma::fill::zeros);
         CHECK_THROWS_AS(call(nullptr, &box), std::invalid_argument);

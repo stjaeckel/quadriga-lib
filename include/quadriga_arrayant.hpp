@@ -94,9 +94,9 @@ namespace quadriga_lib
 
     // Copy a single antenna element to one or more destination slots, in place
     template <typename dtype>
-    void arrayant_copy_element(arrayant<dtype> &ant,           // Valid arrayant; updated in-place
-                               arma::uword source,             // Index of the element to copy, 0-based
-                               const arma::uvec &destination); // Target indices, 0-based; the array is enlarged to fit the largest index
+    void arrayant_copy_element(arrayant<dtype> &ant,        // Valid arrayant; updated in-place
+                               arma::uword i_source,        // Index of the element to copy, 0-based
+                               const arma::uvec &i_target); // Target indices, 0-based; the array is enlarged to fit the largest index
 
     // Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
     template <typename dtype>
@@ -167,8 +167,8 @@ namespace quadriga_lib
     // - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry.
     template <typename dtype>
     void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of valid arrayant objects; modified in-place
-                                     arma::uword source,                         // Index of the element to copy from; must be within current element count
-                                     const arma::uvec &destination);             // Indices of target elements; enlarges all entries if any index exceeds current count
+                                     arma::uword i_source,                       // Index of the element to copy from; must be within current element count
+                                     const arma::uvec &i_target);                // Indices of target elements; enlarges all entries if any index exceeds current count
 
     // Interpolate the polarimetric field pattern of an array antenna at given azimuth and elevation angles
     // - Angles [1, n_ang]: the same for all outputs (planar wave); [n_out, n_ang]: one angle per output (spherical wave)

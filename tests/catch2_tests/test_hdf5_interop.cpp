@@ -22,7 +22,7 @@
 //                        if not set). A value per snapshot is a float dataset of the same name; the attribute keeps
 //                        its default then. A channel without structured data keeps all defaults (and no name).
 //   snapshot data        in the channel group (one snapshot) or in groups Snap_<i>: attribute NumPath (uint32) and
-//                        float datasets coeff_re, coeff_im, delay, path_gain, ... and uint32 no_interact
+//                        float datasets coeff_re, coeff_im, delay, path_gain, ... and uint32 n_interact
 //   /channel_<id>/Data   unstructured datasets par_<name> in creation order: the element type of the written object,
 //                        a scalar dataspace for scalars, rank 1 for vectors (arma::Row too), rank 2 for matrices,
 //                        rank 3 for cubes; strings as fixed-length strings (an empty string as one NUL byte)
@@ -152,7 +152,7 @@ namespace
         const bool has_snapshot_data = c.coeff_re.size() == ns || c.delay.size() == ns || c.path_gain.size() == ns ||
                                        c.path_length.size() == ns || c.path_polarization.size() == ns ||
                                        c.path_angles.size() == ns || c.path_fbs_pos.size() == ns ||
-                                       c.path_lbs_pos.size() == ns || c.no_interact.size() == ns;
+                                       c.path_lbs_pos.size() == ns || c.n_interact.size() == ns;
         const arma::uvec n_path = c.n_path();
         for (size_t s = 0; s < ns && has_snapshot_data; ++s)
         {
@@ -184,8 +184,8 @@ namespace
             mat(c.path_angles, "path_angles");
             mat(c.path_fbs_pos, "path_fbs_pos");
             mat(c.path_lbs_pos, "path_lbs_pos");
-            if (c.no_interact.size() == ns)
-                t.add_dataset(sg + "/no_interact", raw(H5T_STD_U32LE, {np}, c.no_interact[s].memptr(), np));
+            if (c.n_interact.size() == ns)
+                t.add_dataset(sg + "/no_interact", raw(H5T_STD_U32LE, {np}, c.n_interact[s].memptr(), np));
             mat(c.interact_coord, "interact_coord");
         }
 
@@ -440,11 +440,11 @@ namespace
             c.path_angles.push_back(filled(mat(np, 4), o + 60.0));
             c.path_fbs_pos.push_back(filled(mat(3, np), o + 70.0));
             c.path_lbs_pos.push_back(filled(mat(3, np), o + 80.0));
-            arma::u32_vec no_interact(np);
+            arma::u32_vec n_interact(np);
             for (arma::uword p = 0; p < np; ++p)
-                no_interact(p) = (unsigned)(p % 3);
-            c.no_interact.push_back(no_interact);
-            c.interact_coord.push_back(filled(mat(3, arma::accu(no_interact)), o + 90.0));
+                n_interact(p) = (unsigned)(p % 3);
+            c.n_interact.push_back(n_interact);
+            c.interact_coord.push_back(filled(mat(3, arma::accu(n_interact)), o + 90.0));
         }
         return c;
     }

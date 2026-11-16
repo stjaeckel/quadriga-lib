@@ -15,22 +15,22 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g. for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
-- Paths below `gain_min` are excluded; `max_no_paths` caps the total number of exported paths
+- Paths below `gain_min` are excluded; `max_paths` caps the total number of exported paths
 - Paths with non-finite coordinates are skipped
 - Takes raw channel data fields directly; no channel dict is required
-- The per-snapshot fields `no_interact`, `interact_coord` and `coeff` each accept either a `list`
+- The per-snapshot fields `n_interact`, `interact_coord` and `coeff` each accept either a `list`
   (one entry per snapshot, ragged) or a single padded `ndarray` (MATLAB-style nD layout)
 
 ## Usage:
 ```
-quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, \
-    radius_max, radius_min, n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, \
+quadriga_lib.channel.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colormap, \
+    radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
     coeff_re, coeff_im, i_snap )
 ```
 
 ## Inputs:
 - **`fn`** — Output `.obj` file path; str
-- **`max_no_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
+- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
 - **`gain_max`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
@@ -39,10 +39,10 @@ quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_m
 - **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
 - **`rx_pos`** — Receiver positions; ndarray `(3, n_snap)` or `(3, 1)`
 - **`tx_pos`** — Transmitter positions; ndarray `(3, n_snap)` or `(3, 1)`
-- **`no_interact`** — Number of interaction points of each path with the environment; uint32;
+- **`n_interact`** — Number of interaction points of each path with the environment; uint32;
   either a `list` of `n_snap` arrays of shape `(n_path,)`, or an ndarray `(n_path, n_snap)`
 - **`interact_coord`** — Interaction coordinates; either a `list` of `n_snap` arrays of shape
-  `(3, sum(no_interact))`, or an ndarray `(3, max(sum(no_interact)), n_snap)`; fewer than `sum(no_interact)`
+  `(3, sum(n_interact))`, or an ndarray `(3, max(sum(n_interact)), n_snap)`; fewer than `sum(n_interact)`
   columns in a snapshot raise an error
 - **`center_freq`** — Center frequency in Hz; ndarray `(n_snap,)` or scalar
 - **`coeff`** — Channel coefficients, complex valued; either a `list` of `n_snap` arrays of shape
@@ -59,7 +59,7 @@ quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_m
 MD!*/
 
 void channel_export_obj_file(const std::string &fn,
-                             size_t max_no_paths,
+                             size_t max_paths,
                              double gain_max,
                              double gain_min,
                              const std::string &colormap,
@@ -68,7 +68,7 @@ void channel_export_obj_file(const std::string &fn,
                              size_t n_edges,
                              py::handle &rx_pos,
                              py::handle &tx_pos,
-                             py::handle no_interact,
+                             py::handle n_interact,
                              py::handle interact_coord,
                              py::handle &center_freq,
                              py::handle coeff,
@@ -83,15 +83,15 @@ void channel_export_obj_file(const std::string &fn,
     c.tx_pos = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     c.center_freq = qd_python_numpy2arma_Col<double>(center_freq, true);
 
-    // no_interact: list of 1D arrays (ragged) OR a 2D ndarray (n_path, n_snap)
-    if (py::isinstance<py::list>(no_interact))
-        c.no_interact = qd_python_list2vector_Col<unsigned>(py::reinterpret_borrow<py::list>(no_interact));
+    // n_interact: list of 1D arrays (ragged) OR a 2D ndarray (n_path, n_snap)
+    if (py::isinstance<py::list>(n_interact))
+        c.n_interact = qd_python_list2vector_Col<unsigned>(py::reinterpret_borrow<py::list>(n_interact));
     else
     {
-        const auto no_interact_a = qd_python_numpy2arma_Mat<unsigned>(no_interact, true);
-        c.no_interact.reserve(no_interact_a.n_cols);
-        for (arma::uword j = 0; j < no_interact_a.n_cols; ++j)
-            c.no_interact.push_back(no_interact_a.col(j));
+        const auto n_interact_a = qd_python_numpy2arma_Mat<unsigned>(n_interact, true);
+        c.n_interact.reserve(n_interact_a.n_cols);
+        for (arma::uword j = 0; j < n_interact_a.n_cols; ++j)
+            c.n_interact.push_back(n_interact_a.col(j));
     }
 
     // interact_coord: list of 2D arrays (ragged) OR a 3D ndarray (3, X, n_snap)
@@ -139,16 +139,16 @@ void channel_export_obj_file(const std::string &fn,
     // All three per-snapshot fields must have the same number of snapshots as the
     // coefficients, otherwise the trim loop below indexes the vectors out of bounds.
     const size_t n_snap = c.coeff_re.size();
-    if (c.no_interact.size() != n_snap || c.interact_coord.size() != n_snap)
+    if (c.n_interact.size() != n_snap || c.interact_coord.size() != n_snap)
         throw std::invalid_argument("Number of snapshots in interact_coord must match coefficients.");
 
     for (size_t i = 0; i < n_snap; ++i)
     {
         c.delay.push_back(arma::cube(c.coeff_re[i].n_rows, c.coeff_re[i].n_cols, c.coeff_re[i].n_slices));
-        arma::uword sum_no_int = arma::accu(arma::conv_to<arma::uvec>::from(c.no_interact[i]));
+        arma::uword sum_no_int = arma::accu(arma::conv_to<arma::uvec>::from(c.n_interact[i]));
         if (sum_no_int != 0 && (c.interact_coord[i].n_rows != 3 || c.interact_coord[i].n_cols < sum_no_int))
             throw std::invalid_argument("Snapshot " + std::to_string(i) + ": 'interact_coord' must have 3 rows and at least " +
-                                        "sum(no_interact) = " + std::to_string(sum_no_int) + " columns.");
+                                        "sum(n_interact) = " + std::to_string(sum_no_int) + " columns.");
         c.interact_coord[i] = arma::resize(c.interact_coord[i], 3, sum_no_int);
     }
 
@@ -156,5 +156,5 @@ void channel_export_obj_file(const std::string &fn,
     arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, true);
 
     // Call library function
-    c.write_paths_to_obj_file(fn, max_no_paths, gain_max, gain_min, colormap, i_snap_a, radius_max, radius_min, n_edges);
+    c.write_paths_to_obj_file(fn, max_paths, gain_max, gain_min, colormap, i_snap_a, radius_max, radius_min, n_edges);
 }

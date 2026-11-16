@@ -494,7 +494,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
-  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers) pass the `no_int` of [qrt_file_read](channel-functions.md#qrt_file_read)
+  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers) pass the `n_interact` of [qrt_file_read](channel-functions.md#qrt_file_read)
   (interaction count = path type); for ray-traced files the user sets it (values > 2 throw)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
@@ -811,7 +811,7 @@ void quadriga_lib::o2i_loss(
     arma::mat &loss,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
-    arma::uvec *model_index = nullptr);
+    arma::uvec *model_ind = nullptr);
 ```
 
 ### Inputs:
@@ -826,7 +826,7 @@ void quadriga_lib::o2i_loss(
 ### Outputs:
 - **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
-- **`model_index`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
+- **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
 
 ### See also:
 - [los_probability](#los_probability) (uses the outdoor distance `d2D - d2d_in`)

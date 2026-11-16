@@ -23,7 +23,7 @@ Read ray-tracing CIR data from a QRT file
 - File reading and the conversion to numpy arrays are overlapped: a background thread reads the
   next snapshot into a double buffer while the main thread converts the previous one
 - If `downlink = True`, origin is TX and destination is RX; if `False`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 - Per-snapshot outputs are returned as lists with one entry per requested snapshot
@@ -31,7 +31,7 @@ Read ray-tracing CIR data from a QRT file
 ## Usage:
 ```
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
-    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord, \
+    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
     interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M )
 ```
 
@@ -68,10 +68,10 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`aoa`** — Arrival azimuth angles; list of length `n_out`; entries `(n_path,)`
 - **`eoa`** — Arrival elevation angles; list of length `n_out`; entries `(n_path,)`
 - **`path_coord`** — Interaction coordinates per path; list of length `n_out`; each entry is a list of length `n_path` with arrays `(3, n_interact + 2)`
-- **`no_int`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries `(n_path,)`
-- **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(no_int))`
+- **`n_interact`** — Number of mesh interactions per path (0 indicates LOS); list of length `n_out`; entries `(n_path,)`
+- **`coord`** — Interaction coordinates concatenated across paths; list of length `n_out`; entries `(3, sum(n_interact))`
 - **`interact_type`** — Interaction type codes concatenated across paths (matching `coord`); list of length `n_out`;
-  entries `(sum(no_int),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
+  entries `(sum(n_interact),)`. Empty for v4 legacy files. GBSM paths written with the C++ API carry 129 (GR) and
   193 (NLOS); LOS and GR paths are not marked as GBSM.
 
 ## See also:
@@ -89,7 +89,7 @@ struct qd_qrt_slot
     arma::vec path_length, aod, eod, aoa, eoa;
     arma::cube M;
     std::vector<arma::mat> path_coord;
-    arma::u32_vec no_int;
+    arma::u32_vec n_interact;
     arma::fmat coord;
     std::vector<uint8_t> interact_type;
 };
@@ -140,10 +140,10 @@ py::tuple qrt_file_read(const std::string &fn,
     arma::uword no_out = i_cir_a.n_elem;
 
     // Center frequencies in Hz (taken from the cache, identical for all snapshots)
-    arma::uword no_freq = (arma::uword)cache.no_freq;
+    arma::uword n_freq = (arma::uword)cache.no_freq;
     arma::vec center_freq;
-    auto center_freq_py = qd_python_init_output(no_freq, &center_freq);
-    for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+    auto center_freq_py = qd_python_init_output(n_freq, &center_freq);
+    for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
         center_freq[i_freq] = (cache.version == 6) ? (double)cache.freq[i_freq] : 1.0e9 * (double)cache.freq[i_freq];
 
     // Fixed-size outputs, one column per requested snapshot
@@ -155,7 +155,7 @@ py::tuple qrt_file_read(const std::string &fn,
 
     // Per-snapshot outputs (one list entry per requested snapshot)
     py::list fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, M_py;
-    py::list aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py, interact_type_py;
+    py::list aod_py, eod_py, aoa_py, eoa_py, path_coord_py, n_interact_py, coord_py, interact_type_py;
 
     // Double buffer, the reader thread fills one slot while the main thread converts the other
     qd_qrt_slot slot[2];
@@ -187,7 +187,7 @@ py::tuple qrt_file_read(const std::string &fn,
                                                     &s.tx_pos, &s.tx_orientation, &s.rx_pos, &s.rx_orientation,
                                                     &s.fbs_pos, &s.lbs_pos, &s.path_gain, &s.path_length, &s.M,
                                                     &s.aod, &s.eod, &s.aoa, &s.eoa, &s.path_coord, normalize_M,
-                                                    &s.no_int, &s.coord, &s.interact_type, &stream, &cache);
+                                                    &s.n_interact, &s.coord, &s.interact_type, &stream, &cache);
             }
             catch (const std::exception &e)
             {
@@ -235,7 +235,7 @@ py::tuple qrt_file_read(const std::string &fn,
         aoa_py.append(qd_python_copy2numpy(&s.aoa));
         eoa_py.append(qd_python_copy2numpy(&s.eoa));
         path_coord_py.append(qd_python_copy2list(&s.path_coord));
-        no_int_py.append(qd_python_copy2numpy(&s.no_int));
+        n_interact_py.append(qd_python_copy2numpy(&s.n_interact));
         coord_py.append(qd_python_copy2numpy(&s.coord));
 
         arma::Col<arma::u8> it_view(s.interact_type.data(), s.interact_type.size(), false, true);
@@ -260,6 +260,6 @@ py::tuple qrt_file_read(const std::string &fn,
     // Return tuple
     return py::make_tuple(center_freq_py, tx_pos_py, tx_orientation_py, rx_pos_py, rx_orientation_py,
                           fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, M_py,
-                          aod_py, eod_py, aoa_py, eoa_py, path_coord_py, no_int_py, coord_py,
+                          aod_py, eod_py, aoa_py, eoa_py, path_coord_py, n_interact_py, coord_py,
                           interact_type_py);
 }

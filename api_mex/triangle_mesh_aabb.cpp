@@ -22,12 +22,12 @@ Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-me
 
 ## Usage:
 ```
-aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
+aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size );
 ```
 
 ## Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
-- **`sub_mesh_index`** — Start indices of sub-meshes in `mesh`; use [[triangle_mesh_segmentation]] to generate; 
+- **`sub_mesh_ind`** — Start indices of sub-meshes in `mesh`; use [[triangle_mesh_segmentation]] to generate; 
   `[n_sub]` or empty; default: `[]` (returns AABB of the entire mesh)
 - **`vec_size`** — Alignment size for SIMD/CUDA padding (e.g., 8 for AVX2); default: 1
 
@@ -48,19 +48,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read input data
     const arma::mat mesh = qd_mex_get_Mat<double>(prhs[0]);
-    arma::u32_vec sub_mesh_index = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true, "sub_mesh_index");
+    arma::u32_vec sub_mesh_ind = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true, "sub_mesh_ind");
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    // Convert sub_mesh_index to 0-based
-    for (unsigned &val : sub_mesh_index)
+    // Convert sub_mesh_ind to 0-based
+    for (unsigned &val : sub_mesh_ind)
     {
         if (val == 0)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_mesh_index' cannot be 0.");
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_mesh_ind' cannot be 0.");
         --val;
     }
 
     // Wrap optional input pointer
-    const arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
+    const arma::u32_vec *p_sub_mesh_index = sub_mesh_ind.empty() ? nullptr : &sub_mesh_ind;
 
     // Output (returned by value, size determined at runtime)
     arma::mat aabb;

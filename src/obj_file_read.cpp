@@ -504,8 +504,8 @@ arma::uword quadriga_lib::obj_file_read(
 - **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
 - **`obj_names`** — Object names; length `max(obj_ind)+1`
 - **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
-- **`mtl_names`** — Visual material names (raw `usemtl`); length `no_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
+- **`mtl_names`** — Visual material names (raw `usemtl`); length `n_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
 - **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
 - **`csv_names`** — Material names from the table; length `n_csv` (the full table)
 - **`csv_prop`** — Material properties keyed by CSV column name (excluding `name`); each value has

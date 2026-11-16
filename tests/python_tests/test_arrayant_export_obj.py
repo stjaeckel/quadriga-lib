@@ -4,8 +4,8 @@
 
 # Python port of test_arrayant_export_obj_file.m.
 # MEX-only cases are dropped: argument-count / nargout errors, the 1-based `i_element = 0`
-# violation, and the 1-based `freq = 0` error (freq_ind = 0 is the valid default in Python).
-# The multi-frequency struct array is replaced by a 4D pattern dict selected via `freq_ind`.
+# violation, and the 1-based `freq = 0` error (i_freq = 0 is the valid default in Python).
+# The multi-frequency struct array is replaced by a 4D pattern dict selected via `i_freq`.
 
 import sys
 import os
@@ -169,7 +169,7 @@ class test_case(unittest.TestCase):
         # element omitted / None -> export all elements.
         obj_all = self._read(self._export(ant, object_radius=1.0, icosphere_n_div=2))[3]
         obj_one = self._read(
-            self._export(ant, object_radius=1.0, icosphere_n_div=2, element=[0])
+            self._export(ant, object_radius=1.0, icosphere_n_div=2, i_element=[0])
         )[3]
 
         self.assertEqual(np.unique(obj_all).size, 2)
@@ -195,7 +195,7 @@ class test_case(unittest.TestCase):
             )
             self.assertTrue(os.path.exists(p))
 
-    # ---- multi-frequency dispatch via freq_ind ----
+    # ---- multi-frequency dispatch via i_freq ----
 
     def test_multifreq(self):
         base = quadriga_lib.arrayant.generate("3gpp", res=10)  # entry 0
@@ -204,9 +204,9 @@ class test_case(unittest.TestCase):
 
         kw = dict(object_radius=1.0, icosphere_n_div=2)
 
-        # freq_ind selects which frequency entry is exported.
-        v0 = self._read(self._export(mf, freq_ind=0, **kw))[1]
-        v1 = self._read(self._export(mf, freq_ind=1, **kw))[1]
+        # i_freq selects which frequency entry is exported.
+        v0 = self._read(self._export(mf, i_freq=0, **kw))[1]
+        v1 = self._read(self._export(mf, i_freq=1, **kw))[1]
         self.assertFalse(np.array_equal(v0, v1))  # patterns differ -> geometry differs
 
         # Each multi-freq export matches its direct single-frequency counterpart.
@@ -215,7 +215,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(v0, v_a, atol=1e-9, rtol=0)
         npt.assert_allclose(v1, v_b, atol=1e-9, rtol=0)
 
-        # Omitted freq_ind defaults to 0.
+        # Omitted i_freq defaults to 0.
         v_default = self._read(self._export(mf, **kw))[1]
         npt.assert_allclose(v_default, v0, atol=1e-9, rtol=0)
 
@@ -229,13 +229,13 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ANY_ERR):
             quadriga_lib.arrayant.export_obj_file(self._obj_path(), 1.0)
 
-        # freq_ind out of bound for a 2-entry frequency-dependent dict.
+        # i_freq out of bound for a 2-entry frequency-dependent dict.
         with self.assertRaises(ANY_ERR):
-            quadriga_lib.arrayant.export_obj_file(self._obj_path(), mf, freq_ind=5)
+            quadriga_lib.arrayant.export_obj_file(self._obj_path(), mf, i_freq=5)
 
-        # freq_ind out of bound for a single-frequency dict (only 0 is valid).
+        # i_freq out of bound for a single-frequency dict (only 0 is valid).
         with self.assertRaises(ANY_ERR):
-            quadriga_lib.arrayant.export_obj_file(self._obj_path(), base, freq_ind=1)
+            quadriga_lib.arrayant.export_obj_file(self._obj_path(), base, i_freq=1)
 
         # Filename must end in .obj.
         with self.assertRaises(ANY_ERR):

@@ -131,21 +131,21 @@ arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
 
     // Calculate BVH tree
     arma::Mat<dtype> meshR;
-    arma::u32_vec sub_mesh_index(1);
+    arma::u32_vec sub_mesh_ind(1);
     size_t target_size = 10 * (size_t)std::ceil(std::sqrt((double)n_mesh));
     target_size = (target_size < 1024) ? 1024 : target_size;
 
     // Carry obj_ind through the reordering/padding so fbs_ind (into meshR) maps correctly.
     arma::uvec obj_ind_R;
     bool have_obj = (obj_ind != nullptr && obj_ind->n_elem != 0);
-    quadriga_lib::triangle_mesh_segmentation(mesh, &meshR, &sub_mesh_index, target_size, 8,
+    quadriga_lib::triangle_mesh_segmentation(mesh, &meshR, &sub_mesh_ind, target_size, 8,
                                              have_obj ? obj_ind : nullptr,
                                              have_obj ? &obj_ind_R : nullptr);
 
     // Calculate intersections
     arma::Mat<dtype> fbs, sbs;
-    arma::u32_vec no_interact, fbs_ind, sbs_ind;
-    ray_triangle_intersect(&orig, &dest, &meshR, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind, &sub_mesh_index);
+    arma::u32_vec n_interact, fbs_ind, sbs_ind;
+    ray_triangle_intersect(&orig, &dest, &meshR, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, &sub_mesh_ind);
 
     // Calculate the incidence angles
     arma::Col<dtype> fbs_angle, thickness;

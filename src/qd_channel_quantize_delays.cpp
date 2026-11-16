@@ -194,7 +194,7 @@ void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<dtype>> *coeff_im_quant,
     std::vector<arma::Cube<dtype>> *delay_quant,
     dtype tap_spacing = (dtype)5.0e-9,
-    arma::uword max_no_taps = 48,
+    arma::uword max_taps = 48,
     dtype power_exponent = (dtype)1.0,
     int fix_taps = 0);
 ```
@@ -205,7 +205,7 @@ void quadriga_lib::quantize_delays(
 - **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`;
   non-negative with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
 - **`tap_spacing`** *(optional)* — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate
-- **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
+- **`max_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
 - **`fix_taps`** *(optional)* — Delay grid sharing mode:<br><br>
   | Value | Meaning                                                                                                                               |
@@ -240,7 +240,7 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
                                    std::vector<arma::Cube<dtype>> *coeff_im_quant,
                                    std::vector<arma::Cube<dtype>> *delay_quant,
                                    dtype tap_spacing,
-                                   arma::uword max_no_taps,
+                                   arma::uword max_taps,
                                    dtype power_exponent,
                                    int fix_taps)
 {
@@ -486,7 +486,7 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
             already_quantized ? nullptr : di_sub.data(),
             already_quantized ? nullptr : pi_sub.data(),
             already_quantized ? 0 : 2 * nn,
-            max_no_taps);
+            max_taps);
     };
 
     // D_grid[s][a] = sorted vector of tap indices
@@ -735,7 +735,7 @@ template void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<float>> *coeff_im_quant,
     std::vector<arma::Cube<float>> *delay_quant,
     float tap_spacing,
-    arma::uword max_no_taps,
+    arma::uword max_taps,
     float power_exponent,
     int fix_taps);
 
@@ -747,6 +747,6 @@ template void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<double>> *coeff_im_quant,
     std::vector<arma::Cube<double>> *delay_quant,
     double tap_spacing,
-    arma::uword max_no_taps,
+    arma::uword max_taps,
     double power_exponent,
     int fix_taps);

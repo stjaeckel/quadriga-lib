@@ -15,7 +15,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 
 - Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_ind` uses 0 to mark padding entries
 - If `mtl_ind` is provided, material indices are reordered and padded the same way (padding uses index 0)
 
 ## Declaration:
@@ -23,12 +23,12 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 arma::uword triangle_mesh_segmentation(
     const arma::Mat<dtype> *mesh,
     arma::Mat<dtype> *meshR,
-    arma::u32_vec *sub_mesh_index,
+    arma::u32_vec *sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
     const arma::uvec *mtl_ind = nullptr,
     arma::uvec *mtl_ind_out = nullptr,
-    arma::u32_vec *mesh_index = nullptr);
+    arma::u32_vec *mesh_ind = nullptr);
 ```
 
 ## Inputs:
@@ -39,27 +39,27 @@ arma::uword triangle_mesh_segmentation(
 
 ## Outputs:
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
 - **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
-- **`mesh_index`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
+- **`mesh_ind`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
 
 ## Returns:
 - Number of created sub-meshes `n_sub`
 
 ## See also:
-- [[calc_diffraction_gain]] (uses `sub_mesh_index` for acceleration)
+- [[calc_diffraction_gain]] (uses `sub_mesh_ind` for acceleration)
 - [[obj_file_read]] (defines `mtl_ind` / `csv_ind`)
 MD!*/
 
 template <typename dtype>
 arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,
                                                      arma::Mat<dtype> *meshR,
-                                                     arma::u32_vec *sub_mesh_index,
+                                                     arma::u32_vec *sub_mesh_ind,
                                                      arma::uword target_size,
                                                      arma::uword vec_size,
                                                      const arma::uvec *mtl_ind,
                                                      arma::uvec *mtl_ind_out,
-                                                     arma::u32_vec *mesh_index)
+                                                     arma::u32_vec *mesh_ind)
 {
     // Input validation
     if (mesh == nullptr)
@@ -73,11 +73,11 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
 
     if (meshR == nullptr)
         throw std::invalid_argument("Output 'meshR' cannot be NULL.");
-    if (sub_mesh_index == nullptr)
-        throw std::invalid_argument("Output 'sub_mesh_index' cannot be NULL.");
+    if (sub_mesh_ind == nullptr)
+        throw std::invalid_argument("Output 'sub_mesh_ind' cannot be NULL.");
     qd_check_alias(meshR, "meshR", mesh);
     qd_check_alias(mtl_ind_out, "mtl_ind_out", mtl_ind);
-    qd_check_alias_outputs(sub_mesh_index, "sub_mesh_index", mesh_index, "mesh_index");
+    qd_check_alias_outputs(sub_mesh_ind, "sub_mesh_ind", mesh_ind, "mesh_ind");
 
     if (target_size == 0)
         throw std::invalid_argument("Input 'target_size' cannot be 0.");
@@ -186,8 +186,8 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
 
     // Get the sub-mesh indices
     arma::uword n_sub = c.size(), n_out = 0;
-    sub_mesh_index->set_size(n_sub);
-    unsigned *p_sub_ind = sub_mesh_index->memptr();
+    sub_mesh_ind->set_size(n_sub);
+    unsigned *p_sub_ind = sub_mesh_ind->memptr();
 
     for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
     {
@@ -210,10 +210,10 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
     }
 
     unsigned *p_mesh_index = nullptr;
-    if (mesh_index != nullptr)
+    if (mesh_ind != nullptr)
     {
-        mesh_index->zeros(n_out);
-        p_mesh_index = mesh_index->memptr();
+        mesh_ind->zeros(n_out);
+        p_mesh_index = mesh_ind->memptr();
     }
 
     for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
@@ -283,9 +283,9 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
 }
 
 template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<float> *mesh, arma::Mat<float> *meshR,
-                                                              arma::u32_vec *sub_mesh_index, arma::uword target_size, arma::uword vec_size,
-                                                              const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_index);
+                                                              arma::u32_vec *sub_mesh_ind, arma::uword target_size, arma::uword vec_size,
+                                                              const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);
 
 template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<double> *mesh, arma::Mat<double> *meshR,
-                                                              arma::u32_vec *sub_mesh_index, arma::uword target_size, arma::uword vec_size,
-                                                              const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_index);
+                                                              arma::u32_vec *sub_mesh_ind, arma::uword target_size, arma::uword vec_size,
+                                                              const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);

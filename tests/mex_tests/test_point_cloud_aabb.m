@@ -30,16 +30,16 @@ aabb = quadriga_lib.point_cloud_aabb(points);
 T = [0.0, 40.3, -50.0, 50.0, 1.0, 1.0];
 assertElementsAlmostEqual( aabb, T, 'absolute', 1e-14 );
 
-sub_cloud_index =  uint32([1 9])';
+sub_cloud_ind =  uint32([1 9])';
 
 % Calculate bounding box
-aabb = quadriga_lib.point_cloud_aabb(points, sub_cloud_index);
+aabb = quadriga_lib.point_cloud_aabb(points, sub_cloud_ind);
 
 T = [0.0, 40.3, -50.0, -50.0, 1.0, 1.0 ; 0.0, 40.3, 50.0, 50.0, 1.0, 1.0  ];
 assertElementsAlmostEqual( aabb, T, 'absolute', 1e-14 );
 
 try % 2 outputs
-    [~,~] = quadriga_lib.point_cloud_aabb( points, sub_cloud_index );
+    [~,~] = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -59,7 +59,7 @@ catch ME
 end
 
 try % 4 inputs
-    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, 1, 1 );
+    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind, 1, 1 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -79,7 +79,7 @@ catch ME
 end
 
 try % Wrong sub index
-    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index + uint32([1;0]));
+    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind + uint32([1;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'First sub-cloud must start at index 0.';
@@ -89,7 +89,7 @@ catch ME
 end
 
 try % Wrong sub index
-    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index + uint32([0;1000]));
+    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind + uint32([0;1000]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sub-cloud indices cannot exceed number of points.';
@@ -99,7 +99,7 @@ catch ME
 end
 
 try % Wrong vec size
-    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, 0 );
+    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''vec_size'' cannot be 0.';
@@ -109,7 +109,7 @@ catch ME
 end
 
 try % Vector for the scalar vec_size
-    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, [8, 1] );
+    aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind, [8, 1] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''vec_size'' must be a scalar.';

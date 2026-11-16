@@ -23,22 +23,22 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh_sub );
 assertElementsAlmostEqual( aabb, [-1 1 -1 1 -1 1], 'absolute', 1e-14 );
 
 % Test segmentation
-[mesh_seg, sub_mesh_index] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64);
-assertTrue( numel(sub_mesh_index) > 1 );
+[mesh_seg, sub_mesh_ind] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64);
+assertTrue( numel(sub_mesh_ind) > 1 );
 
-aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index );
-assertTrue( size(aabb,1) == numel(sub_mesh_index) );
+aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind );
+assertTrue( size(aabb,1) == numel(sub_mesh_ind) );
 
 assertElementsAlmostEqual( max(abs(aabb)), [1 1 1 1 1 1], 'absolute', 1e-14 );
 
-aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index, 8 );
+aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind, 8 );
 assertTrue( size(aabb,1) == 8 );
 
 assertElementsAlmostEqual( max(abs(aabb)), [1 1 1 1 1 1], 'absolute', 1e-14 );
 assertElementsAlmostEqual( min(abs(aabb)), [0 0 0 0 0 0], 'absolute', 1e-14 );
 
 try % 2 outputs
-    [~,~] = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index );
+    [~,~] = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -58,7 +58,7 @@ catch ME
 end
 
 try % 4 inputs
-    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index, 1, 1 );
+    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind, 1, 1 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -78,7 +78,7 @@ catch ME
 end
 
 try % Wrong sub mesh index
-    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index + uint32([1;0;0]));
+    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind + uint32([1;0;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'First sub-mesh must start at index 0.';
@@ -88,7 +88,7 @@ catch ME
 end
 
 try % Wrong sub mesh index
-    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index + uint32([0;0;1000]));
+    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind + uint32([0;0;1000]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sub-mesh indices cannot exceed number of faces.';
@@ -98,7 +98,7 @@ catch ME
 end
 
 try % Wrong sub mesh index
-    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index + uint32([0;1000;0]));
+    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind + uint32([0;1000;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sub-mesh indices must be sorted in ascending order.';
@@ -108,7 +108,7 @@ catch ME
 end
 
 try % Wrong vec size
-    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_index, 0 );
+    aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''vec_size'' cannot be 0.';

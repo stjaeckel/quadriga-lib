@@ -402,8 +402,8 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
     if (!channel.path_lbs_pos.empty())
         output["lbs_pos"] = qd_python_emit_paths<double>(&channel.path_lbs_pos, stack, i_snap);
 
-    if (!channel.no_interact.empty())
-        output["no_interact"] = qd_python_emit_paths<py::ssize_t>(&channel.no_interact, stack, i_snap);
+    if (!channel.n_interact.empty())
+        output["n_interact"] = qd_python_emit_paths<py::ssize_t>(&channel.n_interact, stack, i_snap);
     if (!channel.interact_coord.empty())
         output["interact_coord"] = qd_python_emit_paths<double>(&channel.interact_coord, stack, i_snap);
 
@@ -526,13 +526,13 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
         else
             c.path_length = qd_python_numpy2arma_vecCol<double>(v);
     }
-    if (has("no_interact"))
+    if (has("n_interact"))
     {
-        py::object v = dict["no_interact"];
+        py::object v = dict["n_interact"];
         if (py::isinstance<py::list>(v))
-            c.no_interact = qd_python_list2vector_Col<unsigned>(py::reinterpret_borrow<py::list>(v));
+            c.n_interact = qd_python_list2vector_Col<unsigned>(py::reinterpret_borrow<py::list>(v));
         else
-            c.no_interact = qd_python_numpy2arma_vecCol<unsigned>(v);
+            c.n_interact = qd_python_numpy2arma_vecCol<unsigned>(v);
     }
 
     // Per-path vector<Mat> real fields: list of 2D or 3D (rows, cols, n_snap)

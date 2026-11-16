@@ -26,9 +26,9 @@ TEST_CASE("Ray-Triangle Intersect - Simple Mode")
     arma::mat dest = {{10.0, 0.0, 0.5}};
 
     arma::mat fbs, sbs;
-    arma::u32_vec no_interact, fbs_ind, sbs_ind;
+    arma::u32_vec n_interact, fbs_ind, sbs_ind;
 
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
 
     arma::mat T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
@@ -36,7 +36,7 @@ TEST_CASE("Ray-Triangle Intersect - Simple Mode")
     T = {{1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-6));
 
-    CHECK(no_interact.at(0) == 2);
+    CHECK(n_interact.at(0) == 2);
     CHECK(fbs_ind.at(0) == 9);
     CHECK(sbs_ind.at(0) == 11);
 }
@@ -73,10 +73,10 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
     arma::mat dest = {{0.9, 10.0, 0.5}};
 
     arma::mat fbs, sbs;
-    arma::u32_vec no_interact, fbs_ind, sbs_ind;
+    arma::u32_vec n_interact, fbs_ind, sbs_ind;
 
     // Run intersect algorithm without sub-mesh
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
 
     // Check results
     arma::mat T = {{0.9, -1.0, 0.5}};
@@ -89,7 +89,7 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
     unsigned sbs_0 = sbs_ind.at(0);
     
     // Run intersect algorithm with sub-mesh
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind, &cube_index);
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, &cube_index);
 
     // Check results
     T = {{0.9, -1.0, 0.5}};

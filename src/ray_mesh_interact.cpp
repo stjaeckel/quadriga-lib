@@ -3264,7 +3264,7 @@ void quadriga_lib::ray_state_update(
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *fbsN,
     const arma::Mat<dtype> *sbsN,
-    const arma::u32_vec *no_interact,
+    const arma::u32_vec *n_interact,
     const arma::Col<dtype> *fbs_angleN,
     const arma::Mat<dtype> *normal_vecN,
     const std::vector<uint8_t> *out_typeN,
@@ -3301,7 +3301,7 @@ void quadriga_lib::ray_state_update(
 - **`center_freq`** — Center frequency in [Hz]
 - **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
 - **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
-- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
+- **`n_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
 - **`fbs_angleN`** — Incidence angle at FBS (the angle to the face, as [[ray_mesh_interact]] writes it), compact set; `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`; required.
   The plane of the VBS, and the test whether the two faces of an entry are parallel.
@@ -3451,7 +3451,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     const arma::Mat<dtype> *dest,
                                     const arma::Mat<dtype> *fbsN,
                                     const arma::Mat<dtype> *sbsN,
-                                    const arma::u32_vec *no_interact,
+                                    const arma::u32_vec *n_interact,
                                     const arma::Col<dtype> *fbs_angleN,
                                     const arma::Mat<dtype> *normal_vecN,
                                     const std::vector<uint8_t> *out_typeN,
@@ -3506,9 +3506,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (sbsN->n_rows != n_rayN)
         throw std::invalid_argument("Inputs 'fbs' and 'sbs' must have the same number of rows.");
 
-    if (no_interact == nullptr || no_interact->n_elem != n_ray)
-        throw std::invalid_argument("Input 'no_interact' must match the number of rays in 'orig'.");
-    const unsigned *p_no_interact = no_interact->memptr();
+    if (n_interact == nullptr || n_interact->n_elem != n_ray)
+        throw std::invalid_argument("Input 'n_interact' must match the number of rays in 'orig'.");
+    const unsigned *p_no_interact = n_interact->memptr();
 
     if (fbs_angleN == nullptr || fbs_angleN->n_elem != n_rayN)
         throw std::invalid_argument("Input 'fbs_angleN' cannot be NULL and have length n_rayN.");
@@ -4728,7 +4728,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
 template void quadriga_lib::ray_state_update(int interaction_type, float center_freq,
                                              const arma::Mat<float> *orig, const arma::Mat<float> *dest,
                                              const arma::Mat<float> *fbsN, const arma::Mat<float> *sbsN,
-                                             const arma::u32_vec *no_interact, const arma::Col<float> *fbs_angleN,
+                                             const arma::u32_vec *n_interact, const arma::Col<float> *fbs_angleN,
                                              const arma::Mat<float> *normal_vecN, const std::vector<uint8_t> *out_typeN,
                                              const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
@@ -4750,7 +4750,7 @@ template void quadriga_lib::ray_state_update(int interaction_type, float center_
 template void quadriga_lib::ray_state_update(int interaction_type, double center_freq,
                                              const arma::Mat<double> *orig, const arma::Mat<double> *dest,
                                              const arma::Mat<double> *fbsN, const arma::Mat<double> *sbsN,
-                                             const arma::u32_vec *no_interact, const arma::Col<double> *fbs_angleN,
+                                             const arma::u32_vec *n_interact, const arma::Col<double> *fbs_angleN,
                                              const arma::Mat<double> *normal_vecN, const std::vector<uint8_t> *out_typeN,
                                              const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,

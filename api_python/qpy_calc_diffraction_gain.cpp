@@ -26,12 +26,12 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ```
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, \
+    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 ```
 
@@ -46,7 +46,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   1 / 2 = 7 / 19 paths with 3 segments; 3 = 37 paths, 4 segments; 4 = 61 paths, 5 segments; 5 / 6 = 1 / 2 paths
   with 2 segments (debug); 7 = direct line in 10 segments; default: 2
 - **`verbose`** — Verbosity level; default: 0
-- **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `(n_mesh,)` or `None`; default: `None`
+- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `(n_mesh,)` or `None`; default: `None`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
 - **`scalar_mode`** — If `True`, uses scalar transmission (TE-only reflection coefficient,
@@ -78,7 +78,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   (e.g. `(3, 2, n_pos)` for lod 2, `(3, 9, n_pos)` for lod 7, `(3, 0, n_pos)` for lod 0)
 
 ## See also:
-- [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
+- [[triangle_mesh_segmentation]] (generates `sub_mesh_ind`)
 - [[obj_file_read]] (defines the material format)
 - [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)
 - [[get_channels_spherical]] (applies the same propagation phase as `apply_phase`)
@@ -92,7 +92,7 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
                                 double center_freq,
                                 int lod,
                                 int verbose,
-                                const py::handle &sub_mesh_index,
+                                const py::handle &sub_mesh_ind,
                                 int use_kernel,
                                 int gpu_id,
                                 bool scalar_mode,
@@ -105,7 +105,7 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     const auto mesh_a = qd_python_numpy2arma_Mat<double>(mesh, true);
     const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true);
     const auto mtl_prop_map = qd_python_dict2map<double>(mtl_prop);
-    const auto sub_mesh_index_a = qd_python_numpy2arma_Col<unsigned>(sub_mesh_index, true);
+    const auto sub_mesh_index_a = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true);
 
     arma::uword n_pos = orig_a.n_rows;
 

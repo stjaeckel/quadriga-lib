@@ -281,8 +281,8 @@ py::object qd_python_any2numpy(const std::any &dset);
 | `path_angles` | `path_angles` | `(n_path, 4)` | float |
 | `fbs_pos` | `path_fbs_pos` | `(3, n_path)` | float |
 | `lbs_pos` | `path_lbs_pos` | `(3, n_path)` | float |
-| `no_interact` | `no_interact` | `(n_path,)` | int |
-| `interact_coord` | `interact_coord` | `(3, sum(no_interact))` | float |
+| `n_interact` | `n_interact` | `(n_path,)` | int |
+| `interact_coord` | `interact_coord` | `(3, sum(n_interact))` | float |
 | `center_freq` | `center_freq` | scalar or `(n_snap,)`; plain array in both models | float |
 | `initial_position` | `initial_position` | — | `int` |
 

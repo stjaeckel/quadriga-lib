@@ -67,7 +67,7 @@ class test_case(unittest.TestCase):
         pos = np.array([[1.0, 0.0], [0.0, 2.0], [0.0, 0.5]])
         pos_res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0], ori, pos, None, True, True,
                                                     False, 1, False)
-        kw_res = quadriga_lib.arrayant.interpolate(arrayant=self.ant, azimuth=self.az, elevation=self.el, element=[1, 0],
+        kw_res = quadriga_lib.arrayant.interpolate(arrayant=self.ant, azimuth=self.az, elevation=self.el, i_element=[1, 0],
                                                    orientation=ori, element_pos=pos, freq_new=None, dist=True,
                                                    local_angles=True, fast_access=False, use_kernel=1, complex=False)
         self.assertEqual(len(kw_res), 8)
@@ -77,14 +77,14 @@ class test_case(unittest.TestCase):
     def test_element(self):
         V_re = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)[0]
         for e in (None, [], np.zeros(0)):
-            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e,
+            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, i_element=e,
                                                                      complex=False)[0], V_re)
         # 0-based, permuted, repeated; integer and list input
         ref = V_re[[1, 0, 1], :]
         for e in ([1, 0, 1], np.array([1, 0, 1], dtype=np.uint32), np.array([1.0, 0.0, 1.0])):
-            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=e,
+            npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, i_element=e,
                                                                      complex=False)[0], ref)
-        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=[1],
+        npt.assert_array_equal(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, i_element=[1],
                                                                  complex=False)[0], V_re[[1], :])
 
     def test_orientation(self):
@@ -146,7 +146,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(r3[0].shape, (2, 3, 1))
         npt.assert_array_equal(r3[0][:, :, 0], V_re)
         # Element indices in the multi-frequency mode
-        r_e = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, element=[1, 0, 1], freq_new=[1.5e9],
+        r_e = quadriga_lib.arrayant.interpolate(self.ant_m, self.az, self.el, i_element=[1, 0, 1], freq_new=[1.5e9],
                                                 complex=False)
         npt.assert_array_equal(r_e[0][:, :, 0], res[0][[1, 0, 1], :, 1])
         # Complex output
@@ -255,7 +255,7 @@ class test_case(unittest.TestCase):
             quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el[:, :2])
         self.assertIn("'elevation' must have the same size as 'azimuth'", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, element=[2])
+            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, i_element=[2])
         self.assertIn("exceed the number of elements", str(ctx.exception))
         bad = dict(self.ant, azimuth_grid=np.array([0.0, np.nan]))
         with self.assertRaises(ValueError) as ctx:

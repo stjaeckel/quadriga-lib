@@ -40,7 +40,7 @@ void quadriga_lib_channel(py::module_ &m)
 
     m.def("channel_export_obj_file", &channel_export_obj_file,
           py::arg("fn"),
-          py::arg("max_no_paths") = 0,
+          py::arg("max_paths") = 0,
           py::arg("gain_max") = -60.0,
           py::arg("gain_min") = -140.0,
           py::arg("colormap") = "jet",
@@ -49,7 +49,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("n_edges") = 5,
           py::arg("rx_pos") = py::none(),
           py::arg("tx_pos") = py::none(),
-          py::arg("no_interact") = py::list(),
+          py::arg("n_interact") = py::list(),
           py::arg("interact_coord") = py::list(),
           py::arg("center_freq") = py::none(),
           py::arg("coeff") = py::none(),
@@ -66,7 +66,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("iy") = py::none(),
           py::arg("iz") = py::none(),
           py::arg("iw") = py::none(),
-          py::arg("snap") = py::none(),
+          py::arg("i_snap") = py::none(),
           py::arg("stack") = false);
 
     m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
@@ -134,7 +134,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("coeff_im") = py::none(),
           py::arg("delay") = py::none(),
           py::arg("tap_spacing") = 5e-9,
-          py::arg("max_no_taps") = 48,
+          py::arg("max_taps") = 48,
           py::arg("power_exponent") = 1.0,
           py::arg("fix_taps") = 0,
           py::arg("stack") = false,

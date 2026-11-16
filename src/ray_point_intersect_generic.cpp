@@ -37,7 +37,7 @@ int *qd_RPI_staging::scratch(size_t i_thread, size_t n)
     return scratch_space[i_thread].data();
 }
 
-void qd_RPI_staging::assemble(size_t n_point, std::vector<unsigned> *hit_index, unsigned *hit_offset) const
+void qd_RPI_staging::assemble(size_t n_point, std::vector<unsigned> *hit_ind, unsigned *hit_offset) const
 {
     std::vector<const unsigned long long *> p_buffer;
     std::vector<size_t> n_hit_buffer;
@@ -47,7 +47,7 @@ void qd_RPI_staging::assemble(size_t n_point, std::vector<unsigned> *hit_index, 
             if (!c.empty())
                 p_buffer.push_back(c.data()), n_hit_buffer.push_back(c.size());
 
-    qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_index, hit_offset);
+    qd_RPI_assemble(p_buffer.data(), n_hit_buffer.data(), p_buffer.size(), n_point, hit_ind, hit_offset);
 }
 
 // Assemble a point-major CSR hit list from a set of packed hit buffers
@@ -58,11 +58,11 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
                      const size_t *n_hit_buffer,                  // Number of records in each buffer, length n_buffer
                      const size_t n_buffer,                       // Number of buffers, may be 0
                      const size_t n_point,                        // Number of points
-                     std::vector<unsigned> *hit_index,            // Output: flat list of ray indices grouped by point
+                     std::vector<unsigned> *hit_ind,              // Output: flat list of ray indices grouped by point
                      unsigned *hit_offset)                        // Output: 0-based start of each point's block, length n_point + 1
 {
-    if (hit_index == nullptr)
-        throw std::invalid_argument("Output 'hit_index' cannot be NULL.");
+    if (hit_ind == nullptr)
+        throw std::invalid_argument("Output 'hit_ind' cannot be NULL.");
     if (hit_offset == nullptr)
         throw std::invalid_argument("Output 'hit_offset' cannot be NULL.");
 
@@ -77,7 +77,7 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
     if (n_hit_total == 0ULL)
     {
         std::memset(hit_offset, 0, (n_point + 1) * sizeof(unsigned));
-        hit_index->clear();
+        hit_ind->clear();
         return;
     }
 
@@ -164,8 +164,8 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
         }
     }
 
-    hit_index->resize((size_t)n_hit_total);
-    unsigned *p_index = hit_index->data();
+    hit_ind->resize((size_t)n_hit_total);
+    unsigned *p_index = hit_ind->data();
 
     // Scatter, each worker writes into its own disjoint slots
 #pragma omp parallel for schedule(static) if (n_hit_total >= 16384)
@@ -205,7 +205,7 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                     const dtype *D3x, const dtype *D3y, const dtype *D3z, // Third ray direction in GCS, length n_ray
                     const dtype *rD1, const dtype *rD2, const dtype *rD3, // Inverse Dot product of ray direction and normal vector
                     const size_t n_ray,                                   // Number of rays
-                    std::vector<unsigned> *hit_index,                     // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
+                    std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                     unsigned *hit_offset)                                 // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
 {
     // Point and ray indices are packed into 32 bit fields of the hit records
@@ -444,7 +444,7 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
     } // end omp parallel
 
     // Assemble the point-major CSR hit list
-    stage.assemble(n_point, hit_index, hit_offset);
+    stage.assemble(n_point, hit_ind, hit_offset);
 }
 
 template void qd_RPI_GENERIC<float>(const float *Px, const float *Py, const float *Pz, size_t n_point,
@@ -453,7 +453,7 @@ template void qd_RPI_GENERIC<float>(const float *Px, const float *Py, const floa
                                     const float *T3x, const float *T3y, const float *T3z, const float *Nx, const float *Ny, const float *Nz,
                                     const float *D1x, const float *D1y, const float *D1z, const float *D2x, const float *D2y, const float *D2z,
                                     const float *D3x, const float *D3y, const float *D3z, const float *rD1, const float *rD2, const float *rD3,
-                                    size_t n_ray, std::vector<unsigned> *hit_index, unsigned *hit_offset);
+                                    size_t n_ray, std::vector<unsigned> *hit_ind, unsigned *hit_offset);
 
 template void qd_RPI_GENERIC<double>(const double *Px, const double *Py, const double *Pz, size_t n_point,
                                      const unsigned int *SCI, const double *Xmin, const double *Xmax, const double *Ymin, const double *Ymax, const double *Zmin, const double *Zmax,
@@ -461,4 +461,4 @@ template void qd_RPI_GENERIC<double>(const double *Px, const double *Py, const d
                                      const double *T3x, const double *T3y, const double *T3z, const double *Nx, const double *Ny, const double *Nz,
                                      const double *D1x, const double *D1y, const double *D1z, const double *D2x, const double *D2y, const double *D2z,
                                      const double *D3x, const double *D3y, const double *D3z, const double *rD1, const double *rD2, const double *rD3,
-                                     size_t n_ray, std::vector<unsigned> *hit_index, unsigned *hit_offset);
+                                     size_t n_ray, std::vector<unsigned> *hit_ind, unsigned *hit_offset);

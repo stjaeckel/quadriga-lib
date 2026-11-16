@@ -52,10 +52,10 @@ static arma::u32_vec counts(fz::input &in)
 
 // Interaction coordinates for the counts: [3, sum], or near that size; never more than 256 columns
 template <typename T>
-static arma::Mat<T> interactions(fz::input &in, const arma::u32_vec &no_interact)
+static arma::Mat<T> interactions(fz::input &in, const arma::u32_vec &n_interact)
 {
     arma::uword sum = 0;
-    for (auto v : no_interact)
+    for (auto v : n_interact)
         sum += v;
     return geo<T>(in, near(in, 3), near(in, std::min(sum, (arma::uword)256)));
 }
@@ -68,15 +68,15 @@ static void run(fz::input &in)
         T p[6];
         for (auto &v : p)
             v = coord<T>(in);
-        arma::u32_vec no_interact = counts(in);
-        arma::Mat<T> interact_coord = interactions<T>(in, no_interact);
+        arma::u32_vec n_interact = counts(in);
+        arma::Mat<T> interact_coord = interactions<T>(in, n_interact);
         arma::Col<T> path_length(in.size(2));
         arma::Mat<T> fbs_pos, lbs_pos(in.size(4), in.size(2)), path_angles;
         std::vector<arma::Mat<T>> path_coord(in.size(2));
         const int mask = in.ConsumeIntegralInRange<int>(0, 31);
         const bool reverse = in.ConsumeBool();
         fz::clean([&]
-                  { quadriga_lib::coord2path<T>({p[0], p[1], p[2]}, {p[3], p[4], p[5]}, &no_interact, &interact_coord,
+                  { quadriga_lib::coord2path<T>({p[0], p[1], p[2]}, {p[3], p[4], p[5]}, &n_interact, &interact_coord,
                                                 (mask & 1) ? &path_length : nullptr, (mask & 2) ? &fbs_pos : nullptr,
                                                 (mask & 4) ? &lbs_pos : nullptr, (mask & 8) ? &path_angles : nullptr,
                                                 (mask & 16) ? &path_coord : nullptr, reverse); });
@@ -87,15 +87,15 @@ static void run(fz::input &in)
         T irs[3];
         for (auto &v : irs)
             v = coord<T>(in);
-        arma::u32_vec no_interact_1 = counts(in), no_interact_2 = counts(in), no_interact(in.size(2));
-        arma::Mat<T> coord_1 = interactions<T>(in, no_interact_1), coord_2 = interactions<T>(in, no_interact_2), interact_coord;
-        std::vector<bool> active_path(near(in, no_interact_1.n_elem * no_interact_2.n_elem));
+        arma::u32_vec n_interact_1 = counts(in), n_interact_2 = counts(in), n_interact(in.size(2));
+        arma::Mat<T> coord_1 = interactions<T>(in, n_interact_1), coord_2 = interactions<T>(in, n_interact_2), interact_coord;
+        std::vector<bool> active_path(near(in, n_interact_1.n_elem * n_interact_2.n_elem));
         for (size_t i = 0; i < active_path.size(); ++i)
             active_path[i] = in.ConsumeBool();
         const bool rev_1 = in.ConsumeBool(), rev_2 = in.ConsumeBool(), use_active = in.ConsumeBool();
         fz::clean([&]
-                  { quadriga_lib::combine_irs_coord<T>({irs[0], irs[1], irs[2]}, &no_interact_1, &coord_1, &no_interact_2, &coord_2,
-                                                       &no_interact, &interact_coord, rev_1, rev_2, use_active ? &active_path : nullptr); });
+                  { quadriga_lib::combine_irs_coord<T>({irs[0], irs[1], irs[2]}, &n_interact_1, &coord_1, &n_interact_2, &coord_2,
+                                                       &n_interact, &interact_coord, rev_1, rev_2, use_active ? &active_path : nullptr); });
     }
 
     // Tubes around a path; up to 16 points, up to 16 edges

@@ -48,7 +48,7 @@ arma::uword ray_init(
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
     const arma::fmat *mesh = nullptr,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     const arma::fmat *aabb = nullptr,
     const arma::fmat *rx_points = nullptr,
     bool scalar_mode = false);
@@ -62,9 +62,9 @@ arma::uword ray_init(
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`. Used only to auto-size
   the launch sphere `r0`. NULL → the mesh does not bound `r0`.
-- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
+- **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
   strictly increasing, first entry 0; passed to [[ray_triangle_intersect]]; `[n_sub]`. NULL → no partitioning
-- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
+- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Unlike [[ray_progress]], boxes are *not* computed internally when omitted: the probe is a fixed 2880 rays,
   so building them here would usually cost more than it saves. Pass the [[triangle_mesh_aabb]] result the
   caller already holds for the tracing loop.
@@ -95,7 +95,7 @@ arma::uword ray_init(
 ## See also:
 - [[icosphere]] (generates the ray fan, beam wavefront, and directions)
 - [[ray_triangle_intersect]] (launch-sphere sizing and per-segment intersection)
-- [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
+- [[triangle_mesh_segmentation]] (generates `sub_mesh_ind`)
 - [[triangle_mesh_aabb]] (generates `aabb`)
 - [[ray_mesh_interact]] (consumes `orig` / `dest` / `trivec` / `tridir`)
 - [[ray_state_update]] (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
@@ -118,7 +118,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
                                    arma::fmat *acc_dist,
                                    std::vector<quadriga_lib::path> *paths,
                                    const arma::fmat *mesh,
-                                   const arma::u32_vec *sub_mesh_index,
+                                   const arma::u32_vec *sub_mesh_ind,
                                    const arma::fmat *aabb,
                                    const arma::fmat *rx_points,
                                    bool scalar_mode)
@@ -148,28 +148,28 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     if (has_mesh)
     {
         arma::uword n_sub = 0;
-        if (sub_mesh_index && sub_mesh_index->n_elem != 0)
+        if (sub_mesh_ind && sub_mesh_ind->n_elem != 0)
         {
-            n_sub = sub_mesh_index->n_elem;
-            const unsigned *p_sub = sub_mesh_index->memptr();
+            n_sub = sub_mesh_ind->n_elem;
+            const unsigned *p_sub = sub_mesh_ind->memptr();
 
             if (p_sub[0] != 0u)
-                throw std::invalid_argument("First element of 'sub_mesh_index' must be 0.");
+                throw std::invalid_argument("First element of 'sub_mesh_ind' must be 0.");
 
             for (arma::uword i = 1; i < n_sub; ++i)
             {
                 if ((arma::uword)p_sub[i] >= mesh->n_rows)
-                    throw std::invalid_argument("Entries of 'sub_mesh_index' cannot exceed the number of mesh faces.");
+                    throw std::invalid_argument("Entries of 'sub_mesh_ind' cannot exceed the number of mesh faces.");
                 if (p_sub[i] <= p_sub[i - 1])
-                    throw std::invalid_argument("Entries of 'sub_mesh_index' must be strictly increasing.");
+                    throw std::invalid_argument("Entries of 'sub_mesh_ind' must be strictly increasing.");
             }
-            sub_mesh_ptr = sub_mesh_index;
+            sub_mesh_ptr = sub_mesh_ind;
         }
 
         if (aabb && aabb->n_elem != 0)
         {
             if (n_sub == 0)
-                throw std::invalid_argument("Input 'aabb' requires 'sub_mesh_index'.");
+                throw std::invalid_argument("Input 'aabb' requires 'sub_mesh_ind'.");
             if (aabb->n_rows != n_sub || aabb->n_cols != 6)
                 throw std::invalid_argument("Input 'aabb' must have size [n_sub, 6].");
             aabb_ptr = aabb;

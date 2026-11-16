@@ -25,21 +25,21 @@ assertEqual( uint32(sum(ray_ind ~= 0, 1)'), hit_count );           % nnz per col
 nz = ray_ind(ray_ind ~= 0);
 assertTrue( all( nz >= 1 & nz <= uint32(size(orig,1)) ) ); % indices are 1-based
 
-% Empty sub_cloud_index behaves like omitting it
+% Empty sub_cloud_ind behaves like omitting it
 hit_count_e = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, [] );
 assertEqual( hit_count, hit_count_e );
 
-% Valid manual sub_cloud_index (split into two halves of 8 points each)
+% Valid manual sub_cloud_ind (split into two halves of 8 points each)
 sub_idx = uint32([1, 9]);
 [hit_count_s, ray_ind_s] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, sub_idx );
 assertEqual( hit_count, hit_count_s );
 assertEqual( ray_ind, ray_ind_s );
 
 % Integration with point_cloud_segmentation: results must match after un-permuting
-[pointsR, sub_cloud_index, ~, reverse_index] = ...
+[pointsR, sub_cloud_ind, ~, reverse_ind] = ...
     quadriga_lib.point_cloud_segmentation( points, 4, 8 );
-hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_index );
-assertEqual( hit_count, hit_count_R(reverse_index) );
+hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_ind );
+assertEqual( hit_count, hit_count_R(reverse_ind) );
 
 % Explicit GENERIC kernel must produce the same result as auto
 hit_count_g = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, [], 1 );
@@ -52,9 +52,9 @@ assertEqual( hit_count, hit_count_u );
 assertEqual( ray_ind, ray_ind_u );
 hit_count_u = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, sub_idx, 1 );
 assertEqual( hit_count, hit_count_u );
-[pointsR, sub_cloud_index, ~, reverse_index] = quadriga_lib.point_cloud_segmentation( points, 3 );
-hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_index );
-assertEqual( hit_count, hit_count_R(reverse_index) );
+[pointsR, sub_cloud_ind, ~, reverse_ind] = quadriga_lib.point_cloud_segmentation( points, 3 );
+hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_ind );
+assertEqual( hit_count, hit_count_R(reverse_ind) );
 
 try % 3 imputs
     quadriga_lib.ray_point_intersect( orig, trivec, tridir );

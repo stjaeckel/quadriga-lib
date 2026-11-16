@@ -133,7 +133,7 @@ for k = 1:size(cre_q, 3)
     end
 end
 
-% --- max_no_taps limits output ---
+% --- max_taps limits output ---
 cre = zeros(1, 1, 5, 1);
 cim = zeros(1, 1, 5, 1);
 dl = zeros(1, 1, 5, 1);

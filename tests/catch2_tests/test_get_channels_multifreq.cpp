@@ -1286,11 +1286,11 @@ TEST_CASE("Multifreq - NLOS delay and phase follow path_length")
     // full length 156.5685 m, geometric TX-FBS-LBS-RX polyline 140 m
     const double C = 299792458.0;
     auto va = wrap_single(quadriga_lib::generate_arrayant_omni<double>(10.0));
-    arma::u32_vec no_int = {3};
+    arma::u32_vec n_interact = {3};
     arma::mat coord = {{30.0, 50.0, 70.0}, {40.0, 60.0, 40.0}, {0.0, 0.0, 0.0}};
     arma::vec len;
     arma::mat fbs, lbs;
-    quadriga_lib::coord2path<double>({0, 0, 0}, {100, 0, 0}, &no_int, &coord, &len, &fbs, &lbs);
+    quadriga_lib::coord2path<double>({0, 0, 0}, {100, 0, 0}, &n_interact, &coord, &len, &fbs, &lbs);
     const double L_true = 100.0 + 40.0 * std::sqrt(2.0);
     REQUIRE(std::abs(len(0) - L_true) < 1e-9);
 

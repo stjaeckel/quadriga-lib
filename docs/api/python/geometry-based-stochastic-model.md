@@ -406,7 +406,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_rays_from_paths) �
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else NLOS. A
-  GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `no_int` of
+  GR path needs `path_type`: for QRT files whose paths were built from GBSM scatterers pass the `n_interact` of
   [qrt_file_read](channel-functions.md#qrt_file_read) (interaction count = path type); for ray-traced files the user sets it (values > 2 raise
   `ValueError`)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
@@ -677,7 +677,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#o2i_loss) · [MATLAB](.
 
 ### Usage:
 ```python
-loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
+loss, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
 ```
 
 ### Inputs:
@@ -693,7 +693,7 @@ loss, d2d_in, model_index = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models
 ### Outputs:
 - **`loss`** — Penetration loss in dB; `(n_ut, n_freq)`
 - **`d2d_in`** — Indoor 2D distance in m, 0 for the car models; `(n_ut,)`
-- **`model_index`** — Chosen model per UT, 0-based index into `models`; uint64; `(n_ut,)`
+- **`model_ind`** — Chosen model per UT, 0-based index into `models`; uint64; `(n_ut,)`
 
 ### See also:
 - [los_probability](#los_probability) (uses the outdoor distance `d2D - d2d_in`)

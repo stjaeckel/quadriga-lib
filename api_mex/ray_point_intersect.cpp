@@ -22,7 +22,7 @@ Calculate intersections of ray beams with points in 3D space
 ## Usage:
 ```
 [ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, ...
-    sub_cloud_index, use_kernel, gpu_id );
+    sub_cloud_ind, use_kernel, gpu_id );
 ```
 
 ## Inputs:
@@ -32,7 +32,7 @@ Calculate intersections of ray beams with points in 3D space
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
 - **`points`** — 3D point cloud coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** — Segment boundary indices for the point cloud; use [[point_cloud_segmentation]] to generate;
+- **`sub_cloud_ind`** — Segment boundary indices for the point cloud; use [[point_cloud_segmentation]] to generate;
   sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
   uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
 - **`use_kernel`** — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable
@@ -64,20 +64,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat trivec = qd_mex_get_Mat<double>(prhs[1]);
     const arma::mat tridir = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat points = qd_mex_get_Mat<double>(prhs[3]);
-    arma::u32_vec sub_cloud_index = (nrhs < 5) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[4], true, "sub_cloud_index");
+    arma::u32_vec sub_cloud_ind = (nrhs < 5) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[4], true, "sub_cloud_ind");
     const int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     const int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
 
-    // Convert sub_mesh_index to 0-based
-    for (unsigned &val : sub_cloud_index)
+    // Convert sub_mesh_ind to 0-based
+    for (unsigned &val : sub_cloud_ind)
     {
         if (val == 0)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_cloud_index' cannot be 0.");
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_cloud_ind' cannot be 0.");
         --val;
     }
 
     // Wrap optional input pointer
-    const arma::u32_vec *p_sub_cloud_index = sub_cloud_index.empty() ? nullptr : &sub_cloud_index;
+    const arma::u32_vec *p_sub_cloud_index = sub_cloud_ind.empty() ? nullptr : &sub_cloud_ind;
 
     // hit_count output: size known (n_points), allocate MATLAB-owned memory if requested
     arma::u32_vec hit_count;
@@ -86,12 +86,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     arma::u32_vec *p_hit_count = hit_count.empty() ? nullptr : &hit_count;
 
-    // ray_ind is assembled from the flat CSR list returned by the library: 'hit_index'
+    // ray_ind is assembled from the flat CSR list returned by the library: 'hit_ind'
     // holds the ray indices grouped by point, 'hit_offset' marks the start of each
     // point's block. Both are sized by the C++ call, so the (nlhs > 1) guard is used.
-    std::vector<unsigned> hit_index;
+    std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset;
-    std::vector<unsigned> *p_hit_index = (nlhs > 1) ? &hit_index : nullptr;
+    std::vector<unsigned> *p_hit_index = (nlhs > 1) ? &hit_ind : nullptr;
     arma::u32_vec *p_hit_offset = (nlhs > 1) ? &hit_offset : nullptr;
 
     // Call library function
@@ -121,7 +121,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         if (max_hits != 0)
         {
-            const unsigned *p_idx = hit_index.data();
+            const unsigned *p_idx = hit_ind.data();
             unsigned *p_ray_ind = ray_ind.memptr();
 
             for (arma::uword i_point = 0; i_point < n_points; ++i_point)

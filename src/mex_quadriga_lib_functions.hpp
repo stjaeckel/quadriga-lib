@@ -190,7 +190,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     const bool h_pa = !c0.path_angles.empty();
     const bool h_fbs = !c0.path_fbs_pos.empty();
     const bool h_lbs = !c0.path_lbs_pos.empty();
-    const bool h_ni = !c0.no_interact.empty();
+    const bool h_ni = !c0.n_interact.empty();
     const bool h_ic = !c0.interact_coord.empty();
     const bool h_cf = !c0.center_freq.is_empty();
     const bool h_ini = c0.initial_position != 0;
@@ -225,7 +225,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     if (h_lbs)
         fields.push_back("lbs_pos");
     if (h_ni)
-        fields.push_back("no_interact");
+        fields.push_back("n_interact");
     if (h_ic)
         fields.push_back("interact_coord");
     if (h_cf)
@@ -274,13 +274,16 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         if (h_lbs)
             qd_mex_set_field(output, "lbs_pos", qd_mex_vector2matlab(&c.path_lbs_pos), n);
         if (h_ni)
-            qd_mex_set_field(output, "no_interact", qd_mex_vector2matlab(&c.no_interact), n);
+            qd_mex_set_field(output, "n_interact", qd_mex_vector2matlab(&c.n_interact), n);
         if (h_ic)
             qd_mex_set_field(output, "interact_coord", qd_mex_vector2matlab(&c.interact_coord), n);
         if (h_cf)
             qd_mex_set_field(output, "center_freq", qd_mex_copy2matlab(&c.center_freq), n);
         if (h_ini)
-            qd_mex_set_field(output, "initial_position", qd_mex_copy2matlab(&c.initial_position), n);
+        {
+            const int initial_position = c.initial_position + 1; // 0-based in C++, 1-based in MATLAB
+            qd_mex_set_field(output, "initial_position", qd_mex_copy2matlab(&initial_position), n);
+        }
     }
     return output;
 }
@@ -334,8 +337,8 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "lbs_pos"))
             c.path_lbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, "lbs_pos");
 
-        if (mxArray *fp = mxGetField(input, (mwIndex)i, "no_interact"))
-            c.no_interact = qd_mex_matlab2vector_Col<unsigned>(fp, 1, "no_interact");
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "n_interact"))
+            c.n_interact = qd_mex_matlab2vector_Col<unsigned>(fp, 1, "n_interact");
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "interact_coord"))
             c.interact_coord = qd_mex_matlab2vector_Mat<double>(fp, 2, "interact_coord");
 
@@ -343,15 +346,20 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
             c.center_freq = qd_mex_get_Col<double>(fp, copy, "center_freq");
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "initial_position"))
-            c.initial_position = qd_mex_get_scalar<int>(fp, "initial_position", 0);
+        {
+            const int initial_position = qd_mex_get_scalar<int>(fp, "initial_position", 1);
+            if (initial_position < 1)
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Field 'initial_position' must be >= 1 (1-based index).");
+            c.initial_position = initial_position - 1;
+        }
 
         // Prune zero-padded trailing columns in interact_coord (round-trip artifacts)
         const size_t n_snap = (size_t)c.n_snap();
-        if (c.no_interact.size() == n_snap && c.interact_coord.size() == n_snap)
+        if (c.n_interact.size() == n_snap && c.interact_coord.size() == n_snap)
             for (size_t s = 0; s < n_snap; ++s)
             {
                 unsigned cnt = 0;
-                for (auto v : c.no_interact[s])
+                for (auto v : c.n_interact[s])
                     cnt += v;
                 if (c.interact_coord[s].n_cols > (arma::uword)cnt)
                     c.interact_coord[s].resize(c.interact_coord[s].n_rows, (arma::uword)cnt);

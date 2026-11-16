@@ -22,7 +22,7 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 
 ## Usage:
 ```
-[ pointsR, sub_cloud_index, forward_index, reverse_index ] = ...
+[ pointsR, sub_cloud_ind, forward_ind, reverse_ind ] = ...
     quadriga_lib.point_cloud_segmentation( points, target_size, vec_size );
 ```
 
@@ -34,9 +34,9 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 
 ## Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_index`** — 1-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_index`** — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_index`** — 1-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
+- **`forward_ind`** — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_ind`** — 1-based row in `pointsR` of each row of `points`; `[n_points]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -54,31 +54,31 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Outputs (sizes are determined by C++ at runtime)
     arma::mat pointsR;
-    arma::u32_vec sub_cloud_index, forward_index, reverse_index;
+    arma::u32_vec sub_cloud_ind, forward_ind, reverse_ind;
 
     // Wrap optional output pointers using nlhs guard
     // (.empty() guard is unsafe here because C++ resizes these outputs)
-    arma::u32_vec *p_forward_index = (nlhs > 2) ? &forward_index : nullptr;
-    arma::u32_vec *p_reverse_index = (nlhs > 3) ? &reverse_index : nullptr;
+    arma::u32_vec *p_forward_index = (nlhs > 2) ? &forward_ind : nullptr;
+    arma::u32_vec *p_reverse_index = (nlhs > 3) ? &reverse_ind : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::point_cloud_segmentation<double>(&points, &pointsR, &sub_cloud_index,
+    CALL_QD(quadriga_lib::point_cloud_segmentation<double>(&points, &pointsR, &sub_cloud_ind,
                                                            target_size, vec_size,
                                                            p_forward_index, p_reverse_index));
 
     // Convert 0-based C++ indices to 1-based MATLAB indices
-    // (forward_index is already 1-based in C++ with 0 for padding — no conversion)
-    sub_cloud_index += 1;
+    // (forward_ind is already 1-based in C++ with 0 for padding — no conversion)
+    sub_cloud_ind += 1;
     if (p_reverse_index != nullptr)
-        reverse_index += 1;
+        reverse_ind += 1;
 
     // Copy outputs to MATLAB
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&pointsR);
     if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&sub_cloud_index);
+        plhs[1] = qd_mex_copy2matlab(&sub_cloud_ind);
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&forward_index);
+        plhs[2] = qd_mex_copy2matlab(&forward_ind);
     if (nlhs > 3)
-        plhs[3] = qd_mex_copy2matlab(&reverse_index);
+        plhs[3] = qd_mex_copy2matlab(&reverse_ind);
 }

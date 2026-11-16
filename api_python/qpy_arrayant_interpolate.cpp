@@ -30,7 +30,7 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 ## Usage:
 ```
 # Single-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, element, orientation, element_pos, \
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, i_element, orientation, element_pos, \
     use_kernel=0 )
 
 # Single-frequency mode with the projected distance and the local angles
@@ -50,7 +50,7 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
 - **`azimuth`** — Azimuth angles in GCS; `(1, n_ang)` (same angles for all outputs) or `(n_out, n_ang)` (one angle
   per output)
 - **`elevation`** — Elevation angles in GCS; same shape as `azimuth`
-- **`element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
+- **`i_element`** — Element indices, 0-based, duplicates allowed; `(n_out,)`; default: `None` (all elements)
 - **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `(3, 1)`, `(3, n_out)`, `(3, 1, n_ang)` or
   `(3, n_out, n_ang)`; default: `None` (no rotation)
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `(3, n_out)`; default: `None`
@@ -88,7 +88,7 @@ MD!*/
 py::tuple arrayant_interpolate(const py::dict &arrayant,
                                const py::array_t<double> &azimuth,
                                const py::array_t<double> &elevation,
-                               py::handle element,
+                               py::handle i_element,
                                py::handle orientation,
                                py::handle element_pos,
                                py::handle freq_new,
@@ -105,17 +105,17 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
 
     const auto azimuth_a = qd_python_numpy2arma_Mat(azimuth, true);
     const auto elevation_a = qd_python_numpy2arma_Mat(elevation, true);
-    const auto element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
+    const auto i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
     const auto orientation_a = qd_python_numpy2arma_Cube<double>(orientation, true);
     const auto element_pos_a = qd_python_numpy2arma_Mat<double>(element_pos, true);
     const auto freq_new_a = qd_python_numpy2arma_Col<double>(freq_new, true);
 
-    const arma::uvec *p_element = element_a.is_empty() ? nullptr : &element_a;
+    const arma::uvec *p_element = i_element_a.is_empty() ? nullptr : &i_element_a;
     const arma::cube *p_orientation = orientation_a.is_empty() ? nullptr : &orientation_a;
     const arma::mat *p_element_pos = element_pos_a.is_empty() ? nullptr : &element_pos_a;
 
     const auto ant = qd_python_dict2arrayant_multi(arrayant, true, strict);
-    const arma::uword n_out = element_a.is_empty() ? ant[0].n_elements() : element_a.n_elem;
+    const arma::uword n_out = i_element_a.is_empty() ? ant[0].n_elements() : i_element_a.n_elem;
     const arma::uword n_ang = azimuth_a.n_cols;
 
     if (ant.size() > 1 || !freq_new_a.is_empty()) // Multi-frequency mode

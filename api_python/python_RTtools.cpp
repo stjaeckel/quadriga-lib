@@ -34,7 +34,7 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("center_freq"),
           py::arg("lod") = 2,
           py::arg("verbose") = 0,
-          py::arg("sub_mesh_index") = py::none(),
+          py::arg("sub_mesh_ind") = py::none(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0,
           py::arg("scalar_mode") = false,
@@ -119,14 +119,14 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("orig") = py::array_t<double>(),
           py::arg("dest") = py::array_t<double>(),
           py::arg("mesh") = py::array_t<double>(),
-          py::arg("sub_mesh_index") = py::array_t<unsigned>(),
+          py::arg("sub_mesh_ind") = py::array_t<unsigned>(),
           py::arg("aabb") = py::array_t<double>(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0);
 
     m.def("triangle_mesh_aabb", &triangle_mesh_aabb,
           py::arg("triangles") = py::array_t<double>(),
-          py::arg("sub_mesh_index") = py::array_t<unsigned>(),
+          py::arg("sub_mesh_ind") = py::array_t<unsigned>(),
           py::arg("vec_size") = 1);
 
     m.def("triangle_mesh_segmentation", &triangle_mesh_segmentation,

@@ -22,7 +22,7 @@ TEST_CASE("ray_progress - single reflection", "[wave]")
     o.max_tra = 0; // reflection only
 
     auto s = C.step(S, o);
-    CHECK(s[0] == 1); // n_interact
+    CHECK(s[0] == 1); // n_hit
     CHECK(s[1] == 0); // n_subdiv
     CHECK(s[2] == 1); // n_reflect
     CHECK(s[3] == 0); // n_transmit
@@ -143,7 +143,7 @@ TEST_CASE("ray_progress - no hit terminates the trace", "[wave]")
 
 TEST_CASE("ray_progress - every ray hits but none survives the gain gate", "[wave]")
 {
-    // n_interact > 0 with an empty launch configuration: the counts are NOT all zero, so a
+    // n_hit > 0 with an empty launch configuration: the counts are NOT all zero, so a
     // caller that tests only the return value would loop forever. The empty configuration is
     // the end-of-trace signal.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
@@ -164,7 +164,7 @@ TEST_CASE("ray_progress - every ray hits but none survives the gain gate", "[wav
     CHECK_THROWS_AS(C.step(S), std::invalid_argument);
 }
 
-TEST_CASE("ray_progress - max_no_interactions = 0 disables tracing", "[wave]")
+TEST_CASE("ray_progress - max_interactions = 0 disables tracing", "[wave]")
 {
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
     Cfg C = one_ray();
@@ -225,7 +225,7 @@ TEST_CASE("ray_progress - per-ray counters gate the next generation", "[wave]")
     // A cube on each side of the source so a reflected ray finds a second target
     Scene S = two_cubes();
 
-    SECTION("the reflection counter stops at max_no_reflections")
+    SECTION("the reflection counter stops at max_reflections")
     {
         Cfg C = one_ray(20.0f);
         Opt o;
@@ -245,7 +245,7 @@ TEST_CASE("ray_progress - per-ray counters gate the next generation", "[wave]")
         CHECK(s2[0] == 1); // it still hits
         CHECK(s2[2] == 0); // but no reflection is launched
     }
-    SECTION("the transmission counter stops at max_no_transmissions")
+    SECTION("the transmission counter stops at max_transmissions")
     {
         Cfg C = one_ray(20.0f);
         C.paths[0].nTRA = 3;
@@ -257,7 +257,7 @@ TEST_CASE("ray_progress - per-ray counters gate the next generation", "[wave]")
         CHECK(s[3] == 0);
         check_shapes(C, 0);
     }
-    SECTION("the segment count stops at max_no_interactions")
+    SECTION("the segment count stops at max_interactions")
     {
         // Follow the transmission strand: x = 4 (enter cube 1), x = 6 (exit cube 1),
         // x = 8 (cube 2) — so the ray keeps hitting after the limit is reached.
@@ -355,7 +355,7 @@ TEST_CASE("ray_progress - subdivision requires beam data and a positive limit", 
         CHECK(s[2] == 1);
         CHECK(s[3] == 1);
     }
-    SECTION("max_no_subdivisions = 0")
+    SECTION("max_subdivisions = 0")
     {
         Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
         Opt o;
@@ -375,7 +375,7 @@ TEST_CASE("ray_progress - subdivision requires beam data and a positive limit", 
         CHECK(s[1] == 0);
         CHECK(s[2] == 1);
     }
-    SECTION("the subdivision counter stops at max_no_subdivisions")
+    SECTION("the subdivision counter stops at max_subdivisions")
     {
         Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
         C.paths[0].nSUB = 2;
@@ -390,7 +390,7 @@ TEST_CASE("ray_progress - subdivision requires beam data and a positive limit", 
 
 TEST_CASE("ray_progress - every ray subdivided", "[wave]")
 {
-    // n_interact drops to zero after the subdivision compaction, so both interaction passes are
+    // n_active drops to zero after the subdivision compaction, so both interaction passes are
     // skipped and the output is nothing but sub-beams.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
 
@@ -527,7 +527,7 @@ TEST_CASE("ray_progress - compaction preserves per-ray results", "[wave]")
 
 TEST_CASE("ray_progress - the reported hit count is independent of subdivision", "[wave]")
 {
-    // n_interact is reported as the number of rays that hit the mesh, counted before anything is
+    // n_hit is reported as the number of rays that hit the mesh, counted before anything is
     // compacted or split. Subdivision removes rays from the interaction passes, so a count taken
     // after that stage — or reused as an array stride — would silently under-report.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
@@ -910,7 +910,7 @@ TEST_CASE("ray_progress - delegated intersection matches the internal one", "[wa
     }
     SECTION("rays that miss are dropped the same way")
     {
-        // Half the fan is aimed away from the cube, so the delegated no_interact drives the
+        // Half the fan is aimed away from the cube, so the delegated n_interact drives the
         // compaction rather than an internally computed one.
         beam_fan(32, 0, dirs, half);
         arma::fmat away = dirs;
@@ -989,7 +989,7 @@ TEST_CASE("ray_progress - delegated intersection across a multi-generation trace
 
 TEST_CASE("ray_progress - delegated intersection ignores the acceleration structure", "[wave]")
 {
-    // sub_mesh_index and aabb only feed the internal intersector, so passing them alongside a
+    // sub_mesh_ind and aabb only feed the internal intersector, so passing them alongside a
     // delegated result must change nothing. They are still validated.
     Scene S = two_cubes();
     arma::u32_vec smi = {0u, 12u};
@@ -1015,14 +1015,14 @@ TEST_CASE("ray_progress - delegated intersection ignores the acceleration struct
     check_identical(A, B);
 }
 
-TEST_CASE("ray_progress - delegated intersection with max_no_interactions = 0", "[wave]")
+TEST_CASE("ray_progress - delegated intersection with max_interactions = 0", "[wave]")
 {
     // Tracing stays disabled even when the caller hands in a full set of hits.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
     Cfg C = one_ray();
 
     Hits H = intersect(C, S);
-    REQUIRE(H.no_interact(0) > 0u); // the ray really does hit
+    REQUIRE(H.n_interact(0) > 0u); // the ray really does hit
 
     Opt o;
     o.max_int = 0;
@@ -1051,7 +1051,7 @@ TEST_CASE("ray_progress - delegated intersection validation", "[wave]")
             Cfg C = one_ray();
             Opt o;
             if (mask & 1)
-                o.ni_in = &ref.no_interact;
+                o.ni_in = &ref.n_interact;
             if (mask & 2)
                 o.fi_in = &ref.fbs_ind;
             if (mask & 4)
@@ -1062,7 +1062,7 @@ TEST_CASE("ray_progress - delegated intersection validation", "[wave]")
     SECTION("each array must match the ray count")
     {
         Hits H = ref;
-        H.no_interact.set_size(2);
+        H.n_interact.set_size(2);
         Cfg C = one_ray();
         CHECK_THROWS_AS(C.step(S, with_hits(Opt(), H)), std::invalid_argument);
 
@@ -1376,7 +1376,7 @@ TEST_CASE("ray_progress - delegated subdivision flag validation", "[wave]")
         std::vector<bool> f(1, false);
         CHECK_THROWS_AS(C.step(S, with_flag(base, f)), std::invalid_argument);
     }
-    SECTION("max_no_subdivisions = 0 rejects a flag instead of ignoring it")
+    SECTION("max_subdivisions = 0 rejects a flag instead of ignoring it")
     {
         Opt o = base;
         o.max_sub = 0;
@@ -1403,7 +1403,7 @@ TEST_CASE("ray_progress - delegated subdivision flag validation", "[wave]")
 TEST_CASE("ray_progress - a flagged ray that misses the mesh is still subdivided", "[wave]")
 {
     // A compaction that discarded these rays before the subdivision was applied would make a
-    // shading pass that held the beam back lose its energy. n_subdiv is independent of n_interact
+    // shading pass that held the beam back lose its energy. n_subdiv is independent of n_hit
     // and the two are counted separately.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
 
@@ -1492,7 +1492,7 @@ TEST_CASE("ray_progress - a flagged ray past its subdivision limit is still subd
 
         Hits H = intersect(C, S);
         auto f_auto = subdiv_flags(C, S, H, o);
-        REQUIRE(f_auto[0] == false); // ray_subdivide_flag applies max_no_subdivisions
+        REQUIRE(f_auto[0] == false); // ray_subdivide_flag applies max_subdivisions
 
         std::vector<bool> f(1, true);
         auto s = C.step(S, with_flag(o, f));
@@ -1602,7 +1602,7 @@ TEST_CASE("ray_progress - the outside-a-medium branch still recomputes and clear
 
 TEST_CASE("ray_progress - hit and subdivision counts are independent", "[wave]")
 {
-    // n_subdiv is not a subset of n_interact. A mixed set exercises all four combinations of
+    // n_subdiv is not a subset of n_hit. A mixed set exercises all four combinations of
     // (hit, flagged) in one call and pins the identity n_out = 4*n_subdiv + n_reflect + n_transmit.
     Scene S = one_cube(5.0f, 0.0f, 0.0f);
 
@@ -1850,7 +1850,7 @@ TEST_CASE("ray_progress - input validation", "[wave]")
         {
             Cfg C = one_ray();
             Opt o;
-            o.aabb = &box; // no sub_mesh_index
+            o.aabb = &box; // no sub_mesh_ind
             CHECK_THROWS_AS(C.step(T, o), std::invalid_argument);
         }
         {
@@ -1974,7 +1974,7 @@ TEST_CASE("Measurement - ray_progress follows the coupling between the series of
 
     QD_DIAG("\n# diag: mirror through ray_progress. One ray, called until none is left, scalar, float, 1 GHz. wall AB: air | A 50 |\n");
     QD_DIAG("# B 100 | air; wall HSH: air | host 50 | sheet 6 mm eps 5.24 - 0.63j | host 50 | air, against host | sheet | host with\n");
-    QD_DIAG("# 6 mm of host divided out. slab: thin_slab_threshold. max: max_no_interactions. nT, nR: the paths that end behind\n");
+    QD_DIAG("# 6 mm of host divided out. slab: thin_slab_threshold. max: max_interactions. nT, nR: the paths that end behind\n");
     QD_DIAG("# and in front of the wall; seg: the segments of the longest. T1, R1: the shortest path alone against the matrix of\n");
     QD_DIAG("# the whole wall, dB; T, R: all of them, dB and deg at the polyline's point\n");
     QD_DIAG("# min: min_gain_dB. wall HS: air | host 100 | coating 6 mm | air; wall H: air | host 100 | air. slab 1.00 declines\n");
@@ -2160,7 +2160,7 @@ TEST_CASE("ray_progress - a declined series at a sheet is followed and not dropp
     { return std::arg(z) * 180.0 / PI; };
 
     QD_DIAG("\n# diag: declined series at a sheet, through ray_progress. wall HS: air | host 100 | coating 6 mm | air, the summed\n");
-    QD_DIAG("# paths against the matrix of the wall, dB and deg. slab: thin_slab_threshold; max: max_no_interactions; nT, nR:\n");
+    QD_DIAG("# paths against the matrix of the wall, dB and deg. slab: thin_slab_threshold; max: max_interactions; nT, nR:\n");
     QD_DIAG("# the paths behind and in front of the wall\n");
     QD_DIAG("wall,host,tracer,slab,max,theta,nT,nR,T_dB,R_dB,R_deg\n");
     for (int hst : {5, 6})
@@ -2385,7 +2385,7 @@ TEST_CASE("Measurement - ray_progress and the mirror behind a back reflection", 
     // ---- B. A sheet inside a wall: the gain floor (a printed table) ----
     QD_DIAG("\n# diag: mirror behind, a sheet inside a wall and the gain floor. air | host 50 | sheet 6 mm | host 50 | air, undeviated\n");
     QD_DIAG("# tracer. D: threshold 0.15; Z: threshold 0. Each against Z at 60 interactions and a floor of -300 dB, dB.\n");
-    QD_DIAG("# max: max_no_interactions; min: min_gain_dB; n: the paths behind the wall\n");
+    QD_DIAG("# max: max_interactions; min: min_gain_dB; n: the paths behind the wall\n");
     QD_DIAG("host,theta,max,min,nT_D,nT_Z,T_D,T_Z,T_D/Z,R_D,R_Z,R_D/Z\n");
     if (qd_diag())
     {

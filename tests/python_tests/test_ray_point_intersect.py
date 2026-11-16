@@ -25,30 +25,30 @@ class test_case(unittest.TestCase):
 
     Outputs (compressed sparse row layout):
       hit_count  : uint32 ndarray of shape (n_points,)
-      hit_index  : 1-D ndarray of 0-based ray indices, grouped by point, shape (n_hit,)
+      hit_ind  : 1-D ndarray of 0-based ray indices, grouped by point, shape (n_hit,)
       hit_offset : uint32 ndarray of shape (n_points + 1,); the rays hitting point i
-                   are hit_index[hit_offset[i]:hit_offset[i+1]]
+                   are hit_ind[hit_offset[i]:hit_offset[i+1]]
     """
 
     # ---------------- helpers ----------------
 
-    def _csr_to_sets(self, hit_index, hit_offset, n_points):
+    def _csr_to_sets(self, hit_ind, hit_offset, n_points):
         """Convert the CSR outputs to list[set[int]] for set-equality checks."""
-        hit_index = np.asarray(hit_index)
+        hit_ind = np.asarray(hit_ind)
         hit_offset = np.asarray(hit_offset)
 
-        self.assertEqual(hit_index.ndim, 1, "hit_index must be 1-D.")
+        self.assertEqual(hit_ind.ndim, 1, "hit_ind must be 1-D.")
         self.assertEqual(hit_offset.ndim, 1, "hit_offset must be 1-D.")
         self.assertEqual(
             hit_offset.shape[0], n_points + 1, "hit_offset length must equal n_points + 1."
         )
         self.assertEqual(
-            int(hit_offset[-1]), hit_index.shape[0], "hit_offset[-1] must equal len(hit_index)."
+            int(hit_offset[-1]), hit_ind.shape[0], "hit_offset[-1] must equal len(hit_ind)."
         )
 
         out = []
         for i in range(n_points):
-            block = hit_index[hit_offset[i] : hit_offset[i + 1]]
+            block = hit_ind[hit_offset[i] : hit_offset[i + 1]]
             as_set = set(int(v) for v in block)
             self.assertEqual(
                 len(as_set), block.size, f"point {i}: duplicate ray index in its block"
@@ -57,9 +57,9 @@ class test_case(unittest.TestCase):
         return out
 
     @staticmethod
-    def _csr_to_list(hit_index, hit_offset):
+    def _csr_to_list(hit_ind, hit_offset):
         """Per-point list of arrays, the form the wrapper returned before the CSR change."""
-        return np.split(np.asarray(hit_index), np.asarray(hit_offset)[1:-1])
+        return np.split(np.asarray(hit_ind), np.asarray(hit_offset)[1:-1])
 
     @staticmethod
     def _two_beam_setup():
@@ -91,12 +91,12 @@ class test_case(unittest.TestCase):
         return orig, trivec, tridir, L, r
 
     @staticmethod
-    def _icosphere_setup(no_div=20):
+    def _icosphere_setup(n_div=20):
         """Full icosphere of beams shifted by (-10,-20,-30); 16 test points around origin.
 
         Mirrors the MATLAB test: each point is hit by exactly one beam.
         """
-        orig, _, trivec, tridir = quadriga_lib.RTtools.icosphere(no_div, 1.0, 1)
+        orig, _, trivec, tridir = quadriga_lib.RTtools.icosphere(n_div, 1.0, 1)
         orig = orig - np.array([10.0, 20.0, 30.0])
 
         pts = np.zeros((4, 3))
@@ -128,10 +128,10 @@ class test_case(unittest.TestCase):
         n_points = points.shape[0]
         self.assertEqual(n_points, 16)
 
-        hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
+        hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points
         )
-        sets = self._csr_to_sets(hit_index, hit_offset, n_points)
+        sets = self._csr_to_sets(hit_ind, hit_offset, n_points)
         expected = [{0, 1}, {1}, set(), {0}] + [set()] * 12
 
         for i, (got, exp) in enumerate(zip(sets, expected)):
@@ -150,15 +150,15 @@ class test_case(unittest.TestCase):
 
     def test_icosphere_each_point_hit_once(self):
         """A full icosphere of beams must hit every test point exactly once."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
-        hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
+        hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points
         )
         npt.assert_array_equal(
             hit_count.astype(np.uint32),
             np.ones(points.shape[0], dtype=np.uint32),
         )
-        sets = self._csr_to_sets(hit_index, hit_offset, points.shape[0])
+        sets = self._csr_to_sets(hit_ind, hit_offset, points.shape[0])
         for i, s in enumerate(sets):
             self.assertEqual(
                 len(s), 1, f"Point {i}: expected exactly 1 hit, got {len(s)}"
@@ -169,8 +169,8 @@ class test_case(unittest.TestCase):
 
     def test_output_types_and_shapes(self):
         """Verify dtype, shape, and structure of all three outputs."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
-        hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
+        hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points
         )
         n_points = points.shape[0]
@@ -185,30 +185,30 @@ class test_case(unittest.TestCase):
         self.assertEqual(hit_offset.shape, (n_points + 1,))
         self.assertEqual(hit_offset.dtype, np.uint32)
 
-        # hit_index
-        self.assertIsInstance(hit_index, np.ndarray)
-        self.assertEqual(hit_index.ndim, 1)
+        # hit_ind
+        self.assertIsInstance(hit_ind, np.ndarray)
+        self.assertEqual(hit_ind.ndim, 1)
         self.assertTrue(
-            np.issubdtype(hit_index.dtype, np.integer),
-            f"hit_index dtype must be integer, got {hit_index.dtype}",
+            np.issubdtype(hit_ind.dtype, np.integer),
+            f"hit_ind dtype must be integer, got {hit_ind.dtype}",
         )
-        self.assertEqual(hit_index.shape, (int(hit_offset[-1]),))
+        self.assertEqual(hit_ind.shape, (int(hit_offset[-1]),))
 
         for i in range(n_points):
-            block = hit_index[hit_offset[i] : hit_offset[i + 1]]
+            block = hit_ind[hit_offset[i] : hit_offset[i + 1]]
             for v in block:
                 self.assertGreaterEqual(int(v), 0)
                 self.assertLess(int(v), orig.shape[0])
             self.assertEqual(
                 int(hit_count[i]),
                 block.size,
-                f"hit_count[{i}] disagrees with the size of its hit_index block",
+                f"hit_count[{i}] disagrees with the size of its hit_ind block",
             )
 
     def test_csr_structure_invariants(self):
-        """hit_offset must start at 0, be monotone, and end at len(hit_index)."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
-        hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
+        """hit_offset must start at 0, be monotone, and end at len(hit_ind)."""
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
+        hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points
         )
         offs = np.asarray(hit_offset).astype(np.int64)
@@ -216,7 +216,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(int(offs[0]), 0, "hit_offset[0] must be 0")
         self.assertTrue(np.all(np.diff(offs) >= 0), "hit_offset must be non-decreasing")
         self.assertEqual(
-            int(offs[-1]), np.asarray(hit_index).size, "hit_offset[-1] must equal len(hit_index)"
+            int(offs[-1]), np.asarray(hit_ind).size, "hit_offset[-1] must equal len(hit_ind)"
         )
         npt.assert_array_equal(
             np.diff(offs), np.asarray(hit_count).astype(np.int64),
@@ -225,19 +225,19 @@ class test_case(unittest.TestCase):
 
     def test_split_form_matches_csr(self):
         """numpy.split reproduces the per-point list form documented for migration."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
-        hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
+        hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points
         )
         n_points = points.shape[0]
 
-        parts = self._csr_to_list(hit_index, hit_offset)
+        parts = self._csr_to_list(hit_ind, hit_offset)
         self.assertEqual(len(parts), n_points)
         for i, part in enumerate(parts):
             self.assertEqual(part.ndim, 1, f"part {i} must be 1-D")
             self.assertEqual(part.size, int(hit_count[i]))
             npt.assert_array_equal(
-                part, np.asarray(hit_index)[hit_offset[i] : hit_offset[i + 1]]
+                part, np.asarray(hit_ind)[hit_offset[i] : hit_offset[i + 1]]
             )
 
     def test_no_hits_returns_empty_csr(self):
@@ -250,10 +250,10 @@ class test_case(unittest.TestCase):
 
         for kernel in (0, 1):
             with self.subTest(use_kernel=kernel):
-                hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
+                hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
                     orig, trivec, tridir, points, use_kernel=kernel
                 )
-                self.assertEqual(np.asarray(hit_index).size, 0)
+                self.assertEqual(np.asarray(hit_ind).size, 0)
                 npt.assert_array_equal(
                     np.asarray(hit_count).astype(np.int64), np.zeros(n_points, dtype=np.int64)
                 )
@@ -261,7 +261,7 @@ class test_case(unittest.TestCase):
                     np.asarray(hit_offset).astype(np.int64),
                     np.zeros(n_points + 1, dtype=np.int64),
                 )
-                parts = self._csr_to_list(hit_index, hit_offset)
+                parts = self._csr_to_list(hit_ind, hit_offset)
                 self.assertEqual(len(parts), n_points)
                 self.assertTrue(all(p.size == 0 for p in parts))
 
@@ -305,14 +305,14 @@ class test_case(unittest.TestCase):
         points = np.array([[0.035, 0.0, 1.0 + 0.1 * i] for i in range(16)])
         n_points = points.shape[0]
 
-        hit_count, hit_index, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
+        hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points, use_kernel=1
         )
         self.assertGreater(
             int(np.asarray(hit_count).max()), 1, "test needs a point with several hits"
         )
 
-        idx = np.asarray(hit_index)
+        idx = np.asarray(hit_ind)
         for i in range(n_points):
             block = idx[hit_offset[i] : hit_offset[i + 1]]
             if block.size > 1:
@@ -323,7 +323,7 @@ class test_case(unittest.TestCase):
 
     def test_sub_cloud_ind_omitted_vs_empty_vs_manual(self):
         """Omitted, empty, and explicit segmentation must yield identical results."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
 
         hit_a, idx_a, off_a = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points
@@ -351,22 +351,22 @@ class test_case(unittest.TestCase):
         )
 
     def test_integration_with_point_cloud_segmentation(self):
-        """Permuted point cloud + auto-generated sub_cloud_index must match unsegmented after un-permuting."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        """Permuted point cloud + auto-generated sub_cloud_ind must match unsegmented after un-permuting."""
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_ref, _, _ = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points
         )
-        pointsR, sub_cloud_index, _, reverse_index = (
+        pointsR, sub_cloud_ind, _, reverse_ind = (
             quadriga_lib.RTtools.point_cloud_segmentation(points, 4, 8)
         )
         hit_R, _, _ = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, pointsR, sub_cloud_ind=sub_cloud_index
+            orig, trivec, tridir, pointsR, sub_cloud_ind=sub_cloud_ind
         )
-        npt.assert_array_equal(hit_ref, hit_R[reverse_index])
+        npt.assert_array_equal(hit_ref, hit_R[reverse_ind])
 
     def test_unaligned_sub_cloud_ind(self):
         """Sub-clouds that are not aligned to the SIMD vector size are accepted by every kernel."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_ref, idx_ref, off_ref = quadriga_lib.RTtools.ray_point_intersect(orig, trivec, tridir, points)
         sci = np.array([0, 3, 11], dtype=np.uint32)
         for kernel in (0, 1):
@@ -380,7 +380,7 @@ class test_case(unittest.TestCase):
 
     def test_kernel_auto_vs_generic(self):
         """auto and GENERIC kernel must produce identical results."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_auto, idx_auto, off_auto = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points, use_kernel=0
         )
@@ -396,7 +396,7 @@ class test_case(unittest.TestCase):
 
     def test_kernel_avx2(self):
         """AVX2 kernel must agree with GENERIC if available; skip otherwise."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_gen, idx_gen, off_gen = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points, use_kernel=1
         )
@@ -416,7 +416,7 @@ class test_case(unittest.TestCase):
 
     def test_kernel_cuda(self):
         """CUDA kernel must agree with GENERIC if available; skip otherwise."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_gen, idx_gen, off_gen = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, points, use_kernel=1
         )
@@ -437,7 +437,7 @@ class test_case(unittest.TestCase):
 
     def test_input_validation(self):
         """Invalid inputs must raise."""
-        orig, trivec, tridir, points = self._icosphere_setup(no_div=20)
+        orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
 
         cases = [
             (

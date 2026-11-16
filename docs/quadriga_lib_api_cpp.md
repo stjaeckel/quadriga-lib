@@ -26,11 +26,16 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 **General conventions**
 
 - Shapes: `[a, b, c]` means `[rows, cols, slices]`, `[rows, cols]` a matrix and `[n]` a vector; arrays are column-major (C++: `arma::Cube`, `arma::Mat`, `arma::Col` / `arma::Row`).
-- Index base: 0-based unless the field is explicitly called "1-based" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).
+- Index base: 0-based unless the field is explicitly called "1-based" (which applies to `mtl_ind`, `fbs_ind`, `sbs_ind`, `point_ind`, `forward_ind`, `mesh_ind`, and QDANT `id`).
 - Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation as in 3GPP TR 38.901 (bearing, downtilt, slant), so that orientations from TR 38.901 are entered as published: a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down, a positive bank turns the y-axis toward z.
 - Complex data: separate real and imaginary arrays (`_re` / `_im`), or interleaved along the rows where documented (e.g. `M`), for compatibility with older Octave versions, whose MEX interface has no interleaved complex arrays. Some functions also offer an optional `std::complex` output, which replaces the split pair (then left empty).
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
+- Counts: `n_<thing>`, e.g. `n_path`, `n_snap`, `n_interact` (interaction points per path; mesh intersections per ray in the ray-tracing functions).
+- Limits: `max_<things>` / `min_<things>` limit a count, e.g. `max_interactions`, `max_paths`, `min_segments`; a limit on a value names the quantity, e.g. `max_path_length`.
+- Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`.
+- Index arrays: `<thing>_ind`, indices into other data, e.g. `obj_ind`, `mtl_ind`, `sub_mesh_ind`, `hit_ind`.
+- Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
 
 **Frequencies**
 
@@ -627,21 +632,21 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_copy_element) · [Python](qua
 - Added elements get their own port with identity coupling; positions of added elements that are not copied are zero
 - When the array grows, an empty `element_pos` and an empty coupling are written out first (zeros, identity), so
   that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for an empty `destination`, a source index out of bound, or a destination index
+- Throws `std::invalid_argument` for an empty `i_target`, a source index out of bound, or a destination index
   equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
 
 ### Declaration:
 ```cpp
 void quadriga_lib::arrayant_copy_element(
     arrayant<dtype> &ant,
-    arma::uword source,
-    const arma::uvec &destination);
+    arma::uword i_source,
+    const arma::uvec &i_target);
 ```
 
 ### Inputs:
 - **`ant`** — Valid arrayant; updated in-place
-- **`source`** — Index of the element to copy, 0-based
-- **`destination`** — Target indices, 0-based; a single index is passed as `{i}`
+- **`i_source`** — Index of the element to copy, 0-based
+- **`i_target`** — Target indices, 0-based; a single index is passed as `{i}`
 
 ### Example:
 ```cpp
@@ -668,14 +673,14 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_copy_element) · [Python](qua
 ```cpp
 void quadriga_lib::arrayant_copy_element_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        arma::uword source,
-        const arma::uvec &destination);
+        arma::uword i_source,
+        const arma::uvec &i_target);
 ```
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
-- **`source`** — Index of the element to copy from; must be within current element count
-- **`destination`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
+- **`i_source`** — Index of the element to copy from; must be within current element count
+- **`i_target`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
 
 ### Example:
 ```cpp
@@ -1550,8 +1555,8 @@ Not in: MATLAB, Python
 | `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
 | `std::vector<arma::Mat<dtype>> path_fbs_pos`      | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
 | `std::vector<arma::Mat<dtype>> path_lbs_pos`      | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
-| `std::vector<arma::Col<unsigned>> no_interact`    | per snap `[n_path]`                                             | Number of interactions per path                             |
-| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(no_interact)]`                                | Interaction point coordinates                               |
+| `std::vector<arma::Col<unsigned>> n_interact`     | per snap `[n_path]`                                             | Number of interactions per path                             |
+| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(n_interact)]`                                 | Interaction point coordinates                               |
 | `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
 | `std::vector<std::any> par_data`                  | —                                                               | Unstructured metadata values (string, scalar, matrix, etc.) |
 | `int initial_position`                            | scalar                                                          | 0-based index of the reference snapshot                     |
@@ -1589,7 +1594,7 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Cube<dtype> *coeff_re_add = nullptr,
     const arma::Cube<dtype> *coeff_im_add = nullptr,
     const arma::Cube<dtype> *delay_add = nullptr,
-    const arma::u32_vec *no_interact_add = nullptr,
+    const arma::u32_vec *n_interact_add = nullptr,
     const arma::Mat<dtype> *interact_coord_add = nullptr,
     const arma::Col<dtype> *path_gain_add = nullptr,
     const arma::Col<dtype> *path_length_add = nullptr,
@@ -1604,8 +1609,8 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`coeff_re_add`** *(optional)* — Real part of channel coefficients; `[n_rx, n_tx, n_path_add]`
 - **`coeff_im_add`** *(optional)* — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_add]`
 - **`delay_add`** *(optional)* — Propagation delays in seconds; `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`
-- **`no_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
-- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(no_interact)]`
+- **`n_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
+- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(n_interact)]`
 - **`path_gain_add`** *(optional)* — Path gains before antenna effects; `[n_path_add]`
 - **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
 - **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
@@ -1641,14 +1646,14 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](q
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min` are excluded; `max_no_paths` limits total count
+- Paths below `gain_min` are excluded; `max_paths` limits total count
 - Paths with non-finite coordinates are skipped
 
 ### Declaration:
 ```cpp
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     std::string fn,
-    arma::uword max_no_paths = 0,
+    arma::uword max_paths = 0,
     dtype gain_max = -60.0,
     dtype gain_min = -140.0,
     std::string colormap = "jet",
@@ -1660,7 +1665,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_no_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
@@ -2044,18 +2049,18 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_layout) · [Python](quadriga
 - Returns `{nx, ny, nz, nw}` describing the 4D slot grid of the file.
 - Returns `{0, 0, 0, 0}` if the file does not exist; throws if the file exists but is not a channel file of
   version 3 (see [hdf5_read_channel](#hdf5_read_channel)).
-- `channelID` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
+- `channel_id` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
 
 ### Declaration:
 ```cpp
 arma::u32_vec quadriga_lib::hdf5_read_layout(
     std::string fn,
-    arma::u32_vec *channelID = nullptr);
+    arma::u32_vec *channel_id = nullptr);
 ```
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`channelID`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
+- **`channel_id`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ### Returns:
 - Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
@@ -2326,7 +2331,7 @@ Not in: MATLAB, Python
 - Writes the path data for a single TX into the next free slot reserved by [qrt_file_init](#qrt_file_init), and records the TX name, position, and orientation.
 - Paths are grouped by their CIR index (`path::iC`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
 - Validates every path before writing: `iC` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
-- Throws when all TX slots are already filled — the file holds at most the `no_orig` slots reserved at init.
+- Throws when all TX slots are already filled — the file holds at most the `n_orig` slots reserved at init.
 - Only v5/6 files can be appended to. Positional data is converted to `float` on write.
 - Returns the total number of paths written.
 
@@ -2366,7 +2371,7 @@ Not in: MATLAB, Python
 - Writes no path data. The BS position/orientation rows and the BS index table are reserved as zeros; each [qrt_file_append](#qrt_file_append) call fills the next free slot.
 - CIR orientation is stored compressed: only the angle columns that carry a nonzero value after conversion to `float` are written,
   encoded in a per-file format byte. [qrt_file_append](#qrt_file_append) reads this byte from the file.
-- `no_orig` fixes the number of TX slots; the file can hold at most that many appended TX blocks.
+- `n_orig` fixes the number of TX slots; the file can hold at most that many appended TX blocks.
 - Positional data is converted to `float` on write regardless of `dtype`.
 
 ### Declaration:
@@ -2379,7 +2384,7 @@ void quadriga_lib::qrt_file_init(
     const arma::Mat<dtype> &cir_orientation,
     const std::vector<std::string> &dest_names = {"RX"},
     const arma::u32_vec &cir_offset = {0},
-    unsigned no_orig = 1,
+    unsigned n_orig = 1,
     bool scalar_mode = false);
 ```
 
@@ -2387,11 +2392,11 @@ void quadriga_lib::qrt_file_init(
 - **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
   opened, so an invalid input throws and leaves an existing file unchanged)
 - **`center_freq`** — Center frequencies in Hz; `[n_freq]`, 1 to 127 entries; an EM file stores them in GHz
-- **`cir_pos`** — CIR positions in Cartesian coordinates; `[no_cir, 3]`
-- **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[no_cir, 3]` or empty for none
-- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[no_dest]`
-- **`cir_offset`** — CIR offset for each receiver, 0-based, the first entry 0; `[no_dest]`, must equal `dest_names` in length
-- **`no_orig`** — Number of origin (TX) slots to reserve; at least 1
+- **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
+- **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
+- **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[n_dest]`
+- **`cir_offset`** — Number of CIRs before each receiver (offset of its first CIR), the first entry 0; `[n_dest]`, must equal `dest_names` in length
+- **`n_orig`** — Number of origin (TX) slots to reserve; at least 1
 - **`scalar_mode`** — `true` writes a v6 scalar-layout file, `false` a v5 EM file
 
 ### See also:
@@ -2408,17 +2413,17 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_parse) · [Python](quadriga_l
 - Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR offsets, names, positions, orientations, and file version.
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
-- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
+- When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
 - Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp
 void quadriga_lib::qrt_file_parse(
     const std::string &fn,
-    arma::uword *no_cir = nullptr,
-    arma::uword *no_orig = nullptr,
-    arma::uword *no_dest = nullptr,
-    arma::uword *no_freq = nullptr,
+    arma::uword *n_cir = nullptr,
+    arma::uword *n_orig = nullptr,
+    arma::uword *n_dest = nullptr,
+    arma::uword *n_freq = nullptr,
     arma::uvec *cir_offset = nullptr,
     std::vector<std::string> *orig_names = nullptr,
     std::vector<std::string> *dest_names = nullptr,
@@ -2436,19 +2441,19 @@ void quadriga_lib::qrt_file_parse(
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
 ### Outputs:
-- **`no_cir`** *(optional)* — Number of channel snapshots per origin point
-- **`no_orig`** *(optional)* — Number of origin points (TX)
-- **`no_dest`** *(optional)* — Number of destination points (RX)
-- **`no_freq`** *(optional)* — Number of frequency bands
-- **`cir_offset`** *(optional)* — CIR offset per destination; `[no_dest]`
-- **`orig_names`** *(optional)* — Names of origin points; `[no_orig]`
-- **`dest_names`** *(optional)* — Names of destination points; `[no_dest]`
+- **`n_cir`** *(optional)* — Number of channel snapshots per origin point
+- **`n_orig`** *(optional)* — Number of origin points (TX)
+- **`n_dest`** *(optional)* — Number of destination points (RX)
+- **`n_freq`** *(optional)* — Number of frequency bands
+- **`cir_offset`** *(optional)* — Number of CIRs before each destination (offset of its first CIR), the first entry 0; `[n_dest]`
+- **`orig_names`** *(optional)* — Names of origin points; `[n_orig]`
+- **`dest_names`** *(optional)* — Names of destination points; `[n_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[no_freq]`
-- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[no_cir, 3]`
-- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[no_cir, 3]`
-- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[no_orig, 3]`
-- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles; `[no_orig, 3]`
+- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[n_freq]`
+- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[n_cir, 3]`
+- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[n_cir, 3]`
+- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[n_orig, 3]`
+- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles; `[n_orig, 3]`
 
 ---
 <a id="qrt_file_read"></a>
@@ -2460,7 +2465,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_read) · [Python](quadriga_li
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `no_int`, `coord` and
+  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
@@ -2492,7 +2497,7 @@ void quadriga_lib::qrt_file_read(
     arma::Col<dtype> *eoa = nullptr,
     std::vector<arma::Mat<dtype>> *path_coord = nullptr,
     int normalize_M = 1,
-    arma::u32_vec *no_int = nullptr,
+    arma::u32_vec *n_interact = nullptr,
     arma::fmat *coord = nullptr,
     std::vector<uint8_t> *interact_type = nullptr,
     std::ifstream *file = nullptr,
@@ -2533,9 +2538,9 @@ void quadriga_lib::qrt_file_read(
 - **`aoa`** — Arrival azimuth angles; `[n_path]`
 - **`eoa`** — Arrival elevation angles; `[n_path]`
 - **`path_coord`** — Interaction coordinates per path; vector of length `n_path`, each `[3, n_interact + 2]`
-- **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
-- **`coord`** — Interaction coordinates; `[3, sum(no_int)]`
-- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `no_int`; `[sum(no_int)]`.
+- **`n_interact`** — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
+- **`coord`** — Interaction coordinates; `[3, sum(n_interact)]`
+- **`interact_type`** — Interaction type codes, concatenated per path and segmented by `n_interact`; `[sum(n_interact)]`.
   Empty for v4 legacy files. GBSM paths of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) carry 129 (GR) and 193 (NLOS); LOS and GR
   paths are not marked as GBSM.
 
@@ -2587,7 +2592,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(
 
 ### Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are supplied
-- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `no_orig`
+- **`i_orig`** — Origin index to read (for downlink, origin = TX); must be less than `n_orig`
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 - **`cache`** *(optional)* — Pre-parsed metadata from [qrt_read_cache_init](#qrt_read_cache_init); pass `nullptr` to parse the header on this call
 
@@ -2613,9 +2618,9 @@ Not in: MATLAB, Python
   and `length` exist on the returned objects only ([qrt_file_read_raw](#qrt_file_read_raw) returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
   [qrt_file_read](#qrt_file_read) (`downlink = true`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
-  within float32 accuracy, the polyline as `path_length` and `path_type` as `no_int`
-- `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init) (which
-  takes GHz): `qrt_file_read` recomputes the lengths from the stored positions; not checked
+  within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
+- `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init):
+  `qrt_file_read` recomputes the lengths from the stored positions; not checked
 - Float32 storage: use local coordinates, shifted in x and y only (ground at z = 0); path length error 2.7 µm,
   0.31 mm, 1.0 mm for coordinates up to 150 m, 5 km, 20 km (phase 0.003, 0.39, 1.29 rad at 60 GHz)
 - Memory: 80 to 105 bytes per path object at one frequency, e.g. 3 to 4 GB for 1000 UTs, 100 snapshots, 381 rays
@@ -2734,7 +2739,7 @@ void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<dtype>> *coeff_im_quant,
     std::vector<arma::Cube<dtype>> *delay_quant,
     dtype tap_spacing = (dtype)5.0e-9,
-    arma::uword max_no_taps = 48,
+    arma::uword max_taps = 48,
     dtype power_exponent = (dtype)1.0,
     int fix_taps = 0);
 ```
@@ -2745,7 +2750,7 @@ void quadriga_lib::quantize_delays(
 - **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`;
   non-negative with a tolerance of `tap_spacing / 2`, finite, below `2^31 * tap_spacing`
 - **`tap_spacing`** *(optional)* — Delay bin spacing in seconds, positive and finite; 5 ns corresponds to 200 MHz sampling rate
-- **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
+- **`max_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
 - **`fix_taps`** *(optional)* — Delay grid sharing mode:
   | Value | Meaning                                                                                                                               |
@@ -3971,7 +3976,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quad
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
 - QRT stores no path types or taps. Without `path_type`: LOS where FBS = LBS on the direct line (0.1 mm), else
-  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) pass the `no_int` of [qrt_file_read](#qrt_file_read)
+  NLOS. A GR path needs `path_type`: for files of [qrt_paths_from_scatterers](#qrt_paths_from_scatterers) pass the `n_interact` of [qrt_file_read](#qrt_file_read)
   (interaction count = path type); for ray-traced files the user sets it (values > 2 throw)
 - The GR point (`lbs_pos`) must be within 1 mm of z = 0
 
@@ -4288,7 +4293,7 @@ void quadriga_lib::o2i_loss(
     arma::mat &loss,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
-    arma::uvec *model_index = nullptr);
+    arma::uvec *model_ind = nullptr);
 ```
 
 ### Inputs:
@@ -4303,7 +4308,7 @@ void quadriga_lib::o2i_loss(
 ### Outputs:
 - **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
-- **`model_index`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
+- **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
 
 ### See also:
 - [los_probability](#los_probability) (uses the outdoor distance `d2D - d2d_in`)
@@ -5141,7 +5146,7 @@ void calc_diffraction_gain(
     arma::Mat<dtype> *xprmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     int use_kernel = 0,
     int gpu_id = 0,
     bool scalar_mode = false,
@@ -5165,7 +5170,7 @@ void calc_diffraction_gain(
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths)
 - **`verbose`** — Verbosity level
-- **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
+- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
@@ -5202,7 +5207,7 @@ void calc_diffraction_gain(
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [obj_file_read](#obj_file_read) (defines mtl_prop format)
 - [ray_mesh_interact](#ray_mesh_interact) (used for media interactions)
 - [qrt_file_read](#qrt_file_read) (same path-loss model, used by `apply_fspl`)
@@ -5238,7 +5243,7 @@ Combine path interaction coordinates for IRS-assisted TX → RX channels
 Not in: MATLAB, Python
 
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
-- Interaction coordinates use a compressed format: `no_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
+- Interaction coordinates use a compressed format: `n_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
 - Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [get_channels_irs](#get_channels_irs)) reduces this to active combinations only
 - Typically used after [get_channels_irs](#get_channels_irs) to produce interaction data for path visualization (e.g. in Blender) via [coord2path](#coord2path)
@@ -5247,11 +5252,11 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::combine_irs_coord(
     const arma::Mat<dtype> &irs_pos,
-    const arma::u32_vec *no_interact_1,
+    const arma::u32_vec *n_interact_1,
     const arma::Mat<dtype> *interact_coord_1,
-    const arma::u32_vec *no_interact_2,
+    const arma::u32_vec *n_interact_2,
     const arma::Mat<dtype> *interact_coord_2,
-    arma::u32_vec *no_interact,
+    arma::u32_vec *n_interact,
     arma::Mat<dtype> *interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
@@ -5260,19 +5265,19 @@ void quadriga_lib::combine_irs_coord(
 
 ### Inputs:
 - **`irs_pos`** — IRS position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
-- **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
-- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`; any other size throws
-  `std::invalid_argument` (an empty matrix is accepted when `sum(no_interact_1)` is 0)
-- **`no_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
-- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(no_interact_2)]`; same check as for
+- **`n_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
+- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(n_interact_1)]`; any other size throws
+  `std::invalid_argument` (an empty matrix is accepted when `sum(n_interact_1)` is 0)
+- **`n_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
+- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(n_interact_2)]`; same check as for
   `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
 - **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [get_channels_irs](#get_channels_irs) directly; `[n_path_1 × n_path_2]`
 
 ### Outputs:
-- **`no_interact`** — Number of interaction points per combined path; `[n_path_irs]`
-- **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(no_interact)]`
+- **`n_interact`** — Number of interaction points per combined path; `[n_path_irs]`
+- **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(n_interact)]`
 
 ### See also:
 - [get_channels_irs](#get_channels_irs) (generates `active_path` and channel coefficients for IRS channels)
@@ -5285,9 +5290,9 @@ Convert path interaction coordinates into FBS/LBS positions, path length, and an
 
 Not in: MATLAB, Python
 
-- `no_interact` is a vector of length `n_path` with the number of interactions per path
-- `interact_coord` stores all coordinates concatenated in path order, size `[3, sum(no_interact)]`
-- LOS paths (`no_interact[i] == 0`) get a virtual FBS/LBS at the midpoint between TX and RX
+- `n_interact` is a vector of length `n_path` with the number of interactions per path
+- `interact_coord` stores all coordinates concatenated in path order, size `[3, sum(n_interact)]`
+- LOS paths (`n_interact[i] == 0`) get a virtual FBS/LBS at the midpoint between TX and RX
 - Set `reverse_path = true` to swap TX/RX and reverse all interaction sequences
 
 ### Declaration:
@@ -5295,7 +5300,7 @@ Not in: MATLAB, Python
 void quadriga_lib::coord2path(
     const arma::Mat<dtype> &tx_pos,
     const arma::Mat<dtype> &rx_pos,
-    const arma::u32_vec *no_interact,
+    const arma::u32_vec *n_interact,
     const arma::Mat<dtype> *interact_coord,
     arma::Col<dtype> *path_length = nullptr,
     arma::Mat<dtype> *fbs_pos = nullptr,
@@ -5308,8 +5313,8 @@ void quadriga_lib::coord2path(
 ### Inputs:
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
-- **`no_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
-- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(no_interact)]`
+- **`n_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
+- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(n_interact)]`
 - **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 
 ### Outputs:
@@ -5630,8 +5635,8 @@ arma::uword quadriga_lib::obj_file_read(
 - **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
 - **`obj_names`** — Object names; length `max(obj_ind)+1`
 - **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
-- **`mtl_names`** — Visual material names (raw `usemtl`); length `no_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
+- **`mtl_names`** — Visual material names (raw `usemtl`); length `n_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `[n_mtl, 17]`
 - **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
 - **`csv_names`** — Material names from the table; length `n_csv` (the full table)
 - **`csv_prop`** — Material properties keyed by CSV column name (excluding `name`); each value has
@@ -5839,20 +5844,20 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_aabb) · [Python](quadriga_lib_api_python.md#point_cloud_aabb)
 
 - Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
-- If `sub_cloud_index` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
+- If `sub_cloud_ind` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
 
 ### Declaration:
 ```cpp
 arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
     const arma::Mat<dtype> *points,
-    const arma::u32_vec *sub_cloud_index = nullptr,
+    const arma::u32_vec *sub_cloud_ind = nullptr,
     arma::uword vec_size = 1);
 ```
 
 ### Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
-- **`sub_cloud_index`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
+- **`sub_cloud_ind`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
 ### Returns:
@@ -5879,11 +5884,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_segmentation) · [Python](
 arma::uword quadriga_lib::point_cloud_segmentation(
     const arma::Mat<dtype> *points,
     arma::Mat<dtype> *pointsR,
-    arma::u32_vec *sub_cloud_index,
+    arma::u32_vec *sub_cloud_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
-    arma::u32_vec *forward_index = nullptr,
-    arma::u32_vec *reverse_index = nullptr);
+    arma::u32_vec *forward_ind = nullptr,
+    arma::u32_vec *reverse_ind = nullptr);
 ```
 
 ### Inputs:
@@ -5894,9 +5899,9 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 
 ### Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_index`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_index`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
+- **`forward_ind`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_ind`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
 
 ### Returns:
 - Number of generated sub-clouds `n_sub`
@@ -6003,13 +6008,13 @@ Not in: MATLAB, Python
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
   its coefficients, per frequency, via [medium_gain](#medium_gain) on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
-- The receiver index is written to the committed path's `iC`, 0-based. Without `point_index` it indexes
-  `points` as passed in; with `point_index` it indexes the caller's original, unsegmented point list, so a
+- The receiver index is written to the committed path's `iC`, 0-based. Without `point_ind` it indexes
+  `points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
   cloud reordered by [point_cloud_segmentation](#point_cloud_segmentation) needs no remapping afterwards.
 - Padding points inserted by [point_cloud_segmentation](#point_cloud_segmentation) for SIMD alignment sit at the center of their
-  sub-cloud AABB and are therefore hit often. They are dropped when `point_index` is supplied and committed
+  sub-cloud AABB and are therefore hit often. They are dropped when `point_ind` is supplied and committed
   as if they were receivers when it is not.
-- `min_no_segments` suppresses commits from rays that have not interacted often enough. The launch-sphere
+- `min_segments` suppresses commits from rays that have not interacted often enough. The launch-sphere
   beams of the first generation carry `nSEG = 0` and are far too wide for a point-in-tube test to be
   meaningful, so a beam-traced run passes 1 here.
 - The committed path is not extended by a segment: the receiver is not an interaction point, so `nSEG` and
@@ -6029,12 +6034,12 @@ arma::uword quadriga_lib::ray_commit(
     const arma::fmat &tridir,
     const arma::Col<short> &mtl_ind_current,
     const arma::fmat &rx_points,
-    const arma::u32_vec *sub_cloud_index = nullptr,
-    const arma::u32_vec *point_index = nullptr,
+    const arma::u32_vec *sub_cloud_ind = nullptr,
+    const arma::u32_vec *point_ind = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr,
     float max_path_length = 10e3,
     float min_gain_dB = -140.0f,
-    uint8_t min_no_segments = 0,
+    uint8_t min_segments = 0,
     bool ignore_direct_path = false);
 ```
 
@@ -6054,11 +6059,11 @@ arma::uword quadriga_lib::ray_commit(
 - **`mtl_ind_current`** — Current medium state word, 0 = outside (bit-masked: `mat = w & 0x3FFF`,
   flags in bits 14 and 15); `[n_ray]`
 - **`rx_points`** — Receive points in 3D space; `[n_point, 3]`
-- **`sub_cloud_index`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
+- **`sub_cloud_ind`** *(optional)* — Sub-cloud partition offsets for the point cloud (see
   [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`. NULL → no partitioning
-- **`point_index`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
-  list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_index` output of
-  [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_index`, which runs the other way and has
+- **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
+  list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
+  [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_ind`, which runs the other way and has
   length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `iC` is written in the original
   indexing. NULL → `points` is used as passed in and `iC` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
@@ -6067,7 +6072,7 @@ arma::uword quadriga_lib::ray_commit(
 - **`max_path_length`** *(optional)* — Maximum total path length including the leg to the receiver [m]
 - **`min_gain_dB`** *(optional)* — Gain at `center_freq[0]` below which a path is not committed, in dB;
   evaluated with free-space path loss and the in-medium loss of the final leg included
-- **`min_no_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
+- **`min_segments`** *(optional)* — Minimum number of interaction segments (`nSEG`) a ray must carry
   before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
   generation, including the sub-beams they spawn, which keep `nSEG = 0` until their first interaction
 - **`ignore_direct_path`** *(optional)* — Drop every path that arrives by transmission only
@@ -6088,7 +6093,7 @@ arma::uword quadriga_lib::ray_commit(
 - [ray_point_intersect](#ray_point_intersect) (ray-point intersection, produces the pair list)
 - [ray_subdivide_flag](#ray_subdivide_flag) (produces `subdiv_flag_in`)
 - [ray_progress](#ray_progress) (advance the launch configuration to the next generation)
-- [point_cloud_segmentation](#point_cloud_segmentation) (generate `sub_cloud_index` and `point_index`)
+- [point_cloud_segmentation](#point_cloud_segmentation) (generate `sub_cloud_ind` and `point_ind`)
 - [calc_diffraction_gain](#calc_diffraction_gain) (covers the paths removed by `ignore_direct_path`)
 - [path](#path) (the per-ray storage object)
 
@@ -6134,7 +6139,7 @@ arma::uword ray_init(
     arma::fmat *acc_dist = nullptr,
     std::vector<quadriga_lib::path> *paths = nullptr,
     const arma::fmat *mesh = nullptr,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     const arma::fmat *aabb = nullptr,
     const arma::fmat *rx_points = nullptr,
     bool scalar_mode = false);
@@ -6148,9 +6153,9 @@ arma::uword ray_init(
 - **`max_path_length`** — Maximum ray length [m]; sets `dest` and bounds the launch-sphere probe (floored at 0.01 m)
 - **`mesh`** *(optional)* — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`. Used only to auto-size
   the launch sphere `r0`. NULL → the mesh does not bound `r0`.
-- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
+- **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based,
   strictly increasing, first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
-- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
+- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   Unlike [ray_progress](#ray_progress), boxes are *not* computed internally when omitted: the probe is a fixed 2880 rays,
   so building them here would usually cost more than it saves. Pass the [triangle_mesh_aabb](#triangle_mesh_aabb) result the
   caller already holds for the tracing loop.
@@ -6181,7 +6186,7 @@ arma::uword ray_init(
 ### See also:
 - [icosphere](#icosphere) (generates the ray fan, beam wavefront, and directions)
 - [ray_triangle_intersect](#ray_triangle_intersect) (launch-sphere sizing and per-segment intersection)
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [triangle_mesh_aabb](#triangle_mesh_aabb) (generates `aabb`)
 - [ray_mesh_interact](#ray_mesh_interact) (consumes `orig` / `dest` / `trivec` / `tridir`)
 - [ray_state_update](#ray_state_update) (consumes the medium-state words, `path_dir_prev`, and `acc_dist`)
@@ -6348,7 +6353,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ray_point_intersect) · [Python](quadr
 
 - Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.
 - Reports, for each point, the list of 0-based ray indices whose beam intersects that point.
-- The primary output is a flat CSR pair (`hit_index`, `hit_offset`); the ray indices of point `i` are `hit_index[hit_offset[i] .. hit_offset[i+1]-1]`.
+- The primary output is a flat CSR pair (`hit_ind`, `hit_offset`); the ray indices of point `i` are `hit_ind[hit_offset[i] .. hit_offset[i+1]-1]`.
 - All outputs are optional and are only computed when a non-NULL pointer is passed.
 - All internal computations use single precision.
 
@@ -6359,11 +6364,11 @@ void quadriga_lib::ray_point_intersect(
     const arma::Mat<dtype> &orig,
     const arma::Mat<dtype> &trivec,
     const arma::Mat<dtype> &tridir,
-    std::vector<unsigned> *hit_index = nullptr,
+    std::vector<unsigned> *hit_ind = nullptr,
     arma::u32_vec *hit_offset = nullptr,
     arma::u32_vec *hit_count = nullptr,
     std::vector<arma::u32_vec> *hits_per_point = nullptr,
-    const arma::u32_vec *sub_cloud_index = nullptr,
+    const arma::u32_vec *sub_cloud_ind = nullptr,
     int use_kernel = 0,
     int gpu_id = 0);
 ```
@@ -6373,14 +6378,14 @@ void quadriga_lib::ray_point_intersect(
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates (need not be normalized), order `[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]`; `[n_ray, 9]`
-- **`sub_cloud_index`** *(optional)* — Segment boundary indices for the point cloud (see [point_cloud_segmentation](#point_cloud_segmentation)); sub-clouds
+- **`sub_cloud_ind`** *(optional)* — Segment boundary indices for the point cloud (see [point_cloud_segmentation](#point_cloud_segmentation)); sub-clouds
   need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed); `[n_sub]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ### Optional outputs:
-- **`hit_index`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
-- **`hit_offset`** — Start of each point's block within `hit_index`, last element is `n_hit`; `[n_points + 1]`
+- **`hit_ind`** — Flat list of 0-based ray indices, grouped by point; written by the compute kernel without an intermediate copy; `[n_hit]`
+- **`hit_offset`** — Start of each point's block within `hit_ind`, last element is `n_hit`; `[n_points + 1]`
 - **`hit_count`** — Number of rays intersecting each point, equals `hit_offset[i+1] - hit_offset[i]`; `[n_points]`
 - **`hits_per_point`** — Per-point list of 0-based ray indices; allocates one `arma::u32_vec` per non-empty point, so only request it when the split form is actually needed; `[n_points]`
 
@@ -6423,8 +6428,8 @@ Not in: MATLAB, Python
   note on `center_freq`).
 - Beam subdivision and beam-front updates are active only when `trivec` and `tridir` are supplied;
   otherwise rays are traced as infinitesimal.
-- The ray-mesh intersection can be delegated: pass `no_interact_in`, `fbs_ind_in` and `sbs_ind_in`
-  to reuse a [ray_triangle_intersect](#ray_triangle_intersect) result. When the intersection is delegated, `sub_mesh_index` and `aabb` are unused —
+- The ray-mesh intersection can be delegated: pass `n_interact_in`, `fbs_ind_in` and `sbs_ind_in`
+  to reuse a [ray_triangle_intersect](#ray_triangle_intersect) result. When the intersection is delegated, `sub_mesh_ind` and `aabb` are unused —
   they only accelerate the internal intersector — validation is skipped in this case and the parameters may be omitted.
 - The subdivision decision can likewise be delegated via `subdiv_flag_in`, which a shading pass needs so it
   does not commit beams that reappear as sub-beams. When supplied it is the authority on what gets split;
@@ -6451,18 +6456,18 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     std::vector<quadriga_lib::path> &paths,
     arma::fmat *trivec = nullptr,
     arma::fmat *tridir = nullptr,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     const arma::fmat *aabb = nullptr,
-    uint8_t max_no_interactions = 20,
-    uint8_t max_no_reflections = 10,
-    uint8_t max_no_transmissions = 10,
-    uint8_t max_no_subdivisions = 2,
+    uint8_t max_interactions = 20,
+    uint8_t max_reflections = 10,
+    uint8_t max_transmissions = 10,
+    uint8_t max_subdivisions = 2,
     float min_gain_dB = -140.0f,
     float subdivision_tolerance_m = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
     bool scalar_mode = false,
-    const arma::u32_vec *no_interact_in = nullptr,
+    const arma::u32_vec *n_interact_in = nullptr,
     const arma::u32_vec *fbs_ind_in = nullptr,
     const arma::u32_vec *sbs_ind_in = nullptr,
     const std::vector<bool> *subdiv_flag_in = nullptr);
@@ -6474,14 +6479,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl` (max 16383)
 - **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
-- **`sub_mesh_index`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
+- **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
-- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_index`.
+- **`aabb`** *(optional)* — Axis-aligned bounding box per sub-mesh; `[n_sub, 6]`. Requires `sub_mesh_ind`.
   NULL with a partition present → boxes are computed internally via [triangle_mesh_aabb](#triangle_mesh_aabb)
-- **`max_no_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
-- **`max_no_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
-- **`max_no_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
-- **`max_no_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
+- **`max_interactions`** — Total interactions (segments) per ray before termination, 0 to 255. 0 disables tracing (returns 0 rays)
+- **`max_reflections`** — Reflections per ray, 0 to 255. 0 skips the reflection pass
+- **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
+- **`max_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
   counter `nSUB` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
@@ -6489,17 +6494,17 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
-- **`no_interact_in`** *(optional)* — Externally computed intersection count per ray from [ray_triangle_intersect](#ray_triangle_intersect); `[n_ray]`.
+- **`n_interact_in`** *(optional)* — Externally computed intersection count per ray from [ray_triangle_intersect](#ray_triangle_intersect); `[n_ray]`.
   When given, the internal intersector is skipped and `fbs_ind_in` and `sbs_ind_in` become mandatory
 - **`fbs_ind_in`** *(optional)* — Externally computed 1-based index of the first intersected mesh element, 0 = none; `[n_ray]`.
-  Must be non-zero wherever `no_interact_in` is non-zero.
+  Must be non-zero wherever `n_interact_in` is non-zero.
 - **`sbs_ind_in`** *(optional)* — Externally computed 1-based index of the second intersected mesh element, 0 = none; `[n_ray]`
 - **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; `[n_ray]`, indexed in the full ray
   set (unlike everything else, which is compacted first). When supplied it is the authority on what gets
   subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been
   subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance_m` is unused. Pass the
   output of [ray_subdivide_flag](#ray_subdivide_flag) to reproduce the internal decision exactly; a hand-built list overrides it.
-  Requires beam mode; conflicts with `max_no_subdivisions` = 0
+  Requires beam mode; conflicts with `max_subdivisions` = 0
 
 ### In/out (launch configuration, updated in place; [n_ray, …] on entry, [n_out, …] on return):
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
@@ -6521,14 +6526,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`tridir`** *(optional)* — Vertex-ray directions, Cartesian; `[n_ray, 9]`
 
 ### Returns:
-- Per-stage ray counts `{n_interact, n_subdiv, n_reflect, n_transmit}`:
-  - **`n_interact`** — rays that hit the mesh, i.e. `no_interact != 0`, counted before any compaction
+- Per-stage ray counts `{n_hit, n_subdiv, n_reflect, n_transmit}`:
+  - **`n_hit`** — rays that hit the mesh, i.e. `n_interact != 0`, counted before any compaction
   - **`n_subdiv`** — rays flagged for subdivision, each expanded into 4 sub-beams. Not a subset of
-    `n_interact`: a delegated flag may mark rays that missed the mesh, so the two counts are independent
+    `n_hit`: a delegated flag may mark rays that missed the mesh, so the two counts are independent
   - **`n_reflect`** — reflected continuations launched
   - **`n_transmit`** — transmitted / refracted continuations launched
 - Only rays that hit the mesh *and* were not subdivided reach the interaction passes, so
-  `n_reflect + n_transmit` is bounded by twice that number, not by `2·n_interact`.
+  `n_reflect + n_transmit` is bounded by twice that number, not by `2·n_hit`.
 
 ### See also:
 - [ray_init](#ray_init) (produces the initial launch configuration this function advances)
@@ -6572,7 +6577,7 @@ void quadriga_lib::ray_state_update(
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *fbsN,
     const arma::Mat<dtype> *sbsN,
-    const arma::u32_vec *no_interact,
+    const arma::u32_vec *n_interact,
     const arma::Col<dtype> *fbs_angleN,
     const arma::Mat<dtype> *normal_vecN,
     const std::vector<uint8_t> *out_typeN,
@@ -6609,7 +6614,7 @@ void quadriga_lib::ray_state_update(
 - **`center_freq`** — Center frequency in [Hz]
 - **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
 - **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
-- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
+- **`n_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
 - **`fbs_angleN`** — Incidence angle at FBS (the angle to the face, as [ray_mesh_interact](#ray_mesh_interact) writes it), compact set; `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`; required.
   The plane of the VBS, and the test whether the two faces of an entry are parallel.
@@ -6780,8 +6785,8 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::fmat &tridir,
     const std::vector<quadriga_lib::path> &paths,
     const arma::Col<short> &mtl_ind_current,
-    uint8_t max_no_interactions = 20,
-    uint8_t max_no_subdivisions = 2,
+    uint8_t max_interactions = 20,
+    uint8_t max_subdivisions = 2,
     float subdivision_tolerance_m = 3.0f);
 ```
 
@@ -6796,9 +6801,9 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
 - **`mtl_ind_current`** — Current medium state word, 0 = outside; `[n_ray]`. A ray inside a medium is
   never split: the sub-beams restart their in-layer accumulator and recompute their direction
   geometrically, which is only valid outside
-- **`max_no_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
+- **`max_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
-- **`max_no_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
+- **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
   the returned flags are all `false`
 - **`subdivision_tolerance_m`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
@@ -6839,10 +6844,10 @@ void quadriga_lib::ray_triangle_intersect(
     const arma::Mat<dtype> *mesh,
     arma::Mat<dtype> *fbs = nullptr,
     arma::Mat<dtype> *sbs = nullptr,
-    arma::u32_vec *no_interact = nullptr,
+    arma::u32_vec *n_interact = nullptr,
     arma::u32_vec *fbs_ind = nullptr,
     arma::u32_vec *sbs_ind = nullptr,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     const arma::Mat<dtype> *aabb = nullptr,
     int use_kernel = 0,
     int gpu_id = 0);
@@ -6852,7 +6857,7 @@ void quadriga_lib::ray_triangle_intersect(
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `[n_mesh, 9]`
-- **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
+- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
@@ -6860,7 +6865,7 @@ void quadriga_lib::ray_triangle_intersect(
 ### Outputs:
 - **`fbs`** (optional) — First-bounce intersection points in GCS; `[n_ray, 3]`
 - **`sbs`** (optional) — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
+- **`n_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
 - **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
 - **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
 
@@ -7017,13 +7022,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_aabb) · [Python](quadri
 ```cpp
 arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
     const arma::Mat<dtype> *mesh,
-    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::u32_vec *sub_mesh_ind = nullptr,
     arma::uword vec_size = 1);
 ```
 
 ### Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `[n_triangles, 9]`
-- **`sub_mesh_index`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
+- **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
 ### Returns:
@@ -7041,7 +7046,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_segmentation) · [Python
 
 - Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_ind` uses 0 to mark padding entries
 - If `mtl_ind` is provided, material indices are reordered and padded the same way (padding uses index 0)
 
 ### Declaration:
@@ -7049,12 +7054,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_segmentation) · [Python
 arma::uword triangle_mesh_segmentation(
     const arma::Mat<dtype> *mesh,
     arma::Mat<dtype> *meshR,
-    arma::u32_vec *sub_mesh_index,
+    arma::u32_vec *sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
     const arma::uvec *mtl_ind = nullptr,
     arma::uvec *mtl_ind_out = nullptr,
-    arma::u32_vec *mesh_index = nullptr);
+    arma::u32_vec *mesh_ind = nullptr);
 ```
 
 ### Inputs:
@@ -7065,15 +7070,15 @@ arma::uword triangle_mesh_segmentation(
 
 ### Outputs:
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
 - **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
-- **`mesh_index`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
+- **`mesh_ind`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
 
 ### Returns:
 - Number of created sub-meshes `n_sub`
 
 ### See also:
-- [calc_diffraction_gain](#calc_diffraction_gain) (uses `sub_mesh_index` for acceleration)
+- [calc_diffraction_gain](#calc_diffraction_gain) (uses `sub_mesh_ind` for acceleration)
 - [obj_file_read](#obj_file_read) (defines `mtl_ind` / `csv_ind`)
 
 ---
@@ -7162,7 +7167,7 @@ Not in: MATLAB, Python
   gain extraction, normalization, and gain application. They are selected independently through
   `initialize`, `update`, `normalize`, `gain`, and `apply_gain`, so a call can do any combination
   (see Usage)
-- An optional `ray_index` lets the update set be a subset of the global state, scattered into
+- An optional `ray_ind` lets the update set be a subset of the global state, scattered into
   `xprmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
 - Storage is interleaved complex, column-major, matching the `xprmat` output of
   [calc_diffraction_gain](#calc_diffraction_gain). EM mode carries the full 2x2 Jones matrix; scalar mode carries a
@@ -7177,14 +7182,14 @@ void xpr_update(
     bool initialize = false,
     bool normalize = false,
     bool apply_gain = false,
-    const arma::uvec *ray_index = nullptr);
+    const arma::uvec *ray_ind = nullptr);
 ```
 
 ### Arguments:
 - **`xprmat`** — Global XPR state, updated in place. EM mode `[8, n_ray]`, scalar mode
   `[2, n_ray]`. If empty on entry it is sized from `update` and seeded to unity (see Usage). A
   pre-sized (non-empty) buffer is treated as accumulated state unless `initialize` is set. When
-  `ray_index` is given, `xprmat` must already exist, because the extent of the global set cannot be
+  `ray_ind` is given, `xprmat` must already exist, because the extent of the global set cannot be
   inferred from a subset.
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
   match `xprmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
@@ -7203,7 +7208,7 @@ void xpr_update(
 - **`normalize`** — If `true`, each touched column is scaled to unit gain after the update.
   Untouched columns of `xprmat` are left alone.
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
-- **`ray_index`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
+- **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
   Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
   `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
   in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
@@ -7213,7 +7218,7 @@ void xpr_update(
 ### Usage:
 The flags are composable in one call; the per-column order is always
 initialize -> update -> normalize -> apply_gain. Argument order is
-`(xprmat, update, gain, initialize, normalize, apply_gain, ray_index)`.
+`(xprmat, update, gain, initialize, normalize, apply_gain, ray_ind)`.
 ```cpp
 arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 

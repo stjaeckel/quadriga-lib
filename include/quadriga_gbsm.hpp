@@ -171,7 +171,7 @@ namespace quadriga_lib
                   arma::mat &loss,                           // Output: Penetration loss in [dB], [n_ut, n_freq]
                   double d2d_in_max = 25.0,                  // Maximum indoor 2D distance in [m] (key O2I_d2D_in_max)
                   arma::vec *d2d_in = nullptr,               // Optional output: Indoor 2D distance in [m], 0 for car models, [n_ut]
-                  arma::uvec *model_index = nullptr);        // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]
+                  arma::uvec *model_ind = nullptr);          // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]
 
     // ---- Small-scale fading ----
     // Cluster level (ssf_clusters) and ray level (gbsm_rays, ssf_rays, ssf_paths) of TR 38.901 clause 7.5;

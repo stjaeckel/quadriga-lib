@@ -72,7 +72,7 @@ class test_case(unittest.TestCase):
             self.assertGreaterEqual(sub_idx.min(initial=0), 0)
             self.assertTrue(
                 np.all(np.diff(sub_idx) > 0),
-                "sub_mesh_index must be strictly increasing",
+                "sub_mesh_ind must be strictly increasing",
             )
             starts = sub_idx
             ends = np.append(sub_idx[1:], n_out)
@@ -102,7 +102,7 @@ class test_case(unittest.TestCase):
             # No padding expected when vec_size == 1
             self.assertTrue(
                 np.all(mesh_idx > 0),
-                "No zeros expected in mesh_index for vec_size == 1",
+                "No zeros expected in mesh_ind for vec_size == 1",
             )
 
             # Mapping correctness: triangles_out must be a reordering of triangles_in
@@ -154,7 +154,7 @@ class test_case(unittest.TestCase):
                 "Each submesh size must be a multiple of vec_size",
             )
 
-            # Identify padded rows via mesh_index == 0
+            # Identify padded rows via mesh_ind == 0
             mesh_idx = np.asarray(mesh_idx)
             pad_mask = mesh_idx == 0
             self.assertTrue(

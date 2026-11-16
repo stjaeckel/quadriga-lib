@@ -35,14 +35,14 @@ class test_case(unittest.TestCase):
         out = self.out
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 3)
-        loss, d2d_in, model_index = out
+        loss, d2d_in, model_ind = out
         self.assertEqual(loss.shape, (3, 3))
         self.assertEqual(d2d_in.shape, (3,))
-        self.assertEqual(model_index.shape, (3,))
+        self.assertEqual(model_ind.shape, (3,))
         self.assertEqual(loss.dtype, np.float64)
         self.assertEqual(d2d_in.dtype, np.float64)
-        self.assertEqual(model_index.dtype, np.uint64)
-        npt.assert_array_equal(model_index, [0, 1, 2])  # 0-based
+        self.assertEqual(model_ind.dtype, np.uint64)
+        npt.assert_array_equal(model_ind, [0, 1, 2])  # 0-based
         npt.assert_allclose(d2d_in, [0.3 * 25, 0.0, 0.2 * 25], atol=1e-14, rtol=0)
         npt.assert_allclose(loss[1], [3.0, 3.0, 3.0], atol=1e-14, rtol=0)  # car: 9 + 5·N, N = -1.2
         f = self.fc / 1e9  # low-loss model of UT 0

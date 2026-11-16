@@ -40,13 +40,13 @@ MD!*/
 py::tuple hdf5_read_layout(const std::string &fn)
 {
     // Read the storage layout and the per-slot channel IDs
-    arma::Col<unsigned> channelID;
-    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channelID);
+    arma::Col<unsigned> channel_id;
+    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channel_id);
 
     const unsigned nx = storage_space.at(0), ny = storage_space.at(1),
                    nz = storage_space.at(2), nw = storage_space.at(3);
 
-    if (channelID.n_elem != (arma::uword)nx * ny * nz * nw)
+    if (channel_id.n_elem != (arma::uword)nx * ny * nz * nw)
         throw std::runtime_error("Corrupted storage index.");
 
     // storage_dims: 4-element vector [nx, ny, nz, nw] (copied integer output: int64)
@@ -58,7 +58,7 @@ py::tuple hdf5_read_layout(const std::string &fn)
     for (unsigned w = 0; w < nw; ++w)
     {
         unsigned *dst = has_data_cubes[w].memptr();
-        const unsigned *src = channelID.memptr() + (size_t)w * nx * ny * nz;
+        const unsigned *src = channel_id.memptr() + (size_t)w * nx * ny * nz;
         for (size_t i = 0, n = (size_t)nx * ny * nz; i < n; ++i)
             dst[i] = (src[i] != 0u) ? 1u : 0u;
     }

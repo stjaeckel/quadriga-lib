@@ -11,7 +11,7 @@ TEST_CASE("QRT Reader")
 {
     std::string fn = "tests/data/test.qrt";
 
-    arma::uword no_orig, no_cir, no_dest, no_freq;
+    arma::uword n_orig, n_cir, n_dest, n_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
     int version;
@@ -20,15 +20,15 @@ TEST_CASE("QRT Reader")
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
     // Check parser
-    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version,
+    quadriga_lib::qrt_file_parse(fn, &n_cir, &n_orig, &n_dest, &n_freq, &cir_offset, &orig_names, &dest_names, &version,
                                  &center_freq_f, &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 
-    REQUIRE(no_orig == 3ULL);
-    REQUIRE(no_dest == 2ULL);
-    REQUIRE(no_cir == 7ULL);
-    REQUIRE(no_freq == 1ULL);
+    REQUIRE(n_orig == 3ULL);
+    REQUIRE(n_dest == 2ULL);
+    REQUIRE(n_cir == 7ULL);
+    REQUIRE(n_freq == 1ULL);
     REQUIRE(version == 4);
-    REQUIRE(cir_offset.n_elem == no_dest);
+    REQUIRE(cir_offset.n_elem == n_dest);
 
     CHECK(cir_offset[0] == 0ULL);
     CHECK(cir_offset[1] == 1ULL);
@@ -344,15 +344,15 @@ TEST_CASE("QRT Reader v5")
 {
     std::string fn = "tests/data/test_v5.qrt";
 
-    arma::uword no_orig, no_cir, no_dest, no_freq;
+    arma::uword n_orig, n_cir, n_dest, n_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
     int version;
 
-    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version);
+    quadriga_lib::qrt_file_parse(fn, &n_cir, &n_orig, &n_dest, &n_freq, &cir_offset, &orig_names, &dest_names, &version);
 
     CHECK(version == 5);
-    CHECK(no_freq == 2);
+    CHECK(n_freq == 2);
 
     arma::cube M;
     arma::mat path_gain;

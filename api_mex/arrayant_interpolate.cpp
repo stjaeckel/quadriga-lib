@@ -28,11 +28,11 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 ```
 % Single-frequency mode
 [ V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma ] = quadriga_lib.arrayant_interpolate( ...
-    arrayant, azimuth, elevation, element, orientation, element_pos, [], use_kernel );
+    arrayant, azimuth, elevation, i_element, orientation, element_pos, [], use_kernel );
 
 % Multi-frequency mode
 [ V_re, V_im, H_re, H_im ] = quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, ...
-    element, orientation, element_pos, freq_new, use_kernel );
+    i_element, orientation, element_pos, freq_new, use_kernel );
 ```
 
 ## Inputs:
@@ -41,7 +41,7 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 - **`azimuth`** — Azimuth angles in GCS; `[1, n_ang]` (same angles for all outputs) or `[n_out, n_ang]` (one angle per
   output)
 - **`elevation`** — Elevation angles in GCS; same size as `azimuth`
-- **`element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
+- **`i_element`** — Element indices, 1-based, duplicates allowed; `[n_out]`; default: all elements
 - **`orientation`** — Euler angles (bank, tilt, heading) of the antenna; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]` or
   `[3, n_out, n_ang]`; default: no rotation
 - **`element_pos`** — Element positions in local antenna coordinates, used for `dist`; `[3, n_out]`; default: the
@@ -81,21 +81,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto el = qd_mex_get_Mat<double>(prhs[2], false, "elevation");
 
     // Element indices: 1-based (MATLAB) -> 0-based (C++), empty = all elements
-    arma::uvec element = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], true, "element");
-    if (arma::any(element == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'element' cannot be 0 (1-based index).");
-    element -= 1;
+    arma::uvec i_element = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], true, "i_element");
+    if (arma::any(i_element == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");
+    i_element -= 1;
 
     const auto orientation = (nrhs < 5) ? arma::cube() : qd_mex_get_Cube<double>(prhs[4], false, "orientation");
     const auto element_pos = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5], false, "element_pos");
     const auto freq_new = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "freq_new");
     const int use_kernel = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "use_kernel", 0);
 
-    const arma::uvec *p_element = element.is_empty() ? nullptr : &element;
+    const arma::uvec *p_element = i_element.is_empty() ? nullptr : &i_element;
     const arma::cube *p_orientation = orientation.is_empty() ? nullptr : &orientation;
     const arma::mat *p_element_pos = element_pos.is_empty() ? nullptr : &element_pos;
 
-    const arma::uword n_out = element.is_empty() ? ant[0].n_elements() : element.n_elem;
+    const arma::uword n_out = i_element.is_empty() ? ant[0].n_elements() : i_element.n_elem;
     const arma::uword n_ang = az.n_cols;
 
     if (ant.size() > 1 || !freq_new.is_empty()) // Multi-frequency mode

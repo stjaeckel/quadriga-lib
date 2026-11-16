@@ -57,7 +57,7 @@ assertElementsAlmostEqual( gain_only, gain_single, 'absolute', 1e-5 );
 quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, [] );
 quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, 1 );
 
-% Non-uint32 numeric sub_mesh_index (typecast path) gives identical result.
+% Non-uint32 numeric sub_mesh_ind (typecast path) gives identical result.
 gain_smi = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, 1 );
 assertElementsAlmostEqual( gain, gain_smi, 'absolute', 1e-10 );
 
@@ -284,7 +284,7 @@ assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind
 assert_throws( @() out4( orig, dest, cube, mtl_ind, mtl_st, 1e9, 5 ), ...
     'Too many output arguments.' );                                                % 4 outputs
 assert_throws( @() quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_ind, mtl_st, 1e9, 0, 0, 0 ), ...
-    'Entries in ''sub_mesh_index'' cannot be 0 (1-based index).' );                % sub_mesh entry 0
+    'Entries in ''sub_mesh_ind'' cannot be 0 (1-based index).' );                % sub_mesh entry 0
 
 % Library-layer guards. Strings marked (guess) are best-effort and may need
 % updating to match the refactored library messages.

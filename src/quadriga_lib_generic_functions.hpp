@@ -26,7 +26,7 @@ void qd_RPI_assemble(const unsigned long long *const *hit_buffer, // Packed hit 
                      const size_t *n_hit_buffer,                  // Number of records in each buffer, length n_buffer
                      const size_t n_buffer,                       // Number of buffers, may be 0
                      const size_t n_point,                        // Number of points
-                     std::vector<unsigned> *hit_index,            // Output: flat list of ray indices grouped by point, resized to the total hit count
+                     std::vector<unsigned> *hit_ind,              // Output: flat list of ray indices grouped by point, resized to the total hit count
                      unsigned *hit_offset);                       // Output: 0-based start of each point's block, length n_point + 1
 
 // Per-thread staging of packed hit records for RayPointIntersect, in chunks of fixed size
@@ -53,7 +53,7 @@ public:
     int *scratch(size_t i_thread, size_t n);
 
     // Assembles the point-major CSR hit list from the chunks in thread order, which preserves the ray order
-    void assemble(size_t n_point, std::vector<unsigned> *hit_index, unsigned *hit_offset) const;
+    void assemble(size_t n_point, std::vector<unsigned> *hit_ind, unsigned *hit_offset) const;
 
 private:
     std::vector<std::vector<std::vector<unsigned long long>>> chunks; // [n_threads][n_chunks][chunk_size or less]
@@ -98,7 +98,7 @@ void qd_RPI_GENERIC(const dtype *Px, const dtype *Py, const dtype *Pz,    // Poi
                     const dtype *D3x, const dtype *D3y, const dtype *D3z, // Third ray direction in GCS, length n_ray
                     const dtype *rD1, const dtype *rD2, const dtype *rD3, // Inverse Dot product of ray direction and normal vector
                     const size_t n_ray,                                   // Number of rays
-                    std::vector<unsigned> *hit_index,                     // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
+                    std::vector<unsigned> *hit_ind,                       // Output: flat list of 0-based ray indices grouped by point, resized by the kernel
                     unsigned *hit_offset);                                // Output: 0-based start of each point's block, length n_point + 1, allocated by the caller
 
 // sin and cos of 2 * pi * r for r in [-0.5, 0.5] (one period, already reduced in double precision by the caller).

@@ -657,21 +657,21 @@ Copy a single antenna element to one or more destination slots
 - Added elements get their own port with identity coupling; positions of added elements that are not copied are zero
 - When the array grows, an empty `element_pos` and an empty coupling are written out first (zeros, identity), so
   that all elements can be edited afterwards; otherwise empty members stay empty
-- Throws `std::invalid_argument` for an empty `destination`, a source index out of bound, or a destination index
+- Throws `std::invalid_argument` for an empty `i_target`, a source index out of bound, or a destination index
   equal to the largest `arma::uword` (e.g. `-1` cast to unsigned)
 
 ## Declaration:
 ```
 void quadriga_lib::arrayant_copy_element(
     arrayant<dtype> &ant,
-    arma::uword source,
-    const arma::uvec &destination);
+    arma::uword i_source,
+    const arma::uvec &i_target);
 ```
 
 ## Inputs:
 - **`ant`** — Valid arrayant; updated in-place
-- **`source`** — Index of the element to copy, 0-based
-- **`destination`** — Target indices, 0-based; a single index is passed as `{i}`
+- **`i_source`** — Index of the element to copy, 0-based
+- **`i_target`** — Target indices, 0-based; a single index is passed as `{i}`
 
 ## Example:
 ```
@@ -685,13 +685,13 @@ ant.element_pos.row(1) = arma::rowvec({-0.75, -0.25, 0.25, 0.75});
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword source, const arma::uvec &destination)
+void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword i_source, const arma::uvec &i_target)
 {
-    if (destination.n_elem == 0)
-        throw std::invalid_argument("Input 'destination' is empty.");
+    if (i_target.n_elem == 0)
+        throw std::invalid_argument("Input 'i_target' is empty.");
 
     // The largest index cannot be reached by resizing: index + 1 would wrap to 0
-    if (destination.max() == std::numeric_limits<arma::uword>::max())
+    if (i_target.max() == std::numeric_limits<arma::uword>::max())
         throw std::invalid_argument("Destination index out of bound.");
 
     // Check if arrayant object is valid
@@ -703,9 +703,9 @@ void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword sourc
     arma::uword n_az = ant.e_theta_re.n_cols;
     arma::uword n_ang = n_el * n_az;
     arma::uword n_elements = ant.e_theta_re.n_slices;
-    arma::uword n_element_max = destination.max() + 1;
+    arma::uword n_element_max = i_target.max() + 1;
 
-    if (source >= n_elements)
+    if (i_source >= n_elements)
         throw std::invalid_argument("Source index out of bound");
 
     // Enlarge the arrayant; empty positions and coupling are written out first (zeros, identity), so that the new
@@ -733,15 +733,15 @@ void quadriga_lib::arrayant_copy_element(arrayant<dtype> &ant, arma::uword sourc
     }
 
     // Copy data from source to destination
-    for (auto dest = destination.begin(); dest != destination.end(); ++dest)
-        if (source != *dest)
+    for (auto dest = i_target.begin(); dest != i_target.end(); ++dest)
+        if (i_source != *dest)
         {
-            std::memcpy(ant.e_theta_re.slice_memptr(*dest), ant.e_theta_re.slice_memptr(source), n_ang * sizeof(dtype));
-            std::memcpy(ant.e_theta_im.slice_memptr(*dest), ant.e_theta_im.slice_memptr(source), n_ang * sizeof(dtype));
-            std::memcpy(ant.e_phi_re.slice_memptr(*dest), ant.e_phi_re.slice_memptr(source), n_ang * sizeof(dtype));
-            std::memcpy(ant.e_phi_im.slice_memptr(*dest), ant.e_phi_im.slice_memptr(source), n_ang * sizeof(dtype));
+            std::memcpy(ant.e_theta_re.slice_memptr(*dest), ant.e_theta_re.slice_memptr(i_source), n_ang * sizeof(dtype));
+            std::memcpy(ant.e_theta_im.slice_memptr(*dest), ant.e_theta_im.slice_memptr(i_source), n_ang * sizeof(dtype));
+            std::memcpy(ant.e_phi_re.slice_memptr(*dest), ant.e_phi_re.slice_memptr(i_source), n_ang * sizeof(dtype));
+            std::memcpy(ant.e_phi_im.slice_memptr(*dest), ant.e_phi_im.slice_memptr(i_source), n_ang * sizeof(dtype));
             if (!ant.element_pos.empty()) // Empty only when the array did not grow
-                std::memcpy(ant.element_pos.colptr(*dest), ant.element_pos.colptr(source), 3 * sizeof(dtype));
+                std::memcpy(ant.element_pos.colptr(*dest), ant.element_pos.colptr(i_source), 3 * sizeof(dtype));
         }
 
     qd_arrayant_mark_valid(ant);
@@ -861,63 +861,63 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     // Generate vertices and faces
     arma::mat vertices_icosphere; // double precision
     arma::u32_mat faces_icosphere;
-    size_t no_faces, no_vert;
+    size_t n_faces, n_vert;
     {
         arma::mat center, vert;
-        no_faces = quadriga_lib::icosphere<double>(icosphere_n_div, 1.0, &center, nullptr, &vert);
+        n_faces = quadriga_lib::icosphere<double>(icosphere_n_div, 1.0, &center, nullptr, &vert);
 
-        vertices_icosphere.set_size(3 * no_faces, 3);
-        faces_icosphere.set_size(no_faces, 3);
+        vertices_icosphere.set_size(3 * n_faces, 3);
+        faces_icosphere.set_size(n_faces, 3);
 
         double *pc = center.memptr(), *pv = vert.memptr(), *v = vertices_icosphere.memptr();
         unsigned *f_ico = faces_icosphere.memptr();
 
-        for (size_t i_face = 0; i_face < no_faces; ++i_face)
+        for (size_t i_face = 0; i_face < n_faces; ++i_face)
         {
             double x, y, z;
 
             x = pc[i_face] + pv[i_face];
-            y = pc[i_face + no_faces] + pv[i_face + no_faces];
-            z = pc[i_face + 2 * no_faces] + pv[i_face + 2 * no_faces];
+            y = pc[i_face + n_faces] + pv[i_face + n_faces];
+            z = pc[i_face + 2 * n_faces] + pv[i_face + 2 * n_faces];
 
             v[3 * i_face] = x;
-            v[3 * i_face + 3 * no_faces] = y;
-            v[3 * i_face + 6 * no_faces] = z;
+            v[3 * i_face + 3 * n_faces] = y;
+            v[3 * i_face + 6 * n_faces] = z;
             f_ico[i_face] = 3 * (unsigned)i_face + 1;
 
-            x = pc[i_face] + pv[i_face + 3 * no_faces];
-            y = pc[i_face + no_faces] + pv[i_face + 4 * no_faces];
-            z = pc[i_face + 2 * no_faces] + pv[i_face + 5 * no_faces];
+            x = pc[i_face] + pv[i_face + 3 * n_faces];
+            y = pc[i_face + n_faces] + pv[i_face + 4 * n_faces];
+            z = pc[i_face + 2 * n_faces] + pv[i_face + 5 * n_faces];
 
             v[3 * i_face + 1] = x;
-            v[3 * i_face + 3 * no_faces + 1] = y;
-            v[3 * i_face + 6 * no_faces + 1] = z;
-            f_ico[i_face + no_faces] = 3 * (unsigned)i_face + 2;
+            v[3 * i_face + 3 * n_faces + 1] = y;
+            v[3 * i_face + 6 * n_faces + 1] = z;
+            f_ico[i_face + n_faces] = 3 * (unsigned)i_face + 2;
 
-            x = pc[i_face] + pv[i_face + 6 * no_faces];
-            y = pc[i_face + no_faces] + pv[i_face + 7 * no_faces];
-            z = pc[i_face + 2 * no_faces] + pv[i_face + 8 * no_faces];
+            x = pc[i_face] + pv[i_face + 6 * n_faces];
+            y = pc[i_face + n_faces] + pv[i_face + 7 * n_faces];
+            z = pc[i_face + 2 * n_faces] + pv[i_face + 8 * n_faces];
 
             v[3 * i_face + 2] = x;
-            v[3 * i_face + 3 * no_faces + 2] = y;
-            v[3 * i_face + 6 * no_faces + 2] = z;
-            f_ico[i_face + 2 * no_faces] = 3 * (unsigned)i_face + 3;
+            v[3 * i_face + 3 * n_faces + 2] = y;
+            v[3 * i_face + 6 * n_faces + 2] = z;
+            f_ico[i_face + 2 * n_faces] = 3 * (unsigned)i_face + 3;
         }
     }
-    no_vert = 3 * no_faces;
+    n_vert = 3 * n_faces;
 
     // Convert vertices to angles
     arma::Mat<dtype> azimuth, elevation;
-    azimuth.set_size(1, no_vert);
-    elevation.set_size(1, no_vert);
+    azimuth.set_size(1, n_vert);
+    elevation.set_size(1, n_vert);
     {
         double *v = vertices_icosphere.memptr();
         dtype *az = azimuth.memptr(), *el = elevation.memptr();
-        for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+        for (size_t i_vert = 0; i_vert < n_vert; ++i_vert)
         {
             double x = v[i_vert];
-            double y = v[i_vert + no_vert];
-            double z = v[i_vert + 2 * no_vert];
+            double y = v[i_vert + n_vert];
+            double z = v[i_vert + 2 * n_vert];
             x = x > 1.0 ? 1.0 : x, y = y > 1.0 ? 1.0 : y, z = z > 1.0 ? 1.0 : z;
             x = x < -1.0 ? -1.0 : x, y = y < -1.0 ? -1.0 : y, z = z < -1.0 ? -1.0 : z;
             az[i_vert] = (dtype)std::atan2(y, x);
@@ -937,7 +937,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     auto find_max_pow = [&]()
     {
         max_pow = 0.0, has_nan = false;
-        for (size_t i = 0; i < no_vert * no_elements_t; ++i)
+        for (size_t i = 0; i < n_vert * no_elements_t; ++i)
         {
             double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
             double p = a * a + b * b + c * c + d * d;
@@ -948,7 +948,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     find_max_pow();
     if (std::isinf(max_pow)) // Power above the double range: rescale the interpolated fields
     {
-        dtype s = (dtype)qd_inverse_max_field(vr, vi, hr, hi, no_vert * no_elements_t);
+        dtype s = (dtype)qd_inverse_max_field(vr, vi, hr, hi, n_vert * no_elements_t);
         V_re *= s, V_im *= s, H_re *= s, H_im *= s;
         find_max_pow();
     }
@@ -974,9 +974,9 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
             outFile << "\no " << "QuaDRiGa_ANT_" << ant_name << "_" << std::setfill('0') << std::setw(3) << i_array_element << "\n";
 
             // Calculate Shape
-            arma::vec pow(no_vert);
+            arma::vec pow(n_vert);
             double *pp = pow.memptr();
-            for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+            for (size_t i_vert = 0; i_vert < n_vert; ++i_vert)
             {
                 size_t i = i_vert * no_elements_t + i_el;
                 double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
@@ -989,23 +989,23 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
             }
 
             // Scale vertices
-            arma::mat scaled_vertices(no_vert, 3);
+            arma::mat scaled_vertices(n_vert, 3);
             double *v_scale = scaled_vertices.memptr();  // Scaled vertices
             double *v_ico = vertices_icosphere.memptr(); // Icosphere vertices
-            for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+            for (size_t i_vert = 0; i_vert < n_vert; ++i_vert)
             {
                 v_scale[i_vert] = v_ico[i_vert] * pp[i_vert];                             // x
-                v_scale[i_vert + no_vert] = v_ico[i_vert + no_vert] * pp[i_vert];         // y
-                v_scale[i_vert + 2 * no_vert] = v_ico[i_vert + 2 * no_vert] * pp[i_vert]; // z
+                v_scale[i_vert + n_vert] = v_ico[i_vert + n_vert] * pp[i_vert];           // y
+                v_scale[i_vert + 2 * n_vert] = v_ico[i_vert + 2 * n_vert] * pp[i_vert];   // z
             }
 
             // Process faces
             double eps = 0.001; // Co-location tolerance in [m], relative to 1 m radius
             eps *= eps;         // Squared value
 
-            arma::mat final_vertices(no_vert, 3);
-            arma::u32_mat vert_index(no_faces, 3);
-            arma::u32_vec cmap_index(no_faces);
+            arma::mat final_vertices(n_vert, 3);
+            arma::u32_mat vert_index(n_faces, 3);
+            arma::u32_vec cmap_index(n_faces);
 
             double *v_final = final_vertices.memptr(); // Final vertices
             unsigned *f_final = vert_index.memptr();   // Final face indices
@@ -1014,20 +1014,20 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
             size_t no_final_vert = 0; // Number of final vertices
             size_t no_final_face = 0; // Number of final faces
 
-            for (size_t i_face = 0; i_face < no_faces; ++i_face)
+            for (size_t i_face = 0; i_face < n_faces; ++i_face)
             {
                 // Load the 3 scaled vertices of the face
                 double x0 = v_scale[3 * i_face];
-                double y0 = v_scale[3 * i_face + no_vert];
-                double z0 = v_scale[3 * i_face + 2 * no_vert];
+                double y0 = v_scale[3 * i_face + n_vert];
+                double z0 = v_scale[3 * i_face + 2 * n_vert];
 
                 double x1 = v_scale[3 * i_face + 1];
-                double y1 = v_scale[3 * i_face + no_vert + 1];
-                double z1 = v_scale[3 * i_face + 2 * no_vert + 1];
+                double y1 = v_scale[3 * i_face + n_vert + 1];
+                double z1 = v_scale[3 * i_face + 2 * n_vert + 1];
 
                 double x2 = v_scale[3 * i_face + 2];
-                double y2 = v_scale[3 * i_face + no_vert + 2];
-                double z2 = v_scale[3 * i_face + 2 * no_vert + 2];
+                double y2 = v_scale[3 * i_face + n_vert + 2];
+                double z2 = v_scale[3 * i_face + 2 * n_vert + 2];
 
                 // Check if face vertices collapse to a point or line
                 double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
@@ -1065,8 +1065,8 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
                     for (size_t i = 0; i < no_final_vert; ++i) // Search existing vertex
                     {
                         dx = v_final[i] - x;
-                        dy = v_final[i + no_vert] - y;
-                        dz = v_final[i + 2 * no_vert] - z;
+                        dy = v_final[i + n_vert] - y;
+                        dz = v_final[i + 2 * n_vert] - z;
                         dd = dx * dx + dy * dy + dz * dz;
                         if (dd < eps)
                         {
@@ -1079,13 +1079,13 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
                     {
                         i_vert_final = no_final_vert;
                         v_final[i_vert_final] = x;
-                        v_final[i_vert_final + no_vert] = y;
-                        v_final[i_vert_final + 2 * no_vert] = z;
+                        v_final[i_vert_final + n_vert] = y;
+                        v_final[i_vert_final + 2 * n_vert] = z;
                         ++no_final_vert;
                     }
 
                     // Write face ID
-                    f_final[no_final_face + i3 * no_faces] = (unsigned)i_vert_final;
+                    f_final[no_final_face + i3 * n_faces] = (unsigned)i_vert_final;
                 }
 
                 // Get the colormap index
@@ -1103,8 +1103,8 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
             for (size_t i_vert = 0; i_vert < no_final_vert; ++i_vert)
             {
                 double x = v_final[i_vert];
-                double y = v_final[i_vert + no_vert];
-                double z = v_final[i_vert + 2 * no_vert];
+                double y = v_final[i_vert + n_vert];
+                double z = v_final[i_vert + 2 * n_vert];
 
                 x *= radius;
                 y *= radius;
@@ -1133,7 +1133,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
                             outFile << "usemtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i_color << "\n";
                             color_not_used = false;
                         }
-                        outFile << "f " << f_final[i_face] + face_offset << " " << f_final[i_face + no_faces] + face_offset << " " << f_final[i_face + 2 * no_faces] + face_offset << "\n";
+                        outFile << "f " << f_final[i_face] + face_offset << " " << f_final[i_face + n_faces] + face_offset << " " << f_final[i_face + 2 * n_faces] + face_offset << "\n";
                     }
                 }
             }

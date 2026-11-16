@@ -447,14 +447,14 @@ Copy an antenna element to one or more destinations across all entries in a mult
 ```
 void quadriga_lib::arrayant_copy_element_multi(
         std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-        arma::uword source,
-        const arma::uvec &destination);
+        arma::uword i_source,
+        const arma::uvec &i_target);
 ```
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
-- **`source`** — Index of the element to copy from; must be within current element count
-- **`destination`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
+- **`i_source`** — Index of the element to copy from; must be within current element count
+- **`i_target`** — Indices of target elements; enlarges all entries if any index exceeds current count; a single index is passed as `{i}`
 
 ## Example:
 ```
@@ -473,20 +473,20 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec,
-                                               arma::uword source,
-                                               const arma::uvec &destination)
+                                               arma::uword i_source,
+                                               const arma::uvec &i_target)
 {
     if (arrayant_vec.empty())
         throw std::invalid_argument("arrayant_copy_element_multi: Input vector is empty.");
 
-    if (destination.is_empty())
+    if (i_target.is_empty())
         throw std::invalid_argument("arrayant_copy_element_multi: Destination index vector is empty.");
 
     for (size_t i = 0; i < arrayant_vec.size(); ++i)
     {
         try
         {
-            quadriga_lib::arrayant_copy_element(arrayant_vec[i], source, destination);
+            quadriga_lib::arrayant_copy_element(arrayant_vec[i], i_source, i_target);
         }
         catch (const std::invalid_argument &e)
         {

@@ -22,11 +22,11 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 arma::uword quadriga_lib::point_cloud_segmentation(
     const arma::Mat<dtype> *points,
     arma::Mat<dtype> *pointsR,
-    arma::u32_vec *sub_cloud_index,
+    arma::u32_vec *sub_cloud_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
-    arma::u32_vec *forward_index = nullptr,
-    arma::u32_vec *reverse_index = nullptr);
+    arma::u32_vec *forward_ind = nullptr,
+    arma::u32_vec *reverse_ind = nullptr);
 ```
 
 ## Inputs:
@@ -37,9 +37,9 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 
 ## Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_index`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_index`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
+- **`forward_ind`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_ind`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
 
 ## Returns:
 - Number of generated sub-clouds `n_sub`
@@ -54,11 +54,11 @@ MD!*/
 template <typename dtype>
 arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *points,
                                                    arma::Mat<dtype> *pointsR,
-                                                   arma::u32_vec *sub_cloud_index,
+                                                   arma::u32_vec *sub_cloud_ind,
                                                    arma::uword target_size,
                                                    arma::uword vec_size,
-                                                   arma::u32_vec *forward_index,
-                                                   arma::u32_vec *reverse_index)
+                                                   arma::u32_vec *forward_ind,
+                                                   arma::u32_vec *reverse_ind)
 {
 
     // Input validation
@@ -73,12 +73,12 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
 
     if (pointsR == nullptr)
         throw std::invalid_argument("Output 'pointsR' cannot be NULL.");
-    if (sub_cloud_index == nullptr)
-        throw std::invalid_argument("Output 'sub_cloud_index' cannot be NULL.");
+    if (sub_cloud_ind == nullptr)
+        throw std::invalid_argument("Output 'sub_cloud_ind' cannot be NULL.");
     qd_check_alias(pointsR, "pointsR", points);
-    qd_check_alias_outputs(sub_cloud_index, "sub_cloud_index", forward_index, "forward_index");
-    qd_check_alias_outputs(sub_cloud_index, "sub_cloud_index", reverse_index, "reverse_index");
-    qd_check_alias_outputs(forward_index, "forward_index", reverse_index, "reverse_index");
+    qd_check_alias_outputs(sub_cloud_ind, "sub_cloud_ind", forward_ind, "forward_ind");
+    qd_check_alias_outputs(sub_cloud_ind, "sub_cloud_ind", reverse_ind, "reverse_ind");
+    qd_check_alias_outputs(forward_ind, "forward_ind", reverse_ind, "reverse_ind");
 
     if (target_size == 0)
         throw std::invalid_argument("Input 'target_size' cannot be 0.");
@@ -182,8 +182,8 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
 
     // Get the sub-cloud indices
     arma::uword n_sub = c.size(), n_out = 0;
-    sub_cloud_index->set_size(n_sub);
-    unsigned *p_sub_ind = sub_cloud_index->memptr();
+    sub_cloud_ind->set_size(n_sub);
+    unsigned *p_sub_ind = sub_cloud_ind->memptr();
 
     for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
     {
@@ -198,7 +198,7 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
     dtype *p_points_out = pointsR->memptr();
 
     unsigned *p_forward_index = nullptr;
-    if (forward_index != nullptr || reverse_index != nullptr)
+    if (forward_ind != nullptr || reverse_ind != nullptr)
         p_forward_index = new unsigned[n_out]();
 
     for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
@@ -251,30 +251,30 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
     }
 
     // Copy forward index
-    if (forward_index != nullptr)
+    if (forward_ind != nullptr)
     {
-        forward_index->set_size(n_out);
-        std::memcpy(forward_index->memptr(), p_forward_index, n_out * sizeof(unsigned));
+        forward_ind->set_size(n_out);
+        std::memcpy(forward_ind->memptr(), p_forward_index, n_out * sizeof(unsigned));
     }
 
     // Generate reverse index
-    if (reverse_index != nullptr)
+    if (reverse_ind != nullptr)
     {
-        reverse_index->set_size(n_points);
-        unsigned *p = reverse_index->memptr();
+        reverse_ind->set_size(n_points);
+        unsigned *p = reverse_ind->memptr();
         for (unsigned i = 0; i < n_out; ++i)
             if (p_forward_index[i] != 0)
                 p[p_forward_index[i] - 1] = i;
     }
 
-    if (forward_index != nullptr || reverse_index != nullptr)
+    if (forward_ind != nullptr || reverse_ind != nullptr)
         delete[] p_forward_index;
 
     return n_sub;
 }
 
-template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<float> *points, arma::Mat<float> *pointsR, arma::u32_vec *sub_cloud_index,
-                                                            arma::uword target_size, arma::uword vec_size, arma::u32_vec *forward_index, arma::u32_vec *reverse_index);
+template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<float> *points, arma::Mat<float> *pointsR, arma::u32_vec *sub_cloud_ind,
+                                                            arma::uword target_size, arma::uword vec_size, arma::u32_vec *forward_ind, arma::u32_vec *reverse_ind);
 
-template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<double> *points, arma::Mat<double> *pointsR, arma::u32_vec *sub_cloud_index,
-                                                            arma::uword target_size, arma::uword vec_size, arma::u32_vec *forward_index, arma::u32_vec *reverse_index);
+template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<double> *points, arma::Mat<double> *pointsR, arma::u32_vec *sub_cloud_ind,
+                                                            arma::uword target_size, arma::uword vec_size, arma::u32_vec *forward_ind, arma::u32_vec *reverse_ind);

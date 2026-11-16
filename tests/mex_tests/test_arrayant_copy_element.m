@@ -143,7 +143,7 @@ catch ME
     end
 end
 
-% source_element = 0 (1-based violation)
+% i_source = 0 (1-based violation)
 try
     quadriga_lib.arrayant_copy_element( ant, 0, 2 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -154,7 +154,7 @@ catch ME
     end
 end
 
-% dest_element = 0 (1-based violation)
+% i_target = 0 (1-based violation)
 try
     quadriga_lib.arrayant_copy_element( ant, 1, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -165,7 +165,7 @@ catch ME
     end
 end
 
-% Empty source_element
+% Empty i_source
 try
     quadriga_lib.arrayant_copy_element( ant, [], 2 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -176,7 +176,7 @@ catch ME
     end
 end
 
-% Empty dest_element
+% Empty i_target
 try
     quadriga_lib.arrayant_copy_element( ant, 1, [] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');

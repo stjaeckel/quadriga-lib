@@ -160,7 +160,7 @@ class test_quantize_delays(unittest.TestCase):
                 npt.assert_allclose(im, 0.3, atol=1e-12, rtol=0)
 
     def test_max_no_taps(self):
-        """max_no_taps limits the number of output taps"""
+        """max_taps limits the number of output taps"""
         cre = [np.zeros((1, 1, 5))]
         cim = [np.zeros((1, 1, 5))]
         dl = [np.zeros((1, 1, 5))]
@@ -172,7 +172,7 @@ class test_quantize_delays(unittest.TestCase):
         cre[0][0, 0, 4] = 4.0; dl[0][0, 0, 4] = 20.0e-9
 
         cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, max_no_taps=3, complex=False)
+            cre, cim, dl, tap_spacing=5e-9, max_taps=3, complex=False)
 
         self.assertLessEqual(cre_q[0].shape[2], 3)
 
@@ -358,7 +358,7 @@ class test_quantize_delays(unittest.TestCase):
 
         # First pass: quantize
         cre_q1, cim_q1, dl_q1 = quadriga_lib.channel.quantize_delays(
-            cre, cim, dl, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0, complex=False)
+            cre, cim, dl, tap_spacing=5e-9, max_taps=48, power_exponent=1.0, fix_taps=0, complex=False)
 
         # Verify output delays are on-grid (multiples of tap_spacing)
         for s in range(len(dl_q1)):
@@ -372,7 +372,7 @@ class test_quantize_delays(unittest.TestCase):
 
         # Second pass: feed quantized output back in
         cre_q2, cim_q2, dl_q2 = quadriga_lib.channel.quantize_delays(
-            cre_q1, cim_q1, dl_q1, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0, complex=False)
+            cre_q1, cim_q1, dl_q1, tap_spacing=5e-9, max_taps=48, power_exponent=1.0, fix_taps=0, complex=False)
 
         # Output must be identical
         self.assertEqual(len(cre_q2), len(cre_q1))

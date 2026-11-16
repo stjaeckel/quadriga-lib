@@ -61,23 +61,23 @@ void fuzz_one(const uint8_t *data, size_t size)
 {
     std::string fn = fz::write_file("in.qrt", data, size);
 
-    arma::uword no_cir = 0, no_orig = 0;
+    arma::uword n_cir = 0, n_orig = 0;
     fz::clean([&]
               {
-        arma::uword no_dest, no_freq;
+        arma::uword n_dest, n_freq;
         arma::uvec cir_offset;
         std::vector<std::string> orig_names, dest_names;
         int version;
         arma::fvec freq;
         arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
-        quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names,
+        quadriga_lib::qrt_file_parse(fn, &n_cir, &n_orig, &n_dest, &n_freq, &cir_offset, &orig_names, &dest_names,
                                      &version, &freq, &cir_pos, &cir_orientation, &orig_pos, &orig_orientation); });
     fz::clean([&] { quadriga_lib::qrt_read_cache_init(fn); });
 
-    arma::uword n_orig = std::min(no_orig, (arma::uword)2), n_cir = std::min(no_cir, (arma::uword)2);
-    for (arma::uword i_orig = 0; i_orig <= n_orig; ++i_orig) // i_orig == n_orig: past the end if the file has one or two
+    arma::uword n_orig_try = std::min(n_orig, (arma::uword)2), n_cir_try = std::min(n_cir, (arma::uword)2);
+    for (arma::uword i_orig = 0; i_orig <= n_orig_try; ++i_orig) // i_orig == n_orig_try: past the end if the file has one or two
     {
-        for (arma::uword i_cir = 0; i_cir <= n_cir; ++i_cir)
+        for (arma::uword i_cir = 0; i_cir <= n_cir_try; ++i_cir)
             for (bool downlink : {true, false})
                 fz::clean([&]
                           {
@@ -85,13 +85,13 @@ void fuzz_one(const uint8_t *data, size_t size)
                     arma::mat fbs_pos, lbs_pos, path_gain;
                     arma::cube M;
                     std::vector<arma::mat> path_coord;
-                    arma::u32_vec no_int;
+                    arma::u32_vec n_interact;
                     arma::fmat coord;
                     std::vector<uint8_t> interact_type;
                     quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, downlink, &center_freq, &tx_pos,
                                                         &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
                                                         &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
-                                                        &path_coord, downlink ? 1 : 0, &no_int, &coord, &interact_type); });
+                                                        &path_coord, downlink ? 1 : 0, &n_interact, &coord, &interact_type); });
         fz::clean([&] { quadriga_lib::qrt_file_read_raw(fn, i_orig); });
     }
 }

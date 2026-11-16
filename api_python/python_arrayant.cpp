@@ -48,8 +48,8 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("copy_element", &arrayant_copy_element,
           py::arg("arrayant"),
-          py::arg("source_element"),
-          py::arg("dest_element"));
+          py::arg("i_source"),
+          py::arg("i_target"));
 
     m.def("export_obj_file", &arrayant_export_obj_file,
           py::arg("fn"),
@@ -58,8 +58,8 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("colormap") = "jet",
           py::arg("object_radius") = 1.0,
           py::arg("icosphere_n_div") = 4,
-          py::arg("element") = py::none(),
-          py::arg("freq_ind") = 0);
+          py::arg("i_element") = py::none(),
+          py::arg("i_freq") = 0);
 
     m.def("generate", &arrayant_generate,
           py::arg("type"),
@@ -105,7 +105,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("arrayant"),
           py::arg("azimuth").none(false),
           py::arg("elevation").none(false),
-          py::arg("element") = py::none(),
+          py::arg("i_element") = py::none(),
           py::arg("orientation") = py::none(),
           py::arg("element_pos") = py::none(),
           py::arg("freq_new") = py::none(),

@@ -52,8 +52,8 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 - **`obj_ind`** — 0-based object index per triangle; `(n_mesh,)`
 - **`obj_names`** — Object names; list of `str`; length `max(obj_ind) + 1`
 - **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `(n_mesh,)`
-- **`mtl_names`** — Visual material names (raw `usemtl`); list of `str`; length `no_mtl`
-- **`bsdf`** — Principled BSDF values from the `.mtl`; `(no_mtl, 17)`
+- **`mtl_names`** — Visual material names (raw `usemtl`); list of `str`; length `n_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `(n_mtl, 17)`
 - **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `(n_mesh,)`
 - **`csv_names`** — Material names from the table; list of `str`; length `n_csv`
 - **`csv_prop`** — Material properties as a `dict`; each key is one CSV column (excluding `name`)
