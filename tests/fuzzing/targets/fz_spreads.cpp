@@ -100,12 +100,12 @@ static void run(fz::input &in)
         arma::Mat<T> orientation(in.size(4), in.size(2));
         std::vector<arma::Col<T>> phi(in.size(2)), theta;
         const int mask = in.ConsumeIntegralInRange<int>(0, 31);
-        const bool disable_wrapping = in.ConsumeBool(), calc_bank_angle = in.ConsumeBool();
+        const bool wrapping = in.ConsumeBool(), calc_bank_angle = in.ConsumeBool();
         const T quantize = in.ConsumeBool() ? T(0) : in.value<T>();
         fz::clean([&]
                   { quadriga_lib::calc_angular_spreads_sphere<T>(az, el, powers, (mask & 1) ? &as : nullptr, (mask & 2) ? &es : nullptr,
                                                                  (mask & 4) ? &orientation : nullptr, (mask & 8) ? &phi : nullptr,
-                                                                 (mask & 16) ? &theta : nullptr, disable_wrapping, calc_bank_angle, quantize); });
+                                                                 (mask & 16) ? &theta : nullptr, wrapping, calc_bank_angle, quantize); });
     }
 
     // Rician K-factor and cross-polarization ratio

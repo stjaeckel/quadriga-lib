@@ -42,7 +42,7 @@ p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut,
   2D distance in indoor scenarios; `(n_link,)`
 - **`h_bs`** — BS height in m, finite; float or `(n_link,)`
 - **`h_ut`** — UT height in m, finite; float or `(n_link,)`
-- **`d_clutter`** — Clutter size in m of the InF and SMa models, > 0; `None` or nan = TR default (InF-SL and InF-SH 10
+- **`d_clutter`** — Clutter size in m of the InF and SMa models; `None`, nan or <= 0: TR default (InF-SL and InF-SH 10
   m, InF-DL and InF-DH 2 m, SMa 30 m); default: None
 - **`r_clutter`** — Clutter density of the InF models (default 0.2 for SL and SH, 0.6 for DL and DH), vegetation density
   of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1); `None` or nan = default; default: None

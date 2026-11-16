@@ -16,7 +16,7 @@ Read ray-tracing CIR data from a QRT file
 
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
   of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
@@ -25,7 +25,7 @@ Read ray-tracing CIR data from a QRT file
 ```
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
     path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
-    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
+    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_M );
 ```
 
 ## Inputs:
@@ -33,7 +33,7 @@ Read ray-tracing CIR data from a QRT file
 - **`i_cir`** — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: `[]` (read all; for a file
   without CIRs, all outputs are empty with `n_out = 0`)
 - **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
-- **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped; logical scalar; default: `true`
+- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX); logical scalar; default: `false`
 - **`normalize_M`** — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
@@ -89,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::string fn = qd_mex_get_string(prhs[0]);
     arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_cir");
     arma::uword i_orig = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 1);
-    const bool downlink = (nrhs < 4) ? true : qd_mex_get_scalar<bool>(prhs[3], "downlink", true);
+    const bool uplink = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "uplink", false);
     const int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);
 
     // Convert 1-based (MATLAB) to 0-based (C++); guard against unsigned underflow
@@ -219,7 +219,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     for (arma::uword i_out = 0; i_out < no_out; ++i_out)
     {
         // Call library function
-        CALL_QD(quadriga_lib::qrt_file_read<double>(fn, i_cir[i_out], i_orig, downlink, nullptr,
+        CALL_QD(quadriga_lib::qrt_file_read<double>(fn, i_cir[i_out], i_orig, uplink, nullptr,
                                                     p_tx_pos, p_tx_orientation, p_rx_pos, p_rx_orientation,
                                                     p_fbs_pos, p_lbs_pos, p_path_gain, p_path_length, p_M,
                                                     p_aod, p_eod, p_aoa, p_eoa,

@@ -60,8 +60,8 @@ namespace quadriga_lib
                                      arma::Mat<dtype> *orientation = nullptr,        // Mean-angle orientation [bank;tilt;heading] in [rad], Size [3, n_cir]
                                      std::vector<arma::Col<dtype>> *phi = nullptr,   // Rotated azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
                                      std::vector<arma::Col<dtype>> *theta = nullptr, // Rotated elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
-                                     bool disable_wrapping = true,                   // Disable the rotation and use raw az/el angles for spread calculation
-                                     bool calc_bank_angle = false,                   // Compute optimal bank angle analytically (only for disable_wrapping = false)
+                                     bool wrapping = false,                          // Rotate the mean direction to the equator before the spread calculation
+                                     bool calc_bank_angle = false,                   // Compute optimal bank angle analytically (only for wrapping = true)
                                      dtype quantize = 0.0);                          // Angular quantization step in [deg], 0 = disabled
 
     // Calculate the Rician K-Factor
@@ -500,8 +500,8 @@ namespace quadriga_lib
     void write_png(const arma::Mat<dtype> &data, // Data matrix
                    std::string fn,               // Filename of the PNG file, string
                    std::string colormap = "jet", // Colormap
-                   dtype min_val = NAN,          // Minimum value, when passing NAN, minimum in data is used
-                   dtype max_val = NAN,          // Maximum value, when passing NAN, maximum data is used
+                   dtype min_val = NAN,          // Lower clipping bound, NaN = data minimum
+                   dtype max_val = NAN,          // Upper clipping bound, NaN = data maximum
                    bool log_transform = false);  // Transform data to log-domain (10*log10(data))
 
     // Polarization transfer (Jones) matrix threading along a ray path

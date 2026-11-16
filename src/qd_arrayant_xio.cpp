@@ -188,6 +188,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
     // Step 1: Probe the file with id=1 to obtain the layout
     // Even if id=1 does not exist, qd_arrayant_qdant_read still returns the layout
     arma::u32_mat file_layout;
+    std::string probe_error;
     {
         std::string probe_name;
         arma::Cube<dtype> t_re, t_im, p_re, p_im;
@@ -195,17 +196,18 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
         arma::Mat<dtype> elem_pos, cpl_re, cpl_im;
         dtype center_freq = dtype(0.0);
 
-        qd_arrayant_qdant_read(fn, 1, &probe_name,
-                               &t_re, &t_im, &p_re, &p_im,
-                               &az_grid, &el_grid, &elem_pos,
-                               &cpl_re, &cpl_im, &center_freq,
-                               &file_layout);
-        // Error from the probe read is intentionally ignored; we only need the layout.
+        probe_error = qd_arrayant_qdant_read(fn, 1, &probe_name,
+                                             &t_re, &t_im, &p_re, &p_im,
+                                             &az_grid, &el_grid, &elem_pos,
+                                             &cpl_re, &cpl_im, &center_freq,
+                                             &file_layout);
+        // An error of the probe read only matters without a layout (e.g. a missing file); ID 1 may not exist.
         // Temporary arrayant data goes out of scope here.
     }
 
     if (file_layout.is_empty())
-        throw std::invalid_argument("qdant_read_multi: Could not read layout from file '" + fn + "'.");
+        throw std::invalid_argument(probe_error.empty() ? "qdant_read_multi: Could not read layout from file '" + fn + "'."
+                                                        : probe_error);
 
     // Step 2: Extract unique IDs from the layout in order of first appearance
     std::vector<unsigned> unique_ids;

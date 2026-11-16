@@ -63,7 +63,7 @@ namespace
         arma::u32_vec ni;
         arma::fmat co;
         std::vector<uint8_t> it;
-        quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &fc, &tp, &to, &rp, &ro, &fbs, &lbs, &pg, &pl, &M,
+        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &fc, &tp, &to, &rp, &ro, &fbs, &lbs, &pg, &pl, &M,
                                             &aod, &eod, &aoa, &eoa, &pc, 1, &ni, &co, &it);
     }
 }
@@ -78,7 +78,7 @@ TEST_CASE("QRT Reader - counts and offsets that do not fit the file")
     // The unpatched file reads back
     {
         arma::vec pl;
-        quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, &pl);
         CHECK(pl.n_elem == 1);
         CHECK(quadriga_lib::qrt_file_read_raw(fn, 0).size() == 1);
@@ -129,7 +129,7 @@ TEST_CASE("QRT Reader - counts and offsets that do not fit the file")
                 auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);
                 qrt_require_fast_throw([&]
                                        { arma::vec pl;
-                                         quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                         quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr,
                                                                              nullptr, nullptr, nullptr, &pl, nullptr, nullptr, nullptr,
                                                                              nullptr, nullptr, nullptr, 1, nullptr, nullptr, nullptr, &f, &cache); });
                 f.clear();

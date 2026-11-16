@@ -488,7 +488,8 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [Python](.
   - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
   - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `horn`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2pi·radius)`.
+- For `horn`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
+  and `f_ctrl = c/(2pi·radius)`.
 
 ### Usage:
 ```matlab
@@ -500,18 +501,18 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 
 ### Inputs:
 - **`driver_type`** - Driver directivity model: `piston`, `horn`, or `omni`; default: `piston`
-- **`radius`** - Effective radiating radius in m; cone/dome radius for piston, mouth radius for horn; default: 0.05
-- **`lower_cutoff`** - Lower -3 dB bandpass frequency in Hz; default: 80
-- **`upper_cutoff`** - Upper -3 dB bandpass frequency in Hz; default: 12000
-- **`lower_rolloff_slope`** - Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth); default: 12
-- **`upper_rolloff_slope`** - High-frequency rolloff in dB/octave; default: 12
+- **`radius`** - Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn; default: 0.05
+- **`lower_cutoff`** - Lower -3 dB bandpass frequency in Hz, > 0; default: 80
+- **`upper_cutoff`** - Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`; default: 12000
+- **`lower_rolloff_slope`** - Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth); default: 12
+- **`upper_rolloff_slope`** - High-frequency rolloff in dB/octave, > 0; default: 12
 - **`sensitivity`** - On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** - Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`; default: `hemisphere`
-- **`hor_coverage`** - Horn horizontal coverage angle in degrees; `0` defaults to 90;  default: 90
-- **`ver_coverage`** - Horn vertical coverage angle in degrees; `0` defaults to 60;  default: 60
-- **`horn_control_freq`** - Horn pattern control frequency; `0` auto-derives from `radius`; default: 0
-- **`baffle_width`** - Baffle width; used by `hemisphere` model; default: 0.15
-- **`baffle_height`** - Baffle height; used by `hemisphere` model; default: 0.25
+- **`hor_coverage`** - Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; default: NaN
+- **`ver_coverage`** - Horn vertical coverage angle in degrees; NaN or <= 0: default 60; default: NaN
+- **`horn_control_freq`** - Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
+- **`baffle_width`** - Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
+- **`baffle_height`** - Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
 - **`center_freq`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
 - **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
@@ -532,7 +533,6 @@ Also in: [C++](../cpp/array-antenna-functions.md#qdant_read) · [Python](../pyth
   or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
   same azimuth and elevation grids, element positions and coupling size), otherwise
   an error asks to pass `id`
-- Differs from Python, where `qdant_read(fn)` reads ID 1 only
 - With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
 - An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
 - Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;

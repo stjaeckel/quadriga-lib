@@ -264,10 +264,16 @@ data = quadriga_lib.generate_speaker('horn', 0.025, 1500.0, 20000.0, [], [], [],
 assertTrue(all(isfinite(data(1).e_theta_re(:))));
 assertTrue(max(abs(data(1).e_theta_re(:))) > 0);
 
-% Auto coverage (0 -> derived internally)
-data = quadriga_lib.generate_speaker('horn', 0.025, 1500.0, 20000.0, [], [], [], [], ...
-                                      0.0, 0.0, [], [], [], 4000.0, 5.0);
-assertTrue(all(isfinite(data(1).e_theta_re(:))));
+% Auto parameters: NaN (the default), [] or <= 0 select 90 deg, 60 deg and c / (2 pi radius)
+ref = quadriga_lib.generate_speaker('horn', 0.025, 1500.0, 20000.0, [], [], [], [], ...
+                                     90.0, 60.0, 344.0 / (2*pi*0.025), [], [], [500.0, 4000.0], 10.0);
+for v = { NaN, [], 0.0, -1.0 }
+    data = quadriga_lib.generate_speaker('horn', 0.025, 1500.0, 20000.0, [], [], [], [], ...
+                                          v{1}, v{1}, v{1}, [], [], [500.0, 4000.0], 10.0);
+    for i = 1:2
+        assertElementsAlmostEqual(data(i).e_theta_re, ref(i).e_theta_re, 'absolute', 1e-10);
+    end
+end
 
 % ================================================================================
 % Baffle parameters
@@ -355,6 +361,16 @@ assertTrue(amp_high_10k > amp_high_200);
 % ================================================================================
 % Errors
 % ================================================================================
+
+% A radius of 0 is an error, not a request for the default
+try
+    data = quadriga_lib.generate_speaker('piston', 0, [], [], [], [], [], [], [], [], [], [], [], 1000.0, 90.0);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'radius'))
+        rethrow(ME);
+    end
+end
 
 % Invalid driver type
 try

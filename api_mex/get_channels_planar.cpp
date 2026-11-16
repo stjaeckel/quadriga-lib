@@ -25,7 +25,7 @@ Calculate MIMO channel coefficients for planar wave paths
   keep their order, shifted by one slot.
 - With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- Setting `center_freq = 0` disables phase calculation (delays still computed).
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
   centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
@@ -53,7 +53,7 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
+- **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`

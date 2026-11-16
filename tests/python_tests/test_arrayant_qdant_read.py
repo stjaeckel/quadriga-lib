@@ -132,24 +132,36 @@ class test_case(unittest.TestCase):
 
 class test_default_id(unittest.TestCase):
 
-    # Python reads ID 1 by default (MATLAB reads all entries, which must form a frequency set)
+    # Without 'id' (or with id = None) every entry is read, as in MATLAB; the entries must form a frequency set
     def test(self):
         with tempfile.TemporaryDirectory() as tmp:
+            fn = os.path.join(tmp, 'freq.qdant')
+            arrayant.qdant_write(fn, arrayant.generate('omni', freq=1e9), 1)
+            arrayant.qdant_write(fn, arrayant.generate('omni', freq=2e9), 2)
+            for r in (arrayant.qdant_read(fn), arrayant.qdant_read(fn, None)):
+                self.assertEqual(r['e_theta_re'].ndim, 4)
+                npt.assert_array_equal(r['center_freq'], [1e9, 2e9])
+            r = arrayant.qdant_read(fn, 2)
+            self.assertEqual(r['e_theta_re'].ndim, 3)
+            self.assertEqual(r['center_freq'], 2e9)
+            # IDs are 1-based: 0 is not an ID and does not mean "all"
+            with self.assertRaisesRegex(ValueError, "'id' must be >= 1"):
+                arrayant.qdant_read(fn, 0)
+            with self.assertRaisesRegex(TypeError, "'id' must be an integer or None"):
+                arrayant.qdant_read(fn, 1.5)
+            npt.assert_array_equal(arrayant.qdant_read(fn, np.int64(2))['center_freq'], 2e9)
             fn = os.path.join(tmp, 'two.qdant')
             arrayant.qdant_write(fn, arrayant.generate('omni'), 1)
             arrayant.qdant_write(fn, arrayant.generate('xpol'), 2)
-            r = arrayant.qdant_read(fn)
-            self.assertEqual(r['e_theta_re'].shape[2], 1)
-            r2 = arrayant.qdant_read(fn, 2)
-            self.assertEqual(r2['e_theta_re'].shape[2], 2)
-            # id = 0 reads all entries; they must form a frequency set (same element count and grids)
+            self.assertEqual(arrayant.qdant_read(fn, 1)['e_theta_re'].shape[2], 1)
+            self.assertEqual(arrayant.qdant_read(fn, 2)['e_theta_re'].shape[2], 2)
             with self.assertRaisesRegex(ValueError, "do not form a frequency set.*pass 'id'"):
-                arrayant.qdant_read(fn, 0)
+                arrayant.qdant_read(fn)
             fn = os.path.join(tmp, 'grids.qdant')
             arrayant.qdant_write(fn, arrayant.generate('omni'), 1)
             arrayant.qdant_write(fn, arrayant.generate('omni', res=5.0), 2)
             with self.assertRaisesRegex(ValueError, "do not form a frequency set"):
-                arrayant.qdant_read(fn, 0)
+                arrayant.qdant_read(fn)
 
 
 if __name__ == '__main__':

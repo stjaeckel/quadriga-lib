@@ -95,6 +95,14 @@ TEST_CASE("Write PNG - Degenerate ranges / NaN / Inf")
     CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(4, 4, arma::fill::randu), "test_png_err.png", "jet", 2.0, 1.0),
                     std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(), "test_png_err.png"), std::invalid_argument);
+    // Infinite limits throw (NaN selects the data minimum / maximum)
+    for (double v : {inf, -inf})
+    {
+        CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(4, 4, arma::fill::randu), "test_png_err.png", "jet", v, nan),
+                        std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(4, 4, arma::fill::randu), "test_png_err.png", "jet", nan, v),
+                        std::invalid_argument);
+    }
     CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(0, 5), "test_png_err.png"), std::invalid_argument);
     CHECK_FALSE(std::filesystem::exists("test_png_err.png"));
 

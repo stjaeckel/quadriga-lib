@@ -61,9 +61,9 @@ Also in: [MATLAB](../mex/channel-statistics.md#calc_angular_spread) · [Python](
 
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each CIR may have a different number of paths.
 - RMS spread formula: `sqrt(sum(pw .* d^2))` where `d` are wrapped deviations from the circular mean (3GPP TR 38.901 second-moment definition).
-- With wrapping (`disable_wrapping = false`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
+- With wrapping (`wrapping = true`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
 - When `calc_bank_angle = true` (with wrapping), an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
-- When `disable_wrapping = true` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
+- When `wrapping = false` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
 - When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
   `quantize` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
 
@@ -78,7 +78,7 @@ void quadriga_lib::calc_angular_spreads_sphere(
     arma::Mat<dtype> *orientation = nullptr,
     std::vector<arma::Col<dtype>> *phi = nullptr,
     std::vector<arma::Col<dtype>> *theta = nullptr,
-    bool disable_wrapping = true,
+    bool wrapping = false,
     bool calc_bank_angle = false,
     dtype quantize = (dtype)0);
 ```
@@ -87,10 +87,10 @@ void quadriga_lib::calc_angular_spreads_sphere(
 - **`az`** — Azimuth angles; range -pi to pi; `[n_cir]` vector, each element of length `n_path`
 - **`el`** — Elevation angles; range -pi/2 to pi/2; same structure as `az`
 - **`powers`** — Path powers in [W]; same structure as `az`
-- **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles; default:
-  `true` (wrapping off, as in the MATLAB and Python wrappers)
+- **`wrapping`** *(optional)* — If true, rotates the paths so that their mean direction lies on the equator before
+  computing the spreads; if false, computes the spreads from the raw angles; default: `false`
 - **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when
-  `disable_wrapping = false`; default: `false`
+  `wrapping = true`; default: `false`
 - **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
   otherwise it must be finite and >= 1e-3 deg, else `std::invalid_argument` is thrown
 

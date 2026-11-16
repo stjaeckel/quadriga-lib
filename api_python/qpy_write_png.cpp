@@ -32,8 +32,8 @@ Write data to a PNG file
 - The auto-detected range ignores `NaN` and `+-inf`; `inf` and `-inf` values get the last and first colour
 - `NaN` values get the first colour of the map
 - A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
-  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
-- Raises `ValueError` for empty `data` and for `min_val > max_val` (both given)
+  input without a positive value) maps every value to the first colour
+- Raises `ValueError` for empty `data`, an infinite `min_val` or `max_val`, and for `min_val > max_val` (both given)
 
 ## Usage:
 ```
@@ -52,12 +52,10 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', optional, default = 'jet'
 
 - **`min_val`** (optional)<br>
-  Minimum value. Values below this value will have be encoded with the color of the smallest value.
-  If `NAN` is provided (default), the lowest values is determined from the data.
+  Lower clipping bound; values below get the first colour. NaN (default): data minimum.
 
 - **`max_val`** (optional)<br>
-  Maximum value. Values above this value will have be encoded with the color of the largest value.
-  If `NAN` is provided (default), the largest values is determined from the data.
+  Upper clipping bound; values above get the last colour. NaN (default): data maximum.
 
 - `**log_transform**` (optional)<br>
   If enabled, the `data` values are transformed to the log-domain (`10*log10(data)`) before processing.
@@ -67,8 +65,8 @@ MD!*/
 void write_png(const std::string &fn,           // Output file name
                const py::array_t<double> &data, // Data matrix
                const std::string &colormap,     // Colormap
-               double min_val,                  // Minimum value, when passing NAN, minimum in data is used
-               double max_val,                  // Maximum value, when passing NAN, maximum data is used
+               double min_val,                  // Lower clipping bound, NaN = data minimum
+               double max_val,                  // Upper clipping bound, NaN = data maximum
                bool log_transform)              // Transform data to log-domain (10*log10(data))
 {
     auto data_arma = qd_python_numpy2arma_Mat(data, true);

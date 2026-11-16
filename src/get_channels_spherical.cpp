@@ -33,7 +33,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
   [[coord2path]] or [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry (spherical waves).
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -87,7 +87,7 @@ void quadriga_lib::get_channels_spherical(
   (e.g. 0) use the polyline length; `[n_path]`
 - **`M`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); `[8, n_path]`
-- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot

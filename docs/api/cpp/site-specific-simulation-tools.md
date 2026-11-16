@@ -2049,8 +2049,9 @@ Also in: [MATLAB](../mex/miscellaneous-tools.md#write_png) · [Python](../python
 - The auto-detected range ignores `NaN` and `+-Inf`; `+Inf` and `-Inf` values get the last and first colour
 - `NaN` values get the first colour of the map
 - A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
-  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
-- Throws `std::invalid_argument` for an empty `data` matrix and for `min_val > max_val` (both given)
+  input without a positive value) maps every value to the first colour
+- Throws `std::invalid_argument` for an empty `data` matrix, an infinite `min_val` or `max_val`, and for
+  `min_val > max_val` (both given)
 - Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
 
 ### Declaration:
@@ -2068,8 +2069,8 @@ void quadriga_lib::write_png(
 - **`data`** — Input data matrix
 - **`fn`** — Output `.png` file path
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for valid values
-- **`min_val`** *(optional)* — Lower clipping bound; auto-detected if `NAN`
-- **`max_val`** *(optional)* — Upper clipping bound; auto-detected if `NAN`
+- **`min_val`** *(optional)* — Lower clipping bound; NaN (the default): data minimum
+- **`max_val`** *(optional)* — Upper clipping bound; NaN (the default): data maximum
 - **`log_transform`** *(optional)* — Apply 10*log10(data) before mapping; non-positive values map to the minimum color
 
 ---

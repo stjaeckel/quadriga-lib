@@ -18,8 +18,8 @@ Write a data matrix to a color-coded PNG file
 - The auto-detected range ignores `NaN` and `Inf`; `Inf` and `-Inf` values get the last and first colour
 - `NaN` values get the first colour of the map
 - A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
-  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
-- Raises an error for empty `data` and for `min_val > max_val` (both given)
+  input without a positive value) maps every value to the first colour
+- Raises an error for empty `data`, an infinite `min_val` or `max_val`, and for `min_val > max_val` (both given)
 - Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
 
 ## Usage:
@@ -31,8 +31,8 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform );
 - **`fn`** — Output `.png` file path; string
 - **`data`** — Input data matrix; `[n_rows, n_cols]`
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
-- **`min_val`** — Lower clipping bound; auto-detected if `NaN`; default: `NaN`
-- **`max_val`** — Upper clipping bound; auto-detected if `NaN`; default: `NaN`
+- **`min_val`** — Lower clipping bound; NaN: data minimum; default: `NaN`
+- **`max_val`** — Upper clipping bound; NaN: data maximum; default: `NaN`
 - **`log_transform`** — Apply 10·log10(data) before mapping; non-positive values map to the minimum color; logical; default: false
 MD!*/
 

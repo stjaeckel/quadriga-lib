@@ -380,7 +380,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_generate) 
   not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
   (see `acf_tail` of [sos_calc_mse](#sos_calc_mse)). To prevent this, set `spatial_freq_min`
 - `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each
-  sinusoid; 0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
+  sinusoid; by default there is no lower limit, and the upper limit is `15 / max(dist)`
 - The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
   stored for all sample points. It must not have more than 100000 points (the default has 151),
   which limits `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
@@ -408,9 +408,9 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_generate) 
   (false); default: true
 - **`spatial_freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
   default: 0
-- **`spatial_freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
-  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
-  grid, see above; default: 0
+- **`spatial_freq_max`** — Upper limit of the frequency magnitude; NaN or <= 0: default `15 / max(dist)`;
+  must be larger than `spatial_freq_min`; limited by the size of the search grid, see above;
+  default: NaN
 - **`seed`** — Seed; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1
 
 ### Outputs:

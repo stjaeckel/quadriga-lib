@@ -45,7 +45,7 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
   at 0 by the caller; the 2D distance in indoor scenarios; `[n_link]`
 - **`h_bs`** — BS height in [m], finite; `[n_link]` or `[1]` for all links
 - **`h_ut`** — UT height in [m], finite; `[n_link]` or `[1]` for all links
-- **`d_clutter`** — Clutter size in [m] of the InF and SMa models, > 0, scalar; NaN or empty = TR
+- **`d_clutter`** — Clutter size in [m] of the InF and SMa models, scalar; NaN, empty or <= 0: TR
   default (InF-SL and InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m); default: NaN
 - **`r_clutter`** — Clutter density of the InF models (default 0.2 for SL and SH, 0.6 for DL and
   DH), vegetation density of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1), scalar; NaN or

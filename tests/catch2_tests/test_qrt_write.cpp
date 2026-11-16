@@ -363,7 +363,7 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     arma::Col<double> tx_pos_out, path_length;
     arma::Mat<double> path_gain;
     arma::u32_vec n_interact;
-    quadriga_lib::qrt_file_read<double>(fn, 0, 1, true, nullptr, &tx_pos_out, nullptr,
+    quadriga_lib::qrt_file_read<double>(fn, 0, 1, false, nullptr, &tx_pos_out, nullptr,
                                         nullptr, nullptr, nullptr, nullptr, &path_gain,
                                         &path_length, nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, 0, &n_interact, nullptr, nullptr);
@@ -533,7 +533,7 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
         {
             arma::vec rx_pos, rx_ori;
             arma::u32_vec n_interact;
-            quadriga_lib::qrt_file_read<double>(fn, c, 0, true, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
+            quadriga_lib::qrt_file_read<double>(fn, c, 0, false, nullptr, nullptr, nullptr, &rx_pos, &rx_ori, nullptr, nullptr,
                                                 nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
             CHECK(arma::approx_equal(rx_pos, cir_pos.row(c).t(), "absdiff", 0.0));
             CHECK(rx_ori(2) == (c == 1 ? 0.25 : 0.0));
@@ -564,9 +564,9 @@ TEST_CASE("QRT Write - uplink read returns the transposed M")
         {
             arma::mat pg_dl, pg_ul;
             arma::cube M_dl, M_ul;
-            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                &pg_dl, nullptr, &M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_M);
             quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                &pg_dl, nullptr, &M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_M);
+            quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                                 &pg_ul, nullptr, &M_ul, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_M);
             REQUIRE(M_dl.n_rows == (scalar ? 2u : 8u));
             REQUIRE(M_dl.n_cols == 2);
@@ -635,7 +635,7 @@ TEST_CASE("QRT Write - origin position and orientation shapes")
     {
         INFO("origin " << i_orig);
         arma::fmat tx_pos(1, 7), tx_ori(1, 7); // any previous size: outputs are set to [3, 1]
-        quadriga_lib::qrt_file_read<float>(fn, 0, i_orig, true, nullptr, &tx_pos, &tx_ori);
+        quadriga_lib::qrt_file_read<float>(fn, 0, i_orig, false, nullptr, &tx_pos, &tx_ori);
         CHECK(arma::approx_equal(tx_pos, col_pos, "absdiff", 0.0f));
         CHECK(arma::approx_equal(tx_ori, i_orig < 2 ? col_ori : zeros, "absdiff", 0.0f));
     }

@@ -71,7 +71,7 @@ py::tuple calc_angular_spread(py::list az,
     // Call library function
     quadriga_lib::calc_angular_spreads_sphere<double>(az_a, el_a, powers_a,
                                                       &azimuth_spread, &elevation_spread, &orientation,
-                                                      &phi, &theta, !wrapping, calc_bank_angle, quantize);
+                                                      &phi, &theta, wrapping, calc_bank_angle, quantize);
 
     // Convert to Python
     auto azimuth_spread_py = qd_python_copy2numpy(&azimuth_spread);

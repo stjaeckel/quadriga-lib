@@ -45,6 +45,10 @@ assertEqual( f8, f4 );
 f9 = quadriga_lib.sos_generate( expo, 0:40, 12, 2, true, 7, true, 0, 0, 6 );
 assertTrue( max(abs(f9(:) - f4(:))) > 1e-6 );
 assertTrue( all(diff(a4) <= 0) );
+fd = quadriga_lib.sos_generate( expo, 0:40, 12, 2, true, 7, true, 0, 15/40, 5 );            % default 15 / max(dist)
+for v = { NaN, 0, -1, [] }                                                     % spatial_freq_max: NaN or <= 0 selects it
+    assertEqual( quadriga_lib.sos_generate( expo, 0:40, 12, 2, true, 7, true, 0, v{1}, 5 ), fd );
+end
 
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.sos_generate( expo, 0:40, 12, 2, true, 7, true, 0, 0, 5 );

@@ -31,6 +31,10 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`.
 - Index arrays: `<thing>_ind`, indices into other data, e.g. `obj_ind`, `mtl_ind`, `sub_mesh_ind`, `hit_ind`.
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
+- Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
+- Not given / all: an omitted optional input (C++ `nullptr` or an empty container, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
+- Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity cannot be <= 0 (a size, an angle range, a frequency limit), values <= 0 select it too. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
+- Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_M`, `fix_taps`, `axis`) or strings, each documented by its function.
 
 **Frequencies**
 

@@ -154,7 +154,7 @@ namespace quadriga_lib
                          const arma::vec &h_bs,             // BS height in [m], [n_link] or [1]
                          const arma::vec &h_ut,             // UT height in [m], [n_link] or [1]
                          arma::vec &p_los,                  // Output: LOS probability, [n_link]
-                         double d_clutter = NAN,            // InF, SMa: clutter size in [m]; NaN = TR default of the model
+                         double d_clutter = NAN,            // InF, SMa: clutter size in [m]; NaN or <= 0 = TR default of the model
                          double r_clutter = NAN,            // InF: clutter density; SMa: vegetation density r_vegetation; NaN = default
                          double h_clutter = NAN,            // InF SH, DH: clutter height in [m]; NaN = default
                          const arma::vec *rnd_g = nullptr,  // Optional: Normal(0,1) per link for the soft LOS state, [n_link]

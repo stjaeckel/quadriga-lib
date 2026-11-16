@@ -140,8 +140,8 @@ void quadriga_lib::los_probability(
   caller; the 2D distance in indoor scenarios; `[n_link]`
 - **`h_bs`** — BS height in [m], finite; `[n_link]` or `[1]` for all links
 - **`h_ut`** — UT height in [m], finite; `[n_link]` or `[1]` for all links
-- **`d_clutter`** *(optional)* — Clutter size in [m] of the InF and SMa models, > 0; NaN = TR default (InF-SL and
-  InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m)
+- **`d_clutter`** *(optional)* — Clutter size in [m] of the InF and SMa models; NaN or <= 0: TR default (InF-SL and
+  InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m); infinite values throw
 - **`r_clutter`** *(optional)* — Clutter density of the InF models (default 0.2 for SL and SH, 0.6 for DL and DH),
   vegetation density of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1); NaN = default
 - **`h_clutter`** *(optional)* — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0; NaN =
@@ -195,8 +195,10 @@ void quadriga_lib::los_probability(const std::string &model,
         throw std::invalid_argument("Input 'h_ut' must be finite.");
 
     // Clutter arguments
-    if (!std::isnan(d_clutter) && !(std::isfinite(d_clutter) && d_clutter > 0.0))
-        throw std::invalid_argument("Input 'd_clutter' must be NaN or > 0.");
+    if (std::isinf(d_clutter))
+        throw std::invalid_argument("Input 'd_clutter' must be finite or NaN.");
+    if (!(d_clutter > 0.0)) // A clutter size cannot be <= 0: such values select the default, as NaN does
+        d_clutter = NAN;
     if (!std::isnan(r_clutter) && !(r_clutter >= 0.0 && r_clutter < 1.0))
         throw std::invalid_argument("Input 'r_clutter' must be NaN or in the range from 0 to 1, 1 excluded.");
     if (!std::isnan(h_clutter) && !(std::isfinite(h_clutter) && h_clutter >= 0.0))

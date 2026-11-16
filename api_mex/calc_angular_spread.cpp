@@ -85,7 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Call library function (double precision only)
     CALL_QD(quadriga_lib::calc_angular_spreads_sphere<double>(
         az, el, powers, p_as, p_es, p_orient, p_phi, p_theta,
-        !wrapping, calc_bank_angle, quantize));
+        wrapping, calc_bank_angle, quantize));
 
     // Write outputs to MATLAB
     if (nlhs > 0)

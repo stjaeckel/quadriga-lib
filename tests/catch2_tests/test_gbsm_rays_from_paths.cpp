@@ -237,7 +237,7 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
 
     in_t in;
     arma::u32_vec n_interact;
-    quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &in.cf, &in.T, nullptr, &in.R, nullptr, &in.fbs, &in.lbs,
+    quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &in.cf, &in.T, nullptr, &in.R, nullptr, &in.fbs, &in.lbs,
                                         &in.pg, &in.pl, &in.M, nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
     std::remove(fn.c_str());
     REQUIRE(n_interact.n_elem == n_path);
@@ -311,7 +311,7 @@ TEST_CASE("gbsm_rays_from_paths - n_interact of qrt_file_read passes as path_typ
     arma::mat fbs, lbs, pg;
     arma::cube M;
     arma::u32_vec n_interact;
-    quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &cf, &T, nullptr, &R, nullptr, &fbs, &lbs, &pg, &pl, &M,
+    quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &cf, &T, nullptr, &R, nullptr, &fbs, &lbs, &pg, &pl, &M,
                                         nullptr, nullptr, nullptr, nullptr, nullptr, 1, &n_interact);
     std::remove(fn.c_str());
 

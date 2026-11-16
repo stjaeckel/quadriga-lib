@@ -282,8 +282,8 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    def test_default_id_reads_first(self):
-        """Default read (id=1) should return the first entry."""
+    def test_default_reads_single_entry(self):
+        """Default read (all entries) of a file with one entry returns that entry."""
         ant = make_dipole_single(res=10.0)
         fn = _temp_qdant()
         try:
@@ -322,7 +322,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['e_theta_im'], ant['e_theta_im'], decimal=5)
             npt.assert_array_almost_equal(out['e_phi_re'], ant['e_phi_re'], decimal=5)
@@ -336,7 +336,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['e_phi_re'], ant['e_phi_re'], decimal=5)
         finally:
@@ -359,12 +359,12 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
     # ================================================================================
 
     def test_output_is_4d(self):
-        """Multi-freq read (id=0) should produce 4D pattern arrays."""
+        """Multi-freq read (all entries, the default) should produce 4D pattern arrays."""
         ant = make_dipole_multi(n_freq=3, res=10.0)
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].ndim, 4)
             self.assertEqual(out['e_phi_re'].ndim, 4)
         finally:
@@ -376,7 +376,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape, ant['e_theta_re'].shape)
             self.assertEqual(out['e_theta_im'].shape, ant['e_theta_im'].shape)
             self.assertEqual(out['e_phi_re'].shape, ant['e_phi_re'].shape)
@@ -391,7 +391,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape[3], n_freq)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -402,7 +402,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             for key in ['e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im',
                         'azimuth_grid', 'elevation_grid', 'element_pos',
                         'coupling_re', 'coupling_im', 'center_freq', 'name', 'layout']:
@@ -420,7 +420,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['azimuth_grid'], ant['azimuth_grid'], decimal=10)
             npt.assert_array_almost_equal(out['elevation_grid'], ant['elevation_grid'], decimal=10)
         finally:
@@ -432,7 +432,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['center_freq'], ant['center_freq'], decimal=0)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -443,7 +443,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertEqual(out['center_freq'].ndim, 1)
             self.assertEqual(len(out['center_freq']), 3)
         finally:
@@ -455,7 +455,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['element_pos'], ant['element_pos'], decimal=10)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -466,7 +466,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertEqual(out['name'], 'dipole_multi')
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -477,7 +477,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertIn('layout', out)
             self.assertIsInstance(out['layout'], np.ndarray)
         finally:
@@ -507,7 +507,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             # Freq 0 and freq 2 have different scaling (1.0 vs 1.2), should not be equal
             self.assertFalse(np.allclose(out['e_theta_re'][:, :, 0, 0],
                                          out['e_theta_re'][:, :, 0, 2], atol=1e-6))
@@ -515,12 +515,12 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
             if os.path.exists(fn): os.unlink(fn)
 
     def test_individual_freq_matches_single_read(self):
-        """Each freq entry read with id=0 should match reading that entry individually."""
+        """Each freq entry read together (the default) should match reading that entry individually."""
         ant = make_multi_freq_xpol(n_freq=3, res=10.0)
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out_multi = arrayant.qdant_read(fn, id=0)
+            out_multi = arrayant.qdant_read(fn)
             for f_idx in range(3):
                 out_single = arrayant.qdant_read(fn, id=f_idx + 1)
                 npt.assert_array_almost_equal(
@@ -561,7 +561,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, speaker)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape, speaker['e_theta_re'].shape)
             npt.assert_array_almost_equal(out['e_theta_re'], speaker['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['center_freq'], speaker['center_freq'], decimal=0)
@@ -578,7 +578,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn, id=0)
+            out = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape[3], 2)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
         finally:

@@ -1050,7 +1050,8 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
   - `hemisphere` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W·H))`
   - `dipole` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere
   - `cardioid` — `R = 0.5·(1+cos(θ_off))`
-- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π·radius)`.
+- For `"horn"`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
+  60° and `f_ctrl = c/(2π·radius)`.
 
 ### Declaration:
 ```cpp
@@ -1063,9 +1064,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype upper_rolloff_slope = 12.0,
         dtype sensitivity = 85.0,
         std::string radiation_type = "hemisphere",
-        dtype hor_coverage = 0.0,
-        dtype ver_coverage = 0.0,
-        dtype horn_control_freq = 0.0,
+        dtype hor_coverage = NAN,
+        dtype ver_coverage = NAN,
+        dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         arma::Col<dtype> center_freq = arma::Col<dtype>(),
@@ -1074,20 +1075,20 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 
 ### Inputs:
 - **`driver_type`** *(optional)* — Driver directivity model: `"piston"`, `"horn"`, or `"omni"`
-- **`radius`** *(optional)* — Effective radiating radius; cone/dome radius for piston, mouth radius for horn
-- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency
-- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency
-- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth)
-- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave
+- **`radius`** *(optional)* — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn
+- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz, > 0
+- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz, larger than `lower_cutoff`
+- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
+- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave, > 0
 - **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
-- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; `0` defaults to 90°
-- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; `0` defaults to 60°
-- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; `0` auto-derives from `radius`
-- **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
-- **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
+- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
+- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
+- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
+- **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
+- **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
 - **`center_freq`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
-- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 5°
+- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion

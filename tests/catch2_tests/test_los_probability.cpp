@@ -701,11 +701,18 @@ TEST_CASE("los_probability - input validation")
     SECTION("d_clutter")
     {
         for (const char *m : {"38.901_InF_SL", "38.901_SMa", "LOS"}) // checked for every model
-            for (double v : {0.0, -1.0, inf})
+            for (double v : {inf, -inf})
             {
                 INFO("model " << m << ", value " << v);
                 CHECK_THROWS_MATCHES(call_c(m, v, NAN, NAN), std::invalid_argument,
-                                     Message("Input 'd_clutter' must be NaN or > 0."));
+                                     Message("Input 'd_clutter' must be finite or NaN."));
+            }
+        // A clutter size cannot be <= 0: such values select the TR default, as NaN does
+        for (const char *m : {"38.901_InF_SL", "38.901_InF_DH", "38.901_SMa"})
+            for (double v : {0.0, -1.0})
+            {
+                INFO("model " << m << ", value " << v);
+                CHECK(p_one(m, 60.0, 8.0, 1.5, v) == p_one(m, 60.0, 8.0, 1.5));
             }
     }
     SECTION("r_clutter")

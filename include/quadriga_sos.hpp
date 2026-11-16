@@ -6,6 +6,7 @@
 #define quadriga_sos_H
 
 #include <armadillo>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -179,7 +180,7 @@ namespace quadriga_lib
                       arma::uword n_dir = 10,               // Number of test directions, must be > 0
                       bool random_init = true,              // Start from random frequencies (true) or build up sinusoid by sinusoid (false)
                       dtype spatial_freq_min = 0.0,         // Lower limit of abs(f) in [1/m], 0 = none
-                      dtype spatial_freq_max = 0.0,         // Upper limit of abs(f) in [1/m], 0 = 15 / max(dist)
+                      dtype spatial_freq_max = NAN,         // Upper limit of abs(f) in [1/m], NaN or <= 0 = 15 / max(dist)
                       arma::sword seed = -1);               // Seed, -1 = system random device
 }
 

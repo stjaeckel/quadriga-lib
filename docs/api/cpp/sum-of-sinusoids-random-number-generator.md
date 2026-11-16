@@ -423,7 +423,7 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_generat
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse in
   others; the tables of [sos_preset](#sos_preset) were made with 300
 - `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each sinusoid;
-  0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
+  by default there is no lower limit, and the upper limit is `15 / max(dist)`
 - The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are stored for
   all sample points. It must not have more than 100000 points (the default has 151), which limits
   `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
@@ -448,7 +448,7 @@ void quadriga_lib::sos_generate(
     arma::uword n_dir = 10,
     bool random_init = true,
     dtype spatial_freq_min = 0.0,
-    dtype spatial_freq_max = 0.0,
+    dtype spatial_freq_max = NAN,
     arma::sword seed = -1);
 ```
 
@@ -462,8 +462,8 @@ void quadriga_lib::sos_generate(
 - **`random_init`** *(optional)* — Start from random frequencies (`true`) or build up sinusoid by sinusoid
   (`false`)
 - **`spatial_freq_min`** *(optional)* — Lower limit of the spatial-frequency magnitude in [1/m]; must be >= 0; 0 = none
-- **`spatial_freq_max`** *(optional)* — Upper limit of the spatial-frequency magnitude in [1/m]; must be >= 0 and, if not 0,
-  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search grid, see above
+- **`spatial_freq_max`** *(optional)* — Upper limit of the spatial-frequency magnitude in [1/m]; NaN or <= 0: default
+  `15 / max(dist)`; must be larger than `spatial_freq_min`; limited by the size of the search grid, see above
 - **`seed`** *(optional)* — Seed; must be >= -1; `-1` seeds from the system random device
 
 ### Outputs:

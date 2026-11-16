@@ -17,7 +17,6 @@ Reads array antenna data from QDANT files
   or a single struct when it has exactly one entry; multiple entries must form a frequency set (same number of elements,
   same azimuth and elevation grids, element positions and coupling size), otherwise
   an error asks to pass `id`
-- Differs from Python, where `qdant_read(fn)` reads ID 1 only
 - With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
 - An `id` that is not in the file is an error; the first entry counts as ID 1 only if it has no `id` attribute
 - Malformed files are an error, also when they declare more elements (`NoElements`) than the file has data for;

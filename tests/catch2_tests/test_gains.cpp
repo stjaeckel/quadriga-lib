@@ -107,7 +107,7 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, EM mode")
     {
         arma::vec cf, txp, rxp, pl;
         arma::mat pg;
-        quadriga_lib::qrt_file_read<double>(fn, ic, 0, true, &cf, &txp, nullptr, &rxp, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, ic, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
                                             nullptr, nullptr, &pg, &pl, nullptr,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0);
 
@@ -174,7 +174,7 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
     {
         arma::vec cf, txp, rxp, pl;
         arma::mat pg;
-        quadriga_lib::qrt_file_read<double>(fn, ic, 0, true, &cf, &txp, nullptr, &rxp, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, ic, 0, false, &cf, &txp, nullptr, &rxp, nullptr,
                                             nullptr, nullptr, &pg, &pl, nullptr,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0);
 
@@ -213,7 +213,7 @@ TEST_CASE("Gains - FSPL matches qrt_file_read, scalar mode")
     auto excess_dB = [&](arma::uword ic) -> double
     {
         arma::mat pg;
-        quadriga_lib::qrt_file_read<double>(fn, ic, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr,
+        quadriga_lib::qrt_file_read<double>(fn, ic, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr,
                                             nullptr, nullptr, &pg, nullptr, nullptr,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, 0);
         return -10.0 * std::log10(pg(0, 2) / pg(0, 0));

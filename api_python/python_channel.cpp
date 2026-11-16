@@ -147,6 +147,6 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("fn"),
           py::arg("i_cir") = py::none(),
           py::arg("i_orig") = 0,
-          py::arg("downlink") = true,
+          py::arg("uplink") = false,
           py::arg("normalize_M") = 1);
 }

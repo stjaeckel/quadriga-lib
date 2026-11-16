@@ -41,7 +41,8 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   - `hemisphere` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W·H))`
   - `dipole` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere
   - `cardioid` — `R = 0.5·(1+cos(θ_off))`
-- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π·radius)`.
+- For `"horn"`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
+  60° and `f_ctrl = c/(2π·radius)`.
 
 ## Declaration:
 ```
@@ -54,9 +55,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype upper_rolloff_slope = 12.0,
         dtype sensitivity = 85.0,
         std::string radiation_type = "hemisphere",
-        dtype hor_coverage = 0.0,
-        dtype ver_coverage = 0.0,
-        dtype horn_control_freq = 0.0,
+        dtype hor_coverage = NAN,
+        dtype ver_coverage = NAN,
+        dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         arma::Col<dtype> center_freq = arma::Col<dtype>(),
@@ -65,20 +66,20 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 
 ## Inputs:
 - **`driver_type`** *(optional)* — Driver directivity model: `"piston"`, `"horn"`, or `"omni"`
-- **`radius`** *(optional)* — Effective radiating radius; cone/dome radius for piston, mouth radius for horn
-- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency
-- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency
-- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth)
-- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave
+- **`radius`** *(optional)* — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn
+- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz, > 0
+- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz, larger than `lower_cutoff`
+- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
+- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave, > 0
 - **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
-- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; `0` defaults to 90°
-- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; `0` defaults to 60°
-- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; `0` auto-derives from `radius`
-- **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
-- **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
+- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
+- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
+- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
+- **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
+- **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
 - **`center_freq`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
-- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 5°
+- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ## Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion
@@ -125,35 +126,33 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(std::s
     if (radiation_type != "monopole" && radiation_type != "hemisphere" && radiation_type != "dipole" && radiation_type != "cardioid")
         throw std::invalid_argument("generate_speaker: radiation_type must be 'monopole', 'hemisphere', 'dipole', or 'cardioid'.");
 
-    // Non-finite values cannot be replaced by a default (except the cutoffs, see below)
-    const dtype scalars[9] = {radius, lower_rolloff_slope, upper_rolloff_slope, sensitivity, hor_coverage, ver_coverage,
-                              horn_control_freq, baffle_width, baffle_height};
-    for (dtype v : scalars)
-        if (!std::isfinite(v))
-            throw std::invalid_argument("generate_speaker: radius, slopes, sensitivity, coverage, horn_control_freq and baffle size must be finite.");
+    // The horn parameters default to NaN, which selects the value derived below; all other scalars must be valid
+    for (dtype v : {radius, lower_rolloff_slope, upper_rolloff_slope, baffle_width, baffle_height, lower_cutoff})
+        if (!std::isfinite(v) || v <= dtype(0.0))
+            throw std::invalid_argument("generate_speaker: radius, slopes, baffle size and lower_cutoff must be finite and > 0.");
+    if (!std::isfinite(upper_cutoff) || upper_cutoff <= lower_cutoff)
+        throw std::invalid_argument("generate_speaker: upper_cutoff must be finite and larger than lower_cutoff.");
+    if (!std::isfinite(sensitivity))
+        throw std::invalid_argument("generate_speaker: sensitivity must be finite.");
+    if (angular_resolution <= dtype(0.0))
+        throw std::invalid_argument("generate_speaker: angular_resolution must be in the range from 0.1 to 90 deg.");
+    for (dtype v : {hor_coverage, ver_coverage, horn_control_freq})
+        if (std::isinf(v))
+            throw std::invalid_argument("generate_speaker: coverage and horn_control_freq must be finite or NaN.");
     for (dtype f : center_freq)
         if (!std::isfinite(f) || f <= dtype(0.0))
             throw std::invalid_argument("generate_speaker: center_freq must be finite and positive.");
 
-    // --- Fix input ranges ---
-    radius = (radius <= dtype(0.0)) ? dtype(0.05) : radius;
-    lower_cutoff = (lower_cutoff <= dtype(0.0) || !std::isfinite(lower_cutoff)) ? dtype(80.0) : lower_cutoff;
-    upper_cutoff = (upper_cutoff <= lower_cutoff || !std::isfinite(upper_cutoff)) ? dtype(12000.0) : upper_cutoff;
-    lower_rolloff_slope = (lower_rolloff_slope <= dtype(0.0)) ? dtype(12.0) : lower_rolloff_slope;
-    upper_rolloff_slope = (upper_rolloff_slope <= dtype(0.0)) ? dtype(12.0) : upper_rolloff_slope;
-    sensitivity = (sensitivity <= dtype(0.0)) ? dtype(85.0) : sensitivity;
     angular_resolution = qd_arrayant_grid_resolution(angular_resolution, dtype(5.0), "angular_resolution");
-    baffle_width = (baffle_width <= dtype(0.0)) ? dtype(0.15) : baffle_width;
-    baffle_height = (baffle_height <= dtype(0.0)) ? dtype(0.25) : baffle_height;
 
-    // --- Auto-derive horn parameters from radius when set to 0 ---
+    // --- Horn parameters: NaN or <= 0 selects the default ---
     if (driver_type == "horn")
     {
-        if (horn_control_freq <= dtype(0.0))
+        if (!(horn_control_freq > dtype(0.0)))
             horn_control_freq = dtype(c_sound / (two_pi * (double)radius));
-        if (hor_coverage <= dtype(0.0))
+        if (!(hor_coverage > dtype(0.0)))
             hor_coverage = dtype(90.0);
-        if (ver_coverage <= dtype(0.0))
+        if (!(ver_coverage > dtype(0.0)))
             ver_coverage = dtype(60.0);
     }
 

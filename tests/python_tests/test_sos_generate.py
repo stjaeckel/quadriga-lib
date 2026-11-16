@@ -64,11 +64,13 @@ class test_case(unittest.TestCase):
         self.assertEqual(test_dir.shape, (10, 2))
         self.assertEqual(test_dir.dtype, np.float64)
 
-        # The remaining defaults, with a seed: random_init = True, spatial_freq_min = 0, spatial_freq_max = 0
+        # The remaining defaults, with a seed: random_init = True, spatial_freq_min = 0, spatial_freq_max = NaN;
+        # NaN or a value <= 0 selects 15 / max(dist)
         ref = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, seed=5)
-        out = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 3, True, 10, True, 0.0, 0.0, 5)
-        for a, b in zip(out, ref):
-            npt.assert_array_equal(a, b)
+        for f_max in (np.nan, 0.0, -1.0, 15.0 / np.max(self.dist_e)):
+            out = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 3, True, 10, True, 0.0, f_max, 5)
+            for a, b in zip(out, ref):
+                npt.assert_array_equal(a, b)
 
     def test_optional_inputs(self):
         # n_dim and n_dir

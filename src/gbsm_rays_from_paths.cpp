@@ -18,7 +18,7 @@ SECTION!*/
 Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Fills a [[gbsm_rays]] object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [[qrt_file_read]], read as `qrt_file_read<double>` with `normalize_M = 1` (`downlink = false` gives the reverse
+  [[qrt_file_read]], read as `qrt_file_read<double>` with `normalize_M = 1` (`uplink = true` gives the reverse
   link; `normalize_M = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;

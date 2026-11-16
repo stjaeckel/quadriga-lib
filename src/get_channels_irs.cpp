@@ -34,7 +34,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
-- Setting `center_freq = 0.0` disables phase computation
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
@@ -99,7 +99,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
 - **`i_irs`** *(optional)* — IRS codebook port index
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
-- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [[arrayant]]
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`

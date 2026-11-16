@@ -121,7 +121,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · No
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
-- Setting `center_freq = 0.0` disables phase computation
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
@@ -186,7 +186,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
 - **`i_irs`** *(optional)* — IRS codebook port index
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
-- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](array-antenna-class.md#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
@@ -328,7 +328,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_planar) ·
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- Setting `center_freq = 0` disables phase calculation (delays still computed).
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
   centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [quantize_delays](channel-functions.md#quantize_delays) rejects
@@ -374,7 +374,7 @@ void quadriga_lib::get_channels_planar(
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`center_freq`** *(optional)* — Center frequency; 0 disables phase calculation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
@@ -408,7 +408,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_spherical)
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
   [coord2path](site-specific-simulation-tools.md#coord2path) or [qrt_file_read](channel-functions.md#qrt_file_read) with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry (spherical waves).
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -462,7 +462,7 @@ void quadriga_lib::get_channels_spherical(
   (e.g. 0) use the polyline length; `[n_path]`
 - **`M`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); `[8, n_path]`
-- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot

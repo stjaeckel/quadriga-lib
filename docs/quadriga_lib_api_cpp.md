@@ -36,6 +36,10 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`.
 - Index arrays: `<thing>_ind`, indices into other data, e.g. `obj_ind`, `mtl_ind`, `sub_mesh_ind`, `hit_ind`.
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
+- Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
+- Not given / all: an omitted optional input (C++ `nullptr` or an empty container, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
+- Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity cannot be <= 0 (a size, an angle range, a frequency limit), values <= 0 select it too. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
+- Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_M`, `fix_taps`, `axis`) or strings, each documented by its function.
 
 **Frequencies**
 
@@ -1331,7 +1335,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
   - `hemisphere` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W·H))`
   - `dipole` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere
   - `cardioid` — `R = 0.5·(1+cos(θ_off))`
-- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π·radius)`.
+- For `"horn"`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
+  60° and `f_ctrl = c/(2π·radius)`.
 
 ### Declaration:
 ```cpp
@@ -1344,9 +1349,9 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype upper_rolloff_slope = 12.0,
         dtype sensitivity = 85.0,
         std::string radiation_type = "hemisphere",
-        dtype hor_coverage = 0.0,
-        dtype ver_coverage = 0.0,
-        dtype horn_control_freq = 0.0,
+        dtype hor_coverage = NAN,
+        dtype ver_coverage = NAN,
+        dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         arma::Col<dtype> center_freq = arma::Col<dtype>(),
@@ -1355,20 +1360,20 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 
 ### Inputs:
 - **`driver_type`** *(optional)* — Driver directivity model: `"piston"`, `"horn"`, or `"omni"`
-- **`radius`** *(optional)* — Effective radiating radius; cone/dome radius for piston, mouth radius for horn
-- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency
-- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency
-- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth)
-- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave
+- **`radius`** *(optional)* — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn
+- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz, > 0
+- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz, larger than `lower_cutoff`
+- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
+- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave, > 0
 - **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
-- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; `0` defaults to 90°
-- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; `0` defaults to 60°
-- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; `0` auto-derives from `radius`
-- **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
-- **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
+- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
+- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
+- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
+- **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
+- **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
 - **`center_freq`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
-- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90, values <= 0 select 5°
+- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion
@@ -2466,7 +2471,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_read) · [Python](quadriga_li
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
   of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal.
@@ -2482,7 +2487,7 @@ void quadriga_lib::qrt_file_read(
     const std::string &fn,
     arma::uword i_cir = 0,
     arma::uword i_orig = 0,
-    bool downlink = true,
+    bool uplink = false,
     arma::Col<dtype> *center_freq = nullptr,
     arma::Mat<dtype> *tx_pos = nullptr,
     arma::Mat<dtype> *tx_orientation = nullptr,
@@ -2510,7 +2515,7 @@ void quadriga_lib::qrt_file_read(
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
-- **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
+- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
@@ -2554,7 +2559,7 @@ arma::vec center_freq, tx_pos, rx_pos, path_length;
 arma::mat path_gain; arma::cube M;
 for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
     for (arma::uword io = 0; io < cache.no_orig; ++io)
-        quadriga_lib::qrt_file_read<double>("", ic, io, true,
+        quadriga_lib::qrt_file_read<double>("", ic, io, false,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
             nullptr, nullptr, &path_gain, &path_length, &M,
             nullptr, nullptr, nullptr, nullptr, nullptr, 1,
@@ -2619,7 +2624,7 @@ Not in: MATLAB, Python
   `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only ([qrt_file_read_raw](#qrt_file_read_raw) returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
-  [qrt_file_read](#qrt_file_read) (`downlink = true`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
+  [qrt_file_read](#qrt_file_read) (`uplink = false`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init):
   `qrt_file_read` recomputes the lengths from the stored positions; not checked
@@ -2894,7 +2899,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_irs) · Not in: Python
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
-- Setting `center_freq = 0.0` disables phase computation
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
@@ -2959,7 +2964,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
 - **`i_irs`** *(optional)* — IRS codebook port index
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
-- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
@@ -3101,7 +3106,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_planar) · [Python](quadr
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- Setting `center_freq = 0` disables phase calculation (delays still computed).
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
   centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [quantize_delays](#quantize_delays) rejects
@@ -3147,7 +3152,7 @@ void quadriga_lib::get_channels_planar(
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`center_freq`** *(optional)* — Center frequency; 0 disables phase calculation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
@@ -3181,7 +3186,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_spherical) · [Python](qu
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
   [coord2path](#coord2path) or [qrt_file_read](#qrt_file_read) with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry (spherical waves).
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -3235,7 +3240,7 @@ void quadriga_lib::get_channels_spherical(
   (e.g. 0) use the polyline length; `[n_path]`
 - **`M`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); `[8, n_path]`
-- **`center_freq`** *(optional)* — Center frequency; set to `0` to skip phase computation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, always adds one output path; slot 0 holds the LOS path (zero power
   if none was found); a LOS path found in the input leaves a zero-power path in its original slot
@@ -3316,9 +3321,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_angular_spread) · [Python](quadr
 
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each CIR may have a different number of paths.
 - RMS spread formula: `sqrt(sum(pw .* d^2))` where `d` are wrapped deviations from the circular mean (3GPP TR 38.901 second-moment definition).
-- With wrapping (`disable_wrapping = false`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
+- With wrapping (`wrapping = true`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
 - When `calc_bank_angle = true` (with wrapping), an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
-- When `disable_wrapping = true` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
+- When `wrapping = false` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
 - When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
   `quantize` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
 
@@ -3333,7 +3338,7 @@ void quadriga_lib::calc_angular_spreads_sphere(
     arma::Mat<dtype> *orientation = nullptr,
     std::vector<arma::Col<dtype>> *phi = nullptr,
     std::vector<arma::Col<dtype>> *theta = nullptr,
-    bool disable_wrapping = true,
+    bool wrapping = false,
     bool calc_bank_angle = false,
     dtype quantize = (dtype)0);
 ```
@@ -3342,10 +3347,10 @@ void quadriga_lib::calc_angular_spreads_sphere(
 - **`az`** — Azimuth angles; range -pi to pi; `[n_cir]` vector, each element of length `n_path`
 - **`el`** — Elevation angles; range -pi/2 to pi/2; same structure as `az`
 - **`powers`** — Path powers in [W]; same structure as `az`
-- **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles; default:
-  `true` (wrapping off, as in the MATLAB and Python wrappers)
+- **`wrapping`** *(optional)* — If true, rotates the paths so that their mean direction lies on the equator before
+  computing the spreads; if false, computes the spreads from the raw angles; default: `false`
 - **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when
-  `disable_wrapping = false`; default: `false`
+  `wrapping = true`; default: `false`
 - **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
   otherwise it must be finite and >= 1e-3 deg, else `std::invalid_argument` is thrown
 
@@ -3972,7 +3977,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [MATLAB](quadriga_lib_api_mex.md#gbsm_rays_from_paths) · [Python](quadriga_lib_api_python.md#gbsm.rays_from_paths)
 
 - Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [qrt_file_read](#qrt_file_read), read as `qrt_file_read<double>` with `normalize_M = 1` (`downlink = false` gives the reverse
+  [qrt_file_read](#qrt_file_read), read as `qrt_file_read<double>` with `normalize_M = 1` (`uplink = true` gives the reverse
   link; `normalize_M = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
@@ -4159,8 +4164,8 @@ void quadriga_lib::los_probability(
   caller; the 2D distance in indoor scenarios; `[n_link]`
 - **`h_bs`** — BS height in [m], finite; `[n_link]` or `[1]` for all links
 - **`h_ut`** — UT height in [m], finite; `[n_link]` or `[1]` for all links
-- **`d_clutter`** *(optional)* — Clutter size in [m] of the InF and SMa models, > 0; NaN = TR default (InF-SL and
-  InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m)
+- **`d_clutter`** *(optional)* — Clutter size in [m] of the InF and SMa models; NaN or <= 0: TR default (InF-SL and
+  InF-SH 10 m, InF-DL and InF-DH 2 m, SMa 30 m); infinite values throw
 - **`r_clutter`** *(optional)* — Clutter density of the InF models (default 0.2 for SL and SH, 0.6 for DL and DH),
   vegetation density of SMa (default 0; 0.1 sparse, 0.2 dense); in [0, 1); NaN = default
 - **`h_clutter`** *(optional)* — Clutter height in [m] of InF-SH (default 2 m) and InF-DH (6 m), >= 0; NaN =
@@ -7132,8 +7137,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#write_png) · [Python](quadriga_lib_ap
 - The auto-detected range ignores `NaN` and `+-Inf`; `+Inf` and `-Inf` values get the last and first colour
 - `NaN` values get the first colour of the map
 - A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
-  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
-- Throws `std::invalid_argument` for an empty `data` matrix and for `min_val > max_val` (both given)
+  input without a positive value) maps every value to the first colour
+- Throws `std::invalid_argument` for an empty `data` matrix, an infinite `min_val` or `max_val`, and for
+  `min_val > max_val` (both given)
 - Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
 
 ### Declaration:
@@ -7151,8 +7157,8 @@ void quadriga_lib::write_png(
 - **`data`** — Input data matrix
 - **`fn`** — Output `.png` file path
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for valid values
-- **`min_val`** *(optional)* — Lower clipping bound; auto-detected if `NAN`
-- **`max_val`** *(optional)* — Upper clipping bound; auto-detected if `NAN`
+- **`min_val`** *(optional)* — Lower clipping bound; NaN (the default): data minimum
+- **`max_val`** *(optional)* — Upper clipping bound; NaN (the default): data maximum
 - **`log_transform`** *(optional)* — Apply 10*log10(data) before mapping; non-positive values map to the minimum color
 
 ---
@@ -7670,7 +7676,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_generate) · [Python](quadriga_lib
 - Use enough test directions: with few (e.g. 10) the result fits those directions and is worse in
   others; the tables of [sos_preset](#sos_preset) were made with 300
 - `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each sinusoid;
-  0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
+  by default there is no lower limit, and the upper limit is `15 / max(dist)`
 - The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are stored for
   all sample points. It must not have more than 100000 points (the default has 151), which limits
   `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
@@ -7695,7 +7701,7 @@ void quadriga_lib::sos_generate(
     arma::uword n_dir = 10,
     bool random_init = true,
     dtype spatial_freq_min = 0.0,
-    dtype spatial_freq_max = 0.0,
+    dtype spatial_freq_max = NAN,
     arma::sword seed = -1);
 ```
 
@@ -7709,8 +7715,8 @@ void quadriga_lib::sos_generate(
 - **`random_init`** *(optional)* — Start from random frequencies (`true`) or build up sinusoid by sinusoid
   (`false`)
 - **`spatial_freq_min`** *(optional)* — Lower limit of the spatial-frequency magnitude in [1/m]; must be >= 0; 0 = none
-- **`spatial_freq_max`** *(optional)* — Upper limit of the spatial-frequency magnitude in [1/m]; must be >= 0 and, if not 0,
-  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search grid, see above
+- **`spatial_freq_max`** *(optional)* — Upper limit of the spatial-frequency magnitude in [1/m]; NaN or <= 0: default
+  `15 / max(dist)`; must be larger than `spatial_freq_min`; limited by the size of the search grid, see above
 - **`seed`** *(optional)* — Seed; must be >= -1; `-1` seeds from the system random device
 
 ### Outputs:

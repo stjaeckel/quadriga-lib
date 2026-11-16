@@ -78,7 +78,7 @@ void fuzz_one(const uint8_t *data, size_t size)
     for (arma::uword i_orig = 0; i_orig <= n_orig_try; ++i_orig) // i_orig == n_orig_try: past the end if the file has one or two
     {
         for (arma::uword i_cir = 0; i_cir <= n_cir_try; ++i_cir)
-            for (bool downlink : {true, false})
+            for (bool uplink : {false, true})
                 fz::clean([&]
                           {
                     arma::vec center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, path_length, aod, eod, aoa, eoa;
@@ -88,10 +88,10 @@ void fuzz_one(const uint8_t *data, size_t size)
                     arma::u32_vec n_interact;
                     arma::fmat coord;
                     std::vector<uint8_t> interact_type;
-                    quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, downlink, &center_freq, &tx_pos,
+                    quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, uplink, &center_freq, &tx_pos,
                                                         &tx_orientation, &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos,
                                                         &path_gain, &path_length, &M, &aod, &eod, &aoa, &eoa,
-                                                        &path_coord, downlink ? 1 : 0, &n_interact, &coord, &interact_type); });
+                                                        &path_coord, uplink ? 0 : 1, &n_interact, &coord, &interact_type); });
         fz::clean([&] { quadriga_lib::qrt_file_read_raw(fn, i_orig); });
     }
 }

@@ -36,7 +36,12 @@ function test_write_png
     assertTrue(exist(outFile, 'file') == 2);
     delete_if_exists(outFile);
 
-    % --- 4) Error: wrong number of inputs ---
+    % --- 4) Error: infinite limits (NaN selects the data minimum / maximum) ---
+    f = @() quadriga_lib.write_png(outFile, gradient, 'jet', NaN, Inf);
+    assertExceptionThrown(f, 'quadriga_lib:CPPerror');
+    assertFalse(exist(outFile, 'file') == 2);
+
+    % --- 5) Error: wrong number of inputs ---
     f = @() quadriga_lib.write_png();
     assertExceptionThrown(f, 'quadriga_lib:CPPerror');
 end

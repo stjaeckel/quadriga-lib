@@ -112,7 +112,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
 - The scalar argument `i_freq` selects the frequency index that is processed; a single frequency is returned per call.
-- If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
+- `center_freq = None` or a selected entry of `0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - If `use_absolute_delays == False`, the straight-line TX-RX delay between the phase centres (LOS delay) is subtracted
   from all paths; per-element delays of pairs that are closer to each other than the phase centres are then
   negative, down to about -(half the TX array size + half the RX array size) / speed of light; [quantize_delays](channel-functions.md#quantize_delays) rejects
@@ -153,8 +153,8 @@ coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., i_fr
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip
-  phase computation; default: `None`
+- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
+  coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
@@ -195,7 +195,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
   length; the per-element offsets follow the FBS / LBS geometry.
 - Path data is given for `n_freq` frequencies; single-frequency data uses `n_freq = 1`.
 - The scalar argument `i_freq` selects the frequency index that is processed; a single frequency is returned per call.
-- If `center_freq` is `None` or the selected entry is `0`, phase calculation is disabled and only delays are computed.
+- `center_freq = None` or a selected entry of `0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -255,7 +255,7 @@ coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
 - **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_out)` in batch mode
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
-- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; set an entry to `0` or pass `None` to skip phase computation; default: `None`
+- **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`

@@ -34,7 +34,7 @@ Calculate MIMO channel coefficients for planar wave paths
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
-- Setting `center_freq = 0` disables phase calculation (delays still computed).
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
   centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [[quantize_delays]] rejects
@@ -80,7 +80,7 @@ void quadriga_lib::get_channels_planar(
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`center_freq`** *(optional)* — Center frequency; 0 disables phase calculation
+- **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot

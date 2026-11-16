@@ -334,14 +334,16 @@ class TestSpeakerGenerate(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
         self.assertGreater(np.max(np.abs(data['e_theta_re'])), 0)
 
-    def test_horn_auto_coverage(self):
-        """Horn with coverage=0 (auto) produces valid output."""
-        data = arrayant.generate_speaker(driver_type='horn', radius=0.025,
-                                         lower_cutoff=1500.0, upper_cutoff=20000.0,
-                                         hor_coverage=0.0, ver_coverage=0.0,
-                                         center_freq=np.array([4000.0]),
-                                         angular_resolution=5.0)
-        self.assertTrue(np.all(np.isfinite(data['e_theta_re'])))
+    def test_horn_auto_parameters(self):
+        """Horn: NaN (the default) or <= 0 selects 90 deg, 60 deg and c / (2 pi radius)."""
+        kw = dict(driver_type='horn', radius=0.025, lower_cutoff=1500.0, upper_cutoff=20000.0,
+                  center_freq=np.array([500.0, 4000.0]), angular_resolution=10.0)
+        ref = arrayant.generate_speaker(**kw, hor_coverage=90.0, ver_coverage=60.0,
+                                        horn_control_freq=344.0 / (2.0 * np.pi * 0.025))
+        for v in (None, np.nan, 0.0, -1.0):
+            arg = {} if v is None else dict(hor_coverage=v, ver_coverage=v, horn_control_freq=v)
+            data = arrayant.generate_speaker(**kw, **arg)
+            npt.assert_allclose(data['e_theta_re'], ref['e_theta_re'], atol=1e-10, rtol=0)
 
     # ================================================================================
     # Baffle parameters (piston only)
@@ -453,6 +455,11 @@ class TestSpeakerGenerate(unittest.TestCase):
         """Invalid radiation type should raise an error."""
         with self.assertRaises(Exception):
             arrayant.generate_speaker(radiation_type='laserbeam')
+
+    def test_out_of_range_scalar_throws(self):
+        """A radius of 0 is an error, not a request for the default."""
+        with self.assertRaisesRegex(ValueError, "radius"):
+            arrayant.generate_speaker(radius=0.0, center_freq=np.array([1000.0]), angular_resolution=90.0)
 
     # ================================================================================
     # Reproduce with different parameters

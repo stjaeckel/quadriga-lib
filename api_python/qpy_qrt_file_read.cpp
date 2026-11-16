@@ -22,7 +22,7 @@ Read ray-tracing CIR data from a QRT file
   significantly speeds up multi-snapshot reads
 - File reading and the conversion to numpy arrays are overlapped: a background thread reads the
   next snapshot into a double buffer while the main thread converts the previous one
-- If `downlink = True`, origin is TX and destination is RX; if `False`, roles are swapped and `M` is the transpose
+- If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `M` is the transpose
   of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
@@ -32,7 +32,7 @@ Read ray-tracing CIR data from a QRT file
 ```
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
     path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
-    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M )
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_M )
 ```
 
 ## Inputs:
@@ -40,7 +40,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`i_cir`** — Snapshot indices to read, 0-based; `(n_out,)` or `None`; if `None` or empty, all snapshots are read (for a file
   without CIRs, all outputs are empty with `n_out = 0`); default: `None`
 - **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
-- **`downlink`** — If `True`, origin=TX and destination=RX; if `False`, the roles are swapped; default: `True`
+- **`uplink`** — If `False`, origin=TX and destination=RX; if `True`, the roles are swapped (origin=RX, destination=TX); default: `False`
 - **`normalize_M`** — Controls `M` and `path_gain` scaling; 0 = values as stored in the QRT file with
   `path_gain` = -PL; 1 = `M` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
@@ -121,7 +121,7 @@ struct qd_qrt_reader_guard
 py::tuple qrt_file_read(const std::string &fn,
                         py::handle cir,
                         arma::uword orig,
-                        bool downlink,
+                        bool uplink,
                         int normalize_M)
 {
     // Open file stream and initialize the read cache (reused across all snapshots)
@@ -183,7 +183,7 @@ py::tuple qrt_file_read(const std::string &fn,
             try
             {
                 qd_qrt_slot &s = slot[i % 2ULL];
-                quadriga_lib::qrt_file_read<double>(fn, i_cir_a[i], orig, downlink, nullptr,
+                quadriga_lib::qrt_file_read<double>(fn, i_cir_a[i], orig, uplink, nullptr,
                                                     &s.tx_pos, &s.tx_orientation, &s.rx_pos, &s.rx_orientation,
                                                     &s.fbs_pos, &s.lbs_pos, &s.path_gain, &s.path_length, &s.M,
                                                     &s.aod, &s.eod, &s.aoa, &s.eoa, &s.path_coord, normalize_M,

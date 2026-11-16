@@ -24,7 +24,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path_in` is provided, it overrides `threshold_dB` for path selection
 - Optional `ant_irs_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
@@ -62,7 +62,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
-- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: `0`
+- **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`active_path_in`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
 - **`ant_irs_2`** — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns

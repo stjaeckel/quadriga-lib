@@ -48,7 +48,7 @@ Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
   not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
   (see `acf_tail` of [[sos_calc_mse]]). To prevent this, set `spatial_freq_min`
 - `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each
-  sinusoid; 0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
+  sinusoid; by default there is no lower limit, and the upper limit is `15 / max(dist)`
 - The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
   stored for all sample points. It must not have more than 100000 points (the default has 151),
   which limits `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
@@ -76,9 +76,9 @@ Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
   (false); default: true
 - **`spatial_freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
   default: 0
-- **`spatial_freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
-  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
-  grid, see above; default: 0
+- **`spatial_freq_max`** — Upper limit of the frequency magnitude; NaN or <= 0: default `15 / max(dist)`;
+  must be larger than `spatial_freq_min`; limited by the size of the search grid, see above;
+  default: NaN
 - **`seed`** — Seed; integer from -1 to 2^63-1; -1 seeds from the system random device; default: -1
 
 ## Outputs:
@@ -110,7 +110,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_dir = (nrhs < 6) ? 10 : qd_mex_sos_count(prhs[5], "n_dir", 10.0);
     const bool random_init = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "random_init", true);
     const double spatial_freq_min = (nrhs < 8) ? 0.0 : qd_mex_get_scalar<double>(prhs[7], "spatial_freq_min", 0.0);
-    const double spatial_freq_max = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "spatial_freq_max", 0.0);
+    const double spatial_freq_max = (nrhs < 9) ? NAN : qd_mex_get_scalar<double>(prhs[8], "spatial_freq_max", NAN);
     const arma::sword seed = (nrhs < 10) ? -1 : qd_mex_get_seed(prhs[9]);
 
     // Wrap optional pointers; the number of passes is known only after the call

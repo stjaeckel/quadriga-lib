@@ -18,8 +18,9 @@ Write a data matrix to a color-coded PNG file
 - The auto-detected range ignores `NaN` and `+-Inf`; `+Inf` and `-Inf` values get the last and first colour
 - `NaN` values get the first colour of the map
 - A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
-  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
-- Throws `std::invalid_argument` for an empty `data` matrix and for `min_val > max_val` (both given)
+  input without a positive value) maps every value to the first colour
+- Throws `std::invalid_argument` for an empty `data` matrix, an infinite `min_val` or `max_val`, and for
+  `min_val > max_val` (both given)
 - Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
 
 ## Declaration:
@@ -37,8 +38,8 @@ void quadriga_lib::write_png(
 - **`data`** — Input data matrix
 - **`fn`** — Output `.png` file path
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for valid values
-- **`min_val`** *(optional)* — Lower clipping bound; auto-detected if `NAN`
-- **`max_val`** *(optional)* — Upper clipping bound; auto-detected if `NAN`
+- **`min_val`** *(optional)* — Lower clipping bound; NaN (the default): data minimum
+- **`max_val`** *(optional)* — Upper clipping bound; NaN (the default): data maximum
 - **`log_transform`** *(optional)* — Apply 10*log10(data) before mapping; non-positive values map to the minimum color
 MD!*/
 
@@ -49,6 +50,8 @@ void quadriga_lib::write_png(const arma::Mat<dtype> &data, std::string fn, std::
     if (data.n_elem == 0)
         throw std::invalid_argument("Input 'data' must not be empty.");
 
+    if (std::isinf(min_val) || std::isinf(max_val))
+        throw std::invalid_argument("'min_val' and 'max_val' must be finite or NaN.");
     if (std::isfinite(min_val) && std::isfinite(max_val) && min_val > max_val)
         throw std::invalid_argument("'min_val' must not be larger than 'max_val'.");
 

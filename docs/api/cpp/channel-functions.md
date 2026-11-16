@@ -807,7 +807,7 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_read) · [Python](../pyth
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
   of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal.
@@ -823,7 +823,7 @@ void quadriga_lib::qrt_file_read(
     const std::string &fn,
     arma::uword i_cir = 0,
     arma::uword i_orig = 0,
-    bool downlink = true,
+    bool uplink = false,
     arma::Col<dtype> *center_freq = nullptr,
     arma::Mat<dtype> *tx_pos = nullptr,
     arma::Mat<dtype> *tx_orientation = nullptr,
@@ -851,7 +851,7 @@ void quadriga_lib::qrt_file_read(
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
-- **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
+- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
@@ -895,7 +895,7 @@ arma::vec center_freq, tx_pos, rx_pos, path_length;
 arma::mat path_gain; arma::cube M;
 for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
     for (arma::uword io = 0; io < cache.no_orig; ++io)
-        quadriga_lib::qrt_file_read<double>("", ic, io, true,
+        quadriga_lib::qrt_file_read<double>("", ic, io, false,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
             nullptr, nullptr, &path_gain, &path_length, &M,
             nullptr, nullptr, nullptr, nullptr, nullptr, 1,
@@ -960,7 +960,7 @@ Not in: MATLAB, Python
   `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only ([qrt_file_read_raw](#qrt_file_read_raw) returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
-  [qrt_file_read](#qrt_file_read) (`downlink = true`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
+  [qrt_file_read](#qrt_file_read) (`uplink = false`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init):
   `qrt_file_read` recomputes the lengths from the stored positions; not checked

@@ -1001,7 +1001,7 @@ Read ray-tracing CIR data from a QRT file
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped and `M` is the transpose
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
   of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal.
@@ -1017,7 +1017,7 @@ void quadriga_lib::qrt_file_read(
     const std::string &fn,
     arma::uword i_cir = 0,
     arma::uword i_orig = 0,
-    bool downlink = true,
+    bool uplink = false,
     arma::Col<dtype> *center_freq = nullptr,
     arma::Mat<dtype> *tx_pos = nullptr,
     arma::Mat<dtype> *tx_orientation = nullptr,
@@ -1045,7 +1045,7 @@ void quadriga_lib::qrt_file_read(
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
-- **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
+- **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
@@ -1089,7 +1089,7 @@ arma::vec center_freq, tx_pos, rx_pos, path_length;
 arma::mat path_gain; arma::cube M;
 for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
     for (arma::uword io = 0; io < cache.no_orig; ++io)
-        quadriga_lib::qrt_file_read<double>("", ic, io, true,
+        quadriga_lib::qrt_file_read<double>("", ic, io, false,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
             nullptr, nullptr, &path_gain, &path_length, &M,
             nullptr, nullptr, nullptr, nullptr, nullptr, 1,
@@ -1102,7 +1102,7 @@ for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
+void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool uplink,
                                  arma::Col<dtype> *center_freq, arma::Mat<dtype> *tx_pos, arma::Mat<dtype> *tx_orientation,
                                  arma::Mat<dtype> *rx_pos, arma::Mat<dtype> *rx_orientation,
                                  arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos,
@@ -1545,25 +1545,25 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         dtype *p = out->memptr();
         p[0] = x, p[1] = y, p[2] = z;
     };
-    if (tx_pos && downlink)
+    if (tx_pos && !uplink)
         put(tx_pos, Ox, Oy, Oz);
-    if (rx_pos && !downlink)
+    if (rx_pos && uplink)
         put(rx_pos, Ox, Oy, Oz);
 
-    if (rx_pos && downlink)
+    if (rx_pos && !uplink)
         put(rx_pos, Dx, Dy, Dz);
-    if (tx_pos && !downlink)
+    if (tx_pos && uplink)
         put(tx_pos, Dx, Dy, Dz);
 
     // Output: orientations
-    if (tx_orientation && downlink)
+    if (tx_orientation && !uplink)
         put(tx_orientation, (dtype)orig_ox, (dtype)orig_oy, (dtype)orig_oz);
-    if (tx_orientation && !downlink)
+    if (tx_orientation && uplink)
         put(tx_orientation, (dtype)cir_ox, (dtype)cir_oy, (dtype)cir_oz);
 
-    if (rx_orientation && downlink)
+    if (rx_orientation && !uplink)
         put(rx_orientation, (dtype)cir_ox, (dtype)cir_oy, (dtype)cir_oz);
-    if (rx_orientation && !downlink)
+    if (rx_orientation && uplink)
         put(rx_orientation, (dtype)orig_ox, (dtype)orig_oy, (dtype)orig_oz);
 
     // Output: raw interaction data
@@ -1633,7 +1633,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
                 if (dst)
                 {
-                    if (downlink) // copy, normalize
+                    if (!uplink) // copy, normalize
                     {
                         dst[0] = r11 * scale;
                         dst[1] = i11 * scale;
@@ -1691,16 +1691,16 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         const arma::Col<dtype> o_pos = {Ox, Oy, Oz}, d_pos = {Dx, Dy, Dz};
         if (want_angles && want_length)
             quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
-                                            &path_length_local, fbs_pos, lbs_pos, &path_angles, path_coord, !downlink);
+                                            &path_length_local, fbs_pos, lbs_pos, &path_angles, path_coord, uplink);
         else if (want_angles && !want_length)
             quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
-                                            nullptr, fbs_pos, lbs_pos, &path_angles, path_coord, !downlink);
+                                            nullptr, fbs_pos, lbs_pos, &path_angles, path_coord, uplink);
         else if (!want_angles && want_length)
             quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
-                                            &path_length_local, fbs_pos, lbs_pos, nullptr, path_coord, !downlink);
+                                            &path_length_local, fbs_pos, lbs_pos, nullptr, path_coord, uplink);
         else // want_none
             quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
-                                            nullptr, fbs_pos, lbs_pos, nullptr, path_coord, !downlink);
+                                            nullptr, fbs_pos, lbs_pos, nullptr, path_coord, uplink);
 
         // Adjust path gain to include the path loss
         if (want_length)
@@ -1761,7 +1761,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     }
 }
 
-template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
+template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool uplink,
                                           arma::Col<float> *center_freq, arma::Mat<float> *tx_pos, arma::Mat<float> *tx_orientation,
                                           arma::Mat<float> *rx_pos, arma::Mat<float> *rx_orientation,
                                           arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos,
@@ -1770,7 +1770,7 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_c
                                           std::vector<arma::Mat<float>> *path_coord, int normalize_M, arma::u32_vec *n_interact, arma::fmat *coord,
                                           std::vector<uint8_t> *interact_type, std::ifstream *file, const qrt_read_cache *cache);
 
-template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
+template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool uplink,
                                           arma::Col<double> *center_freq, arma::Mat<double> *tx_pos, arma::Mat<double> *tx_orientation,
                                           arma::Mat<double> *rx_pos, arma::Mat<double> *rx_orientation,
                                           arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos,
@@ -1972,7 +1972,7 @@ Path objects of one CIR from spherical path data, for qrt_file_append
   `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only ([[qrt_file_read_raw]] returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
-  [[qrt_file_read]] (`downlink = true`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
+  [[qrt_file_read]] (`uplink = false`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [[qrt_file_append]] and `rx_pos` the CIR position of [[qrt_file_init]]:
   `qrt_file_read` recomputes the lengths from the stored positions; not checked

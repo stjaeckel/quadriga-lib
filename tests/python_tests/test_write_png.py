@@ -79,5 +79,7 @@ class test_case(unittest.TestCase):
             quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), "jet", 2.0, 1.0)
         with self.assertRaises(ValueError):
             quadriga_lib.tools.write_png(out_file, np.zeros((0, 3)))
+        with self.assertRaises(ValueError):  # infinite limits
+            quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), "jet", -np.inf)
         self.assertFalse(os.path.exists(out_file))
 

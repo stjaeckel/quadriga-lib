@@ -451,7 +451,7 @@ namespace quadriga_lib
     void qrt_file_read(const std::string &fn,                               // Path to the QRT file
                        arma::uword i_cir = 0,                               // Snapshot index
                        arma::uword i_orig = 0,                              // Origin index (for downlink Origin = TX)
-                       bool downlink = true,                                // Switch for uplink / downlink direction
+                       bool uplink = false,                                 // Reverse direction: origin = RX, destination = TX
                        arma::Col<dtype> *center_freq = nullptr,             // Center frequency in [Hz], Size [n_freq]
                        arma::Mat<dtype> *tx_pos = nullptr,                  // Transmitter position in Cartesian coordinates in [m], [3, 1]
                        arma::Mat<dtype> *tx_orientation = nullptr,          // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1]

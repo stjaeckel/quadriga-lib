@@ -23,7 +23,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
   [[qrt_file_read]] with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry.
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -56,7 +56,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`rx_pos`** — Receiver position, finite; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
+- **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`

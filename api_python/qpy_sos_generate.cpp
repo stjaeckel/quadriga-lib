@@ -31,7 +31,7 @@ Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
   not controlled; sinusoids with a frequency near zero keep it above zero at all larger distances
   (see `acf_tail` of [[sos.calc_mse]]). To prevent this, set `spatial_freq_min`
 - `spatial_freq_min` and `spatial_freq_max` limit the magnitude of the frequency along the direction of each
-  sinusoid; 0 selects the default: no lower limit, and `15 / max(dist)` as upper limit
+  sinusoid; by default there is no lower limit, and the upper limit is `15 / max(dist)`
 - The search grid has `( spatial_freq_max - spatial_freq_min ) · max(dist) / 0.1 + 1` points, and its cosines are
   stored for all sample points. It must not have more than 100000 points (the default has 151),
   which limits `spatial_freq_max - spatial_freq_min` to less than `10000 / max(dist)`
@@ -60,9 +60,9 @@ spatial_freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_d
   (`False`); default: `True`
 - **`spatial_freq_min`** — Lower limit of the frequency magnitude; must be >= 0; 0 = none;
   default: 0.0
-- **`spatial_freq_max`** — Upper limit of the frequency magnitude; must be >= 0 and, if not 0,
-  larger than `spatial_freq_min`; 0 = `15 / max(dist)`; limited by the size of the search
-  grid, see above; default: 0.0
+- **`spatial_freq_max`** — Upper limit of the frequency magnitude; NaN or <= 0: default `15 / max(dist)`;
+  must be larger than `spatial_freq_min`; limited by the size of the search grid, see above;
+  default: NaN
 - **`seed`** — Seed; `int`; must be >= -1; -1 seeds from the system random device; default: -1
 
 ## Outputs:

@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <random>
 #include <stdexcept>
 
@@ -303,10 +304,25 @@ TEST_CASE("sos_generate - input validation")
     SECTION("spatial_freq_min and spatial_freq_max")
     {
         CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, -0.1, 0.0, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.0, -0.1, 1), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.2, 0.1, 1), std::invalid_argument);
         // The lower limit must also stay below the default upper limit of 15 / 20 = 0.75 / m
         CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, spatial_freq, no_vec, no_mat, 3, true, 5, true, 0.8, 0.0, 1), std::invalid_argument);
+    }
+    SECTION("spatial_freq_max: NaN or <= 0 selects 15 / max(dist); infinite values throw")
+    {
+        // max(dist) = 20 m: the default is 0.75 / m
+        const double nan = std::numeric_limits<double>::quiet_NaN(), inf = std::numeric_limits<double>::infinity();
+        arma::mat ref, f;
+        quadriga_lib::sos_generate(acf, dist, 4, ref, no_vec, no_mat, 2, true, 5, true, 0.0, 0.75, 1);
+        for (double v : {nan, 0.0, -0.1})
+        {
+            quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.0, v, 1);
+            CHECK(arma::approx_equal(f, ref, "absdiff", 0.0));
+        }
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.0, inf, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.0, -inf, 1), std::invalid_argument);
+        // The lower limit must stay below the default also when NaN selects it
+        CHECK_THROWS_AS(quadriga_lib::sos_generate(acf, dist, 4, f, no_vec, no_mat, 2, true, 5, true, 0.8, nan, 1), std::invalid_argument);
     }
     SECTION("spatial_freq_max: the search grid is limited to 100000 points")
     {

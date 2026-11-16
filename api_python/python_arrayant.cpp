@@ -93,9 +93,9 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("upper_rolloff_slope") = 12.0,
           py::arg("sensitivity") = 85.0,
           py::arg("radiation_type") = "hemisphere",
-          py::arg("hor_coverage") = 0.0,
-          py::arg("ver_coverage") = 0.0,
-          py::arg("horn_control_freq") = 0.0,
+          py::arg("hor_coverage") = NAN,
+          py::arg("ver_coverage") = NAN,
+          py::arg("horn_control_freq") = NAN,
           py::arg("baffle_width") = 0.15,
           py::arg("baffle_height") = 0.25,
           py::arg("center_freq") = py::none(),
@@ -115,7 +115,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("use_kernel") = 0,
           py::arg("complex") = true);
 
-    m.def("qdant_read", &qdant_read, py::arg("fn"), py::arg("id") = 1);
+    m.def("qdant_read", &qdant_read, py::arg("fn"), py::arg("id") = py::none());
 
     m.def("qdant_write", &qdant_write,
           py::arg("fn"),

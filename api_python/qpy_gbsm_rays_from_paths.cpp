@@ -13,7 +13,7 @@ SECTION!*/
 Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Returns the ray dict of [[ssf_rays]] (`fallback` empty) from path data in the names and order of [[qrt_file_read]],
-  read with `normalize_M = 1` (`downlink = False` gives the reverse link; `normalize_M = 0` leaves only the
+  read with `normalize_M = 1` (`uplink = True` gives the reverse link; `normalize_M = 0` leaves only the
   free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;

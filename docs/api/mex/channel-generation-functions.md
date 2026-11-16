@@ -112,7 +112,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · Not i
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path_in` is provided, it overrides `threshold_dB` for path selection
 - Optional `ant_irs_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
 
@@ -150,7 +150,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · Not i
 - **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
-- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: `0`
+- **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`active_path_in`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
 - **`ant_irs_2`** — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns
@@ -265,7 +265,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
   keep their order, shifted by one slot.
 - With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- Setting `center_freq = 0` disables phase calculation (delays still computed).
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance (between the phase centres) from all path
   lengths before converting to delay; per-element delays of pairs that are closer to each other than the phase
   centres are then negative, down to about -(half the TX array size + half the RX array size) / speed of light; [quantize_delays](channel-functions.md#quantize_delays) rejects
@@ -293,7 +293,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
+- **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
@@ -329,7 +329,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
   TX-FBS-LBS-RX polyline length; the length beyond the polyline (interactions between FBS and LBS, e.g. paths of
   [qrt_file_read](channel-functions.md#qrt_file_read) with more than two interactions) is added to the FBS-LBS segment. Delays and
   phases follow this length; the per-element offsets follow the FBS / LBS geometry.
-- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual.
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres is subtracted from all paths.
   Delays are per element pair, so pairs that are closer to each other than the phase centres get negative delays,
   down to about -(half the TX array size + half the RX array size) / speed of light (both arrays endfire).
@@ -362,7 +362,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`rx_pos`** — Receiver position, finite; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
+- **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`

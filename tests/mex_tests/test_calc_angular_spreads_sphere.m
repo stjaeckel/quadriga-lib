@@ -60,7 +60,7 @@ powers = [1.0; 1.0];
 assertElementsAlmostEqual(orient_nobank(1,1), 0.0, 'absolute', 1e-10);
 assertTrue(as_bank >= as_nobank - 1e-6);
 
-% --- Disable wrapping ---
+% --- Without wrapping ---
 az = [0.1; -0.1; 0.05];
 el = [0.2; -0.2; 0.0];
 powers = [1.0; 1.0; 1.0];

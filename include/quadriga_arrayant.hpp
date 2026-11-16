@@ -6,6 +6,7 @@
 #define quadriga_arrayant_H
 
 #include <armadillo>
+#include <cmath>
 #include <atomic>
 #include <string>
 
@@ -354,7 +355,7 @@ namespace quadriga_lib
     //   and combining the results via arrayant_concat and element_pos
     // - Supported driver types: "piston" (cone/dome), "horn" (constant directivity), "omni" (subwoofer)
     // - Supported radiation types: "monopole" (4pi), "hemisphere" (2pi, sealed box), "dipole" (figure-8), "cardioid"
-    // - Horn parameters that are 0: hor_coverage and ver_coverage default to 90 and 60 deg, horn_control_freq is derived from radius
+    // - Horn parameters that are NaN (the default) or <= 0: hor_coverage and ver_coverage default to 90 and 60 deg, horn_control_freq is derived from radius
     // - Frequency samples are in Hz; if empty, third-octave bands from lower_cutoff to upper_cutoff are used
     // - Angular resolution is in degrees; used to generate azimuth_grid and elevation_grid
     template <typename dtype>
@@ -366,9 +367,9 @@ namespace quadriga_lib
                                                   dtype upper_rolloff_slope = 12.0,                  // High-frequency rolloff in [dB/octave]
                                                   dtype sensitivity = 85.0,                          // On-axis sensitivity in [dB SPL] at 1W/1m
                                                   std::string radiation_type = "hemisphere",         // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
-                                                  dtype hor_coverage = 0.0,                          // Horizontal coverage angle in [deg], horn only, 0 = auto (90)
-                                                  dtype ver_coverage = 0.0,                          // Vertical coverage angle in [deg], horn only, 0 = auto (60)
-                                                  dtype horn_control_freq = 0.0,                     // Horn pattern control frequency in [Hz], 0 = auto from radius
+                                                  dtype hor_coverage = NAN,                          // Horizontal coverage angle in [deg], horn only, NaN or <= 0 = 90
+                                                  dtype ver_coverage = NAN,                          // Vertical coverage angle in [deg], horn only, NaN or <= 0 = 60
+                                                  dtype horn_control_freq = NAN,                     // Horn pattern control frequency in [Hz], NaN or <= 0 = c / (2 pi radius)
                                                   dtype baffle_width = 0.15,                         // Enclosure baffle width in [m], piston only
                                                   dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
                                                   arma::Col<dtype> center_freq = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
@@ -406,7 +407,7 @@ namespace quadriga_lib
                                 arma::Cube<dtype> &coeff_re,              // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> &coeff_im,              // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> &delay,                 // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path]
-                                dtype center_freq = dtype(0.0),      // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
+                                dtype center_freq = dtype(0.0),      // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
                                 bool use_absolute_delays = false,    // Option: If true, the LOS delay is included for all paths
                                 bool add_fake_los_path = false,      // Option: Add one path, slot 0 = LOS path (zero power if none was present)
                                 arma::Cube<dtype> *aod = nullptr,    // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
@@ -483,7 +484,7 @@ namespace quadriga_lib
                                        arma::Cube<dtype> &delay,                        // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path_irs]
                                        arma::uword i_irs = 0,                           // IRS codebook entry (= port number in the IRS array)
                                        dtype threshold_dB = -140.0,                     // Threshold in dB relative to path gain below which paths are discarded from the output
-                                       dtype center_freq = 0.0,                         // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
+                                       dtype center_freq = 0.0,                         // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
                                        bool use_absolute_delays = false,                // Option: If true, the LOS delay is included for all paths
                                        arma::Cube<dtype> *aod = nullptr,                // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
                                        arma::Cube<dtype> *eod = nullptr,                // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
@@ -521,7 +522,7 @@ namespace quadriga_lib
                              arma::Cube<dtype> &coeff_re,              // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
                              arma::Cube<dtype> &coeff_im,              // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
                              arma::Cube<dtype> &delay,                 // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
-                             dtype center_freq = dtype(0.0),          // Center frequency in [Hz]; a value of 0.0 disables phase calculation in coefficients
+                             dtype center_freq = dtype(0.0),          // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
                              bool use_absolute_delays = false,        // Option: If true, the LOS delay is included for all paths
                              bool add_fake_los_path = false,          // Option: Add one path, slot 0 = LOS path (zero power if none was present)
                              arma::Col<dtype> *rx_Doppler = nullptr); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'

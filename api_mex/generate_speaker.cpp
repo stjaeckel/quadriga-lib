@@ -34,7 +34,8 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
   - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `horn`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2pi·radius)`.
+- For `horn`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
+  and `f_ctrl = c/(2pi·radius)`.
 
 ## Usage:
 ```
@@ -46,18 +47,18 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 
 ## Inputs:
 - **`driver_type`** - Driver directivity model: `piston`, `horn`, or `omni`; default: `piston`
-- **`radius`** - Effective radiating radius in m; cone/dome radius for piston, mouth radius for horn; default: 0.05
-- **`lower_cutoff`** - Lower -3 dB bandpass frequency in Hz; default: 80
-- **`upper_cutoff`** - Upper -3 dB bandpass frequency in Hz; default: 12000
-- **`lower_rolloff_slope`** - Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth); default: 12
-- **`upper_rolloff_slope`** - High-frequency rolloff in dB/octave; default: 12
+- **`radius`** - Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn; default: 0.05
+- **`lower_cutoff`** - Lower -3 dB bandpass frequency in Hz, > 0; default: 80
+- **`upper_cutoff`** - Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`; default: 12000
+- **`lower_rolloff_slope`** - Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth); default: 12
+- **`upper_rolloff_slope`** - High-frequency rolloff in dB/octave, > 0; default: 12
 - **`sensitivity`** - On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** - Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`; default: `hemisphere`
-- **`hor_coverage`** - Horn horizontal coverage angle in degrees; `0` defaults to 90;  default: 90
-- **`ver_coverage`** - Horn vertical coverage angle in degrees; `0` defaults to 60;  default: 60
-- **`horn_control_freq`** - Horn pattern control frequency; `0` auto-derives from `radius`; default: 0
-- **`baffle_width`** - Baffle width; used by `hemisphere` model; default: 0.15
-- **`baffle_height`** - Baffle height; used by `hemisphere` model; default: 0.25
+- **`hor_coverage`** - Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; default: NaN
+- **`ver_coverage`** - Horn vertical coverage angle in degrees; NaN or <= 0: default 60; default: NaN
+- **`horn_control_freq`** - Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
+- **`baffle_width`** - Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
+- **`baffle_height`** - Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
 - **`center_freq`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
 - **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
@@ -84,9 +85,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double upper_rolloff_slope = (nrhs < 6) ? 12.0 : qd_mex_get_scalar<double>(prhs[5], "upper_rolloff_slope", 12.0);
     const double sensitivity = (nrhs < 7) ? 85.0 : qd_mex_get_scalar<double>(prhs[6], "sensitivity", 85.0);
     const std::string radiation_type = (nrhs < 8) ? "hemisphere" : qd_mex_get_string(prhs[7], "hemisphere");
-    const double hor_coverage = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "hor_coverage", 0.0);
-    const double ver_coverage = (nrhs < 10) ? 0.0 : qd_mex_get_scalar<double>(prhs[9], "ver_coverage", 0.0);
-    const double horn_control_freq = (nrhs < 11) ? 0.0 : qd_mex_get_scalar<double>(prhs[10], "horn_control_freq", 0.0);
+    const double hor_coverage = (nrhs < 9) ? NAN : qd_mex_get_scalar<double>(prhs[8], "hor_coverage", NAN);
+    const double ver_coverage = (nrhs < 10) ? NAN : qd_mex_get_scalar<double>(prhs[9], "ver_coverage", NAN);
+    const double horn_control_freq = (nrhs < 11) ? NAN : qd_mex_get_scalar<double>(prhs[10], "horn_control_freq", NAN);
     const double baffle_width = (nrhs < 12) ? 0.15 : qd_mex_get_scalar<double>(prhs[11], "baffle_width", 0.15);
     const double baffle_height = (nrhs < 13) ? 0.25 : qd_mex_get_scalar<double>(prhs[12], "baffle_height", 0.25);
     const arma::vec center_freq = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13]);

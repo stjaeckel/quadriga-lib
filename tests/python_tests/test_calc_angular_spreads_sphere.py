@@ -97,7 +97,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(o_nobank[0, 0], 0.0, atol=1e-10, rtol=0)
         self.assertGreaterEqual(a_bank[0] + 1e-6, a_nobank[0])
 
-    def test_disable_wrapping(self):
+    def test_without_wrapping(self):
         az = [np.array([0.1, -0.1, 0.05])]
         el = [np.array([0.2, -0.2, 0.0])]
         powers = [np.array([1.0, 1.0, 1.0])]

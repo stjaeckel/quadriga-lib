@@ -32,7 +32,8 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
   - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `horn`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2pi·radius)`
+- For `horn`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
+  and `f_ctrl = c/(2pi·radius)`
 
 ## Usage:
 ```
@@ -55,24 +56,25 @@ speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 5
 
 ## Inputs:
 - **`driver_type`** — Driver directivity model: `piston`, `horn`, or `omni`; default: `piston`
-- **`radius`** — Effective radiating radius in m; cone/dome radius for piston, mouth radius for horn;
+- **`radius`** — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn;
   default: 0.05
-- **`lower_cutoff`** — Lower -3 dB bandpass frequency in Hz; default: 80
-- **`upper_cutoff`** — Upper -3 dB bandpass frequency in Hz; default: 12000
-- **`lower_rolloff_slope`** — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth);
+- **`lower_cutoff`** — Lower -3 dB bandpass frequency in Hz, > 0; default: 80
+- **`upper_cutoff`** — Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`;
+  default: 12000
+- **`lower_rolloff_slope`** — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth);
   default: 12
-- **`upper_rolloff_slope`** — High-frequency rolloff in dB/octave; default: 12
+- **`upper_rolloff_slope`** — High-frequency rolloff in dB/octave, > 0; default: 12
 - **`sensitivity`** — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** — Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`;
   default: `hemisphere`
-- **`hor_coverage`** — Horn horizontal coverage angle in degrees; 0 auto-defaults to 90; horn only;
-  default: 0
-- **`ver_coverage`** — Horn vertical coverage angle in degrees; 0 auto-defaults to 60; horn only;
-  default: 0
-- **`horn_control_freq`** — Horn pattern control frequency in Hz; 0 auto-derives from `radius`;
-  default: 0
-- **`baffle_width`** — Baffle width in m; used by `hemisphere` model; default: 0.15
-- **`baffle_height`** — Baffle height in m; used by `hemisphere` model; default: 0.25
+- **`hor_coverage`** — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; horn only;
+  default: NaN
+- **`ver_coverage`** — Horn vertical coverage angle in degrees; NaN or <= 0: default 60; horn only;
+  default: NaN
+- **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`;
+  horn only; default: NaN
+- **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
+- **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
 - **`center_freq`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
   `(n_freq,)` or None; default: None
 - **`angular_resolution`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5

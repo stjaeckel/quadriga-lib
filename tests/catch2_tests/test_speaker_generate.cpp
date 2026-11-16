@@ -342,26 +342,27 @@ TEST_CASE("Speaker - Horn coverage angles check")
 
 TEST_CASE("Speaker - Horn auto-derivation of parameters")
 {
-    // When horn params are 0, they should be auto-derived from radius
+    // NaN (the default) or a value <= 0 selects the default of each horn parameter:
     // horn_control_freq = c / (2*pi*radius) = 344 / (2*pi*0.1) = 547.4 Hz
     // hor_coverage = 90°, ver_coverage = 60°
 
-    arma::vec freqs = {5000.0};
-
-    // Call with all zeros (auto-derive)
-    auto spk_auto = quadriga_lib::generate_speaker<double>("horn", 0.1, 80.0, 20000.0, 12.0, 12.0, 85.0,
-                                                           "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+    arma::vec freqs = {300.0, 5000.0}; // below and above horn_control_freq
 
     // Call with explicit values that match the auto-derived ones
     double expected_ctrl = 344.0 / (2.0 * arma::datum::pi * 0.1);
     auto spk_explicit = quadriga_lib::generate_speaker<double>("horn", 0.1, 80.0, 20000.0, 12.0, 12.0, 85.0,
                                                                "monopole", 90.0, 60.0, expected_ctrl, 0.15, 0.25, freqs, 10.0);
+    REQUIRE(spk_explicit.size() == 2);
 
-    REQUIRE(spk_auto.size() == 1);
-    REQUIRE(spk_explicit.size() == 1);
-
-    // Patterns should be identical
-    CHECK(arma::approx_equal(spk_auto[0].e_theta_re.slice(0), spk_explicit[0].e_theta_re.slice(0), "absdiff", 1e-10));
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    for (double v : {nan, 0.0, -1.0})
+    {
+        auto spk_auto = quadriga_lib::generate_speaker<double>("horn", 0.1, 80.0, 20000.0, 12.0, 12.0, 85.0,
+                                                               "monopole", v, v, v, 0.15, 0.25, freqs, 10.0);
+        REQUIRE(spk_auto.size() == 2);
+        for (arma::uword i = 0; i < 2; ++i)
+            CHECK(arma::approx_equal(spk_auto[i].e_theta_re, spk_explicit[i].e_theta_re, "absdiff", 1e-10));
+    }
 }
 
 TEST_CASE("Speaker - Frequency response: -3 dB at cutoff frequencies")
@@ -1838,36 +1839,50 @@ TEST_CASE("Speaker - Non-finite and too fine inputs")
                                                                  0.0, 0.0, 0.0, 0.15, 0.25, f, res),
                           std::invalid_argument);
 
-    // Non-finite cutoffs select the defaults (80 Hz, 12 kHz), as values <= 0 do
-    auto freqs = [](double lo, double hi)
+    // Cutoffs: the lower one must be finite and > 0, the upper one finite and above the lower one
+    auto freqs = [&](double lo, double hi)
     {
         auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, lo, hi, 12.0, 12.0, 85.0, "monopole",
-                                                          0.0, 0.0, 0.0, 0.15, 0.25, arma::vec(), 90.0);
+                                                          nan, nan, nan, 0.15, 0.25, arma::vec(), 90.0);
         arma::vec out(spk.size());
         for (size_t i = 0; i < spk.size(); ++i)
             out[i] = spk[i].center_freq;
         return out;
     };
-    const arma::vec ref = freqs(80.0, 12000.0);
-    for (double lo : {nan, inf, 0.0})
-        CHECK(arma::approx_equal(freqs(lo, 12000.0), ref, "absdiff", 0.0));
-    for (double hi : {nan, inf})
-        CHECK(arma::approx_equal(freqs(80.0, hi), ref, "absdiff", 0.0));
+    for (double lo : {nan, inf, -inf, 0.0, -1.0})
+        CHECK_THROWS_AS(freqs(lo, 12000.0), std::invalid_argument);
+    for (double hi : {nan, inf, 80.0, 50.0})
+        CHECK_THROWS_AS(freqs(80.0, hi), std::invalid_argument);
 
     // A subnormal lower cutoff gives the bands of a 10 Hz cutoff (bands below 20 Hz are dropped)
     CHECK(arma::approx_equal(freqs(std::numeric_limits<double>::denorm_min(), 12000.0), freqs(10.0, 12000.0), "absdiff", 0.0));
 
-    // Other non-finite scalars and non-finite or non-positive frequencies throw
+    // Scalars: radius, slopes and baffle size (entries 0, 1, 2, 7, 8) must be finite and > 0, the sensitivity in
+    // dB SPL (entry 3) finite; the horn parameters (entries 4 to 6) take NaN or <= 0 for their default, Inf throws
     auto call = [&](int i, double v)
     {
-        double a[9] = {0.05, 12.0, 12.0, 85.0, 0.0, 0.0, 0.0, 0.15, 0.25};
+        double a[9] = {0.05, 12.0, 12.0, 85.0, nan, nan, nan, 0.15, 0.25};
         a[i] = v;
-        quadriga_lib::generate_speaker<double>("horn", a[0], 80.0, 12000.0, a[1], a[2], a[3], "hemisphere",
-                                               a[4], a[5], a[6], a[7], a[8], f, 90.0);
+        return quadriga_lib::generate_speaker<double>("horn", a[0], 80.0, 12000.0, a[1], a[2], a[3], "hemisphere",
+                                                      a[4], a[5], a[6], a[7], a[8], f, 90.0);
     };
     for (int i = 0; i < 9; ++i)
-        for (double v : {nan, inf})
-            CHECK_THROWS_AS(call(i, v), std::invalid_argument);
+    {
+        INFO("entry " << i);
+        CHECK_THROWS_AS(call(i, inf), std::invalid_argument);
+        CHECK_THROWS_AS(call(i, -inf), std::invalid_argument);
+        const bool horn = i >= 4 && i <= 6;
+        if (horn)
+            CHECK_NOTHROW(call(i, nan));
+        else
+            CHECK_THROWS_AS(call(i, nan), std::invalid_argument);
+        if (i != 3 && !horn)
+            for (double v : {0.0, -1.0})
+                CHECK_THROWS_AS(call(i, v), std::invalid_argument);
+    }
+    // A sensitivity of 0 dB SPL is used as given: 85 dB below the unity amplitude of 85 dB SPL
+    const double a85 = arma::abs(call(3, 85.0)[0].e_theta_re).max(), a0 = arma::abs(call(3, 0.0)[0].e_theta_re).max();
+    CHECK(std::abs(a0 / a85 - std::pow(10.0, -85.0 / 20.0)) < 1e-12);
     for (double v : {nan, inf, 0.0, -1.0})
         CHECK_THROWS_AS(quadriga_lib::generate_speaker<double>("omni", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "monopole",
                                                                0.0, 0.0, 0.0, 0.15, 0.25, arma::vec({1000.0, v}), 90.0),

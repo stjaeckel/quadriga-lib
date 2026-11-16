@@ -145,7 +145,7 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
         arma::cube M;
         arma::u32_vec n_interact;
         std::vector<uint8_t> itype;
-        quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, &cf, &tx, nullptr, &rx, nullptr, &fbs, &lbs, &pg, &pl, &M,
+        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &cf, &tx, nullptr, &rx, nullptr, &fbs, &lbs, &pg, &pl, &M,
                                             nullptr, nullptr, nullptr, nullptr, nullptr, norm, &n_interact, nullptr, &itype);
         REQUIRE(pg.n_rows == n_path);
         REQUIRE(pg.n_cols == n_freq);

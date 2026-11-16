@@ -49,8 +49,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#write_png) · [MATLAB](.
 - The auto-detected range ignores `NaN` and `+-inf`; `inf` and `-inf` values get the last and first colour
 - `NaN` values get the first colour of the map
 - A degenerate range (`max <= min` after auto-detection, e.g. constant or single-value data, all-`NaN` data, or log
-  input without a positive value; also an infinite `min_val` or `max_val`) maps every value to the first colour
-- Raises `ValueError` for empty `data` and for `min_val > max_val` (both given)
+  input without a positive value) maps every value to the first colour
+- Raises `ValueError` for empty `data`, an infinite `min_val` or `max_val`, and for `min_val > max_val` (both given)
 
 ### Usage:
 ```python
@@ -69,12 +69,10 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', optional, default = 'jet'
 
 - **`min_val`** (optional)\
-  Minimum value. Values below this value will have be encoded with the color of the smallest value.
-  If `NAN` is provided (default), the lowest values is determined from the data.
+  Lower clipping bound; values below get the first colour. NaN (default): data minimum.
 
 - **`max_val`** (optional)\
-  Maximum value. Values above this value will have be encoded with the color of the largest value.
-  If `NAN` is provided (default), the largest values is determined from the data.
+  Upper clipping bound; values above get the last colour. NaN (default): data maximum.
 
 - `**log_transform**` (optional)\
   If enabled, the `data` values are transformed to the log-domain (`10*log10(data)`) before processing.

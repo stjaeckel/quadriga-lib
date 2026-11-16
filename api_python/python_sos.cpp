@@ -129,6 +129,6 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("n_dir") = 10,
           py::arg("random_init") = true,
           py::arg("spatial_freq_min") = 0.0,
-          py::arg("spatial_freq_max") = 0.0,
+          py::arg("spatial_freq_max") = NAN,
           py::arg("seed") = -1);
 }
