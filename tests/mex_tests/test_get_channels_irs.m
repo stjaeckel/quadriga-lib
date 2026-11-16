@@ -148,11 +148,12 @@ assertTrue(any(abs(cr_i0(:)-cr_i1(:))>1e-12));
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
     i_irs0, thr_keep_all, f0_zero, false, all_mask, ant_irs_diff );
 assertTrue(any(abs(cr_sym(:)-cr_asym(:))>1e-12));
+assertTrue(isequal(ant_irs, make_ant(n_el,n_az,n_elem_irs,n_ports_irs,1.0)));  % inputs are not changed
 
 % ---------- 7a) Threshold filtering reduces output paths ----------
-% path_gain_1 = [1, 0.2], path_gain_2 = [1, 0.05] → combined gains span a wide range;
-% a moderate threshold should drop the weakest combinations.
-thr_mid = -10;
+% The threshold is absolute: with these antennas the combined paths have a peak power of 24, 17, 11 and 4 dB, so
+% 14 dB keeps two of them.
+thr_mid = 14;
 [cr_thr,~,~,act_thr] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...

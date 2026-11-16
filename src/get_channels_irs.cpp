@@ -166,32 +166,56 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array
     // Do we need to calculate the angles?
     bool calc_angles = aod != nullptr || eod != nullptr || aoa != nullptr || eoa != nullptr;
 
-    // Construst IRS array with only the desired weight vector
-    arma::uword n_azimuth_irs = irs_array.e_theta_re.n_cols;
-    arma::uword n_elevation_irs = irs_array.e_theta_re.n_rows;
-    arma::uword n_elements_irs = irs_array.e_theta_re.n_slices;
+    // Optional second IRS array for the RX-facing side
+    const arma::uword n_elements_irs = irs_array.e_theta_re.n_slices;
+    if (irs_array_2 != nullptr)
+    {
+        error_message = qd_arrayant_is_valid_quick(*irs_array_2);
+        if (error_message.length() != 0)
+        {
+            error_message = "IRS array 2: " + error_message;
+            throw std::invalid_argument(error_message.c_str());
+        }
 
-    quadriga_lib::arrayant<dtype> irs;
-    irs.e_theta_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_theta_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.e_theta_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_theta_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.e_phi_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_phi_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.e_phi_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array.e_phi_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-    irs.azimuth_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array.azimuth_grid.memptr()), n_azimuth_irs, false, true);
-    irs.elevation_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array.elevation_grid.memptr()), n_elevation_irs, false, true);
+        if (irs_array_2->e_theta_re.n_slices != n_elements_irs)
+            throw std::invalid_argument("IRS 2 must have the same number of elements as IRS 1");
 
-    if (irs_array.element_pos.n_cols != n_elements_irs)
-        irs.element_pos.zeros(3ULL, n_elements_irs);
-    else
-        irs.element_pos = arma::Mat<dtype>(const_cast<dtype *>(irs_array.element_pos.memptr()), 3ULL, n_elements_irs, false, true);
+        if (irs_array_2->coupling_re.n_cols != irs_array.coupling_re.n_cols)
+            throw std::invalid_argument("IRS 2 must have a Coupling matrix of the same size as of IRS 1.");
+    }
 
-    irs.coupling_re = arma::Mat<dtype>(const_cast<dtype *>(irs_array.coupling_re.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
-    if (irs_array.coupling_im.n_rows != n_elements_irs)
-        irs.coupling_im.zeros(n_elements_irs, 1ULL);
-    else
-        irs.coupling_im = arma::Mat<dtype>(const_cast<dtype *>(irs_array.coupling_im.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
+    // IRS arrays with only the desired weight vector: read-only views of the pattern data of a valid array. Each
+    // segment gets its own object, since assigning to a view copies into the viewed data. An empty element_pos or
+    // coupling_im (of any shape) has no data to view and is replaced by zeros.
+    auto irs_view = [&](arrayant<dtype> &dst, const arrayant<dtype> &src)
+    {
+        const arma::uword n_az = src.e_theta_re.n_cols, n_el = src.e_theta_re.n_rows;
+        auto cube = [&](const arma::Cube<dtype> &c)
+        { return arma::Cube<dtype>(const_cast<dtype *>(c.memptr()), n_el, n_az, n_elements_irs, false, true); };
+        dst.e_theta_re = cube(src.e_theta_re), dst.e_theta_im = cube(src.e_theta_im);
+        dst.e_phi_re = cube(src.e_phi_re), dst.e_phi_im = cube(src.e_phi_im);
+        dst.azimuth_grid = arma::Col<dtype>(const_cast<dtype *>(src.azimuth_grid.memptr()), n_az, false, true);
+        dst.elevation_grid = arma::Col<dtype>(const_cast<dtype *>(src.elevation_grid.memptr()), n_el, false, true);
 
-    if (center_freq > dtype(1.0e-5))
-        irs.center_freq = center_freq;
+        if (src.element_pos.is_empty())
+            dst.element_pos.zeros(3ULL, n_elements_irs);
+        else
+            dst.element_pos = arma::Mat<dtype>(const_cast<dtype *>(src.element_pos.memptr()), 3ULL, n_elements_irs, false, true);
+
+        dst.coupling_re = arma::Mat<dtype>(const_cast<dtype *>(src.coupling_re.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
+        if (src.coupling_im.is_empty())
+            dst.coupling_im.zeros(n_elements_irs, 1ULL);
+        else
+            dst.coupling_im = arma::Mat<dtype>(const_cast<dtype *>(src.coupling_im.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
+
+        if (center_freq > dtype(1.0e-5))
+            dst.center_freq = center_freq;
+    };
+    quadriga_lib::arrayant<dtype> irs_1, irs_2;
+    irs_view(irs_1, irs_array);
+    if (irs_array_2 != nullptr)
+        irs_view(irs_2, *irs_array_2);
+    const quadriga_lib::arrayant<dtype> &irs = irs_1, &irs_rx = irs_array_2 != nullptr ? irs_2 : irs_1;
 
     // Calculate the channel coefficients of the first segment from the TX to the IRS
     arma::Cube<dtype> coeff_re_1, coeff_im_1, delay_1, aod_1, eod_1;
@@ -206,54 +230,16 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array
                                                     coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 
-    // Update the IRS array for the second segment
-    if (irs_array_2 != nullptr)
-    {
-        std::string error_message = qd_arrayant_is_valid_quick(*irs_array_2);
-        if (error_message.length() != 0)
-        {
-            error_message = "IRS array 2: " + error_message;
-            throw std::invalid_argument(error_message.c_str());
-        }
-
-        if (irs_array_2->e_theta_re.n_slices != n_elements_irs)
-            throw std::invalid_argument("IRS 2 must have the same number of elements as IRS 1");
-
-        if (irs_array_2->coupling_re.n_cols != irs_array.coupling_re.n_cols)
-            throw std::invalid_argument("IRS 2 must have a Coupling matrix of the same size as of IRS 1.");
-
-        n_azimuth_irs = irs_array_2->e_theta_re.n_cols;
-        n_elevation_irs = irs_array_2->e_theta_re.n_rows;
-
-        irs.e_theta_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array_2->e_theta_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-        irs.e_theta_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array_2->e_theta_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-        irs.e_phi_re = arma::Cube<dtype>(const_cast<dtype *>(irs_array_2->e_phi_re.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-        irs.e_phi_im = arma::Cube<dtype>(const_cast<dtype *>(irs_array_2->e_phi_im.memptr()), n_elevation_irs, n_azimuth_irs, n_elements_irs, false, true);
-        irs.azimuth_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array_2->azimuth_grid.memptr()), n_azimuth_irs, false, true);
-        irs.elevation_grid = arma::Col<dtype>(const_cast<dtype *>(irs_array_2->elevation_grid.memptr()), n_elevation_irs, false, true);
-
-        if (irs_array_2->element_pos.n_cols != n_elements_irs)
-            irs.element_pos.zeros(3ULL, n_elements_irs);
-        else
-            irs.element_pos = arma::Mat<dtype>(const_cast<dtype *>(irs_array_2->element_pos.memptr()), 3ULL, n_elements_irs, false, true);
-
-        irs.coupling_re = arma::Mat<dtype>(const_cast<dtype *>(irs_array_2->coupling_re.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
-        if (irs_array_2->coupling_im.n_rows != n_elements_irs)
-            irs.coupling_im.zeros(n_elements_irs, 1ULL);
-        else
-            irs.coupling_im = arma::Mat<dtype>(const_cast<dtype *>(irs_array_2->coupling_im.colptr(i_irs)), n_elements_irs, 1ULL, false, true);
-    }
-
     // Calculate channel coefficients of the second segment from the IRS to the RX
     arma::Cube<dtype> coeff_re_2, coeff_im_2, delay_2, aoa_2, eoa_2;
     if (calc_angles)
     {
-        quadriga_lib::get_channels_spherical<dtype>(irs, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
+        quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
                                                     coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, &aoa_2, &eoa_2, 1);
     }
     else
     {
-        quadriga_lib::get_channels_spherical<dtype>(irs, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
+        quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
                                                     coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
     }
 

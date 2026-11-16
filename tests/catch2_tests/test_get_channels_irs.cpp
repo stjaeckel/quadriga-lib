@@ -817,3 +817,84 @@ TEST_CASE("Get Channels IRS - Position and orientation shapes")
             CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
         }
 }
+
+TEST_CASE("Get Channels IRS - Empty element_pos and coupling_im of any shape")
+{
+    // An empty element_pos ([0, n] as well as [0, 0]) places all IRS elements at the phase centre, an empty coupling_im
+    // ([n, 0] as well as [0, 0]) means real weights; both are valid and give the result of the explicit zeros
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, nullptr, 10.0);
+    irs.coupling_re = arma::mat(4, 3, arma::fill::ones), irs.coupling_re(1, 2) = -1.0;
+    irs.element_pos.zeros(3, 4), irs.coupling_im.zeros(4, 3);
+    const arma::mat fb1 = arma::mat({5.0, 5.0, 7.0}).t(), fb2 = arma::mat({15.0, 5.0, 3.0}).t();
+    const arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    const arma::vec g = {1.0}, l = {0.0};
+    auto run = [&](const quadriga_lib::arrayant<double> &irs_1, const quadriga_lib::arrayant<double> *irs_2, arma::cube &cr, arma::cube &ci)
+    {
+        arma::cube dl;
+        quadriga_lib::get_channels_irs<double>(ant, ant, irs_1, {0, 0, 10}, {0, 0, 0}, {20, 0, 1.5}, {0, 0, 0}, {10, 10, 5}, {0, 0, 0},
+                                               fb1, fb1, g, l, M, fb2, fb2, g, l, M, cr, ci, dl, 2, -140.0, 3.5e9, false,
+                                               nullptr, nullptr, nullptr, nullptr, irs_2);
+    };
+    arma::cube cr_ref, ci_ref, cr, ci;
+    run(irs, nullptr, cr_ref, ci_ref);
+    REQUIRE(cr_ref.n_slices == 1);
+
+    for (int k = 0; k < 4; ++k)
+    {
+        auto e = irs;
+        if (k == 0) e.element_pos.set_size(0, 4);
+        if (k == 1) e.element_pos.reset();
+        if (k == 2) e.coupling_im.set_size(4, 0);
+        if (k == 3) e.coupling_im.reset();
+        REQUIRE(e.is_valid().empty());
+        run(e, nullptr, cr, ci);
+        CHECK(arma::approx_equal(cr, cr_ref, "absdiff", 0.0));
+        CHECK(arma::approx_equal(ci, ci_ref, "absdiff", 0.0));
+        run(irs, &e, cr, ci);
+        CHECK(arma::approx_equal(cr, cr_ref, "absdiff", 0.0));
+        CHECK(arma::approx_equal(ci, ci_ref, "absdiff", 0.0));
+    }
+}
+
+TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged")
+{
+    // irs_array_2 is used for the RX-facing side only; both arrays are inputs and keep their data, so a repeated call
+    // gives the same result, and the second array may use another angle grid
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    auto irs = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, nullptr, 10.0);
+    irs.coupling_re = arma::mat(4, 3, arma::fill::ones), irs.coupling_im.zeros(4, 3);
+    auto irs2 = irs;
+    irs2.e_theta_re *= 0.5, irs2.coupling_re *= 3.0, irs2.element_pos.fill(0.1);
+    const quadriga_lib::arrayant<double> irs_copy = irs, irs2_copy = irs2;
+    const arma::mat fb1 = arma::mat({5.0, 5.0, 7.0}).t(), fb2 = arma::mat({15.0, 5.0, 3.0}).t();
+    const arma::mat M = arma::mat({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}).t();
+    const arma::vec g = {1.0}, l = {0.0};
+    auto run = [&](const quadriga_lib::arrayant<double> &irs_2, arma::cube &cr, arma::cube &ci)
+    {
+        arma::cube dl;
+        quadriga_lib::get_channels_irs<double>(ant, ant, irs, {0, 0, 10}, {0, 0, 0}, {20, 0, 1.5}, {0, 0, 0}, {10, 10, 5}, {0, 0, 0},
+                                               fb1, fb1, g, l, M, fb2, fb2, g, l, M, cr, ci, dl, 1, -140.0, 3.5e9, false,
+                                               nullptr, nullptr, nullptr, nullptr, &irs_2);
+    };
+    arma::cube cr_1, ci_1, cr_2, ci_2;
+    run(irs2, cr_1, ci_1), run(irs2, cr_2, ci_2);
+    REQUIRE(cr_1.n_slices == 1);
+    CHECK(arma::approx_equal(cr_1, cr_2, "absdiff", 0.0));
+    CHECK(arma::approx_equal(ci_1, ci_2, "absdiff", 0.0));
+    for (const auto *p : {&irs, &irs2})
+    {
+        const auto &c = (p == &irs) ? irs_copy : irs2_copy;
+        CHECK(arma::approx_equal(p->e_theta_re, c.e_theta_re, "absdiff", 0.0));
+        CHECK(arma::approx_equal(p->element_pos, c.element_pos, "absdiff", 0.0));
+        CHECK(arma::approx_equal(p->coupling_re, c.coupling_re, "absdiff", 0.0));
+    }
+
+    // The same second IRS on a 5 degree grid
+    auto irs3 = quadriga_lib::generate_arrayant_ula<double>(4, 3.5e9, 0.5, nullptr, 5.0);
+    irs3.e_theta_re *= 0.5, irs3.coupling_re = irs2.coupling_re, irs3.coupling_im.reset(), irs3.element_pos = irs2.element_pos;
+    arma::cube cr_3, ci_3;
+    REQUIRE_NOTHROW(run(irs3, cr_3, ci_3));
+    CHECK(arma::approx_equal(cr_3, cr_1, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ci_3, ci_1, "absdiff", 1e-6));
+}
