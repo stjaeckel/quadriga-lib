@@ -59,6 +59,15 @@ Examples: `panel = 8` is an 8 × 1 column, `ports = 1` combines every column int
 - Test files follow the SPEC naming in the rewrite: `tests/mex_tests/test_generate_arrayant.m` becomes `test_arrayant_generate.m`; the two Python generator test files are merged.
 - Implementation hint: positions and coupling follow directly from the indices (p, m, n, mg, ng) and the sub-array index, in one loop, instead of the four copy-element stacking loops of today; this makes `ports` and `pan` simple.
 
+Extension rules (decided 2026-11-16). After v1.0 the generator interface stays stable, and further antenna types (see [antenna_candidates.md](antenna_candidates.md)) are added without breaking calls:
+
+- Reserved codes: `pol` 4 to 6 throw in v1.0 and are reserved (e.g. for circular polarisation later); a code is never given a new meaning once it had one.
+- Type names: a type tied to one document carries its prefix (`3GPP`, `3GPP-UT`, `3GPP-CPE`, later e.g. `ITU-M2101`); a generic physical model has a plain name (`omni`, `dipole`, later e.g. `circular-aperture`).
+- Tuples grow only at the end: a new trailing entry has a default, so existing calls keep their meaning (e.g. `res` may later become `[step_deg, max_angle_deg]` for narrow-beam grids).
+- `element` is the per-type hook: a new type defines its own `element` entries instead of a new position; new positions, if needed, are appended with a default.
+- No new Python outputs later (a new Python output is a breaking change, SPEC_PYTHON_API): what a layout system later needs from the generator (e.g. the resolved parameter record that regenerates an antenna) becomes a member of the returned arrayant.
+- Regenerating antennas from stored generator parameters (planned for the layout system) needs the resolved parameters, not the omitted ones; the C++ dispatcher fills every default in one place (G6, G7), so it can report them. A custom `pattern` cannot be stored as numbers and needs a file reference.
+
 ### 2.3 Open for the BS session
 
 - Order of the TR constants in `element`. Proposed: beamwidths first, as the custom shape: `[φ_3dB, θ_3dB, SLA_V, A_max, G_max]` (omitted: θ_3dB = φ_3dB, A_max = SLA_V, G_max as above), so that the first two entries are azimuth and elevation beamwidth for every type. Alternative: vertical first, as Table 7.3-1.
