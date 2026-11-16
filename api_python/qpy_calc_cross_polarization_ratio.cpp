@@ -23,7 +23,7 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
   polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
 - V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
   the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries couple circular patterns through `M` as get_channels_spherical couples antenna patterns,
+- The circular entries couple circular patterns through `M` as `channel.spherical` couples antenna patterns,
   `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
   (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP); names after the IEEE
   definition for the time convention exp(+j 2 pi f t) of the library's coefficients exp(-j 2 pi f tau).

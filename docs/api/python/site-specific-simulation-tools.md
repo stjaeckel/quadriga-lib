@@ -75,7 +75,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 - **`apply_phase`** — If `True`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium
   wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude,
-  so `xprmat` stays normalized. This is the phase [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from
+  so `xprmat` stays normalized. This is the phase [channel.spherical](channel-generation-functions.md#channel.spherical) would otherwise add from
   `path_length`; default: `False`
 
 ### Outputs:
@@ -85,7 +85,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
   interleaved complex, column-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row
-  order of `M` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical), `(8, n_pos)`; scalar
+  order of `M` in [channel.spherical](channel-generation-functions.md#channel.spherical), `(8, n_pos)`; scalar
   mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)` with `n_seg` from `lod`
   (e.g. `(3, 2, n_pos)` for lod 2, `(3, 9, n_pos)` for lod 7, `(3, 0, n_pos)` for lod 0)
@@ -94,7 +94,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_ind`)
 - [obj_file_read](#obj_file_read) (defines the material format)
 - [qrt_file_read](channel-functions.md#qrt_file_read) (same path-loss model, used by `apply_fspl`)
-- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (applies the same propagation phase as `apply_phase`)
+- [channel.spherical](channel-generation-functions.md#channel.spherical) (applies the same propagation phase as `apply_phase`)
 
 ---
 <a id="cube"></a>

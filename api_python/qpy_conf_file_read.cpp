@@ -76,7 +76,7 @@ be filled directly (keys in [[ssf_rays]]); continue with step 6.<br><br>
 | sub-cluster | one of the three parts of a split cluster (step 11, Table 7.5-5) |
 | ray | one of the `NumSubPaths` rays of a cluster, or the LOS or GR ray (QuaDRiGa: sub-path) |
 | kept ray | a LOS or GR ray, or an NLOS ray with power > 0 at some frequency (at `i_freq` in [[gbsm.single_link_channel]]) |
-| path | a propagation path as `get_channels_*` take it and QRT files store it; [[ssf_paths]] makes one per kept ray (QuaDRiGa also says path for a cluster) |
+| path | a propagation path as `channel.spherical` / `channel.planar` take it and QRT files store it; [[ssf_paths]] makes one per kept ray (QuaDRiGa also says path for a cluster) |
 | tap | rays summed in one output tap: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`"quadriga"`) |
 | snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
 | segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |

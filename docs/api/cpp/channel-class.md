@@ -125,7 +125,7 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const;
 ## .write_paths_to_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Python](../python/channel-functions.md#channel_export_obj_file)
+Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Python](../python/channel-functions.md#channel.export_obj_file)
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain

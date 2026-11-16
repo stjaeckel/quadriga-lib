@@ -12,7 +12,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-miscel
 ## version
 Returns the quadriga-lib version number
 
-Also in: [Python](../python/miscellaneous-tools.md#version) · Not in: C++
+Also in: [C++](../cpp/miscellaneous-tools.md#quadriga_lib_version) · [Python](../python/miscellaneous-tools.md#version)
 
 - If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
   a suffix `_AVX2` is added after the version number

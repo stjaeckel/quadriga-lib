@@ -52,17 +52,17 @@ namespace quadriga_lib
     // and an optional bank angle aligns the angular distribution to its principal axes.
     // Defaults: wrapping off, bank angle off (as in the MATLAB and Python wrappers).
     template <typename dtype>
-    void calc_angular_spreads_sphere(const std::vector<arma::Col<dtype>> &az,        // Azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
-                                     const std::vector<arma::Col<dtype>> &el,        // Elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
-                                     const std::vector<arma::Col<dtype>> &powers,    // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
-                                     arma::Col<dtype> *azimuth_spread = nullptr,     // RMS azimuth angular spread in [rad], Length [n_cir]
-                                     arma::Col<dtype> *elevation_spread = nullptr,   // RMS elevation angular spread in [rad], Length [n_cir]
-                                     arma::Mat<dtype> *orientation = nullptr,        // Mean-angle orientation [bank;tilt;heading] in [rad], Size [3, n_cir]
-                                     std::vector<arma::Col<dtype>> *phi = nullptr,   // Rotated azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
-                                     std::vector<arma::Col<dtype>> *theta = nullptr, // Rotated elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
-                                     bool wrapping = false,                          // Rotate the mean direction to the equator before the spread calculation
-                                     bool calc_bank_angle = false,                   // Compute optimal bank angle analytically (only for wrapping = true)
-                                     dtype quantize = 0.0);                          // Angular quantization step in [deg], 0 = disabled
+    void calc_angular_spread(const std::vector<arma::Col<dtype>> &az,        // Azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                             const std::vector<arma::Col<dtype>> &el,        // Elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                             const std::vector<arma::Col<dtype>> &powers,    // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
+                             arma::Col<dtype> *azimuth_spread = nullptr,     // RMS azimuth angular spread in [rad], Length [n_cir]
+                             arma::Col<dtype> *elevation_spread = nullptr,   // RMS elevation angular spread in [rad], Length [n_cir]
+                             arma::Mat<dtype> *orientation = nullptr,        // Mean-angle orientation [bank;tilt;heading] in [rad], Size [3, n_cir]
+                             std::vector<arma::Col<dtype>> *phi = nullptr,   // Rotated azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                             std::vector<arma::Col<dtype>> *theta = nullptr, // Rotated elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                             bool wrapping = false,                          // Rotate the mean direction to the equator before the spread calculation
+                             bool calc_bank_angle = false,                   // Compute optimal bank angle analytically (only for wrapping = true)
+                             dtype quantize = 0.0);                          // Angular quantization step in [deg], 0 = disabled
 
     // Calculate the Rician K-Factor
     // - KF = ratio of signal power in the dominant line-of-sight (LOS) path to the power in the scattered (non-line-of-sight, or NLOS) paths

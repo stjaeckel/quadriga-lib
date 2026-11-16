@@ -15,8 +15,8 @@ Channel coefficients of one link at one frequency over one segment
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
   `rays["center_freq"][i_freq]`: per snapshot, the paths of [[ssf_paths]] at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (see Terms)
-- `"phase"`: [[get_channels_planar]] with the arrays at the positions of `rays` and the orientations of the snapshot;
-  delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [[get_channels_spherical]] with the
+- `"phase"`: [[channel.planar]] with the arrays at the positions of `rays` and the orientations of the snapshot;
+  delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [[channel.spherical]] with the
   arrays at the positions and orientations of the snapshot
 - `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
   per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per

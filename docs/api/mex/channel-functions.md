@@ -98,7 +98,7 @@ Also in: [C++](../cpp/channel-functions.md#baseband_freq_response) · [Python](.
 ## channel_export_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [Python](../python/channel-functions.md#channel_export_obj_file)
+Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [Python](../python/channel-functions.md#channel.export_obj_file)
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
@@ -140,7 +140,7 @@ quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colorma
 ## hdf5_create_file
 Create a new HDF5 channel file with a custom storage layout
 
-Also in: [C++](../cpp/channel-functions.md#hdf5_create) · [Python](../python/channel-functions.md#hdf5_create_file)
+Also in: [C++](../cpp/channel-functions.md#hdf5_create_file) · [Python](../python/channel-functions.md#hdf5_create_file)
 
 - Initializes a new HDF5 file for storing wireless channel data
 - Defines a 4D layout `(nx, ny, nz, nw)` where each index combination maps to one channel storage slot
@@ -365,7 +365,7 @@ storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
 ## hdf5_write_channel
 Write one or more channel objects to an HDF5 file
 
-Also in: [C++](../cpp/channel-functions.md#hdf5_write) · [Python](../python/channel-functions.md#hdf5_write_channel)
+Also in: [C++](../cpp/channel-functions.md#hdf5_write_channel) · [Python](../python/channel-functions.md#hdf5_write_channel)
 
 - Writes a struct array of channels into 4D slots (one slot per array element)
 - Optional unstructured data can be passed as a matching struct array

@@ -74,7 +74,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File already exists.");
 
     // Create file
-    CALL_QD(quadriga_lib::hdf5_create(fn, nx, ny, nz, nw));
+    CALL_QD(quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw));
 
     // Return storage space
     if (nlhs > 0)

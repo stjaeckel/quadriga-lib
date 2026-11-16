@@ -9,7 +9,7 @@ Channel generation functions
 SECTION!*/
 
 /*!MD
-# get_ieee_indoor
+# channel.ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
 - Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
@@ -24,7 +24,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
   (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP
 - Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls
 - Time evolution: each sub-path is rotated by `exp(+j 2 pi f_D t)`, i.e. a station moving towards the AP or a scatterer
-  sees a positive Doppler shift `f_D`, as the channel of [[get_channels_spherical]] along the returned station positions
+  sees a positive Doppler shift `f_D`, as the channel of [[channel.spherical]] along the returned station positions
 - Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation),
   so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)
 - NAN or negative value for any override parameter restores the model default, except `XPR_NLOS_linear` (see below)
@@ -33,7 +33,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
 ## Usage:
 ```
-chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
+chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack )

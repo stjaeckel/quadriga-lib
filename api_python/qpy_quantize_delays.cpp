@@ -33,8 +33,8 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
   `(-tap_spacing / 2, 0)` are treated as 0, so all of their power goes to tap 0. Delays at or below
   `-tap_spacing / 2` raise `ValueError`, as do NaN, Inf and delays of 2^31 taps or more (`delay / tap_spacing < 2^31`,
   e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)
-- Relative delays (`use_absolute_delays = false` in [[get_channels_spherical]], [[get_channels_multifreq]] and
-  [[get_channels_planar]]) are negative for element pairs that are closer to each other than the phase centres, by up
+- Relative delays (`use_absolute_delays = false` in [[channel.spherical]], [[channel.multifreq]] and
+  [[channel.planar]]) are negative for element pairs that are closer to each other than the phase centres, by up
   to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay
   above `-tap_spacing / 2` only while these half sizes add up to less than `tap_spacing / 2` times the propagation
   speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every

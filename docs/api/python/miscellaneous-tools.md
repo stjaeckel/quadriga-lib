@@ -25,7 +25,7 @@ components = quadriga_lib.components()
 ## version
 Returns the quadriga-lib version number
 
-Also in: [MATLAB](../mex/miscellaneous-tools.md#version) · Not in: C++
+Also in: [C++](../cpp/miscellaneous-tools.md#quadriga_lib_version) · [MATLAB](../mex/miscellaneous-tools.md#version)
 
 ### Usage:
 ```python

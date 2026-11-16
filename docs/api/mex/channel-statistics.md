@@ -53,7 +53,7 @@ Also in: [C++](../cpp/channel-statistics.md#acdf) · [Python](../python/channel-
 ## calc_angular_spread
 Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
 
-Also in: [C++](../cpp/channel-statistics.md#calc_angular_spreads_sphere) · [Python](../python/channel-statistics.md#calc_angular_spread)
+Also in: [C++](../cpp/channel-statistics.md#calc_angular_spread) · [Python](../python/channel-statistics.md#calc_angular_spread)
 
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each column
   of `az`/`el`/`powers` is one CIR; zero-power paths can be used to pad CIRs with fewer paths

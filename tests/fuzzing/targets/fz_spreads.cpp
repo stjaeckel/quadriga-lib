@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Channel statistics: acdf, calc_delay_spread, calc_angular_spreads_sphere, calc_rician_k_factor and
+// Channel statistics: acdf, calc_delay_spread, calc_angular_spread, calc_rician_k_factor and
 // calc_cross_polarization_ratio with fuzzed (empty, ragged, zero, negative, non-finite) delays, angles and powers
 
 #include "fuzz_target.hpp"
@@ -103,7 +103,7 @@ static void run(fz::input &in)
         const bool wrapping = in.ConsumeBool(), calc_bank_angle = in.ConsumeBool();
         const T quantize = in.ConsumeBool() ? T(0) : in.value<T>();
         fz::clean([&]
-                  { quadriga_lib::calc_angular_spreads_sphere<T>(az, el, powers, (mask & 1) ? &as : nullptr, (mask & 2) ? &es : nullptr,
+                  { quadriga_lib::calc_angular_spread<T>(az, el, powers, (mask & 1) ? &as : nullptr, (mask & 2) ? &es : nullptr,
                                                                  (mask & 4) ? &orientation : nullptr, (mask & 8) ? &phi : nullptr,
                                                                  (mask & 16) ? &theta : nullptr, wrapping, calc_bank_angle, quantize); });
     }

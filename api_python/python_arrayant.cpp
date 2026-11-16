@@ -20,9 +20,6 @@ namespace py = pybind11;
 #include "qpy_qdant_write.cpp"
 #include "qpy_arrayant_rotate_pattern.cpp"
 #include "qpy_generate_speaker.cpp"
-#include "qpy_get_channels_planar.cpp"
-#include "qpy_get_channels_spherical.cpp"
-#include "qpy_get_channels_multifreq.cpp"
 
 void quadriga_lib_arrayant(py::module_ &m)
 {
@@ -84,7 +81,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("apply_weights") = false,
           py::arg("pattern") = py::dict());
 
-    m.def("generate_speaker", &arrayant_generate_speaker,
+    m.def("generate_speaker", &generate_speaker,
           py::arg("driver_type") = "piston",
           py::arg("radius") = 0.05,
           py::arg("lower_cutoff") = 80.0,
@@ -128,63 +125,4 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("orientation"),
           py::arg("usage") = 0,
           py::arg("i_element") = py::none());
-
-    m.def("get_channels_planar", &get_channels_planar,
-          py::arg("ant_tx"),
-          py::arg("ant_rx"),
-          py::arg("aod"),
-          py::arg("eod"),
-          py::arg("aoa"),
-          py::arg("eoa"),
-          py::arg("path_gain"),
-          py::arg("path_length"),
-          py::arg("M"),
-          py::arg("tx_pos"),
-          py::arg("tx_orientation"),
-          py::arg("rx_pos"),
-          py::arg("rx_orientation"),
-          py::arg("center_freq") = py::none(),
-          py::arg("use_absolute_delays") = false,
-          py::arg("add_fake_los_path") = false,
-          py::arg("complex") = true,
-          py::arg("i_freq") = 0);
-
-    m.def("get_channels_spherical", &get_channels_spherical,
-          py::arg("ant_tx"),
-          py::arg("ant_rx"),
-          py::arg("fbs_pos"),
-          py::arg("lbs_pos"),
-          py::arg("path_gain"),
-          py::arg("path_length"),
-          py::arg("M"),
-          py::arg("tx_pos"),
-          py::arg("tx_orientation"),
-          py::arg("rx_pos"),
-          py::arg("rx_orientation"),
-          py::arg("center_freq") = py::none(),
-          py::arg("use_absolute_delays") = false,
-          py::arg("add_fake_los_path") = false,
-          py::arg("angles") = false,
-          py::arg("complex") = true,
-          py::arg("i_freq") = 0,
-          py::arg("use_kernel") = 0);
-
-    m.def("get_channels_multifreq", &get_channels_multifreq,
-          py::arg("ant_tx"),
-          py::arg("ant_rx"),
-          py::arg("fbs_pos"),
-          py::arg("lbs_pos"),
-          py::arg("path_gain"),
-          py::arg("path_length"),
-          py::arg("M"),
-          py::arg("tx_pos"),
-          py::arg("tx_orientation"),
-          py::arg("rx_pos"),
-          py::arg("rx_orientation"),
-          py::arg("freq"),
-          py::arg("freq_new"),
-          py::arg("use_absolute_delays") = false,
-          py::arg("add_fake_los_path") = false,
-          py::arg("propagation_speed") = 299792458.0,
-          py::arg("complex") = true);
 }

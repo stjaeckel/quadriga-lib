@@ -11,7 +11,7 @@ Math functions
 SECTION!*/
 
 /*!MD
-# GEO2CART
+# FAST_GEO2CART
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
 - Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
@@ -26,10 +26,10 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 ## Usage:
 ```
 split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
+[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 
 split = false;
-cart = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
+cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 ```
 
 ## Inputs:

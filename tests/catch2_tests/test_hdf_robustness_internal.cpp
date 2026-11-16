@@ -430,8 +430,8 @@ namespace
                  { quadriga_lib::hdf5_read_dset(fn, "x", 0); }},
                 {"hdf5_read_dset_names", [=]()
                  { std::vector<std::string> names; quadriga_lib::hdf5_read_dset_names(fn, &names, 0); }},
-                {"hdf5_write", [=]()
-                 { auto c = minimal_channel(5.0); quadriga_lib::hdf5_write(&c, fn, 1); }},
+                {"hdf5_write_channel", [=]()
+                 { auto c = minimal_channel(5.0); quadriga_lib::hdf5_write_channel(&c, fn, 1); }},
                 {"hdf5_write_dset", [=]()
                  { std::any x = 5.0; quadriga_lib::hdf5_write_dset(fn, "new", &x, 0); }},
                 {"hdf5_reshape_layout", [=]()
@@ -460,7 +460,7 @@ namespace
     void standard_file(const std::string &fn)
     {
         std::remove(fn.c_str());
-        quadriga_lib::hdf5_create(fn, 4);
+        quadriga_lib::hdf5_create_file(fn, 4);
         quadriga_lib::channel<double> c0;
         c0.name = "test";
         c0.center_freq = {3e9};
@@ -471,9 +471,9 @@ namespace
         c0.delay.push_back(arma::cube(4, 2, 50, arma::fill::value(1e-7)));
         c0.par_names = {"x", "s", "u", "big"};
         c0.par_data = {1.5, std::string("abc"), arma::Col<unsigned>{1, 2, 3}, arma::regspace<arma::vec>(1.0, 1000.0)};
-        quadriga_lib::hdf5_write(&c0, fn, 0);
+        quadriga_lib::hdf5_write_channel(&c0, fn, 0);
         auto c1 = full_channel({3, 0, 2});
-        quadriga_lib::hdf5_write(&c1, fn, 1);
+        quadriga_lib::hdf5_write_channel(&c1, fn, 1);
         std::any a = 2.5;
         quadriga_lib::hdf5_write_dset(fn, "a", &a, 2);
     }
@@ -604,7 +604,7 @@ TEST_CASE("hdf5 - files with the consistency flag or bytes after the end of file
         CHECK(arma::all(id == arma::u32_vec({1, 2, 3, 0})));
         check_contents();
         auto c = minimal_channel(7.0);
-        CHECK(quadriga_lib::hdf5_write(&c, fn, 3) == 0);
+        CHECK(quadriga_lib::hdf5_write_channel(&c, fn, 3) == 0);
         std::any y = 3.5;
         quadriga_lib::hdf5_write_dset(fn, "y", &y, 1);
         CHECK(value_of(fn, 3) == 7.0);
@@ -622,7 +622,7 @@ TEST_CASE("hdf5 - files with the consistency flag or bytes after the end of file
         save(fn, b);
         check_contents();
         auto c = minimal_channel(7.0);
-        CHECK(quadriga_lib::hdf5_write(&c, fn, 3) == 0);
+        CHECK(quadriga_lib::hdf5_write_channel(&c, fn, 3) == 0);
         const uint64_t new_eof = eof_of(fn);
         const uint64_t ref3 = h5::get_le(&load(fn)[contiguous_data(fn, "ChannelRef").first + 24], 8);
         CHECK(ref3 > eof); // The block starts at the old end-of-file address
@@ -1093,13 +1093,13 @@ TEST_CASE("hdf5 - snapshot groups linked several times may not read more data th
     auto build = [&](bool large_second_channel)
     {
         std::remove(fn.c_str());
-        quadriga_lib::hdf5_create(fn, 2);
+        quadriga_lib::hdf5_create_file(fn, 2);
         auto c = full_channel({600, 1, 1});
-        quadriga_lib::hdf5_write(&c, fn, 0);
+        quadriga_lib::hdf5_write_channel(&c, fn, 0);
         if (large_second_channel)
         {
             auto c1 = full_channel({2000});
-            quadriga_lib::hdf5_write(&c1, fn, 1);
+            quadriga_lib::hdf5_write_channel(&c1, fn, 1);
         }
         const uint64_t snap0 = locate(fn, "channel_1/Snap_0");
         redirect(fn, "channel_1/Snap_1", snap0);
@@ -1129,9 +1129,9 @@ TEST_CASE("hdf5 - snapshot links to one empty snapshot group may not read more h
     // bytes, but every read of the snapshot reads its 12 headers (about 1 KB) again
     const std::string fn = "test_hdf_rb_shared_headers.hdf5";
     test_files files({fn});
-    quadriga_lib::hdf5_create(fn, 2);
+    quadriga_lib::hdf5_create_file(fn, 2);
     auto c = full_channel({0, 0});
-    quadriga_lib::hdf5_write(&c, fn, 0);
+    quadriga_lib::hdf5_write_channel(&c, fn, 0);
     const uint64_t snap0 = locate(fn, "channel_1/Snap_0");
 
     auto add_channel = [&](uint32_t n_snap)
@@ -1161,7 +1161,7 @@ TEST_CASE("hdf5 - snapshot links to one empty snapshot group may not read more h
     {
         const std::string fn_compact = "test_hdf_rb_shared_headers_compact.hdf5";
         test_files compact_files({fn_compact});
-        quadriga_lib::hdf5_create(fn_compact, 1);
+        quadriga_lib::hdf5_create_file(fn_compact, 1);
         std::any v = arma::regspace<arma::vec>(1.0, 500.0);
         quadriga_lib::hdf5_write_dset(fn_compact, "v", &v);
         CHECK(std::any_cast<arma::vec>(quadriga_lib::hdf5_read_dset(fn_compact, "v")).n_elem == 500);
@@ -1191,7 +1191,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
 
     SECTION("unstructured cube with 2^29 empty slices, extents whose product exceeds 64 bits, or a 2^40 by 0 matrix")
     {
-        quadriga_lib::hdf5_create(fn, 4);
+        quadriga_lib::hdf5_create_file(fn, 4);
         std::any x = arma::fcube(0, 0, 5);
         quadriga_lib::hdf5_write_dset(fn, "c", &x, 0);
         for (std::vector<uint64_t> dims : {std::vector<uint64_t>{1ULL << 29, 0, 0}, {0, 1ULL << 40, 1ULL << 40}, {1ULL << 40, 0}})
@@ -1207,12 +1207,12 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         // byte, the extent fits the file, but the slice pointers of the cube (8 bytes each) do not.
         for (bool huge : {false, true})
         {
-            quadriga_lib::hdf5_create(fn, 4);
+            quadriga_lib::hdf5_create_file(fn, 4);
             quadriga_lib::channel<double> c;
             c.tx_pos = arma::vec({0.0, 0.0, 1.0});
             c.rx_pos = arma::vec({10.0, 0.0, 1.5});
             c.delay = {arma::cube(1, 1, 0)}; // A valid channel without paths; the test sets the extents in the file
-            quadriga_lib::hdf5_write(&c, fn, 0, 0, 0, 0);
+            quadriga_lib::hdf5_write_channel(&c, fn, 0, 0, 0, 0);
             const uint64_t n = huge ? 1ULL << 29 : eof_of(fn);
             INFO("slices " << n);
             set_dataspace("channel_1/delay", {n, 0, 1});
@@ -1233,8 +1233,8 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         c.interact_coord = {arma::mat(3, 1, arma::fill::ones)};
         for (std::pair<uint32_t, uint32_t> counts : {std::pair<uint32_t, uint32_t>{0xFFFFFFFFu, 0xFFFFFFFFu}, {1u << 29, 0u}})
         {
-            quadriga_lib::hdf5_create(fn, 4);
-            quadriga_lib::hdf5_write(&c, fn, 0);
+            quadriga_lib::hdf5_create_file(fn, 4);
+            quadriga_lib::hdf5_write_channel(&c, fn, 0);
             edit_messages(fn, "channel_1/no_interact", 0, [&](std::vector<message> &m)
                           {
                               bytes &layout = m[find(m, h5::msg_layout)].data; // 03 00, size, compact data
@@ -1264,21 +1264,21 @@ TEST_CASE("hdf5 - index data that overlaps object headers is rejected before a w
                                                      {"Order", 724}, {"ChannelRef", 712}})
         {
             INFO("data of " << p.first << " at " << p.second);
-            quadriga_lib::hdf5_create(fn, 4);
+            quadriga_lib::hdf5_create_file(fn, 4);
             set_data_address(p.first, p.second);
             check_all_throw(fn, all_functions(fn));
         }
     }
     SECTION("a root link chunk inside the index data")
     {
-        quadriga_lib::hdf5_create(fn, 4);
+        quadriga_lib::hdf5_create_file(fn, 4);
         auto c = minimal_channel(1.0);
-        quadriga_lib::hdf5_write(&c, fn, 0);
+        quadriga_lib::hdf5_write_channel(&c, fn, 0);
         const region chunk = link_chunk(fn, 0);
         set_data_address("Order", chunk.addr); // Order [chunk.addr, + 16): the slot IDs are bytes of the link chunk
         CHECK_NOTHROW(quadriga_lib::hdf5_read_channel<double>(fn, 0));
         const bytes before = load(fn);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write(&c, fn, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, fn, 1), std::invalid_argument);
         std::any x = 1.0;
         CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "x", &x, 2), std::invalid_argument);
         CHECK(load(fn) == before);
@@ -1290,9 +1290,9 @@ TEST_CASE("hdf5 - a file that exists but cannot be read is not replaced")
 {
     const std::string fn = "test_hdf_rb_write_only.hdf5";
     test_files files({fn});
-    quadriga_lib::hdf5_create(fn, 4);
+    quadriga_lib::hdf5_create_file(fn, 4);
     auto c = minimal_channel(1.0);
-    quadriga_lib::hdf5_write(&c, fn, 0);
+    quadriga_lib::hdf5_write_channel(&c, fn, 0);
     const bytes before = load(fn);
     namespace fs = std::filesystem;
     fs::permissions(fn, fs::perms::owner_write, fs::perm_options::replace);
@@ -1301,7 +1301,7 @@ TEST_CASE("hdf5 - a file that exists but cannot be read is not replaced")
     else
     {
         std::any x = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write(&c, fn, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, fn, 1), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "x", &x, 1), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_layout(fn), std::invalid_argument);
         CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::invalid_argument);
@@ -1319,11 +1319,11 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
     // extended with a dataset (new group 'Data'), slot 46 created by hdf5_write_dset (ID 46), slot 47 empty
     const std::string fn = "test_hdf_rb_writers.hdf5", fn_w = "test_hdf_rb_writers_copy.hdf5";
     test_files files({fn, fn_w});
-    quadriga_lib::hdf5_create(fn, 48);
+    quadriga_lib::hdf5_create_file(fn, 48);
     for (unsigned s = 0; s < 45; ++s)
     {
         auto c = minimal_channel(s + 1.0);
-        quadriga_lib::hdf5_write(&c, fn, s);
+        quadriga_lib::hdf5_write_channel(&c, fn, s);
     }
     std::any a = 1.0;
     quadriga_lib::hdf5_write_dset(fn, "a", &a, 1);
@@ -1339,20 +1339,20 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
     };
     std::any z = 9.0;
     const std::vector<writer> writers = {
-        {"hdf5_write, empty slot", [](const std::string &f)
-         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write(&c, f, 47); },
+        {"hdf5_write_channel, empty slot", [](const std::string &f)
+         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write_channel(&c, f, 47); },
          [](const std::string &f)
          { CHECK(value_of(f, 47) == 100.0); }},
-        {"hdf5_write, overwrite of slot 0 (link chunk 0)", [](const std::string &f)
-         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write(&c, f, 0); },
+        {"hdf5_write_channel, overwrite of slot 0 (link chunk 0)", [](const std::string &f)
+         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write_channel(&c, f, 0); },
          [](const std::string &f)
          { CHECK(value_of(f, 0) == 100.0); }},
-        {"hdf5_write, overwrite of slot 44 (last link chunk)", [](const std::string &f)
-         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write(&c, f, 44); },
+        {"hdf5_write_channel, overwrite of slot 44 (last link chunk)", [](const std::string &f)
+         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write_channel(&c, f, 44); },
          [](const std::string &f)
          { CHECK(value_of(f, 44) == 100.0); }},
-        {"hdf5_write, overwrite of slot 1 (with 'Data')", [](const std::string &f)
-         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write(&c, f, 1); },
+        {"hdf5_write_channel, overwrite of slot 1 (with 'Data')", [](const std::string &f)
+         { auto c = minimal_channel(100.0); quadriga_lib::hdf5_write_channel(&c, f, 1); },
          [](const std::string &f)
          { CHECK(value_of(f, 1) == 100.0); CHECK(dset_names(f, 1).empty()); }},
         {"hdf5_write_dset, empty slot", [&](const std::string &f)
@@ -1396,9 +1396,9 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
             }
         }
     };
-    const std::set<std::string> root_writers = {"hdf5_write, empty slot", "hdf5_write, overwrite of slot 0 (link chunk 0)",
-                                                "hdf5_write, overwrite of slot 44 (last link chunk)",
-                                                "hdf5_write, overwrite of slot 1 (with 'Data')", "hdf5_write_dset, empty slot"};
+    const std::set<std::string> root_writers = {"hdf5_write_channel, empty slot", "hdf5_write_channel, overwrite of slot 0 (link chunk 0)",
+                                                "hdf5_write_channel, overwrite of slot 44 (last link chunk)",
+                                                "hdf5_write_channel, overwrite of slot 1 (with 'Data')", "hdf5_write_dset, empty slot"};
     std::set<std::string> all;
     for (const writer &w : writers)
         all.insert(w.name);
@@ -1483,7 +1483,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
             INFO("edit " << e.first);
             save(fn, good);
             edit_link_chunk(0, e.second);
-            check_writers({"hdf5_write, overwrite of slot 0 (link chunk 0)", "hdf5_write, overwrite of slot 1 (with 'Data')"},
+            check_writers({"hdf5_write_channel, overwrite of slot 0 (link chunk 0)", "hdf5_write_channel, overwrite of slot 1 (with 'Data')"},
                           unsupported_message);
             check_readers();
         }
@@ -1573,13 +1573,13 @@ TEST_CASE("hdf5 - single-byte flips in headers and index data give std::invalid_
     const std::string fn = "test_hdf_rb_flip.hdf5", fn_v = "test_hdf_rb_flip_variant.hdf5",
                       fn_w = "test_hdf_rb_flip_writer.hdf5";
     test_files files({fn, fn_v, fn_w});
-    quadriga_lib::hdf5_create(fn, 2);
+    quadriga_lib::hdf5_create_file(fn, 2);
     auto first = minimal_channel(1.0);
-    quadriga_lib::hdf5_write(&first, fn, 0);
+    quadriga_lib::hdf5_write_channel(&first, fn, 0);
     auto c = full_channel({3, 0, 2});
     c.par_names = {"x", "s", "m"};
     c.par_data = {1.5, std::string("text"), arma::Mat<int>(2, 3, arma::fill::value(-4))};
-    quadriga_lib::hdf5_write(&c, fn, 0);
+    quadriga_lib::hdf5_write_channel(&c, fn, 0);
     std::any e = 2.5, a = 3.5, w = 7.0;
     quadriga_lib::hdf5_write_dset(fn, "e", &e, 0);
     quadriga_lib::hdf5_write_dset(fn, "a", &a, 1);
@@ -1671,7 +1671,7 @@ TEST_CASE("hdf5 - single-byte flips in headers and index data give std::invalid_
          [&]()
          { return std::any_cast<double>(quadriga_lib::hdf5_read_dset(fn_w, "flip", 0)) == 7.0; }},
         {[&]()
-         { quadriga_lib::hdf5_write(&overwrite, fn_w, 0); },
+         { quadriga_lib::hdf5_write_channel(&overwrite, fn_w, 0); },
          [&]()
          { return value_of(fn_w, 0) == 42.0; }}};
 
@@ -1811,11 +1811,11 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
     // IDs 1-41, link chunk 1 IDs 42-50), slot 50 is empty
     const std::string fn_a = "test_hdf_rb_int_a.hdf5", fn_b = "test_hdf_rb_int_b.hdf5", fn = "test_hdf_rb_int.hdf5";
     test_files files({fn_a, fn_b, fn});
-    quadriga_lib::hdf5_create(fn_a, 51);
+    quadriga_lib::hdf5_create_file(fn_a, 51);
     for (unsigned s = 0; s < 50; ++s)
     {
         auto c = minimal_channel(s + 1.0);
-        quadriga_lib::hdf5_write(&c, fn_a, s);
+        quadriga_lib::hdf5_write_channel(&c, fn_a, s);
     }
     REQUIRE(link_chunk_ids(fn_a, 0).size() == 41);
     REQUIRE(link_chunk_ids(fn_a, 1).size() == 9);
@@ -1823,14 +1823,14 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
     const auto ref = contiguous_data(fn_a, "ChannelRef"), order = contiguous_data(fn_a, "Order");
     std::any x = 7.0, y = 8.0;
 
-    // The continuation of every state: an hdf5_write to an empty and to a filled slot succeed and read back with
+    // The continuation of every state: an hdf5_write_channel to an empty and to a filled slot succeed and read back with
     // the next IDs ('last_id' = ID of the last root link of the state)
     auto continue_writing = [&](unsigned last_id)
     {
         auto c = minimal_channel(200.0);
-        CHECK(quadriga_lib::hdf5_write(&c, fn, 50) == 0);
+        CHECK(quadriga_lib::hdf5_write_channel(&c, fn, 50) == 0);
         c = minimal_channel(300.0);
-        CHECK(quadriga_lib::hdf5_write(&c, fn, 3) == 1);
+        CHECK(quadriga_lib::hdf5_write_channel(&c, fn, 3) == 1);
         arma::u32_vec id;
         quadriga_lib::hdf5_read_layout(fn, &id);
         CHECK(id(50) == last_id + 1);
@@ -1849,11 +1849,11 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
     auto order_entry = [&](unsigned slot)
     { return region{order.first + 4 * slot, 4}; };
 
-    SECTION("hdf5_write overwrite: block, superblock, new link, ChannelRef, Order, removal of the old link")
+    SECTION("hdf5_write_channel overwrite: block, superblock, new link, ChannelRef, Order, removal of the old link")
     {
         save(fn_b, load(fn_a));
         auto c = minimal_channel(100.0);
-        quadriga_lib::hdf5_write(&c, fn_b, 0);
+        quadriga_lib::hdf5_write_channel(&c, fn_b, 0);
         // Premise: the old link is in link chunk 0, the new one is appended to link chunk 1
         CHECK(link_chunk_ids(fn_a, 0)[0] == 1);
         CHECK(link_chunk_ids(fn_b, 0)[0] == 2);
@@ -1876,17 +1876,17 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
             continue_writing(i >= 2 ? 51 : 50);
         }
     }
-    SECTION("hdf5_write overwrite with the old and the new link in the same link chunk")
+    SECTION("hdf5_write_channel overwrite with the old and the new link in the same link chunk")
     {
-        quadriga_lib::hdf5_create(fn_a, 3);
+        quadriga_lib::hdf5_create_file(fn_a, 3);
         for (unsigned s = 0; s < 2; ++s)
         {
             auto c = minimal_channel(s + 1.0);
-            quadriga_lib::hdf5_write(&c, fn_a, s);
+            quadriga_lib::hdf5_write_channel(&c, fn_a, s);
         }
         save(fn_b, load(fn_a));
         auto c = minimal_channel(100.0);
-        quadriga_lib::hdf5_write(&c, fn_b, 0);
+        quadriga_lib::hdf5_write_channel(&c, fn_b, 0);
         CHECK(link_chunk_ids(fn_b, 0) == std::vector<long long>({2, 3}));
         const bytes A = load(fn_a), B = load(fn_b);
         const auto r = contiguous_data(fn_b, "ChannelRef"), o = contiguous_data(fn_b, "Order");
@@ -1920,7 +1920,7 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
                 quadriga_lib::hdf5_read_layout(fn, &id);
                 CHECK(id(50) == (i >= 4 ? 51u : 0u));
                 auto c = minimal_channel(300.0);
-                CHECK(quadriga_lib::hdf5_write(&c, fn, 3) == 1);
+                CHECK(quadriga_lib::hdf5_write_channel(&c, fn, 3) == 1);
                 quadriga_lib::hdf5_read_layout(fn, &id);
                 CHECK(id(3) == 52);
             }
@@ -1977,11 +1977,11 @@ TEST_CASE("hdf5 - 8000 channels fill the root link directory and keep their IDs"
     const std::string fn = "test_hdf_rb_8000.hdf5";
     test_files files({fn});
     const unsigned n = 8000;
-    quadriga_lib::hdf5_create(fn, n);
+    quadriga_lib::hdf5_create_file(fn, n);
     for (unsigned s = 0; s < n; ++s)
     {
         auto c = minimal_channel(s + 1.0);
-        quadriga_lib::hdf5_write(&c, fn, s);
+        quadriga_lib::hdf5_write_channel(&c, fn, s);
     }
     // Overwrites: new IDs 8001-8005; the last-written slot twice more
     arma::u32_vec expected_id = arma::regspace<arma::u32_vec>(1, n);
@@ -1990,7 +1990,7 @@ TEST_CASE("hdf5 - 8000 channels fill the root link directory and keep their IDs"
     for (unsigned s : {0u, 3999u, 7999u, 7999u, 7999u})
     {
         auto c = minimal_channel(100000.0 + next_id);
-        CHECK(quadriga_lib::hdf5_write(&c, fn, s) == 1);
+        CHECK(quadriga_lib::hdf5_write_channel(&c, fn, s) == 1);
         expected_id(s) = next_id, expected_value(s) = 100000.0 + next_id;
         ++next_id;
     }

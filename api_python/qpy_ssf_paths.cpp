@@ -15,10 +15,10 @@ Antenna-free paths of one link at one position
 - Computes the antenna-free paths (gains, lengths, polarization matrices, angles and scatterers) of the kept rays of
   `rays` (see Terms) at new Tx and Rx positions (default: the ray-data positions), LOS and GR also at zero power; paths
   in ray order, `ray_ind` maps them to the rays (e.g. `rays["tap"][ray_ind]`)
-- `"phase"`: use the outputs with [[get_channels_planar]] and the arrays at the positions of `rays`; the displacement
+- `"phase"`: use the outputs with [[channel.planar]] and the arrays at the positions of `rays`; the displacement
   phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer identified
   and the displacement phase counts twice, without an error
-- `"drift"`: use the outputs at the new positions with [[get_channels_spherical]] or [[get_channels_multifreq]]; needs
+- `"drift"`: use the outputs at the new positions with [[channel.spherical]] or [[channel.multifreq]]; needs
   the scatterers of [[ssf_scatterers]]
 
 | Quantity | `"phase"` | `"drift"` |
@@ -61,7 +61,7 @@ path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_
 ## Outputs:
 - **`path_gain`** — Path gains (linear); `(n_path, n_freq)`
 - **`path_length`** — Path lengths in m; `(n_path,)`
-- **`M`** — Polarization transfer matrices, real, rows as in [[get_channels_planar]]; `(8, n_path, n_freq)`
+- **`M`** — Polarization transfer matrices, real, rows as in [[channel.planar]]; `(8, n_path, n_freq)`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in rad, GCS; `(n_path,)`
 - **`fbs_pos`**, **`lbs_pos`** — Scatterer positions in m; `(3, n_path)`, `(3, 0)` in `"phase"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; int64; `(n_path,)`

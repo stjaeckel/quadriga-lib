@@ -11,7 +11,7 @@
 // Oracles: published lookup3 test vectors and a superblock written by the HDF5 library 1.14.6; the byte encodings of
 // the predefined datatypes as written by the HDF5 library; sizes and layouts derived by hand from the HDF5 File Format
 // Specification Version 3.0 ("Version 2 Object Header", "Header Message Types").
-// Fixtures: files are created with quadriga_lib::hdf5_create where a valid file is needed; each file is removed at
+// Fixtures: files are created with quadriga_lib::hdf5_create_file where a valid file is needed; each file is removed at
 // the end of its test case.
 
 #include <catch2/catch_test_macros.hpp>
@@ -331,7 +331,7 @@ TEST_CASE("qd_hdf5 - header::emit splits at 65535 bytes and keeps the reserve in
 TEST_CASE("qd_hdf5 - chain_links grows groups in place and by continuation chunks")
 {
     test_file f("test_qd_hdf5_chain.hdf5");
-    quadriga_lib::hdf5_create(f.fn, 2);
+    quadriga_lib::hdf5_create_file(f.fn, 2);
     h5::file file;
     REQUIRE(file.open(f.fn, "r+b"));
     h5::superblock sb = h5::read_superblock(file);
@@ -402,7 +402,7 @@ TEST_CASE("qd_hdf5 - chain_links grows groups in place and by continuation chunk
 TEST_CASE("qd_hdf5 - root_links builds the directory of link chunks")
 {
     test_file f("test_qd_hdf5_root.hdf5");
-    quadriga_lib::hdf5_create(f.fn, 1);
+    quadriga_lib::hdf5_create_file(f.fn, 1);
     h5::file file;
     REQUIRE(file.open(f.fn, "r+b"));
 

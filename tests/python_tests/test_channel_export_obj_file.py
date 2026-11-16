@@ -75,7 +75,7 @@ class test_channel_export_obj_file(unittest.TestCase):
     def _export(self, name, **kwargs):
         """Run the exporter and return the path to the written OBJ file."""
         fn = self._path(name)
-        quadriga_lib.channel.channel_export_obj_file(fn, **kwargs)
+        quadriga_lib.channel.export_obj_file(fn, **kwargs)
         return fn
 
     # value tests
@@ -230,7 +230,7 @@ class test_channel_export_obj_file(unittest.TestCase):
     def test_error_bad_filename(self):
         kw, _ = self._valid_kwargs()
         with self.assertRaises(Exception):
-            quadriga_lib.channel.channel_export_obj_file(self._path('bad.txt'), **kw)
+            quadriga_lib.channel.export_obj_file(self._path('bad.txt'), **kw)
 
     def test_error_bad_colormap(self):
         kw, _ = self._valid_kwargs()
@@ -291,13 +291,13 @@ class test_channel_export_obj_file(unittest.TestCase):
         ni = [np.array([1, 0, 2], dtype=np.uint32)]
         for ic in ([np.zeros((3, 0))], [np.zeros((3, 2))], [np.zeros((2, 3))], np.zeros((3, 2, 1))):
             with self.assertRaises(ValueError):
-                quadriga_lib.channel.channel_export_obj_file(self._path('bad.obj'), n_interact=ni,
+                quadriga_lib.channel.export_obj_file(self._path('bad.obj'), n_interact=ni,
                                                             interact_coord=ic, **common)
-        quadriga_lib.channel.channel_export_obj_file(self._path('ok.obj'), n_interact=ni,
+        quadriga_lib.channel.export_obj_file(self._path('ok.obj'), n_interact=ni,
                                                     interact_coord=[np.ones((3, 3))], **common)
-        quadriga_lib.channel.channel_export_obj_file(self._path('ok4.obj'), n_interact=ni,
+        quadriga_lib.channel.export_obj_file(self._path('ok4.obj'), n_interact=ni,
                                                     interact_coord=np.ones((3, 4, 1)), **common)
-        quadriga_lib.channel.channel_export_obj_file(self._path('ok0.obj'), n_interact=[np.zeros(3, dtype=np.uint32)],
+        quadriga_lib.channel.export_obj_file(self._path('ok0.obj'), n_interact=[np.zeros(3, dtype=np.uint32)],
                                                     interact_coord=[np.zeros((3, 0))], **common)
 
 
@@ -305,7 +305,7 @@ class test_channel_export_obj_file(unittest.TestCase):
         """The counts add up to 2^32 + 6; a 32-bit sum would wrap to 6 and accept 6 columns."""
         ni = np.array([[0xFFFFFFFF], [7]], dtype=np.uint32)
         with self.assertRaisesRegex(ValueError, '4294967302'):
-            quadriga_lib.channel.channel_export_obj_file(
+            quadriga_lib.channel.export_obj_file(
                 self._path('wrap.obj'), rx_pos=np.array([[10.0], [0], [1]]), tx_pos=np.array([[0.0], [0], [10]]),
                 n_interact=ni, interact_coord=np.ones((3, 6, 1)), center_freq=np.array([3e9]),
                 coeff_re=np.ones((1, 1, 2, 1)), coeff_im=np.zeros((1, 1, 2, 1)), gain_min=-500.0, gain_max=0.0)

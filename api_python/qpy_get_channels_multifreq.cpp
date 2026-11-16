@@ -9,10 +9,10 @@ Channel generation functions
 SECTION!*/
 
 /*!MD
-# get_channels_multifreq
+# channel.multifreq
 Compute channel coefficients for spherical waves across multiple frequencies
 
-- Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
+- Multi-frequency extension of [[channel.spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
 - Aligns four frequency grids: TX array (`ant_tx['center_freq']`), RX array (`ant_rx['center_freq']`), input samples (`freq`), and output (`freq_new`)
 - Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
@@ -50,11 +50,11 @@ Compute channel coefficients for spherical waves across multiple frequencies
 
 ## Usage:
 ```
-coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ant_tx, ant_rx, fbs_pos, \
+coeff, delay = quadriga_lib.channel.multifreq( ant_tx, ant_rx, fbs_pos, \
     lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq, \
     freq_new, use_absolute_delays, add_fake_los_path, propagation_speed )
 
-coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=False )
+coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
 ```
 
 ## Inputs:
@@ -88,7 +88,7 @@ coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., c
 - **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
 
 ## See also:
-- [[get_channels_spherical]] (single-frequency equivalent)
+- [[channel.spherical]] (single-frequency equivalent)
 - [[generate_speaker]] (acoustic source construction)
 MD!*/
 

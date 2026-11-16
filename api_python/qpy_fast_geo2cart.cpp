@@ -10,7 +10,7 @@ Math functions
 SECTION!*/
 
 /*!MD
-# geo2cart
+# fast_geo2cart
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
 - Conversion: x = cos(el)·cos(az)·len, y = cos(el)·sin(az)·len, z = sin(el)·len
@@ -18,14 +18,14 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
   (3, n, m), or separate `az`, `el`, `len` of shape (n, m)
 - For combined input, row 0 = azimuth, row 1 = elevation, row 2 = length
 - `len` is optional in separate mode; omit it for unit length
-- Inverse of `cart2geo`; round-trips in both the combined and separate forms
+- Inverse of `fast_cart2geo`; round-trips in both the combined and separate forms
 - The AVX2 kernel computes sine and cosine in single precision (angles reduced in double precision first; max. error
   about 1.3e-7 for angles up to 1e10); use `use_kernel = 1` for full double precision
 
 ## Usage:
 ```
-cart    = quadriga_lib.tools.geo2cart( az, el, len, combine, use_kernel )
-x, y, z = quadriga_lib.tools.geo2cart( az, el, len, combine=False )
+cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, combine, use_kernel )
+x, y, z = quadriga_lib.tools.fast_geo2cart( az, el, len, combine=False )
 ```
 
 ## Inputs:
@@ -44,11 +44,11 @@ x, y, z = quadriga_lib.tools.geo2cart( az, el, len, combine=False )
 - **`z`** — Z-coordinates `(n, m)`; returned when `combine` is False
 MD!*/
 
-py::object geo2cart(const py::array_t<double> &az,
-                    py::handle el,
-                    py::handle len,
-                    bool combine,
-                    int use_kernel)
+py::object fast_geo2cart(const py::array_t<double> &az,
+                         py::handle el,
+                         py::handle len,
+                         bool combine,
+                         int use_kernel)
 {
     // Read inputs into flat angle/length vectors; in separate mode these alias az_a, el_a, len_a, which must
     // therefore live in function scope

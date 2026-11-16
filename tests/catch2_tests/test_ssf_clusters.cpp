@@ -30,7 +30,7 @@
 //  - the absolute time of arrival of TR eq. (7.6-43): NLOS delays plus the offset, eq. (7.6-44): no offset in LOS
 //  - statistics: the medians of the output/input spread ratios in a window of +-0.03 around the values of the method
 //    (UMa NLOS, 6 GHz); +-0.03 is more than 5 standard errors of the median of 2000 independent links; the spreads
-//    of the output are computed with calc_delay_spread and calc_angular_spreads_sphere
+//    of the output are computed with calc_delay_spread and calc_angular_spread
 // Tolerances: delays 1e-12 relative to max(delay, DS); powers 1e-12 relative; angles 1e-11 rad (the oracle orders the
 // operations differently and the angles reach a few thousand degrees before the wrap); values that the function
 // forms by the same operations are compared bitwise.

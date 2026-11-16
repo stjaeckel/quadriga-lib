@@ -56,7 +56,7 @@ py::array_t<py::ssize_t> hdf5_create_file(const std::string &fn, unsigned nx, un
         throw std::invalid_argument("File already exists.");
 
     // Create file with the requested storage layout
-    quadriga_lib::hdf5_create(fn, nx, ny, nz, nw);
+    quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw);
 
     // Return the storage layout that was used
     arma::u32_vec storage_space = {nx, ny, nz, nw};

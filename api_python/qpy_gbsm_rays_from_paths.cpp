@@ -36,7 +36,7 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m; `(3, n_path)`
 - **`path_gain`** — Path gains (linear); `(n_path, n_freq)`
 - **`path_length`** — Path lengths in m; `(n_path,)`
-- **`M`** — Polarization transfer matrices, real, rows as in [[get_channels_planar]]; `(8, n_path, n_freq)`
+- **`M`** — Polarization transfer matrices, real, rows as in [[channel.planar]]; `(8, n_path, n_freq)`
 - **`method`** — Value of `rays["method"]`; sets the GR power law and the default mobility; default: `"quadriga"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `(n_path,)`; default: None
 - **`tap`** — Tap index; `None`: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also without a GR

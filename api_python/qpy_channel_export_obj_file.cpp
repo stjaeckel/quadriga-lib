@@ -10,7 +10,7 @@ Channel functions
 SECTION!*/
 
 /*!MD
-# channel_export_obj_file
+# channel.export_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g. for use in Blender)
@@ -23,7 +23,7 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 ## Usage:
 ```
-quadriga_lib.channel.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colormap, \
+quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max, gain_min, colormap, \
     radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
     coeff_re, coeff_im, i_snap )
 ```

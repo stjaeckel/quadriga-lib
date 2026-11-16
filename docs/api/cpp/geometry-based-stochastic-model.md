@@ -1083,7 +1083,7 @@ void quadriga_lib::ssf_clusters(
 - [gbsm_draw](#gbsm_draw) (the random values `rnd` and `rnd_freq`)
 - [lsp_generate](#lsp_generate) (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [ssf_rays](#ssf_rays) (the rays of the clusters)
-- [calc_delay_spread](channel-statistics.md#calc_delay_spread), [calc_angular_spreads_sphere](channel-statistics.md#calc_angular_spreads_sphere) (spreads of the output)
+- [calc_delay_spread](channel-statistics.md#calc_delay_spread), [calc_angular_spread](channel-statistics.md#calc_angular_spread) (spreads of the output)
 
 ---
 <a id="ssf_paths"></a>

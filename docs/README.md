@@ -31,6 +31,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [C++: Channel statistics](api/cpp/channel-statistics.md): 5 functions
 - [C++: Geometry-based stochastic model](api/cpp/geometry-based-stochastic-model.md): 17 functions
 - [C++: Math functions](api/cpp/math-functions.md): 9 functions
+- [C++: Miscellaneous / Tools](api/cpp/miscellaneous-tools.md): 3 functions
 - [C++: Site-specific simulation tools](api/cpp/site-specific-simulation-tools.md): 35 functions
 - [C++: Sum-of-sinusoids random number generator](api/cpp/sum-of-sinusoids-random-number-generator.md): 14 functions
 - [MATLAB / Octave: General usage notes](api/mex/general-usage-notes.md)

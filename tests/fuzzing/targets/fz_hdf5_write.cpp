@@ -3,8 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Channel objects with fuzzed members (consistent or mismatched sizes, unstructured par_names / par_data of all
-// types): channel::is_valid, calc_effective_path_gain, add_paths, write_paths_to_obj_file, then hdf5_create,
-// hdf5_write, hdf5_write_dset, hdf5_reshape_layout and the readers hdf5_read_layout, hdf5_read_channel,
+// types): channel::is_valid, calc_effective_path_gain, add_paths, write_paths_to_obj_file, then hdf5_create_file,
+// hdf5_write_channel, hdf5_write_dset, hdf5_reshape_layout and the readers hdf5_read_layout, hdf5_read_channel,
 // hdf5_read_dset_names, hdf5_read_dset
 
 #include "fuzz_target.hpp"
@@ -178,12 +178,12 @@ static void run(fz::input &in)
     if (in.ConsumeBool())
     {
         unsigned nx = (unsigned)in.size(3), ny = (unsigned)in.size(3), nz = (unsigned)in.size(2), nw = (unsigned)in.size(2);
-        fz::clean([&] { quadriga_lib::hdf5_create(fn, nx, ny, nz, nw); });
+        fz::clean([&] { quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw); });
     }
     unsigned ix = (unsigned)in.index(2), iy = (unsigned)in.index(2), iz = (unsigned)in.size(1), iw = (unsigned)in.size(1);
-    fz::clean([&] { quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw); });
+    fz::clean([&] { quadriga_lib::hdf5_write_channel(&c, fn, ix, iy, iz, iw); });
     if (in.ConsumeBool()) // overwrite the slot
-        fz::clean([&] { quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw); });
+        fz::clean([&] { quadriga_lib::hdf5_write_channel(&c, fn, ix, iy, iz, iw); });
     {
         std::string name = fuzzed_name(in);
         std::any par = fuzzed_any<T>(in);

@@ -13,7 +13,7 @@ Channel generation functions
 SECTION!*/
 
 /*!MD
-# get_channels_spherical
+# channel.spherical
 Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 - Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths,
@@ -62,17 +62,17 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 ## Usage:
 ```
-coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ant_tx, ant_rx, \
+coeff, delays = quadriga_lib.channel.spherical( ant_tx, ant_rx, \
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
 
-coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=False )
+coeff_re, coeff_im, delays = quadriga_lib.channel.spherical( ..., complex=False )
 
-coeff, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
+coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
 
-coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., i_freq=1 )
+coeff, delays = quadriga_lib.channel.spherical( ..., i_freq=1 )
 
-coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 )
+coeff, delays = quadriga_lib.channel.spherical( ..., use_kernel=1 )
 ```
 
 ## Inputs:
@@ -114,8 +114,8 @@ coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., use_kernel=1 
 - In batch mode, every output is a list of length `n_out` whose entries have the shapes given above.
 
 ## See also:
-- [[get_channels_multifreq]] (multi-frequency extension)
-- [[get_channels_planar]] (planar wave variant)
+- [[channel.multifreq]] (multi-frequency extension)
+- [[channel.planar]] (planar wave variant)
 - [[qrt_file_read]] (produces the list format used by batch mode)
 MD!*/
 

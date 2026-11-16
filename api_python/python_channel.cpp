@@ -19,6 +19,9 @@ namespace py = pybind11;
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
 #include "qpy_get_channels_ieee_indoor.cpp"
+#include "qpy_get_channels_planar.cpp"
+#include "qpy_get_channels_spherical.cpp"
+#include "qpy_get_channels_multifreq.cpp"
 #include "qpy_qrt_file_parse.cpp"
 #include "qpy_qrt_file_read.cpp"
 #include "qpy_quantize_delays.cpp"
@@ -38,7 +41,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("freq_new") = py::none(),
           py::arg("remove_delay_phase") = true);
 
-    m.def("channel_export_obj_file", &channel_export_obj_file,
+    m.def("export_obj_file", &channel_export_obj_file,
           py::arg("fn"),
           py::arg("max_paths") = 0,
           py::arg("gain_max") = -60.0,
@@ -102,7 +105,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("data") = py::none(),
           py::arg("prefix") = "par_");
 
-    m.def("get_ieee_indoor", &get_channels_ieee_indoor,
+    m.def("ieee_indoor", &get_channels_ieee_indoor,
           py::arg("ap_array") = py::dict(),
           py::arg("sta_array") = py::dict(),
           py::arg("ChannelType"),
@@ -128,6 +131,65 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("n_walls") = py::array_t<arma::uword>(),
           py::arg("wall_loss") = 5.0,
           py::arg("stack") = false);
+
+    m.def("planar", &get_channels_planar,
+          py::arg("ant_tx"),
+          py::arg("ant_rx"),
+          py::arg("aod"),
+          py::arg("eod"),
+          py::arg("aoa"),
+          py::arg("eoa"),
+          py::arg("path_gain"),
+          py::arg("path_length"),
+          py::arg("M"),
+          py::arg("tx_pos"),
+          py::arg("tx_orientation"),
+          py::arg("rx_pos"),
+          py::arg("rx_orientation"),
+          py::arg("center_freq") = py::none(),
+          py::arg("use_absolute_delays") = false,
+          py::arg("add_fake_los_path") = false,
+          py::arg("complex") = true,
+          py::arg("i_freq") = 0);
+
+    m.def("spherical", &get_channels_spherical,
+          py::arg("ant_tx"),
+          py::arg("ant_rx"),
+          py::arg("fbs_pos"),
+          py::arg("lbs_pos"),
+          py::arg("path_gain"),
+          py::arg("path_length"),
+          py::arg("M"),
+          py::arg("tx_pos"),
+          py::arg("tx_orientation"),
+          py::arg("rx_pos"),
+          py::arg("rx_orientation"),
+          py::arg("center_freq") = py::none(),
+          py::arg("use_absolute_delays") = false,
+          py::arg("add_fake_los_path") = false,
+          py::arg("angles") = false,
+          py::arg("complex") = true,
+          py::arg("i_freq") = 0,
+          py::arg("use_kernel") = 0);
+
+    m.def("multifreq", &get_channels_multifreq,
+          py::arg("ant_tx"),
+          py::arg("ant_rx"),
+          py::arg("fbs_pos"),
+          py::arg("lbs_pos"),
+          py::arg("path_gain"),
+          py::arg("path_length"),
+          py::arg("M"),
+          py::arg("tx_pos"),
+          py::arg("tx_orientation"),
+          py::arg("rx_pos"),
+          py::arg("rx_orientation"),
+          py::arg("freq"),
+          py::arg("freq_new"),
+          py::arg("use_absolute_delays") = false,
+          py::arg("add_fake_los_path") = false,
+          py::arg("propagation_speed") = 299792458.0,
+          py::arg("complex") = true);
 
     m.def("quantize_delays", &quantize_delays,
           py::arg("coeff_re") = py::none(),

@@ -13,7 +13,7 @@ void fuzz_seeds(const fz::seeds &s)
 
     // A 2 x 2 layout with two channels: one with structured data only, one with paths and unstructured data
     std::string fn = s.path("two_channels.hdf5");
-    quadriga_lib::hdf5_create(fn, 2, 2);
+    quadriga_lib::hdf5_create_file(fn, 2, 2);
 
     quadriga_lib::channel<double> c;
     c.name = "first";
@@ -22,7 +22,7 @@ void fuzz_seeds(const fz::seeds &s)
     c.coeff_re.push_back(arma::cube(1, 2, 2, arma::fill::value(0.5)));
     c.coeff_im.push_back(arma::cube(1, 2, 2, arma::fill::value(-0.5)));
     c.delay.push_back(arma::cube(1, 2, 2, arma::fill::value(1.0e-8)));
-    quadriga_lib::hdf5_write(&c, fn, 0);
+    quadriga_lib::hdf5_write_channel(&c, fn, 0);
 
     c.name = "second";
     c.center_freq = {3.5e9};
@@ -30,7 +30,7 @@ void fuzz_seeds(const fz::seeds &s)
     c.path_length.push_back(arma::vec({3.0, 7.5}));
     c.par_names = {"note", "gain", "grid"};
     c.par_data = {std::string("text"), 2.5, arma::mat(2, 3, arma::fill::value(1.25))};
-    quadriga_lib::hdf5_write(&c, fn, 1, 1);
+    quadriga_lib::hdf5_write_channel(&c, fn, 1, 1);
 }
 
 void fuzz_one(const uint8_t *data, size_t size)

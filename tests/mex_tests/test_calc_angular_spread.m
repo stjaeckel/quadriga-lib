@@ -1,5 +1,5 @@
-function test_calc_angular_spreads_sphere()
-% MOxUnit tests for quadriga_lib.calc_angular_spreads_sphere
+function test_calc_angular_spread()
+% MOxUnit tests for quadriga_lib.calc_angular_spread
 
 % --- Single path returns zero spread ---
 az = 0.5;

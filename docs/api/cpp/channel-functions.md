@@ -8,13 +8,13 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
-| [hdf5_create](#hdf5_create) | Create a new HDF5 channel file with a defined storage layout |
+| [hdf5_create_file](#hdf5_create_file) | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_dset](#hdf5_read_dset) | Read an unstructured dataset from an HDF5 file at a specified 4D index |
 | [hdf5_read_dset_names](#hdf5_read_dset_names) | Read names of unstructured datasets stored at a 4D slot in an HDF5 file |
 | [hdf5_read_layout](#hdf5_read_layout) | Read the storage layout of an HDF5 channel file |
 | [hdf5_reshape_layout](#hdf5_reshape_layout) | Reshape the 4D storage layout of an existing HDF5 channel file |
-| [hdf5_write](#hdf5_write) | Write a channel object to an HDF5 file at a specified 4D index |
+| [hdf5_write_channel](#hdf5_write_channel) | Write a channel object to an HDF5 file at a specified 4D index |
 | [hdf5_write_dset](#hdf5_write_dset) | Write a single unstructured dataset to an HDF5 file at a specified 4D index |
 | [path](#path) | Class for storing and managing a single propagation path with a compact fixed-size header |
 | [qrt_file_append](#qrt_file_append) | Append one transmitter's path data to an existing QRT file |
@@ -215,8 +215,8 @@ void quadriga_lib::baseband_freq_response_vec(
 - [baseband_freq_response_multi](#baseband_freq_response_multi) (multi-freq counterpart)
 
 ---
-<a id="hdf5_create"></a>
-## hdf5_create
+<a id="hdf5_create_file"></a>
+## hdf5_create_file
 Create a new HDF5 channel file with a defined storage layout
 
 Also in: [MATLAB](../mex/channel-functions.md#hdf5_create_file) · [Python](../python/channel-functions.md#hdf5_create_file)
@@ -233,7 +233,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_create_file) · [Python](../p
 
 ### Declaration:
 ```cpp
-void quadriga_lib::hdf5_create(
+void quadriga_lib::hdf5_create_file(
     const std::string &fn,
     unsigned nx = 65536,
     unsigned ny = 1,
@@ -250,7 +250,7 @@ void quadriga_lib::hdf5_create(
 
 ### See also:
 - [hdf5_reshape_layout](#hdf5_reshape_layout) (change layout dimensions of an existing file)
-- [hdf5_write](#hdf5_write) (write channel data into a slot)
+- [hdf5_write_channel](#hdf5_write_channel) (write channel data into a slot)
 
 ---
 <a id="hdf5_read_channel"></a>
@@ -263,7 +263,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_channel) · [Python](../
 - Structured data is stored in single precision in the file and converted to `dtype` on read.
 - Unstructured fields (`std::any`) retain their original stored type without conversion; see [hdf5_read_dset](#hdf5_read_dset)
   for the returned types.
-- Round trip with [hdf5_write](#hdf5_write): every per-snapshot field comes back with one entry per snapshot, also for
+- Round trip with [hdf5_write_channel](#hdf5_write_channel): every per-snapshot field comes back with one entry per snapshot, also for
   snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
   with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
 - Throws `std::invalid_argument` if the file is malformed (e.g. a dataset does not have the size given by the
@@ -295,7 +295,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 - Channel object at the specified slot; empty if no data is present
 
 ### See also:
-- [hdf5_write](#hdf5_write) (write a channel object to a slot)
+- [hdf5_write_channel](#hdf5_write_channel) (write a channel object to a slot)
 - [hdf5_read_layout](#hdf5_read_layout) (inspect slot occupancy before reading)
 
 ---
@@ -409,7 +409,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 - Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
 
 ### See also:
-- [hdf5_create](#hdf5_create) (create a file with a defined layout)
+- [hdf5_create_file](#hdf5_create_file) (create a file with a defined layout)
 - [hdf5_reshape_layout](#hdf5_reshape_layout) (change layout dimensions of an existing file)
 
 ---
@@ -442,12 +442,12 @@ void quadriga_lib::hdf5_reshape_layout(
 - **`nw`** *(optional)* — New size of w-dimension
 
 ### See also:
-- [hdf5_create](#hdf5_create) (set initial layout at file creation)
+- [hdf5_create_file](#hdf5_create_file) (set initial layout at file creation)
 - [hdf5_read_layout](#hdf5_read_layout) (query current layout)
 
 ---
-<a id="hdf5_write"></a>
-## hdf5_write
+<a id="hdf5_write_channel"></a>
+## hdf5_write_channel
 Write a channel object to an HDF5 file at a specified 4D index
 
 Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_channel) · [Python](../python/channel-functions.md#hdf5_write_channel)
@@ -459,8 +459,8 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_channel) · [Python](..
 - If the slot already holds data, the slot is replaced completely: the old structured data and all unstructured
   datasets of the slot (`par_*`, including those added with [hdf5_write_dset](#hdf5_write_dset)) are removed, and only the new
   channel is stored there. The space of the removed data is not reused, so the file does not shrink; to reclaim
-  it, copy the channels into a new file ([hdf5_read_channel](#hdf5_read_channel), [hdf5_write](#hdf5_write)).
-- Throws if the index was not reserved during [hdf5_create](#hdf5_create).
+  it, copy the channels into a new file ([hdf5_read_channel](#hdf5_read_channel), [hdf5_write_channel](#hdf5_write_channel)).
+- Throws if the index was not reserved during [hdf5_create_file](#hdf5_create_file).
 - Structured data is always stored in single precision; input may be float or double.
 - Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.
 - Channel names longer than 255 characters are rejected.
@@ -469,7 +469,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_channel) · [Python](..
 
 ### Declaration:
 ```cpp
-int quadriga_lib::hdf5_write(
+int quadriga_lib::hdf5_write_channel(
     const quadriga_lib::channel<dtype> *ch,
     const std::string &fn,
     unsigned ix = 0,
@@ -490,7 +490,7 @@ int quadriga_lib::hdf5_write(
 - `0` if the slot was empty, `1` if existing data in the slot was replaced
 
 ### See also:
-- [hdf5_create](#hdf5_create) (create file and reserve layout)
+- [hdf5_create_file](#hdf5_create_file) (create file and reserve layout)
 - [hdf5_read_channel](#hdf5_read_channel) (read channel data from a slot)
 
 ---
@@ -502,7 +502,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_dset) · [Python](../py
 
 - Dataset is stored under `prefix + par_name`; name must contain only alphanumeric characters and underscores.
 - Adds the dataset to the slot and keeps everything else stored there (channel data and other datasets); an empty
-  slot is reserved for it. A later [hdf5_write](#hdf5_write) to the same slot replaces the slot completely, including the
+  slot is reserved for it. A later [hdf5_write_channel](#hdf5_write_channel) to the same slot replaces the slot completely, including the
   datasets written with this function.
 - Supported scalar types: `std::string`, `unsigned`, `int`, `long long`, `unsigned long long`, `float`, `double`
 - Supported Armadillo types: `arma::Col`, `arma::Row`, `arma::Mat`, `arma::Cube` with element types `float`, `double`, `int`, `unsigned`, `sword`, `uword`, `unsigned long long`
@@ -510,7 +510,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_dset) · [Python](../py
 - Throws for unsupported types and invalid names, before the file is changed.
 - Throws if a dataset with the same name already exists at the specified slot; no overwrite/update is supported.
 - One writer per file at a time; files are not locked.
-- Creates the file with the default layout of [hdf5_create](#hdf5_create) if it does not exist; an existing file must be
+- Creates the file with the default layout of [hdf5_create_file](#hdf5_create_file) if it does not exist; an existing file must be
   a channel file of version 3 (see [hdf5_read_channel](#hdf5_read_channel)).
 
 ### Declaration:

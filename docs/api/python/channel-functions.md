@@ -5,7 +5,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-cha
 | Function | Summary |
 | --- | --- |
 | [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
-| [channel_export_obj_file](#channel_export_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
+| [channel.export_obj_file](#channel.export_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 | [hdf5_create_file](#hdf5_create_file) | Create a new HDF5 channel file with a custom storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Reads channel data from HDF5 files |
 | [hdf5_read_dset](#hdf5_read_dset) | Read a single unstructured dataset from an HDF5 file |
@@ -84,7 +84,7 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   required for multi-freq input; may replace `bandwidth` + `pilot_grid` for single-freq; default: `None`
 - **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel generator before SLERP,
   then re-apply it analytically per output carrier; multi-freq only; needs channels generated with
-  `use_absolute_delays = True`: the coefficients of `get_channels_*` carry the phase of the absolute path length also
+  `use_absolute_delays = True`: the coefficients of the generators carry the phase of the absolute path length also
   when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`,
   which gives wrong phases (magnitudes stay right); default: `True`
 
@@ -93,12 +93,12 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   where `n_out` is the number of processed snapshots
 
 ### See also:
-- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (single-frequency channel generator)
-- [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq) (multi-frequency channel generator)
+- [channel.spherical](channel-generation-functions.md#channel.spherical) (single-frequency channel generator)
+- [channel.multifreq](channel-generation-functions.md#channel.multifreq) (multi-frequency channel generator)
 
 ---
-<a id="channel_export_obj_file"></a>
-## channel_export_obj_file
+<a id="channel.export_obj_file"></a>
+## channel.export_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../mex/channel-functions.md#channel_export_obj_file)
@@ -113,7 +113,7 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../
 
 ### Usage:
 ```python
-quadriga_lib.channel.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colormap, \
+quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max, gain_min, colormap, \
     radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
     coeff_re, coeff_im, i_snap )
 ```
@@ -152,7 +152,7 @@ quadriga_lib.channel.channel_export_obj_file( fn, max_paths, gain_max, gain_min,
 ## hdf5_create_file
 Create a new HDF5 channel file with a custom storage layout
 
-Also in: [C++](../cpp/channel-functions.md#hdf5_create) · [MATLAB](../mex/channel-functions.md#hdf5_create_file)
+Also in: [C++](../cpp/channel-functions.md#hdf5_create_file) · [MATLAB](../mex/channel-functions.md#hdf5_create_file)
 
 - Initializes a new HDF5 file for storing channel data
 - Defines a 4D storage layout `(nx, ny, nz, nw)`; each index combination maps to one channel slot
@@ -229,7 +229,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
   | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)`  | `(n_rx, n_tx, n_path, n_snap)`       |
   | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
   | `path_length`      | Path length in m                                                         | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
-  | `path_polarization`| Polarization transfer matrix, real, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar)   | list of `(8, n_path_s)`           | `(8, n_path, n_snap)`                |
+  | `path_polarization`| Polarization transfer matrix, real, rows as in [channel.planar](channel-generation-functions.md#channel.planar)        | list of `(8, n_path_s)`           | `(8, n_path, n_snap)`                |
   | `path_angles`      | Departure and arrival angles (AOD, EOD, AOA, EOA) in rad                 | list of `(n_path_s, 4)`           | `(n_path, 4, n_snap)`                |
   | `fbs_pos`          | First-bounce scatterer positions                                         | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
@@ -382,7 +382,7 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 ## hdf5_write_channel
 Write one or more channel objects to an HDF5 file
 
-Also in: [C++](../cpp/channel-functions.md#hdf5_write) · [MATLAB](../mex/channel-functions.md#hdf5_write_channel)
+Also in: [C++](../cpp/channel-functions.md#hdf5_write_channel) · [MATLAB](../mex/channel-functions.md#hdf5_write_channel)
 
 - Writes a list of channel dicts into 4D storage slots (one slot per list entry)
 - `chan` may also be a single dict, in which case one channel is written
@@ -569,9 +569,9 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 
 ### See also:
 - [generate](array-antenna-functions.md#generate) (for generating antenna arrays)
-- [get_channels_planar](channel-generation-functions.md#get_channels_planar) (for embedding antennas using departure and arrival angles)
-- [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (for embedding antennas using FBS/LBS positions)
-- [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq) (for multi-frequency antenna embedding)
+- [channel.planar](channel-generation-functions.md#channel.planar) (for embedding antennas using departure and arrival angles)
+- [channel.spherical](channel-generation-functions.md#channel.spherical) (for embedding antennas using FBS/LBS positions)
+- [channel.multifreq](channel-generation-functions.md#channel.multifreq) (for multi-frequency antenna embedding)
 
 ---
 <a id="quantize_delays"></a>
@@ -600,8 +600,8 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [MATLAB](../mex/c
   `(-tap_spacing / 2, 0)` are treated as 0, so all of their power goes to tap 0. Delays at or below
   `-tap_spacing / 2` raise `ValueError`, as do NaN, Inf and delays of 2^31 taps or more (`delay / tap_spacing < 2^31`,
   e.g. 10.7 s at 5 ns or 12.4 h at 48 kHz)
-- Relative delays (`use_absolute_delays = false` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical), [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq) and
-  [get_channels_planar](channel-generation-functions.md#get_channels_planar)) are negative for element pairs that are closer to each other than the phase centres, by up
+- Relative delays (`use_absolute_delays = false` in [channel.spherical](channel-generation-functions.md#channel.spherical), [channel.multifreq](channel-generation-functions.md#channel.multifreq) and
+  [channel.planar](channel-generation-functions.md#channel.planar)) are negative for element pairs that are closer to each other than the phase centres, by up
   to about (half the TX array size + half the RX array size) / propagation speed (both arrays endfire). They stay
   above `-tap_spacing / 2` only while these half sizes add up to less than `tap_spacing / 2` times the propagation
   speed: about 0.75 m for radio at 5 ns taps, but only about 3.6 mm for sound at 48 kHz taps, i.e. practically every

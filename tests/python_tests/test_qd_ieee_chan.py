@@ -83,7 +83,7 @@ def _ieee_call(ant_ap, ant_sta, model, *,
                n_walls=None,
                wall_loss=5.0,
                stack=False):
-    """Wrapper around channel.get_ieee_indoor that supplies the 25 positional
+    """Wrapper around channel.ieee_indoor that supplies the 25 positional
     arguments by name with the documented defaults."""
     if Dist_m is None:
         Dist_m = np.array([4.99])
@@ -94,7 +94,7 @@ def _ieee_call(ant_ap, ant_sta, model, *,
     if n_walls is None:
         n_walls = np.array([0], dtype=np.uint64)
 
-    return channel.get_ieee_indoor(
+    return channel.ieee_indoor(
         ant_ap, ant_sta, model,
         CarrierFreq_Hz, tap_spacing_s, n_users,
         observation_time, update_rate,
@@ -129,7 +129,7 @@ class test_case(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_ieee_chan_a_1user_xpol(self):
         ant = arrayant.generate("xpol", 30.0)
-        chan = channel.get_ieee_indoor(ant, ant, "A")
+        chan = channel.ieee_indoor(ant, ant, "A")
 
         self.assertEqual(len(chan), 1)
         ch = chan[0]
@@ -636,7 +636,7 @@ class test_case(unittest.TestCase):
     def test_output_keys_and_center_frequency_shape(self):
         """center_freq is an array of shape (1,); initial_position is returned."""
         ant = arrayant.generate('omni')
-        c = channel.get_ieee_indoor(ant, ant, 'B', seed=1)[0]
+        c = channel.ieee_indoor(ant, ant, 'B', seed=1)[0]
         self.assertIsInstance(c['center_freq'], np.ndarray)
         self.assertEqual(c['center_freq'].shape, (1,))
         self.assertIn('initial_position', c)

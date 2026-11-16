@@ -126,7 +126,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         unsigned ny = iy_vec.max();
         unsigned nz = iz_vec.max();
         unsigned nw = iw_vec.max();
-        CALL_QD(quadriga_lib::hdf5_create(fn, nx, ny, nz, nw));
+        CALL_QD(quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw));
         storage_space.at(0) = nx;
         storage_space.at(1) = ny;
         storage_space.at(2) = nz;
@@ -177,7 +177,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         // Write (convert to 0-based)
         int return_code = 0;
-        CALL_QD(return_code = quadriga_lib::hdf5_write(&c, fn, ix - 1, iy - 1, iz - 1, iw - 1));
+        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(&c, fn, ix - 1, iy - 1, iz - 1, iw - 1));
         if (return_code == 1)
             any_overwrite = true;
     }

@@ -14,7 +14,7 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-from quadriga_lib import arrayant
+from quadriga_lib import arrayant, channel
 
 C = 299792458.0
 PI = math.pi
@@ -75,7 +75,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant = minimal_ant()
         aod, eod, aoa, eoa, path_gain, path_length, M = minimal_paths()
 
-        coeff_re, coeff_im, delay, rx_Doppler = arrayant.get_channels_planar(
+        coeff_re, coeff_im, delay, rx_Doppler = channel.planar(
             ant, ant, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, complex=False)
 
@@ -112,7 +112,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         path_length = np.array([math.hypot(10, 10) + math.sqrt(10 ** 2 + 20 ** 2 + 10 ** 2), 20.0])
         M = make_M(2)
 
-        coeff_re, coeff_im, delay, rx_Doppler = arrayant.get_channels_planar(
+        coeff_re, coeff_im, delay, rx_Doppler = channel.planar(
             ant, ant, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, True, complex=False)
 
@@ -156,7 +156,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
 
         # Case 1: identity coupling (from copy_element), relative delays, fake LOS appended
         ant = base_ant()
-        cr, ci, delay, _ = arrayant.get_channels_planar(
+        cr, ci, delay, _ = channel.planar(
             ant, ant, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 0.0, False, True, complex=False)
 
@@ -171,7 +171,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant = base_ant()
         ant['coupling_re'] = np.ones((3, 1), order='F')
         ant.pop('coupling_im', None)
-        cr, ci, delay, _ = arrayant.get_channels_planar(
+        cr, ci, delay, _ = channel.planar(
             ant, ant, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 0.0, True, False, complex=False)
 
@@ -184,7 +184,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant = base_ant()
         ant['coupling_re'] = np.ones((3, 1), order='F') * 2.0
         ant.pop('coupling_im', None)
-        cr, ci, delay, _ = arrayant.get_channels_planar(
+        cr, ci, delay, _ = channel.planar(
             ant, ant, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 0.0, True, False, complex=False)
 
@@ -204,11 +204,11 @@ class TestGetChannelsPlanar(unittest.TestCase):
                 [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0])
         kwargs = dict(center_freq=2997924580.0, use_absolute_delays=True)
 
-        cr, ci, delay_r, dop_r = arrayant.get_channels_planar(*args, complex=False, **kwargs)
-        coeff, delay_c, dop_c = arrayant.get_channels_planar(*args, **kwargs)  # complex by default
+        cr, ci, delay_r, dop_r = channel.planar(*args, complex=False, **kwargs)
+        coeff, delay_c, dop_c = channel.planar(*args, **kwargs)  # complex by default
 
-        self.assertEqual(len(arrayant.get_channels_planar(*args, complex=False, **kwargs)), 4)
-        self.assertEqual(len(arrayant.get_channels_planar(*args, complex=True, **kwargs)), 3)
+        self.assertEqual(len(channel.planar(*args, complex=False, **kwargs)), 4)
+        self.assertEqual(len(channel.planar(*args, complex=True, **kwargs)), 3)
 
         self.assertTrue(np.iscomplexobj(coeff))
         npt.assert_array_equal(coeff.real, cr)
@@ -217,9 +217,9 @@ class TestGetChannelsPlanar(unittest.TestCase):
         npt.assert_array_equal(dop_c, dop_r)
 
         # 'complex' is a flag: None selects the default, other types raise TypeError
-        npt.assert_array_equal(arrayant.get_channels_planar(*args, complex=None, **kwargs)[0], coeff)
+        npt.assert_array_equal(channel.planar(*args, complex=None, **kwargs)[0], coeff)
         with self.assertRaises(TypeError) as ctx:
-            arrayant.get_channels_planar(*args, complex=2.5, **kwargs)
+            channel.planar(*args, complex=2.5, **kwargs)
         self.assertIn("Input 'complex' must be a bool or None.", str(ctx.exception))
 
     def test_complex_with_fake_los(self):
@@ -235,8 +235,8 @@ class TestGetChannelsPlanar(unittest.TestCase):
                 [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0])
         kwargs = dict(center_freq=2997924580.0, use_absolute_delays=True, add_fake_los_path=True)
 
-        cr, ci, _, _ = arrayant.get_channels_planar(*args, complex=False, **kwargs)
-        coeff, _, _ = arrayant.get_channels_planar(*args, complex=True, **kwargs)
+        cr, ci, _, _ = channel.planar(*args, complex=False, **kwargs)
+        coeff, _, _ = channel.planar(*args, complex=True, **kwargs)
 
         self.assertEqual(coeff.shape[2], 3)
         self.assertTrue(np.iscomplexobj(coeff))
@@ -253,7 +253,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         path_length = np.array([100.0])
         M = make_M(1)
         for aoa_v, eoa_v in [(0.0, 0.0), (PI / 2, 0.0), (PI, 0.0), (0.0, PI / 2)]:
-            _, _, _, dop = arrayant.get_channels_planar(
+            _, _, _, dop = channel.planar(
                 ant, ant, np.zeros(1), np.zeros(1), np.array([aoa_v]), np.array([eoa_v]),
                 path_gain, path_length, M,
                 [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, complex=False)
@@ -265,7 +265,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
 
     def test_center_freq_zero_no_phase(self):
         ant = omni()
-        cr, ci, _, _ = arrayant.get_channels_planar(
+        cr, ci, _, _ = channel.planar(
             ant, ant, np.zeros(1), np.zeros(1), np.array([PI]), np.zeros(1),
             np.array([1.0]), np.array([100.0]), make_M(1),
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, complex=False)
@@ -282,10 +282,10 @@ class TestGetChannelsPlanar(unittest.TestCase):
         common = (ant, ant, np.zeros(1), np.zeros(1), np.array([PI]), np.zeros(1),
                   np.array([1.0]), np.array([dist]), make_M(1),
                   [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0])
-        cr_a, ci_a, d_a, _ = arrayant.get_channels_planar(*common, center_freq=0.0, use_absolute_delays=True,
-                                                          complex=False)
-        cr_r, ci_r, d_r, _ = arrayant.get_channels_planar(*common, center_freq=0.0, use_absolute_delays=False,
-                                                          complex=False)
+        cr_a, ci_a, d_a, _ = channel.planar(*common, center_freq=0.0, use_absolute_delays=True,
+                                            complex=False)
+        cr_r, ci_r, d_r, _ = channel.planar(*common, center_freq=0.0, use_absolute_delays=False,
+                                            complex=False)
 
         npt.assert_almost_equal(d_a[0, 0, 0], dist / C, decimal=12)
         npt.assert_almost_equal(d_r[0, 0, 0], 0.0, decimal=12)
@@ -303,10 +303,10 @@ class TestGetChannelsPlanar(unittest.TestCase):
         common = (ant, ant, np.zeros(1), np.zeros(1), np.array([PI]), np.zeros(1),
                   np.array([1.0]), np.array([dist]), make_M(1),
                   [0, 0, 0], [0, 0, 0], [dist, 0, 0], [0, 0, 0])
-        cr_f, ci_f, d_f, _ = arrayant.get_channels_planar(*common, center_freq=fc, use_absolute_delays=True,
-                                                          complex=False)
-        cr_0, ci_0, d_0, _ = arrayant.get_channels_planar(*common, center_freq=0.0, use_absolute_delays=True,
-                                                          complex=False)
+        cr_f, ci_f, d_f, _ = channel.planar(*common, center_freq=fc, use_absolute_delays=True,
+                                            complex=False)
+        cr_0, ci_0, d_0, _ = channel.planar(*common, center_freq=0.0, use_absolute_delays=True,
+                                            complex=False)
 
         npt.assert_almost_equal(amp2(cr_f, ci_f)[0, 0, 0], amp2(cr_0, ci_0)[0, 0, 0], decimal=8)
         npt.assert_almost_equal(d_f[0, 0, 0], d_0[0, 0, 0], decimal=12)
@@ -324,7 +324,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         M[0, 0] = s2; M[1, 0] = s2     # VV = exp(j*pi/4)
         M[6, 0] = -s2; M[7, 0] = -s2   # HH = -exp(j*pi/4)
 
-        cr, ci, _, _ = arrayant.get_channels_planar(
+        cr, ci, _, _ = channel.planar(
             ant, ant, np.zeros(1), np.zeros(1), np.array([PI]), np.zeros(1),
             np.array([1.0]), np.array([100.0]), M,
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, complex=False)
@@ -342,7 +342,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         pos = ([0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0])
 
         def run(M):
-            return arrayant.get_channels_planar(
+            return channel.planar(
                 probe, probe, z, z, np.array([PI]), z,
                 np.array([1.0]), np.array([100.0]), M, *pos, 0.0, True, complex=False)
 
@@ -369,9 +369,9 @@ class TestGetChannelsPlanar(unittest.TestCase):
         z = np.zeros(1)
         common = (tx, rx, z, z, np.array([PI]), z, np.array([1.0]), np.array([100.0]), make_M(1))
 
-        cr0, ci0, _, _ = arrayant.get_channels_planar(
+        cr0, ci0, _, _ = channel.planar(
             *common, [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, False, complex=False)
-        cr_r, ci_r, _, _ = arrayant.get_channels_planar(
+        cr_r, ci_r, _, _ = channel.planar(
             *common, [0, 0, 0], [0, 0, 0], [100, 0, 0], [PI / 2, 0, 0], 0.0, False, complex=False)
 
         a_v0 = amp2(cr0, ci0)[0, 0, 0]
@@ -408,14 +408,14 @@ class TestGetChannelsPlanar(unittest.TestCase):
         path_length = np.array([100.0, 105.0, 110.0, 102.0])
         M = make_M(n_path)
 
-        cr, ci, delay, dop = arrayant.get_channels_planar(
+        cr, ci, delay, dop = channel.planar(
             tx, rx, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, False, complex=False)
         for arr in (cr, ci, delay):
             self.assertEqual(arr.shape, (2, 3, n_path))
         self.assertEqual(dop.shape, (n_path,))
 
-        cr2, ci2, delay2, dop2 = arrayant.get_channels_planar(
+        cr2, ci2, delay2, dop2 = channel.planar(
             tx, rx, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, True, complex=False)
         for arr in (cr2, ci2, delay2):
@@ -436,7 +436,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         path_length = np.array([100.0, 100.0])
         M = make_M(2)
 
-        cr, ci, _, _ = arrayant.get_channels_planar(
+        cr, ci, _, _ = channel.planar(
             ant, ant, aod, eod, aoa, eoa, path_gain, path_length, M,
             [0, 0, 0], [0, 0, 0], [100, 0, 0], [0, 0, 0], 0.0, True, complex=False)
 
@@ -452,7 +452,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant = minimal_ant()
         ant.pop('element_pos', None)
         aod, eod, aoa, eoa, pg, pl, M = minimal_paths()
-        result = arrayant.get_channels_planar(
+        result = channel.planar(
             ant, ant, aod, eod, aoa, eoa, pg, pl, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, complex=False)
         self.assertEqual(len(result), 4)
@@ -463,7 +463,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant.pop('coupling_re', None)   # leaves coupling_im only
         aod, eod, aoa, eoa, pg, pl, M = minimal_paths()
         with self.assertRaises(ValueError) as ctx:
-            arrayant.get_channels_planar(
+            channel.planar(
                 ant, ant, aod, eod, aoa, eoa, pg, pl, M,
                 [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True)
         self.assertEqual(str(ctx.exception),
@@ -476,7 +476,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant.pop('coupling_re', None)
         ant.pop('coupling_im', None)
         aod, eod, aoa, eoa, pg, pl, M = minimal_paths()
-        result = arrayant.get_channels_planar(
+        result = channel.planar(
             ant, ant, aod, eod, aoa, eoa, pg, pl, M,
             [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True, complex=False)
         self.assertEqual(len(result), 4)
@@ -485,7 +485,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant = minimal_ant()
         aod, eod, aoa, eoa, pg, pl, M = minimal_paths()
         with self.assertRaises(ValueError) as ctx:
-            arrayant.get_channels_planar(
+            channel.planar(
                 ant, ant, aod[[0, 1, 1]], eod, aoa, eoa, pg, pl, M,
                 [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True)
         self.assertEqual(str(ctx.exception),
@@ -496,7 +496,7 @@ class TestGetChannelsPlanar(unittest.TestCase):
         ant = minimal_ant()
         aod, eod, aoa, eoa, pg, pl, M = minimal_paths()
         with self.assertRaises(ValueError) as ctx:
-            arrayant.get_channels_planar(
+            channel.planar(
                 ant, ant, aod, eod, aoa, eoa, pg, pl, M,
                 [0, 0, 1, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0], 2997924580.0, True)
         self.assertEqual(str(ctx.exception), "Input 'tx_pos' has incorrect number of elements.")
@@ -517,9 +517,9 @@ class TestGetChannelsPlanar(unittest.TestCase):
             bad = list(args)
             bad[i] = np.array([[0.0, 50.0], [0.0, 0.0], [10.0, 10.0]])  # (3, 2), documented (3,)
             with self.assertRaises(ValueError):
-                arrayant.get_channels_planar(o, o, *bad)
+                channel.planar(o, o, *bad)
         args[7] = np.array([[0.0], [0.0], [0.0]])  # (3, 1) has 3 elements and is accepted
-        arrayant.get_channels_planar(o, o, *args)
+        channel.planar(o, o, *args)
 
     def test_center_freq_array_single_frequency(self):
         import warnings
@@ -527,16 +527,16 @@ class TestGetChannelsPlanar(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter('error')
             o['center_freq'] = 2e9
-            ref = arrayant.get_channels_planar(o, o, *self._planar_args(), complex=False)
+            ref = channel.planar(o, o, *self._planar_args(), complex=False)
             for cf in (np.array([2e9]), np.array(2e9), np.float32(2e9), [2e9], 2000000000):
                 o['center_freq'] = cf
-                r = arrayant.get_channels_planar(o, o, *self._planar_args(), complex=False)
+                r = channel.planar(o, o, *self._planar_args(), complex=False)
                 for k in range(len(ref)):
                     npt.assert_array_equal(r[k], ref[k])
         for cf in (np.array([2e9, 3e9]), np.array([]), None):
             o['center_freq'] = cf
             with self.assertRaises(ValueError):
-                arrayant.get_channels_planar(o, o, *self._planar_args())
+                channel.planar(o, o, *self._planar_args())
 
 
 class test_zero_paths_fake_los(unittest.TestCase):
@@ -545,30 +545,30 @@ class test_zero_paths_fake_los(unittest.TestCase):
     def test(self):
         ant = arrayant.generate('omni')
         e = np.zeros(0)
-        cr, ci, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
-                                                       [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, True,
-                                                       complex=False)
+        cr, ci, dl, dop = channel.planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                         [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, True,
+                                         complex=False)
         self.assertEqual(dl.shape, (1, 1, 1))
         npt.assert_array_equal(np.concatenate([cr.ravel(), ci.ravel(), np.ravel(dop)]), [0, 0, 0])
         npt.assert_allclose(dl.ravel(), [10 / 299792458.0], rtol=1e-15)
-        cr, ci, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
-                                                       [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, False, True,
-                                                       complex=False)
+        cr, ci, dl, dop = channel.planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                         [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, False, True,
+                                         complex=False)
         npt.assert_array_equal(dl.ravel(), [0])
 
     # 0 paths without add_fake_los_path: empty outputs (n_rx_ports, n_tx_ports, 0), as in C++ and MATLAB
     def test_without_fake_los(self):
         ant = arrayant.generate('xpol')
         e = np.zeros(0)
-        cr, ci, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
-                                                       [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False,
-                                                       complex=False)
+        cr, ci, dl, dop = channel.planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                         [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False,
+                                         complex=False)
         for x in (cr, ci, dl):
             self.assertEqual(x.shape, (2, 2, 0))
         self.assertEqual(np.shape(dop), (0,))
-        c, dl, dop = arrayant.get_channels_planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
-                                                  [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False,
-                                                  complex=True)
+        c, dl, dop = channel.planar(ant, ant, e, e, e, e, e, e, np.zeros((8, 0)),
+                                    [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], 1e9, True, False,
+                                    complex=True)
         self.assertEqual(c.shape, (2, 2, 0))
 
 

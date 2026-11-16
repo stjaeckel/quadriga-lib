@@ -15,7 +15,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
-Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_ieee_indoor) · [Python](../python/channel-generation-functions.md#get_ieee_indoor)
+Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_ieee_indoor) · [Python](../python/channel-generation-functions.md#channel.ieee_indoor)
 
 - Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
 - 2D model: azimuth angles and planar motion only, no elevation
@@ -214,7 +214,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 ## get_channels_multifreq
 Compute channel coefficients for spherical waves across multiple frequencies
 
-Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_multifreq) · [Python](../python/channel-generation-functions.md#get_channels_multifreq)
+Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_multifreq) · [Python](../python/channel-generation-functions.md#channel.multifreq)
 
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
@@ -312,7 +312,7 @@ void quadriga_lib::get_channels_multifreq(
 ## get_channels_planar
 Calculate MIMO channel coefficients for planar wave paths
 
-Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_planar) · [Python](../python/channel-generation-functions.md#get_channels_planar)
+Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_planar) · [Python](../python/channel-generation-functions.md#channel.planar)
 
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
@@ -397,7 +397,7 @@ void quadriga_lib::get_channels_planar(
 ## get_channels_spherical
 Calculate MIMO channel coefficients and delays for spherical wave propagation
 
-Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_spherical) · [Python](../python/channel-generation-functions.md#get_channels_spherical)
+Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_spherical) · [Python](../python/channel-generation-functions.md#channel.spherical)
 
 - Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).

@@ -11,7 +11,7 @@ Math functions
 SECTION!*/
 
 /*!MD
-# CART2GEO
+# FAST_CART2GEO
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
 - Computes: `len = sqrt(x² + y² + z²)`, `az = atan2(y, x)`, `el = asin(clamp(z / len, -1, 1))`
@@ -25,7 +25,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 
 ## Usage:
 ```
-[ az, el, len ] = quadriga_lib.cart2geo( x, y, z, use_kernel );
+[ az, el, len ] = quadriga_lib.fast_cart2geo( x, y, z, use_kernel );
 ```
 
 ## Inputs:

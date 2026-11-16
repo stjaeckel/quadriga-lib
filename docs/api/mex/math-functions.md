@@ -5,9 +5,9 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-math-f
 | Function | Summary |
 | --- | --- |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Calculate rotation matrices from Euler angles |
-| [cart2geo](#cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
+| [fast_cart2geo](#fast_cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
+| [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [fast_sincos](#fast_sincos) | Compute elementwise approximate sine and/or cosine of a vector |
-| [geo2cart](#geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [interp](#interp) | Perform linear interpolation (1D or 2D) on single or multiple data sets |
 
 ---
@@ -34,11 +34,11 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, transpose );
 - **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
 
 ---
-<a id="cart2geo"></a>
-## cart2geo
+<a id="fast_cart2geo"></a>
+## fast_cart2geo
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [Python](../python/math-functions.md#cart2geo)
+Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [Python](../python/math-functions.md#fast_cart2geo)
 
 - Computes: `len = sqrt(x² + y² + z²)`, `az = atan2(y, x)`, `el = asin(clamp(z / len, -1, 1))`
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
@@ -51,7 +51,7 @@ Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [Python](../python/mat
 
 ### Usage:
 ```matlab
-[ az, el, len ] = quadriga_lib.cart2geo( x, y, z, use_kernel );
+[ az, el, len ] = quadriga_lib.fast_cart2geo( x, y, z, use_kernel );
 ```
 
 ### Inputs:
@@ -65,6 +65,50 @@ Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [Python](../python/mat
 - **`az`** — Azimuth angles in radians; `[n, m]`
 - **`el`** — Elevation angles in radians; `[n, m]`
 - **`len`** — Euclidean vector length `sqrt(x² + y² + z²)`; `[n, m]`
+
+---
+<a id="fast_geo2cart"></a>
+## fast_geo2cart
+Convert elementwise azimuth/elevation angles to Cartesian coordinates
+
+Also in: [C++](../cpp/math-functions.md#fast_geo2cart) · [Python](../python/math-functions.md#fast_geo2cart)
+
+- Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
+- Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
+  output list to skip their computation
+- Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
+  MATLAB's default numeric type
+- Set `use_kernel=0` for auto-selection or `use_kernel=2` to force AVX2; the AVX2 kernel
+  computes sine and cosine in single precision (angles reduced in double precision first; max. error
+  about 1.3e-7 for angles up to 1e10), results widened back
+
+### Usage:
+```matlab
+split = true;
+[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+
+split = false;
+cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+```
+
+### Inputs:
+- **`az`** — Azimuth angles in radians; `[n, m]`
+- **`el`** — Elevation angles in radians; `[n, m]`
+- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
+- **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
+  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1
+- **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
+  return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
+
+### Outputs:
+- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube with components 
+  along the first dim, `[3, n, m]`
+- **`y`** — Y-coordinates; `[n, m]` or empty
+- **`z`** — Z-coordinates; `[n, m]` or empty
+- **`sAZ`** — sin(az); `[n, m]` or empty
+- **`cAZ`** — cos(az); `[n, m]` or empty
+- **`sEL`** — sin(el); `[n, m]` or empty
+- **`cEL`** — cos(el); `[n, m]` or empty
 
 ---
 <a id="fast_sincos"></a>
@@ -98,50 +142,6 @@ c = quadriga_lib.fast_sincos(x, true);
 ### Outputs:
 - **`s`** — sin(x); single; `[n_elem]`
 - **`c`** — cos(x); single; `[n_elem]`
-
----
-<a id="geo2cart"></a>
-## geo2cart
-Convert elementwise azimuth/elevation angles to Cartesian coordinates
-
-Also in: [C++](../cpp/math-functions.md#fast_geo2cart) · [Python](../python/math-functions.md#geo2cart)
-
-- Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
-- Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
-  output list to skip their computation
-- Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
-  MATLAB's default numeric type
-- Set `use_kernel=0` for auto-selection or `use_kernel=2` to force AVX2; the AVX2 kernel
-  computes sine and cosine in single precision (angles reduced in double precision first; max. error
-  about 1.3e-7 for angles up to 1e10), results widened back
-
-### Usage:
-```matlab
-split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
-
-split = false;
-cart = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
-```
-
-### Inputs:
-- **`az`** — Azimuth angles in radians; `[n, m]`
-- **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
-- **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
-  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1
-- **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
-  return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
-
-### Outputs:
-- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube with components 
-  along the first dim, `[3, n, m]`
-- **`y`** — Y-coordinates; `[n, m]` or empty
-- **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sAZ`** — sin(az); `[n, m]` or empty
-- **`cAZ`** — cos(az); `[n, m]` or empty
-- **`sEL`** — sin(el); `[n, m]` or empty
-- **`cEL`** — cos(el); `[n, m]` or empty
 
 ---
 <a id="interp"></a>

@@ -4,15 +4,15 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-mat
 
 | Function | Summary |
 | --- | --- |
-| [cart2geo](#cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
-| [geo2cart](#geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
+| [fast_cart2geo](#fast_cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
+| [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 
 ---
-<a id="cart2geo"></a>
-## cart2geo
+<a id="fast_cart2geo"></a>
+## fast_cart2geo
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [MATLAB](../mex/math-functions.md#cart2geo)
+Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [MATLAB](../mex/math-functions.md#fast_cart2geo)
 
 - Computes: length = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / length, -1, 1))
 - Inputs are arbitrary 3D vectors (not required to be unit length); length returns the Euclidean norm
@@ -25,8 +25,8 @@ Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [MATLAB](../mex/math-f
 
 ### Usage:
 ```python
-geo_coords     = quadriga_lib.tools.cart2geo( cart, y, z, combine, use_kernel )
-az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
+geo_coords     = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine, use_kernel )
+az, el, length = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine=False )
 ```
 
 ### Inputs:
@@ -43,25 +43,25 @@ az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
 - **`length`** — Vector length `(n, m)`; returned when `combine` is False
 
 ---
-<a id="geo2cart"></a>
-## geo2cart
+<a id="fast_geo2cart"></a>
+## fast_geo2cart
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
-Also in: [C++](../cpp/math-functions.md#fast_geo2cart) · [MATLAB](../mex/math-functions.md#geo2cart)
+Also in: [C++](../cpp/math-functions.md#fast_geo2cart) · [MATLAB](../mex/math-functions.md#fast_geo2cart)
 
 - Conversion: x = cos(el)·cos(az)·len, y = cos(el)·sin(az)·len, z = sin(el)·len
 - Two mutually exclusive input forms: a combined array `az` holding geographic coordinates
   (3, n, m), or separate `az`, `el`, `len` of shape (n, m)
 - For combined input, row 0 = azimuth, row 1 = elevation, row 2 = length
 - `len` is optional in separate mode; omit it for unit length
-- Inverse of `cart2geo`; round-trips in both the combined and separate forms
+- Inverse of `fast_cart2geo`; round-trips in both the combined and separate forms
 - The AVX2 kernel computes sine and cosine in single precision (angles reduced in double precision first; max. error
   about 1.3e-7 for angles up to 1e10); use `use_kernel = 1` for full double precision
 
 ### Usage:
 ```python
-cart    = quadriga_lib.tools.geo2cart( az, el, len, combine, use_kernel )
-x, y, z = quadriga_lib.tools.geo2cart( az, el, len, combine=False )
+cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, combine, use_kernel )
+x, y, z = quadriga_lib.tools.fast_geo2cart( az, el, len, combine=False )
 ```
 
 ### Inputs:

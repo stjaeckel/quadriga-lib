@@ -106,13 +106,13 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | Compute the baseband frequency response of multiple MIMO channels |
-| [hdf5_create](#hdf5_create) | Channel functions | Create a new HDF5 channel file with a defined storage layout |
+| [hdf5_create_file](#hdf5_create_file) | Channel functions | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Channel functions | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_dset](#hdf5_read_dset) | Channel functions | Read an unstructured dataset from an HDF5 file at a specified 4D index |
 | [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | Read names of unstructured datasets stored at a 4D slot in an HDF5 file |
 | [hdf5_read_layout](#hdf5_read_layout) | Channel functions | Read the storage layout of an HDF5 channel file |
 | [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | Reshape the 4D storage layout of an existing HDF5 channel file |
-| [hdf5_write](#hdf5_write) | Channel functions | Write a channel object to an HDF5 file at a specified 4D index |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | Write a channel object to an HDF5 file at a specified 4D index |
 | [hdf5_write_dset](#hdf5_write_dset) | Channel functions | Write a single unstructured dataset to an HDF5 file at a specified 4D index |
 | [path](#path) | Channel functions | Class for storing and managing a single propagation path with a compact fixed-size header |
 | [qrt_file_append](#qrt_file_append) | Channel functions | Append one transmitter's path data to an existing QRT file |
@@ -129,7 +129,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [get_channels_planar](#get_channels_planar) | Channel generation functions | Calculate MIMO channel coefficients for planar wave paths |
 | [get_channels_spherical](#get_channels_spherical) | Channel generation functions | Calculate MIMO channel coefficients and delays for spherical wave propagation |
 | [acdf](#acdf) | Channel statistics | Calculate the empirical averaged cumulative distribution function (CDF) |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | Calculate azimuth and elevation angular spreads, optionally with spherical wrapping |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | Calculate azimuth and elevation angular spreads, optionally with spherical wrapping |
 | [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
 | [calc_delay_spread](#calc_delay_spread) | Channel statistics | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | Calculate the Rician K-Factor from channel impulse response data |
@@ -159,6 +159,9 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [fast_sincos](#fast_sincos) | Math functions | Compute elementwise approximate sine and/or cosine of a vector |
 | [fast_slerp](#fast_slerp) | Math functions | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
 | [interp_2D](#interp_2D) | Math functions | Perform linear interpolation (1D or 2D) on single or multiple data sets |
+| [quadriga_lib_has_AVX2](#quadriga_lib_has_AVX2) | Miscellaneous / Tools | Checks whether AVX2 kernels can be used |
+| [quadriga_lib_has_CUDA](#quadriga_lib_has_CUDA) | Miscellaneous / Tools | Checks whether CUDA kernels can be used |
+| [quadriga_lib_version](#quadriga_lib_version) | Miscellaneous / Tools | Returns the quadriga-lib version number |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh |
 | [colormap](#colormap) | Site-specific simulation tools | Generate a colormap matrix with RGB values |
 | [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | Combine path interaction coordinates for IRS-assisted TX → RX channels |
@@ -1650,7 +1653,7 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const;
 ## .write_paths_to_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](quadriga_lib_api_python.md#channel_export_obj_file)
+Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](quadriga_lib_api_python.md#channel.export_obj_file)
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
@@ -1880,8 +1883,8 @@ void quadriga_lib::baseband_freq_response_vec(
 - [baseband_freq_response_multi](#baseband_freq_response_multi) (multi-freq counterpart)
 
 ---
-<a id="hdf5_create"></a>
-## hdf5_create
+<a id="hdf5_create_file"></a>
+## hdf5_create_file
 Create a new HDF5 channel file with a defined storage layout
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_create_file) · [Python](quadriga_lib_api_python.md#hdf5_create_file)
@@ -1898,7 +1901,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_create_file) · [Python](quadriga
 
 ### Declaration:
 ```cpp
-void quadriga_lib::hdf5_create(
+void quadriga_lib::hdf5_create_file(
     const std::string &fn,
     unsigned nx = 65536,
     unsigned ny = 1,
@@ -1915,7 +1918,7 @@ void quadriga_lib::hdf5_create(
 
 ### See also:
 - [hdf5_reshape_layout](#hdf5_reshape_layout) (change layout dimensions of an existing file)
-- [hdf5_write](#hdf5_write) (write channel data into a slot)
+- [hdf5_write_channel](#hdf5_write_channel) (write channel data into a slot)
 
 ---
 <a id="hdf5_read_channel"></a>
@@ -1928,7 +1931,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_channel) · [Python](quadrig
 - Structured data is stored in single precision in the file and converted to `dtype` on read.
 - Unstructured fields (`std::any`) retain their original stored type without conversion; see [hdf5_read_dset](#hdf5_read_dset)
   for the returned types.
-- Round trip with [hdf5_write](#hdf5_write): every per-snapshot field comes back with one entry per snapshot, also for
+- Round trip with [hdf5_write_channel](#hdf5_write_channel): every per-snapshot field comes back with one entry per snapshot, also for
   snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
   with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
 - Throws `std::invalid_argument` if the file is malformed (e.g. a dataset does not have the size given by the
@@ -1960,7 +1963,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 - Channel object at the specified slot; empty if no data is present
 
 ### See also:
-- [hdf5_write](#hdf5_write) (write a channel object to a slot)
+- [hdf5_write_channel](#hdf5_write_channel) (write a channel object to a slot)
 - [hdf5_read_layout](#hdf5_read_layout) (inspect slot occupancy before reading)
 
 ---
@@ -2074,7 +2077,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 - Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
 
 ### See also:
-- [hdf5_create](#hdf5_create) (create a file with a defined layout)
+- [hdf5_create_file](#hdf5_create_file) (create a file with a defined layout)
 - [hdf5_reshape_layout](#hdf5_reshape_layout) (change layout dimensions of an existing file)
 
 ---
@@ -2107,12 +2110,12 @@ void quadriga_lib::hdf5_reshape_layout(
 - **`nw`** *(optional)* — New size of w-dimension
 
 ### See also:
-- [hdf5_create](#hdf5_create) (set initial layout at file creation)
+- [hdf5_create_file](#hdf5_create_file) (set initial layout at file creation)
 - [hdf5_read_layout](#hdf5_read_layout) (query current layout)
 
 ---
-<a id="hdf5_write"></a>
-## hdf5_write
+<a id="hdf5_write_channel"></a>
+## hdf5_write_channel
 Write a channel object to an HDF5 file at a specified 4D index
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel) · [Python](quadriga_lib_api_python.md#hdf5_write_channel)
@@ -2124,8 +2127,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel) · [Python](quadri
 - If the slot already holds data, the slot is replaced completely: the old structured data and all unstructured
   datasets of the slot (`par_*`, including those added with [hdf5_write_dset](#hdf5_write_dset)) are removed, and only the new
   channel is stored there. The space of the removed data is not reused, so the file does not shrink; to reclaim
-  it, copy the channels into a new file ([hdf5_read_channel](#hdf5_read_channel), [hdf5_write](#hdf5_write)).
-- Throws if the index was not reserved during [hdf5_create](#hdf5_create).
+  it, copy the channels into a new file ([hdf5_read_channel](#hdf5_read_channel), [hdf5_write_channel](#hdf5_write_channel)).
+- Throws if the index was not reserved during [hdf5_create_file](#hdf5_create_file).
 - Structured data is always stored in single precision; input may be float or double.
 - Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved.
 - Channel names longer than 255 characters are rejected.
@@ -2134,7 +2137,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel) · [Python](quadri
 
 ### Declaration:
 ```cpp
-int quadriga_lib::hdf5_write(
+int quadriga_lib::hdf5_write_channel(
     const quadriga_lib::channel<dtype> *ch,
     const std::string &fn,
     unsigned ix = 0,
@@ -2155,7 +2158,7 @@ int quadriga_lib::hdf5_write(
 - `0` if the slot was empty, `1` if existing data in the slot was replaced
 
 ### See also:
-- [hdf5_create](#hdf5_create) (create file and reserve layout)
+- [hdf5_create_file](#hdf5_create_file) (create file and reserve layout)
 - [hdf5_read_channel](#hdf5_read_channel) (read channel data from a slot)
 
 ---
@@ -2167,7 +2170,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset) · [Python](quadriga_
 
 - Dataset is stored under `prefix + par_name`; name must contain only alphanumeric characters and underscores.
 - Adds the dataset to the slot and keeps everything else stored there (channel data and other datasets); an empty
-  slot is reserved for it. A later [hdf5_write](#hdf5_write) to the same slot replaces the slot completely, including the
+  slot is reserved for it. A later [hdf5_write_channel](#hdf5_write_channel) to the same slot replaces the slot completely, including the
   datasets written with this function.
 - Supported scalar types: `std::string`, `unsigned`, `int`, `long long`, `unsigned long long`, `float`, `double`
 - Supported Armadillo types: `arma::Col`, `arma::Row`, `arma::Mat`, `arma::Cube` with element types `float`, `double`, `int`, `unsigned`, `sword`, `uword`, `unsigned long long`
@@ -2175,7 +2178,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset) · [Python](quadriga_
 - Throws for unsupported types and invalid names, before the file is changed.
 - Throws if a dataset with the same name already exists at the specified slot; no overwrite/update is supported.
 - One writer per file at a time; files are not locked.
-- Creates the file with the default layout of [hdf5_create](#hdf5_create) if it does not exist; an existing file must be
+- Creates the file with the default layout of [hdf5_create_file](#hdf5_create_file) if it does not exist; an existing file must be
   a channel file of version 3 (see [hdf5_read_channel](#hdf5_read_channel)).
 
 ### Declaration:
@@ -2794,7 +2797,7 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_ieee_indoor) · [Python](quadriga_lib_api_python.md#get_ieee_indoor)
+Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_ieee_indoor) · [Python](quadriga_lib_api_python.md#channel.ieee_indoor)
 
 - Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
 - 2D model: azimuth angles and planar motion only, no elevation
@@ -2993,7 +2996,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 ## get_channels_multifreq
 Compute channel coefficients for spherical waves across multiple frequencies
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_multifreq) · [Python](quadriga_lib_api_python.md#get_channels_multifreq)
+Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_multifreq) · [Python](quadriga_lib_api_python.md#channel.multifreq)
 
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
@@ -3091,7 +3094,7 @@ void quadriga_lib::get_channels_multifreq(
 ## get_channels_planar
 Calculate MIMO channel coefficients for planar wave paths
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_planar) · [Python](quadriga_lib_api_python.md#get_channels_planar)
+Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_planar) · [Python](quadriga_lib_api_python.md#channel.planar)
 
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
@@ -3176,7 +3179,7 @@ void quadriga_lib::get_channels_planar(
 ## get_channels_spherical
 Calculate MIMO channel coefficients and delays for spherical wave propagation
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_spherical) · [Python](quadriga_lib_api_python.md#get_channels_spherical)
+Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_spherical) · [Python](quadriga_lib_api_python.md#channel.spherical)
 
 - Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).
@@ -3314,8 +3317,8 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values, `[9]`
 
 ---
-<a id="calc_angular_spreads_sphere"></a>
-## calc_angular_spreads_sphere
+<a id="calc_angular_spread"></a>
+## calc_angular_spread
 Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#calc_angular_spread) · [Python](quadriga_lib_api_python.md#calc_angular_spread)
@@ -3330,7 +3333,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_angular_spread) · [Python](quadr
 
 ### Declaration:
 ```cpp
-void quadriga_lib::calc_angular_spreads_sphere(
+void quadriga_lib::calc_angular_spread(
     const std::vector<arma::Col<dtype>> &az,
     const std::vector<arma::Col<dtype>> &el,
     const std::vector<arma::Col<dtype>> &powers,
@@ -4573,7 +4576,7 @@ void quadriga_lib::ssf_clusters(
 - [gbsm_draw](#gbsm_draw) (the random values `rnd` and `rnd_freq`)
 - [lsp_generate](#lsp_generate) (the LSPs, EoD offset, absolute TOA and ground permittivity)
 - [ssf_rays](#ssf_rays) (the rays of the clusters)
-- [calc_delay_spread](#calc_delay_spread), [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) (spreads of the output)
+- [calc_delay_spread](#calc_delay_spread), [calc_angular_spread](#calc_angular_spread) (spreads of the output)
 
 ---
 <a id="ssf_paths"></a>
@@ -4907,7 +4910,7 @@ void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fv
 ## fast_cart2geo
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#cart2geo) · [Python](quadriga_lib_api_python.md#cart2geo)
+Also in: [MATLAB](quadriga_lib_api_mex.md#fast_cart2geo) · [Python](quadriga_lib_api_python.md#fast_cart2geo)
 
 - Conversion: len = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / len, -1, 1))
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
@@ -4946,7 +4949,7 @@ void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const a
 ## fast_geo2cart
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#geo2cart) · [Python](quadriga_lib_api_python.md#geo2cart)
+Also in: [MATLAB](quadriga_lib_api_mex.md#fast_geo2cart) · [Python](quadriga_lib_api_python.md#fast_geo2cart)
 
 - Conversion: x = cos(el)*cos(az)*len, y = cos(el)*sin(az)*len, z = sin(el)*len
 - Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
@@ -5123,6 +5126,65 @@ arma::vec xo = arma::linspace(0, 4, 10);
 
 auto output = quadriga_lib::interp_1D(input, xi, xo);
 ```
+
+---
+
+<a id="sec-miscellaneous-tools"></a>
+# Miscellaneous / Tools
+
+---
+<a id="quadriga_lib_has_AVX2"></a>
+## quadriga_lib_has_AVX2
+Checks whether AVX2 kernels can be used
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#version) · [Python](quadriga_lib_api_python.md#version)
+
+- True if the library was built with AVX2 support and the CPU runs the AVX2 test kernel correctly
+- The test kernel runs once; later calls return the stored result
+
+### Declaration:
+```cpp
+bool quadriga_lib::quadriga_lib_has_AVX2();
+```
+
+### Returns:
+- `true` if AVX2 kernels can be used, else `false`
+
+---
+<a id="quadriga_lib_has_CUDA"></a>
+## quadriga_lib_has_CUDA
+Checks whether CUDA kernels can be used
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#version) · [Python](quadriga_lib_api_python.md#version)
+
+- True if the library was built with CUDA support and a CUDA-capable GPU runs the test kernel correctly
+
+### Declaration:
+```cpp
+bool quadriga_lib::quadriga_lib_has_CUDA();
+```
+
+### Returns:
+- `true` if CUDA kernels can be used, else `false`
+
+---
+<a id="quadriga_lib_version"></a>
+## quadriga_lib_version
+Returns the quadriga-lib version number
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#version) · [Python](quadriga_lib_api_python.md#version)
+
+### Declaration:
+```cpp
+std::string quadriga_lib::quadriga_lib_version();
+```
+
+### Returns:
+- Version number in the format `x.y.z`
+
+### See also:
+- [quadriga_lib_has_AVX2](#quadriga_lib_has_AVX2) (AVX2 support of library and CPU)
+- [quadriga_lib_has_CUDA](#quadriga_lib_has_CUDA) (CUDA support of library and GPU)
 
 ---
 

@@ -14,7 +14,7 @@ Maintainer notes on the native HDF5 I/O of quadriga-lib: what changed against qu
 
 - **Dependency and packaging.** CMake carried `HDF5_PATH`, `HDF5_STATIC`, a bundled `external/hdf5-1.14.6.zip` (42 MB) built through `ExternalProject`, a prebuilt-HDF5 autodetect for MSVC, installation of `libhdf5`, and HDF5 link flags for every MEX file, the Python module and the tests. Debian, Docker, conda and the READMEs required `libhdf5-dev`/`hdf5`. A static libhdf5 forced Octave off ("version clash").
 - **MATLAB.** MATLAB bundles its own libhdf5; the MEX files linked a differently named system or static copy. The thread-safe libhdf5 creates pthread keys with destructors that it never deletes, and MATLAB R2026a unloads MEX files on `clear mex` and at exit, so all MEX files were linked with `-Wl,-z,nodelete`. Without the flag, v2 MEX files still crash R2026a at exit (re-checked as a control, section 11).
-- **Write cost.** Every `hdf5_write` read and rewrote the whole `Order` index (256 KB with the default 65536 slots, up to 16 GB at the 2^32 − 1 slot limit), and libhdf5 opened and closed the file, the B-trees and the metadata cache on every call. The ray-tracing mix was CPU-bound in libhdf5: ≈ 0.18 ms per snapshot written, 0.23 ms read, ≈ 1300 system calls per channel write and ≈ 2900 per read (section 9).
+- **Write cost.** Every `hdf5_write_channel` read and rewrote the whole `Order` index (256 KB with the default 65536 slots, up to 16 GB at the 2^32 − 1 slot limit), and libhdf5 opened and closed the file, the B-trees and the metadata cache on every call. The ray-tracing mix was CPU-bound in libhdf5: ≈ 0.18 ms per snapshot written, 0.23 ms read, ≈ 1300 system calls per channel write and ≈ 2900 per read (section 9).
 - **Metadata.** libhdf5 stored ≈ 4.9 KB of metadata per snapshot of a SISO channel with 20 paths (payload ≈ 2.3 KB); version 3 stores ≈ 1.2 KB.
 
 ## 3. File format version 3
@@ -58,7 +58,7 @@ Rules and the reasons for them (measured with libhdf5 1.14.6 on prototype files)
 - **Null reference** = address 0 (libhdf5 tests `addr == 0`); valid references dereference to the channel groups.
 - Fill Value written as libhdf5 does (`03 09` compact, `03 0a` contiguous); no modification time, no filters.
 
-File written by `hdf5_create` (offsets fixed; readers still locate every object through the root links):
+File written by `hdf5_create_file` (offsets fixed; readers still locate every object through the root links):
 
 | Offset | Size | Object |
 |-------:|-----:|--------|
@@ -91,7 +91,7 @@ Growable group headers (`chain_links`): only two insertions happen after a heade
 
 ### 4.1 Write path
 
-1. All inputs are validated, and every file structure the writer will read or rewrite is read and checked, before the first byte is written. A writer that throws leaves the file byte-identical. Writers read only what they need: `hdf5_reshape_layout` the superblock, root chunk 0 and the four root dataset headers; `hdf5_write` in addition the directory chunks, the last link chunk and the old link's chunk (never the old channel group); `hdf5_write_dset` the directory and last link chunk for an empty slot, the channel group (and its `Data` group) for a filled slot.
+1. All inputs are validated, and every file structure the writer will read or rewrite is read and checked, before the first byte is written. A writer that throws leaves the file byte-identical. Writers read only what they need: `hdf5_reshape_layout` the superblock, root chunk 0 and the four root dataset headers; `hdf5_write_channel` in addition the directory chunks, the last link chunk and the old link's chunk (never the old channel group); `hdf5_write_dset` the directory and last link chunk for an empty slot, the channel group (and its `Data` group) for a filled slot.
 2. The new objects are emitted as one block from the stored EOF (not the physical file end) through a 1 MiB buffer (`io_block`). Float data of ≥ 1 MiB is written directly from Armadillo memory; double input is converted in ≤ 1 MiB pieces. A ray-tracing channel is one `write` call. Objects are emitted in post-order (children before their group, so each group header knows its children's addresses): snapshot datasets and `Snap_<i>` headers, channel-level datasets, unstructured datasets and `Data`, the new root directory/link chunk if any, then the channel group. The link chunk must precede the channel group (lookup rule of 3.3).
 3. In-place updates, in this order:
 
@@ -104,11 +104,11 @@ Growable group headers (`chain_links`): only two insertions happen after a heade
 | 4b | `Order[slot]` (4 bytes) | new state | both groups, the old one unreferenced |
 | 5 | overwrite only: the old link's chunk without it | new state | new state |
 
-Why EOF comes first: libhdf5 ignores bytes past the stored EOF and truncates them on a read-write close, and it cannot open an object past the stored EOF. With the link written before the EOF update, any libhdf5 read-write session in between would cut off the new object and leave a dangling link. New IDs come from the last root link, so a link left by an interrupted write is never reused. A crash between 4a and 4b of an `hdf5_write_dset` on an empty slot leaves `Order[slot] = 0` with a filled `ChannelRef`; this is not repaired automatically (the next `hdf5_write` to the slot fixes it). `hdf5_write_dset` on a filled slot writes the block, the superblock, then either the channel-group chunk that receives the `Data` link or `Data` chunk 0 (creation index + 1) and its last chunk; `Order` and `ChannelRef` stay.
+Why EOF comes first: libhdf5 ignores bytes past the stored EOF and truncates them on a read-write close, and it cannot open an object past the stored EOF. With the link written before the EOF update, any libhdf5 read-write session in between would cut off the new object and leave a dangling link. New IDs come from the last root link, so a link left by an interrupted write is never reused. A crash between 4a and 4b of an `hdf5_write_dset` on an empty slot leaves `Order[slot] = 0` with a filled `ChannelRef`; this is not repaired automatically (the next `hdf5_write_channel` to the slot fixes it). `hdf5_write_dset` on a filled slot writes the block, the superblock, then either the channel-group chunk that receives the `Data` link or `Data` chunk 0 (creation index + 1) and its last chunk; `Order` and `ChannelRef` stay.
 
 The file is opened unbuffered, so the writes reach the operating system in program order. There is no `fsync`: the order protects against an interrupted process, not against power loss (as v2). A torn chunk write breaks that chunk's checksum: libhdf5 can no longer iterate the root, the library's readers are unaffected (they use `ChannelRef`), and a later write that needs the chunk throws.
 
-**Overwrite = dead space.** The old channel group and its data stay in the file; only the old root link is removed. The file never shrinks and free space is not reused. To reclaim space, copy the channels into a new file (`hdf5_read_channel` + `hdf5_write`); `h5repack` output is not readable any more. **Reshape** writes the 16 bytes of `ChannelDims`. **Create** truncates and writes the image of 3.2 (no interruption guarantee).
+**Overwrite = dead space.** The old channel group and its data stay in the file; only the old root link is removed. The file never shrinks and free space is not reused. To reclaim space, copy the channels into a new file (`hdf5_read_channel` + `hdf5_write_channel`); `h5repack` output is not readable any more. **Reshape** writes the 16 bytes of `ChannelDims`. **Create** truncates and writes the image of 3.2 (no interruption guarantee).
 
 ### 4.2 Read path
 
@@ -132,13 +132,13 @@ Every function validates everything it reads; violations throw `std::invalid_arg
 
 | Situation | Exception: message |
 |-----------|--------------------|
-| missing file (`hdf5_read_layout` returns zeros, `hdf5_write`/`hdf5_write_dset` create the file) | invalid_argument: `File does not exist.` |
+| missing file (`hdf5_read_layout` returns zeros, `hdf5_write_channel`/`hdf5_write_dset` create the file) | invalid_argument: `File does not exist.` |
 | shorter than 8 bytes or wrong signature | invalid_argument: `Not an HDF5 file.` |
 | valid HDF5 outside the subset: superblock ≠ 2 (every v2 file, libhdf5 writes version 0), other root links, dense storage, writer structure rules | invalid_argument: `Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2) and files modified with other HDF5 tools are not supported. Version-2 files can be converted with tools/hdf5_convert_v2.py.` |
 | `Version` ≠ 3 | invalid_argument: `Unsupported channel file version <n>; this version of quadriga-lib reads version 3 only.` |
 | `ChannelDims`/`Order`/`ChannelRef` inconsistent | invalid_argument: `Storage index in HDF file is corrupted.` |
 | any other rule | invalid_argument: `Malformed HDF5 file: <what>.`, e.g. `checksum mismatch at address <a>`, `address <a> is outside the file`, `unsupported object header flags at address <a>`, `continuation chunk at address <a> is out of order`, `the channel references more data than the file holds`, `the storage index overlaps the object header at address <a>`, `cannot read <n> bytes at address <a>`, and the v2 texts for schema checks |
-| file cannot be opened | invalid_argument: `Error opening file.` (`hdf5_write`: `… It may be opened by another program.`; `hdf5_create`: `Error creating file. It may be already opened.`) |
+| file cannot be opened | invalid_argument: `Error opening file.` (`hdf5_write_channel`: `… It may be opened by another program.`; `hdf5_create_file`: `Error creating file. It may be already opened.`) |
 | write, seek before a write, or close fails | runtime_error: `Cannot write file '<fn>'.` |
 | no channel ID left | runtime_error: `No free channel ID left in the HDF5 file.` |
 | argument errors | the v2 texts; new: `Parameter name is too long.` (> 65000 bytes), `String '<name>' is too long: at most 4294967295 bytes can be stored.` |
@@ -200,7 +200,7 @@ Results at the commits (the total Catch2 count depends on build options such as 
 
 ## 9. Performance
 
-Protocol: a standalone benchmark program (public API only; compiles against both versions) writes all slots with `hdf5_write<float>`, then flushes the file (`fsync`, timed separately), drops its page cache (`posix_fadvise(POSIX_FADV_DONTNEED)`) and reads every slot with `hdf5_read_channel<float>`; data from four seeded template channels varied per slot; a read check counts mismatches (`bad=0` in all runs). v2 = `26da9f93` with the system libhdf5 1.14.6 (shared), v3 = `a719e43`; same configure (g++-12, `-O3 -fopenmp`, AVX2, static library, no BLAS), `OMP_NUM_THREADS=1`, files on ext4/NVMe, AMD Ryzen 9 5950X. Three rounds alternating v2/v3 under `flock /tmp/bench.lock`, 2026-10-29.
+Protocol: a standalone benchmark program (public API only; compiles against both versions) writes all slots with `hdf5_write_channel<float>`, then flushes the file (`fsync`, timed separately), drops its page cache (`posix_fadvise(POSIX_FADV_DONTNEED)`) and reads every slot with `hdf5_read_channel<float>`; data from four seeded template channels varied per slot; a read check counts mismatches (`bad=0` in all runs). v2 = `26da9f93` with the system libhdf5 1.14.6 (shared), v3 = `a719e43`; same configure (g++-12, `-O3 -fopenmp`, AVX2, static library, no BLAS), `OMP_NUM_THREADS=1`, files on ext4/NVMe, AMD Ryzen 9 5950X. Three rounds alternating v2/v3 under `flock /tmp/bench.lock`, 2026-10-29.
 
 Mixes: a) MIMO, 3200 channels × 10 snapshots × 16×4 antennas × 200 paths (coefficients, per-pair delays, positions, orientations); b) ray-tracing route, 7000 channels × 100 snapshots × SISO × 20 paths with every path field (7000 instead of 20 000 channels keeps the v2 file at 5 GB).
 

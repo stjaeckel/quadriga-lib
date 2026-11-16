@@ -76,9 +76,9 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 
 ## See also:
 - [[generate]] (for generating antenna arrays)
-- [[get_channels_planar]] (for embedding antennas using departure and arrival angles)
-- [[get_channels_spherical]] (for embedding antennas using FBS/LBS positions)
-- [[get_channels_multifreq]] (for multi-frequency antenna embedding)
+- [[channel.planar]] (for embedding antennas using departure and arrival angles)
+- [[channel.spherical]] (for embedding antennas using FBS/LBS positions)
+- [[channel.multifreq]] (for multi-frequency antenna embedding)
 MD!*/
 
 // Per-snapshot read buffer, two of these are used as a double buffer

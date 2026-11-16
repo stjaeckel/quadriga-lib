@@ -210,11 +210,11 @@ namespace quadriga_lib
     // - It is possible to reshape the layout using 'hdf5_reshape_layout', but the total number of
     //   entries must not change
     // - The total number of entries nx * ny * nz * nw must not exceed 4294967295 (2^32 - 1)
-    void hdf5_create(const std::string &fn, // Filename of the HDF5 file
-                     unsigned nx = 65536,   // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
-                     unsigned ny = 1,       // Number of y-entries in the storage layout (second dimension, e.g. for UEs)
-                     unsigned nz = 1,       // Number of z-entries in the storage layout (second dimension, e.g. for carrier frequency)
-                     unsigned nw = 1);      // Number of w-entries in the storage layout (fourth dimension)
+    void hdf5_create_file(const std::string &fn, // Filename of the HDF5 file
+                          unsigned nx = 65536,   // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
+                          unsigned ny = 1,       // Number of y-entries in the storage layout (second dimension, e.g. for UEs)
+                          unsigned nz = 1,       // Number of z-entries in the storage layout (second dimension, e.g. for carrier frequency)
+                          unsigned nw = 1);      // Number of w-entries in the storage layout (fourth dimension)
 
     // Save data to HDF file (stand alone function)
     // - All data is stored in single precision
@@ -227,14 +227,14 @@ namespace quadriga_lib
     //   (also those written with hdf5_write_dset) are removed; the file does not shrink; copy the channels into a new
     //   file to reclaim the space
     // - One writer per file at a time (no file locking)
-    // - Throws an error if the requested index in the file has not been reserved during hdf5_create
-    template <typename dtype>                              // Float or double
-    int hdf5_write(const quadriga_lib::channel<dtype> *ch, // Channel object to write
-                   const std::string &fn,                  // Filename of the HDF5 file
-                   unsigned ix = 0,                        // x-Index in the HDF file
-                   unsigned iy = 0,                        // y-Index in the HDF file
-                   unsigned iz = 0,                        // z-Index in the HDF file
-                   unsigned iw = 0);                       // w-Index in the HDF file
+    // - Throws an error if the requested index in the file has not been reserved during hdf5_create_file
+    template <typename dtype>                                      // Float or double
+    int hdf5_write_channel(const quadriga_lib::channel<dtype> *ch, // Channel object to write
+                           const std::string &fn,                  // Filename of the HDF5 file
+                           unsigned ix = 0,                        // x-Index in the HDF file
+                           unsigned iy = 0,                        // y-Index in the HDF file
+                           unsigned iz = 0,                        // z-Index in the HDF file
+                           unsigned iw = 0);                       // w-Index in the HDF file
 
     // Read the storage layout of channel data inside an HDF5 file
     // - Returns 4-element vector with storage layout in form: {nx, ny, nz, nw}
@@ -244,7 +244,7 @@ namespace quadriga_lib
     arma::u32_vec hdf5_read_layout(const std::string &fn, arma::u32_vec *channel_id = nullptr);
 
     // Reshapes the storage layout inside an existing HDF5 file
-    // - Total number of elements in the HDF5 file is fixed when calling hdf5_create
+    // - Total number of elements in the HDF5 file is fixed when calling hdf5_create_file
     // - Reshaping is possible only when the total number does not change (at most 4294967295 entries)
     // - Throws if the file does not exist or is not a version-3 channel file; one writer per file at a time
     void hdf5_reshape_layout(const std::string &fn, // Filename of the HDF5 file

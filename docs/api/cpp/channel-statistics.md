@@ -5,7 +5,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | Function | Summary |
 | --- | --- |
 | [acdf](#acdf) | Calculate the empirical averaged cumulative distribution function (CDF) |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Calculate azimuth and elevation angular spreads, optionally with spherical wrapping |
+| [calc_angular_spread](#calc_angular_spread) | Calculate azimuth and elevation angular spreads, optionally with spherical wrapping |
 | [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
 | [calc_delay_spread](#calc_delay_spread) | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Calculate the Rician K-Factor from channel impulse response data |
@@ -53,8 +53,8 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across the data sets with finite values, `[9]`
 
 ---
-<a id="calc_angular_spreads_sphere"></a>
-## calc_angular_spreads_sphere
+<a id="calc_angular_spread"></a>
+## calc_angular_spread
 Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
 
 Also in: [MATLAB](../mex/channel-statistics.md#calc_angular_spread) · [Python](../python/channel-statistics.md#calc_angular_spread)
@@ -69,7 +69,7 @@ Also in: [MATLAB](../mex/channel-statistics.md#calc_angular_spread) · [Python](
 
 ### Declaration:
 ```cpp
-void quadriga_lib::calc_angular_spreads_sphere(
+void quadriga_lib::calc_angular_spread(
     const std::vector<arma::Col<dtype>> &az,
     const std::vector<arma::Col<dtype>> &el,
     const std::vector<arma::Col<dtype>> &powers,

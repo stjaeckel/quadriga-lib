@@ -31,7 +31,26 @@
 // ts = te;
 // std::cout << "A = " << 1.0e-9 * double(dur) << std::endl;
 
-// Returns the quadriga-lib version number as a string
+/*!SECTION
+Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
+# quadriga_lib_version
+Returns the quadriga-lib version number
+
+## Declaration:
+```
+std::string quadriga_lib::quadriga_lib_version();
+```
+
+## Returns:
+- Version number in the format `x.y.z`
+
+## See also:
+- [[quadriga_lib_has_AVX2]] (AVX2 support of library and CPU)
+- [[quadriga_lib_has_CUDA]] (CUDA support of library and GPU)
+MD!*/
 std::string quadriga_lib::quadriga_lib_version()
 {
     return QUADRIGA_LIB_VERSION_STR;
@@ -60,7 +79,21 @@ namespace arma
 }
 #endif
 
-// Check if AVX2 is supported; the test kernel runs once, later calls return the stored result
+/*!MD
+# quadriga_lib_has_AVX2
+Checks whether AVX2 kernels can be used
+
+- True if the library was built with AVX2 support and the CPU runs the AVX2 test kernel correctly
+- The test kernel runs once; later calls return the stored result
+
+## Declaration:
+```
+bool quadriga_lib::quadriga_lib_has_AVX2();
+```
+
+## Returns:
+- `true` if AVX2 kernels can be used, else `false`
+MD!*/
 bool quadriga_lib::quadriga_lib_has_AVX2()
 {
     static const bool has_avx2 = []
@@ -82,7 +115,20 @@ bool quadriga_lib::quadriga_lib_has_AVX2()
     return has_avx2;
 }
 
-// Check if CUDA is supported
+/*!MD
+# quadriga_lib_has_CUDA
+Checks whether CUDA kernels can be used
+
+- True if the library was built with CUDA support and a CUDA-capable GPU runs the test kernel correctly
+
+## Declaration:
+```
+bool quadriga_lib::quadriga_lib_has_CUDA();
+```
+
+## Returns:
+- `true` if CUDA kernels can be used, else `false`
+MD!*/
 bool quadriga_lib::quadriga_lib_has_CUDA()
 {
 #if BUILD_WITH_CUDA

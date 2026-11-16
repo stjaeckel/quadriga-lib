@@ -42,7 +42,7 @@ Not implemented: the link-level CDL and TDL models (7.7, only building blocks), 
 
 Main drifts in implemented features (details in the rows):
 
-- The angular spread of `calc_angular_spreads_sphere` is not the circular standard deviation of Annex A.1, although its doc calls it the TR definition. It agrees for small spreads only.
+- The angular spread of `calc_angular_spread` is not the circular standard deviation of Annex A.1, although its doc calls it the TR definition. It agrees for small spreads only.
 - The RMa ZOD offset uses the SMa form with the actual heights and the hUT < 3.5 m gate. The TR fixes hBS = 35 m and hUT = 1.5 m.
 - The ground permittivity of the ground reflection uses QuaDRiGa's fits. Medium and wet ground differ from TR Table 7.6.8-1.
 - Oxygen absorption omits τ_Δ of eq. 7.6-1 (too little loss in NLOS without absolute TOA) and the in-band variation of eq. 7.6-2.
@@ -359,7 +359,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | Full calibration setup | 7.8.2, Tables 7.8-2, 7.8-2A | Partial | `lsp_generate`, `ssf_clusters`, `ssf_rays`, `gbsm_single_link_channel`, `generate_arrayant_3GPP` | Chain and BS arrays exist; config 1 port mapping needs a caller-set coupling; the handheld UT configurations are missing (7.3). |
-| Full metric: DS and AS CDFs | Table 7.8-2 | Partial | `calc_delay_spread` (`src/qd_tools_calc_delay_spread.cpp:54`); `calc_angular_spreads_sphere` (`src/qd_tools_calc_angular_spread.cpp:148`) | **Drift:** the metric asks for the TR 25.996 circular AS; the library uses another definition (see Annex A.1). |
+| Full metric: DS and AS CDFs | Table 7.8-2 | Partial | `calc_delay_spread` (`src/qd_tools_calc_delay_spread.cpp:54`); `calc_angular_spread` (`src/qd_tools_calc_angular_spread.cpp:148`) | **Drift:** the metric asks for the TR 25.996 circular AS; the library uses another definition (see Annex A.1). |
 | Full metric: PRB singular values | Table 7.8-2 | Partial | `baseband_freq_response` (`src/baseband_freq_response.cpp:67`) | H per subcarrier; PRB averaging and eigenvalues are the caller's. |
 | Full comparison with 3GPP results | 7.8.2 | No | – | Open item in ssf_notes section 7. |
 
@@ -378,7 +378,7 @@ No 3GPP calibration has been reproduced with the library, and no test compares w
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
 | InF setup | 7.8.4, Table 7.8-7 | Partial | `los_probability` defaults; conf `DS_VS`, `absTOA_Lmax` | Clutter defaults and hall V/S and L match (`tests/catch2_tests/test_conf_files_v19.cpp:131`, `test_los_probability.cpp:217`). BS lattice and UT drop are the caller's. |
-| InF metrics incl. first-path delay | Table 7.8-7 | Partial | `calc_angular_spreads_sphere`, `calc_delay_spread`, `lsp_generate` `abs_toa` | AS definition drift (A.1). |
+| InF metrics incl. first-path delay | Table 7.8-7 | Partial | `calc_angular_spread`, `calc_delay_spread`, `lsp_generate` `abs_toa` | AS definition drift (A.1). |
 
 ### 3.9 Channel model(s) for ISAC (7.9)
 
@@ -471,9 +471,9 @@ The deterministic part of clause 8 maps onto the library's ray tracer: `obj_file
 
 | Feature | TR ref | Covered | Function, location | Comment |
 |---|---|---|---|---|
-| Angular spread | A.1, eq. A-1 | Partial | `calc_angular_spreads_sphere` (`src/qd_tools_calc_angular_spread.cpp:148`; helper `:14`, RMS `:88`) | **Drift:** A.1 (v19.5) is the circular standard deviation √(−2 ln\|Σ P e^{jφ}/Σ P\|). The library computes √(Σ p·wrap(φ − μ)²) around the circular mean, which is neither A-1 nor the TR 25.996 minimum over shifts. All agree for small spreads; two equal paths at 0° and 120° give 60° vs 67.5° with A-1. The API doc and the comment at `:88` call this "the 3GPP TR 38.901 definition" (from reading, not measured). |
-| Mean angle | A.2, eq. A-2 | Partial | `calc_angular_spreads_sphere` (internal mean `:17`; `orientation` output) | A-2 is computed internally but not output; with wrapping on, `orientation` is a 3D mean direction, equal to A-2 only for equal elevations (from reading, not measured). |
-| Cluster angular spread incl. LOS | A.3, eq. A-3 | Partial | `calc_angular_spreads_sphere` | The caller passes cluster angles plus the LOS path; A.1 drift applies. |
+| Angular spread | A.1, eq. A-1 | Partial | `calc_angular_spread` (`src/qd_tools_calc_angular_spread.cpp:148`; helper `:14`, RMS `:88`) | **Drift:** A.1 (v19.5) is the circular standard deviation √(−2 ln\|Σ P e^{jφ}/Σ P\|). The library computes √(Σ p·wrap(φ − μ)²) around the circular mean, which is neither A-1 nor the TR 25.996 minimum over shifts. All agree for small spreads; two equal paths at 0° and 120° give 60° vs 67.5° with A-1. The API doc and the comment at `:88` call this "the 3GPP TR 38.901 definition" (from reading, not measured). |
+| Mean angle | A.2, eq. A-2 | Partial | `calc_angular_spread` (internal mean `:17`; `orientation` output) | A-2 is computed internally but not output; with wrapping on, `orientation` is a 3D mean direction, equal to A-2 only for equal elevations (from reading, not measured). |
+| Cluster angular spread incl. LOS | A.3, eq. A-3 | Partial | `calc_angular_spread` | The caller passes cluster angles plus the LOS path; A.1 drift applies. |
 | Cluster mean angle incl. LOS | A.4, eq. A-4 | Partial | as A.2 | |
 | CDL AS scaling factor | A.5, eq. A-5, A-6 | No | – | |
 | Handheld UT antenna positions and orientations | A.6, Tables A.6-1/-2 | No | – | Part of CR 0032; see 7.3. |
@@ -517,7 +517,7 @@ Fast fading and additional components:
 
 Link level, calibration, Annex A:
 
-- **Angular spread definition (5):** `calc_angular_spreads_sphere` on two equal paths at 0° and 120° and on three equal paths at 0°, 170°, −170°, against A-1 and TR 25.996 (hand values: 60° / 67.5° / 60°; ≈104° / ≈86° / ≈85°). Then the p5/p50/p95 ASA/ASD of 1000 UMa/UMi NLOS links with all three definitions, against the 7.8.2 references.
+- **Angular spread definition (5):** `calc_angular_spread` on two equal paths at 0° and 120° and on three equal paths at 0°, 170°, −170°, against A-1 and TR 25.996 (hand values: 60° / 67.5° / 60°; ≈104° / ≈86° / ≈85°). Then the p5/p50/p95 ASA/ASD of 1000 UMa/UMi NLOS links with all three definitions, against the 7.8.2 references.
 - **Mean angle (5):** with wrapping on, compare the `orientation` heading with A-2 for paths at elevations 0° and 60°.
 - **CDL route (3.7):** CDL-A through `ssf_rays` → `gbsm_single_link_channel` (`rays`); check the normalised DS and the effect of the forced sub-cluster split.
 - **CDL K-factor (3.7):** CDL-D with `kf_ratio`; compare ray powers with eq. 7.7.6-1 (same K, total power kept instead of LOS power, delays not renormalised).

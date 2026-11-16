@@ -212,7 +212,7 @@ if (omp_failed)
 Site-specific simulation tools
 SECTION!*/
 ```
-- Section names in use: "Array antenna class", "Array antenna functions", "Channel class", "Channel functions", "Channel generation functions", "Channel statistics", "Geometry-based stochastic model", "Math functions", "Miscellaneous / Tools" (wrappers only), "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group. If the section is not clear from the header, ask.
+- Section names in use: "Array antenna class", "Array antenna functions", "Channel class", "Channel functions", "Channel generation functions", "Channel statistics", "Geometry-based stochastic model", "Math functions", "Miscellaneous / Tools", "Site-specific simulation tools", "Sum-of-sinusoids random number generator". The name must match exactly to end up in the same group. If the section is not clear from the header, ask.
 
 ## Documentation block
 - The block is placed immediately before the function definition.

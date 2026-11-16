@@ -266,7 +266,7 @@ namespace
     }
 
     // Output/input spread ratios of each link appended to ratio[0 ... 4] (DS, ASD, ASA, ESD, ESA; frequency 0), with
-    // calc_delay_spread and calc_angular_spreads_sphere
+    // calc_delay_spread and calc_angular_spread
     void spread_ratios(const out_t &o, const arma::cube &lsp, std::vector<double> *ratio)
     {
         const arma::uword n = o.delay.n_rows;
@@ -277,8 +277,8 @@ namespace
             az_a[i] = rv(o.aoa, i), el_a[i] = rv(o.eoa, i);
         }
         arma::vec ds = quadriga_lib::calc_delay_spread(d, p), as[4];
-        quadriga_lib::calc_angular_spreads_sphere(az_d, el_d, p, &as[0], &as[2]);
-        quadriga_lib::calc_angular_spreads_sphere(az_a, el_a, p, &as[1], &as[3]);
+        quadriga_lib::calc_angular_spread(az_d, el_d, p, &as[0], &as[2]);
+        quadriga_lib::calc_angular_spread(az_a, el_a, p, &as[1], &as[3]);
         for (arma::uword i = 0; i < n; ++i)
         {
             ratio[0].push_back(ds(i) / lsp(i, 0, 0));

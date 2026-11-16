@@ -9,7 +9,7 @@ Channel generation functions
 SECTION!*/
 
 /*!MD
-# get_channels_planar
+# channel.planar
 Calculate MIMO channel coefficients for planar wave paths
 
 - Computes complex channel coefficients and delays for all TX/RX port pairs across `n_path` propagation
@@ -40,13 +40,13 @@ Calculate MIMO channel coefficients for planar wave paths
 
 ## Usage:
 ```
-coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ant_tx, ant_rx, \
+coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ant_tx, ant_rx, \
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
 
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=False )
+coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
 
-coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., i_freq=1 )
+coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 ```
 
 ## Inputs:
@@ -81,8 +81,8 @@ coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., i_fr
 - **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
 ## See also:
-- [[get_channels_spherical]] (spherical wave variant)
-- [[get_ieee_indoor]] (IEEE compliant channels using `get_channels_planar` internally)
+- [[channel.spherical]] (spherical wave variant)
+- [[channel.ieee_indoor]] (IEEE compliant channels using `channel.planar` internally)
 - [[generate]] (antenna array generator)
 MD!*/
 

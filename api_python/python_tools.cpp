@@ -8,14 +8,14 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_cart2geo.cpp"
+#include "qpy_fast_cart2geo.cpp"
 #include "qpy_write_png.cpp"
 #include "qpy_calc_delay_spread.cpp"
 #include "qpy_acdf.cpp"
 #include "qpy_calc_angular_spread.cpp"
 #include "qpy_calc_rician_k_factor.cpp"
 #include "qpy_calc_cross_polarization_ratio.cpp"
-#include "qpy_geo2cart.cpp"
+#include "qpy_fast_geo2cart.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
@@ -24,7 +24,7 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("bins") = py::none(),
           py::arg("n_bins") = 201);
 
-    m.def("cart2geo", &cart2geo,
+    m.def("fast_cart2geo", &fast_cart2geo,
           py::arg("cart"),
           py::arg("y") = py::none(),
           py::arg("z") = py::none(),
@@ -69,7 +69,7 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("include_los") = false,
           py::arg("window_size") = 0.01);
 
-    m.def("geo2cart", &geo2cart,
+    m.def("fast_geo2cart", &fast_geo2cart,
           py::arg("az"),
           py::arg("el") = py::none(),
           py::arg("len") = py::none(),

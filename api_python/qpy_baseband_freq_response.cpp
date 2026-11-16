@@ -73,7 +73,7 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   required for multi-freq input; may replace `bandwidth` + `pilot_grid` for single-freq; default: `None`
 - **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel generator before SLERP,
   then re-apply it analytically per output carrier; multi-freq only; needs channels generated with
-  `use_absolute_delays = True`: the coefficients of `get_channels_*` carry the phase of the absolute path length also
+  `use_absolute_delays = True`: the coefficients of the generators carry the phase of the absolute path length also
   when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`,
   which gives wrong phases (magnitudes stay right); default: `True`
 
@@ -82,8 +82,8 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   where `n_out` is the number of processed snapshots
 
 ## See also:
-- [[get_channels_spherical]] (single-frequency channel generator)
-- [[get_channels_multifreq]] (multi-frequency channel generator)
+- [[channel.spherical]] (single-frequency channel generator)
+- [[channel.multifreq]] (multi-frequency channel generator)
 MD!*/
 
 // Called in a catch block inside an OpenMP region: keep the first exception, which is rethrown after the region

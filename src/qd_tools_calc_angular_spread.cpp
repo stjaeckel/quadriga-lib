@@ -98,7 +98,7 @@ Channel statistics
 SECTION!*/
 
 /*!MD
-# calc_angular_spreads_sphere
+# calc_angular_spread
 Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
 
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each CIR may have a different number of paths.
@@ -111,7 +111,7 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
 
 ## Declaration:
 ```
-void quadriga_lib::calc_angular_spreads_sphere(
+void quadriga_lib::calc_angular_spread(
     const std::vector<arma::Col<dtype>> &az,
     const std::vector<arma::Col<dtype>> &el,
     const std::vector<arma::Col<dtype>> &powers,
@@ -147,17 +147,17 @@ void quadriga_lib::calc_angular_spreads_sphere(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::calc_angular_spreads_sphere(const std::vector<arma::Col<dtype>> &az,
-                                               const std::vector<arma::Col<dtype>> &el,
-                                               const std::vector<arma::Col<dtype>> &powers,
-                                               arma::Col<dtype> *azimuth_spread,
-                                               arma::Col<dtype> *elevation_spread,
-                                               arma::Mat<dtype> *orientation,
-                                               std::vector<arma::Col<dtype>> *phi_out,
-                                               std::vector<arma::Col<dtype>> *theta_out,
-                                               bool wrapping,
-                                               bool calc_bank_angle,
-                                               dtype quantize)
+void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
+                                       const std::vector<arma::Col<dtype>> &el,
+                                       const std::vector<arma::Col<dtype>> &powers,
+                                       arma::Col<dtype> *azimuth_spread,
+                                       arma::Col<dtype> *elevation_spread,
+                                       arma::Mat<dtype> *orientation,
+                                       std::vector<arma::Col<dtype>> *phi_out,
+                                       std::vector<arma::Col<dtype>> *theta_out,
+                                       bool wrapping,
+                                       bool calc_bank_angle,
+                                       dtype quantize)
 {
     arma::uword N = (arma::uword)az.size();
 
@@ -391,14 +391,14 @@ void quadriga_lib::calc_angular_spreads_sphere(const std::vector<arma::Col<dtype
     }
 }
 
-template void quadriga_lib::calc_angular_spreads_sphere(
+template void quadriga_lib::calc_angular_spread(
     const std::vector<arma::Col<float>> &, const std::vector<arma::Col<float>> &,
     const std::vector<arma::Col<float>> &,
     arma::Col<float> *, arma::Col<float> *, arma::Mat<float> *,
     std::vector<arma::Col<float>> *, std::vector<arma::Col<float>> *,
     bool, bool, float);
 
-template void quadriga_lib::calc_angular_spreads_sphere(
+template void quadriga_lib::calc_angular_spread(
     const std::vector<arma::Col<double>> &, const std::vector<arma::Col<double>> &,
     const std::vector<arma::Col<double>> &,
     arma::Col<double> *, arma::Col<double> *, arma::Mat<double> *,

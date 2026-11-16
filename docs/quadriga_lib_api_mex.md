@@ -73,9 +73,9 @@ lang: en-US
 | [ssf_rays](#ssf_rays) | Geometry-based stochastic model | Ray parameters of a set of links at the drop (TR 38.901 clause 7.5 steps 7 to 10, clause 7.6.16) |
 | [ssf_scatterers](#ssf_scatterers) | Geometry-based stochastic model | First- and last-bounce scatterers of the rays of one link (two-bounce solver) |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | Calculate rotation matrices from Euler angles |
-| [cart2geo](#cart2geo) | Math functions | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [fast_sincos](#fast_sincos) | Math functions | Compute elementwise approximate sine and/or cosine of a vector |
-| [geo2cart](#geo2cart) | Math functions | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [interp](#interp) | Math functions | Perform linear interpolation (1D or 2D) on single or multiple data sets |
 | [version](#version) | Miscellaneous / Tools | Returns the quadriga-lib version number |
 | [write_png](#write_png) | Miscellaneous / Tools | Write a data matrix to a color-coded PNG file |
@@ -788,7 +788,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [Python](quadr
 ## channel_export_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-Also in: [C++](quadriga_lib_api_cpp.md#.write_paths_to_obj_file) · [Python](quadriga_lib_api_python.md#channel_export_obj_file)
+Also in: [C++](quadriga_lib_api_cpp.md#.write_paths_to_obj_file) · [Python](quadriga_lib_api_python.md#channel.export_obj_file)
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
@@ -830,7 +830,7 @@ quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colorma
 ## hdf5_create_file
 Create a new HDF5 channel file with a custom storage layout
 
-Also in: [C++](quadriga_lib_api_cpp.md#hdf5_create) · [Python](quadriga_lib_api_python.md#hdf5_create_file)
+Also in: [C++](quadriga_lib_api_cpp.md#hdf5_create_file) · [Python](quadriga_lib_api_python.md#hdf5_create_file)
 
 - Initializes a new HDF5 file for storing wireless channel data
 - Defines a 4D layout `(nx, ny, nz, nw)` where each index combination maps to one channel storage slot
@@ -1055,7 +1055,7 @@ storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
 ## hdf5_write_channel
 Write one or more channel objects to an HDF5 file
 
-Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write) · [Python](quadriga_lib_api_python.md#hdf5_write_channel)
+Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_channel) · [Python](quadriga_lib_api_python.md#hdf5_write_channel)
 
 - Writes a struct array of channels into 4D slots (one slot per array element)
 - Optional unstructured data can be passed as a matching struct array
@@ -1308,7 +1308,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [Python](quadriga_lib
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
-Also in: [C++](quadriga_lib_api_cpp.md#get_channels_ieee_indoor) · [Python](quadriga_lib_api_python.md#get_ieee_indoor)
+Also in: [C++](quadriga_lib_api_cpp.md#get_channels_ieee_indoor) · [Python](quadriga_lib_api_python.md#channel.ieee_indoor)
 
 - Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
 - 2D model: azimuth angles and planar motion only, no elevation
@@ -1468,7 +1468,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · Not in: Python
 ## get_channels_multifreq
 Compute channel coefficients for spherical waves across multiple frequencies
 
-Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadriga_lib_api_python.md#get_channels_multifreq)
+Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadriga_lib_api_python.md#channel.multifreq)
 
 - Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
@@ -1543,7 +1543,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 ## get_channels_planar
 Calculate MIMO channel coefficients for planar wave paths
 
-Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga_lib_api_python.md#get_channels_planar)
+Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga_lib_api_python.md#channel.planar)
 
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
@@ -1609,7 +1609,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 ## get_channels_spherical
 Calculate MIMO channel coefficients and delays for spherical wave propagation
 
-Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadriga_lib_api_python.md#get_channels_spherical)
+Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadriga_lib_api_python.md#channel.spherical)
 
 - Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths,
   using spherical wave assumption with per-element phase and delay.
@@ -1727,7 +1727,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#acdf) · [Python](quadriga_lib_api_python
 ## calc_angular_spread
 Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
 
-Also in: [C++](quadriga_lib_api_cpp.md#calc_angular_spreads_sphere) · [Python](quadriga_lib_api_python.md#calc_angular_spread)
+Also in: [C++](quadriga_lib_api_cpp.md#calc_angular_spread) · [Python](quadriga_lib_api_python.md#calc_angular_spread)
 
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each column
   of `az`/`el`/`powers` is one CIR; zero-power paths can be used to pad CIRs with fewer paths
@@ -3049,11 +3049,11 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, transpose );
 - **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
 
 ---
-<a id="cart2geo"></a>
-## cart2geo
+<a id="fast_cart2geo"></a>
+## fast_cart2geo
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-Also in: [C++](quadriga_lib_api_cpp.md#fast_cart2geo) · [Python](quadriga_lib_api_python.md#cart2geo)
+Also in: [C++](quadriga_lib_api_cpp.md#fast_cart2geo) · [Python](quadriga_lib_api_python.md#fast_cart2geo)
 
 - Computes: `len = sqrt(x² + y² + z²)`, `az = atan2(y, x)`, `el = asin(clamp(z / len, -1, 1))`
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
@@ -3066,7 +3066,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_cart2geo) · [Python](quadriga_lib_a
 
 ### Usage:
 ```matlab
-[ az, el, len ] = quadriga_lib.cart2geo( x, y, z, use_kernel );
+[ az, el, len ] = quadriga_lib.fast_cart2geo( x, y, z, use_kernel );
 ```
 
 ### Inputs:
@@ -3080,6 +3080,50 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_cart2geo) · [Python](quadriga_lib_a
 - **`az`** — Azimuth angles in radians; `[n, m]`
 - **`el`** — Elevation angles in radians; `[n, m]`
 - **`len`** — Euclidean vector length `sqrt(x² + y² + z²)`; `[n, m]`
+
+---
+<a id="fast_geo2cart"></a>
+## fast_geo2cart
+Convert elementwise azimuth/elevation angles to Cartesian coordinates
+
+Also in: [C++](quadriga_lib_api_cpp.md#fast_geo2cart) · [Python](quadriga_lib_api_python.md#fast_geo2cart)
+
+- Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
+- Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
+  output list to skip their computation
+- Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
+  MATLAB's default numeric type
+- Set `use_kernel=0` for auto-selection or `use_kernel=2` to force AVX2; the AVX2 kernel
+  computes sine and cosine in single precision (angles reduced in double precision first; max. error
+  about 1.3e-7 for angles up to 1e10), results widened back
+
+### Usage:
+```matlab
+split = true;
+[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+
+split = false;
+cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+```
+
+### Inputs:
+- **`az`** — Azimuth angles in radians; `[n, m]`
+- **`el`** — Elevation angles in radians; `[n, m]`
+- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
+- **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
+  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1
+- **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
+  return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
+
+### Outputs:
+- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube with components 
+  along the first dim, `[3, n, m]`
+- **`y`** — Y-coordinates; `[n, m]` or empty
+- **`z`** — Z-coordinates; `[n, m]` or empty
+- **`sAZ`** — sin(az); `[n, m]` or empty
+- **`cAZ`** — cos(az); `[n, m]` or empty
+- **`sEL`** — sin(el); `[n, m]` or empty
+- **`cEL`** — cos(el); `[n, m]` or empty
 
 ---
 <a id="fast_sincos"></a>
@@ -3113,50 +3157,6 @@ c = quadriga_lib.fast_sincos(x, true);
 ### Outputs:
 - **`s`** — sin(x); single; `[n_elem]`
 - **`c`** — cos(x); single; `[n_elem]`
-
----
-<a id="geo2cart"></a>
-## geo2cart
-Convert elementwise azimuth/elevation angles to Cartesian coordinates
-
-Also in: [C++](quadriga_lib_api_cpp.md#fast_geo2cart) · [Python](quadriga_lib_api_python.md#geo2cart)
-
-- Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
-- Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
-  output list to skip their computation
-- Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
-  MATLAB's default numeric type
-- Set `use_kernel=0` for auto-selection or `use_kernel=2` to force AVX2; the AVX2 kernel
-  computes sine and cosine in single precision (angles reduced in double precision first; max. error
-  about 1.3e-7 for angles up to 1e10), results widened back
-
-### Usage:
-```matlab
-split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
-
-split = false;
-cart = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
-```
-
-### Inputs:
-- **`az`** — Azimuth angles in radians; `[n, m]`
-- **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
-- **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
-  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1
-- **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
-  return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
-
-### Outputs:
-- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube with components 
-  along the first dim, `[3, n, m]`
-- **`y`** — Y-coordinates; `[n, m]` or empty
-- **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sAZ`** — sin(az); `[n, m]` or empty
-- **`cAZ`** — cos(az); `[n, m]` or empty
-- **`sEL`** — sin(el); `[n, m]` or empty
-- **`cEL`** — cos(el); `[n, m]` or empty
 
 ---
 <a id="interp"></a>
@@ -3201,7 +3201,7 @@ dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
 ## version
 Returns the quadriga-lib version number
 
-Also in: [Python](quadriga_lib_api_python.md#version) · Not in: C++
+Also in: [C++](quadriga_lib_api_cpp.md#quadriga_lib_version) · [Python](quadriga_lib_api_python.md#version)
 
 - If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
   a suffix `_AVX2` is added after the version number

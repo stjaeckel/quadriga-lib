@@ -97,21 +97,21 @@ speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 5
   - `name` — Name of the array antenna object; str
 MD!*/
 
-py::dict arrayant_generate_speaker(const std::string &driver_type,
-                                   double radius,
-                                   double lower_cutoff,
-                                   double upper_cutoff,
-                                   double lower_rolloff_slope,
-                                   double upper_rolloff_slope,
-                                   double sensitivity,
-                                   const std::string &radiation_type,
-                                   double hor_coverage,
-                                   double ver_coverage,
-                                   double horn_control_freq,
-                                   double baffle_width,
-                                   double baffle_height,
-                                   py::handle center_freq,
-                                   double angular_resolution)
+py::dict generate_speaker(const std::string &driver_type,
+                          double radius,
+                          double lower_cutoff,
+                          double upper_cutoff,
+                          double lower_rolloff_slope,
+                          double upper_rolloff_slope,
+                          double sensitivity,
+                          const std::string &radiation_type,
+                          double hor_coverage,
+                          double ver_coverage,
+                          double horn_control_freq,
+                          double baffle_width,
+                          double baffle_height,
+                          py::handle center_freq,
+                          double angular_resolution)
 {
     // Empty arma::vec when center_freq is None or empty
     const auto freq_vec = qd_python_numpy2arma_Col<double>(center_freq, true);

@@ -10,7 +10,7 @@ Math functions
 SECTION!*/
 
 /*!MD
-# cart2geo
+# fast_cart2geo
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
 - Computes: length = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / length, -1, 1))
@@ -24,8 +24,8 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 
 ## Usage:
 ```
-geo_coords     = quadriga_lib.tools.cart2geo( cart, y, z, combine, use_kernel )
-az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
+geo_coords     = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine, use_kernel )
+az, el, length = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine=False )
 ```
 
 ## Inputs:
@@ -42,11 +42,11 @@ az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
 - **`length`** — Vector length `(n, m)`; returned when `combine` is False
 MD!*/
 
-py::object cart2geo(const py::array_t<double> &cart,
-                    py::handle y,
-                    py::handle z,
-                    bool combine,
-                    int use_kernel)
+py::object fast_cart2geo(const py::array_t<double> &cart,
+                         py::handle y,
+                         py::handle z,
+                         bool combine,
+                         int use_kernel)
 {
     // Read inputs into flat coordinate vectors; in separate mode these alias x_a, y_a, z_a, which must
     // therefore live in function scope

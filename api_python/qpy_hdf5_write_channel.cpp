@@ -128,7 +128,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
         unsigned ny = iy_vec.max() + 1u;
         unsigned nz = iz_vec.max() + 1u;
         unsigned nw = iw_vec.max() + 1u;
-        quadriga_lib::hdf5_create(fn, nx, ny, nz, nw);
+        quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw);
         storage_space.at(0) = nx;
         storage_space.at(1) = ny;
         storage_space.at(2) = nz;
@@ -159,7 +159,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
         unsigned cw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
 
         // Write (indices are 0-based, passed through unchanged)
-        int return_code = quadriga_lib::hdf5_write(&c, fn, cx, cy, cz, cw);
+        int return_code = quadriga_lib::hdf5_write_channel(&c, fn, cx, cy, cz, cw);
         if (return_code == 1)
             any_overwrite = true;
     }

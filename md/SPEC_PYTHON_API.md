@@ -48,7 +48,7 @@ Existing wrappers that show the patterns:
 Unlike the C++ work, the wrapper is written first and the test second: the physics is already verified by the Catch2 suite, and the Python test exercises the wrapper.
 1. **Wrapper and registration.** Write `api_python/qpy_<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES". Register it in the dispatcher of its submodule. It must compile without warnings.
 2. **Test.** Write `tests/python_tests/test_<function_name>.py` (see "TESTS") and run it. It is expected to pass. If it fails, the cause is in the wrapper, the registration or the test's expectation; find out which before changing anything. If the failure points to the C++ function itself, stop and report it; do not work around it in the wrapper.
-3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature and the dispatcher entry name the same arguments in the same order. If the C++ function has another name than the wrapper, add the pair to `docs_builder/content/api_matching.toml` (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
+3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature and the dispatcher entry name the same arguments in the same order. If the C++ function has another name than the wrapper, or the exposed name drops its prefix (e.g. `channel.irs`) and no MEX wrapper of the same file stem exists, add the pair to `docs_builder/content/api_matching.toml`; the builder finds the C++ counterpart by the documented names, and without the entry the page shows "Not in: C++" (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
 
 # HAND-OVER REPORT
 - the Python usage line and the submodule
@@ -60,8 +60,8 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 
 ## File and function naming
 - All Python wrapper source files use the `qpy_` prefix and match the C++/MEX function name, so `quadriga_lib::function_name` is wrapped in `qpy_function_name.cpp`.
-- By default, the wrapper function itself and the name exposed to Python are both the name of the C++ function it wraps (e.g. `acdf`). The function name is kept as-is — no case conversion (lowercase stays lowercase).
-- Deviations are decided case by case. Example: the existing array antenna wrappers are C++ functions named `arrayant_<name>` that are exposed as `quadriga_lib.arrayant.<name>` (the prefix that repeats the submodule is dropped). Do not introduce such a renaming for a new wrapper unless requested.
+- The wrapper function itself has the name of the C++ function it wraps (e.g. `acdf`, `arrayant_interpolate`). The name exposed to Python is that name without the fixed prefix of its submodule, which would repeat the submodule: `arrayant_` in `arrayant`, `channel_` and `get_channels_` in `channel`, `sos_` in `sos`, `gbsm_` in `gbsm`; `tools` and `RTtools` have no prefix. Examples: `arrayant_interpolate` is `quadriga_lib.arrayant.interpolate`, `get_channels_spherical` is `quadriga_lib.channel.spherical`, `acdf` is `quadriga_lib.tools.acdf`. No case conversion (lowercase stays lowercase).
+- There are no other renamings. The few wrappers whose name is not a C++ function name (e.g. `version`) are listed in `docs_builder/content/api_matching.toml`.
 - The heading of the documentation block and the Usage line always use the name exposed to Python.
 
 ## Submodules
@@ -78,10 +78,10 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 | Site-specific simulation tools | `RTtools` |
 | Sum-of-sinusoids random number generator | `sos` |
 | Geometry-based stochastic model | `gbsm` |
-| Channel generation functions | not clear (`arrayant` or `channel`): ask |
+| Channel generation functions | `channel` |
 
 - If the submodule is not clear from the C++ documentation, ask.
-- Submodule `sos`: the wrapper of `quadriga_lib::sos_<name>` is the C++ function `sos_<name>` in `qpy_sos_<name>.cpp`, exposed as `quadriga_lib.sos.<name>` (prefix dropped, as for `arrayant`). Its documentation block is headed `# sos.<name>` and linked as `[[sos.<name>]]`, so that the heading equals what the user types and bare names of different sections (e.g. `generate`) do not clash; the Usage line shows the call `quadriga_lib.sos.<name>(...)`. The arrayant wrappers keep the bare name (`# generate`).
+- A name without its prefix in `channel`, `sos` or `gbsm` (e.g. `quadriga_lib.sos.val`, wrapper `sos_val` in `qpy_sos_val.cpp`) has its documentation block headed `# <submodule>.<name>` and linked as `[[<submodule>.<name>]]`, so that the heading equals what the user types and bare names of different submodules (e.g. `generate`, `export_obj_file`) do not clash; the Usage line shows the call `quadriga_lib.<submodule>.<name>(...)`. The arrayant wrappers and the other `channel` functions keep the bare name (`# generate`, `# hdf5_read_channel`).
 
 ## Index and dtype conventions
 - C++ and Python both use 0-based indices, so no conversion is performed in either direction. Indices documented as "1-based" in the C++ documentation remain 1-based in Python (the user provides 1-based and gets 1-based back).
@@ -306,7 +306,7 @@ SECTION!*/
 
 ## Documentation block
 - The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
-- The heading is the name exposed to Python, without case conversion (`sos` wrappers: see "Submodules").
+- The heading is the name exposed to Python, without case conversion (names without their prefix: see "Submodules").
 - Omit dtype specifications (except for integer and complex arguments). Use Python types and syntax: tuples `(n, m)` for shapes, `list`, `dict`, `str`, `None`.
 - A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements; split long calls (line length: `docs_builder/README.md`, "Writing pitfalls") with continuation lines indented by 4 and ending in ` \`. If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
 ```

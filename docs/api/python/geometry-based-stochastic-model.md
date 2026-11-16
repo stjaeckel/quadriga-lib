@@ -88,7 +88,7 @@ be filled directly (keys in [ssf_rays](#ssf_rays)); continue with step 6.
 | sub-cluster | one of the three parts of a split cluster (step 11, Table 7.5-5) |
 | ray | one of the `NumSubPaths` rays of a cluster, or the LOS or GR ray (QuaDRiGa: sub-path) |
 | kept ray | a LOS or GR ray, or an NLOS ray with power > 0 at some frequency (at `i_freq` in [gbsm.single_link_channel](#gbsm.single_link_channel)) |
-| path | a propagation path as `get_channels_*` take it and QRT files store it; [ssf_paths](#ssf_paths) makes one per kept ray (QuaDRiGa also says path for a cluster) |
+| path | a propagation path as `channel.spherical` / `channel.planar` take it and QRT files store it; [ssf_paths](#ssf_paths) makes one per kept ray (QuaDRiGa also says path for a cluster) |
 | tap | rays summed in one output tap: the LOS ray, the GR ray, a sub-cluster (TR methods) or a cluster (`"quadriga"`) |
 | snapshot | one Tx and Rx position and orientation at which coefficients are computed (QuaDRiGa) |
 | segment | the snapshots of one drop over which the ray data are kept (QuaDRiGa) |
@@ -423,7 +423,7 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m; `(3, n_path)`
 - **`path_gain`** — Path gains (linear); `(n_path, n_freq)`
 - **`path_length`** — Path lengths in m; `(n_path,)`
-- **`M`** — Polarization transfer matrices, real, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar); `(8, n_path, n_freq)`
+- **`M`** — Polarization transfer matrices, real, rows as in [channel.planar](channel-generation-functions.md#channel.planar); `(8, n_path, n_freq)`
 - **`method`** — Value of `rays["method"]`; sets the GR power law and the default mobility; default: `"quadriga"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `(n_path,)`; default: None
 - **`tap`** — Tap index; `None`: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also without a GR
@@ -449,8 +449,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 - Computes the MIMO coefficients of one link with its antennas over the `n_snap` snapshots of one segment at
   `rays["center_freq"][i_freq]`: per snapshot, the paths of [ssf_paths](#ssf_paths) at the snapshot positions with the link
   gain and K-factor ratio of the snapshot, for the kept rays (see Terms)
-- `"phase"`: [get_channels_planar](channel-generation-functions.md#get_channels_planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
-  delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) with the
+- `"phase"`: [channel.planar](channel-generation-functions.md#channel.planar) with the arrays at the positions of `rays` and the orientations of the snapshot;
+  delays, path lengths and angles stay those of the ray-data positions. `"drift"`: [channel.spherical](channel-generation-functions.md#channel.spherical) with the
   arrays at the positions and orientations of the snapshot
 - `"taps"`: the rays summed per tap index, taps in ascending index, one tap per distinct index of the kept rays (fixed
   per call); LOS and GR taps are present whenever `rays` holds them, also at zero power. The delay of a tap per
@@ -927,10 +927,10 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_paths) · [MATLAB](
 - Computes the antenna-free paths (gains, lengths, polarization matrices, angles and scatterers) of the kept rays of
   `rays` (see Terms) at new Tx and Rx positions (default: the ray-data positions), LOS and GR also at zero power; paths
   in ray order, `ray_ind` maps them to the rays (e.g. `rays["tap"][ray_ind]`)
-- `"phase"`: use the outputs with [get_channels_planar](channel-generation-functions.md#get_channels_planar) and the arrays at the positions of `rays`; the displacement
+- `"phase"`: use the outputs with [channel.planar](channel-generation-functions.md#channel.planar) and the arrays at the positions of `rays`; the displacement
   phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer identified
   and the displacement phase counts twice, without an error
-- `"drift"`: use the outputs at the new positions with [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) or [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq); needs
+- `"drift"`: use the outputs at the new positions with [channel.spherical](channel-generation-functions.md#channel.spherical) or [channel.multifreq](channel-generation-functions.md#channel.multifreq); needs
   the scatterers of [ssf_scatterers](#ssf_scatterers)
 
 | Quantity | `"phase"` | `"drift"` |
@@ -973,7 +973,7 @@ path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_
 ### Outputs:
 - **`path_gain`** — Path gains (linear); `(n_path, n_freq)`
 - **`path_length`** — Path lengths in m; `(n_path,)`
-- **`M`** — Polarization transfer matrices, real, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar); `(8, n_path, n_freq)`
+- **`M`** — Polarization transfer matrices, real, rows as in [channel.planar](channel-generation-functions.md#channel.planar); `(8, n_path, n_freq)`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in rad, GCS; `(n_path,)`
 - **`fbs_pos`**, **`lbs_pos`** — Scatterer positions in m; `(3, n_path)`, `(3, 0)` in `"phase"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; int64; `(n_path,)`
@@ -1042,7 +1042,7 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | `delay` | `(n_ray,)` | float | Delays in s relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `(n_ray, n_freq)` | float | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `(n_ray,)` | float | Departure and arrival azimuth and elevation in rad, GCS | yes |
-| `M` | `(8, n_ray, n_freq)` | float | Polarization transfer matrices incl. initial phases, real, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | yes |
+| `M` | `(8, n_ray, n_freq)` | float | Polarization transfer matrices incl. initial phases, real, rows as in [channel.planar](channel-generation-functions.md#channel.planar) | yes |
 | `path_type` | `(n_ray,)` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS | yes |
 | `tap` | `(n_ray,)` | uint32 | Tap index; rays with equal index form one tap | yes |
 | `gr_eps` | `(n_freq,)` or empty | complex | Ground permittivity, used as `real - j·imag`; needed where a GR ray is recomputed | no |

@@ -121,7 +121,7 @@ void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fv
 ## fast_cart2geo
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-Also in: [MATLAB](../mex/math-functions.md#cart2geo) · [Python](../python/math-functions.md#cart2geo)
+Also in: [MATLAB](../mex/math-functions.md#fast_cart2geo) · [Python](../python/math-functions.md#fast_cart2geo)
 
 - Conversion: len = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / len, -1, 1))
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
@@ -160,7 +160,7 @@ void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const a
 ## fast_geo2cart
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
-Also in: [MATLAB](../mex/math-functions.md#geo2cart) · [Python](../python/math-functions.md#geo2cart)
+Also in: [MATLAB](../mex/math-functions.md#fast_geo2cart) · [Python](../python/math-functions.md#fast_geo2cart)
 
 - Conversion: x = cos(el)*cos(az)*len, y = cos(el)*sin(az)*len, z = sin(el)*len
 - Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
