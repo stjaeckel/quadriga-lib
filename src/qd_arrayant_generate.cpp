@@ -210,9 +210,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
     ant.e_phi_re.zeros(no_el, no_az, 1);
     ant.e_phi_im.zeros(no_el, no_az, 1);
 
-    arma::Mat<dtype> tmp = dtype(0.999999) * arma::repmat(ant.elevation_grid, 1, no_az);
-    tmp = arma::cos(pih * arma::sin(tmp)) / arma::cos(tmp);
-    tmp = tmp * dtype(1.280968208215292);
+    // cos(pi/2 sin(el)) / cos(el), written without the cancellation of cos(pi/2 sin(el)) next to the poles
+    arma::Mat<dtype> c = arma::repmat(arma::cos(ant.elevation_grid), 1, no_az);
+    arma::Mat<dtype> s = arma::repmat(arma::abs(arma::sin(ant.elevation_grid)), 1, no_az);
+    arma::Mat<dtype> tmp = arma::sin(pih * arma::square(c) / (dtype(1.0) + s)) / c * dtype(1.280968208215292);
 
     std::memcpy(ant.e_theta_re.slice_memptr(0), tmp.memptr(), tmp.n_elem * sizeof(dtype));
 

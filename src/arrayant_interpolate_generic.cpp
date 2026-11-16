@@ -37,8 +37,9 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
 
     // Declare constants at compile time to avoid unnecessary type conversions
     const dtype pi_double = dtype(6.28318530717958647692528676655900576); // 2 pi
+    const dtype pi_half = dtype(1.57079632679489661923132169163975144);
     const dtype R1 = std::numeric_limits<dtype>::epsilon();
-    const dtype R0 = R1 * R1 * R1;
+    const dtype R0 = R1 * R1 * R1, R_pole = dtype(64.0) * R1 * R1;
     constexpr dtype one = dtype(1.0), neg_one = dtype(-1.0), zero = dtype(0.0),
                     tL = dtype(-0.999), tS = dtype(-0.99), dT = one / (tS - tL);
 
@@ -80,7 +81,7 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
             // Transform input angles to Cartesian coordinates
             if (per_element_angles || o == 0)
                 sAZi = std::sin(*p_az_local), cAZi = std::cos(*p_az_local++),
-                sELi = std::sin(*p_el_local), cELi = std::cos(*p_el_local++) + R1,
+                sELi = std::sin(*p_el_local), cELi = std::cos(*p_el_local++),
                 Cx = cELi * cAZi, Cy = cELi * sAZi;
 
             // Apply rotation (Co = R * Ci) for antenna pattern interpolation
@@ -95,11 +96,20 @@ void qd_arrayant_interpolate_GENERIC(const dtype *e_theta_re, const dtype *e_the
                 dz = Rp[2] * Cx + Rp[5] * Cy + Rp[8] * sELi;
                 dz = dz > one ? one : dz;
                 dz = dz < neg_one ? neg_one : dz;
-                az = std::atan2(dy, dx), el = std::asin(dz), sAZo = std::sin(az), cAZo = std::cos(az);
 
                 // Calculate basis vectors
                 dtype eTHi_x = sELi * cAZi, eTHi_y = sELi * sAZi, eTHi_z = -cELi;
                 dtype ePHi_x = -sAZi, ePHi_y = cAZi;
+
+                // On the pole of the local frame (dx, dy rounding residues) the local azimuth is undefined; it is taken
+                // from the theta unit vector of the query in the local frame, so that the polarization is not rotated;
+                // the elevation is set to +/- pi/2 there (asin(dz) loses about sqrt(eps) next to dz = +/- 1)
+                dtype ax = dx, ay = dy;
+                el = std::asin(dz);
+                if (dx * dx + dy * dy < R_pole)
+                    ax = dz * (Rp[0] * eTHi_x + Rp[3] * eTHi_y + Rp[6] * eTHi_z),
+                    ay = dz * (Rp[1] * eTHi_x + Rp[4] * eTHi_y + Rp[7] * eTHi_z), el = dz > zero ? pi_half : -pi_half;
+                az = std::atan2(ay, ax), sAZo = std::sin(az), cAZo = std::cos(az);
                 dtype eTHo_x = dz * cAZo, eTHo_y = dz * sAZo, eTHo_z = -std::cos(el);
 
                 // Apply rotation to eTHo

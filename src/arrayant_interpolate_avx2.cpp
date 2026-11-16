@@ -320,7 +320,7 @@ namespace
     //   sAZi8       — sin(input_azimuth),   8 lanes
     //   cAZi8       — cos(input_azimuth),   8 lanes
     //   sELi8       — sin(input_elevation), 8 lanes
-    //   cELi8       — cos(input_elevation), 8 lanes  (must already include pole guard: += eps)
+    //   cELi8       — cos(input_elevation), 8 lanes
     //
     // Outputs:
     //   dx8, dy8, dz8   — rotated direction vector (needed for distance computation)
@@ -349,22 +349,32 @@ namespace
 
         // Derive sin/cos of output angles from dx/dy/dz directly (avoids extra sincos). The pattern lookup (az8) and the
         // polarization basis (cAZo8, sAZo8) must use the same azimuth with a unit-length basis, also next to the local
-        // pole; on the pole itself (dx^2 + dy^2 below the smallest normal float) the azimuth is undefined and set to 0
-        const __m256 tiny8 = _mm256_set1_ps(FLT_MIN);
-        __m256 hyp_sq8 = _mm256_fmadd_ps(*dx8, *dx8, _mm256_mul_ps(*dy8, *dy8));
-        __m256 pole8 = _mm256_cmp_ps(hyp_sq8, tiny8, _CMP_LT_OQ);
-        __m256 inv_hypot8 = _fm256_rsqrt_nr_ps(_mm256_max_ps(hyp_sq8, tiny8));
-        __m256 cAZo8 = _mm256_blendv_ps(_mm256_mul_ps(*dx8, inv_hypot8), _mm256_set1_ps(1.0f), pole8);
-        __m256 sAZo8 = _mm256_andnot_ps(pole8, _mm256_mul_ps(*dy8, inv_hypot8));
-        *az8 = _mm256_andnot_ps(pole8, *az8);
-        __m256 cELo8 = _mm256_mul_ps(hyp_sq8, inv_hypot8);
-
-        // Input basis vectors: eTHi = [sEL*cAZ, sEL*sAZ, -cEL], ePHi = [-sAZ, cAZ, 0]
-        __m256 eTHi_x8 = _mm256_mul_ps(sELi8, cAZi8);
+        // pole. On the pole itself (dx, dy rounding residues: dx^2 + dy^2 < (8 eps)^2) the azimuth is undefined; it is
+        // taken from the theta unit vector of the query in the local frame (R * eTHi), so that the polarization is not
+        // rotated there.
+        __m256 eTHi_x8 = _mm256_mul_ps(sELi8, cAZi8); // Input basis vectors: eTHi = [sEL*cAZ, sEL*sAZ, -cEL]
         __m256 eTHi_y8 = _mm256_mul_ps(sELi8, sAZi8);
         __m256 eTHi_z8 = _mm256_xor_ps(cELi8, _mm256_set1_ps(-0.0f)); // -cELi
-        __m256 ePHi_x8 = _mm256_xor_ps(sAZi8, _mm256_set1_ps(-0.0f)); // -sAZi
+        __m256 ePHi_x8 = _mm256_xor_ps(sAZi8, _mm256_set1_ps(-0.0f)); // ePHi = [-sAZ, cAZ, 0]
         __m256 ePHi_y8 = cAZi8;
+
+        const __m256 tiny8 = _mm256_set1_ps(64.0f * FLT_EPSILON * FLT_EPSILON);
+        __m256 hyp_sq8 = _mm256_fmadd_ps(*dx8, *dx8, _mm256_mul_ps(*dy8, *dy8));
+        __m256 pole8 = _mm256_cmp_ps(hyp_sq8, tiny8, _CMP_LT_OQ);
+        __m256 ax8 = *dx8, ay8 = *dy8, hyp_a8 = hyp_sq8;
+        if (_mm256_movemask_ps(pole8))
+        {
+            __m256 tx8 = _mm256_fmadd_ps(R.r[0], eTHi_x8, _mm256_fmadd_ps(R.r[3], eTHi_y8, _mm256_mul_ps(R.r[6], eTHi_z8)));
+            __m256 ty8 = _mm256_fmadd_ps(R.r[1], eTHi_x8, _mm256_fmadd_ps(R.r[4], eTHi_y8, _mm256_mul_ps(R.r[7], eTHi_z8)));
+            ax8 = _mm256_blendv_ps(ax8, _mm256_mul_ps(*dz8, tx8), pole8);
+            ay8 = _mm256_blendv_ps(ay8, _mm256_mul_ps(*dz8, ty8), pole8);
+            *az8 = _mm256_blendv_ps(*az8, _fm256_atan2256_ps(ay8, ax8), pole8);
+            hyp_a8 = _mm256_fmadd_ps(ax8, ax8, _mm256_mul_ps(ay8, ay8));
+        }
+        __m256 inv_hypot8 = _fm256_rsqrt_nr_ps(_mm256_max_ps(hyp_a8, tiny8));
+        __m256 cAZo8 = _mm256_mul_ps(ax8, inv_hypot8);
+        __m256 sAZo8 = _mm256_mul_ps(ay8, inv_hypot8);
+        __m256 cELo8 = _mm256_mul_ps(hyp_sq8, inv_hypot8); // About 0 on the pole
 
         // Output basis vector: eTHo = [dz*cAZo, dz*sAZo, -cELo]
         __m256 eTHo_x8 = _mm256_mul_ps(*dz8, cAZo8);
@@ -677,8 +687,7 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
     // All constants are float — avoids double-eps vanishing below float precision
     const float two_pi = (float)dtype(6.28318530717958647692528676655900576);
-    const float eps = FLT_EPSILON; // pole guard
-    const float eps_cubed = eps * eps * eps;                 // tiny guard for weight computation
+    const float eps_cubed = FLT_EPSILON * FLT_EPSILON * FLT_EPSILON; // tiny guard for weight computation
     constexpr float one = 1.0f;
 
     // Reciprocal grid spacings: 1/(grid[i] - grid[i-1]), used as interpolation weight multipliers
@@ -785,9 +794,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
         offset_elem[o] = offset_elem[n_out - 1];
     }
 
-    // AVX2 constants
-    const __m256 eps_8 = _mm256_set1_ps(eps);
-
     // Tail mask for masked stores (based on n_out % 8)
     const int tail = (int)(n_out % 8);
     __m256i tail_mask;
@@ -824,7 +830,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
 
             float sAZi_s = std::sin(az_a), cAZi_s = std::cos(az_a);
             float sELi_s = std::sin(el_a), cELi_s = std::cos(el_a);
-            cELi_s += eps; // pole guard
 
             __m256 sAZi8 = _mm256_set1_ps(sAZi_s);
             __m256 cAZi8 = _mm256_set1_ps(cAZi_s);
@@ -1037,7 +1042,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                 __m256 sAZi8, cAZi8, sELi8, cELi8; // <false>: and / or selection, faster in this kernel
                 _fm256_sincos256_ps<false>(az_in8, &sAZi8, &cAZi8);
                 _fm256_sincos256_ps<false>(el_in8, &sELi8, &cELi8);
-                cELi8 = _mm256_add_ps(cELi8, eps_8); // pole guard
 
                 // Stages B+C: Rotation, cart2geo, basis vectors, gamma
                 __m256 dx8, dy8, dz8, az8, el8, cos_gamma8, sin_gamma8;
@@ -1282,7 +1286,6 @@ void qd_arrayant_interpolate_AVX2(const dtype *e_theta_re, const dtype *e_theta_
                 __m256 sAZi8, cAZi8, sELi8, cELi8; // <false>: and / or selection, faster in this kernel
                 _fm256_sincos256_ps<false>(az_in8, &sAZi8, &cAZi8);
                 _fm256_sincos256_ps<false>(el_in8, &sELi8, &cELi8);
-                cELi8 = _mm256_add_ps(cELi8, eps_8); // pole guard
 
                 // Load rotation matrix from SoA buffer
                 RMatrix8 R;

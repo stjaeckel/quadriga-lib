@@ -7,6 +7,8 @@
 #include "quadriga_lib.hpp"
 #include "qd_test_arrayant.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -370,4 +372,89 @@ TEST_CASE("generate_arrayant_3GPP - a positive electrical tilt points the beam d
     const auto ant = quadriga_lib::generate_arrayant_3GPP<double>(8, 1, 3.5e9, 4, 10.0);
     const arma::uword i = arma::index_max(arma::vectorise(arma::square(ant.e_theta_re.slice(0)) + arma::square(ant.e_theta_im.slice(0))));
     CHECK(std::abs(ant.elevation_grid(i % ant.n_elevation()) * 180.0 / arma::datum::pi + 10.0) < 1.01);
+}
+
+TEST_CASE("generate_arrayant_3GPP - turned polarizations follow TR 38.901 Model-1, also on the rotation axis")
+{
+    // pol = 2 and 3 turn the vertical element by the slant angle zeta (90 degree; +45 and -45 degree). Off the rotation
+    // axis, TR 38.901 eq. 7.3-3: F_theta = sqrt(A) cos(psi), F_phi = sqrt(A) sin(psi) with
+    // cos(psi) = (cos(zeta) sin(theta) + sin(zeta) sin(phi) cos(theta)) / w, sin(psi) = sin(zeta) cos(phi) / w and
+    // w = sqrt(1 - (cos(zeta) cos(theta) - sin(zeta) sin(phi) sin(theta))^2), theta the zenith angle; sqrt(A) is the
+    // vertical element (pol = 1). On the axis (w = 0) the polarization is not rotated, and float equals double there,
+    // as everywhere else.
+    const double deg = arma::datum::pi / 180.0;
+    const auto v = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.5e9, 1);
+    for (unsigned pol : {2u, 3u})
+    {
+        const auto d = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.5e9, pol);
+        const auto f = quadriga_lib::generate_arrayant_3GPP<float>(1, 1, 3.5e9f, pol);
+        const double zeta[2] = {pol == 2 ? 0.0 : 45.0 * deg, pol == 2 ? 90.0 * deg : -45.0 * deg};
+        double d_model = 0.0, d_float = 0.0;
+        for (arma::uword s = 0; s < 2; ++s)
+            for (arma::uword j = 0; j < d.n_azimuth(); ++j)
+                for (arma::uword i = 0; i < d.n_elevation(); ++i)
+                {
+                    const double th = 0.5 * arma::datum::pi - d.elevation_grid(i), ph = d.azimuth_grid(j);
+                    const double cz = std::cos(zeta[s]), sz = std::sin(zeta[s]);
+                    const double x = cz * std::cos(th) - sz * std::sin(ph) * std::sin(th), w = std::sqrt(1.0 - x * x);
+                    if (w > 1e-3)
+                    {
+                        const double A = v.e_theta_re(i, j, 0);
+                        const double cpsi = (cz * std::sin(th) + sz * std::sin(ph) * std::cos(th)) / w, spsi = sz * std::cos(ph) / w;
+                        d_model = std::max({d_model, std::abs(d.e_theta_re(i, j, s) - A * cpsi), std::abs(d.e_phi_re(i, j, s) - A * spsi)});
+                    }
+                    d_float = std::max({d_float, std::abs((double)f.e_theta_re(i, j, s) - d.e_theta_re(i, j, s)),
+                                        std::abs((double)f.e_phi_re(i, j, s) - d.e_phi_re(i, j, s))});
+                }
+        INFO("pol = " << pol);
+        CHECK(d_model < 1e-12);
+        CHECK(d_float < 1e-5); // Single-precision field tolerance
+    }
+
+    // H element of pol = 2 on its axis (elevation 0, azimuth -90 and +90 degree): equal to the vertical element
+    const auto d = quadriga_lib::generate_arrayant_3GPP<double>(1, 1, 3.5e9, 2);
+    for (arma::uword j : {90ULL, 270ULL})
+    {
+        CHECK(std::abs(d.e_theta_re(90, j, 1) - v.e_theta_re(90, j, 0)) < 1e-12);
+        CHECK(std::abs(d.e_phi_re(90, j, 1)) < 1e-12);
+    }
+}
+
+TEST_CASE("generate_arrayant_multibeam - turned polarizations: float equals double, also on the rotation axis")
+{
+    // The beams of pol = 2 and 3 combine turned elements; their rotation axes lie on the default 1 degree grid
+    for (unsigned pol : {2u, 3u})
+    {
+        const auto d = quadriga_lib::generate_arrayant_multibeam<double>(2, 2, {0.0}, {0.0}, {1.0}, 3.5e9, pol);
+        const auto f = quadriga_lib::generate_arrayant_multibeam<float>(2, 2, {0.0f}, {0.0f}, {1.0f}, 3.5e9f, pol);
+        const double peak = std::max(arma::abs(d.e_theta_re).max(), arma::abs(d.e_phi_re).max());
+        const double d_float = std::max({arma::abs(arma::conv_to<arma::cube>::from(f.e_theta_re) - d.e_theta_re).max(),
+                                         arma::abs(arma::conv_to<arma::cube>::from(f.e_phi_re) - d.e_phi_re).max(),
+                                         arma::abs(arma::conv_to<arma::cube>::from(f.e_theta_im) - d.e_theta_im).max(),
+                                         arma::abs(arma::conv_to<arma::cube>::from(f.e_phi_im) - d.e_phi_im).max()});
+        INFO("pol = " << pol);
+        CHECK(d_float < 2e-5 * peak); // Float rounding of the polarization angle grows as 1 / (distance from the axis)
+    }
+}
+
+TEST_CASE("generate_arrayant_half_wave_dipole - pattern equals cos(pi/2 sin(el)) / cos(el), also at the poles")
+{
+    const auto d = quadriga_lib::generate_arrayant_half_wave_dipole<double>();
+    const auto f = quadriga_lib::generate_arrayant_half_wave_dipole<float>();
+    const double scale = 1.280968208215292, pih = 0.5 * arma::datum::pi;
+    double d_model = 0.0, d_float = 0.0;
+    for (arma::uword i = 1; i + 1 < d.n_elevation(); ++i)
+    {
+        const double el = d.elevation_grid(i);
+        d_model = std::max(d_model, std::abs(d.e_theta_re(i, 0, 0) - scale * std::cos(pih * std::sin(el)) / std::cos(el)));
+    }
+    for (arma::uword i = 0; i < d.n_elevation(); ++i)
+        d_float = std::max(d_float, std::abs((double)f.e_theta_re(i, 0, 0) - d.e_theta_re(i, 0, 0)));
+    CHECK(d_model < 1e-12);
+    CHECK(d_float < 1e-6);
+    for (arma::uword i : {0ULL, 180ULL})
+    {
+        CHECK(std::abs(d.e_theta_re(i, 7, 0)) < 1e-12); // Limit 0 at the poles
+        CHECK(std::abs(f.e_theta_re(i, 7, 0)) < 1e-6f);
+    }
 }

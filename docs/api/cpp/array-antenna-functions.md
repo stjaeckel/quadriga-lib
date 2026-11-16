@@ -468,6 +468,8 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_interpolate) · [Py
 - Angles are not range-checked; values outside [-pi, pi] and [-pi/2, pi/2] denote the corresponding direction. NaN or
   infinite angles give NaN in all outputs of that angle and output, without an exception
 - Outputs are resized only when their size differs, so pre-allocated outputs are written in place
+- On a pole of the local frame (a direction along the z-axis of the oriented antenna) the local azimuth is chosen so
+  that the local and the global theta unit vectors agree: the polarization is not rotated there
 - Kernels: GENERIC computes in the precision of `dtype`; AVX2 computes in single precision also for `double`, with
   errors of up to about 2e-6 of the peak field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole
   of the local frame up to about 2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most

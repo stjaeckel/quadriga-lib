@@ -32,6 +32,7 @@
 #include "qd_test_diag.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <complex>
 #include <cstdint>
@@ -897,19 +898,20 @@ TEST_CASE("arrayant_interpolate - GENERIC and AVX2 agree on a 3GPP panel")
 TEST_CASE("arrayant_interpolate - AVX2 accuracy at fixed directions and at the poles")
 {
     // Fixed directions where single-precision arithmetic is weakest: the poles of the global frame (zenith, nadir),
-    // the pole of the local frame (antenna tilted by 90 degree) and 1e-3 rad next to it, the azimuth wrap, grid points
-    // and midpoints, and a pattern whose grid is built in single precision. Reference: GENERIC with double on the same
-    // double inputs. Each case runs through the three AVX2 code paths (8 outputs: vectorized over elements; 3 outputs:
-    // vectorized over angles; per-element angles: per element and angle), with float and double. Tolerances: 3 to 5
+    // the pole of the local frame (antenna tilted by 90 degree), alone, among other directions in one call (pole and
+    // other lanes in one AVX2 vector) and 1e-3 rad next to it, the azimuth wrap, grid points and midpoints, and a
+    // pattern whose grid is built in single precision. Reference: GENERIC with double on the same double inputs. Each
+    // case runs through the three AVX2 code paths (8 outputs: vectorized over elements; 3 outputs: vectorized over
+    // angles; per-element angles: per element and angle), with float and double. Tolerances: 3 to 5
     // times the largest deviation measured on an AVX2 CPU, at least about one single-precision rounding (1e-7 for
     // field and power, 2e-7 rad for angles); field and power (|V|^2 + |H|^2) relative to the peak amplitude M and M^2
-    // of the pattern, angles in rad, distance in m (element positions up to 0.4 m). At the exact local pole the local
-    // azimuth is undefined (inf: not compared), so the field components depend on the azimuth each kernel picks; the
-    // power does not. Near the local pole the azimuth error grows as about 2e-7 rad divided by the distance from it.
+    // of the pattern, angles in rad, distance in m (element positions up to 0.4 m). At the exact local pole both kernels
+    // take the local azimuth from the theta unit vector of the query, so gamma is 0. Near the local pole the azimuth
+    // error grows as about 2e-7 rad divided by the distance from it.
     if (!quadriga_lib::quadriga_lib_has_AVX2())
         return;
 
-    const double inf = std::numeric_limits<double>::infinity(), deg = pi / 180.0;
+    const double deg = pi / 180.0;
     std::vector<double> az_gen, el_gen, az_8, el_pole, el_near, az_grid, el_grid, az_fgrid, el_fgrid;
     for (int i = 0; i < 16; ++i)
         az_gen.push_back((-170.0 + 21.3 * i) * deg), el_gen.push_back((-75.0 + 9.7 * i) * deg);
@@ -941,7 +943,8 @@ TEST_CASE("arrayant_interpolate - AVX2 accuracy at fixed directions and at the p
     const qd_case cases[] = {
         {"generic", 0, az_gen, el_gen, 0.3, -0.2, 0.7, 1e-6, 1e-6, 4e-6, 6e-7, 4e-6, 6e-7},
         {"global poles", 2, az_8, el_pole, 0.0, 0.0, 0.0, 5e-7, 1e-6, 5e-7, 2e-7, 2e-7, 1.5e-7},
-        {"local pole", 2, {0.0, pi, 0.0, pi}, {0.0, 0.0, 0.0, 0.0}, 0.0, -0.5 * pi, 0.0, inf, 2e-6, inf, 2e-7, inf, 3e-7},
+        {"local pole", 2, {0.0, pi, 0.0, pi}, {0.0, 0.0, 0.0, 0.0}, 0.0, -0.5 * pi, 0.0, 1e-6, 2e-6, 2e-7, 2e-7, 3e-7, 3e-7},
+        {"local pole among other directions", 2, {0.0, 0.4, pi, -2.0, 0.0, 1.0, pi, -0.5, 0.0}, {0.0, 0.3, 0.0, -0.6, 0.0, 0.9, 0.0, 0.2, 0.0}, 0.0, -0.5 * pi, 0.0, 1e-6, 2e-6, 6e-7, 8e-7, 5e-7, 3e-7},
         {"1e-3 from the local pole", 2, {0.0, pi, 0.0, pi}, {1e-3, 1e-3, -1e-3, -1e-3}, 0.0, -0.5 * pi, 0.0, 3e-4, 2e-6, 3e-4, 1e-4, 3e-4, 3e-7},
         {"1e-3 from the poles, dipole", 3, az_8, el_near, 0.0, 0.0, 0.0, 7e-5, 1.5e-7, 5e-7, 1e-4, 2e-7, 3e-7},
         {"azimuth wrap", 0, {pi - 1e-6, -pi + 1e-6, pi - 0.3 * deg, -pi + 0.3 * deg, pi}, {0.1, -0.2, 0.3, 0.0, 0.5}, 0.0, 0.0, 0.0, 1e-7, 1e-7, 4e-7, 2e-7, 2e-7, 5e-7},
@@ -996,11 +999,11 @@ TEST_CASE("arrayant_interpolate - AVX2 accuracy at fixed directions and at the p
             QD_DIAG("%s,%s,%s,%.3e,%.3e,%.3e,%.3e,%.3e,%.3e\n", c.name, p.name, std::is_same<dtype, float>::value ? "float" : "double",
                     d_field, d_power, d_az, d_el, d_gamma, d_dist);
             INFO(c.name << ", " << p.name << ", " << (std::is_same<dtype, float>::value ? "float" : "double"));
-            CHECK(d_power < c.t_power); // Also where the fields are not compared
-            CHECK((std::isinf(c.t_field) || d_field < c.t_field));
-            CHECK((std::isinf(c.t_az) || d_az < c.t_az));
+            CHECK(d_power < c.t_power);
+            CHECK(d_field < c.t_field);
+            CHECK(d_az < c.t_az);
             CHECK(d_el < c.t_el);
-            CHECK((std::isinf(c.t_gamma) || d_gamma < c.t_gamma));
+            CHECK(d_gamma < c.t_gamma);
             CHECK(d_dist < c.t_dist);
         }
     };
@@ -1008,6 +1011,64 @@ TEST_CASE("arrayant_interpolate - AVX2 accuracy at fixed directions and at the p
     {
         check(patterns_f[c.pattern], c, patterns_d[c.pattern]);
         check(patterns_d[c.pattern], c, patterns_d[c.pattern]);
+    }
+}
+
+TEST_CASE("arrayant_interpolate - on the pole of the local frame the polarization is not rotated")
+{
+    // A direction along the local z-axis (zenith or nadir) of an oriented 3GPP element: the local azimuth is that of the
+    // theta unit vector t of the query in the local frame (atan2(z t_y, z t_x), z = +1 at the zenith and -1 at the
+    // nadir), the polarization rotation angle is 0, and the field is the pole row of the pattern at that azimuth (real
+    // and positive, so amplitude interpolation is linear). The pole row is not constant (-23 dB at local azimuth 0,
+    // -30 dB from 50 degree), so a wrong local azimuth also changes the field. Orientations: all multiples of 45 degree
+    // (rotated rounding gives residues of about one epsilon) and an un-rotated antenna with several azimuths of the same
+    // zenith or nadir direction, where the local azimuth equals the query azimuth. Every kernel, float and double.
+    const auto ant_d = quadriga_lib::generate_arrayant_3GPP<double>();
+    const auto ant_f = convert<float>(ant_d);
+    const double q = pi / 4.0;
+    std::vector<std::array<double, 3>> orientations;
+    for (int b = -4; b < 4; ++b)
+        for (int t = -2; t <= 2; ++t)
+            for (int h = -4; h < 4; ++h)
+                orientations.push_back({b * q, t * q, h * q});
+
+    auto check = [&](const auto &ant, int kernel, double bank, double tilt, double heading, double az, double el, double zenith)
+    {
+        using dtype = typename std::decay<decltype(ant.e_theta_re)>::type::elem_type;
+        const arma::vec R = quadriga_lib::calc_rotation_matrix(arma::vec{bank, tilt, heading}); // Local to GCS, column-major
+        const double tx = std::sin(el) * std::cos(az), ty = std::sin(el) * std::sin(az), tz = -std::cos(el); // Query theta
+        const double az_ref = std::atan2(zenith * (R(3) * tx + R(4) * ty + R(5) * tz), zenith * (R(0) * tx + R(1) * ty + R(2) * tz));
+        const arma::uword row = zenith > 0.0 ? ant_d.n_elevation() - 1 : 0;
+        const double x = (az_ref + pi) * 180.0 / pi; // Position on the 1 degree azimuth grid
+        const arma::uword j = std::min((arma::uword)x, ant_d.n_azimuth() - 2);
+        const double V_ref = (1.0 - (x - (double)j)) * ant_d.e_theta_re(row, j, 0) + (x - (double)j) * ant_d.e_theta_re(row, j + 1, 0);
+        arma::Cube<dtype> ori(3, 1, 1);
+        ori(0) = (dtype)bank, ori(1) = (dtype)tilt, ori(2) = (dtype)heading;
+        const auto r = run(ant, arma::Mat<dtype>{(dtype)az}, arma::Mat<dtype>{(dtype)el}, nullptr, &ori, nullptr, kernel);
+        INFO("kernel " << kernel << (std::is_same<dtype, float>::value ? " float" : " double") << ", orientation (" << bank
+                       << ", " << tilt << ", " << heading << "), direction (" << az << ", " << el << ")");
+        CHECK(std::abs(wrap((double)r.az_loc(0) - az_ref)) < tol_angle<dtype>(kernel));
+        CHECK(std::abs((double)r.gamma(0)) < tol_angle<dtype>(kernel));
+        CHECK(std::abs((double)r.V_re(0) - V_ref) < tol_field<dtype>(kernel));
+        CHECK(std::abs((double)r.H_re(0)) < tol_field<dtype>(kernel));
+    };
+    for (int kernel : kernels())
+    {
+        for (const auto &o : orientations)
+            for (double zenith : {1.0, -1.0})
+            {
+                // Query direction: the local z-axis (third column of R) times zenith, as azimuth and elevation
+                const arma::vec R = quadriga_lib::calc_rotation_matrix(arma::vec{o[0], o[1], o[2]});
+                const double az = std::atan2(zenith * R(7), zenith * R(6)), el = std::atan2(zenith * R(8), std::hypot(R(6), R(7)));
+                check(ant_d, kernel, o[0], o[1], o[2], az, el, zenith);
+                check(ant_f, kernel, o[0], o[1], o[2], az, el, zenith);
+            }
+        for (int a = -180; a < 180; a += 30)
+            for (double zenith : {1.0, -1.0})
+            {
+                check(ant_d, kernel, 0.0, 0.0, 0.0, a * pi / 180.0, zenith * 0.5 * pi, zenith);
+                check(ant_f, kernel, 0.0, 0.0, 0.0, a * pi / 180.0, zenith * 0.5 * pi, zenith);
+            }
     }
 }
 

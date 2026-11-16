@@ -466,6 +466,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [Python](quadrig
   bracket it are interpolated and blended; frequencies outside the entries take the nearest entry; up to 4 outputs
 - `azimuth` of size `[1, 0]` or `[n_out, 0]` gives empty outputs; `[]` raises an error
 - NaN or infinite angles give NaN in all outputs of that angle and output, without an error
+- On a pole of the local frame (a direction along the z-axis of the oriented antenna) the local azimuth is chosen so
+  that the local and the global theta unit vectors agree: the polarization is not rotated there
 - Kernels: GENERIC computes in double precision; AVX2 in single precision, with errors of up to about 2e-6 of the peak
   field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
   2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
