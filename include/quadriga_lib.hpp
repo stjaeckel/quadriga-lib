@@ -40,57 +40,6 @@ namespace quadriga_lib
     // Check if CUDA is supported
     bool quadriga_lib_has_CUDA();
 
-    // Channel generation function for IEEE TGn, TGac, TGax and TGah indoor channel models
-    // - Returns vector of channel objects, length n_users
-    // - Depends on arrayant and channel classes
-    // - 2D model, no elevation angles
-    std::vector<channel<double>> get_channels_ieee_indoor(
-        const arrayant<double> &ap_array,  // Access point array antenna with 'n_tx' elements (= ports after element coupling)
-        const arrayant<double> &sta_array, // Mobile station array antenna with 'n_rx' elements (= ports after element coupling)
-        std::string ChannelType,           // Channel Model Type (A, B, C, D, E, F) as defined by TGn
-        double CarrierFreq_Hz = 5.25e9,    // Carrier frequency in Hz
-        double tap_spacing_s = 10.0e-9,    // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
-        arma::uword n_users = 1,           // Number of user (only for TGac, TGah)
-        double observation_time = 0.0,     // Channel observation time in seconds (0.0 = static channel)
-        double update_rate = 1.0e-3,       // Channel update interval in seconds
-        double speed_station_kmh = 0.0,    // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
-        double speed_env_kmh = 1.2,        // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
-        arma::vec Dist_m = {4.99},         // Distance between TX and RX in meters, length n_users or length 1 (if same for all users)
-        arma::uvec n_floors = {0},         // Number of floors for the TGah model, adjusted for each user, up to 4 floors, length n_users or length 1 (if same for all users); attenuation only, no delay
-        bool uplink = false,               // Default channel direction is downlink, set uplink to true to get reverse direction (transpose, same Doppler shift)
-        arma::mat offset_angles = {},      // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
-        arma::uword n_subpath = 20,        // Number of sub-paths per path and cluster for Laplacian AS mapping
-        double Doppler_effect = 50.0,      // Special Doppler effects in models D, E (fluorescent lights, value = mains freq.) and F (moving vehicle speed in kmh), use 0.0 to disable
-        arma::sword seed = -1,             // Numeric seed, optional, value -1 disabled seed and uses system random device
-        double KF_linear = NAN,            // Overwrites the default KF (linear scale)
-        double XPR_NLOS_linear = NAN,      // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths; NAN = default, else finite and > 0
-        double SF_std_dB_LOS = NAN,        // Overwrites the default Shadow Fading STD for LOS channels in dB
-        double SF_std_dB_NLOS = NAN,       // Overwrites the default Shadow Fading STD for NLOS channels in dB
-        double dBP_m = NAN,                // Overwrites the default breakpoint distance in meters
-        arma::uvec n_walls = {0},          // Number of walls per user TGax models; [n_users] or [1]
-        double wall_loss = 5.0);           // Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
-
-    // Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
-    // - Per snapshot get_channels_planar ("phase", arrays at the positions of 'rays', computed once per distinct
-    //   orientation) or get_channels_spherical ("drift") with the paths of ssf_paths
-    // - "taps": rays summed per tap, LOS and GR taps always present, tap count fixed per call; "rays": one path per ray
-    // - Validity: see ssf_paths; the channel's 'par' reports the largest displacement relative to the limit
-    //   ("phase": sqrt(lambda * b_eff / 8); "drift": 0.2 * b_med)
-    channel<double> gbsm_single_link_channel(const arrayant<double> &tx_array,          // Tx array antenna, n_tx ports
-                                             const arrayant<double> &rx_array,          // Rx array antenna, n_rx ports
-                                             const gbsm_rays &rays,                     // Ray data of the link
-                                             const arma::vec &link_gain_dB,             // Link gain -PL - O2I + 10·lg(SF) at rays.center_freq(i_freq) in [dB], [n_snap] or [1]
-                                             const std::string &mobility = "auto",      // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
-                                             const std::string &output = "taps",        // "taps" or "rays"
-                                             arma::uword i_freq = 0,                    // Frequency index in rays.center_freq, 0-based; TR methods: 0 (one entry)
-                                             const arma::mat *tx_pos = nullptr,         // Optional: Tx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.tx_pos
-                                             const arma::mat *rx_pos = nullptr,         // Optional: Rx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.rx_pos
-                                             const arma::mat *tx_orientation = nullptr, // Optional: Tx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
-                                             const arma::mat *rx_orientation = nullptr, // Optional: Rx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
-                                             const arma::vec *kf_ratio = nullptr,       // Optional: K(snapshot) / K(drop) at rays.center_freq(i_freq), [n_snap] or [1]; nullptr = 1
-                                             bool oxygen = false,                       // TR 7.6.1 oxygen absorption from each path's own length
-                                             bool use_absolute_delays = false);         // Include the LOS delay in all delays, as get_channels_*
-
     // Initialize rays; float only; returns n_ray; min 190 byte per ray
     arma::uword ray_init(
         arma::uword n_ray_target,                         // Target number of rays

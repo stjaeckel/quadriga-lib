@@ -5,7 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
-#include "quadriga_lib.hpp"
+#include "quadriga_channel.hpp" // Not quadriga_lib.hpp: checks that this header declares the channel generation functions
 
 #include <algorithm>
 #include <cmath>

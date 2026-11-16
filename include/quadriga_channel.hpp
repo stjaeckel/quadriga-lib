@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
@@ -16,6 +14,8 @@
 #include <complex>
 #include <fstream>
 #include <cstdint>
+
+#include "quadriga_arrayant.hpp"
 
 namespace quadriga_lib
 {
@@ -493,6 +493,188 @@ namespace quadriga_lib
                                                 const arma::cube &M,               // Polarization transfer matrices, [8, n_path, n_freq]
                                                 const arma::u32_vec &path_type,    // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
                                                 arma::uword i_cir = 0);            // CIR index, stored in path::iC, < 2^32
+
+    // ---- Channel generation functions ----
+
+    // Calculate channel coefficients for spherical waves
+    // - Interpolates the transmit antenna pattern (including orientation and polarization)
+    // - Interpolates the receive antenna pattern (including orientation and polarization)
+    // - Calculates the channel response and delays in time domain for each MIMO sub-link (including antenna element coupling)
+    // - LOS-Path identification: path-length must equal the TX-RX 3D-distance within 0.1 mm (use double precision for satellite links!)
+    // - For the LOS-Path, FBS and LBS must be on the direct line between Tx and Rx (i.e. FBS-Pos = TX-Pos, LBS-Pos = RX-Pos)
+    // - LOS-Path delays and amplitudes are calculated including the individual element positions
+    // - If path length is shorter than the shortest possible path (TX > FBS > LBS > RX), shortest possible path is used for delay calculation
+    // - If path length is longer (more interactions than FBS and LBS), it is used for the delay and phase of the phase centres;
+    //   the extra length is added to the FBS-LBS segment, per-element offsets follow the FBS / LBS geometry
+    // - Polarization transfer matrix: 2x2 Jones matrix (rows = RX pol. V/H, columns = TX pol. V/H), column-major, Re/Im
+    //   interleaved: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx)
+    // - Polarization transfer matrix must be normalized (i.e., not include the free-space equivalent path gain)
+    // - add_fake_los_path always adds one output path: slot 0 holds the LOS path (zero power if none was found); a LOS path
+    //   found in the input leaves a zero-power path in its original slot
+    template <typename dtype>
+    void get_channels_spherical(const arrayant<dtype> &tx_array,          // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
+                                const arrayant<dtype> &rx_array,          // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+                                const arma::Mat<dtype> &tx_pos,           // Transmitter position in Cartesian coordinates [m], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &tx_orientation,   // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &rx_pos,           // Receiver position in Cartesian coordinates [m], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &rx_orientation,   // Receiver orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &fbs_pos,          // First-bounce scatterer positions, matrix of size [3, n_path]
+                                const arma::Mat<dtype> &lbs_pos,          // Last-bounce scatterer positions, matrix of size [3, n_path]
+                                const arma::Col<dtype> &path_gain,        // Path gain (linear scale), vector of length [n_path]
+                                const arma::Col<dtype> &path_length,      // Absolute path length from TX to RX phase center, vector of length [n_path]
+                                const arma::Mat<dtype> &M,                // Polarization transfer matrix, matrix of size [8, n_path]
+                                arma::Cube<dtype> &coeff_re,              // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> &coeff_im,              // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> &delay,                 // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path]
+                                dtype center_freq = dtype(0.0),      // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+                                bool use_absolute_delays = false,    // Option: If true, the LOS delay is included for all paths
+                                bool add_fake_los_path = false,      // Option: Add one path, slot 0 = LOS path (zero power if none was present)
+                                arma::Cube<dtype> *aod = nullptr,    // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *eoa = nullptr,    // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+                                int use_kernel = 0);                 // Kernel of antenna interpolation and coefficients: 0 = auto, 1 = GENERIC, 2 = AVX2
+
+    // Calculate channel coefficients for spherical waves across multiple frequencies
+    // - Extends get_channels_spherical to support frequency-dependent antenna patterns, path gains, and Jones matrices
+    // - Geometry (angles, delays, LOS detection) is computed once and reused for all output frequencies
+    // - TX/RX antenna patterns are interpolated from multi-frequency arrayant vectors at each output frequency
+    // - Path gain and polarization transfer matrix are interpolated from freq to freq_new grids
+    // - Supports both radio (speed of light) and acoustic (speed of sound) propagation
+    // - Jones matrix M can have 2 rows (scalar pressure: Re, Im of (V rx, V tx) only) or 8 rows (full polarimetric, row
+    //   order as in get_channels_spherical)
+    // - NLOS path lengths and add_fake_los_path as in get_channels_spherical
+    // - For baseband_freq_response_multi with remove_delay_phase = true, generate the channels with use_absolute_delays = true
+    // - Output coefficients and delays are returned as vectors of cubes, one per output frequency
+    template <typename dtype>
+    void get_channels_multifreq(const std::vector<arrayant<dtype>> &tx_array, // Multi-frequency transmit array
+                                const std::vector<arrayant<dtype>> &rx_array, // Multi-frequency receive array
+                                const arma::Mat<dtype> &tx_pos,               // Transmitter position [m], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &tx_orientation,       // Transmitter orientation (bank, tilt, heading) [rad], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &rx_pos,               // Receiver position [m], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &rx_orientation,       // Receiver orientation (bank, tilt, heading) [rad], [3, 1] or [1, 3]
+                                const arma::Mat<dtype> &fbs_pos,              // First-bounce scatterer positions [3, n_path]
+                                const arma::Mat<dtype> &lbs_pos,              // Last-bounce scatterer positions [3, n_path]
+                                const arma::Mat<dtype> &path_gain,            // Path gain (linear), [n_path, n_freq]
+                                const arma::Col<dtype> &path_length,          // Absolute path length TX→RX [n_path]
+                                const arma::Cube<dtype> &M,                   // Polarization transfer matrix [8, n_path, n_freq] or [2, n_path, n_freq]
+                                const arma::Col<dtype> &freq,                 // Input sample frequencies [Hz], length [n_freq]
+                                const arma::Col<dtype> &freq_new,             // Target frequencies [Hz], length [n_freq_new]
+                                std::vector<arma::Cube<dtype>> &coeff_re,     // Output: real part of coefficients, length [n_freq_new], each [n_rx, n_tx, n_path]
+                                std::vector<arma::Cube<dtype>> &coeff_im,     // Output: imag part of coefficients, length [n_freq_new], each [n_rx, n_tx, n_path]
+                                std::vector<arma::Cube<dtype>> &delay,        // Output: delays [s], length [n_freq_new], each [n_rx, n_tx, n_path]
+                                bool use_absolute_delays = false,             // If true, include LOS delay in all paths
+                                bool add_fake_los_path = false,               // Add one path, slot 0 = LOS path (zero power if none was present)
+                                dtype propagation_speed = 299792458.0,        // Wave propagation speed [m/s]
+                                std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr); // Optional output: complex coeff_re / coeff_im (then left empty)
+
+    // Calculate channels for Intelligent Reflective Surfaces (IRS)
+    // - IRS is provided as a 3rd array antenna model comprised of 'n_irs' elements
+    // - Requires 2 channel segments: (1) TX -> IRS and (2) IRS -> RX
+    // - Assumes a low-rank channel where the IRS creates additional multipath components
+    // - The IRS weights (phase shifts) are provided as Coupling matrix of the IRS array (column vectors); it must not be empty
+    // - Multiple columns in the Coupling matrix can be seen as multiple IRS codebook entries. Only one entry can be selected
+    // - Generates n_path_irs output paths where n_path_irs <= n_path_1 * n_path_2
+    // - By default the 'irs_array' for both, the receive (TX-IRS) and receive (IRS-RX) direction.
+    // - If different IRS patterns are required for the receive (IRS-RX) direction, a second IRS array can be supplied as optional input
+    // - Returns a vector of bools indicating which of the n_path_1 * n_path_2 paths are in the output
+    template <typename dtype>                                                           // Supported types: float or double
+    std::vector<bool> get_channels_irs(const arrayant<dtype> &tx_array,                 // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
+                                       const arrayant<dtype> &rx_array,                 // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+                                       const arrayant<dtype> &irs_array,                // IRS array with 'n_irs' elements (only one port can be selected for channel generation)
+                                       const arma::Mat<dtype> &tx_pos,                  // Transmitter position in Cartesian coordinates [m], [3, 1] or [1, 3]
+                                       const arma::Mat<dtype> &tx_orientation,          // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
+                                       const arma::Mat<dtype> &rx_pos,                  // Receiver position in Cartesian coordinates [m], [3, 1] or [1, 3]
+                                       const arma::Mat<dtype> &rx_orientation,          // Receiver orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
+                                       const arma::Mat<dtype> &irs_pos,                 // IRS position in Cartesian coordinates [m], [3, 1] or [1, 3]
+                                       const arma::Mat<dtype> &irs_orientation,         // IRS orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
+                                       const arma::Mat<dtype> &fbs_pos_1,               // First-bounce scatterer positions of TX-IRS paths, matrix of size [3, n_path_1]
+                                       const arma::Mat<dtype> &lbs_pos_1,               // Last-bounce scatterer positions of TX-IRS paths, matrix of size [3, n_path_1]
+                                       const arma::Col<dtype> &path_gain_1,             // Path gain (linear scale) of TX-IRS paths, vector of length [n_path_1]
+                                       const arma::Col<dtype> &path_length_1,           // Absolute path length from TX to IRS phase center, vector of length [n_path_1]
+                                       const arma::Mat<dtype> &M_1,                     // Polarization transfer matrix of TX-IRS paths, matrix of size [8, n_path_1]
+                                       const arma::Mat<dtype> &fbs_pos_2,               // First-bounce scatterer positions of IRS-RX paths, matrix of size [3, n_path_2]
+                                       const arma::Mat<dtype> &lbs_pos_2,               // Last-bounce scatterer positions of IRS-RX paths, matrix of size [3, n_path_2]
+                                       const arma::Col<dtype> &path_gain_2,             // Path gain (linear scale) of IRS-RX paths, vector of length [n_path_2]
+                                       const arma::Col<dtype> &path_length_2,           // Absolute path length from IRS to RX phase center, vector of length [n_path_2]
+                                       const arma::Mat<dtype> &M_2,                     // Polarization transfer matrix of IRS-RX paths, matrix of size [8, n_path_2]
+                                       arma::Cube<dtype> &coeff_re,                     // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> &coeff_im,                     // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> &delay,                        // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path_irs]
+                                       arma::uword i_irs = 0,                           // IRS codebook entry (= port number in the IRS array)
+                                       dtype threshold_dB = -140.0,                     // Threshold in dB relative to path gain below which paths are discarded from the output
+                                       dtype center_freq = 0.0,                         // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+                                       bool use_absolute_delays = false,                // Option: If true, the LOS delay is included for all paths
+                                       arma::Cube<dtype> *aod = nullptr,                // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *eod = nullptr,                // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *aoa = nullptr,                // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *eoa = nullptr,                // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       const arrayant<dtype> *irs_array_2 = nullptr,    // Optional input: Transmit IRS for the second segment with 'n_irs' elements
+                                       const std::vector<bool> *active_path = nullptr); // Optional input: Switch to activate individual paths, ignores threshold_dB
+
+    // Calculate channel coefficients for planar waves
+    // - Interpolates the transmit antenna pattern (including orientation and polarization)
+    // - Interpolates the receive antenna pattern (including orientation and polarization)
+    // - Calculates the channel response and delays in time domain for each MIMO sub-link (including antenna element coupling)
+    // - LOS-Path identification: path-length must equal the TX-RX 3D-distance within 0.1 mm
+    // - Angles are ignored for LOS path identification
+    // - Polarization transfer matrix: 2x2 Jones matrix (rows = RX pol. V/H, columns = TX pol. V/H), column-major, Re/Im
+    //   interleaved: rows 0-1 = (V rx, V tx), 2-3 = (H rx, V tx), 4-5 = (V rx, H tx), 6-7 = (H rx, H tx)
+    // - Polarization transfer matrix must be normalized (i.e., not include the path gain)
+    // - add_fake_los_path always adds one output path: slot 0 holds the strongest LOS path (zero power if none was found);
+    //   a LOS path found in the input leaves a zero-power path in its original slot
+    // - Option to calculate the Doppler weights from orientation (+1 Moves towards path, -1 moves away from path)
+    template <typename dtype>
+    void get_channels_planar(const arrayant<dtype> &tx_array,          // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
+                             const arrayant<dtype> &rx_array,          // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+                             const arma::Mat<dtype> &tx_pos,           // Transmitter position in Cartesian coordinates [m], [3, 1] or [1, 3]
+                             const arma::Mat<dtype> &tx_orientation,   // Transmitter orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
+                             const arma::Mat<dtype> &rx_pos,           // Receiver position in Cartesian coordinates [m], [3, 1] or [1, 3]
+                             const arma::Mat<dtype> &rx_orientation,   // Receiver orientation (bank, tilt, heading) in [rad], [3, 1] or [1, 3]
+                             const arma::Col<dtype> &aod,              // Departure azimuth angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> &eod,              // Departure elevation angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> &aoa,              // Arrival azimuth angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> &eoa,              // Arrival elevation angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> &path_gain,        // Path gain (linear scale), vector of length [n_path]
+                             const arma::Col<dtype> &path_length,      // Absolute path length from TX to RX phase center, vector of length [n_path]
+                             const arma::Mat<dtype> &M,                // Polarization transfer matrix, matrix of size [8, n_path]
+                             arma::Cube<dtype> &coeff_re,              // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
+                             arma::Cube<dtype> &coeff_im,              // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
+                             arma::Cube<dtype> &delay,                 // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
+                             dtype center_freq = dtype(0.0),          // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+                             bool use_absolute_delays = false,        // Option: If true, the LOS delay is included for all paths
+                             bool add_fake_los_path = false,          // Option: Add one path, slot 0 = LOS path (zero power if none was present)
+                             arma::Col<dtype> *rx_Doppler = nullptr); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
+
+    // Channel generation function for IEEE TGn, TGac, TGax and TGah indoor channel models
+    // - Returns vector of channel objects, length n_users
+    // - Depends on arrayant and channel classes
+    // - 2D model, no elevation angles
+    std::vector<channel<double>> get_channels_ieee_indoor(
+        const arrayant<double> &ap_array,  // Access point array antenna with 'n_tx' elements (= ports after element coupling)
+        const arrayant<double> &sta_array, // Mobile station array antenna with 'n_rx' elements (= ports after element coupling)
+        std::string ChannelType,           // Channel Model Type (A, B, C, D, E, F) as defined by TGn
+        double CarrierFreq_Hz = 5.25e9,    // Carrier frequency in Hz
+        double tap_spacing_s = 10.0e-9,    // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
+        arma::uword n_users = 1,           // Number of user (only for TGac, TGah)
+        double observation_time = 0.0,     // Channel observation time in seconds (0.0 = static channel)
+        double update_rate = 1.0e-3,       // Channel update interval in seconds
+        double speed_station_kmh = 0.0,    // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
+        double speed_env_kmh = 1.2,        // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
+        arma::vec Dist_m = {4.99},         // Distance between TX and RX in meters, length n_users or length 1 (if same for all users)
+        arma::uvec n_floors = {0},         // Number of floors for the TGah model, adjusted for each user, up to 4 floors, length n_users or length 1 (if same for all users); attenuation only, no delay
+        bool uplink = false,               // Default channel direction is downlink, set uplink to true to get reverse direction (transpose, same Doppler shift)
+        arma::mat offset_angles = {},      // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
+        arma::uword n_subpath = 20,        // Number of sub-paths per path and cluster for Laplacian AS mapping
+        double Doppler_effect = 50.0,      // Special Doppler effects in models D, E (fluorescent lights, value = mains freq.) and F (moving vehicle speed in kmh), use 0.0 to disable
+        arma::sword seed = -1,             // Numeric seed, optional, value -1 disabled seed and uses system random device
+        double KF_linear = NAN,            // Overwrites the default KF (linear scale)
+        double XPR_NLOS_linear = NAN,      // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths; NAN = default, else finite and > 0
+        double SF_std_dB_LOS = NAN,        // Overwrites the default Shadow Fading STD for LOS channels in dB
+        double SF_std_dB_NLOS = NAN,       // Overwrites the default Shadow Fading STD for NLOS channels in dB
+        double dBP_m = NAN,                // Overwrites the default breakpoint distance in meters
+        arma::uvec n_walls = {0},          // Number of walls per user TGax models; [n_users] or [1]
+        double wall_loss = 5.0);           // Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
 
 }
 

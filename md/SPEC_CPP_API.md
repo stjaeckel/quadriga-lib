@@ -12,13 +12,13 @@ quadriga-lib is a C++ radio channel modelling library and the numerical core beh
 
 # REPOSITORY LAYOUT AND BUILD
 - `include/` — public headers, the contract:
-  - `quadriga_lib.hpp` — version functions, channel generation, the float-only ray-tracing pipeline (`ray_init`, `ray_progress`, `ray_commit`, ...); includes the headers below
+  - `quadriga_lib.hpp` — version functions, the float-only ray-tracing pipeline (`ray_init`, `ray_progress`, `ray_commit`, ...); includes the headers below
   - `quadriga_tools.hpp` — site-specific simulation tools, channel statistics, miscellaneous tools
   - `quadriga_math.hpp` — math functions
   - `quadriga_arrayant.hpp` — `arrayant` class and array antenna functions
-  - `quadriga_channel.hpp` — `channel` and `path` classes, channel functions
+  - `quadriga_channel.hpp` — `channel` and `path` classes, channel functions, channel generation (`get_channels_*`); includes `quadriga_arrayant.hpp`
   - `quadriga_sos.hpp` — sum-of-sinusoids random number generator
-  - `quadriga_gbsm.hpp` — geometry-based stochastic model: scenario parameters (conf files), large-scale fading
+  - `quadriga_gbsm.hpp` — geometry-based stochastic model: scenario parameters (conf files), large-scale and small-scale fading, single-link channel (`gbsm_single_link_channel`); includes `quadriga_channel.hpp`
 - `src/` — implementations (`*.cpp`) and internal headers (`*.hpp`, `*.h`); internal headers are not installed and may be included by tests that test internals.
 - `tests/catch2_tests/` — Catch2 (v3) tests, one file per function or topic; `tests/quadriga_lib_catch2_tests.cpp` holds `main`.
 - `tests/data/` — input files for tests.

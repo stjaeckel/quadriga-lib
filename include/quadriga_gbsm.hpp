@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "quadriga_channel.hpp"
+
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "uword", "size_t" and "unsigned long long" interchangeably
 // This requires a 64 bit platform, but will compile on Linux, Windows and macOS
@@ -309,6 +311,27 @@ namespace quadriga_lib
                               const arma::u32_vec *tap = nullptr,       // Optional: Tap index, [n_path]; nullptr = one tap per path
                               const arma::vec *gr_eps_re = nullptr,     // Optional: Ground permittivity, real part, [n_freq]; needed where a GR path is recomputed
                               const arma::vec *gr_eps_im = nullptr);    // Optional: Ground permittivity, imaginary part, [n_freq]; needed where a GR path is recomputed
+
+    // Channel coefficients of one link at one frequency over one segment (geometry-based stochastic model)
+    // - Per snapshot get_channels_planar ("phase", arrays at the positions of 'rays', computed once per distinct
+    //   orientation) or get_channels_spherical ("drift") with the paths of ssf_paths
+    // - "taps": rays summed per tap, LOS and GR taps always present, tap count fixed per call; "rays": one path per ray
+    // - Validity: see ssf_paths; the channel's 'par' reports the largest displacement relative to the limit
+    //   ("phase": sqrt(lambda * b_eff / 8); "drift": 0.2 * b_med)
+    channel<double> gbsm_single_link_channel(const arrayant<double> &tx_array,          // Tx array antenna, n_tx ports
+                                             const arrayant<double> &rx_array,          // Rx array antenna, n_rx ports
+                                             const gbsm_rays &rays,                     // Ray data of the link
+                                             const arma::vec &link_gain_dB,             // Link gain -PL - O2I + 10·lg(SF) at rays.center_freq(i_freq) in [dB], [n_snap] or [1]
+                                             const std::string &mobility = "auto",      // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
+                                             const std::string &output = "taps",        // "taps" or "rays"
+                                             arma::uword i_freq = 0,                    // Frequency index in rays.center_freq, 0-based; TR methods: 0 (one entry)
+                                             const arma::mat *tx_pos = nullptr,         // Optional: Tx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.tx_pos
+                                             const arma::mat *rx_pos = nullptr,         // Optional: Rx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.rx_pos
+                                             const arma::mat *tx_orientation = nullptr, // Optional: Tx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
+                                             const arma::mat *rx_orientation = nullptr, // Optional: Rx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
+                                             const arma::vec *kf_ratio = nullptr,       // Optional: K(snapshot) / K(drop) at rays.center_freq(i_freq), [n_snap] or [1]; nullptr = 1
+                                             bool oxygen = false,                       // TR 7.6.1 oxygen absorption from each path's own length
+                                             bool use_absolute_delays = false);         // Include the LOS delay in all delays, as get_channels_*
 }
 
 #endif

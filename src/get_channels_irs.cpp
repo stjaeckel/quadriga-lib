@@ -8,7 +8,7 @@
 #include <algorithm> // std::replace
 #include <iostream>
 
-#include "quadriga_arrayant.hpp"
+#include "quadriga_channel.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 #include "qd_arrayant_functions.hpp"
 
