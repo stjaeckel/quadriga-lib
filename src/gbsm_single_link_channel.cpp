@@ -89,7 +89,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - Channel object: `center_freq` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
   `rx_orientation` `[3, n_snap]`; per snapshot `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap]` (`"taps"`) or
   `[n_rx, n_tx, n_path]` (`"rays"`); `"rays"` also `path_gain`, `path_length`, `path_polarization`, `path_angles`
-  and in `"drift"` `path_fbs_pos`, `path_lbs_pos`; `par_names`, `par_data` with the entries below
+  and in `"drift"` `fbs_pos`, `lbs_pos`; `par_names`, `par_data` with the entries below
 
 ## Entries of `par_names` / `par_data`:
 
@@ -344,7 +344,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         c.path_gain.resize(n_snap), c.path_length.resize(n_snap), c.path_polarization.resize(n_snap);
         c.path_angles.resize(n_snap);
         if (drift)
-            c.path_fbs_pos.resize(n_snap), c.path_lbs_pos.resize(n_snap);
+            c.fbs_pos.resize(n_snap), c.lbs_pos.resize(n_snap);
     }
     const arma::uvec i_gr = arma::find(rr.path_type == 1);
     const bool with_gr = drift && taps && i_gr.n_elem > 0;
@@ -416,7 +416,7 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
             c.path_gain[t] = arma::vectorise(pg), c.path_length[t] = pl, c.path_polarization[t] = M;
             c.path_angles[t] = arma::join_rows(arma::join_rows(aod, eod), arma::join_rows(aoa, eoa));
             if (drift)
-                c.path_fbs_pos[t] = fbs, c.path_lbs_pos[t] = lbs;
+                c.fbs_pos[t] = fbs, c.lbs_pos[t] = lbs;
         }
     };
     loop((int)n_snap, n_snap > 1 && (drift || n_snap * n_kept * n_rx * n_tx >= L_chan), snap);

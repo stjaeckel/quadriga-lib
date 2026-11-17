@@ -38,8 +38,8 @@ namespace quadriga_lib
         std::vector<arma::Col<dtype>> path_length;       // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
         std::vector<arma::Mat<dtype>> path_polarization; // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
         std::vector<arma::Mat<dtype>> path_angles;       // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
-        std::vector<arma::Mat<dtype>> path_fbs_pos;      // First-bounce scatterer positions, matrices of size [3, n_path]
-        std::vector<arma::Mat<dtype>> path_lbs_pos;      // Last-bounce scatterer positions, matrices of size [3, n_path]
+        std::vector<arma::Mat<dtype>> fbs_pos;           // First-bounce scatterer positions, matrices of size [3, n_path]
+        std::vector<arma::Mat<dtype>> lbs_pos;           // Last-bounce scatterer positions, matrices of size [3, n_path]
         std::vector<arma::Col<unsigned>> n_interact;     // Number interaction points of a path with the environment, 0 = LOS, vector (n_snap) of vectors of length [n_path]
         std::vector<arma::Mat<dtype>> interact_coord;    // Interaction coordinates of paths with the environment, matrices of size [3, sum(n_interact)]
         std::vector<std::string> par_names;              // Names of unstructured data fields
@@ -69,8 +69,8 @@ namespace quadriga_lib
                        const arma::Col<dtype> *path_length_add = nullptr,       // Absolute path length from TX to RX phase center, vector of length [n_path_add]
                        const arma::Mat<dtype> *path_polarization_add = nullptr, // Polarization transfer function, Matrix of size [8, n_path_add], interleaved complex
                        const arma::Mat<dtype> *path_angles_add = nullptr,       // Departure and arrival angles, Matrix of size [n_path_add, 4], {AOD, EOD, AOA, EOA}
-                       const arma::Mat<dtype> *path_fbs_pos_add = nullptr,      // First-bounce scatterer positions, Matrix of size [3, n_path_add]
-                       const arma::Mat<dtype> *path_lbs_pos_add = nullptr);     // Last-bounce scatterer positions, Matrix of size [3, n_path_add]
+                       const arma::Mat<dtype> *fbs_pos_add = nullptr,           // First-bounce scatterer positions, Matrix of size [3, n_path_add]
+                       const arma::Mat<dtype> *lbs_pos_add = nullptr);          // Last-bounce scatterer positions, Matrix of size [3, n_path_add]
 
         // Calculate the the effective path gain (linear scale)
         // - sum up the power of all paths and over all transmit and receive antenna pairs

@@ -120,7 +120,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['e_theta_im'], ant['e_theta_im'], decimal=5)
             npt.assert_array_almost_equal(out['e_phi_re'], ant['e_phi_re'], decimal=5)
@@ -134,7 +134,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=4)
             self.assertEqual(out['e_theta_re'].shape, ant['e_theta_re'].shape)
         finally:
@@ -147,7 +147,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['e_phi_re'], ant['e_phi_re'], decimal=5)
             self.assertEqual(out['e_theta_re'].shape[2], 2)
@@ -164,7 +164,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['azimuth_grid'], ant['azimuth_grid'], decimal=10)
             npt.assert_array_almost_equal(out['elevation_grid'], ant['elevation_grid'], decimal=10)
         finally:
@@ -176,7 +176,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_almost_equal(out['center_freq'], 3.5e9, decimal=0)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -187,7 +187,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['element_pos'], ant['element_pos'], decimal=10)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -198,7 +198,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['coupling_re'], ant['coupling_re'], decimal=10)
             npt.assert_array_almost_equal(out['coupling_im'], ant['coupling_im'], decimal=10)
         finally:
@@ -210,7 +210,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['name'], ant['name'])
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -225,7 +225,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].ndim, 3)
             self.assertEqual(out['e_phi_re'].ndim, 3)
         finally:
@@ -237,11 +237,12 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             for key in ['e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im',
                         'azimuth_grid', 'elevation_grid', 'element_pos',
-                        'coupling_re', 'coupling_im', 'center_freq', 'name', 'layout']:
+                        'coupling_re', 'coupling_im', 'center_freq', 'name']:
                 self.assertIn(key, out)
+            self.assertNotIn('layout', out)
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
@@ -251,8 +252,9 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
-            self.assertIsInstance(out['layout'], np.ndarray)
+            out, layout = arrayant.qdant_read(fn)
+            self.assertIsInstance(out, dict)
+            self.assertIsInstance(layout, np.ndarray)
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
@@ -277,7 +279,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant, id=3)
-            out = arrayant.qdant_read(fn, id=3)
+            out, _ = arrayant.qdant_read(fn, id=3)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -288,7 +290,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant, id=1)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -303,7 +305,7 @@ class TestQdantWriteReadSingleFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertTrue(out['e_theta_re'].flags.f_contiguous)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -322,7 +324,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['e_theta_im'], ant['e_theta_im'], decimal=5)
             npt.assert_array_almost_equal(out['e_phi_re'], ant['e_phi_re'], decimal=5)
@@ -336,7 +338,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['e_phi_re'], ant['e_phi_re'], decimal=5)
         finally:
@@ -349,7 +351,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         try:
             arrayant.qdant_write(fn, ant)
             # Read back as single (id=1) since n_freq=1 writes one entry
-            out = arrayant.qdant_read(fn, id=1)
+            out, _ = arrayant.qdant_read(fn, id=1)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'][:, :, :, 0], decimal=5)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -364,7 +366,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].ndim, 4)
             self.assertEqual(out['e_phi_re'].ndim, 4)
         finally:
@@ -376,7 +378,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape, ant['e_theta_re'].shape)
             self.assertEqual(out['e_theta_im'].shape, ant['e_theta_im'].shape)
             self.assertEqual(out['e_phi_re'].shape, ant['e_phi_re'].shape)
@@ -391,7 +393,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape[3], n_freq)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -402,11 +404,12 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             for key in ['e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im',
                         'azimuth_grid', 'elevation_grid', 'element_pos',
-                        'coupling_re', 'coupling_im', 'center_freq', 'name', 'layout']:
+                        'coupling_re', 'coupling_im', 'center_freq', 'name']:
                 self.assertIn(key, out)
+            self.assertNotIn('layout', out)
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
@@ -420,7 +423,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['azimuth_grid'], ant['azimuth_grid'], decimal=10)
             npt.assert_array_almost_equal(out['elevation_grid'], ant['elevation_grid'], decimal=10)
         finally:
@@ -432,7 +435,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['center_freq'], ant['center_freq'], decimal=0)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -443,7 +446,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['center_freq'].ndim, 1)
             self.assertEqual(len(out['center_freq']), 3)
         finally:
@@ -455,7 +458,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             npt.assert_array_almost_equal(out['element_pos'], ant['element_pos'], decimal=10)
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -466,7 +469,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['name'], 'dipole_multi')
         finally:
             if os.path.exists(fn): os.unlink(fn)
@@ -477,9 +480,9 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
-            self.assertIn('layout', out)
-            self.assertIsInstance(out['layout'], np.ndarray)
+            out, layout = arrayant.qdant_read(fn)
+            self.assertIsInstance(out, dict)
+            self.assertIsInstance(layout, np.ndarray)
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
@@ -507,7 +510,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             # Freq 0 and freq 2 have different scaling (1.0 vs 1.2), should not be equal
             self.assertFalse(np.allclose(out['e_theta_re'][:, :, 0, 0],
                                          out['e_theta_re'][:, :, 0, 2], atol=1e-6))
@@ -520,9 +523,9 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out_multi = arrayant.qdant_read(fn)
+            out_multi, _ = arrayant.qdant_read(fn)
             for f_idx in range(3):
-                out_single = arrayant.qdant_read(fn, id=f_idx + 1)
+                out_single, _ = arrayant.qdant_read(fn, id=f_idx + 1)
                 npt.assert_array_almost_equal(
                     out_multi['e_theta_re'][:, :, :, f_idx],
                     out_single['e_theta_re'], decimal=10)
@@ -543,7 +546,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         try:
             arrayant.qdant_write(fn, ant)
             for f_idx in range(3):
-                out = arrayant.qdant_read(fn, id=f_idx + 1)
+                out, _ = arrayant.qdant_read(fn, id=f_idx + 1)
                 self.assertEqual(out['e_theta_re'].ndim, 3)
                 npt.assert_array_almost_equal(
                     out['e_theta_re'], ant['e_theta_re'][:, :, :, f_idx], decimal=5)
@@ -561,7 +564,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, speaker)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape, speaker['e_theta_re'].shape)
             npt.assert_array_almost_equal(out['e_theta_re'], speaker['e_theta_re'], decimal=5)
             npt.assert_array_almost_equal(out['center_freq'], speaker['center_freq'], decimal=0)
@@ -578,7 +581,7 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         fn = _temp_qdant()
         try:
             arrayant.qdant_write(fn, ant)
-            out = arrayant.qdant_read(fn)
+            out, _ = arrayant.qdant_read(fn)
             self.assertEqual(out['e_theta_re'].shape[3], 2)
             npt.assert_array_almost_equal(out['e_theta_re'], ant['e_theta_re'], decimal=5)
         finally:

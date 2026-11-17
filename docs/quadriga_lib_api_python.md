@@ -634,10 +634,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#qdant_read) · [MATLAB](quadriga_lib_api_
 ### Usage:
 ```python
 # Read every entry (a frequency-dependent arrayant when the file holds several)
-data = quadriga_lib.arrayant.qdant_read( fn )
+ant, layout = quadriga_lib.arrayant.qdant_read( fn )
 
 # Read a single entry
-data = quadriga_lib.arrayant.qdant_read( fn, id )
+ant, layout = quadriga_lib.arrayant.qdant_read( fn, id )
 ```
 
 ### Inputs:
@@ -645,14 +645,14 @@ data = quadriga_lib.arrayant.qdant_read( fn, id )
 - **`id`** — 1-based ID of the entry to read, >= 1; `None` reads all entries (see above); default: None
 
 ### Outputs:
-- **`data`** — Dict with the array antenna data; keys as in [generate](#generate), with these specifics:
+- **`ant`** — Dict with the array antenna data; keys as in [generate](#generate), with these specifics:
   - `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` — Pattern fields;
     `(n_elevation, n_azimuth, n_elements)` for a single entry, or
     `(n_elevation, n_azimuth, n_elements, n_freq)` when multiple entries are read
   - `center_freq` — Center frequency in Hz; scalar for a single entry, `(n_freq,)` when reading multiple entries
   - `coupling_re`, `coupling_im` — Coupling matrices; `(n_elements, n_ports)`, or
     `(n_elements, n_ports, n_freq)` when reading multiple entries with per-entry coupling
-  - `layout` — Matrix of element IDs describing how the entries are arranged in the file; int64
+- **`layout`** — Matrix of element IDs describing how the entries are arranged in the file; int64
 
 ### See also:
 - [qdant_write](#qdant_write) (for writing QDANT data)
@@ -966,8 +966,8 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
   | Key                | Description                                                              | Shape `stack = False`             | Shape `stack = True`                 |
   | ------------------ | ------------------------------------------------------------------------ | --------------------------------- | ------------------------------------ |
   | `name`             | Channel name                                                             | str                               | str                                  |
-  | `tx_position`      | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
-  | `rx_position`      | Receiver positions (STA for downlink, AP for uplink)                     | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
+  | `tx_pos`           | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
+  | `rx_pos`           | Receiver positions (STA for downlink, AP for uplink)                     | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
   | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
   | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `(3, n_snap)` or `(3, 1)`         | `(3, n_snap)` or `(3, 1)`            |
   | `coeff`            | Channel coefficients, complex-valued                                     | list of `(n_rx, n_tx, n_path_s)`  | `(n_rx, n_tx, n_path, n_snap)`       |
@@ -1468,8 +1468,8 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, Carri
   | Key                | Description                                                              | Shape `stack = False`            | Shape `stack = True`           |
   | ------------------ | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------ |
   | `name`             | Channel name                                                             | str                              | str                            |
-  | `tx_position`      | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
-  | `rx_position`      | Receiver positions (STA for downlink, AP for uplink)                     | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
+  | `tx_pos`           | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
+  | `rx_pos`           | Receiver positions (STA for downlink, AP for uplink)                     | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
   | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
   | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
   | `coeff`            | Channel coefficients, complex valued                                     | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
@@ -2561,7 +2561,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 
 ### Outputs:
 - **`chan`** — Channel dict, layout as documented in [hdf5_read_channel](#hdf5_read_channel): `center_freq` `(1,)`;
-  `tx_position`, `rx_position` (the snapshot positions), `tx_orientation`, `rx_orientation` `(3, n_snap)`; per
+  `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`, `rx_orientation` `(3, n_snap)`; per
   snapshot `coeff`, `delay` `(n_rx, n_tx, n_tap)` (`"taps"`) or `(n_rx, n_tx, n_path)` (`"rays"`); `"rays"` also
   `path_gain`, `path_length`, `path_polarization`, `path_angles` and in `"drift"` `fbs_pos`, `lbs_pos`
 - **`par`** — Dict with the keys below

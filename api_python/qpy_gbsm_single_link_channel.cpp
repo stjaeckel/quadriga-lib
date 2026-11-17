@@ -64,7 +64,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 
 ## Outputs:
 - **`chan`** — Channel dict, layout as documented in [[hdf5_read_channel]]: `center_freq` `(1,)`;
-  `tx_position`, `rx_position` (the snapshot positions), `tx_orientation`, `rx_orientation` `(3, n_snap)`; per
+  `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`, `rx_orientation` `(3, n_snap)`; per
   snapshot `coeff`, `delay` `(n_rx, n_tx, n_tap)` (`"taps"`) or `(n_rx, n_tx, n_path)` (`"rays"`); `"rays"` also
   `path_gain`, `path_length`, `path_polarization`, `path_angles` and in `"drift"` `fbs_pos`, `lbs_pos`
 - **`par`** — Dict with the keys below

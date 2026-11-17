@@ -151,8 +151,8 @@ TEST_CASE("Channel - add_paths with inputs that are fields of the channel")
     c.delay.push_back(arma::cube(1, 1, 2, arma::fill::zeros));
     c.path_gain.push_back(arma::vec(2, arma::fill::ones));
     c.path_length.push_back(arma::vec(2, arma::fill::ones));
-    c.path_fbs_pos.push_back(arma::mat(3, 2, arma::fill::ones));
-    c.path_lbs_pos.push_back(arma::mat(3, 2, arma::fill::zeros));
+    c.fbs_pos.push_back(arma::mat(3, 2, arma::fill::ones));
+    c.lbs_pos.push_back(arma::mat(3, 2, arma::fill::zeros));
     REQUIRE(c.is_valid().empty());
 
     const arma::cube cre(1, 1, 2, arma::fill::ones), cim(1, 1, 2, arma::fill::zeros), dl(1, 1, 2, arma::fill::zeros);
@@ -169,13 +169,13 @@ TEST_CASE("Channel - add_paths with inputs that are fields of the channel")
 
     // An input is another field of the snapshot
     d = c;
-    CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &d.path_fbs_pos[0]), std::invalid_argument);
+    CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &d.fbs_pos[0]), std::invalid_argument);
     d = c;
     CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &d.path_length[0], &pl, nullptr, nullptr, &fbs, &lbs), std::invalid_argument);
 
     // An input uses the memory of a field
     d = c;
-    const arma::mat fbs_view(d.path_fbs_pos[0].memptr(), 3, 2, false, true);
+    const arma::mat fbs_view(d.fbs_pos[0].memptr(), 3, 2, false, true);
     CHECK_THROWS_AS(d.add_paths(0, &cre, &cim, &dl, nullptr, nullptr, &pg, &pl, nullptr, nullptr, &fbs, &fbs_view), std::invalid_argument);
     CHECK(d.n_path().at(0) == 2);
 }

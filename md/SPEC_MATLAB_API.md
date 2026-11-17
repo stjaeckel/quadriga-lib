@@ -237,19 +237,19 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 ## Arrayant struct
 - A `quadriga_lib::arrayant<double>` is represented in MATLAB as a struct with the fields below. Requires `mex_quadriga_lib_functions.hpp`.
 
-| MATLAB field | C++ member | Size | Required as input |
-| --- | --- | --- | --- |
-| `e_theta_re` | `e_theta_re` | `[n_elevation, n_azimuth, n_elements]` | yes |
-| `e_theta_im` | `e_theta_im` | `[n_elevation, n_azimuth, n_elements]` | yes |
-| `e_phi_re` | `e_phi_re` | `[n_elevation, n_azimuth, n_elements]` | yes |
-| `e_phi_im` | `e_phi_im` | `[n_elevation, n_azimuth, n_elements]` | yes |
-| `azimuth_grid` | `azimuth_grid` | `[n_azimuth]`; returned as row vector | yes |
-| `elevation_grid` | `elevation_grid` | `[n_elevation]`; returned as row vector | yes |
-| `element_pos` | `element_pos` | `[3, n_elements]` | no; default: zeros |
-| `coupling_re` | `coupling_re` | `[n_elements, n_ports]` | no; default: identity |
-| `coupling_im` | `coupling_im` | `[n_elements, n_ports]` | no; default: zeros |
-| `center_freq` | `center_freq` | scalar | no; default: 299792458 |
-| `name` | `name` | string | no |
+| Field (= C++ member) | Size | Required as input |
+| --- | --- | --- |
+| `e_theta_re` | `[n_elevation, n_azimuth, n_elements]` | yes |
+| `e_theta_im` | `[n_elevation, n_azimuth, n_elements]` | yes |
+| `e_phi_re` | `[n_elevation, n_azimuth, n_elements]` | yes |
+| `e_phi_im` | `[n_elevation, n_azimuth, n_elements]` | yes |
+| `azimuth_grid` | `[n_azimuth]`; returned as row vector | yes |
+| `elevation_grid` | `[n_elevation]`; returned as row vector | yes |
+| `element_pos` | `[3, n_elements]` | no; default: zeros |
+| `coupling_re` | `[n_elements, n_ports]` | no; default: identity |
+| `coupling_im` | `[n_elements, n_ports]` | no; default: zeros |
+| `center_freq` | scalar | no; default: 299792458 |
+| `name` | string | no |
 
 - A 1x1 struct is a single-frequency arrayant; a 1xN struct array is a frequency-dependent (multi-frequency) model and maps to `std::vector<quadriga_lib::arrayant<double>>`.
 - Reading: `qd_mex_struct2arrayant(prhs[i], validate, copy)` or `qd_mex_struct2arrayant_multi(...)`.
@@ -264,27 +264,27 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 - A `quadriga_lib::channel<double>` is represented in MATLAB as a struct with the fields below; a `std::vector` of channels is a 1xN struct array. Requires `mex_quadriga_lib_functions.hpp`.
 - Members that are a `std::vector` over snapshots in C++ are regular arrays in MATLAB with the snapshot on the last dimension (zero-padded when the number of paths differs between snapshots).
 
-| MATLAB field | C++ member | MATLAB size |
-| --- | --- | --- |
-| `name` | `name` | string |
-| `tx_position` | `tx_pos` | `[3, 1]` or `[3, n_snap]` |
-| `rx_position` | `rx_pos` | `[3, 1]` or `[3, n_snap]` |
-| `tx_orientation` | `tx_orientation` | `[3, 1]` or `[3, n_snap]` |
-| `rx_orientation` | `rx_orientation` | `[3, 1]` or `[3, n_snap]` |
-| `coeff_re`, `coeff_im`, `delay` | same | `[n_rx, n_tx, n_path, n_snap]` |
-| `path_gain`, `path_length` | same | `[n_path, n_snap]` |
-| `path_polarization` | `path_polarization` | `[8, n_path, n_snap]` |
-| `path_angles` | `path_angles` | `[n_path, 4, n_snap]` |
-| `fbs_pos` | `path_fbs_pos` | `[3, n_path, n_snap]` |
-| `lbs_pos` | `path_lbs_pos` | `[3, n_path, n_snap]` |
-| `n_interact` | `n_interact` | `[n_path, n_snap]`; uint32 |
-| `interact_coord` | `interact_coord` | `[3, max(sum(n_interact)), n_snap]` |
-| `center_freq` | `center_freq` | scalar or `[n_snap]` |
-| `initial_position` | `initial_position` | scalar; int32; 1-based (0-based in C++); absent = 1 |
+| Field (= C++ member) | MATLAB size |
+| --- | --- |
+| `name` | string |
+| `tx_pos` | `[3, 1]` or `[3, n_snap]` |
+| `rx_pos` | `[3, 1]` or `[3, n_snap]` |
+| `tx_orientation` | `[3, 1]` or `[3, n_snap]` |
+| `rx_orientation` | `[3, 1]` or `[3, n_snap]` |
+| `coeff_re`, `coeff_im`, `delay` | `[n_rx, n_tx, n_path, n_snap]` |
+| `path_gain`, `path_length` | `[n_path, n_snap]` |
+| `path_polarization` | `[8, n_path, n_snap]` |
+| `path_angles` | `[n_path, 4, n_snap]` |
+| `fbs_pos` | `[3, n_path, n_snap]` |
+| `lbs_pos` | `[3, n_path, n_snap]` |
+| `n_interact` | `[n_path, n_snap]`; uint32 |
+| `interact_coord` | `[3, max(sum(n_interact)), n_snap]` |
+| `center_freq` | scalar or `[n_snap]` |
+| `initial_position` | scalar; int32; 1-based (0-based in C++); absent = 1 |
 
-- Note the name differences: `tx_position` / `rx_position` and `fbs_pos` / `lbs_pos` in MATLAB vs. `tx_pos` / `rx_pos` and `path_fbs_pos` / `path_lbs_pos` in C++.
+- A field carries the name of its C++ member; exception: a member that is a `std::vector` over snapshots becomes one array (see above).
 - Reading: `qd_mex_struct2channel(prhs[i], validate, copy)` always returns a `std::vector`; all fields are optional, missing fields leave the member empty. Wrap the call in `CALL_QD` when `validate = true`.
-- Writing: `plhs[0] = qd_mex_channel2struct(chan_vec);` Only populated members become fields (decided by the first channel); an empty vector returns a `0x0` struct.
+- Writing: `plhs[0] = qd_mex_channel2struct(chan_vec);` A member becomes a field when at least one channel fills it; the other channels get `[]` in that field. An empty vector returns a `0x0` struct.
 - Unstructured data (`par_names` / `par_data`, a list of `std::any`) is NOT part of the channel struct. It is exchanged through a separate `par` struct, converted with `qd_mex_anycast` / `qd_mex_any2matlab`; see `hdf5_write_channel.cpp` and `hdf5_read_channel.cpp`.
 - In the documentation, refer to [[hdf5_read_channel]] for the field layout instead of repeating the table.
 

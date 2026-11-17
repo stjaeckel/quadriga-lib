@@ -31,9 +31,9 @@ class test_case(unittest.TestCase):
             f.write('</arrayant></qdant>\n')
 
         with self.assertRaises(RuntimeError):
-            data = arrayant.qdant_read( 'testx.qdant' )
+            arrayant.qdant_read( 'testx.qdant' )
 
-        data = arrayant.qdant_read( 'test.qdant' )
+        data, layout = arrayant.qdant_read( 'test.qdant' )
 
         A = 20 * np.log10(data["e_theta_re"])
         B = np.reshape(np.arange(1, 16), (5, 3, 1))
@@ -47,7 +47,7 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(data["coupling_re"], np.array([[1]]), decimal=13)
         npt.assert_almost_equal(data["center_freq"], 299792458, decimal=13)
         assert data["name"] == 'bla'
-        assert data["layout"] == np.uint32(1)
+        assert layout == 1
         
         # More complex test
         with open('test.qdant', 'w') as f:
@@ -66,7 +66,7 @@ class test_case(unittest.TestCase):
             f.write('<xx:CenterFrequency>3e9</xx:CenterFrequency>\n')
             f.write('</xx:arrayant></qdant>\n')
 
-        data = arrayant.qdant_read( 'test.qdant' )
+        data, layout = arrayant.qdant_read( 'test.qdant' )
 
         npt.assert_almost_equal(data["azimuth_grid"], np.array([-np.pi / 2, -np.pi / 4, 0, np.pi / 4, np.pi / 2]), decimal=13)
         npt.assert_almost_equal(data["elevation_grid"], np.array([-np.pi / 2, 0, np.pi / 2]), decimal=13)
@@ -79,7 +79,7 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(data["coupling_im"], 1 / np.sqrt(2), decimal=13)
         npt.assert_almost_equal(data["center_freq"], 3e9, decimal=13)
         assert data["name"] == 'unknown'
-        assert np.array_equal(data["layout"], np.ones((2, 3), dtype=np.uint32))
+        assert np.array_equal(layout, np.ones((2, 3), dtype=int))
 
         # Two array antennas with uncommon formats
         with open('test.qdant', 'w') as f:
@@ -98,13 +98,13 @@ class test_case(unittest.TestCase):
             f.write('<name>xxx</name>\n')
             f.write('</arrayant></qdant>\n')
 
-        data = arrayant.qdant_read( 'test.qdant', 1 )
+        data, layout = arrayant.qdant_read( 'test.qdant', 1 )
 
         B = np.sqrt(np.array([[1.26, 1.26, 1.26], [1.58, 1.58, 2]]))
-        assert np.array_equal(data["layout"], np.array([[1, 3]], dtype=np.uint32))
+        assert np.array_equal(layout, np.array([[1, 3]]))
         npt.assert_almost_equal(data["e_theta_re"][:,:,0], B, decimal=2)
 
-        data = arrayant.qdant_read( 'test.qdant', 3 )
+        data, _ = arrayant.qdant_read( 'test.qdant', 3 )
 
         B = np.array([[1], [-1]]) * np.sqrt(10 ** (np.array([[1, 2, 3], [-1, -2, -3]]) / 10))
         npt.assert_almost_equal(data["e_theta_re"], np.zeros((2, 3, 2)), decimal=13)
@@ -122,9 +122,12 @@ class test_case(unittest.TestCase):
         try:
             fn = os.path.join(d, 'a.qdant')
             arrayant.qdant_write(fn, arrayant.generate('omni'))
-            r = arrayant.qdant_read(fn)
-            self.assertEqual(r['layout'].dtype, np.int64)
-            npt.assert_array_equal(r['layout'], [[1]])
+            out = arrayant.qdant_read(fn)
+            self.assertIsInstance(out, tuple)
+            self.assertEqual(len(out), 2)
+            r, layout = out
+            self.assertEqual(layout.dtype, np.int64)
+            npt.assert_array_equal(layout, [[1]])
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
@@ -137,10 +140,10 @@ class test_default_id(unittest.TestCase):
             fn = os.path.join(tmp, 'freq.qdant')
             arrayant.qdant_write(fn, arrayant.generate('omni', freq=1e9), 1)
             arrayant.qdant_write(fn, arrayant.generate('omni', freq=2e9), 2)
-            for r in (arrayant.qdant_read(fn), arrayant.qdant_read(fn, None)):
+            for r, _ in (arrayant.qdant_read(fn), arrayant.qdant_read(fn, None)):
                 self.assertEqual(r['e_theta_re'].ndim, 4)
                 npt.assert_array_equal(r['center_freq'], [1e9, 2e9])
-            r = arrayant.qdant_read(fn, 2)
+            r, _ = arrayant.qdant_read(fn, 2)
             self.assertEqual(r['e_theta_re'].ndim, 3)
             self.assertEqual(r['center_freq'], 2e9)
             # IDs are 1-based: 0 is not an ID and does not mean "all"
@@ -148,12 +151,12 @@ class test_default_id(unittest.TestCase):
                 arrayant.qdant_read(fn, 0)
             with self.assertRaisesRegex(TypeError, "'id' must be an integer or None"):
                 arrayant.qdant_read(fn, 1.5)
-            npt.assert_array_equal(arrayant.qdant_read(fn, np.int64(2))['center_freq'], 2e9)
+            npt.assert_array_equal(arrayant.qdant_read(fn, np.int64(2))[0]['center_freq'], 2e9)
             fn = os.path.join(tmp, 'two.qdant')
             arrayant.qdant_write(fn, arrayant.generate('omni'), 1)
             arrayant.qdant_write(fn, arrayant.generate('xpol'), 2)
-            self.assertEqual(arrayant.qdant_read(fn, 1)['e_theta_re'].shape[2], 1)
-            self.assertEqual(arrayant.qdant_read(fn, 2)['e_theta_re'].shape[2], 2)
+            self.assertEqual(arrayant.qdant_read(fn, 1)[0]['e_theta_re'].shape[2], 1)
+            self.assertEqual(arrayant.qdant_read(fn, 2)[0]['e_theta_re'].shape[2], 2)
             with self.assertRaisesRegex(ValueError, "do not form a frequency set.*pass 'id'"):
                 arrayant.qdant_read(fn)
             fn = os.path.join(tmp, 'grids.qdant')

@@ -66,7 +66,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(chan["coeff"][0].dtype, np.complex128)
         self.assertEqual(chan["delay"][0].shape, (2, 1, n_tap))
         npt.assert_array_equal(chan["center_freq"], FC[0])
-        npt.assert_array_equal(chan["rx_position"], RX.T)
+        npt.assert_array_equal(chan["rx_pos"], RX.T)
         self.assertIsInstance(par, dict)
         self.assertEqual(list(par.keys()), PAR)
         self.assertEqual(par["tap"].dtype, np.uint32)

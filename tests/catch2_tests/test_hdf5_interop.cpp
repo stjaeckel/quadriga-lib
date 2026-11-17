@@ -152,8 +152,8 @@ namespace
         const size_t ns = n_snap;
         const bool has_snapshot_data = c.coeff_re.size() == ns || c.delay.size() == ns || c.path_gain.size() == ns ||
                                        c.path_length.size() == ns || c.path_polarization.size() == ns ||
-                                       c.path_angles.size() == ns || c.path_fbs_pos.size() == ns ||
-                                       c.path_lbs_pos.size() == ns || c.n_interact.size() == ns;
+                                       c.path_angles.size() == ns || c.fbs_pos.size() == ns ||
+                                       c.lbs_pos.size() == ns || c.n_interact.size() == ns;
         const arma::uvec n_path = c.n_path();
         for (size_t s = 0; s < ns && has_snapshot_data; ++s)
         {
@@ -183,8 +183,8 @@ namespace
             col(c.path_length, "path_length");
             mat(c.path_polarization, "path_polarization");
             mat(c.path_angles, "path_angles");
-            mat(c.path_fbs_pos, "path_fbs_pos");
-            mat(c.path_lbs_pos, "path_lbs_pos");
+            mat(c.fbs_pos, "path_fbs_pos");
+            mat(c.lbs_pos, "path_lbs_pos");
             if (c.n_interact.size() == ns)
                 t.add_dataset(sg + "/no_interact", raw(H5T_STD_U32LE, {np}, c.n_interact[s].memptr(), np));
             mat(c.interact_coord, "interact_coord");
@@ -439,8 +439,8 @@ namespace
             c.path_length.push_back(filled(col(np), o + 40.0));
             c.path_polarization.push_back(filled(mat(8, np), o + 50.0));
             c.path_angles.push_back(filled(mat(np, 4), o + 60.0));
-            c.path_fbs_pos.push_back(filled(mat(3, np), o + 70.0));
-            c.path_lbs_pos.push_back(filled(mat(3, np), o + 80.0));
+            c.fbs_pos.push_back(filled(mat(3, np), o + 70.0));
+            c.lbs_pos.push_back(filled(mat(3, np), o + 80.0));
             arma::u32_vec n_interact(np);
             for (arma::uword p = 0; p < np; ++p)
                 n_interact(p) = (unsigned)(p % 3);

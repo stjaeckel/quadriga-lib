@@ -40,7 +40,7 @@ class test_case(unittest.TestCase):
         id_file = arrayant.qdant_write("test_py.qdant", ant)
         assert id_file == 1
 
-        data = arrayant.qdant_read('test_py.qdant')
+        data, _ = arrayant.qdant_read('test_py.qdant')
         npt.assert_almost_equal(data["azimuth_grid"], ant["azimuth_grid"], decimal=6)
         npt.assert_almost_equal(data["elevation_grid"], ant["elevation_grid"], decimal=6)
         npt.assert_almost_equal(data["e_theta_re"][:,:,0], ant["e_theta_re"], decimal=4)
@@ -60,8 +60,8 @@ class test_case(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             fn = pathlib.Path(d) / "ant.qdant"
             self.assertEqual(arrayant.qdant_write(fn, ant), 1)
-            data_path = arrayant.qdant_read(fn)
-            data_str = arrayant.qdant_read(str(fn))
+            data_path, _ = arrayant.qdant_read(fn)
+            data_str, _ = arrayant.qdant_read(str(fn))
             npt.assert_array_equal(data_path["e_theta_re"], data_str["e_theta_re"])
             npt.assert_array_equal(data_path["e_phi_re"], data_str["e_phi_re"])
         with self.assertRaises(TypeError) as ctx:

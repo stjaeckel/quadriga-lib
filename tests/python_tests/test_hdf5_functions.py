@@ -29,7 +29,7 @@ from quadriga_lib import channel
 
 
 def minimal_channel(name='c'):
-    return {'name': name, 'tx_position': np.zeros((3, 1)), 'rx_position': np.ones((3, 1)),
+    return {'name': name, 'tx_pos': np.zeros((3, 1)), 'rx_pos': np.ones((3, 1)),
             'center_freq': np.array([1e9]), 'coeff': [np.ones((1, 1, 1), complex)],
             'delay': [np.zeros((1, 1, 1))]}
 
@@ -44,8 +44,8 @@ def full_channel(n_path=(3, 2)):
 
     return {
         'name': 'full',
-        'tx_position': q(3, len(n_path)),
-        'rx_position': q(3, 1),
+        'tx_pos': q(3, len(n_path)),
+        'rx_pos': q(3, 1),
         'tx_orientation': q(3, 1),
         'rx_orientation': q(3, len(n_path)),
         'coeff': [q(2, 3, n) + 1j * q(2, 3, n) for n in n_path],
@@ -381,7 +381,7 @@ class test_case(unittest.TestCase):
             ('abc', {}, 'Channel input must be a dict or a list of dicts.'),
             (['abc'], {}, 'Each channel list entry must be a dict.'),
             (dict(c, coeff_re=[np.ones((1, 1, 1))]), {}, "provide either 'coeff' (complex) or 'coeff_re'/'coeff_im'"),
-            (dict(c, tx_position=np.zeros((2, 1))), {}, "'tx_pos' is missing or ill-formatted"),  # from C++
+            (dict(c, tx_pos=np.zeros((2, 1))), {}, "'tx_pos' is missing or ill-formatted"),  # from C++
             (dict(c, name='x' * 256), {}, 'Name can have at most 255 characters.'),
             (c, {'par': 'abc'}, "'par' must be a dict, a list of dicts, or None."),
             (c, {'par': [1]}, "Each 'par' list entry must be a dict."),
@@ -446,7 +446,7 @@ class test_case(unittest.TestCase):
             ref = np.zeros(shape[:-1], dtype=c[key].dtype)  # snapshot 1: 2 paths, 1 interaction, zero-padded
             ref[tuple(slice(0, n) for n in chan_ref[key][1].shape)] = chan_ref[key][1]
             npt.assert_array_equal(c[key][..., 1], ref, err_msg=key)
-        for key in ['name', 'tx_position', 'rx_position', 'tx_orientation', 'rx_orientation', 'center_freq',
+        for key in ['name', 'tx_pos', 'rx_pos', 'tx_orientation', 'rx_orientation', 'center_freq',
                     'initial_position']:
             self.assert_same(c[key], chan_ref[key], key)
 
@@ -455,7 +455,7 @@ class test_case(unittest.TestCase):
         ref = full_channel(n_path=(3, 3))
         f32 = {k: [x.astype(np.complex64 if np.iscomplexobj(x) else np.float32) for x in v]
                if isinstance(v, list) and k != 'n_interact' else v for k, v in ref.items()}
-        f32.update({k: ref[k].astype(np.float32) for k in ['tx_position', 'rx_position', 'center_freq']})
+        f32.update({k: ref[k].astype(np.float32) for k in ['tx_pos', 'rx_pos', 'center_freq']})
         variants = [
             ref,                                                                      # list model
             stack_model(ref),                                                         # stack model
@@ -516,8 +516,8 @@ class test_case(unittest.TestCase):
         c = chan[0]
         for key in ['coeff', 'delay', 'path_gain', 'path_polarization', 'n_interact', 'interact_coord']:
             self.assert_same(c[key], [ref[key][1], ref[key][0]], key)
-        self.assert_same(c['tx_position'], ref['tx_position'][:, [1, 0]])  # per-snapshot columns follow
-        self.assert_same(c['rx_position'], ref['rx_position'])             # a shared column stays
+        self.assert_same(c['tx_pos'], ref['tx_pos'][:, [1, 0]])  # per-snapshot columns follow
+        self.assert_same(c['rx_pos'], ref['rx_pos'])             # a shared column stays
         self.assert_same(c['center_freq'], ref['center_freq'][[1, 0]])
 
         for snap in [1, [1], np.array([1], dtype=np.int32), np.uint64(1)]:

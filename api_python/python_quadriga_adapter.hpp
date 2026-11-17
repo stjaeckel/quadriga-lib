@@ -383,8 +383,8 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
 
     output["name"] = channel.name;
 
-    emit_per_snap_mat("rx_position", channel.rx_pos);
-    emit_per_snap_mat("tx_position", channel.tx_pos);
+    emit_per_snap_mat("rx_pos", channel.rx_pos);
+    emit_per_snap_mat("tx_pos", channel.tx_pos);
     emit_per_snap_mat("rx_orientation", channel.rx_orientation);
     emit_per_snap_mat("tx_orientation", channel.tx_orientation);
 
@@ -403,10 +403,10 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
     if (!channel.path_angles.empty())
         output["path_angles"] = qd_python_emit_paths<double>(&channel.path_angles, stack, i_snap);
 
-    if (!channel.path_fbs_pos.empty())
-        output["fbs_pos"] = qd_python_emit_paths<double>(&channel.path_fbs_pos, stack, i_snap);
-    if (!channel.path_lbs_pos.empty())
-        output["lbs_pos"] = qd_python_emit_paths<double>(&channel.path_lbs_pos, stack, i_snap);
+    if (!channel.fbs_pos.empty())
+        output["fbs_pos"] = qd_python_emit_paths<double>(&channel.fbs_pos, stack, i_snap);
+    if (!channel.lbs_pos.empty())
+        output["lbs_pos"] = qd_python_emit_paths<double>(&channel.lbs_pos, stack, i_snap);
 
     if (!channel.n_interact.empty())
         output["n_interact"] = qd_python_emit_paths<py::ssize_t>(&channel.n_interact, stack, i_snap);
@@ -455,47 +455,49 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
         return dict.contains(key) && !dict[key].is_none();
     };
 
-    // Load a real vector<Cube<double>> field: list of 3D arrays, or a single 4D array.
-    auto load_vecCube_real = [&](const char *key) -> std::vector<arma::Cube<double>>
+    // Load one member if its key is present. Positions, orientations and center_freq are plain arrays;
+    // per-snapshot members are a list of per-snapshot arrays ("list" model) or one array with the
+    // snapshot index on the last axis ("stack" model).
+    auto load = [&](const char *key, auto &member)
     {
+        if (!has(key))
+            return;
         py::object v = dict[key];
-        if (py::isinstance<py::list>(v))
-            return qd_python_list2vector_Cube<double>(py::reinterpret_borrow<py::list>(v));
-        return qd_python_numpy2arma_vecCube<double>(v, true);
+        const bool is_list = py::isinstance<py::list>(v);
+        using M = std::decay_t<decltype(member)>;
+        if constexpr (std::is_same_v<M, arma::Mat<double>>)
+            member = qd_python_numpy2arma_Mat<double>(v, true);
+        else if constexpr (std::is_same_v<M, arma::Col<double>>)
+            member = qd_python_numpy2arma_Col<double>(v, true);
+        else if constexpr (std::is_same_v<M, std::vector<arma::Cube<double>>>)
+            member = is_list ? qd_python_list2vector_Cube<double>(py::reinterpret_borrow<py::list>(v))
+                             : qd_python_numpy2arma_vecCube<double>(v, true);
+        else if constexpr (std::is_same_v<M, std::vector<arma::Mat<double>>>)
+            member = is_list ? qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v))
+                             : qd_python_numpy2arma_vecMat<double>(v);
+        else // std::vector<arma::Col<double or unsigned>>
+        {
+            using T = typename M::value_type::elem_type;
+            member = is_list ? qd_python_list2vector_Col<T>(py::reinterpret_borrow<py::list>(v))
+                             : qd_python_numpy2arma_vecCol<T>(v);
+        }
     };
 
-    // Scalars / strings
     if (has("name"))
         c.name = dict["name"].cast<std::string>();
     if (has("initial_position"))
         c.initial_position = dict["initial_position"].cast<decltype(c.initial_position)>();
 
-    // Positions / orientations: (3, n_snap) or (3, 1)
-    if (has("tx_position"))
-        c.tx_pos = qd_python_numpy2arma_Mat<double>(dict["tx_position"], true);
-    if (has("rx_position"))
-        c.rx_pos = qd_python_numpy2arma_Mat<double>(dict["rx_position"], true);
-    if (has("tx_orientation"))
-        c.tx_orientation = qd_python_numpy2arma_Mat<double>(dict["tx_orientation"], true);
-    if (has("rx_orientation"))
-        c.rx_orientation = qd_python_numpy2arma_Mat<double>(dict["rx_orientation"], true);
+    load("tx_pos", c.tx_pos);
+    load("rx_pos", c.rx_pos);
+    load("tx_orientation", c.tx_orientation);
+    load("rx_orientation", c.rx_orientation);
+    load("center_freq", c.center_freq);
 
-    // Center frequency: (n_snap,) or scalar
-    if (has("center_freq"))
-        c.center_freq = qd_python_numpy2arma_Col<double>(dict["center_freq"], true);
-
-    // Coefficients (complex)
-    // Accepted in one of two mutually exclusive forms:
-    //   * "coeff"                  — a single complex key (list of 3D or 4D complex array)
-    //   * "coeff_re" / "coeff_im"  — two real keys (each: list of 3D or 4D real array)
-    const bool has_coeff = has("coeff");
-    const bool has_coeff_re = has("coeff_re");
-    const bool has_coeff_im = has("coeff_im");
-
-    if (has_coeff && (has_coeff_re || has_coeff_im))
+    // Coefficients: one complex key "coeff", or the two real keys "coeff_re" / "coeff_im", not both
+    if (has("coeff") && (has("coeff_re") || has("coeff_im")))
         throw std::invalid_argument("Channel dict: provide either 'coeff' (complex) or 'coeff_re'/'coeff_im' (real), not both.");
-
-    if (has_coeff)
+    if (has("coeff"))
     {
         py::object v = dict["coeff"];
         if (py::isinstance<py::list>(v))
@@ -503,87 +505,18 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
         else
             qd_python_numpy2arma_vecCube_Cplx<double>(v, c.coeff_re, c.coeff_im);
     }
-    else // split real / imaginary form
-    {
-        if (has_coeff_re)
-            c.coeff_re = load_vecCube_real("coeff_re");
-        if (has_coeff_im)
-            c.coeff_im = load_vecCube_real("coeff_im");
-    }
+    load("coeff_re", c.coeff_re);
+    load("coeff_im", c.coeff_im);
 
-    // Delays (real): list of (n_rx, n_tx, n_path_s) or 4D
-    if (has("delay"))
-        c.delay = load_vecCube_real("delay");
-
-    // Per-path vector<Col> fields: list of (n_path_s,) or 2D (n_path, n_snap)
-    if (has("path_gain"))
-    {
-        py::object v = dict["path_gain"];
-        if (py::isinstance<py::list>(v))
-            c.path_gain = qd_python_list2vector_Col<double>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.path_gain = qd_python_numpy2arma_vecCol<double>(v);
-    }
-    if (has("path_length"))
-    {
-        py::object v = dict["path_length"];
-        if (py::isinstance<py::list>(v))
-            c.path_length = qd_python_list2vector_Col<double>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.path_length = qd_python_numpy2arma_vecCol<double>(v);
-    }
-    if (has("n_interact"))
-    {
-        py::object v = dict["n_interact"];
-        if (py::isinstance<py::list>(v))
-            c.n_interact = qd_python_list2vector_Col<unsigned>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.n_interact = qd_python_numpy2arma_vecCol<unsigned>(v);
-    }
-
-    // Per-path vector<Mat> real fields: list of 2D or 3D (rows, cols, n_snap)
-    if (has("path_angles"))
-    {
-        py::object v = dict["path_angles"];
-        if (py::isinstance<py::list>(v))
-            c.path_angles = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.path_angles = qd_python_numpy2arma_vecMat<double>(v);
-    }
-    if (has("fbs_pos"))
-    {
-        py::object v = dict["fbs_pos"];
-        if (py::isinstance<py::list>(v))
-            c.path_fbs_pos = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.path_fbs_pos = qd_python_numpy2arma_vecMat<double>(v);
-    }
-    if (has("lbs_pos"))
-    {
-        py::object v = dict["lbs_pos"];
-        if (py::isinstance<py::list>(v))
-            c.path_lbs_pos = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.path_lbs_pos = qd_python_numpy2arma_vecMat<double>(v);
-    }
-    if (has("interact_coord"))
-    {
-        py::object v = dict["interact_coord"];
-        if (py::isinstance<py::list>(v))
-            c.interact_coord = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.interact_coord = qd_python_numpy2arma_vecMat<double>(v);
-    }
-
-    // Polarization, real interleaved as in C++: list of (8, n_path_s) or 3D (8, n_path, n_snap)
-    if (has("path_polarization"))
-    {
-        py::object v = dict["path_polarization"];
-        if (py::isinstance<py::list>(v))
-            c.path_polarization = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
-        else
-            c.path_polarization = qd_python_numpy2arma_vecMat<double>(v);
-    }
+    load("delay", c.delay);
+    load("path_gain", c.path_gain);
+    load("path_length", c.path_length);
+    load("path_polarization", c.path_polarization); // real interleaved (8, n_path) as in C++
+    load("path_angles", c.path_angles);
+    load("fbs_pos", c.fbs_pos);
+    load("lbs_pos", c.lbs_pos);
+    load("n_interact", c.n_interact);
+    load("interact_coord", c.interact_coord);
 
     if (validate && !c.empty())
     {

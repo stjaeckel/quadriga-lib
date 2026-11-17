@@ -608,7 +608,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - Channel object: `center_freq` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
   `rx_orientation` `[3, n_snap]`; per snapshot `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap]` (`"taps"`) or
   `[n_rx, n_tx, n_path]` (`"rays"`); `"rays"` also `path_gain`, `path_length`, `path_polarization`, `path_angles`
-  and in `"drift"` `path_fbs_pos`, `path_lbs_pos`; `par_names`, `par_data` with the entries below
+  and in `"drift"` `fbs_pos`, `lbs_pos`; `par_names`, `par_data` with the entries below
 
 ### Entries of `par_names` / `par_data`:
 

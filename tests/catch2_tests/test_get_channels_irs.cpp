@@ -448,14 +448,14 @@ TEST_CASE("Channel - Add Paths")
     CHECK(n_paths[0] == 17ULL);
     CHECK(n_paths[1] == 14ULL);
 
-    // Add path_fbs_pos
+    // Add fbs_pos
     c.path_polarization.clear();
     auto path_pos = arma::mat(3, 2, arma::fill::randn);
 
     // Channel has no path_polarization
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_angles, &path_pos), std::invalid_argument);
-    c.path_fbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
-    c.path_fbs_pos.push_back(arma::mat(3, 14, arma::fill::randn));
+    c.fbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
+    c.fbs_pos.push_back(arma::mat(3, 14, arma::fill::randn));
 
     // No path length provided (but channel has it)
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_angles), std::invalid_argument);
@@ -470,8 +470,8 @@ TEST_CASE("Channel - Add Paths")
     // Channel has no path_polarization
     c.path_angles.clear();
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_pos, &path_pos), std::invalid_argument);
-    c.path_lbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
-    c.path_lbs_pos.push_back(arma::mat(3, 16, arma::fill::randn));
+    c.lbs_pos.push_back(arma::mat(3, 17, arma::fill::randn));
+    c.lbs_pos.push_back(arma::mat(3, 16, arma::fill::randn));
 
     // No path length provided (but channel has it)
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_pos), std::invalid_argument);

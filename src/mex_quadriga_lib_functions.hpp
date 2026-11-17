@@ -175,33 +175,38 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         return qd_mex_make_struct(empty_fields, 0);
     }
 
-    // Determine which fields are populated (based on chan[0])
-    const auto &c0 = chan[0];
-    const bool h_txp = !c0.tx_pos.is_empty();
-    const bool h_rxp = !c0.rx_pos.is_empty();
-    const bool h_txo = !c0.tx_orientation.is_empty();
-    const bool h_rxo = !c0.rx_orientation.is_empty();
-    const bool h_cre = !c0.coeff_re.empty();
-    const bool h_cim = !c0.coeff_im.empty();
-    const bool h_del = !c0.delay.empty();
-    const bool h_pg = !c0.path_gain.empty();
-    const bool h_pl = !c0.path_length.empty();
-    const bool h_pp = !c0.path_polarization.empty();
-    const bool h_pa = !c0.path_angles.empty();
-    const bool h_fbs = !c0.path_fbs_pos.empty();
-    const bool h_lbs = !c0.path_lbs_pos.empty();
-    const bool h_ni = !c0.n_interact.empty();
-    const bool h_ic = !c0.interact_coord.empty();
-    const bool h_cf = !c0.center_freq.is_empty();
-    const bool h_ini = c0.initial_position != 0;
+    // A field exists when any channel fills it; channels without that member get an empty field
+    bool h_txp = false, h_rxp = false, h_txo = false, h_rxo = false, h_cre = false, h_cim = false,
+         h_del = false, h_pg = false, h_pl = false, h_pp = false, h_pa = false, h_fbs = false,
+         h_lbs = false, h_ni = false, h_ic = false, h_cf = false, h_ini = false;
+    for (const auto &c : chan)
+    {
+        h_txp = h_txp || !c.tx_pos.is_empty();
+        h_rxp = h_rxp || !c.rx_pos.is_empty();
+        h_txo = h_txo || !c.tx_orientation.is_empty();
+        h_rxo = h_rxo || !c.rx_orientation.is_empty();
+        h_cre = h_cre || !c.coeff_re.empty();
+        h_cim = h_cim || !c.coeff_im.empty();
+        h_del = h_del || !c.delay.empty();
+        h_pg = h_pg || !c.path_gain.empty();
+        h_pl = h_pl || !c.path_length.empty();
+        h_pp = h_pp || !c.path_polarization.empty();
+        h_pa = h_pa || !c.path_angles.empty();
+        h_fbs = h_fbs || !c.fbs_pos.empty();
+        h_lbs = h_lbs || !c.lbs_pos.empty();
+        h_ni = h_ni || !c.n_interact.empty();
+        h_ic = h_ic || !c.interact_coord.empty();
+        h_cf = h_cf || !c.center_freq.is_empty();
+        h_ini = h_ini || c.initial_position != 0;
+    }
 
     // Build the field list (name is always present)
     std::vector<std::string> fields;
     fields.push_back("name");
     if (h_txp)
-        fields.push_back("tx_position");
+        fields.push_back("tx_pos");
     if (h_rxp)
-        fields.push_back("rx_position");
+        fields.push_back("rx_pos");
     if (h_txo)
         fields.push_back("tx_orientation");
     if (h_rxo)
@@ -248,9 +253,9 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
 
         qd_mex_set_field(output, "name", mxCreateString(c.name.c_str()), n);
         if (h_txp)
-            qd_mex_set_field(output, "tx_position", qd_mex_copy2matlab(&c.tx_pos), n);
+            qd_mex_set_field(output, "tx_pos", qd_mex_copy2matlab(&c.tx_pos), n);
         if (h_rxp)
-            qd_mex_set_field(output, "rx_position", qd_mex_copy2matlab(&c.rx_pos), n);
+            qd_mex_set_field(output, "rx_pos", qd_mex_copy2matlab(&c.rx_pos), n);
         if (h_txo)
             qd_mex_set_field(output, "tx_orientation", qd_mex_copy2matlab(&c.tx_orientation), n);
         if (h_rxo)
@@ -270,9 +275,9 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         if (h_pa)
             qd_mex_set_field(output, "path_angles", qd_mex_vector2matlab(&c.path_angles), n);
         if (h_fbs)
-            qd_mex_set_field(output, "fbs_pos", qd_mex_vector2matlab(&c.path_fbs_pos), n);
+            qd_mex_set_field(output, "fbs_pos", qd_mex_vector2matlab(&c.fbs_pos), n);
         if (h_lbs)
-            qd_mex_set_field(output, "lbs_pos", qd_mex_vector2matlab(&c.path_lbs_pos), n);
+            qd_mex_set_field(output, "lbs_pos", qd_mex_vector2matlab(&c.lbs_pos), n);
         if (h_ni)
             qd_mex_set_field(output, "n_interact", qd_mex_vector2matlab(&c.n_interact), n);
         if (h_ic)
@@ -307,10 +312,10 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "name"))
             c.name = qd_mex_get_string(fp);
 
-        if (mxArray *fp = mxGetField(input, (mwIndex)i, "tx_position"))
-            c.tx_pos = qd_mex_get_Mat<double>(fp, copy, "tx_position");
-        if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_position"))
-            c.rx_pos = qd_mex_get_Mat<double>(fp, copy, "rx_position");
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "tx_pos"))
+            c.tx_pos = qd_mex_get_Mat<double>(fp, copy, "tx_pos");
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_pos"))
+            c.rx_pos = qd_mex_get_Mat<double>(fp, copy, "rx_pos");
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "tx_orientation"))
             c.tx_orientation = qd_mex_get_Mat<double>(fp, copy, "tx_orientation");
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_orientation"))
@@ -333,9 +338,9 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_angles"))
             c.path_angles = qd_mex_matlab2vector_Mat<double>(fp, 2, "path_angles");
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "fbs_pos"))
-            c.path_fbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, "fbs_pos");
+            c.fbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, "fbs_pos");
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "lbs_pos"))
-            c.path_lbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, "lbs_pos");
+            c.lbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, "lbs_pos");
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "n_interact"))
             c.n_interact = qd_mex_matlab2vector_Col<unsigned>(fp, 1, "n_interact");

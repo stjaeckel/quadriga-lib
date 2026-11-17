@@ -229,10 +229,10 @@ namespace
             CHECK(arma::approx_equal(c.path_polarization[t], e[t].M, "absdiff", 1e-12));
             CHECK(arma::approx_equal(c.path_angles[t], e[t].ang, "absdiff", 1e-12));
             if (a.drift())
-                CHECK((arma::approx_equal(c.path_fbs_pos[t], e[t].fbs, "absdiff", 1e-12) &&
-                       arma::approx_equal(c.path_lbs_pos[t], e[t].lbs, "absdiff", 1e-12)));
+                CHECK((arma::approx_equal(c.fbs_pos[t], e[t].fbs, "absdiff", 1e-12) &&
+                       arma::approx_equal(c.lbs_pos[t], e[t].lbs, "absdiff", 1e-12)));
             else
-                CHECK((c.path_fbs_pos.empty() && c.path_lbs_pos.empty()));
+                CHECK((c.fbs_pos.empty() && c.lbs_pos.empty()));
         }
         if (!e.empty())
             CHECK(arma::all(par<arma::u32_vec>(c, "tap") == a.r->tap.elem(e[0].ind)));

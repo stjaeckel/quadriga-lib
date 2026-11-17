@@ -658,8 +658,8 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
                write_path_length = ch->path_length.size() == n_snap,
                write_path_polarization = ch->path_polarization.size() == n_snap,
                write_path_angles = ch->path_angles.size() == n_snap,
-               write_path_fbs_pos = ch->path_fbs_pos.size() == n_snap,
-               write_path_lbs_pos = ch->path_lbs_pos.size() == n_snap,
+               write_path_fbs_pos = ch->fbs_pos.size() == n_snap,
+               write_path_lbs_pos = ch->lbs_pos.size() == n_snap,
                write_no_interact = ch->n_interact.size() == n_snap,
                write_interact_coord = ch->interact_coord.size() == n_snap;
     const bool snapshot_data = n_snap != 0 &&
@@ -688,9 +688,9 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
         if (write_path_angles)
             mat("path_angles", ch->path_angles[i]);
         if (write_path_fbs_pos)
-            mat("path_fbs_pos", ch->path_fbs_pos[i]);
+            mat("path_fbs_pos", ch->fbs_pos[i]);
         if (write_path_lbs_pos)
-            mat("path_lbs_pos", ch->path_lbs_pos[i]);
+            mat("path_lbs_pos", ch->lbs_pos[i]);
         if (write_no_interact)
         {
             const uint64_t n = ch->n_interact[i].n_elem;
@@ -1149,13 +1149,13 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &
         }
         if (find_dataset(*sg, "path_fbs_pos", h5::float32, {np, 3}))
         {
-            c.path_fbs_pos.emplace_back(3, n_path, arma::fill::none);
-            read_float(c.path_fbs_pos.back().memptr());
+            c.fbs_pos.emplace_back(3, n_path, arma::fill::none);
+            read_float(c.fbs_pos.back().memptr());
         }
         if (find_dataset(*sg, "path_lbs_pos", h5::float32, {np, 3}))
         {
-            c.path_lbs_pos.emplace_back(3, n_path, arma::fill::none);
-            read_float(c.path_lbs_pos.back().memptr());
+            c.lbs_pos.emplace_back(3, n_path, arma::fill::none);
+            read_float(c.lbs_pos.back().memptr());
         }
 
         // Number of interaction points of a path with the environment, 0 = LOS, and their coordinates [3, sum]

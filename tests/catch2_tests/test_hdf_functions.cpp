@@ -101,8 +101,8 @@ namespace
             c.path_length.push_back(filled(col(np), o + 40.0));
             c.path_polarization.push_back(filled(mat(8, np), o + 50.0));
             c.path_angles.push_back(filled(mat(np, 4), o + 60.0));
-            c.path_fbs_pos.push_back(filled(mat(3, np), o + 70.0));
-            c.path_lbs_pos.push_back(filled(mat(3, np), o + 80.0));
+            c.fbs_pos.push_back(filled(mat(3, np), o + 70.0));
+            c.lbs_pos.push_back(filled(mat(3, np), o + 80.0));
             arma::u32_vec n_interact(np);
             for (arma::uword p = 0; p < np; ++p)
                 n_interact(p) = (unsigned)(p % 3); // 0 = LOS, 1, 2
@@ -169,8 +169,8 @@ namespace
         same_list(r.path_length, c.path_length, "path_length");
         same_list(r.path_polarization, c.path_polarization, "path_polarization");
         same_list(r.path_angles, c.path_angles, "path_angles");
-        same_list(r.path_fbs_pos, c.path_fbs_pos, "path_fbs_pos");
-        same_list(r.path_lbs_pos, c.path_lbs_pos, "path_lbs_pos");
+        same_list(r.fbs_pos, c.fbs_pos, "fbs_pos");
+        same_list(r.lbs_pos, c.lbs_pos, "lbs_pos");
         same_list(r.interact_coord, c.interact_coord, "interact_coord");
         REQUIRE(r.n_interact.size() == c.n_interact.size());
         for (size_t s = 0; s < c.n_interact.size(); ++s)

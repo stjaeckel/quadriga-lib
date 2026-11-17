@@ -119,8 +119,8 @@ namespace
             c.path_length.push_back(filled(arma::vec(np), o + 40.0));
             c.path_polarization.push_back(filled(arma::mat(8, np), o + 50.0));
             c.path_angles.push_back(filled(arma::mat(np, 4), o + 60.0));
-            c.path_fbs_pos.push_back(filled(arma::mat(3, np), o + 70.0));
-            c.path_lbs_pos.push_back(filled(arma::mat(3, np), o + 80.0));
+            c.fbs_pos.push_back(filled(arma::mat(3, np), o + 70.0));
+            c.lbs_pos.push_back(filled(arma::mat(3, np), o + 80.0));
             arma::u32_vec n_interact(np);
             for (arma::uword p = 0; p < np; ++p)
                 n_interact(p) = (unsigned)(p % 3);

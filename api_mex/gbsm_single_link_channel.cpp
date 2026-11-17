@@ -65,7 +65,7 @@ Channel coefficients of one link at one frequency over one segment
 
 ## Outputs:
 - **`chan`** — Channel struct, layout as documented in [[hdf5_read_channel]]: `center_freq` scalar;
-  `tx_position`, `rx_position` (the snapshot positions), `tx_orientation`, `rx_orientation` `[3, n_snap]`;
+  `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`, `rx_orientation` `[3, n_snap]`;
   `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
   (`'rays'`); `'rays'` also `path_gain`, `path_length`, `path_polarization`, `path_angles` and in `'drift'`
   `fbs_pos`, `lbs_pos`

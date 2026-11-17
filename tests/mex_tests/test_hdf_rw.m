@@ -92,7 +92,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_reshape_layout(fn, 144), 'File does not 
 
 % Stored data keeps its linear slot: 1-based (2, 3) in [4, 3] is slot 10
 quadriga_lib.hdf5_create_file(fn, [4, 3]);
-quadriga_lib.hdf5_write_channel(fn, struct('name', 'keep', 'rx_position', [1; 2; 3], 'tx_position', [0; 0; 0], ...
+quadriga_lib.hdf5_write_channel(fn, struct('name', 'keep', 'rx_pos', [1; 2; 3], 'tx_pos', [0; 0; 0], ...
     'coeff_re', 1, 'coeff_im', 0, 'delay', 1e-6), [], 2, 3);
 quadriga_lib.hdf5_reshape_layout(fn, [2, 3, 1, 2]);
 [~, has_data] = quadriga_lib.hdf5_read_layout(fn);
@@ -186,7 +186,7 @@ assert_cpp_error( @() out2(@quadriga_lib.hdf5_write_channel, fn, dummy_chan, par
 % Round-trip par via hdf5_read_channel
 [chanR, parR] = quadriga_lib.hdf5_read_channel(fn);
 assertTrue(~isfield(chanR, 'coeff_re'));    % no structured data at slot [1,1,1,1]
-assertTrue(~isfield(chanR, 'rx_position'));
+assertTrue(~isfield(chanR, 'rx_pos'));
 
 fieldsPar  = fieldnames(par);
 fieldsParR = fieldnames(parR);
@@ -313,8 +313,8 @@ delay_4d = rand(3, 2, 5, 3);
 
 % Minimal chan: positions, coefficients, delay
 chan = struct;
-chan.rx_position = rx_pos;
-chan.tx_position = tx_pos;
+chan.rx_pos = rx_pos;
+chan.tx_pos = tx_pos;
 chan.coeff_re    = coeff_re;
 chan.coeff_im    = coeff_im;
 chan.delay       = delay_4d;
@@ -322,15 +322,15 @@ quadriga_lib.hdf5_write_channel(fn, chan, [], 3);
 
 % Restore and compare
 chanR = quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1);
-assertEqual(chanR.rx_position, double(single(rx_pos)));
-assertEqual(chanR.tx_position, double(single(tx_pos)));
+assertEqual(chanR.rx_pos, double(single(rx_pos)));
+assertEqual(chanR.tx_pos, double(single(tx_pos)));
 assertEqual(chanR.coeff_re,    double(single(coeff_re)));
 assertEqual(chanR.coeff_im,    double(single(coeff_im)));
 assertEqual(chanR.delay,       double(single(delay_4d)));
 
 % Single precision input gives the same file content
 chan_single = chan;
-chan_single.rx_position = single(rx_pos);
+chan_single.rx_pos = single(rx_pos);
 chan_single.coeff_re    = single(coeff_re);
 chan_single.delay       = single(delay_4d);
 quadriga_lib.hdf5_write_channel(fn, chan_single, [], 9);
@@ -367,8 +367,8 @@ assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 1, 1, 1, 1, 2), 'out of
 % 2D-delay shorthand was removed; explicit reshape works
 delay_2d = rand(5, 3);
 chan = struct;
-chan.rx_position = rx_pos;
-chan.tx_position = tx_pos;
+chan.rx_pos = rx_pos;
+chan.tx_pos = tx_pos;
 chan.coeff_re    = coeff_re;
 chan.coeff_im    = coeff_im;
 chan.delay       = reshape(delay_2d, [1, 1, size(delay_2d, 1), size(delay_2d, 2)]);
@@ -393,8 +393,8 @@ tx_orientation    = rand(3, 3);
 
 chan = struct;
 chan.name              = name;
-chan.rx_position       = rx_pos;
-chan.tx_position       = tx_pos;
+chan.rx_pos            = rx_pos;
+chan.tx_pos            = tx_pos;
 chan.coeff_re          = coeff_re;
 chan.coeff_im          = coeff_im;
 chan.delay             = delay_4d;
@@ -415,8 +415,8 @@ quadriga_lib.hdf5_write_channel(fn, chan, [], 5);
 [chanR, parR] = quadriga_lib.hdf5_read_channel(fn, 5, 1, 1, 1);
 assertTrue(isempty(fieldnames(parR)));
 assertEqual(chanR.name, name);
-assertEqual(chanR.rx_position,       double(single(rx_pos)));
-assertEqual(chanR.tx_position,       double(single(tx_pos)));
+assertEqual(chanR.rx_pos,            double(single(rx_pos)));
+assertEqual(chanR.tx_pos,            double(single(tx_pos)));
 assertEqual(chanR.coeff_re,          double(single(coeff_re)));
 assertEqual(chanR.coeff_im,          double(single(coeff_im)));
 assertEqual(chanR.delay,             double(single(delay_4d)));
@@ -461,8 +461,8 @@ center_freq = rand(3, 1);
 chan = struct;
 chan.name              = name;
 chan.initial_position  = int32(2);
-chan.rx_position       = rx_pos;
-chan.tx_position       = tx_pos;
+chan.rx_pos            = rx_pos;
+chan.tx_pos            = tx_pos;
 chan.coeff_re          = coeff_re;
 chan.coeff_im          = coeff_im;
 chan.delay             = delay_4d;
@@ -473,8 +473,8 @@ quadriga_lib.hdf5_write_channel(fn, chan, par, 6, 1, 1, 2);
 
 [chanR, parR] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 2);
 assertTrue(~isempty(fieldnames(parR)));
-assertEqual(chanR.rx_position,       double(single(rx_pos)));
-assertEqual(chanR.tx_position,       double(single(tx_pos)));
+assertEqual(chanR.rx_pos,            double(single(rx_pos)));
+assertEqual(chanR.tx_pos,            double(single(tx_pos)));
 assertEqual(chanR.coeff_re,          double(single(coeff_re)));
 assertEqual(chanR.coeff_im,          double(single(coeff_im)));
 assertEqual(chanR.delay,             double(single(delay_4d)));
@@ -542,7 +542,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 1.5), 'must 
 
 % Errors from C++: index outside the layout, invalid channel, unsupported par type
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 129), 'Index out of bound.' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, struct('rx_position', [1; 2], 'coeff_re', 1, ...
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, struct('rx_pos', [1; 2], 'coeff_re', 1, ...
     'coeff_im', 1, 'delay', 1), [], 7), '''rx_pos'' is missing or ill-formatted' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, struct('l', true), 7), 'Input ''par.l'' has an unsupported data type.' );
 
@@ -560,8 +560,8 @@ N = 3;
 chans(N) = struct();   % preallocate
 for k = 1:N
     chans(k).name             = sprintf('multi_%d', k);
-    chans(k).rx_position      = rand(3, 1);
-    chans(k).tx_position      = rand(3, 1);
+    chans(k).rx_pos           = rand(3, 1);
+    chans(k).tx_pos           = rand(3, 1);
     chans(k).coeff_re         = rand(2, 2, 4, 2);
     chans(k).coeff_im         = rand(2, 2, 4, 2);
     chans(k).delay            = rand(2, 2, 4, 2);
@@ -578,6 +578,20 @@ for k = 1:N
     assertEqual(chansR(k).name, chans(k).name);
     assertEqual(chansR(k).coeff_re, double(single(chans(k).coeff_re)));
 end
+
+% A member filled only by a later channel is still a field; the other channels have [] there
+delete(fn2);
+mixed = chans(1:2);
+mixed(2).fbs_pos = rand(3, 4, 2);
+quadriga_lib.hdf5_write_channel(fn2, mixed);
+chansR = quadriga_lib.hdf5_read_channel(fn2);
+assertTrue(isempty(chansR(1).fbs_pos));
+assertEqual(chansR(2).fbs_pos, double(single(mixed(2).fbs_pos)));
+delete(fn2);
+quadriga_lib.hdf5_write_channel(fn2, chansR);   % the [] fields write back as absent members
+chansR = quadriga_lib.hdf5_read_channel(fn2);
+assertTrue(isempty(chansR(1).fbs_pos));
+assertEqual(chansR(2).fbs_pos, double(single(mixed(2).fbs_pos)));
 
 % A new file is sized from the indices; [] is the default; no output requested
 delete(fn2);

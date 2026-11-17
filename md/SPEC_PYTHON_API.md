@@ -234,19 +234,19 @@ py::object qd_python_any2numpy(const std::any &dset);
 ## Arrayant dict
 - A `quadriga_lib::arrayant<double>` is represented in Python as a `dict` with the keys below. Requires `python_quadriga_adapter.hpp`.
 
-| Key | C++ member | Shape | Required as input |
-| --- | --- | --- | --- |
-| `e_theta_re` | `e_theta_re` | `(n_elevation, n_azimuth, n_elements)` | yes |
-| `e_theta_im` | `e_theta_im` | `(n_elevation, n_azimuth, n_elements)` | yes |
-| `e_phi_re` | `e_phi_re` | `(n_elevation, n_azimuth, n_elements)` | yes |
-| `e_phi_im` | `e_phi_im` | `(n_elevation, n_azimuth, n_elements)` | yes |
-| `azimuth_grid` | `azimuth_grid` | `(n_azimuth,)` | yes |
-| `elevation_grid` | `elevation_grid` | `(n_elevation,)` | yes |
-| `element_pos` | `element_pos` | `(3, n_elements)` | no; default: zeros |
-| `coupling_re` | `coupling_re` | `(n_elements, n_ports)` | no; default: identity |
-| `coupling_im` | `coupling_im` | `(n_elements, n_ports)` | no; default: zeros |
-| `center_freq` | `center_freq` | scalar | no; default: 299792458 |
-| `name` | `name` | `str` | no |
+| Key (= C++ member) | Shape | Required as input |
+| --- | --- | --- |
+| `e_theta_re` | `(n_elevation, n_azimuth, n_elements)` | yes |
+| `e_theta_im` | `(n_elevation, n_azimuth, n_elements)` | yes |
+| `e_phi_re` | `(n_elevation, n_azimuth, n_elements)` | yes |
+| `e_phi_im` | `(n_elevation, n_azimuth, n_elements)` | yes |
+| `azimuth_grid` | `(n_azimuth,)` | yes |
+| `elevation_grid` | `(n_elevation,)` | yes |
+| `element_pos` | `(3, n_elements)` | no; default: zeros |
+| `coupling_re` | `(n_elements, n_ports)` | no; default: identity |
+| `coupling_im` | `(n_elements, n_ports)` | no; default: zeros |
+| `center_freq` | scalar | no; default: 299792458 |
+| `name` | `str` | no |
 
 - The field patterns stay split into `_re` / `_im` arrays (not complex), in both directions.
 - A frequency-dependent (multi-frequency) arrayant is ONE dict (not a list of dicts, unlike the MATLAB struct array): the four pattern arrays are 4D `(n_elevation, n_azimuth, n_elements, n_freq)`, `center_freq` is a 1D array `(n_freq,)`, the coupling matrices are 2D (shared by all frequencies) or 3D `(n_elements, n_ports, n_freq)`; grids, `element_pos` and `name` are shared. It maps to `std::vector<quadriga_lib::arrayant<double>>`.
@@ -266,27 +266,27 @@ py::object qd_python_any2numpy(const std::any &dset);
   - "list" model (`stack = false`, default): a `list` with one array per snapshot; the number of paths may differ between snapshots.
   - "stack" model (`stack = true`): one array with the snapshot index on the last axis, zero-padded.
 
-| Key | C++ member | Shape per snapshot (list model) | Type |
-| --- | --- | --- | --- |
-| `name` | `name` | — | `str` |
-| `tx_position` | `tx_pos` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
-| `rx_position` | `rx_pos` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
-| `tx_orientation` | `tx_orientation` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
-| `rx_orientation` | `rx_orientation` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
-| `coeff` | `coeff_re`, `coeff_im` | `(n_rx, n_tx, n_path)` | complex |
-| `delay` | `delay` | `(n_rx, n_tx, n_path)` | float |
-| `path_gain` | `path_gain` | `(n_path,)` | float |
-| `path_length` | `path_length` | `(n_path,)` | float |
-| `path_polarization` | `path_polarization` | `(8, n_path)`; rows re, im of each entry, as in C++ and as the input `M` | float |
-| `path_angles` | `path_angles` | `(n_path, 4)` | float |
-| `fbs_pos` | `path_fbs_pos` | `(3, n_path)` | float |
-| `lbs_pos` | `path_lbs_pos` | `(3, n_path)` | float |
-| `n_interact` | `n_interact` | `(n_path,)` | int |
-| `interact_coord` | `interact_coord` | `(3, sum(n_interact))` | float |
-| `center_freq` | `center_freq` | scalar or `(n_snap,)`; plain array in both models | float |
-| `initial_position` | `initial_position` | — | `int` |
+| Key (= C++ member) | Shape per snapshot (list model) | Type |
+| --- | --- | --- |
+| `name` | — | `str` |
+| `tx_pos` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
+| `rx_pos` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
+| `tx_orientation` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
+| `rx_orientation` | `(3, 1)` or `(3, n_snap)`; plain array in both models | float |
+| `coeff` (C++ `coeff_re`, `coeff_im`) | `(n_rx, n_tx, n_path)` | complex |
+| `delay` | `(n_rx, n_tx, n_path)` | float |
+| `path_gain` | `(n_path,)` | float |
+| `path_length` | `(n_path,)` | float |
+| `path_polarization` | `(8, n_path)`; rows re, im of each entry, as in C++ and as the input `M` | float |
+| `path_angles` | `(n_path, 4)` | float |
+| `fbs_pos` | `(3, n_path)` | float |
+| `lbs_pos` | `(3, n_path)` | float |
+| `n_interact` | `(n_path,)` | int |
+| `interact_coord` | `(3, sum(n_interact))` | float |
+| `center_freq` | scalar or `(n_snap,)`; plain array in both models | float |
+| `initial_position` | — | `int` |
 
-- Note the name differences: `tx_position` / `rx_position` and `fbs_pos` / `lbs_pos` in Python vs. `tx_pos` / `rx_pos` and `path_fbs_pos` / `path_lbs_pos` in C++; the coefficients are one complex key `coeff`.
+- A key carries the name of its C++ member; exceptions: a `_re` / `_im` member pair is one complex key (`coeff`), and a member that is a `std::vector` over snapshots is a list or a stacked array (see above).
 - Reading: `qd_python_list2channel(handle, validate)` accepts a single dict or a list of dicts and always returns a `std::vector`; `qd_python_dict2channel(dict, validate)` reads one dict. All keys are optional; the list and stack layout is detected per key; `coeff_re` / `coeff_im` are accepted as an alternative to `coeff`.
 - Writing: `qd_python_channel2list(chan_vec, validate, stack)` or `qd_python_channel2dict(channel, snap, validate, stack)`; `snap` selects snapshots (0-based, empty = all). Only populated members become keys.
 - Unstructured data (`par_names` / `par_data`, a list of `std::any`) is NOT part of the channel dict. It is exchanged through a separate `par` dict, converted with `qd_python_anycast` / `qd_python_any2numpy`; see `qpy_hdf5_write_channel.cpp` and `qpy_hdf5_read_channel.cpp`.

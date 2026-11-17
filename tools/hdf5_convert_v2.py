@@ -151,10 +151,11 @@ def read_slot(group):
         if not np.isnan(cf[0]):
             chan['center_freq'] = cf
     for key in ('tx_position', 'rx_position', 'tx_orientation', 'rx_orientation'):
+        field = key.replace('_position', '_pos')  # channel dict key
         if is_dset(key):
-            chan[key] = f32(group[key][()]).T
+            chan[field] = f32(group[key][()]).T
         elif key in group.attrs or key.endswith('position'):
-            chan[key] = f32(attr(group, key)).reshape(3, 1)
+            chan[field] = f32(attr(group, key)).reshape(3, 1)
 
     # Snapshot groups: the channel group itself for one snapshot, else 'Snap_<i>' sorted by i
     if n_snap == 1:

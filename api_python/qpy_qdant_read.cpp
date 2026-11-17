@@ -28,10 +28,10 @@ Reads array antenna data from QDANT files
 ## Usage:
 ```
 # Read every entry (a frequency-dependent arrayant when the file holds several)
-data = quadriga_lib.arrayant.qdant_read( fn )
+ant, layout = quadriga_lib.arrayant.qdant_read( fn )
 
 # Read a single entry
-data = quadriga_lib.arrayant.qdant_read( fn, id )
+ant, layout = quadriga_lib.arrayant.qdant_read( fn, id )
 ```
 
 ## Inputs:
@@ -39,14 +39,14 @@ data = quadriga_lib.arrayant.qdant_read( fn, id )
 - **`id`** — 1-based ID of the entry to read, >= 1; `None` reads all entries (see above); default: None
 
 ## Outputs:
-- **`data`** — Dict with the array antenna data; keys as in [[generate]], with these specifics:
+- **`ant`** — Dict with the array antenna data; keys as in [[generate]], with these specifics:
   - `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` — Pattern fields;
     `(n_elevation, n_azimuth, n_elements)` for a single entry, or
     `(n_elevation, n_azimuth, n_elements, n_freq)` when multiple entries are read
   - `center_freq` — Center frequency in Hz; scalar for a single entry, `(n_freq,)` when reading multiple entries
   - `coupling_re`, `coupling_im` — Coupling matrices; `(n_elements, n_ports)`, or
     `(n_elements, n_ports, n_freq)` when reading multiple entries with per-entry coupling
-  - `layout` — Matrix of element IDs describing how the entries are arranged in the file; int64
+- **`layout`** — Matrix of element IDs describing how the entries are arranged in the file; int64
 
 ## See also:
 - [[qdant_write]] (for writing QDANT data)
@@ -54,7 +54,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id )
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
-py::dict qdant_read(const py::handle &fn,
+py::tuple qdant_read(const py::handle &fn,
                     py::handle id)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
@@ -93,6 +93,5 @@ py::dict qdant_read(const py::handle &fn,
         output = qd_python_arrayant2dict(ant);
     }
 
-    output["layout"] = qd_python_copy2numpy<unsigned, py::ssize_t>(&layout);
-    return output;
+    return py::make_tuple(output, qd_python_copy2numpy<unsigned, py::ssize_t>(&layout));
 }

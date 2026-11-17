@@ -44,8 +44,8 @@ Read one or more channel objects from an HDF5 file
   | Field              | Description                                                              | Type / Size                         |
   | ------------------ | ------------------------------------------------------------------------ | ----------------------------------- |
   | `name`             | Channel name                                                             | String                              |
-  | `tx_position`      | Transmitter positions (AP for downlink, STA for uplink)                  | `[3, 1]` or `[3, n_snap]`           |
-  | `rx_position`      | Receiver positions (STA for downlink, AP for uplink)                     | `[3, 1]` or `[3, n_snap]`           |
+  | `tx_pos`           | Transmitter positions (AP for downlink, STA for uplink)                  | `[3, 1]` or `[3, n_snap]`           |
+  | `rx_pos`           | Receiver positions (STA for downlink, AP for uplink)                     | `[3, 1]` or `[3, n_snap]`           |
   | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `[3, 1]` or `[3, n_snap]`           |
   | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `[3, 1]` or `[3, n_snap]`           |
   | `coeff_re`         | Channel coefficients, real part                                          | `[n_rx, n_tx, n_path, n_snap]`      |
@@ -208,8 +208,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         sub_vec(channel.path_length, sub.path_length);
         sub_vec(channel.path_polarization, sub.path_polarization);
         sub_vec(channel.path_angles, sub.path_angles);
-        sub_vec(channel.path_fbs_pos, sub.path_fbs_pos);
-        sub_vec(channel.path_lbs_pos, sub.path_lbs_pos);
+        sub_vec(channel.fbs_pos, sub.fbs_pos);
+        sub_vec(channel.lbs_pos, sub.lbs_pos);
         sub_vec(channel.n_interact, sub.n_interact);
         sub_vec(channel.interact_coord, sub.interact_coord);
 

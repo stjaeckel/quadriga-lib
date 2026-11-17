@@ -36,8 +36,8 @@ Class for storing and managing MIMO channel data and metadata across multiple sn
 | `std::vector<arma::Col<dtype>> path_length`       | per snap `[n_path]`                                             | Path lengths TX to RX                                       |
 | `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
 | `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
-| `std::vector<arma::Mat<dtype>> path_fbs_pos`      | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
-| `std::vector<arma::Mat<dtype>> path_lbs_pos`      | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
+| `std::vector<arma::Mat<dtype>> fbs_pos`           | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
+| `std::vector<arma::Mat<dtype>> lbs_pos`           | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
 | `std::vector<arma::Col<unsigned>> n_interact`     | per snap `[n_path]`                                             | Number of interactions per path                             |
 | `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(n_interact)]`                                 | Interaction point coordinates                               |
 | `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
@@ -101,11 +101,11 @@ arma::uword quadriga_lib::channel<dtype>::n_snap() const
     if (path_angles.size() > s_vector)
         s_vector = path_angles.size();
 
-    if (path_fbs_pos.size() > s_vector)
-        s_vector = path_fbs_pos.size();
+    if (fbs_pos.size() > s_vector)
+        s_vector = fbs_pos.size();
 
-    if (path_lbs_pos.size() > s_vector)
-        s_vector = path_lbs_pos.size();
+    if (lbs_pos.size() > s_vector)
+        s_vector = lbs_pos.size();
 
     if (n_interact.size() > s_vector)
         s_vector = n_interact.size();
@@ -158,12 +158,12 @@ arma::uvec quadriga_lib::channel<dtype>::n_path() const
     else if (path_angles.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
             p_path[i] = path_angles[i].n_rows;
-    else if (path_fbs_pos.size() == n_snap)
+    else if (fbs_pos.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
-            p_path[i] = path_fbs_pos[i].n_cols;
-    else if (path_lbs_pos.size() == n_snap)
+            p_path[i] = fbs_pos[i].n_cols;
+    else if (lbs_pos.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
-            p_path[i] = path_lbs_pos[i].n_cols;
+            p_path[i] = lbs_pos[i].n_cols;
     else if (delay.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
             p_path[i] = delay[i].n_slices;
@@ -208,10 +208,10 @@ bool quadriga_lib::channel<dtype>::empty() const
     if (path_angles.size() != 0)
         return false;
 
-    if (path_fbs_pos.size() != 0)
+    if (fbs_pos.size() != 0)
         return false;
 
-    if (path_lbs_pos.size() != 0)
+    if (lbs_pos.size() != 0)
         return false;
 
     if (n_interact.size() != 0)
@@ -339,21 +339,21 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
             if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4ULL)
                 return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_angles'.";
 
-    if (path_fbs_pos.size() != 0 && path_fbs_pos.size() != n_snap_vector)
-        return std::string("'path_fbs_pos' must be empty or match the number of snapshots.");
+    if (fbs_pos.size() != 0 && fbs_pos.size() != n_snap_vector)
+        return std::string("'fbs_pos' must be empty or match the number of snapshots.");
 
-    if (n_snap_arma != 0ULL && path_fbs_pos.size() == n_snap_vector)
+    if (n_snap_arma != 0ULL && fbs_pos.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
-            if (path_fbs_pos[i].n_rows != 3ULL || path_fbs_pos[i].n_cols != n_pth[i])
-                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_fbs_pos'.";
+            if (fbs_pos[i].n_rows != 3ULL || fbs_pos[i].n_cols != n_pth[i])
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'fbs_pos'.";
 
-    if (path_lbs_pos.size() != 0 && path_lbs_pos.size() != n_snap_vector)
-        return std::string("'path_lbs_pos' must be empty or match the number of snapshots.");
+    if (lbs_pos.size() != 0 && lbs_pos.size() != n_snap_vector)
+        return std::string("'lbs_pos' must be empty or match the number of snapshots.");
 
-    if (n_snap_arma != 0ULL && path_lbs_pos.size() == n_snap_vector)
+    if (n_snap_arma != 0ULL && lbs_pos.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
-            if (path_lbs_pos[i].n_rows != 3ULL || path_lbs_pos[i].n_cols != n_pth[i])
-                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_lbs_pos'.";
+            if (lbs_pos[i].n_rows != 3ULL || lbs_pos[i].n_cols != n_pth[i])
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'lbs_pos'.";
 
     if (n_interact.size() != 0 && n_interact.size() != n_snap_vector)
         return std::string("'n_interact' must be empty or match the number of snapshots.");
@@ -409,8 +409,8 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Col<dtype> *path_length_add = nullptr,
     const arma::Mat<dtype> *path_polarization_add = nullptr,
     const arma::Mat<dtype> *path_angles_add = nullptr,
-    const arma::Mat<dtype> *path_fbs_pos_add = nullptr,
-    const arma::Mat<dtype> *path_lbs_pos_add = nullptr);
+    const arma::Mat<dtype> *fbs_pos_add = nullptr,
+    const arma::Mat<dtype> *lbs_pos_add = nullptr);
 ```
 
 ## Inputs:
@@ -424,8 +424,8 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
 - **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
 - **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
-- **`path_fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
-- **`path_lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
+- **`fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
+- **`lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
 MD!*/
 
 template <typename dtype>
@@ -434,7 +434,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
                                              const arma::u32_vec *n_interact_add, const arma::Mat<dtype> *interact_coord_add,
                                              const arma::Col<dtype> *path_gain_add, const arma::Col<dtype> *path_length_add,
                                              const arma::Mat<dtype> *path_polarization_add, const arma::Mat<dtype> *path_angles_add,
-                                             const arma::Mat<dtype> *path_fbs_pos_add, const arma::Mat<dtype> *path_lbs_pos_add)
+                                             const arma::Mat<dtype> *fbs_pos_add, const arma::Mat<dtype> *lbs_pos_add)
 {
     std::string error_message = this->is_valid();
     if (error_message.length() != 0)
@@ -569,43 +569,43 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     else if (this->path_angles.size() != 0)
         throw std::invalid_argument("The channel object has 'path_angles', but no 'path_angles_add' is provided!");
 
-    // Check path_fbs_pos
-    if (path_fbs_pos_add != nullptr)
+    // Check fbs_pos
+    if (fbs_pos_add != nullptr)
     {
-        if (this->path_fbs_pos.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'path_fbs_pos'.");
+        if (this->fbs_pos.size() == 0)
+            throw std::invalid_argument("Channel object requires existing 'fbs_pos'.");
 
         if (!n_path_set)
-            n_path_add = path_fbs_pos_add->n_cols, n_path_set = true;
-        if (path_fbs_pos_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'path_fbs_pos_add' does not match 'n_path_add'");
-        if (path_fbs_pos_add->n_rows != 3ULL)
-            throw std::invalid_argument("Number of rows in 'path_fbs_pos_add' must be 3");
+            n_path_add = fbs_pos_add->n_cols, n_path_set = true;
+        if (fbs_pos_add->n_cols != n_path_add)
+            throw std::invalid_argument("Number of columns in 'fbs_pos_add' does not match 'n_path_add'");
+        if (fbs_pos_add->n_rows != 3ULL)
+            throw std::invalid_argument("Number of rows in 'fbs_pos_add' must be 3");
     }
-    else if (this->path_fbs_pos.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_fbs_pos', but no 'path_fbs_pos_add' is provided!");
+    else if (this->fbs_pos.size() != 0)
+        throw std::invalid_argument("The channel object has 'fbs_pos', but no 'fbs_pos_add' is provided!");
 
-    // Check path_lbs_pos
-    if (path_lbs_pos_add != nullptr)
+    // Check lbs_pos
+    if (lbs_pos_add != nullptr)
     {
-        if (this->path_lbs_pos.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'path_lbs_pos'.");
+        if (this->lbs_pos.size() == 0)
+            throw std::invalid_argument("Channel object requires existing 'lbs_pos'.");
 
         if (!n_path_set)
-            n_path_add = path_lbs_pos_add->n_cols, n_path_set = true;
-        if (path_lbs_pos_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'path_lbs_pos_add' does not match 'n_path_add'");
-        if (path_lbs_pos_add->n_rows != 3ULL)
-            throw std::invalid_argument("Number of rows in 'path_lbs_pos_add' must be 3");
+            n_path_add = lbs_pos_add->n_cols, n_path_set = true;
+        if (lbs_pos_add->n_cols != n_path_add)
+            throw std::invalid_argument("Number of columns in 'lbs_pos_add' does not match 'n_path_add'");
+        if (lbs_pos_add->n_rows != 3ULL)
+            throw std::invalid_argument("Number of rows in 'lbs_pos_add' must be 3");
     }
-    else if (this->path_lbs_pos.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_lbs_pos', but no 'path_lbs_pos_add' is provided!");
+    else if (this->lbs_pos.size() != 0)
+        throw std::invalid_argument("The channel object has 'lbs_pos', but no 'lbs_pos_add' is provided!");
 
     // The fields of snapshot i_snap are written: an input must not be one of them or share memory with one
     auto check_mat = [&](const arma::Mat<dtype> *out, const char *name)
     {
         qd_check_alias(out, name, interact_coord_add, path_gain_add, path_length_add, path_polarization_add,
-                       path_angles_add, path_fbs_pos_add, path_lbs_pos_add);
+                       path_angles_add, fbs_pos_add, lbs_pos_add);
     };
     if (add_coefficients)
     {
@@ -626,10 +626,10 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         check_mat(&this->path_polarization[i_snap], "path_polarization[i_snap]");
     if (path_angles_add != nullptr)
         check_mat(&this->path_angles[i_snap], "path_angles[i_snap]");
-    if (path_fbs_pos_add != nullptr)
-        check_mat(&this->path_fbs_pos[i_snap], "path_fbs_pos[i_snap]");
-    if (path_lbs_pos_add != nullptr)
-        check_mat(&this->path_lbs_pos[i_snap], "path_lbs_pos[i_snap]");
+    if (fbs_pos_add != nullptr)
+        check_mat(&this->fbs_pos[i_snap], "fbs_pos[i_snap]");
+    if (lbs_pos_add != nullptr)
+        check_mat(&this->lbs_pos[i_snap], "lbs_pos[i_snap]");
 
     // Add data to existing channel
     if (add_coefficients)
@@ -657,11 +657,11 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_angles_add != nullptr)
         this->path_angles[i_snap] = arma::join_cols(this->path_angles[i_snap], *path_angles_add);
 
-    if (path_fbs_pos_add != nullptr)
-        this->path_fbs_pos[i_snap] = arma::join_rows(this->path_fbs_pos[i_snap], *path_fbs_pos_add);
+    if (fbs_pos_add != nullptr)
+        this->fbs_pos[i_snap] = arma::join_rows(this->fbs_pos[i_snap], *fbs_pos_add);
 
-    if (path_lbs_pos_add != nullptr)
-        this->path_lbs_pos[i_snap] = arma::join_rows(this->path_lbs_pos[i_snap], *path_lbs_pos_add);
+    if (lbs_pos_add != nullptr)
+        this->lbs_pos[i_snap] = arma::join_rows(this->lbs_pos[i_snap], *lbs_pos_add);
 }
 
 /*!MD

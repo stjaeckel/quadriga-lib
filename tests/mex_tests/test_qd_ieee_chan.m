@@ -45,10 +45,14 @@ H_pow = chan(1).coeff_re(:, :, :, 1).^2 + chan(1).coeff_im(:, :, :, 1).^2;
 pg_from_coeff = squeeze(sum(sum(H_pow, 1), 2)) * 0.5;
 assertElementsAlmostEqual(pg, pg_from_coeff(:), 'absolute', 1e-12);
 
+% Field names are the C++ member names
+assertEqual(fieldnames(chan)', {'name', 'tx_pos', 'rx_pos', 'tx_orientation', 'rx_orientation', 'coeff_re', 'coeff_im', ...
+    'delay', 'path_gain', 'center_freq'});
+
 % TX at origin facing east; RX 4.99 m east facing west (yaw = pi)
-assertElementsAlmostEqual(chan(1).tx_position(:, 1),    [0; 0; 0],     'absolute', 0);
+assertElementsAlmostEqual(chan(1).tx_pos(:, 1),         [0; 0; 0],     'absolute', 0);
 assertElementsAlmostEqual(chan(1).tx_orientation(:, 1), [0; 0; 0],     'absolute', 0);
-assertElementsAlmostEqual(chan(1).rx_position(:, 1),    [4.99; 0; 0],  'absolute', 0);
+assertElementsAlmostEqual(chan(1).rx_pos(:, 1),         [4.99; 0; 0],  'absolute', 0);
 assertElementsAlmostEqual(chan(1).rx_orientation(:, 1), [0; 0; pi],    'absolute', 1e-12);
 
 % Off-diagonal LOS coefficients should be zero (perfect Xpol isolation)
@@ -82,7 +86,7 @@ aoa_deg = -135.3011;
 cx = 4.99 * cos(aod_deg * pi/180);
 cy = 4.99 * sin(aod_deg * pi/180);
 ori_deg = aod_deg - aoa_deg - 180;
-assertElementsAlmostEqual(chan(1).rx_position(:, 1), [cx; cy; 0], 'absolute', 1e-5);
+assertElementsAlmostEqual(chan(1).rx_pos(:, 1), [cx; cy; 0], 'absolute', 1e-5);
 assertElementsAlmostEqual(chan(1).rx_orientation(3, 1) * 180/pi, ori_deg, 'absolute', 1e-4);
 
 % User 2: AoD = -142.9707°, AoA = 115.1550°
@@ -91,7 +95,7 @@ aoa_deg = 115.1550;
 cx = 4.99 * cos(aod_deg * pi/180);
 cy = 4.99 * sin(aod_deg * pi/180);
 ori_deg = aod_deg - aoa_deg + 180;
-assertElementsAlmostEqual(chan(2).rx_position(:, 1), [cx; cy; 0], 'absolute', 1e-5);
+assertElementsAlmostEqual(chan(2).rx_pos(:, 1), [cx; cy; 0], 'absolute', 1e-5);
 assertElementsAlmostEqual(chan(2).rx_orientation(3, 1) * 180/pi, ori_deg, 'absolute', 1e-4);
 
 
@@ -117,7 +121,7 @@ cy = 1.99 * sin(aod_deg * pi/180);
 ori_deg = aod_deg - aoa_deg + 180;
 
 for u = 1:2
-    assertElementsAlmostEqual(chan(u).rx_position(:, 1), [cx; cy; 0], 'absolute', 1e-5);
+    assertElementsAlmostEqual(chan(u).rx_pos(:, 1), [cx; cy; 0], 'absolute', 1e-5);
     assertElementsAlmostEqual(chan(u).rx_orientation(3, 1) * 180/pi, ori_deg, 'absolute', 1e-4);
 end
 
@@ -142,9 +146,9 @@ assertEqual(size(chan(2).coeff_re, 3), 12);
 assertEqual(size(chan(3).coeff_re, 3), 12);
 
 % Floor indicator on rx_pos(3)
-assertElementsAlmostEqual(chan(1).rx_position(3, 1), 0, 'absolute', 0);
-assertElementsAlmostEqual(chan(2).rx_position(3, 1), 0, 'absolute', 0);
-assertElementsAlmostEqual(chan(3).rx_position(3, 1), 3, 'absolute', 0);
+assertElementsAlmostEqual(chan(1).rx_pos(3, 1), 0, 'absolute', 0);
+assertElementsAlmostEqual(chan(2).rx_pos(3, 1), 0, 'absolute', 0);
+assertElementsAlmostEqual(chan(3).rx_pos(3, 1), 3, 'absolute', 0);
 
 % Relative path gains for user 1 (KF=0 dB → first two paths equal)
 p = chan(1).path_gain(:);

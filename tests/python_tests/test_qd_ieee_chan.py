@@ -157,13 +157,13 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(path_gain0, vv, rtol=0.0, atol=1e-12)
 
         # Tx should be at the origin, facing east
-        tx_pos = np.asarray(ch["tx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
+        tx_pos = np.asarray(ch["tx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
         tx_ori = np.asarray(ch["tx_orientation"], dtype=np.float64).reshape(3, -1)[:, 0]
         npt.assert_allclose(tx_pos, np.array([0.0, 0.0, 0.0]), rtol=0.0, atol=0.0)
         npt.assert_allclose(tx_ori, np.array([0.0, 0.0, 0.0]), rtol=0.0, atol=0.0)
 
         # Rx should be 4.99 meters east, facing west (yaw ~ pi)
-        rx_pos = np.asarray(ch["rx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
+        rx_pos = np.asarray(ch["rx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
         rx_ori = np.asarray(ch["rx_orientation"], dtype=np.float64).reshape(3, -1)[:, 0]
         npt.assert_allclose(rx_pos, np.array([4.99, 0.0, 0.0]), rtol=0.0, atol=0.0)
         npt.assert_allclose(rx_ori, np.array([0.0, 0.0, np.pi]), rtol=0.0, atol=1e-12)
@@ -197,7 +197,7 @@ class test_case(unittest.TestCase):
         cy = 4.99 * np.sin(np.deg2rad(aod_deg))
         ori_deg = aod_deg - aoa_deg - 180.0
 
-        rx_pos0 = np.asarray(chan[0]["rx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
+        rx_pos0 = np.asarray(chan[0]["rx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
         rx_ori0 = np.asarray(chan[0]["rx_orientation"], dtype=np.float64).reshape(3, -1)[:, 0]
         npt.assert_allclose(rx_pos0, np.array([cx, cy, 0.0]), atol=1e-5)
         self.assertLess(abs(ori_deg - np.rad2deg(rx_ori0[2])), 1e-4)
@@ -209,7 +209,7 @@ class test_case(unittest.TestCase):
         cy = 4.99 * np.sin(np.deg2rad(aod_deg))
         ori_deg = aod_deg - aoa_deg + 180.0
 
-        rx_pos1 = np.asarray(chan[1]["rx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
+        rx_pos1 = np.asarray(chan[1]["rx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
         rx_ori1 = np.asarray(chan[1]["rx_orientation"], dtype=np.float64).reshape(3, -1)[:, 0]
         npt.assert_allclose(rx_pos1, np.array([cx, cy, 0.0]), atol=1e-5)
         self.assertLess(abs(ori_deg - np.rad2deg(rx_ori1[2])), 1e-4)
@@ -240,7 +240,7 @@ class test_case(unittest.TestCase):
         ori_deg = aod_deg - aoa_deg + 180.0
 
         for u in range(2):
-            rx_pos = np.asarray(chan[u]["rx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
+            rx_pos = np.asarray(chan[u]["rx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
             rx_ori = np.asarray(chan[u]["rx_orientation"], dtype=np.float64).reshape(3, -1)[:, 0]
             npt.assert_allclose(rx_pos, np.array([cx, cy, 0.0]), atol=1e-5)
             self.assertLess(abs(ori_deg - np.rad2deg(rx_ori[2])), 1e-4)
@@ -266,10 +266,10 @@ class test_case(unittest.TestCase):
         # User 2: n_floors=1 → NLOS only, 12 paths
         self.assertEqual(_n_path(chan[2]), 12)
 
-        # Floor indicator on rx_position[2]
-        rx_pos0 = np.asarray(chan[0]["rx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
-        rx_pos1 = np.asarray(chan[1]["rx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
-        rx_pos2 = np.asarray(chan[2]["rx_position"], dtype=np.float64).reshape(3, -1)[:, 0]
+        # Floor indicator on rx_pos[2]
+        rx_pos0 = np.asarray(chan[0]["rx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
+        rx_pos1 = np.asarray(chan[1]["rx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
+        rx_pos2 = np.asarray(chan[2]["rx_pos"], dtype=np.float64).reshape(3, -1)[:, 0]
         self.assertEqual(rx_pos0[2], 0.0)
         self.assertEqual(rx_pos1[2], 0.0)
         self.assertEqual(rx_pos2[2], 3.0)
@@ -585,7 +585,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(pg_s, pg_ref)
 
         # Per-snapshot metadata is unaffected by the stack flag
-        for key in ("tx_position", "rx_position",
+        for key in ("tx_pos", "rx_pos",
                     "tx_orientation", "rx_orientation"):
             npt.assert_array_equal(np.asarray(ch_l[key]), np.asarray(ch_s[key]))
         self.assertEqual(ch_l["name"], ch_s["name"])
@@ -640,7 +640,7 @@ class test_case(unittest.TestCase):
         self.assertIsInstance(c['center_freq'], np.ndarray)
         self.assertEqual(c['center_freq'].shape, (1,))
         self.assertIn('initial_position', c)
-        self.assertEqual(set(c.keys()), {'name', 'tx_position', 'rx_position', 'tx_orientation', 'rx_orientation',
+        self.assertEqual(set(c.keys()), {'name', 'tx_pos', 'rx_pos', 'tx_orientation', 'rx_orientation',
                                          'coeff', 'delay', 'path_gain', 'center_freq', 'initial_position'})
 
 

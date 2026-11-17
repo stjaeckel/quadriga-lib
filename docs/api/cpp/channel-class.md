@@ -36,8 +36,8 @@ Not in: MATLAB, Python
 | `std::vector<arma::Col<dtype>> path_length`       | per snap `[n_path]`                                             | Path lengths TX to RX                                       |
 | `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
 | `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
-| `std::vector<arma::Mat<dtype>> path_fbs_pos`      | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
-| `std::vector<arma::Mat<dtype>> path_lbs_pos`      | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
+| `std::vector<arma::Mat<dtype>> fbs_pos`           | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
+| `std::vector<arma::Mat<dtype>> lbs_pos`           | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
 | `std::vector<arma::Col<unsigned>> n_interact`     | per snap `[n_path]`                                             | Number of interactions per path                             |
 | `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(n_interact)]`                                 | Interaction point coordinates                               |
 | `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
@@ -83,8 +83,8 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Col<dtype> *path_length_add = nullptr,
     const arma::Mat<dtype> *path_polarization_add = nullptr,
     const arma::Mat<dtype> *path_angles_add = nullptr,
-    const arma::Mat<dtype> *path_fbs_pos_add = nullptr,
-    const arma::Mat<dtype> *path_lbs_pos_add = nullptr);
+    const arma::Mat<dtype> *fbs_pos_add = nullptr,
+    const arma::Mat<dtype> *lbs_pos_add = nullptr);
 ```
 
 ### Inputs:
@@ -98,8 +98,8 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
 - **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
 - **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
-- **`path_fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
-- **`path_lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
+- **`fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
+- **`lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
 
 ---
 <a id=".calc_effective_path_gain"></a>

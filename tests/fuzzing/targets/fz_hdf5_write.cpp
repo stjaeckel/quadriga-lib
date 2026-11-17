@@ -105,7 +105,7 @@ static void run(fz::input &in)
         if (mask & 64)
             c.path_angles.push_back(in.mat<T>(sz(n_path), sz(4)));
         if (mask & 128)
-            c.path_fbs_pos.push_back(in.mat<T>(sz(3), sz(n_path))), c.path_lbs_pos.push_back(in.mat<T>(sz(3), sz(n_path)));
+            c.fbs_pos.push_back(in.mat<T>(sz(3), sz(n_path))), c.lbs_pos.push_back(in.mat<T>(sz(3), sz(n_path)));
         if (mask & 256)
         {
             arma::Col<unsigned> n_interact(sz(n_path));
