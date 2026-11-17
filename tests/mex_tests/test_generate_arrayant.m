@@ -94,7 +94,7 @@ try
     data = quadriga_lib.arrayant_generate('3gpp', [], [], [], [], [], 2, 1, [], [], [], [], [], [], [], trash);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Field ''e_theta_im'' not found at index 0!';
+    expectedErrorMessage = 'Field ''e_theta_im'' not found at index 1!';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

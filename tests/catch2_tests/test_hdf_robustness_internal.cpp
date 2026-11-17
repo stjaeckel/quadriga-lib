@@ -973,6 +973,9 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
     {
         set_u32("channel_1", "NumRx", 1);
         check_rejected(0);
+        // The extent check states both shapes, no dimension number
+        CHECK_THROWS_WITH(quadriga_lib::hdf5_read_channel<double>(fn, 0),
+                          Catch::Matchers::ContainsSubstring("has extents [50, 2, 4], expected [50, 2, 1]"));
     }
     SECTION("link coeff_im removed")
     {

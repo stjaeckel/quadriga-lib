@@ -67,7 +67,7 @@ void quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> &mesh, arma::Mat<dt
         p_sub = sub_mesh_ind->memptr();
 
         if (*p_sub != 0U)
-            throw std::invalid_argument("First sub-mesh must start at index 0.");
+            throw std::invalid_argument("First sub-mesh must start at the first face.");
 
         for (arma::uword i = 1; i < n_sub; ++i)
             if (p_sub[i] <= p_sub[i - 1])

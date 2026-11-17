@@ -82,7 +82,7 @@ try % Wrong sub index
     aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_ind + uint32([1;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First sub-cloud must start at index 0.';
+    expectedErrorMessage = 'First sub-cloud must start at the first point.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

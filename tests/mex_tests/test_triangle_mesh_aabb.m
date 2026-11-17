@@ -81,7 +81,7 @@ try % Wrong sub mesh index
     aabb = quadriga_lib.triangle_mesh_aabb( mesh_seg, sub_mesh_ind + uint32([1;0;0]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First sub-mesh must start at index 0.';
+    expectedErrorMessage = 'First sub-mesh must start at the first face.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

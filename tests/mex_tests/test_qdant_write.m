@@ -139,7 +139,7 @@ try
     quadriga_lib.qdant_write('testm.qdant', ant);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Field ''e_phi_re'' not found at index 0!';
+    expectedErrorMessage = 'Field ''e_phi_re'' not found at index 1!';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -259,6 +259,12 @@ end
 
 delete('testm.qdant');
 
+%% Errors name the entry of a struct array 1-based (C++ counts from 0)
+a = quadriga_lib.arrayant_generate('omni');
+b = a; b.e_theta_re = b.e_theta_re(1:end-1, :); % third entry is invalid
+assert_throws( @() quadriga_lib.qdant_write('testm.qdant', [a, a, b]), 'Entry 3: ' );
+assert_throws( @() quadriga_lib.arrayant_interpolate([a, a, b], 0, 0), ': Entry 3: ' ); % inside a C++ exception message
+
 %% An empty center_freq field writes the default 299792458
 ant = quadriga_lib.arrayant_generate('omni');
 quadriga_lib.qdant_write('testm.qdant', mk_ant( ant.e_theta_re, ant.e_theta_im, ant.e_phi_re, ant.e_phi_im, ...
@@ -267,6 +273,18 @@ a2 = quadriga_lib.qdant_read('testm.qdant', 1);
 assertEqual(a2.center_freq, 299792458);
 delete('testm.qdant');
 
+end
+
+% Assert that fn() raises an error whose message contains expected (substring).
+function assert_throws(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
 end
 
 % Arrayant struct from the fields; omitted trailing fields are left out of the struct

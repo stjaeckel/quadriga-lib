@@ -101,7 +101,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
     {
         auto error_msg = ant.is_valid();
         if (!error_msg.empty())
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
+            qd_mex_cpp_error(error_msg);
     }
 
     return ant;
@@ -158,7 +158,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
     {
         auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant);
         if (!error_msg.empty())
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
+            qd_mex_cpp_error(error_msg);
     }
 
     return ant;
@@ -243,7 +243,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         {
             auto error_msg = c.is_valid();
             if (!error_msg.empty())
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
+                qd_mex_cpp_error(error_msg);
         }
 
         qd_mex_set_field(output, "name", mxCreateString(c.name.c_str()), n);
@@ -369,7 +369,7 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         {
             auto error_msg = c.is_valid();
             if (!error_msg.empty())
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error_msg.c_str());
+                qd_mex_cpp_error(error_msg);
         }
 
         chan.push_back(std::move(c));

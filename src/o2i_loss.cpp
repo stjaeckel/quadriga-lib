@@ -88,7 +88,7 @@ void quadriga_lib::o2i_loss(const arma::vec &center_freq,
             throw std::invalid_argument("Uniform columns of 'rnd' must be in the range from 0 to 1.");
     for (arma::uword u = 3 * n_ut; u < 4 * n_ut; ++u)
         if (!std::isfinite(pr[u]))
-            throw std::invalid_argument("Column 3 of 'rnd' must be finite.");
+            throw std::invalid_argument("Normal-distributed column of 'rnd' must be finite.");
 
     // Models: 0 low, 1 high, 2 low_A, 3 legacy_6GHz, 4 car, 5 car_metal
     const char *names[6] = {"low", "high", "low_A", "legacy_6GHz", "car", "car_metal"};

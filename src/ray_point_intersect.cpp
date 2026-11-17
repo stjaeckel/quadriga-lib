@@ -165,7 +165,7 @@ void quadriga_lib::ray_point_intersect(const arma::Mat<dtype> &points,
         const unsigned *p_sub = sub_cloud_ind->memptr();
 
         if (*p_sub != 0U)
-            throw std::invalid_argument("First sub-cloud must start at index 0.");
+            throw std::invalid_argument("First sub-cloud must start at the first point.");
 
         for (size_t i = 1; i < n_sub_t; ++i)
         {

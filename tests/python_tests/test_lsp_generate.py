@@ -197,7 +197,7 @@ class test_case(unittest.TestCase):
         for cplx in (True, False):  # the permittivity is always computed, so column 9 is always checked
             with self.assertRaises(ValueError) as ctx:  # C++
                 self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_b, complex=cplx)
-            self.assertIn("Column 9 of 'rnd' must be in the range from 0 to 1.", str(ctx.exception))
+            self.assertIn("Ground-permittivity column of 'rnd' must be in the range from 0 to 1.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd[:, :10])
         self.assertIn("Input 'rnd' must have size [n_link, 11].", str(ctx.exception))

@@ -402,7 +402,7 @@ class test_case(unittest.TestCase):
             warnings.simplefilter('ignore', getattr(np, 'exceptions', np).ComplexWarning)  # numpy casts the complex input
             with self.assertRaises(ValueError) as ctx:
                 channel.hdf5_write_channel(fn, old)
-        self.assertIn("Size mismatch in 'path_polarization[0]'", str(ctx.exception))
+        self.assertIn("Snapshot 0: Size mismatch in 'path_polarization'", str(ctx.exception))
         self.assertEqual(channel.hdf5_read_layout(fn)[1].sum(), 0)  # nothing was written
 
         with self.assertRaises(TypeError):

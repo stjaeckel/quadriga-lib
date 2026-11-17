@@ -476,7 +476,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     bool planar_wave = (delay0.n_rows == 1 && delay0.n_cols == 1 && delay0.n_slices == n_path);
 
     if (!planar_wave && !(delay0.n_rows == n_rx && delay0.n_cols == n_tx && delay0.n_slices == n_path))
-        throw std::invalid_argument("Input 'delay[0]' must have shape [n_rx, n_tx, n_path] or [1, 1, n_path].");
+        throw std::invalid_argument("Input 'delay' of the first frequency must have shape [n_rx, n_tx, n_path] or [1, 1, n_path].");
 
     for (size_t f = 0; f < n_freq; ++f)
     {

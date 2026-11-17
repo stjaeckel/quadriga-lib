@@ -207,5 +207,19 @@ assertEqual( numel(dl), n_snap );
 assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx(:, 1:2), ori, rx, ori), 'quadriga_lib:CPPerror');
 assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs(1:3), pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');
 assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs{1}, pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');
+Mc_bad = Mc; Mc_bad{2} = Mc{2}(1:7, :); % the error names the snapshot 1-based
+assert_throws( @() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc_bad, tx, ori, rx, ori), 'Snapshot 2: ' );
 
+end
+
+% Assert that fn() raises an error whose message contains expected (substring).
+function assert_throws(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
 end

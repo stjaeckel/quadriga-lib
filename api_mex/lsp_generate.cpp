@@ -136,11 +136,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube *p_lsp_mu = (nlhs > 5) ? &lsp_mu : nullptr;
     arma::cube *p_lsp_sigma = (nlhs > 6) ? &lsp_sigma : nullptr;
 
-    // Column 10 of 'rnd' (C++ column 9) is checked here, so that the message counts the columns from 1
-    if (nlhs > 2 && rnd.n_rows == n_link && rnd.n_cols == 11 && rnd.is_finite() &&
-        (arma::any(rnd.col(9) < 0.0) || arma::any(rnd.col(9) > 1.0)))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Column 10 of 'rnd' must be in the range from 0 to 1.");
-
     // Call library function
     CALL_QD(quadriga_lib::lsp_generate(scenpar, center_freq, tx_pos, rx_pos, rnd, lsp, p_sf_sigma, p_abs_toa, p_gr_eps_re,
                                        p_gr_eps_im, p_eod_offset_deg, p_lsp_mu, p_lsp_sigma, cholesky, clip_spreads));

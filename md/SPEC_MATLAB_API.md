@@ -61,6 +61,7 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 
 ## Index conversion
 - MATLAB users give and get 1-based indices. Indices that are 0-based in C++ are shifted by the wrapper (-1 on input, +1 on output); indices that are 1-based in C++ pass through unchanged.
+- This includes indices in error messages. C++ messages name an entry of a vector input only by the prefixes `Entry <i>: ` and `Snapshot <i>: ` (0-based, see `md/SPEC_CPP_API.md`, "Input validation"). A wrapper passes C++ messages to MATLAB with `CALL_QD` or `qd_mex_cpp_error` (`src/mex_helper_functions.hpp`), which rewrite these prefixes to 1-based; never with `mexErrMsgIdAndTxt` directly. A message the wrapper writes itself states its indices 1-based.
 - Index inputs that get converted MUST be read with `copy = true`. Without the copy, the Armadillo object may borrow the memory of the MATLAB input, and editing it in place modifies the caller's variable (undefined behavior).
 - Always check for zeros before subtracting, otherwise unsigned indices wrap around:
 ```

@@ -150,12 +150,10 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
             continue;
 
         if (M[i].n_rows != 8 || M[i].n_cols != n_path)
-            throw std::invalid_argument("Input 'M' element " + std::to_string(i) +
-                                        " must have 8 rows and " + std::to_string(n_path) + " columns.");
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'M' must have 8 rows and " + std::to_string(n_path) + " columns.");
 
         if (path_length[i].n_elem != n_path)
-            throw std::invalid_argument("Input 'path_length' element " + std::to_string(i) +
-                                        " must have " + std::to_string(n_path) + " elements.");
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'path_length' must have " + std::to_string(n_path) + " elements.");
 
         // --- Calculate TX-RX distance ---
         arma::uword tx_col = fixed_tx ? 0 : i;

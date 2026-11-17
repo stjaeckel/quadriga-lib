@@ -360,7 +360,6 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
   [qrt_file_read](channel-functions.md#qrt_file_read) returns them for one frequency.
 - The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
   snapshots.
-- An error names the snapshot 0-based (`Snapshot 0` is the first cell entry).
 - All outputs are cell arrays of length `n_snap`, `[n_snap, 1]`, whose entries have the shapes given below.
 - Snapshots without any path produce an empty entry, or only the zero-power LOS path with `add_fake_los_path` (as for
   a single snapshot).

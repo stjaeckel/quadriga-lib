@@ -912,7 +912,7 @@ Validate a vector of arrayant objects for multi-frequency consistency
 Not in: MATLAB, Python
 
 - Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
-- Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
+- Cross-entry checks (all vs. the first entry): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_freq`, and coupling matrix values are not compared (expected to vary).
 - All entries must use the same form for `element_pos`, `coupling_re` and `coupling_im`: all empty or all given; a
   mix of empty members and explicit zeros / identity is rejected.
@@ -928,7 +928,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
 
 ### Returns:
-- Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match entry 0."`
+- Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match the first entry."`
 
 ### See also:
 - [.is_valid](#.is_valid) (per-entry validation called internally)

@@ -256,7 +256,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
         const double *u = rnd.memptr() + 9 * n_link; // column 9
         for (arma::uword l = 0; l < n_link; ++l)
             if (!(u[l] >= 0.0 && u[l] <= 1.0))
-                throw std::invalid_argument("Column 9 of 'rnd' must be in the range from 0 to 1.");
+                throw std::invalid_argument("Ground-permittivity column of 'rnd' must be in the range from 0 to 1.");
     }
 
     // Mean and std per link, frequency and LSP; checks the coefficients and the frequency terms

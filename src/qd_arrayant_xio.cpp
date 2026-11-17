@@ -55,7 +55,7 @@ void quadriga_lib::qdant_write_multi(const std::string &fn,
     {
         std::string err = qd_arrayant_check(arrayant_vec[i]);
         if (!err.empty())
-            throw std::invalid_argument("Entry " + std::to_string(i) + " of 'arrayant_vec' is invalid: " + err);
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": " + err);
     }
 
     // Remove existing file to start fresh (only after all entries passed the validation)
@@ -266,7 +266,7 @@ template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::qdant_read_mu
 Validate a vector of arrayant objects for multi-frequency consistency
 
 - Each entry is validated individually via its `is_valid` member (full check; a passing entry is marked as validated).
-- Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
+- Cross-entry checks (all vs. the first entry): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_freq`, and coupling matrix values are not compared (expected to vary).
 - All entries must use the same form for `element_pos`, `coupling_re` and `coupling_im`: all empty or all given; a
   mix of empty members and explicit zeros / identity is rejected.
@@ -282,7 +282,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
 
 ## Returns:
-- Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match entry 0."`
+- Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match the first entry."`
 
 ## See also:
 - .[[is_valid]] (per-entry validation called internally)
@@ -330,12 +330,12 @@ static std::string qd_is_valid_multi(const std::vector<quadriga_lib::arrayant<dt
         // Check angular grid sizes
         if (arrayant_vec[i].n_elevation() != n_el_ref)
             return std::string("Entry ") + idx + ": Number of elevation angles (" +
-                   std::to_string(arrayant_vec[i].n_elevation()) + ") does not match entry 0 (" +
+                   std::to_string(arrayant_vec[i].n_elevation()) + ") does not match the first entry (" +
                    std::to_string(n_el_ref) + ").";
 
         if (arrayant_vec[i].n_azimuth() != n_az_ref)
             return std::string("Entry ") + idx + ": Number of azimuth angles (" +
-                   std::to_string(arrayant_vec[i].n_azimuth()) + ") does not match entry 0 (" +
+                   std::to_string(arrayant_vec[i].n_azimuth()) + ") does not match the first entry (" +
                    std::to_string(n_az_ref) + ").";
 
         // Check angular grid values
@@ -343,37 +343,37 @@ static std::string qd_is_valid_multi(const std::vector<quadriga_lib::arrayant<dt
         const dtype *az_cur = arrayant_vec[i].azimuth_grid.memptr();
         for (arma::uword k = 0; k < n_az_ref; ++k)
             if (az_ref[k] != az_cur[k])
-                return std::string("Entry ") + idx + ": Azimuth grid values do not match entry 0.";
+                return std::string("Entry ") + idx + ": Azimuth grid values do not match the first entry.";
 
         const dtype *el_ref = arrayant_vec[0].elevation_grid.memptr();
         const dtype *el_cur = arrayant_vec[i].elevation_grid.memptr();
         for (arma::uword k = 0; k < n_el_ref; ++k)
             if (el_ref[k] != el_cur[k])
-                return std::string("Entry ") + idx + ": Elevation grid values do not match entry 0.";
+                return std::string("Entry ") + idx + ": Elevation grid values do not match the first entry.";
 
         // Check number of elements
         if (arrayant_vec[i].n_elements() != n_elements_ref)
             return std::string("Entry ") + idx + ": Number of elements (" +
-                   std::to_string(arrayant_vec[i].n_elements()) + ") does not match entry 0 (" +
+                   std::to_string(arrayant_vec[i].n_elements()) + ") does not match the first entry (" +
                    std::to_string(n_elements_ref) + ").";
 
         // Check element positions
         bool has_element_pos_cur = !arrayant_vec[i].element_pos.empty();
         if (has_element_pos_ref != has_element_pos_cur)
-            return std::string("Entry ") + idx + ": Presence of element_pos does not match entry 0.";
+            return std::string("Entry ") + idx + ": Presence of element_pos does not match the first entry.";
 
         if (has_element_pos_ref && has_element_pos_cur)
         {
             if (arrayant_vec[i].element_pos.n_rows != arrayant_vec[0].element_pos.n_rows ||
                 arrayant_vec[i].element_pos.n_cols != arrayant_vec[0].element_pos.n_cols)
-                return std::string("Entry ") + idx + ": Size of element_pos does not match entry 0.";
+                return std::string("Entry ") + idx + ": Size of element_pos does not match the first entry.";
 
             const dtype *pos_ref = arrayant_vec[0].element_pos.memptr();
             const dtype *pos_cur = arrayant_vec[i].element_pos.memptr();
             arma::uword n_pos = arrayant_vec[0].element_pos.n_elem;
             for (arma::uword k = 0; k < n_pos; ++k)
                 if (pos_ref[k] != pos_cur[k])
-                    return std::string("Entry ") + idx + ": Element positions do not match entry 0.";
+                    return std::string("Entry ") + idx + ": Element positions do not match the first entry.";
         }
 
         // Check coupling matrix shape
@@ -381,17 +381,17 @@ static std::string qd_is_valid_multi(const std::vector<quadriga_lib::arrayant<dt
             arrayant_vec[i].coupling_re.n_cols != n_cpl_cols_ref)
             return std::string("Entry ") + idx + ": Coupling matrix size (" +
                    std::to_string(arrayant_vec[i].coupling_re.n_rows) + "x" +
-                   std::to_string(arrayant_vec[i].coupling_re.n_cols) + ") does not match entry 0 (" +
+                   std::to_string(arrayant_vec[i].coupling_re.n_cols) + ") does not match the first entry (" +
                    std::to_string(n_cpl_rows_ref) + "x" + std::to_string(n_cpl_cols_ref) + ").";
 
         bool has_coupling_im_cur = !arrayant_vec[i].coupling_im.empty();
         if (has_coupling_im_ref != has_coupling_im_cur)
-            return std::string("Entry ") + idx + ": Presence of coupling_im does not match entry 0.";
+            return std::string("Entry ") + idx + ": Presence of coupling_im does not match the first entry.";
 
         if (has_coupling_im_ref && has_coupling_im_cur)
             if (arrayant_vec[i].coupling_im.n_rows != arrayant_vec[0].coupling_im.n_rows ||
                 arrayant_vec[i].coupling_im.n_cols != arrayant_vec[0].coupling_im.n_cols)
-                return std::string("Entry ") + idx + ": Size of coupling_im does not match entry 0.";
+                return std::string("Entry ") + idx + ": Size of coupling_im does not match the first entry.";
     }
 
     return std::string("");
@@ -477,8 +477,7 @@ void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib::arrayan
         }
         catch (const std::invalid_argument &e)
         {
-            throw std::invalid_argument("Error at entry " +
-                                        std::to_string(i) + ": " + e.what());
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": " + e.what());
         }
     }
 }
@@ -553,9 +552,7 @@ void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arra
         // Validate indices
         for (arma::uword k = 0; k < i_element.n_elem; ++k)
             if (i_element[k] >= n_elements_ref)
-                throw std::invalid_argument("Element index " +
-                                            std::to_string(i_element[k]) + " is out of range (n_elements = " +
-                                            std::to_string(n_elements_ref) + ").");
+                throw std::invalid_argument("Input 'i_element' contains indices that exceed the number of elements.");
     }
 
     // Apply to all entries
@@ -565,9 +562,8 @@ void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_lib::arra
 
         // Ensure element count matches the reference
         if (ant.n_elements() != n_elements_ref)
-            throw std::invalid_argument("Entry " + std::to_string(i) +
-                                        " has " + std::to_string(ant.n_elements()) +
-                                        " elements, expected " + std::to_string(n_elements_ref) + ".");
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Number of elements (" + std::to_string(ant.n_elements()) +
+                                        ") does not match the first entry (" + std::to_string(n_elements_ref) + ").");
 
         // Initialize element_pos if empty
         if (ant.element_pos.is_empty())
@@ -645,8 +641,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_lib::array
         }
         catch (const std::invalid_argument &e)
         {
-            throw std::invalid_argument("Error at entry " +
-                                        std::to_string(i) + ": " + e.what());
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": " + e.what());
         }
     }
 }
@@ -750,8 +745,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
 
         // Check center frequency match
         if (std::abs((double)a1.center_freq - (double)a2.center_freq) > 1.0e-6 * std::abs((double)a1.center_freq))
-            throw std::invalid_argument("Center frequency mismatch at index " +
-                                        std::to_string(i) + " (" + std::to_string((double)a1.center_freq) +
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Center frequency mismatch (" + std::to_string((double)a1.center_freq) +
                                         " vs " + std::to_string((double)a2.center_freq) + ").");
 
         quadriga_lib::arrayant<dtype> &out = output[i];
@@ -783,8 +777,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
         // Validate and initialize check_ptr
         err = out.is_valid();
         if (!err.empty())
-            throw std::invalid_argument("Output validation failed at index " +
-                                        std::to_string(i) + ": " + err);
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Output validation failed: " + err);
     }
 
     return output;

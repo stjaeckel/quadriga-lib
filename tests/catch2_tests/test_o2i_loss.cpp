@@ -381,7 +381,7 @@ TEST_CASE("o2i_loss - input validation")
             r(4, 3) = v;
             INFO("value " << v);
             CHECK_THROWS_MATCHES(call(fc, r, models, w, 25.0), std::invalid_argument,
-                                 Message("Column 3 of 'rnd' must be finite."));
+                                 Message("Normal-distributed column of 'rnd' must be finite."));
         }
     }
     SECTION("models")

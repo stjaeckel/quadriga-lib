@@ -227,7 +227,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         smi = np.array([1, 6], dtype=np.uint32)
         with self.assertRaises(Exception) as ctx:
             RTtools.ray_triangle_intersect(self.orig, self.dest, self.cube, smi)
-        self.assertIn("start at index 0", str(ctx.exception))
+        self.assertIn("start at the first face", str(ctx.exception))
 
     def test_error_submesh_not_sorted(self):
         smi = np.array([0, 6, 3], dtype=np.uint32)

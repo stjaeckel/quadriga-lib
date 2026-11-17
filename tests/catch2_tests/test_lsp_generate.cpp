@@ -1216,12 +1216,12 @@ TEST_CASE("lsp_generate - input validation")
         arma::mat bad = rnd;
         bad(1, 9) = 1.5;
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re), std::invalid_argument,
-                             Message("Column 9 of 'rnd' must be in the range from 0 to 1."));
+                             Message("Ground-permittivity column of 'rnd' must be in the range from 0 to 1."));
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, nullptr, &im), std::invalid_argument,
-                             Message("Column 9 of 'rnd' must be in the range from 0 to 1."));
+                             Message("Ground-permittivity column of 'rnd' must be in the range from 0 to 1."));
         bad(1, 9) = -0.1;
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp, nullptr, nullptr, &re, &im), std::invalid_argument,
-                             Message("Column 9 of 'rnd' must be in the range from 0 to 1."));
+                             Message("Ground-permittivity column of 'rnd' must be in the range from 0 to 1."));
         // Not checked when the ground permittivity is not requested
         bad(1, 9) = 1.5;
         arma::vec toa;

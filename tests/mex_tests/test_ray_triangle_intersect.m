@@ -226,7 +226,7 @@ try
     quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([2; 6]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'First sub-mesh must start at index 0.';
+    expectedErrorMessage = 'First sub-mesh must start at the first face.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

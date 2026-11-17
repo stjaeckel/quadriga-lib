@@ -160,7 +160,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
         const unsigned *p_sub = sub_mesh_ind->memptr();
 
         if (*p_sub != 0U)
-            throw std::invalid_argument("First sub-mesh must start at index 0.");
+            throw std::invalid_argument("First sub-mesh must start at the first face.");
 
         for (arma::uword i = 1ULL; i < n_sub; ++i)
         {

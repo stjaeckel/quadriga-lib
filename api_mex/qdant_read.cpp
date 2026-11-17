@@ -80,7 +80,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             {
                 err = "Entries in file '" + fn + "' do not form a frequency set (" + err +
                       "); pass 'id' to read single entries.";
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", err.c_str());
+                qd_mex_cpp_error(err);
             }
 
             plhs[0] = qd_mex_arrayant2struct_multi(arrayant);

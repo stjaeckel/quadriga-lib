@@ -16,18 +16,38 @@
 #include <array>
 #include <limits>
 
-// Macro to redirect any exception to stderr
-#define CALL_QD(expr)                                                    \
-    do                                                                   \
-    {                                                                    \
-        try                                                              \
-        {                                                                \
-            expr;                                                        \
-        }                                                                \
-        catch (const std::exception &ex)                                 \
-        {                                                                \
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ex.what()); \
-        }                                                                \
+// Raises a C++ error message in MATLAB / Octave. A C++ message names an entry of a vector input only by the prefix
+// "Entry <i>: " or "Snapshot <i>: " with a 0-based <i>; every such prefix is rewritten to <i> + 1, so that MATLAB
+// users read 1-based indices. User text inside a message (e.g. a file name) that contains such a prefix is rewritten
+// as well; no library message is affected.
+inline void qd_mex_cpp_error(std::string msg)
+{
+    for (const std::string p : {"Entry ", "Snapshot "})
+        for (size_t pos = msg.find(p); pos != std::string::npos; pos = msg.find(p, pos))
+        {
+            const size_t i = pos + p.size(), end = msg.find_first_not_of("0123456789", i);
+            pos = i;
+            if (end == i || end - i > 18 || msg.compare(end, 2, ": ") != 0) // end == npos fails the compare
+                continue;
+            const std::string n = std::to_string(std::stoull(msg.substr(i, end - i)) + 1ULL);
+            msg.replace(i, end - i, n);
+            pos = i + n.size();
+        }
+    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+}
+
+// Macro to redirect any exception to MATLAB / Octave
+#define CALL_QD(expr)                    \
+    do                                   \
+    {                                    \
+        try                              \
+        {                                \
+            expr;                        \
+        }                                \
+        catch (const std::exception &ex) \
+        {                                \
+            qd_mex_cpp_error(ex.what()); \
+        }                                \
     } while (0)
 
 // Helper: check if MATLAB array type matches the requested C++ dtype
@@ -1196,11 +1216,11 @@ inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field,
 
     size_t n_elem = (size_t)mxGetNumberOfElements(strct);
     if (n >= n_elem)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Struct index " + std::to_string(n) + " out of range (size " + std::to_string(n_elem) + ").").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Struct index " + std::to_string(n + 1) + " out of range (size " + std::to_string(n_elem) + ").").c_str());
 
     mxArray *data = mxGetField(strct, (mwIndex)n, field.c_str());
     if (data == nullptr)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + field + "' not found at index " + std::to_string(n) + "!").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + field + "' not found at index " + std::to_string(n + 1) + "!").c_str());
     return data;
 }
 

@@ -175,11 +175,11 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
     {
         arma::uword L = az[n].n_elem;
         if (L == 0)
-            throw std::invalid_argument("Element " + std::to_string(n) + " of 'az' must not be empty.");
+            throw std::invalid_argument("Entry " + std::to_string(n) + ": Input 'az' must not be empty.");
         if (el[n].n_elem != L)
-            throw std::invalid_argument("Element " + std::to_string(n) + " of 'el' must have the same length as 'az'.");
+            throw std::invalid_argument("Entry " + std::to_string(n) + ": Input 'el' must have the same length as 'az'.");
         if (powers[n].n_elem != L)
-            throw std::invalid_argument("Element " + std::to_string(n) + " of 'powers' must have the same length as 'az'.");
+            throw std::invalid_argument("Entry " + std::to_string(n) + ": Input 'powers' must have the same length as 'az'.");
     }
 
     // quantize_deg: 0 (off) or a finite step >= 1e-3 deg, so that the bin count stays below 360 000 + 2
@@ -231,7 +231,7 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
         for (arma::uword i = 0; i < L; i++)
             pt += pw_ptr[i];
         if (pt <= (dtype)0)
-            throw std::invalid_argument("Sum of powers for element " + std::to_string(n) + " must be positive.");
+            throw std::invalid_argument("Entry " + std::to_string(n) + ": Sum of 'powers' must be positive.");
         for (arma::uword i = 0; i < L; i++)
             pnp[i] = pw_ptr[i] / pt;
 

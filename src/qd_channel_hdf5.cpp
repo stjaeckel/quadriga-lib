@@ -991,14 +991,19 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &
             fail("has an unexpected type");
         if (d.rank != (int)expected.size())
             fail("has " + std::to_string(d.rank) + " dimensions, expected " + std::to_string(expected.size()));
+        // Shapes in storage order, slowest first; '*' is any extent
+        bool match = true;
+        std::string got = "[", want = "[";
         int i = 0;
         for (uint64_t e : expected)
         {
-            if (e != h5::undef && d.dims[i] != e)
-                fail("has extent " + std::to_string(d.dims[i]) + " in dimension " + std::to_string(i) + ", expected " +
-                     std::to_string(e));
+            match = match && (e == h5::undef || d.dims[i] == e);
+            got += (i ? ", " : "") + std::to_string(d.dims[i]);
+            want += (i ? ", " : "") + (e == h5::undef ? std::string("*") : std::to_string(e));
             ++i;
         }
+        if (!match)
+            fail("has extents " + got + "], expected " + want + "]");
         return true;
     };
     // Read the single-precision data of 'd' as dtype
@@ -1094,7 +1099,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &
         if (s == 0)
             present_in_first = present;
         else if (present != present_in_first)
-            h5::malformed("snapshot " + std::to_string(s) + " has other datasets than snapshot 0");
+            h5::malformed("snapshot group 'Snap_" + std::to_string(snaps[s].first) + "' has other datasets than 'Snap_0'");
         if (((present & 1u) != 0) != ((present & 2u) != 0))
             h5::malformed("datasets 'coeff_re' and 'coeff_im' must both be present");
 

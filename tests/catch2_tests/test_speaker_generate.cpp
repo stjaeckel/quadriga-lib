@@ -748,7 +748,9 @@ TEST_CASE("Speaker - is_valid_multi: shifted azimuth grid values fails")
     std::string err = quadriga_lib::arrayant_is_valid_multi(spk);
     CHECK(!err.empty());
     CHECK(err.find("Entry 1") != std::string::npos);
+    CHECK(err.rfind("Entry 1: ", 0) == 0);
     CHECK(err.find("Azimuth grid values") != std::string::npos);
+    CHECK(err.find("entry 0") == std::string::npos); // no index besides the prefix
 }
 
 TEST_CASE("Speaker - is_valid_multi: shifted elevation grid values fails")

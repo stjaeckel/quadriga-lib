@@ -285,14 +285,14 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
         for (size_t i = 0; i < n_snap_vector; ++i)
         {
             if (coeff_re[i].n_rows != n_rx || coeff_re[i].n_cols != n_tx || coeff_re[i].n_slices != n_pth[i])
-                return std::string("Size mismatch in 'coeff_re[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'coeff_re'.";
 
             if (coeff_im[i].n_rows != n_rx || coeff_im[i].n_cols != n_tx || coeff_im[i].n_slices != n_pth[i])
-                return std::string("Size mismatch in 'coeff_im[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'coeff_im'.";
 
             if (!(delay[i].n_rows == n_rx && delay[i].n_cols == n_tx && delay[i].n_slices == n_pth[i]) &&
                 !(delay[i].n_rows == 1 && delay[i].n_cols == 1 && delay[i].n_slices == n_pth[i]))
-                return std::string("Size mismatch in 'delay[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'delay'.";
         }
     }
     else if (!coeff_im.empty())
@@ -304,7 +304,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
 
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (delay[i].n_rows != 1 || delay[i].n_cols != 1 || delay[i].n_slices != n_pth[i])
-                return std::string("Size mismatch in 'delay[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'delay'.";
     }
 
     if (path_gain.size() != 0 && path_gain.size() != n_snap_vector)
@@ -313,7 +313,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     if (n_snap_arma != 0ULL && path_gain.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_gain[i].n_elem != n_pth[i])
-                return std::string("Size mismatch in 'path_gain[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_gain'.";
 
     if (path_length.size() != 0 && path_length.size() != n_snap_vector)
         return std::string("'path_length' must be empty or match the number of snapshots.");
@@ -321,7 +321,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     if (n_snap_arma != 0ULL && path_length.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_length[i].n_elem != n_pth[i])
-                return std::string("Size mismatch in 'path_length[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_length'.";
 
     if (path_polarization.size() != 0 && path_polarization.size() != n_snap_vector)
         return std::string("'path_polarization' must be empty or match the number of snapshots.");
@@ -329,7 +329,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     if (n_snap_arma != 0ULL && path_polarization.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_polarization[i].n_rows != 8ULL || path_polarization[i].n_cols != n_pth[i])
-                return std::string("Size mismatch in 'path_polarization[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_polarization'.";
 
     if (path_angles.size() != 0 && path_angles.size() != n_snap_vector)
         return std::string("'path_angles' must be empty or match the number of snapshots.");
@@ -337,7 +337,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     if (n_snap_arma != 0ULL && path_angles.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4ULL)
-                return std::string("Size mismatch in 'path_angles[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_angles'.";
 
     if (path_fbs_pos.size() != 0 && path_fbs_pos.size() != n_snap_vector)
         return std::string("'path_fbs_pos' must be empty or match the number of snapshots.");
@@ -345,7 +345,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     if (n_snap_arma != 0ULL && path_fbs_pos.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_fbs_pos[i].n_rows != 3ULL || path_fbs_pos[i].n_cols != n_pth[i])
-                return std::string("Size mismatch in 'path_fbs_pos[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_fbs_pos'.";
 
     if (path_lbs_pos.size() != 0 && path_lbs_pos.size() != n_snap_vector)
         return std::string("'path_lbs_pos' must be empty or match the number of snapshots.");
@@ -353,7 +353,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     if (n_snap_arma != 0ULL && path_lbs_pos.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_lbs_pos[i].n_rows != 3ULL || path_lbs_pos[i].n_cols != n_pth[i])
-                return std::string("Size mismatch in 'path_lbs_pos[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_lbs_pos'.";
 
     if (n_interact.size() != 0 && n_interact.size() != n_snap_vector)
         return std::string("'n_interact' must be empty or match the number of snapshots.");
@@ -365,17 +365,17 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
         for (size_t i = 0; i < n_snap_vector; ++i)
         {
             if (n_interact[i].n_elem != n_pth[i])
-                return std::string("Size mismatch in 'n_interact[" + std::to_string(i) + "]'.");
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'n_interact'.";
 
             if (interact_coord[i].n_rows != 3ULL)
-                return std::string("'interact_coord[" + std::to_string(i) + "]' must have 3 rows.");
+                return "Snapshot " + std::to_string(i) + ": 'interact_coord' must have 3 rows.";
 
             arma::uword cnt = 0;
             for (const unsigned *p = n_interact[i].begin(); p < n_interact[i].end(); ++p)
                 cnt += (arma::uword)*p;
 
             if (interact_coord[i].n_cols != cnt)
-                return std::string("Number of columns in 'interact_coord[" + std::to_string(i) + "]' must match the sum of 'n_interact'.");
+                return "Snapshot " + std::to_string(i) + ": Number of columns in 'interact_coord' must match the sum of 'n_interact'.";
         }
 
     if (par_names.size() != par_data.size())

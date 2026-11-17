@@ -510,7 +510,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         throw std::invalid_argument("Input 'rnd' must be finite.");
     for (arma::uword i = 0; i < n_link * N; ++i)
         if (!(rnd[i] >= 0.0 && rnd[i] <= 1.0))
-            throw std::invalid_argument("Columns 0 to N-1 of 'rnd' (cluster delays) must be in [0, 1].");
+            throw std::invalid_argument("Cluster-delay columns of 'rnd' must be in [0, 1].");
 
     if ((m_tr || m_mf) && N > 0)
     {
