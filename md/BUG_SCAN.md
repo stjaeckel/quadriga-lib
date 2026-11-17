@@ -78,7 +78,7 @@ Read this before the hunt, so known items are not reported as new:
   - An open issue that covers a finding is not a new finding. If the scan adds information (a reproduction, a second place, a cause), the finding is presented in phase 5 as a comment for that issue.
   - An issue closed as completed is reported again only if the scan reproduces it at the scanned commit, and then as a **regression** of that issue.
   - An issue closed as not planned is not reported again, unless the scan shows it is worse than the closing comment says.
-- **The first full bug hunt** (2026-10-15, 123 items, all fixed afterwards): `git show b7c1009:md/bugs.md`. Use it to look for regressions and to see which methods found what.
+- **The first full bug hunt** (2026-10-15, 123 items, all fixed afterwards): `git show 02d9f3e:md/bugs.md`. Use it to look for regressions and to see which methods found what.
 
 ## Phase 1: build and baseline (the manager, no sub-agents)
 

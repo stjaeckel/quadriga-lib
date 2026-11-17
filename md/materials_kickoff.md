@@ -9,7 +9,7 @@ reference simulation in a residential listening room, (5) measurements, (6) a jo
 the whole pipeline, with the engine as its methods core).
 - Step 1 is the research library `/sjc/accoustic_research`: a separate repository, local only and read-only for this
   project.
-- Step 2 is closed (last commits 9b298cc, 8d89b84, 2026-10-22).
+- Step 2 is closed (last commits c8facd4, 5e06f7d, 2026-10-22).
 - Step 3 builds the acoustic material table the later steps use.
 
 ## Read first
@@ -170,7 +170,7 @@ the whole pipeline, with the engine as its methods core).
 
 ## Facts at the start
 
-- `data/` holds `materials_rf.csv` (EM) and `config/`; the old acoustic table was removed in 8d89b84.
+- `data/` holds `materials_rf.csv` (EM) and `config/`; the old acoustic table was removed in 5e06f7d.
 - Leftovers from step 2:
   - `tools/acoustic/band_probe.cpp` has no `attB` column, and every fitted row uses one;
   - page section 9 says `irr_glass` follows TR 38.901, though only its `att` does;

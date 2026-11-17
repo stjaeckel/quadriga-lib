@@ -1,8 +1,8 @@
 # Prototypes and benchmarks from the review of the sum-of-sinusoids functions
 
 Reference material for the fix plan of the sum-of-sinusoids functions, written during the review of
-2026-10-12. The review and the plan are in the git history (`git show b7c1009:md/REVIEW_QD_SOS.md`,
-section 3; `git show daafa6a^:md/PLAN_QD_SOS_FIXES.md`). Nothing here is built by CMake or used by the
+2026-10-12. The review and the plan are in the git history (`git show 02d9f3e:md/REVIEW_QD_SOS.md`,
+section 3; `git show b6f8db7^:md/PLAN_QD_SOS_FIXES.md`). Nothing here is built by CMake or used by the
 library.
 
 | File | Content | Review |
@@ -15,7 +15,7 @@ library.
 | `bench_sos_val_parts.cpp` | Where `sos_val` spends its time outside the kernel | 3.3 |
 | `bench_functions.cpp` | The other functions: preset, phases, rand, map, remove_bias, calc_mse, acf_estimate, generate | 3.4 |
 
-All prototypes gave output bit-identical to `qd_SOS_AVX2` / `qd_SOS_GENERIC` of commit 38d871a.
+All prototypes gave output bit-identical to `qd_SOS_AVX2` / `qd_SOS_GENERIC` of commit 5032896.
 
 Build, with `LIB` pointing to a build of the library with AVX2 (gcc 12, as `make` uses):
 

@@ -7,7 +7,7 @@
 #   column (a switch: fitted only with V['mfit']), att (dB at 1 kHz) / attB, cF / cQ the bending stiffness, rF / rQ / rS
 #   the resonance (+ the mass-air-mass dip, - the first mode), C the column of the installed loss factor in frequency (a dropped candidate).
 #   The plate rule; tf fixed at the class's absorption law; references, absorption laws and physical constants from
-#   tl_refs.json (the 13 reference constructions of the first acoustic round, bb336dc). Bounds of that round on cF, cQ, rF, rQ.
+#   tl_refs.json (the 13 reference constructions of the first acoustic round, a18bee2). Bounds of that round on cF, cQ, rF, rQ.
 #   Variant V (dict): amax (upper angle of the average; 90 = random incidence, the library's own average and the fit
 #   convention of the fits; 78 = field incidence), mfit, noatt, m13 (the installed loss factor in frequency, 'col' | 'davy'), m14 (a limiting angle in deg), m15 (the bending loss as a resistance), pcf (coiF
 #   pinned at the physical coincidence), attmax (the att bound, 12 dB by default), side (the finite panel as built,
@@ -18,8 +18,8 @@
 #
 # usage: python3 tools/acoustic/txfit.py [--variant JSON] [--seeds N] [--procs P] [--out FILE] [construction ...]
 #   e.g. --variant '{"amax": 90, "side": "lab"}' (the default) fits the library as built at random incidence, each
-#   construction at its laboratory side (2.70 dB, de60194); '{"amax": 90, "side": 0}' the infinite plate
-#   (2.97 dB, bc24b0c)
+#   construction at its laboratory side (2.70 dB, d938ae7); '{"amax": 90, "side": 0}' the infinite plate
+#   (2.97 dB, 2c0f3d6)
 import argparse, json, math, os, random, sys
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))

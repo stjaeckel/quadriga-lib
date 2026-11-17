@@ -21,17 +21,17 @@ batch and brought to Stephan in five parts. The engine stays closed until every 
 
 | batch | families (wish-list entry) | commit |
 | --- | --- | --- |
-| 0 | `concrete` (1.1); the rig moved into a header, cases per group | a97c4ae |
-| — | engine-limit marks by name; tests and tools cite published material only | 4641966 |
-| — | research rows cited by stable id; the research answer folded into the wish-list | 063f05b |
-| 1 | `masonry_heavy` (1.2), `glass_4mm` / `glass_6mm` (1.6), `glass_wool` (5.1); JCA in the rig | a73d1a2 |
-| 2a | `masonry_hollow` (1.3), `door_solid_40mm` + `door_hollow_core_40mm` (1.23, 1.24), `rock_wool` (5.2) | cbe2ae3 |
-| 2b | `masonry_light` (1.4), `glazing_double_24mm` + `glazing_triple_36mm` (1.7), `pu_foam` (5.3; 3.6 to a padding-foam row) | 1a3d92d |
-| 2c | `plaster_15mm` (1.5), `parquet` + `vinyl` (1.16, 1.21), `carpet_tile_11mm` (3.1); porous rows' `thk` at most the name's suffix | 15480d4 |
-| 2d-1 | `clt` (1.25), `screed` (1.18), `gypsum_board_12_5mm` + `plywood_19mm` (1.9, 1.13), the ground classes `ground_*` (6.1–6.6) | c9ee084 |
+| 0 | `concrete` (1.1); the rig moved into a header, cases per group | 67820da |
+| — | engine-limit marks by name; tests and tools cite published material only | 2f7dbd7 |
+| — | research rows cited by stable id; the research answer folded into the wish-list | 0982e65 |
+| 1 | `masonry_heavy` (1.2), `glass_4mm` / `glass_6mm` (1.6), `glass_wool` (5.1); JCA in the rig | 6577fea |
+| 2a | `masonry_hollow` (1.3), `door_solid_40mm` + `door_hollow_core_40mm` (1.23, 1.24), `rock_wool` (5.2) | 9c78baa |
+| 2b | `masonry_light` (1.4), `glazing_double_24mm` + `glazing_triple_36mm` (1.7), `pu_foam` (5.3; 3.6 to a padding-foam row) | 4589278 |
+| 2c | `plaster_15mm` (1.5), `parquet` + `vinyl` (1.16, 1.21), `carpet_tile_11mm` (3.1); porous rows' `thk` at most the name's suffix | a35d5ca |
+| 2d-1 | `clt` (1.25), `screed` (1.18), `gypsum_board_12_5mm` + `plywood_19mm` (1.9, 1.13), the ground classes `ground_*` (6.1–6.6) | fa53ebf |
 
-Earlier commits of step 3: 5be85fb, 13e4e45, 19323d9 / be65346 / bd0a170 (wish-list and guidelines), 69a4555 /
-e5d3743 / e578aee / 5081648 (rig extension and its reviews).
+Earlier commits of step 3: 78bc2f7, aefd5ff, 9f398f6 / 427c648 / 94b142f (wish-list and guidelines), b991484 /
+8258045 / b55d7c1 / 81b70af (rig extension and its reviews).
 
 **The three step-3 documents** (tracked, public, no private details):
 - `md/acoustic_materials.md`, the wish-list: six classes (structural, hard furnishing, soft furnishing, complex
@@ -63,7 +63,7 @@ ground classes (`ground`). The table case checks every row: a case per family, t
 build: g++-12 / gcc-12, static library, tests on, AVX2, CUDA, MATLAB, Octave, Python off) and runs its `test_bin` from
 the repository root; agents build inside their worktrees.
 
-**Baselines** (the generic build, at 8dc137b: batch 2d round 1 plus the HDF5 and small-scale fading merges; regenerated
+**Baselines** (the generic build, at 22028db: batch 2d round 1 plus the HDF5 and small-scale fading merges; regenerated
 2026-10-29): `[wave]` 163474 / 178, `[acoustic]` 45785 / 86 (the rig included), whole suite 1440292 / 1499 (the
 generic build leaves out one build-option case of the merge notice's count). Files `test_wave.txt`, `test_acoustic.txt`,
 `test.txt` in `/home/stephan/quadriga-lib-agents/baselines/`.
@@ -72,11 +72,11 @@ generic build leaves out one build-option case of the merge notice's count). Fil
 `/sjc/accoustic_research/manager/step3_research_report_2026-10-27.md`). Research rows are cited by their stable id
 `<source key>#<n>` at d501809 (Stephan, 2026-10-27), never by line; `data/id_map_2dad906.csv` maps the old lines.
 The line citations are converted and the answer is folded into the wish-list with Stephan's twelve readings D1–D12
-(063f05b; the readings in the section-9 log of 2026-10-28). Further requests go through Stephan in the handoff-7 form.
+(0982e65; the readings in the section-9 log of 2026-10-28). Further requests go through Stephan in the handoff-7 form.
 
 **Next: batch 2d, round 2 (paused 2026-10-29 right after its start; restart on Stephan's word).** Two agents, briefs
 written and approved: `m17_metal_brief.md` (`steel_1mm` + `aluminum_2mm`, plates file) and `m18_asphalt_brief.md`
-(`asphalt` + `asphalt_porous_40mm`, ground file), with `batch2d_common.md`. Their worktrees exist at 8dc137b
+(`asphalt` + `asphalt_porous_40mm`, ground file), with `batch2d_common.md`. Their worktrees exist at 22028db
 (`/home/stephan/quadriga-lib-agents/worktrees/m17_metal`, `m18_asphalt`, branches `agent/<id>`); m17 had begun a build
 there, no report or tracked file was written. To restart: check `git log -1` and `git status` in both (reset or
 recreate them at the current HEAD if main moved), empty `scratch/m17/` and `m18/`, and start both agents on phase 1
@@ -278,17 +278,17 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
 
 ## 9. Log (dated, newest last; the state is section 0)
 
-- **2026-10-23, phase 0.** HEAD cebd0c0 (v0.12.3). `build_linux` reconfigured (it was absent): the generic build,
+- **2026-10-23, phase 0.** HEAD ed325e7 (v0.12.3). `build_linux` reconfigured (it was absent): the generic build,
   g++-12, AVX2 and CUDA off, tests on, MATLAB, Octave and Python off; built with `--parallel 12`.
-  Baselines (untracked, regenerated 2026-10-23 from cebd0c0): `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59,
+  Baselines (untracked, regenerated 2026-10-23 from ed325e7): `[wave]` 163474 / 178 and `[acoustic]` 42741 / 59,
   every row identical to the files of 2026-10-21 (`rowdiff.py`: 141128 and 112451 numbers equal); the whole suite
   1346857 / 1302 (the bug-fix series of 2026-10-21/22 added 38 cases outside the ray tags; the kick-off's
-  1344398 / 1264 is the count at a58c18f). Wall time at 12 threads, load 5 to 7: 14.6 s, 0.9 s, 28.8 s.
+  1344398 / 1264 is the count at a56950c). Wall time at 12 threads, load 5 to 7: 14.6 s, 0.9 s, 28.8 s.
   `check_docs.py` passes.
 - Files of phase 0: this file, `md/materials_agent_template.md`.
 - Phase-1 answers (2026-10-23): the CSV is `data/materials_acoustic.csv`; the rig copies the `lw` helpers it needs
   into its own file; combinations as defined in section 10.
-- Phase-0 files committed by Stephan (5be85fb, 2026-10-23).
+- Phase-0 files committed by Stephan (78bc2f7, 2026-10-23).
 - **Phase 1 in work:** brief `md/materials/rig_brief.md` (two phases: plan, then rig and self-checks).
   - Plan phase done 2026-10-23 (`md/materials/rig_report.md`). The manager reran the probe in
     `build_linux/scratch/rig`: the band verdict (R 1.0726 at 89°, 1816 Hz, threshold 0.15; equal to the single
@@ -372,7 +372,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     thread, all six 0.137 s / 0.459 s; `check_docs.py` passes. Side finding: the API page lists `length` of `path` as
     an attribute; it is the member function `length()` (`include/quadriga_channel.hpp:158`), a documentation point
     for the library, not for this step.
-  - **Phase 1 closed:** the rig committed by Stephan (13e4e45, 2026-10-23). Baselines regenerated at 13e4e45:
+  - **Phase 1 closed:** the rig committed by Stephan (aefd5ff, 2026-10-23). Baselines regenerated at aefd5ff:
     `[wave]` 163474 / 178, `[acoustic]` 42938 / 65 (the rig's 6 cases included), whole suite 1347054 / 1308.
     Decided by Stephan 2026-10-23: PD1 (a) the plate of the added-insulation model gets the library's finite-panel
     radiation (Davy's σ at the wall's `side`) for the random-incidence row, printed, not asserted (implemented with the
@@ -455,7 +455,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     rows (no 100 mm wall measured); masonry classes; clutter grid. Review points left for phase 3: glazing sheet names
     give the unit thickness (`glazing_double_24mm`) while the lumped row's `thk` is the glass alone; the CSV row
     `concrete_cast_152mm` breaks the naming rule until redone as `concrete_150mm`.
-  - Phase 2 documents committed by Stephan (19323d9, 2026-10-26). Before phase 3, a critical review at high effort
+  - Phase 2 documents committed by Stephan (9f398f6, 2026-10-26). Before phase 3, a critical review at high effort
     (brief `md/materials/r01_phase2_review_brief.md`, output `md/materials/r01_phase2_review.md`); the manager passes
     its decisions to Stephan, then an agent updates the documents.
   - r01 done 2026-10-26 (`md/materials/r01_phase2_review.md`): 13 findings, 8 for Stephan (1 two tiers per row,
@@ -499,7 +499,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     and the ISSUE convention); manager check: no `ice` or `box_fridge` left, no private details, `check_docs.py` passes;
     section 5 of this file now points to the wish-list. Open: asphalt absorption and hollow-core doors have no data
     (research requests); several object row names marked proposed.
-  - Draft 3 committed by Stephan (be65346, 2026-10-26). Second independent review r02 started (brief
+  - Draft 3 committed by Stephan (427c648, 2026-10-26). Second independent review r02 started (brief
     `md/materials/r02_phase2_review_brief.md`: draft 3 fresh, r01 decisions checked for consistent application, no
     reopening of decisions without a concrete technical reason).
   - r02 done 2026-10-26 (`md/materials/r02_phase2_review.md`): 16 findings, 9 for Stephan (1 rugs and objects on floor
@@ -534,12 +534,12 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     proposed), no private details, `check_docs.py` passes. Side finding of the drafter: concrete 152 → 203 mm is
     2.67 dB of mass law from the surface masses (draft 3 said 2.51 from the thickness ratio). Open: whether the
     listening room's inventory stays a phase-2 deliverable (proposal: it moves to step 4, the reference simulation).
-  - Draft 4 committed by Stephan (bd0a170, 2026-10-26). Room inventory moved to step 4 (Stephan, 2026-10-27: the list
+  - Draft 4 committed by Stephan (94b142f, 2026-10-26). Room inventory moved to step 4 (Stephan, 2026-10-27: the list
     is enough to set up a simulation and iterate). **Phase 2 closed.**
   - Research hand-over drafted 2026-10-27: `md/materials/research_request_2026-10-27.md` (request 0 stable row ids;
     requests 1–13 by impact in the handoff-7 format; three data errors at lines 1451, 520, 1819 of 2dad906; handoff
     gaps not requested, with reasons). The closed-source column is a proposal for Stephan to confirm.
-  - **Phase 2 result:** the wish-list and the guidelines (draft 3 committed be65346; draft 4 after the second review). Next: the research requests (section 6 of
+  - **Phase 2 result:** the wish-list and the guidelines (draft 3 committed 427c648; draft 4 after the second review). Next: the research requests (section 6 of
     the wish-list, plus the data errors of a01) go to the research manager; phase 3 starts in a new session.
   - **Engine issues for stage 2b** (Stephan, 2026-10-23): every engine miss found in step 3 becomes an issue in
     `md/acoustic_engine_stage2b_issues.md` (tracked, public) with the diagnostics a later engine stage needs, the
@@ -552,7 +552,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     of mass-law rows = column formulas asserted plus a physical plate printed as spread; the wall keeps its row except
     `tf` 0 behind a fill, `tl` only where the wall's `tf` > 0; rig rows in `tests/data/materials_acoustic_rig.csv`;
     `lw::walk` not copied; `band_probe` gains `attB` and `alphaB` with a driver `tools/acoustic/grid_probe.py`).
-- **2026-10-27, phase 3 started** (new manager session). Build current at c9f5c00 (no source change since 13e4e45);
+- **2026-10-27, phase 3 started** (new manager session). Build current at 15dac29 (no source change since aefd5ff);
   baselines rechecked with `rowdiff.py`: `[acoustic]` 42938 / 65 and `[wave]` 163474 / 178, 0 differences; not
   regenerated. Decided by Stephan for the rig extension: the stack rule refuses three co-located faces, with one
   opt-out argument used only by `ISSUE` fixtures (issue 5); a row belongs to the family of its name without the
@@ -599,7 +599,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     1.7 rule 10 (`e` = ρ/ρ₀), 1.10 ISSUE wording and prerequisites, section 3 "rig today"; guidelines 3.1 and 12;
     stage-2b ISSUE convention and bounce cap, issues 1, 3, 4, 5 measured, issue 6 (grazing relaunch) new; open rule
     "dense ground classes". To Stephan for review and commit.
-  - Committed by Stephan (69a4555, 2026-10-27). Baselines regenerated at 69a4555: `[wave]` 163474 / 178,
+  - Committed by Stephan (b991484, 2026-10-27). Baselines regenerated at b991484: `[wave]` 163474 / 178,
     `[acoustic]` 43143 / 69, whole suite 1347259 / 1312. Stephan asked for an independent review of the rig, its
     findings worked in without escalation where possible, kept lean: review r03 started (brief
     `md/materials/r03_rig_review_brief.md`).
@@ -618,7 +618,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     `isfinite`, 16 porous per-octave checks, 5 T checks that could not fail, 1 assertion on an ISSUE line; +7);
     `[materials]` 0.36 s at 12 threads, load 3.4–5.6; `check_docs.py` passes. To Stephan with a summary and a commit
     message.
-  - Committed by Stephan (e5d3743, 2026-10-27). Baselines regenerated at e5d3743: `[wave]` 163474 / 178,
+  - Committed by Stephan (8258045, 2026-10-27). Baselines regenerated at 8258045: `[wave]` 163474 / 178,
     `[acoustic]` 43002 / 69, whole suite 1347118 / 1312. Second independent review r04 started (same procedure; brief
     `md/materials/r04_rig_review_brief.md`: own pass first, then the r03 fixes checked and what r03 missed).
   - r04 done 2026-10-27 (`md/materials/r04_rig_review.md`): r03 fixes right except three incomplete; 8 new findings.
@@ -632,7 +632,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     line (double leaf: paths against `transmit()` 4.95e-5 dB); whole suite 1347119 / 1312; `[materials]` 0.48 s at
     10 threads, load 5–12; the NaN probe now fails every check (dT, dR, R + T infinite, tier 2 false);
     `check_docs.py` passes. To Stephan with a summary and a commit message.
-  - Committed by Stephan (e578aee, 2026-10-27). Baselines regenerated at e578aee: `[wave]` 163474 / 178,
+  - Committed by Stephan (b55d7c1, 2026-10-27). Baselines regenerated at b55d7c1: `[wave]` 163474 / 178,
     `[acoustic]` 43003 / 69, whole suite 1347119 / 1312. Next: rig item 10, the object test.
   - Object test started 2026-10-27 (Stephan: measure the porous body's accuracy against cost at the cap of 10 first,
     stop, then build): brief revision 4, the rig agent on phase 3a.
@@ -651,13 +651,13 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     (0.1937 m², 4mV 0.2000); cushion within 0.47 % of the dense reference (bound 2 %); ISSUE 6 single ray 1.000 →
     1.868 in ten calls. Issue 6 entry and wish-list 1.10 updated. **Rig extension complete; next: material 1,
     concrete.**
-  - Committed by Stephan (5081648, 2026-10-27). Stephan asked how to parallelize the material list; three options
+  - Committed by Stephan (81b70af, 2026-10-27). Stephan asked how to parallelize the material list; three options
     laid out (serial; parallel agents under one manager; one session per group). **Decided 2026-10-27: option (b)**,
     parallel agents under one manager in worktrees; batch 0 `concrete` alone with the rig moved into a header, then
     wait for his feedback; per batch a findings summary, decisions and recommendations. Handed to a fresh manager
-    session (the old one was force-compacted). Plan in section 0. Baselines regenerated at 5081648: `[wave]` 163474 / 178,
+    session (the old one was force-compacted). Plan in section 0. Baselines regenerated at 81b70af: `[wave]` 163474 / 178,
     `[acoustic]` 43021 / 70, whole suite 1347137 / 1313.
-  - New manager session 2026-10-27: state checked (HEAD 5081648, only this file modified; the three baselines in the
+  - New manager session 2026-10-27: state checked (HEAD 81b70af, only this file modified; the three baselines in the
     root; no material brief yet). Batch-0 brief `md/materials/m01_concrete_brief.md` written: the agent in its own
     worktree (rehearses the batch mechanics; brief, baselines and report by absolute path in this checkout), four
     phases (plan stop; the move verified with rowdiff in `--order lex`, since a case in `test_acoustic_mat_*` links
@@ -674,7 +674,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     8.7 dB above the envelope (printed only). Side effect of the fitted mass level (the engine's bonded mass is
     `thk`/`fRef`): a bonded 15 mm plaster adds 0.88 dB instead of 0.48 dB, parquet 0.49 instead of 0.26 (normal-
     incidence mass law, script); to be measured by the plaster and finish agents. Setup findings: the Agent tool
-    created the worktree at cebd0c0 (fast-forwarded by the agent to 5081648); the Write tool refuses paths in the main
+    created the worktree at ed325e7 (fast-forwarded by the agent to 81b70af); the Write tool refuses paths in the main
     checkout from a worktree agent (`cp` works). D1 (`coiF` free, recommended), D2 (`e` 1901), D3 (joint α law) to
     Stephan.
   - Decided by Stephan 2026-10-27: D1 (a) `coiF` free, a fit knob named in the case comment (0.25 dB is not worth an
@@ -691,10 +691,10 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     `tf` 0.00054451, `tfB` 0.3965, `e` 1901, `side` 3.22). Plaster probe: 15 mm adds 0.41–2.33 dB on both faces at
     150 mm, about twice the mass law. Documents: wish-list 1.1 confirmed, 1.6 exception removed, 2.1 entry rewritten;
     stage-2b issue 7 (heavy-wall coincidence, the bonded-mass side effect) and the rig paths; guidelines 12 one row.
-  - Committed by Stephan (a97c4ae, 2026-10-27; a first commit with the agent's worktree as a gitlink was undone
-    locally, `.claude/worktrees/` is now ignored). Then the `fixes` branch was merged (7e9fe61, v0.12.4 26da9f9; the
+  - Committed by Stephan (67820da, 2026-10-27; a first commit with the agent's worktree as a gitlink was undone
+    locally, `.claude/worktrees/` is now ignored). Then the `fixes` branch was merged (29ed1af, v0.12.4 83da42a; the
     large-scale model: `include/quadriga_gbsm.hpp`, conf functions moved there, Python `quadriga_lib.gbsm`,
-    `qd_sos_acf_interp` renamed `qd_interp_linear`). Manager check at 26da9f9: our files unchanged by the merge except
+    `qd_sos_acf_interp` renamed `qd_interp_linear`). Manager check at 83da42a: our files unchanged by the merge except
     one comment line in `qd_test_diag.hpp` (`QD_DIAG_GBSM`); rebuild clean; `[wave]` 141128 numbers identical;
     `[acoustic]` 120637 identical to the batch-0 run; whole suite 1354225 / 1384, every changed number in the conf-file
     cases. Baselines regenerated. New coding rules adopted (section 3). Open for Stephan: the rig and the tools cite
@@ -712,7 +712,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     `data/id_map_2dad906.csv`), 17 rows of 2dad906 changed (manager check by script over the map: 1980 material rows
     mapped; the wish-list cites 2 of the changed rows, Fuchs 327 and 328 of 5.11), library 2544 rows. Plan to work it in
     before batch 1 proposed to Stephan.
-  - Cleanup committed by Stephan (4641966); baselines regenerated there (`[acoustic]` the 7 new labels). Decided by
+  - Cleanup committed by Stephan (2f7dbd7); baselines regenerated there (`[acoustic]` the 7 new labels). Decided by
     Stephan 2026-10-27: rows cited as source key plus id, research pinned at d501809; the citation agent (c02) and the
     analysis agent (a03) started in parallel; batch 1 after the tier readings.
   - c02 done 2026-10-27: wish-list 392 of 426 line citations converted (545 ids), the test comments 10; 34 refused
@@ -746,14 +746,14 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     6 / 4 / 6 / 3 / 5 dB by script). Manager review: the tiers and table rows of 1.2, 1.3, 1.23, 1.24, 4.1, 5.15 as
     decided; D8 rule in 1.2; D6 without any query; D12 in 5.11; `ceiling_tile_25mm` gone; `check_docs.py` passes. To
     Stephan with one commit for the id conversion and the update. Next: the batch-1 briefs.
-  - Committed by Stephan (063f05b, 2026-10-28). Batch-1 briefs written: `md/materials/batch1_common.md` (worktrees at
-    063f05b, 4 threads each, own case only, CSV rows appended, reports copied with `cp`, ids and engine-limit names,
+  - Committed by Stephan (0982e65, 2026-10-28). Batch-1 briefs written: `md/materials/batch1_common.md` (worktrees at
+    0982e65, 4 threads each, own case only, CSV rows appended, reports copied with `cp`, ids and engine-limit names,
     plan phase first), `m02_masonry_heavy_brief.md` (group file `heavy`; open rule generic solid across thickness over
     140–250 mm), `m03_glass_wool_brief.md` (`porous`; fitted-σ check, Scrosati rows, `alpha` on a porous layer, the
     finite sample), `m04_glass_brief.md` (`plates`; reference row per class for glass, thin-plate coincidence at
     3.1 / 2.1 kHz, the absorption refit). To Stephan before the agents start.
   - Briefs approved by Stephan 2026-10-28; the three material agents started on phase 1 (plan), each in its own worktree.
-  - m03 glass wool phase 1 done (worktree `.claude/worktrees/agent-a0f04c4dc30838bba`, fast-forwarded from 26da9f9).
+  - m03 glass wool phase 1 done (worktree `.claude/worktrees/agent-a0f04c4dc30838bba`, fast-forwarded from 83da42a).
     Manager reruns (`compare.py`, `finite.py`): at σ 13112 Komatsu / Miki / JCA (Dupont's own set) miss SFS by −0.072 /
     −0.066 / −0.084 at 250 Hz and −0.108 / −0.098 / −0.087 at 500 Hz; against the band [JCA #1, SFS] 0.049 / 0.035 /
     0.024 (JCA polished 0.023); fitted σ SFS ×1.83 (1–4 kHz ×1.53), Sabine converted ×1.45 (extended reaction),
@@ -761,7 +761,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     upper bound, so the finite sample as the cause of SFS's +0.08 is bounded, not measured. Decisions D1 (JCA in the
     rig's `eps_mu`, about 6 lines, a rig change), D2 (the band [JCA #1, SFS] at ±0.05), D3 (tier 2 at 50 mm only),
     D4 (`alpha` 0), D5 (Scrosati rows not met). Probe time provisional (load 13.5).
-  - m04 glass phase 1 done (worktree `.claude/worktrees/agent-a856d28aa70b22cbf`, at 063f05b). Manager reruns
+  - m04 glass phase 1 done (worktree `.claude/worktrees/agent-a856d28aa70b22cbf`, at 0982e65). Manager reruns
     (`tfcap.py`, `final.py`): physical `coiF` (3121 / 2080 Hz) and η 0.005 with the rest fitted to the laboratory
     references: Quirt within 1.99 / 1.58 dB (4 / 6 mm), AGC 2.25 dB, 6 mm laboratory envelope 0.75 dB; the generic
     EN 12758 values missed by 3.86 dB (4 mm, 250 Hz) and 2.85 dB (6 mm); masses 10.32 / 14.77 kg/m² against 10.00 /
@@ -770,7 +770,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     capped by the face absorption"). Fit knobs at bounds in the 4 mm row (`att`, `resF` 1000 Hz). Decisions D1 (lab
     values asserted, generic printed), D2 (physical coincidence), D3 (PTB#207 law, A 2), D4 (`grid(200,1)`, 8 kHz off
     by 3.2 dB on 50 angles, about 0.17 s, load 9). Side finding: tier-1 bound 2.52e-4 dB on 400 angles at 10 kHz.
-  - m02 masonry_heavy phase 1 done (worktree `.claude/worktrees/agent-adf28abc4018f5af8`, at 063f05b). Manager rerun
+  - m02 masonry_heavy phase 1 done (worktree `.claude/worktrees/agent-adf28abc4018f5af8`, at 0982e65). Manager rerun
     (`meval.py fit_g.json`): one generic fit (ρ 1772 kg/m³, `coiF` 7427 Hz with η ≈ 1, a knob as for concrete; mass level
     0.704 × physical) meets Weise#1 within 1.99 dB, Hopkins#68 2.23 dB, BIA#8 plus one increment 2.08 dB; the envelope
     of the valid walls 0 dB at 100–300 mm, but it is 3–6 dB wide, so the ±1 dB envelope check asserts nothing here;
@@ -801,15 +801,15 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     comment word (`att` fitted in both rows); reran: case 81 / 81, `[materials]` 986 / 14, `[wave]` identical,
     `[acoustic]` 43727 / 73 and the whole suite 1354761 / 1387 with the same single insertion, `check_docs.py` passes.
     To Stephan for the commit; baselines to be regenerated after it. Next: batch 2a (masonry_hollow, rock_wool, doors).
-  - Committed by Stephan (a73d1a2, 2026-10-28). Baselines regenerated there: `[wave]` 163474 / 178, `[acoustic]`
+  - Committed by Stephan (6577fea, 2026-10-28). Baselines regenerated there: `[wave]` 163474 / 178, `[acoustic]`
     43727 / 73, whole suite 1354761 / 1387. The three batch-1 worktrees removed (their changes checked in main first;
     branches without commits deleted); the batch-0 worktree `agent-a00f2c2136594041a` kept. Batch-2a briefs:
-    `batch2a_common.md` (HEAD a73d1a2; lessons: the case grid in the fit cost, build only the approved design, the
+    `batch2a_common.md` (HEAD 6577fea; lessons: the case grid in the fit cost, build only the approved design, the
     confirmed cases unchanged), `m05_masonry_hollow_brief.md` (heavy; range and one row for block and clay),
     `m06_rock_wool_brief.md` (porous; the interlaboratory-rows rule with the Scrosati stone wool), `m07_doors_brief.md`
     (plates; the first lumped rows, coincidence, the 315 Hz dip). To Stephan before the agents start.
   - Briefs approved by Stephan 2026-10-28; the three batch-2a agents started on phase 1 (plan), each in its own worktree.
-  - m06 rock wool phase 1 done (worktree `.claude/worktrees/agent-af8355d6affe51559`, at a73d1a2). Manager reruns
+  - m06 rock wool phase 1 done (worktree `.claude/worktrees/agent-af8355d6affe51559`, at 6577fea). Manager reruns
     (`models.py`, `fitw.py`, load 15–18): Miki fitted to Kosten #7 and Kuhl #2 together 25731 (extended) / 28213
     (local) Pa·s/m², near the stone wool's measured 30300; at 30300 and 500 Hz Komatsu 0.448, Miki 0.428,
     Delany-Bazley 0.387 (extended); the Scrosati 105 mm chamber means weighted by 1/s_R² give ×1.32 / ×1.39 for
@@ -817,7 +817,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     finding on page 10.5 (ε and μ inverted) is wrong: page 10.1 defines z = Z_air/Z, the inverse of the rig's z, so
     ε = n z, μ = n/z there equals the rig's ε = n/z, μ = n z. Decisions D1–D5; D4 (e) needs a `--sR` weighting option
     in `tools/acoustic/sabine_to_random.py` (4 lines, outside the agent's allowance).
-  - m07 doors phase 1 done (worktree `.claude/worktrees/agent-abaf75fed51c5c01d`, at a73d1a2). Manager rerun of the
+  - m07 doors phase 1 done (worktree `.claude/worktrees/agent-abaf75fed51c5c01d`, at 6577fea). Manager rerun of the
     probe (one thread, load 14): solid with `coiF` as a knob meets Quirt#1 within 1.10 dB, Morin#2 1.12 dB, their
     envelope 0 dB; hollow-core with the physical mass-air-mass `resF` (283 Hz) meets Kim within 2.02 dB; the 44 mm
     rescale equals the 40 mm row within 3.2e-7 dB; the probe's 14 failed assertions are all in references the plan
@@ -826,7 +826,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     (hollow-core dip carried by `resS` +1 at 283 Hz; wish-list 1.24 "not expressible" to be corrected), D3 (mass
     level free; `e` = m″/(ρ₀·thk) so the stated mass enters the shift without an override), D4 (Quirt#1, Morin#2, Kim
     asserted; NBS 632/633/634 and Morin#1 printed), D5 (rescale asserted by one run at 1.1 ×, bound 1e-4 dB).
-  - m05 masonry_hollow phase 1 done (worktree `.claude/worktrees/agent-a834bb2bd76bd12d1`, at a73d1a2; two late fits
+  - m05 masonry_hollow phase 1 done (worktree `.claude/worktrees/agent-a834bb2bd76bd12d1`, at 6577fea; two late fits
     ran six workers at load 8). Manager rerun (`heval.py fit_w4kpb.json`): mass level 0.633 × physical; per wall (dB
     outside, 125 Hz–4 kHz): Warnock#3 at 166 mm worst 2.86 (2 kHz; its 4 kHz octave printed, two of three thirds), BIA#14
     plus its own increment at 100 mm 2.52, Granzotto B at 200 mm 2.02, Granzotto C at 250 mm −2.77 at 4 kHz, E +3.14 at
@@ -854,11 +854,11 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     wool Kosten 0.018, Kuhl 0.015. Documents: wish-list 1.3, 1.23, 1.24, 5.2 confirmed with built paragraphs, the
     hollow-core dip sentence corrected, 1.7.10 (lumped mass in `e`), 1.10 (band rule), 1.12 (porous model by the
     reference); stage-2b issue 7 extended to timber doors. To Stephan with the batch report.
-  - Committed by Stephan (cbe2ae3, 2026-10-28). Stephan: no temporary files on the repository's disk (it is backed up
+  - Committed by Stephan (9c78baa, 2026-10-28). Stephan: no temporary files on the repository's disk (it is backed up
     with history). Manager: all four agent worktrees and their branches removed after checking each against main (the
     batch-0 one held only older versions of committed files); `md/materials/` (41 files), `build_linux/scratch/` (131
     files) and the three baselines copied to `/home/stephan/quadriga-lib-agents/` (`materials/`, `scratch/`,
-    `baselines/`; counts and bytes checked), then removed here; baselines regenerated there at cbe2ae3. From batch 2b
+    `baselines/`; counts and bytes checked), then removed here; baselines regenerated there at 9c78baa. From batch 2b
     on the manager creates the worktrees in `/home/stephan/quadriga-lib-agents/worktrees/` and starts the agents
     without `isolation`.
   - Stephan 2026-10-28: `build_linux` is built by the repository's `make` and not touched. The manager's own build
@@ -866,10 +866,10 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     into the source tree); its `[wave]`, `[acoustic]` and whole-suite output equals the baselines number for number
     (141128 / 135185 / 285204, no structural difference). A `tools/acoustic/__pycache__` left by an agent removed;
     agents run Python with `PYTHONDONTWRITEBYTECODE=1`.
-  - Manager session handed over at 2b42dcd (2026-10-28). State checked: HEAD 2b42dcd (since cbe2ae3 only the manager
-    file and the template changed, so the cbe2ae3 baselines hold: `[wave]` 163474 / 178, `[acoustic]` 44326 / 76, whole
+  - Manager session handed over at 088fc5f (2026-10-28). State checked: HEAD 088fc5f (since 9c78baa only the manager
+    file and the template changed, so the 9c78baa baselines hold: `[wave]` 163474 / 178, `[acoustic]` 44326 / 76, whole
     suite 1355360 / 1390); no agent worktrees or `agent/*` branches; the manager's build up to date. Batch-2b briefs
-    written in the agents folder: `batch2b_common.md` (worktrees created by the manager at 2b42dcd in `worktrees/`,
+    written in the agents folder: `batch2b_common.md` (worktrees created by the manager at 088fc5f in `worktrees/`,
     scratch in `scratch/<id>/`, reports written directly, build options of the manager's build, the confirmed cases
     of 2a added, lessons of 2a: the band rule, no figure-reading budget, check page claims against definitions),
     `m08_masonry_light_brief.md` (heavy group; plaster on a class whose D4 references are bare, the coincidence inside
@@ -879,10 +879,10 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     group; one case for both units; the mass-air-mass dip, one resonance column for the triple's two, coincidence,
     the slope above the resonance, AGC against the Quirt cavities, mass level, grid, the rescale check). To Stephan
     before the agents start.
-  - Briefs approved by Stephan 2026-10-28. Worktrees created by the manager at 2b42dcd
+  - Briefs approved by Stephan 2026-10-28. Worktrees created by the manager at 088fc5f
     (`/home/stephan/quadriga-lib-agents/worktrees/m08_masonry_light`, `m09_pu_foam`, `m10_glazing`, branches
     `agent/<id>`); the three agents started on phase 1 (plan) without `isolation`, 4 threads each.
-  - m09 pu_foam phase 1 done (worktree clean at 2b42dcd). Manager reruns (`compare.py`, `cushion.py`, load 8):
+  - m09 pu_foam phase 1 done (worktree clean at 088fc5f). Manager reruns (`compare.py`, `cushion.py`, load 8):
     JCA with Dupont's PU2 set within 0.003 of the band [JCA #6, synthesis #8] (Komatsu 0.071, Miki 0.053,
     Delany-Bazley 0.084 outside it); against the converted chamber value 0.084; the synthesis 0.025–0.056 below the JCA
     model at 250 Hz–4 kHz (glass wool +0.08 above); fitted σ of the synthesis ×1.02 (Miki) / ×1.20 (Komatsu); the
@@ -891,7 +891,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     authors' modelled free layup #3 Miki at 2700 within 0.024, the PU2 row up to 0.216. Decisions D1 (JCA power laws,
     fit from 125 Hz), D2 (band ±0.05, conversion ±0.107, synthesis printed, not marked), D3 (`pu_foam` the acoustic
     foam; 3.6 to a padding-foam row with 3.8), D4 (25–200 mm, 250 Hz–4 kHz). Case 0.148 s, provisional (load 7.8).
-  - m10 glazing phase 1 done (worktree clean at 2b42dcd). Manager reruns (`final.py`, the library probe on
+  - m10 glazing phase 1 done (worktree clean at 088fc5f). Manager reruns (`final.py`, the library probe on
     `grid(200,1)` 2.9 s for all variants, `tfsens.py`, `tfcap.py`; load 2–5): double unit with physical columns (`resS` +1
     at the mass-air-mass 211.3 Hz, coincidence 3123 Hz, η 0.005, the PTB#208 law, `att` rising) meets AGC#2 within
     2.81 dB (250 Hz; 1 kHz −2.75, 4 kHz +2.73); mass level 0.57 × the stated 20 kg/m². Triple with the physical lower
@@ -901,7 +901,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     `resF`; fallback free at 167 Hz, 2.25 dB), G2 (triple: AGC#14 printed under the face-cap engine limit, issue 8
     extended to the dip), G3 (physical coincidence), G4 (AGC asserted; the Quirt pair and Pilkington printed),
     G5 (mass level free), G6 (`grid(200,1)`), G7 (no rescale loop). Case about 0.27 s, provisional.
-  - m08 masonry_light phase 1 done (worktree clean at 2b42dcd). Manager reruns (`plaster.py`, `leval.py fit_A_620.json`,
+  - m08 masonry_light phase 1 done (worktree clean at 088fc5f). Manager reruns (`plaster.py`, `leval.py fit_A_620.json`,
     `coin.py fit_A_620.json`, the library probe 184 / 184 in 0.076 s, load 0.6–4): one solid (ρ 620 kg/m³, `coiF`
     463 Hz with `coiQ` 1.80 as a broad trough, mass level 0.397 × physical) meets the band of Granzotto #2–#5 at 100 mm
     within 2.41 dB and Hopkins #4 at 128 mm within 2.40 dB (both grids); gap bands 1.72 dB. The bare walls dip at
@@ -945,12 +945,12 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     Documents: wish-list 1.3 (Warnock 1995 #2), 1.4, 1.7, 5.3 confirmed with built paragraphs, 3.6 to a padding-foam
     row; stage-2b issue 7 extended to light masonry, issue 8 to the glazing units' mass-air-mass dip; guidelines 7
     (cushions). To Stephan with the batch report.
-  - Committed by Stephan (1a3d92d, 2026-10-28). Manager: the three worktrees checked against the commit (test files
+  - Committed by Stephan (4589278, 2026-10-28). Manager: the three worktrees checked against the commit (test files
     identical apart from the manager's citation of Rubino #9; every CSV row in the commit; no commits on the branches),
-    then removed with their `agent/*` branches; baselines regenerated at 1a3d92d (`[wave]` 163474 / 178, `[acoustic]`
+    then removed with their `agent/*` branches; baselines regenerated at 4589278 (`[wave]` 163474 / 178, `[acoustic]`
     44750 / 79, whole suite 1355784 / 1393; every number identical to the merge run). Noted: the citation made one
     comment line of the foam case 161 characters long (the porous file has 8 comment lines over 120).
-  - Batch-2c briefs written in the agents folder: `batch2c_common.md` (worktrees at 1a3d92d; the 2b cases among the
+  - Batch-2c briefs written in the agents folder: `batch2c_common.md` (worktrees at 4589278; the 2b cases among the
     confirmed; lessons of 2b: `python3 -I -B`, every printed vector names its bands, comment numbers checked against the
     final run, comment lines at most 120 characters; a new group file and its header), `m11_plaster_brief.md` (heavy
     file; the matched pairs through inline bare walls, the sheet on concrete and the mass-level side effect of issue 7,
@@ -960,9 +960,9 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     added insulation on concrete and issue 7, the face absorption, solid against sheet). Both floor agents create
     `test_acoustic_mat_floors.cpp`; the manager joins them. The combination "rug on a hard finish" with the real rows is
     the manager's after the merge. To Stephan before the agents start.
-  - Briefs approved by Stephan 2026-10-28. Worktrees created at 1a3d92d (`worktrees/m11_plaster`, `m12_carpet_tile`,
+  - Briefs approved by Stephan 2026-10-28. Worktrees created at 4589278 (`worktrees/m11_plaster`, `m12_carpet_tile`,
     `m13_floor_finishes`, branches `agent/<id>`); the three agents started on phase 1 (plan), 4 threads each.
-  - m13 floor finishes phase 1 done (worktree clean at 1a3d92d). Manager rerun of the probe (2 threads, load 7–9,
+  - m13 floor finishes phase 1 done (worktree clean at 4589278). Manager rerun of the probe (2 threads, load 7–9,
     identical to the agent's apart from timings): plain mass-law rows (density, physical mass level, the PTB face law,
     `att` 0, no coincidence or resonance columns). Added insulation of 15 mm parquet (710 kg/m³) on 150 mm concrete
     +0.12 / +0.44 / +0.59 / +0.52 / +0.50 / +0.51 / +0.57 / +0.70 / +0.52 dB (31.5 Hz–8 kHz) against +0.27 dB of mass
@@ -972,7 +972,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     (physical mass level; added insulation within ±1 dB of the mass law asserted, the excess printed, no mark), Q3
     (PTB laws ±0.05), Q4 (solid = sheet on the slab; finish solids at least 1.6 mm), Q5 (parquet 710 kg/m³ from birch
     plywood as a stand-in, vinyl 1400 kg/m³ stated, tier 3). Case about 0.25 s, provisional (load 11–15).
-  - m12 carpet_tile phase 1 done (worktree clean at 1a3d92d). Manager reruns (`sabine_to_random.py` both reactions,
+  - m12 carpet_tile phase 1 done (worktree clean at 4589278). Manager reruns (`sabine_to_random.py` both reactions,
     `conv2.py` output, `fit_tf.py 4.4`, the probe 93 / 96 with the 3 deliberate raw-Sabine failures, load 4–7): a
     mass-law sheet of an assumed 4.4 kg/m² whose face law (`tf` 4.9065e-4 at `fRef`, `tfB` 0.73871) meets the
     references within 0.027 (63 Hz neighbours, Salford as a hard face to 500 Hz, Salford converted above); α rises to
@@ -986,7 +986,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     printed), C4 (4.4 kg/m², physical mass level), C5 (rug on a finish printed under issue 4, issue 4 extended).
     Manager: C5 bears on the recipe of wish-list 1.7.4 (a rug is a sheet on the finish solid); option to draw rugs on
     the slab (the finish's mass under a rug is 0.1–0.7 dB) to be put to Stephan.
-  - m11 plaster phase 1 done (worktree clean at 1a3d92d). Manager reruns (`q1_pairs.py`, `q2_envelope.py`, `q2_d8.py`
+  - m11 plaster phase 1 done (worktree clean at 4589278). Manager reruns (`q1_pairs.py`, `q2_envelope.py`, `q2_d8.py`
     identical to the agent's; the probe 125 / 125; load 3–6): pure bonded mass, 1317 kg/m³ (19.75 kg/m², the mean of
     the three pairs 912–1885), physical mass level, the masonry face law. Matched pairs through inline bare walls with a
     fitted mass level, the plaster at the pair's own mass: increments met within 1.81 (BIA brick) / 2.73 (BIA tile) /
@@ -1038,13 +1038,13 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     paragraphs, 1.6 (porous `thk`), 1.7.4 (rug on a finish, finish solids at least 1.6 mm); stage-2b issue 7 (bonded
     sheets and finishes), issue 1 (carpet); guidelines 5 (floors). Outputs in `/home/stephan/quadriga-lib-agents/scratch/b2c/`.
     To Stephan with the batch report.
-  - Committed by Stephan (15480d4, 2026-10-28). Manager: the three worktrees checked against the commit (m11's heavy
+  - Committed by Stephan (a35d5ca, 2026-10-28). Manager: the three worktrees checked against the commit (m11's heavy
     file and m13's floors part identical; m12's case differs only by the manager's real finish rows; every CSV row in
     the commit; no commits on the branches), then removed with their `agent/*` branches; baselines regenerated at
-    15480d4 (`[wave]` 163474 / 178, `[acoustic]` 45143 / 82, whole suite 1356177 / 1396; every number identical to the
+    a35d5ca (`[wave]` 163474 / 178, `[acoustic]` 45143 / 82, whole suite 1356177 / 1396; every number identical to the
     merge run).
   - Batch-2d briefs written in the agents folder, two rounds of at most three agents: `batch2d_common.md` (round 1 at
-    15480d4, round 2 at the round-1 commit; the 2c cases among the confirmed; lessons of 2c: search the research data
+    a35d5ca, round 2 at the round-1 commit; the 2c cases among the confirmed; lessons of 2c: search the research data
     for the class before calling a quantity unmeasured, the table's name/`thk` rule, a bonded addition counts with the
     host's mass level). Round 1: `m14_clt_screed_brief.md` (heavy; CLT across 78–245 mm with its coincidence in the
     band, screed without a spectrum: physical plate or concrete's knobs), `m15_boards_brief.md` (plates;
@@ -1054,9 +1054,9 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     (plates; steel + aluminum: unstated specimen sides, loss factor, face absorption), `m18_asphalt_brief.md` (ground;
     dense by the round-1 rule, porous 40 mm on the dense solid). `vegetation` (6.8) moves to batch 3 with the objects.
     To Stephan before the agents start.
-  - Briefs approved by Stephan 2026-10-28. Round-1 worktrees created at 15480d4 (`worktrees/m14_clt_screed`,
+  - Briefs approved by Stephan 2026-10-28. Round-1 worktrees created at a35d5ca (`worktrees/m14_clt_screed`,
     `m15_boards`, `m16_ground`, branches `agent/<id>`); the three agents started on phase 1 (plan), 4 threads each.
-  - m16 ground phase 1 done (worktree clean at 15480d4). Manager reruns (`gphase.py`, `gsigma.py`, `gstudy.py q3`, `q4`
+  - m16 ground phase 1 done (worktree clean at a35d5ca). Manager reruns (`gphase.py`, `gsigma.py`, `gstudy.py q3`, `q4`
     identical; the probe 156 / 156 in 0.125 s, load 7–8): passive Miki columns fitted to the complex plane-wave
     reflection of the Delany-Bazley half-space (Re μ ≥ 1, a weak pull of n to Delany-Bazley) follow every class from
     loose gravel (10 kPa·s/m²) to F (2 MPa·s/m²): minimax |ΔR| 0.046–0.064 at 0° and 80–89.9°, 31.5 Hz–8 kHz,
@@ -1069,7 +1069,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     row's name to Stephan), G5 (loose gravel a half-space; the layer form recorded), G6 (ground solids at least 1 m,
     within 0.0014), G7 (one case named by the seven families joined by " + "; a shorter name needs a table change).
     Side finding for m18: class G fits as a porous half-space too (0.061).
-  - m15 boards phase 1 done (worktree clean at 15480d4). Manager reruns (`summary.py`, `tfcap.py`, the probe 130 / 134
+  - m15 boards phase 1 done (worktree clean at a35d5ca). Manager reruns (`summary.py`, `tfcap.py`, the probe 130 / 134
     in 2.2 s, identical to the agent's, its 4 failures in the printed plywood P4 and P6; load 3–6): gypsum physical
     (coincidence 2.86 kHz, η 0.0125; dip 3084 Hz by 1/96-octave sweep), mass level 0.90 ×, Hopkins #132 within 2.39,
     Northwood #2 2.29 dB, their envelope 0.45 dB; plywood `coiF` a knob (1245 Hz), mass level 0.62 ×, Wareing #5 and
@@ -1079,7 +1079,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     keeps the cap at +2.67 / +1.51 dB. Manager note: VanHout #9 is a 10 mm plasterboard bonded to 25 mm glass fibre,
     laid on the floor (a panel on a spring), not a free board's face; the physical reason for a high face law is that a
     free panel's 1 − R contains its own τ. Decisions B1–B7.
-  - m14 clt + screed phase 1 done (worktree clean at 15480d4). Manager reruns (`ceval.py fit_A_530.json`, `screed.py`
+  - m14 clt + screed phase 1 done (worktree clean at a35d5ca). Manager reruns (`ceval.py fit_A_530.json`, `screed.py`
     identical to the agent's; the probe 196 / 200, failures the CLT 0.02 dB overshoots and the screed fine-grid bound;
     load 0.4–5): CLT one solid at 530 kg/m³, `coiF` 3.39 kHz and `coiQ` 2.08 as knobs, mass level 0.895: Hoeller CLT03
     (78 mm, wall side 2.988 m) −3.01 at 250 Hz and −2.96 / −3.02 at 4 kHz, CLT05 (175 mm, side not stated, taken 2.988 m)
@@ -1129,24 +1129,24 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     Documents: wish-list 1.9, 1.13, 1.18, 1.25, 6.1–6.6 confirmed with built paragraphs, 4.9 decided; open rule "dense
     ground classes" closed (section 6); stage-2b issue 7 (CLT), issue 8 (light free boards, screed), issue 9 new
     ("thickness resonance"); guidelines 10 (ground). To Stephan with the batch report.
-  - Committed by Stephan (c9ee084, 2026-10-29); main then took the HDF5 merge (0f0228a), the SPEC conventions
-    (ef8027c) and the small-scale fading merge (8dc137b; its manager reported: no acoustic, ray-tracing or material file
-    changed). Manager: the round-1 worktrees checked against c9ee084 (test files identical, every CSV row in the commit,
-    no commits on the branches), removed with their branches; no acoustic file differs between c9ee084 and 8dc137b.
-    Reconfigured and rebuilt at 8dc137b; baselines regenerated there (load 26–50 from other sessions, numbers only):
+  - Committed by Stephan (fa53ebf, 2026-10-29); main then took the HDF5 merge (79961ab), the SPEC conventions
+    (dd9b8c2) and the small-scale fading merge (22028db; its manager reported: no acoustic, ray-tracing or material file
+    changed). Manager: the round-1 worktrees checked against fa53ebf (test files identical, every CSV row in the commit,
+    no commits on the branches), removed with their branches; no acoustic file differs between fa53ebf and 22028db.
+    Reconfigured and rebuilt at 22028db; baselines regenerated there (load 26–50 from other sessions, numbers only):
     `[wave]` 163474 / 178 and `[acoustic]` 45785 / 86 identical to the round-1 merge run number for number; whole suite
     1440292 / 1499, 308325 numbers identical, six last-digit changes (the v19 LOS conf files' NumClusters one higher,
-    from the small-scale fading merge) and three inserted blocks of the new tests. Round-2 worktrees created at 8dc137b
+    from the small-scale fading merge) and three inserted blocks of the new tests. Round-2 worktrees created at 22028db
     (`worktrees/m17_metal`, `m18_asphalt`); the two agents started on phase 1, told of the round-1 decisions that bear
     on them (light panels' face absorption at least their τ; dense ground porous by the bounded reflection fit).
   - Stephan 2026-10-29: pause. The baseline regeneration, cleanup and round-2 start had been taken up on a note from
     another session, not on Stephan's word. Both round-2 agents stopped (m17 had begun its worktree build; no process
-    left); worktrees `m17_metal`, `m18_asphalt` and their branches kept at 8dc137b for a restart.
+    left); worktrees `m17_metal`, `m18_asphalt` and their branches kept at 22028db for a restart.
 
 ## 10. Scope of phase 0 (2026-10-23; naming and combinations superseded by wish-list 1.6 and section 3)
 
 **The CSV.** `data/materials_acoustic.csv`, next to `data/materials_rf.csv`. The old name `materials_ac.csv` is avoided
-on purpose: it was the outdated one-parameter table removed in 8d89b84, and the history should not mix the two. The
+on purpose: it was the outdated one-parameter table removed in 5e06f7d, and the history should not mix the two. The
 file is read by `obj_file_read` with an empty `.obj` name (only the table), so it obeys the reader:
 - only `name` is text; every other cell is a number; no comments, no class or source columns (the class, the sources
   and the residuals live in the test case and in the notes);
@@ -1196,7 +1196,7 @@ named for the construction (`glazing_4_16_4`).
 
 Leftovers of step 2 to settle where they fall: page section 9 says `irr_glass` follows TR 38.901, though only its
 `att` does; if `coiQ` changes meaning, page 11.1, 11.2 and 11.4 are re-measured. (`band_probe` has `attB` since
-13e4e45.)
+aefd5ff.)
 
 ## 12. Traps
 
@@ -1230,7 +1230,7 @@ Leftovers of step 2 to settle where they fall: page section 9 says `irr_glass` f
 - **Fits:** bound and densely sample; select on the evaluation grid; the mass level bound must reach about 3200 for a
   423 kg/m² wall; clip τ at one per frequency, not per band; coincidence needs about 4000 angles.
 
-- **Worktree agents:** the Agent tool's `isolation` may create the worktree at an old commit (m01: cebd0c0, not HEAD);
+- **Worktree agents:** the Agent tool's `isolation` may create the worktree at an old commit (m01: ed325e7, not HEAD);
   since batch 2b the manager creates the worktrees itself at the batch's HEAD and every brief says to check
   `git log -1`. Briefs, reports, baselines and scratch are in the agents folder, read and written by absolute path.
 - **Catch order:** cases run in link order; `test_acoustic_mat_*` links before `test_acoustic_materials.cpp`, so a

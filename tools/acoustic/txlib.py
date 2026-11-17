@@ -3,7 +3,7 @@
 #
 # Formula copy of what the library gives a closed mass-law sheet in air (website_builder/static/quadriga_lib_material_model.md 5.4, 6.5), written from
 # src/ray_mesh_interact.cpp (Material::mass_X0, mass_TL, davy_sigma, Material::interface_gain, Material::tf, qd_plate) as built on
-# 2026-10-19 (m > 0 switches the mass law on at 20 dB per decade, bc24b0c; no coiA; the finite panel: the column side).
+# 2026-10-19 (m > 0 switches the mass law on at 20 dB per decade, 2c0f3d6; no coiA; the finite panel: the column side).
 # Column level, GHz as the library reads them; one face in air, one body, the plate rule:
 #   T = a tau / (a + tau - a tau) * g_int,  R = 1 - a,  a = tf(f) (power law, clamped to [-1, 1], negative -> 0)
 #   tau = 10^(-TL/10),  TL = mass_TL(X0(f, c), c, f, side),  g_int = 10^(-att (f/fRef)^attB / 10), no gain below 0 dB
@@ -12,7 +12,7 @@
 # Checked against the library through the walker (2026-10-16/17): T within 0.0022 dB, R within
 # 0.0005 dB, sheet and traced solid, scalar types 4 / 5 and EM type 1 alike; as built on 2026-10-19 (the 13 fits of
 # the starting rows of page 11.4 at their lab side, type 4): sheet T within 0.0000 dB, traced solid within 0.0042 dB, R within 0.0000 dB
-# (de60194).
+# (d938ae7).
 #
 # Switches V (dict, every key optional) for what the library does not do:
 #   mfit  the mass column as a fitted slope, X0 = ((f/fRef) M)^(m/20) (the library before 2026-10-17)

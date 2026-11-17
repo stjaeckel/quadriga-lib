@@ -18,7 +18,7 @@
 #                          or '<file>/<s>/error' with the exception text if the 0.12.4 Python reader raised for the
 #                          slot. Every value is stored as np.asarray(value) without pickle.
 #
-# Recipe: build the Python module of quadriga-lib 0.12.4 from a checkout of commit 26da9f93 (release 0.12.4):
+# Recipe: build the Python module of quadriga-lib 0.12.4 from a checkout of commit 83da42a1 (release 0.12.4):
 #   cmake -S <src> -B <build> -DENABLE_PYTHON=ON -DPython3_EXECUTABLE=<python> -DCMAKE_CXX_COMPILER=g++-12 \
 #         -DENABLE_MATLAB=OFF -DENABLE_OCTAVE=OFF -DENABLE_TESTS=OFF
 #   cmake --build <build> --target quadriga_py

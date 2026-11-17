@@ -5,7 +5,7 @@
 // of frequencies on the base frequency's geometry (the first one), every path that ends in air outside the structure
 // summed at its polyline's point: T beyond the last face, R in front of the first. Scalar mode; tracer 5 =
 // refraction_mode. Faces are planes x = const (normal towards -x, or +x when flipped), as ub::build makes them.
-// Written for the leaves on a box (04b92bd): a band equals its single frequencies bitwise on a leaf on
+// Written for the leaves on a box (873c6dc): a band equals its single frequencies bitwise on a leaf on
 // a box of air; the fixture is "ray_progress - a leaf on a box of air at every frequency of a band".
 //
 // stdin, one line per run: tag itype theta maxdepth start sink nm (a b c d e f g h thk tf tfB m fRef resF resQ resS att

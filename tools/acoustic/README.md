@@ -87,13 +87,13 @@ python3 tools/acoustic/paris_cf.py check
 
 ```
 python3 tools/acoustic/txfit.py --seeds 6                       # the library at random incidence, all 13 constructions
-python3 tools/acoustic/txfit.py --variant '{"amax": 78, "mfit": 1}' "glass 4 mm"   # the fitted slope at field incidence (before bc24b0c)
+python3 tools/acoustic/txfit.py --variant '{"amax": 78, "mfit": 1}' "glass 4 mm"   # the fitted slope at field incidence (before 2c0f3d6)
 ```
 
 - A seed is one differential-evolution run (about 1 min on one core); `--procs` runs them in parallel. The minimax fit is
   multimodal: in the knob study of 2026-10-16 two independent halves of 3 to 9 seeds differed by up to 0.45 dB on single
   constructions (a variant's worst within 0.03 dB); its final fits used 18 seeds per half.
-- Reference data: `tl_refs.json` (the first acoustic round, bb336dc: measured octaves 125 Hz–4 kHz, the spread of physical models elsewhere;
+- Reference data: `tl_refs.json` (the first acoustic round, a18bee2: measured octaves 125 Hz–4 kHz, the spread of physical models elsewhere;
   `tf` at the class's absorption law). The knob bounds are those of the first acoustic round plus a level up to 10^4.5 (a 423 kg/m²
   wall needs 3200) and `att` up to 12 dB (`attmax` to change it).
 - `txlib.sheet(M, f_hz, theta_rad, V)` takes the library's columns (GHz); `txfit.columns()` turns a fit into them.
