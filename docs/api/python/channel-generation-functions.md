@@ -320,17 +320,16 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 
 ### Usage:
 ```python
+# Complex coefficients (default)
 coeff, delays = quadriga_lib.channel.spherical( ant_tx, ant_rx, \
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path )
+    center_freq, use_absolute_delays, add_fake_los_path, angles, complex, i_freq, use_kernel )
 
+# Real and imaginary parts as separate arrays
 coeff_re, coeff_im, delays = quadriga_lib.channel.spherical( ..., complex=False )
 
+# Departure and arrival angles as well
 coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
-
-coeff, delays = quadriga_lib.channel.spherical( ..., i_freq=1 )
-
-coeff, delays = quadriga_lib.channel.spherical( ..., use_kernel=1 )
 ```
 
 ### Inputs:
@@ -351,7 +350,8 @@ coeff, delays = quadriga_lib.channel.spherical( ..., use_kernel=1 )
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
+- **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory and, with element
+  coupling, the time to convert them to the ports; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `True`
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
@@ -365,10 +365,10 @@ coeff, delays = quadriga_lib.channel.spherical( ..., use_kernel=1 )
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
-- **`aod`** — Azimuth of departure in rad; `(n_ports_rx, n_ports_tx, n_path)`; only when `angles=True`
-- **`eod`** — Elevation of departure in rad; same shape; only when `angles=True`
-- **`aoa`** — Azimuth of arrival in rad; same shape; only when `angles=True`
-- **`eoa`** — Elevation of arrival in rad; same shape; only when `angles=True`
+- **`aod`** — Azimuth of departure in the GCS, in rad; `(n_ports_rx, n_ports_tx, n_path)`; only with `angles=True`
+- **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
+- **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`
+- **`eoa`** — Elevation of arrival in the GCS, in rad; same shape; only with `angles=True`
 - In batch mode, every output is a list of length `n_out` whose entries have the shapes given above.
 
 ### See also:

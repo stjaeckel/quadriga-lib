@@ -171,6 +171,22 @@ class TestGetChannelsSpherical(unittest.TestCase):
             channel.spherical(*args, complex=2.5, **kwargs)
         self.assertIn("Input 'complex' must be a bool or None.", str(ctx.exception))
 
+    def test_angles_flag(self):
+        # The angles follow the delays only with angles=True: 3 or 7 outputs, 2 or 6 with complex=True
+        ant = omni()
+        fbs_pos = np.array([[10.0], [0.0], [1.0]], order='F')
+        pos = ([0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0])
+        single = (ant, ant, fbs_pos, fbs_pos, np.ones(1), np.zeros(1), make_M(1)) + pos
+        batch = (ant, ant, [fbs_pos] * 2, [fbs_pos] * 2, [np.ones(1)] * 2, [np.zeros(1)] * 2, [make_M(1)] * 2) + pos
+        for args in (single, batch):
+            self.assertEqual(len(channel.spherical(*args, complex=False)), 3)
+            self.assertEqual(len(channel.spherical(*args)), 2)
+            self.assertEqual(len(channel.spherical(*args, angles=True, complex=False)), 7)
+            out = channel.spherical(*args, angles=True)
+            self.assertEqual(len(out), 6)
+            aod = out[2][1] if args is batch else out[2]
+            npt.assert_allclose(aod.ravel(), [0.0], atol=1e-14)  # the FBS is straight ahead of the TX
+
     def test_complex_output_with_angles(self):
         ant = omni()
         fbs_pos = np.array([[50.0], [0.0], [0.0]], order='F')
@@ -866,16 +882,18 @@ class TestGetChannelsSpherical(unittest.TestCase):
         fbs_pos = np.asfortranarray(rng.uniform(-30, 30, (3, 5)))
         args = (ant, xpol(), fbs_pos, fbs_pos, np.ones(5), np.zeros(5), make_M(5),
                 [0, 0, 10], [0.1, 0.2, 0.3], [40, 5, 1.5], [0, 0, 0], 3.5e9)
-        ref = channel.spherical(*args, complex=False)
+        ref = channel.spherical(*args, angles=True, complex=False)
         for k in (0, 1):
-            res = channel.spherical(*args, use_kernel=k, complex=False)
+            res = channel.spherical(*args, angles=True, use_kernel=k, complex=False)
             for a, b in zip(res, ref):
                 npt.assert_array_equal(a, b)
         try:
-            res = channel.spherical(*args, use_kernel=2, complex=False)
+            res = channel.spherical(*args, angles=True, use_kernel=2, complex=False)
             scale = np.abs(ref[0]).max()
-            npt.assert_allclose(res[0], ref[0], atol=1e-5 * scale, rtol=0)  # Single precision
-            npt.assert_allclose(res[2], ref[2], atol=1e-12, rtol=0)  # Delays do not depend on the kernel
+            for k in (0, 1):  # Single precision
+                npt.assert_allclose(res[k], ref[k], atol=1e-5 * scale, rtol=0)
+            for k in range(2, 7):  # Delays and angles do not depend on the kernel
+                npt.assert_allclose(res[k], ref[k], atol=1e-12, rtol=0)
         except ValueError as e:
             self.assertIn("AVX2 kernel requested but not available", str(e))
         with self.assertRaises(ValueError) as ctx:

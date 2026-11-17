@@ -62,17 +62,16 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 ## Usage:
 ```
+# Complex coefficients (default)
 coeff, delays = quadriga_lib.channel.spherical( ant_tx, ant_rx, \
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path )
+    center_freq, use_absolute_delays, add_fake_los_path, angles, complex, i_freq, use_kernel )
 
+# Real and imaginary parts as separate arrays
 coeff_re, coeff_im, delays = quadriga_lib.channel.spherical( ..., complex=False )
 
+# Departure and arrival angles as well
 coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
-
-coeff, delays = quadriga_lib.channel.spherical( ..., i_freq=1 )
-
-coeff, delays = quadriga_lib.channel.spherical( ..., use_kernel=1 )
 ```
 
 ## Inputs:
@@ -93,7 +92,8 @@ coeff, delays = quadriga_lib.channel.spherical( ..., use_kernel=1 )
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
+- **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory and, with element
+  coupling, the time to convert them to the ports; default: `False`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `True`
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
@@ -107,10 +107,10 @@ coeff, delays = quadriga_lib.channel.spherical( ..., use_kernel=1 )
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
 - **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
-- **`aod`** — Azimuth of departure in rad; `(n_ports_rx, n_ports_tx, n_path)`; only when `angles=True`
-- **`eod`** — Elevation of departure in rad; same shape; only when `angles=True`
-- **`aoa`** — Azimuth of arrival in rad; same shape; only when `angles=True`
-- **`eoa`** — Elevation of arrival in rad; same shape; only when `angles=True`
+- **`aod`** — Azimuth of departure in the GCS, in rad; `(n_ports_rx, n_ports_tx, n_path)`; only with `angles=True`
+- **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
+- **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`
+- **`eoa`** — Elevation of arrival in the GCS, in rad; same shape; only with `angles=True`
 - In batch mode, every output is a list of length `n_out` whose entries have the shapes given above.
 
 ## See also:
@@ -291,8 +291,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         for (arma::uword i = 0ULL; i < n_out; ++i)
         {
             delay_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &delay[i]));
-
-            if (angles)
+            if (angles) // Without angles, the core skips their conversion to the ports
             {
                 aod_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &aod[i]));
                 eod_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &eod[i]));
@@ -300,12 +299,7 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                 eoa_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &eoa[i]));
             }
 
-            if (want_complex) // Coefficients are combined after the C++ call, no zero-copy mapping possible
-            {
-                coeff_re[i].zeros(n_ports_rx, n_ports_tx, n_path[i]);
-                coeff_im[i].zeros(n_ports_rx, n_ports_tx, n_path[i]);
-            }
-            else
+            if (!want_complex) // Complex coefficients are combined after the C++ call, no zero-copy mapping possible
             {
                 coeff_re_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &coeff_re[i]));
                 coeff_im_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &coeff_im[i]));
@@ -329,15 +323,6 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                 try
                 {
                     const arma::uword j = (arma::uword)i;
-                    if (n_path[j] == 0ULL) // Snapshot without any path
-                    {
-                        coeff_re[j].zeros();
-                        coeff_im[j].zeros();
-                        delay[j].zeros();
-                        if (angles)
-                            aod[j].zeros(), eod[j].zeros(), aoa[j].zeros(), eoa[j].zeros();
-                        continue;
-                    }
 
                     // Select the frequency slice, aliased without copying the data
                     const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a[j].colptr(i_freq)),
@@ -354,10 +339,9 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                                  fbs_pos_a[j], lbs_pos_a[j], path_gain_f, path_length_a[j], M_f,
                                                                  coeff_re[j], coeff_im[j], delay[j],
                                                                  center_freq_sel, use_absolute_delays, add_fake_los_path,
-                                                                 angles ? &aod[j] : nullptr,
-                                                                 angles ? &eod[j] : nullptr,
-                                                                 angles ? &aoa[j] : nullptr,
-                                                                 angles ? &eoa[j] : nullptr, use_kernel);
+                                                                 angles ? &aod[j] : nullptr, angles ? &eod[j] : nullptr,
+                                                                 angles ? &aoa[j] : nullptr, angles ? &eoa[j] : nullptr,
+                                                                 use_kernel);
                 }
                 catch (const std::exception &e)
                 {
@@ -371,22 +355,20 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         if (!error_message.empty())
             throw std::invalid_argument(error_message.c_str());
 
+        py::list out;
         if (want_complex)
         {
             py::list coeff_py;
             for (arma::uword i = 0ULL; i < n_out; ++i)
                 coeff_py.append(qd_python_copy2numpy<double, std::complex<double>>(&coeff_re[i], &coeff_im[i]));
-
-            if (angles)
-                return py::make_tuple(coeff_py, delay_py, aod_py, eod_py, aoa_py, eoa_py);
-            else
-                return py::make_tuple(coeff_py, delay_py);
+            out.append(coeff_py);
         }
-
-        if (angles)
-            return py::make_tuple(coeff_re_py, coeff_im_py, delay_py, aod_py, eod_py, aoa_py, eoa_py);
         else
-            return py::make_tuple(coeff_re_py, coeff_im_py, delay_py);
+            out.append(coeff_re_py), out.append(coeff_im_py);
+        out.append(delay_py);
+        if (angles)
+            out.append(aod_py), out.append(eod_py), out.append(aoa_py), out.append(eoa_py);
+        return py::tuple(out);
     }
 
     // Single-snapshot mode
@@ -430,49 +412,23 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
     const arma::Mat<double> M_f(const_cast<double *>(M_a.slice_memptr(i_freq)), M_a.n_rows, M_a.n_cols, false, true);
     const double center_freq_sel = center_freq_a.empty() ? 0.0 : center_freq_a.at(i_freq);
 
-    // Initialize angles
-    arma::cube aod, eod, aoa, eoa;
+    // Outputs written in place by C++; split coefficients only for complex=False (combined after the call otherwise)
+    arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
+    pybind11::array_t<double> coeff_re_py, coeff_im_py;
+    if (!want_complex)
+    {
+        coeff_re_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_re);
+        coeff_im_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_im);
+    }
+    auto delay_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &delay);
     pybind11::array_t<double> aod_py, eod_py, aoa_py, eoa_py;
-    arma::cube *p_aod = nullptr, *p_eod = nullptr, *p_aoa = nullptr, *p_eoa = nullptr;
-    if (angles)
+    if (angles) // Without angles, the core skips their conversion to the ports
     {
         aod_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &aod);
         eod_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &eod);
         aoa_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &aoa);
         eoa_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &eoa);
-        p_aod = &aod;
-        p_eod = &eod;
-        p_aoa = &aoa;
-        p_eoa = &eoa;
     }
-
-    // Initialize delays
-    arma::cube coeff_re, coeff_im, delay;
-    auto delay_py = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &delay);
-
-    if (want_complex)
-    {
-        {
-            py::gil_scoped_release release;
-            quadriga_lib::get_channels_spherical<double>(ant_tx_a, ant_rx_a,
-                                                         tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
-                                                         fbs_pos_a, lbs_pos_a, path_gain_f, path_length_a, M_f,
-                                                         coeff_re, coeff_im, delay,
-                                                         center_freq_sel, use_absolute_delays, add_fake_los_path,
-                                                         p_aod, p_eod, p_aoa, p_eoa, use_kernel);
-        }
-
-        auto coeff_py = qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
-
-        if (angles)
-            return py::make_tuple(coeff_py, delay_py, aod_py, eod_py, aoa_py, eoa_py);
-        else
-            return py::make_tuple(coeff_py, delay_py);
-    }
-
-    // Real path: zero-copy outputs written in place by C++
-    auto coeff_re_p = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_re);
-    auto coeff_im_p = qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_im);
 
     {
         py::gil_scoped_release release;
@@ -481,11 +437,17 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
                                                      fbs_pos_a, lbs_pos_a, path_gain_f, path_length_a, M_f,
                                                      coeff_re, coeff_im, delay,
                                                      center_freq_sel, use_absolute_delays, add_fake_los_path,
-                                                     p_aod, p_eod, p_aoa, p_eoa, use_kernel);
+                                                     angles ? &aod : nullptr, angles ? &eod : nullptr,
+                                                     angles ? &aoa : nullptr, angles ? &eoa : nullptr, use_kernel);
     }
 
-    if (angles)
-        return py::make_tuple(coeff_re_p, coeff_im_p, delay_py, aod_py, eod_py, aoa_py, eoa_py);
+    py::list out;
+    if (want_complex)
+        out.append(qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im));
     else
-        return py::make_tuple(coeff_re_p, coeff_im_p, delay_py);
+        out.append(coeff_re_py), out.append(coeff_im_py);
+    out.append(delay_py);
+    if (angles)
+        out.append(aod_py), out.append(eod_py), out.append(aoa_py), out.append(eoa_py);
+    return py::tuple(out);
 }

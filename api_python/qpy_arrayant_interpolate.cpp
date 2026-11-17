@@ -14,10 +14,11 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 
 - Returns the complex e-theta (vertical) and e-phi (horizontal) field of the selected elements for directions in the
   global coordinate system (GCS), with the orientation of the antenna and the resulting polarization rotation applied
-- Single-frequency mode (3D pattern arrays and no `freq_new`): outputs `(n_out, n_ang)`; `dist` and `local_angles`
-  add outputs. Multi-frequency mode (4D pattern arrays, or `freq_new` given): for each target frequency, the two
-  entries whose center frequencies bracket it are interpolated and blended; frequencies outside the entries take the
-  nearest entry; outputs `(n_out, n_ang, n_freq)`; a 3D pattern is the same at every frequency
+- Single-frequency mode (3D pattern arrays and no `freq_new`): outputs `(n_out, n_ang)`; `dist` and `local_angles` add
+  outputs, returned only on request since computing them costs extra time and memory. Multi-frequency mode (4D pattern
+  arrays, or `freq_new` given): for each target frequency, the two entries whose center frequencies bracket it are
+  interpolated and blended; frequencies outside the entries take the nearest entry; outputs `(n_out, n_ang, n_freq)`;
+  a 3D pattern is the same at every frequency
 - `azimuth` of shape `(1, 0)` or `(n_out, 0)` gives empty outputs; `np.array([])` raises `ValueError`
 - NaN or infinite angles give NaN in all outputs of that angle and output, without an error
 - On a pole of the local frame (a direction along the z-axis of the oriented antenna) the local azimuth is chosen so

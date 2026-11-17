@@ -326,7 +326,7 @@ out1, out2 = quadriga_lib.tools.function_name( in1, in2, optional_in3 )
   - **No output**: `void`.
   - **Single output**: return the object directly (e.g. `py::array_t<double>`, `arma::uword`, `std::string`, `py::list`, `py::dict`).
   - **Multiple outputs**: return `py::tuple` and build it via `py::make_tuple(out1_py, out2_py, ...)`.
-- All outputs are always computed and returned: there is no `nargout` equivalent in pybind11, and the C++ function always gets a valid pointer for every output. The only standard exceptions are the `complex` and `stack` flags (see "Standard flags"). Do not add other skip or mode flags unless requested; if the C++ side has prohibitively expensive optional computation, ask.
+- All outputs are always computed and returned: there is no `nargout` equivalent in pybind11, and the C++ function always gets a valid pointer for every output. The only standard exceptions are the `complex` and `stack` flags (see "Standard flags"). Two other documented exceptions: `arrayant.interpolate` returns `dist` and the local angles (`azimuth_loc`, `elevation_loc`, `gamma`) only with the flags `dist` / `local_angles`, since computing them costs noticeable extra time and memory; `channel.spherical` returns the departure and arrival angles only with `angles`, since they are rarely needed, more than double the output memory and, with element coupling, cost time to convert to the ports. Do not add other skip or mode flags unless requested; if the C++ side has prohibitively expensive optional computation, ask.
 - In/out arguments (e.g. `bins` / `bins_out`): read the input (empty for `None`); declare a separate output object and copy a non-empty input into it; pass the output's address to C++, which keeps or regenerates the content; copy it to numpy after the call.
 - Naming convention inside the wrapper:
   - Input numpy arg → Armadillo view with suffix `_a` (e.g. `data` → `data_a`).
@@ -447,7 +447,7 @@ auto bins_out_py = qd_python_copy2numpy(&bins_out);
   - `stack=False`: return a `list` of arrays (`qd_python_copy2list`).
   - `stack=True`: return one zero-padded array with the vector index on the last axis (`qd_python_stack2numpy`).
 - Outputs whose Python type depends on a flag are held in a `py::object` (or the wrapper returns from separate branches).
-- Any other flag that changes the returned tuple (as e.g. `angles`, `dist`, `combine` in existing wrappers) is not standard: ask before adding one.
+- Any other flag that changes the returned tuple (as `angles`, `dist`, `local_angles`, `combine` in existing wrappers) is not standard: ask before adding one.
 
 ## Call the C++ function
 - Call the underlying C++ function directly with the converted inputs and output pointers:
