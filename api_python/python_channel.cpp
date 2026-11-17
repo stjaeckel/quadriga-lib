@@ -19,6 +19,7 @@ namespace py = pybind11;
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
 #include "qpy_get_channels_ieee_indoor.cpp"
+#include "qpy_get_channels_irs.cpp"
 #include "qpy_get_channels_planar.cpp"
 #include "qpy_get_channels_spherical.cpp"
 #include "qpy_get_channels_multifreq.cpp"
@@ -132,6 +133,37 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("n_walls") = py::array_t<arma::uword>(),
           py::arg("wall_loss") = 5.0,
           py::arg("stack") = false);
+
+    m.def("irs", &get_channels_irs,
+          py::arg("tx_array").none(false),
+          py::arg("rx_array").none(false),
+          py::arg("irs_array").none(false),
+          py::arg("tx_pos").none(false),
+          py::arg("tx_orientation").none(false),
+          py::arg("rx_pos").none(false),
+          py::arg("rx_orientation").none(false),
+          py::arg("irs_pos").none(false),
+          py::arg("irs_orientation").none(false),
+          py::arg("fbs_pos_1").none(false),
+          py::arg("lbs_pos_1").none(false),
+          py::arg("path_gain_1").none(false),
+          py::arg("path_length_1").none(false),
+          py::arg("M_1").none(false),
+          py::arg("fbs_pos_2").none(false),
+          py::arg("lbs_pos_2").none(false),
+          py::arg("path_gain_2").none(false),
+          py::arg("path_length_2").none(false),
+          py::arg("M_2").none(false),
+          py::arg("i_irs") = 0,
+          py::arg("threshold_dB") = -140.0,
+          py::arg("center_freq") = 0.0,
+          py::arg("use_absolute_delays") = false,
+          py::arg("angles") = false,
+          py::arg("irs_array_2") = py::none(),
+          py::arg("active_path") = py::none(),
+          py::arg("use_kernel") = 0,
+          py::kw_only(),
+          py::arg("complex") = true);
 
     m.def("planar", &get_channels_planar,
           py::arg("ant_tx"),

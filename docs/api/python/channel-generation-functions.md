@@ -5,6 +5,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-cha
 | Function | Summary |
 | --- | --- |
 | [channel.ieee_indoor](#channel.ieee_indoor) | Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models |
+| [channel.irs](#channel.irs) | Calculate MIMO channel coefficients for IRS-assisted communication |
 | [channel.multifreq](#channel.multifreq) | Compute channel coefficients for spherical waves across multiple frequencies |
 | [channel.planar](#channel.planar) | Calculate MIMO channel coefficients for planar wave paths |
 | [channel.spherical](#channel.spherical) | Calculate MIMO channel coefficients and delays for spherical wave propagation |
@@ -96,6 +97,105 @@ See also:
 - [S. Jaeckel; "A modern C++ framework for the IEEE indoor channel models"; IEEE 802.11-25/2318r0; Tech. Rep., 2025](http://quadriga-lib.org/publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf)
 - [hdf5_write_channel](channel-functions.md#hdf5_write_channel) (for writing channel data to a HDF5 file)
 - [hdf5_read_channel](channel-functions.md#hdf5_read_channel) (for reading channel data to a HDF5 file)
+
+---
+<a id="channel.irs"></a>
+## channel.irs
+Calculate MIMO channel coefficients for IRS-assisted communication
+
+Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [MATLAB](../mex/channel-generation-functions.md#get_channels_irs)
+
+- Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
+- IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
+- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` dict without
+  `coupling_re` / `coupling_im` raises, unlike in the other functions, where it stands for identity
+- Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
+  polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
+  column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
+  rows 6-7 = (H rx, H tx)
+- Each segment is computed by [channel.spherical](#channel.spherical): NLOS path lengths are `max(path_length, d_poly)` with the
+  polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
+- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`; the pair
+  of segment-1 path `i_1` and segment-2 path `i_2` has index `i_1 · n_path_2 + i_2` in `active_path` and
+  `active_path_out`, and the output keeps this order
+- A segment without paths (all its path inputs empty) gives empty outputs `(n_rx, n_tx, 0)`
+- If `active_path` is provided, it overrides `threshold_dB` for path selection
+- `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
+- If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
+  is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
+- The flags `use_absolute_delays`, `angles` and `complex` take a bool or `numpy.bool_`; `None` selects the default, any
+  other type raises `TypeError`
+
+### Usage:
+```python
+# Complex coefficients (default)
+coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
+    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, \
+    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel, \
+    complex=True )
+
+# Real and imaginary parts as separate arrays
+coeff_re, coeff_im, delay, active_path_out = quadriga_lib.channel.irs( ..., complex=False )
+
+# Departure and arrival angles as well
+coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..., angles=True )
+```
+
+### Inputs:
+- **`tx_array`** — Transmit arrayant dict; `n_tx` = number of ports after element coupling; see [generate](array-antenna-functions.md#generate)
+- **`rx_array`** — Receive arrayant dict; `n_rx` = number of ports after element coupling; see [generate](array-antenna-functions.md#generate)
+- **`irs_array`** — IRS arrayant dict (TX-facing side) with `n_irs` elements; the coupling matrix holds the IRS
+  weights, one codebook entry per column, `(n_irs, n_codebook)`; see [generate](array-antenna-functions.md#generate)
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`irs_pos`** — IRS position in Cartesian coordinates; `(3,)`
+- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `(3, n_path_1)`
+- **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `(3, n_path_1)`
+- **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `(n_path_1,)`
+- **`path_length_1`** — Total path lengths from TX to IRS phase center; values shorter than the polyline (e.g. 0) use
+  the polyline length; `(n_path_1,)`
+- **`M_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `(8, n_path_1)`
+- **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
+- **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
+- **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `(n_path_2,)`
+- **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
+  the polyline length; `(n_path_2,)`
+- **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
+- **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS coupling matrix); default: `0`
+- **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
+- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
+- **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
+- **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory; default: `False`
+- **`irs_array_2`** — Second IRS arrayant dict for the RX-facing side (asymmetric IRS), with the same number of
+  elements and the same coupling size as `irs_array`; default: `None` (`irs_array` for both sides)
+- **`active_path`** — Mask selecting active path pairs, bool or numeric (nonzero = active); overrides `threshold_dB`
+  when not empty; `(n_path_1 · n_path_2,)`; default: `None`
+- **`use_kernel`** — Kernel of both segments, as in [channel.spherical](#channel.spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision; raises if unavailable); auto selects GENERIC in this version; `int`; default: 0
+- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
+  separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
+
+### Outputs:
+- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_rx, n_tx, n_path_irs)`
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
+- **`delay`** — Propagation delays in seconds; `(n_rx, n_tx, n_path_irs)`
+- **`active_path_out`** — Mask of the path combinations in the output (can be passed as `active_path` to a later
+  call); `bool`; `(n_path_1 · n_path_2,)`
+- **`aod`** — Azimuth of departure in rad; `(n_rx, n_tx, n_path_irs)`; only with `angles=True`
+- **`eod`** — Elevation of departure in rad; same shape; only with `angles=True`
+- **`aoa`** — Azimuth of arrival in rad; same shape; only with `angles=True`
+- **`eoa`** — Elevation of arrival in rad; same shape; only with `angles=True`
+
+### See also:
+- [channel.spherical](#channel.spherical) (single-segment spherical-wave channel)
+- [channel.planar](#channel.planar) (single-segment planar-wave channel)
+- [generate](array-antenna-functions.md#generate) (antenna array generator)
 
 ---
 <a id="channel.multifreq"></a>

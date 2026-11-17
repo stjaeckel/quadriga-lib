@@ -47,7 +47,7 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [Python: General usage notes](api/python/general-usage-notes.md)
 - [Python: Array antenna functions](api/python/array-antenna-functions.md): 12 functions
 - [Python: Channel functions](api/python/channel-functions.md): 13 functions
-- [Python: Channel generation functions](api/python/channel-generation-functions.md): 4 functions
+- [Python: Channel generation functions](api/python/channel-generation-functions.md): 5 functions
 - [Python: Channel statistics](api/python/channel-statistics.md): 5 functions
 - [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 16 functions
 - [Python: Math functions](api/python/math-functions.md): 2 functions

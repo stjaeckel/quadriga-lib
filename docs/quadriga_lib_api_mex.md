@@ -1392,20 +1392,24 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 ## get_channels_irs
 Calculate MIMO channel coefficients for IRS-assisted communication
 
-Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · Not in: Python
+Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_lib_api_python.md#channel.irs)
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
+- The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` struct without
+  `coupling_re` / `coupling_im` throws, unlike in the other functions, where it stands for identity
 - Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx),
   rows 7-8 = (H rx, H tx)
 - Each segment is computed like [get_channels_spherical](#get_channels_spherical): NLOS path lengths are `max(path_length, d_poly)` with the
   polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
-- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths exceeding `threshold_dB`
+- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths exceeding `threshold_dB`; the pair of
+  segment-1 path `i_1` and segment-2 path `i_2` (1-based) has index `(i_1 - 1) · n_path_2 + i_2` in `active_path` and
+  `active_path_out`, and the output keeps this order
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
-- If `active_path_in` is provided, it overrides `threshold_dB` for path selection
-- Optional `ant_irs_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
+- If `active_path` is provided, it overrides `threshold_dB` for path selection
+- Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
 - `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == false`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
@@ -1413,17 +1417,23 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · Not in: Python
 ### Usage:
 ```matlab
 [ coeff_re, coeff_im, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
-    ant_tx, ant_rx, ant_irs, ...
+    tx_array, rx_array, irs_array, ...
+    tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
-    tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
-    i_irs, threshold_dB, center_freq, use_absolute_delays, active_path_in, ant_irs_2, use_kernel );
+    i_irs, threshold_dB, center_freq, use_absolute_delays, irs_array_2, active_path, use_kernel );
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
-- **`ant_rx`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
-- **`ant_irs`** — IRS antenna array (TX-facing side); `n_irs` = number of ports
+- **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
+- **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
+- **`irs_array`** — IRS antenna array (TX-facing side); `n_irs` = number of ports
+- **`tx_pos`** — Transmitter position; `[3, 1]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
+- **`rx_pos`** — Receiver position; `[3, 1]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
+- **`irs_pos`** — IRS position; `[3, 1]`
+- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1, 1]`
@@ -1436,18 +1446,13 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · Not in: Python
 - **`path_length_2`** — Total path lengths from IRS to RX phase center for IRS → RX paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_2, 1]`
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
-- **`tx_pos`** — Transmitter position; `[3, 1]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`rx_pos`** — Receiver position; `[3, 1]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`irs_pos`** — IRS position; `[3, 1]`
-- **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
-- **`active_path_in`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
-- **`ant_irs_2`** — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns
+- **`irs_array_2`** — Second IRS antenna array for the RX-facing side, with the same number of elements and the same
+  coupling size as `irs_array`; enables asymmetric IRS patterns
+- **`active_path`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
 - **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; error if unavailable); auto selects GENERIC in this version; default: 0
 

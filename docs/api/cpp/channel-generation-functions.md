@@ -106,7 +106,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 ## get_channels_irs
 Calculate MIMO channel coefficients for IRS-assisted communication
 
-Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · Not in: Python
+Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · [Python](../python/channel-generation-functions.md#channel.irs)
 
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
@@ -118,7 +118,9 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · No
   rows 6-7 = (H rx, H tx)
 - Each segment is computed by [get_channels_spherical](#get_channels_spherical): NLOS path lengths are `max(path_length, d_poly)` with the
   polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
-- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`
+- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`; the pair
+  of segment-1 path `i_1` and segment-2 path `i_2` has index `i_1 * n_path_2 + i_2` in `active_path` and
+  `active_path_out`, and the output keeps this order
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)

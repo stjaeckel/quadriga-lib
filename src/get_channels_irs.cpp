@@ -31,7 +31,9 @@ Calculate MIMO channel coefficients for IRS-assisted communication
   rows 6-7 = (H rx, H tx)
 - Each segment is computed by [[get_channels_spherical]]: NLOS path lengths are `max(path_length, d_poly)` with the
   polyline length `d_poly` of the segment; the delay of a combined path is the sum of both segment delays
-- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`
+- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`; the pair
+  of segment-1 path `i_1` and segment-2 path `i_2` has index `i_1 * n_path_2 + i_2` in `active_path` and
+  `active_path_out`, and the output keeps this order
 - A segment without paths (all its path inputs empty) gives empty outputs `[n_rx, n_tx, 0]`
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
@@ -187,7 +189,7 @@ void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const array
             throw std::invalid_argument("IRS 2 must have the same number of elements as IRS 1");
 
         if (irs_array_2->coupling_re.n_cols != irs_array.coupling_re.n_cols)
-            throw std::invalid_argument("IRS 2 must have a Coupling matrix of the same size as of IRS 1.");
+            throw std::invalid_argument("Input 'irs_array_2' must have a coupling matrix (the IRS weights) of the same size as 'irs_array'.");
     }
 
     // IRS arrays with only the desired weight vector: read-only views of the pattern data of a valid array. Each
