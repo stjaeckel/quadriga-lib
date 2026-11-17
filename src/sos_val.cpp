@@ -223,7 +223,8 @@ quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, &pos_rx, nu
   of 10 m) the results stay within the tolerance stated in [[sos_val]]. The `float` versions of the
   functions read positions in single precision, i.e. rounded to about 1 mm at a distance of 10 km.
 - **Threads and memory:** the functions that take noticeable time use the OpenMP threads of the process,
-  except [[sos_generate]], which runs on one thread. No result depends on the number of threads.
+  except [[sos_generate]], which runs on one thread. No result depends on the number of threads,
+  except the last digits of the errors of [[sos_calc_mse]].
   [[sos_val]] computes in its output: for `double` it needs no further memory of that size for one device
   and one more array of that size for two devices; for `float` one array in double precision is added.
 

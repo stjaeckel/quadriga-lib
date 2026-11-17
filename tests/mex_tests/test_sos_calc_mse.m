@@ -31,7 +31,7 @@ assertElementsAlmostEqual( sin( dir3(:, 2) ), ( (0:9)' + 0.5 ) / 10, 'absolute',
 assertTrue( isscalar(c3) && isscalar(a3) && c3 > 0 && a3 > 0 );
 assertEqual( size(t3), [4, 1] );
 [ m4, ~, ~, ~, dir4 ] = quadriga_lib.sos_calc_mse( f3, other, dist, [] );
-assertEqual( m4, m3 );
+assertElementsAlmostEqual( m4, m3, 'relative', 1e-12 );                     % parallel sum: last digits
 assertEqual( dir4, dir3 );
 [ m5, ~, ~, ~, dir5 ] = quadriga_lib.sos_calc_mse( f3, other, dist, 7 );
 assertEqual( size(dir5), [7, 2] );
@@ -45,7 +45,7 @@ assertElementsAlmostEqual( dir6, pi * (0:3)' / 4, 'absolute', 1e-14 );
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.sos_calc_mse( f3, other, dist );
 m7 = quadriga_lib.sos_calc_mse( f3, other, dist );
-assertEqual( m7, m3 );
+assertElementsAlmostEqual( m7, m3, 'relative', 1e-12 );
 [ ~, c8 ] = quadriga_lib.sos_calc_mse( f3, other, dist );
 assertEqual( c8, c3 );
 [ ~, ~, a9 ] = quadriga_lib.sos_calc_mse( f3, other, dist );

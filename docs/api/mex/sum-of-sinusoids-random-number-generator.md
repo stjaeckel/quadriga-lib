@@ -117,7 +117,8 @@ val_link = quadriga_lib.sos_val(spatial_freq, phase, pos_tx, pos_rx, [], acf, di
   the origin counted in wavelengths. Up to 1e9 wavelengths (more than 1e9 m for a decorrelation distance
   of 10 m) the results stay within the tolerance stated in [sos_val](#sos_val).
 - **Threads and memory:** the functions that take noticeable time use the OpenMP threads of the process,
-  except [sos_generate](#sos_generate), which runs on one thread. No result depends on the number of threads.
+  except [sos_generate](#sos_generate), which runs on one thread. No result depends on the number of threads,
+  except the last digits of the errors of [sos_calc_mse](#sos_calc_mse).
   [sos_val](#sos_val) computes in its output: it needs no further memory of that size for one device and one more
   array of that size for two devices.
 

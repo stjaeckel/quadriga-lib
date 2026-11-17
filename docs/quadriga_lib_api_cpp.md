@@ -7442,7 +7442,8 @@ quadriga_lib::sos_val<double>(spatial_freq, phase, pos_tx, val_link, &pos_rx, nu
   of 10 m) the results stay within the tolerance stated in [sos_val](#sos_val). The `float` versions of the
   functions read positions in single precision, i.e. rounded to about 1 mm at a distance of 10 km.
 - **Threads and memory:** the functions that take noticeable time use the OpenMP threads of the process,
-  except [sos_generate](#sos_generate), which runs on one thread. No result depends on the number of threads.
+  except [sos_generate](#sos_generate), which runs on one thread. No result depends on the number of threads,
+  except the last digits of the errors of [sos_calc_mse](#sos_calc_mse).
   [sos_val](#sos_val) computes in its output: for `double` it needs no further memory of that size for one device
   and one more array of that size for two devices; for `float` one array in double precision is added.
 
@@ -7676,7 +7677,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_calc_mse) · [Python](quadriga_lib
 - `mse_core_dB` and `mse_all_dB` need the 2-D grids and are only computed when requested
 - A perfect fit has a mean squared error of 0 and is returned as +Inf dB; this happens for a target that
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
-- The test directions are evaluated in parallel; the result does not depend on the number of threads
+- The test directions are summed in parallel; the errors along them (the return value, and `mse_core_dB` for
+  `n_dim = 1`) may differ in the last digits with the number of threads
 - Equally spaced has the meaning given in [sos_acf_2d](#sos_acf_2d)
 
 ### Declaration:

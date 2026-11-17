@@ -62,7 +62,7 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         ref = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, 7)
         out = quadriga_lib.sos.calc_mse(spatial_freq=self.f3, acf=self.other, dist=self.dist, n_dir=7)
-        self.assertEqual(out[:3], ref[:3])
+        npt.assert_allclose(out[:3], ref[:3], rtol=1e-12, atol=0)  # parallel sum: last digits
         npt.assert_array_equal(out[3], ref[3])
         npt.assert_array_equal(out[4], ref[4])
 
@@ -75,7 +75,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(t3.shape, (4,))
 
         m4, _, _, _, dir4 = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, 10)
-        self.assertEqual(m4, m3)
+        npt.assert_allclose(m4, m3, rtol=1e-12, atol=0)
         npt.assert_array_equal(dir4, dir3)
 
         m5, _, _, _, dir5 = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, 7)
@@ -97,7 +97,7 @@ class test_case(unittest.TestCase):
         ]
         for f, a, d in variants:
             out = quadriga_lib.sos.calc_mse(f, a, d)
-            self.assertEqual(out[:3], ref[:3])
+            npt.assert_allclose(out[:3], ref[:3], rtol=1e-12, atol=0)  # parallel sum: last digits
             npt.assert_array_equal(out[3], ref[3])
             npt.assert_array_equal(out[4], ref[4])
 

@@ -37,7 +37,8 @@ Approximation error of the ACF of a set of sinusoids
 - `mse_core_dB` and `mse_all_dB` need the 2-D grids and are only computed when requested
 - A perfect fit has a mean squared error of 0 and is returned as +Inf dB; this happens for a target that
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
-- The test directions are evaluated in parallel; the result does not depend on the number of threads
+- The test directions are summed in parallel; the errors along them (the return value, and `mse_core_dB` for
+  `n_dim = 1`) may differ in the last digits with the number of threads
 - Equally spaced has the meaning given in [[sos_acf_2d]]
 
 ## Declaration:
@@ -129,24 +130,16 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
         return acc / (double)n_coeff;
     };
 
-    // Squared errors of all test directions in parallel; they are then added in a fixed order, so that the
-    // result does not depend on the number of threads
-    arma::mat sq(n_acf, n_test, arma::fill::none);
+    // Squared errors of all test directions; the order of the parallel sum depends on the number of threads
+    double err = 0.0;
     const long long n_test_ll = (long long)n_test;
-#pragma omp parallel for if (n_test > 1)
+#pragma omp parallel for reduction(+ : err) if (n_test > 1)
     for (long long i_test = 0; i_test < n_test_ll; ++i_test)
-    {
-        const arma::uword t = (arma::uword)i_test;
-        double *p = sq.colptr(t);
         for (arma::uword s = 0; s < n_acf; ++s)
         {
-            double e = (double)acf.at(s) - acf_dir(t, (double)dist.at(s));
-            p[s] = e * e;
+            double e = (double)acf.at(s) - acf_dir((arma::uword)i_test, (double)dist.at(s));
+            err += e * e;
         }
-    }
-    double err = 0.0;
-    for (arma::uword i = 0; i < sq.n_elem; ++i)
-        err += sq.at(i);
     const double mse = -10.0 * std::log10(err / (double)(n_test * n_acf));
 
     if (mse_core_dB != nullptr || mse_all_dB != nullptr)
