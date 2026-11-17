@@ -1,7 +1,8 @@
-# Builds quadriga-lib on Ubuntu x86_64 and runs the C++, Octave, Python and MATLAB tests.
+# Builds quadriga-lib on Ubuntu and runs the C++, Octave and Python tests on x86_64 and aarch64, and the MATLAB tests
+# on x86_64 (there is no MATLAB for Linux on ARM).
 #
 # Started by hand only: on GitHub (Actions -> "Linux tests" -> "Run workflow") or with
-#   gh workflow run test-linux.yml --ref <branch>
+#   gh workflow run test-linux.yml --ref <branch> [-f arch=x86_64|aarch64]
 #
 # The jobs call the GNUmakefile targets, so a failure here can be reproduced locally with the same command.
 
@@ -9,15 +10,29 @@ name: Linux tests
 
 on:
   workflow_dispatch:
+    inputs:
+      arch:
+        description: Architectures to test (MATLAB runs with all and x86_64)
+        type: choice
+        options: [all, x86_64, aarch64]
+        default: all
 
 permissions:
   contents: read
 
 jobs:
-  # C++ (test_bin), Octave MEX and Python tests: "make test" without MATLAB
+  # C++ (test_bin), Octave MEX and Python tests: "make test" without MATLAB, one job per architecture.
+  # The exclude entries drop the architecture that was not chosen ("none" matches nothing).
   test:
-    name: C++, Octave, Python
-    runs-on: ubuntu-24.04
+    name: C++, Octave, Python (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+        exclude:
+          - arch: ${{ inputs.arch == 'x86_64' && 'aarch64' || 'none' }}
+          - arch: ${{ inputs.arch == 'aarch64' && 'x86_64' || 'none' }}
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,7 +51,8 @@ jobs:
   # MATLAB MEX tests. MathWorks licenses MATLAB for public repositories only inside its own actions, so the tests run
   # through run-command and not through "make test".
   matlab:
-    name: MATLAB
+    name: MATLAB (x86_64)
+    if: inputs.arch != 'aarch64'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
