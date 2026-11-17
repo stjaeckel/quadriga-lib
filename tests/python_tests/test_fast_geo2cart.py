@@ -188,6 +188,10 @@ class test_case(unittest.TestCase):
             quadriga_lib.tools.fast_geo2cart(np.random.rand(2, 4))
         self.assertIn("(3, n, m)", str(ctx.exception))
 
+        # None for the mandatory input is rejected by pybind11
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.fast_geo2cart(None, e)
+
     # Separate inputs must give the same values as the combined input, also for large n (formerly
     # the separate-input branch read freed memory, wrong values for n > 16, segfault for large n)
     def test_separate_inputs_equal_combined(self):

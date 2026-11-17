@@ -45,8 +45,8 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("copy_element", &arrayant_copy_element,
           py::arg("arrayant"),
-          py::arg("i_source"),
-          py::arg("i_target"));
+          py::arg("i_source").none(false),
+          py::arg("i_target").none(false));
 
     m.def("export_obj_file", &arrayant_export_obj_file,
           py::arg("fn"),
@@ -79,7 +79,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("beam_weight") = py::none(),
           py::arg("separate_beams") = false,
           py::arg("apply_weights") = false,
-          py::arg("pattern") = py::dict());
+          py::arg("pattern") = py::none());
 
     m.def("generate_speaker", &generate_speaker,
           py::arg("driver_type") = "piston",
@@ -122,7 +122,7 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("rotate_pattern", &arrayant_rotate_pattern,
           py::arg("arrayant"),
-          py::arg("orientation"),
+          py::arg("orientation").none(false),
           py::arg("usage") = 0,
           py::arg("i_element") = py::none());
 }

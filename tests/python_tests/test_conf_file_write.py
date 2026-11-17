@@ -171,7 +171,7 @@ class test_case(unittest.TestCase):
         for value in ["yes", 1, 0]:
             with self.assertRaises(TypeError) as ctx:
                 quadriga_lib.gbsm.conf_file_write(self.fn, self.scenpar, write_defaults=value)
-            self.assertIn("Input 'write_defaults' must be a bool or None.", str(ctx.exception))
+            self.assertIn("'write_defaults'", str(ctx.exception))
 
     def test_path_like(self):
         # str, bytes and os.PathLike write the same file

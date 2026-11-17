@@ -101,7 +101,7 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 #include "quadriga_lib.hpp"
 ```
 - `python_arma_adapter.hpp` pulls in pybind11, numpy, and Armadillo. `py` is aliased to `pybind11`.
-- If the wrapper converts arrayant dicts, channel dicts or `std::any` datasets, or reads a flag (`qd_python_flag`), include only `#include "python_quadriga_adapter.hpp"` instead; it includes the two headers above.
+- If the wrapper converts arrayant dicts, channel dicts or `std::any` datasets, or reads a flag (`qd_python_flag`) or a file name (`qd_python_path`), include only `#include "python_quadriga_adapter.hpp"` instead; it includes the two headers above.
 
 ## Helper function signatures
 Quadriga-Lib uses Armadillo for data structures. Conversion between numpy arrays / Python objects and Armadillo types is done via the helpers in `python_arma_adapter.hpp`.
@@ -359,7 +359,7 @@ const auto bins_in_a = qd_python_numpy2arma_Col<double>(bins, true);
 ```
 - The handle overloads of `qd_python_numpy2arma_*` return an empty Armadillo object when the handle is `None`, which can then be checked via `.empty()`.
 - In the registration: `py::arg("bins") = py::none()`.
-- Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object` for new wrappers (some older wrappers do).
+- Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object`. The same holds for optional containers (`list`, `dict`): `py::handle` with default `py::none()`, not `py::list()` / `py::dict()`. Exceptions remain only in `channel.baseband_freq_response` and `channel.ieee_indoor`, whose interfaces are being reworked.
 
 ### Optional inputs and `nullptr`
 - If the C++ function takes an optional input by pointer and distinguishes `nullptr` from an empty object, pass `nullptr` when the user did not provide the input:
@@ -374,6 +374,7 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
 
 ### Strings
 - Strings are taken as `const std::string&` in the wrapper signature; pybind11 handles conversion automatically. No helper needed.
+- File names are the exception: they are taken as `const py::handle &` and read with `qd_python_path(handle, "name")` (`python_quadriga_adapter.hpp`), which accepts a `str`, `bytes` or path-like object (e.g. `pathlib.Path`) and raises `TypeError` for anything else. `docs_builder/content/api_intro_python.md` states this once for all functions.
 - Optional strings: `py::arg("name") = ""` in the declaration.
 
 ### Scalars
@@ -383,9 +384,9 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
 ### Flags
 - A flag is taken as `py::handle` and read with `qd_python_flag(handle, default_value, "name")` (`python_quadriga_adapter.hpp`): `None` selects the default, a Python `bool` or `numpy.bool_` gives its value, any other type (float, int, str, array) raises `TypeError` with `Input '<name>' must be a bool or None.`. A plain `bool` parameter is not used: pybind11 would turn `None` into `False` (silently not the default) and accept other types.
 - The default stays in the registration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
-- The `## Inputs:` line states the default; one bullet of the description states the rule once for all flags of the function ("take a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`"). Where the section description states this rule for all functions of the section (as the `gbsm` submodule does in its conventions), the blocks only state the defaults.
-- Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError`.
-- The `gbsm` submodule follows this rule for all its flags; older wrappers with plain `bool` flags predate it.
+- The `## Inputs:` line states the default. The rule itself is stated once for all functions in `docs_builder/content/api_intro_python.md`; the doc blocks do not repeat it.
+- Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError` whose message names the argument (match the name, not the full sentence).
+- Plain `bool` flags remain only in `channel.baseband_freq_response`, `channel.ieee_indoor` and the `combine` flag of `tools.fast_cart2geo` / `tools.fast_geo2cart`, whose interfaces are being reworked; they predate this rule.
 
 ### Complex arrays
 - The C++ library represents complex data as separate `arma::Mat<dtype>` (or `arma::Cube<dtype>`) for the real and imaginary parts; `std::complex` appears only as an optional extra output of a few functions. The reason is compatibility with older Octave versions (see "Complex data" in the C++ glossary).

@@ -238,6 +238,10 @@ class test_case(unittest.TestCase):
             RTtools.triangle_mesh_segmentation(triangles, mtl_ind=bad_ind)
         self.assertIn("mtl_ind", str(ctx.exception).lower())
 
+    def test_triangles_none_raises(self):
+        with self.assertRaises(TypeError):
+            RTtools.triangle_mesh_segmentation(None)
+
 
 if __name__ == "__main__":
     unittest.main()

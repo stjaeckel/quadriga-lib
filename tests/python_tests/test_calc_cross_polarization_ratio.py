@@ -184,5 +184,24 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(xpr[0, 2], 1.0, atol=1e-10, rtol=0)
 
 
+    def test_none_and_flag_types(self):
+        """include_los: None selects the default (False); None for tx_pos / rx_pos and a non-bool flag raise TypeError"""
+        tx = np.array([[0.0], [0.0], [0.0]])
+        rx = np.array([[10.0], [0.0], [0.0]])
+        pw = [np.array([1.0, 0.5])]
+        M_los = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0]).reshape(8, 1)
+        M_nlos = np.array([0.8, 0.0, 0.2, 0.0, 0.2, 0.0, 0.7, 0.0]).reshape(8, 1)
+        M = [np.hstack([M_los, M_nlos])]
+        pl = [np.array([10.0, 15.0])]
+        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, None)
+        npt.assert_allclose(xpr[0, 1], 16.0, atol=1e-10, rtol=0)  # LOS excluded
+        with self.assertRaises(TypeError) as ctx:
+            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, 2.5)
+        self.assertIn("'include_los'", str(ctx.exception))
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, None, rx)
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, None)
+
 if __name__ == '__main__':
     unittest.main()

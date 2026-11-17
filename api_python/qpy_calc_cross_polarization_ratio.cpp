@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel statistics
@@ -77,9 +76,11 @@ py::tuple calc_cross_polarization_ratio(py::list powers,
                                         py::list path_length,
                                         const py::array_t<double> &tx_pos,
                                         const py::array_t<double> &rx_pos,
-                                        bool include_los,
+                                        py::handle include_los,
                                         double window_size)
 {
+    const bool include_los_b = qd_python_flag(include_los, false, "include_los");
+
     // Convert inputs
     std::vector<arma::vec> powers_a = qd_python_list2vector_Col<double>(powers);
     std::vector<arma::mat> M_a = qd_python_list2vector_Mat<double>(M);
@@ -93,7 +94,7 @@ py::tuple calc_cross_polarization_ratio(py::list powers,
 
     // Call library
     quadriga_lib::calc_cross_polarization_ratio<double>(powers_a, M_a, path_length_a, tx_pos_a, rx_pos_a,
-                                                        &xpr, &pg, include_los, window_size);
+                                                        &xpr, &pg, include_los_b, window_size);
 
     // Convert outputs
     auto xpr_py = qd_python_copy2numpy(&xpr);

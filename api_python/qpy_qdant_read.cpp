@@ -35,7 +35,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id )
 ```
 
 ## Inputs:
-- **`fn`** — path to the QDANT file; str; must not be empty
+- **`fn`** — path to the QDANT file; must not be empty
 - **`id`** — 1-based ID of the entry to read, >= 1; `None` reads all entries (see above); default: None
 
 ## Outputs:
@@ -54,22 +54,24 @@ data = quadriga_lib.arrayant.qdant_read( fn, id )
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
-py::dict qdant_read(const std::string &fn,
+py::dict qdant_read(const py::handle &fn,
                     py::handle id)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     arma::Mat<unsigned> layout;
     py::dict output;
 
     if (id.is_none()) // Read every entry as a (possibly frequency-dependent) arrayant
     {
-        auto ant_vec = quadriga_lib::qdant_read_multi<double>(fn, &layout);
+        auto ant_vec = quadriga_lib::qdant_read_multi<double>(fn_s, &layout);
         if (ant_vec.empty())
             throw std::runtime_error("File does not contain any antenna data.");
         if (ant_vec.size() > 1) // The entries must form a frequency set
         {
             std::string err = quadriga_lib::arrayant_is_valid_multi(ant_vec);
             if (!err.empty())
-                throw std::invalid_argument("Entries in file '" + fn + "' do not form a frequency set (" + err +
+                throw std::invalid_argument("Entries in file '" + fn_s + "' do not form a frequency set (" + err +
                                             "); pass 'id' to read single entries.");
         }
         output = qd_python_arrayant2dict_multi(ant_vec);
@@ -87,7 +89,7 @@ py::dict qdant_read(const std::string &fn,
         }
         if (i < 1 || i > (long long)std::numeric_limits<unsigned>::max())
             throw std::invalid_argument("Input 'id' must be >= 1 (None reads all entries).");
-        auto ant = quadriga_lib::qdant_read<double>(fn, (unsigned)i, &layout);
+        auto ant = quadriga_lib::qdant_read<double>(fn_s, (unsigned)i, &layout);
         output = qd_python_arrayant2dict(ant);
     }
 

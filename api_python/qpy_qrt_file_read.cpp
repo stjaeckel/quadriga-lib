@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 #include <thread>
 #include <mutex>
@@ -118,18 +117,22 @@ struct qd_qrt_reader_guard
     ~qd_qrt_reader_guard() { join(); }
 };
 
-py::tuple qrt_file_read(const std::string &fn,
-                        py::handle cir,
-                        arma::uword orig,
-                        bool uplink,
+py::tuple qrt_file_read(const py::handle &fn,
+                        py::handle i_cir,
+                        arma::uword i_orig,
+                        py::handle uplink,
                         int normalize_M)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
+    const bool uplink_b = qd_python_flag(uplink, false, "uplink");
+
     // Open file stream and initialize the read cache (reused across all snapshots)
-    std::ifstream stream(fn, std::ios::in | std::ios::binary);
-    auto cache = quadriga_lib::qrt_read_cache_init(fn, &stream);
+    std::ifstream stream(fn_s, std::ios::in | std::ios::binary);
+    auto cache = quadriga_lib::qrt_read_cache_init(fn_s, &stream);
 
     // Resolve snapshot indices (None or empty = read all snapshots)
-    arma::uvec i_cir_a = qd_python_numpy2arma_Col<arma::uword>(cir, true);
+    arma::uvec i_cir_a = qd_python_numpy2arma_Col<arma::uword>(i_cir, true);
     if (i_cir_a.empty()) // None for a file without CIRs: empty outputs
     {
         if (cache.no_cir != 0)
@@ -183,7 +186,7 @@ py::tuple qrt_file_read(const std::string &fn,
             try
             {
                 qd_qrt_slot &s = slot[i % 2ULL];
-                quadriga_lib::qrt_file_read<double>(fn, i_cir_a[i], orig, uplink, nullptr,
+                quadriga_lib::qrt_file_read<double>(fn_s, i_cir_a[i], i_orig, uplink_b, nullptr,
                                                     &s.tx_pos, &s.tx_orientation, &s.rx_pos, &s.rx_orientation,
                                                     &s.fbs_pos, &s.lbs_pos, &s.path_gain, &s.path_length, &s.M,
                                                     &s.aod, &s.eod, &s.aoa, &s.eoa, &s.path_coord, normalize_M,

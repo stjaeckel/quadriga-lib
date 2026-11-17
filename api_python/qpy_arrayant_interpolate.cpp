@@ -27,8 +27,6 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
   field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
   2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
   elevation; auto selects GENERIC in this version, which may change in a later version
-- The flags `dist`, `local_angles`, `fast_access` and `complex` take a bool or `numpy.bool_`; `None` selects the
-  default, any other type raises `TypeError`
 
 ## Usage:
 ```

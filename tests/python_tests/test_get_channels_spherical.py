@@ -169,7 +169,36 @@ class TestGetChannelsSpherical(unittest.TestCase):
         self.assertEqual(len(channel.spherical(*args, complex=np.bool_(False), **kwargs)), 3)
         with self.assertRaises(TypeError) as ctx:
             channel.spherical(*args, complex=2.5, **kwargs)
-        self.assertIn("Input 'complex' must be a bool or None.", str(ctx.exception))
+        self.assertIn("'complex'", str(ctx.exception))
+
+    def test_none_and_flag_types(self):
+        ant = omni()
+        fbs_pos = np.array([[10.0], [0.0], [1.0]], order='F')
+        args = (ant, ant, fbs_pos, fbs_pos, np.ones(1), np.ones(1), make_M(1), [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0])
+        ref = channel.spherical(*args, 1e9)
+        for name in ("use_absolute_delays", "add_fake_los_path", "angles"):
+            out = channel.spherical(*args, 1e9, **{name: None})
+            self.assertEqual(len(out), len(ref))
+            for a, b in zip(out, ref):
+                npt.assert_array_equal(a, b)
+            with self.assertRaises(TypeError) as ctx:
+                channel.spherical(*args, 1e9, **{name: 2.5})
+            self.assertIn("'" + name + "'", str(ctx.exception))
+
+        # Path data and positions refuse None
+        for i in range(2, len(args)):
+            with self.assertRaises(TypeError):
+                channel.spherical(*args[:i], None, *args[i + 1:])
+
+        # 4D (multi-frequency) arrayants belong to channel.multifreq
+        ant4 = {k: (np.stack([v, v], axis=3) if k.startswith('e_') else v) for k, v in ant.items()}
+        ant4['center_freq'] = np.array([1e9, 2e9])
+        with self.assertRaises(ValueError) as ctx:
+            channel.spherical(ant4, *args[1:])
+        self.assertIn("has 4D (multi-frequency) patterns", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            channel.spherical(ant, ant4, *args[2:])
+        self.assertIn("has 4D (multi-frequency) patterns", str(ctx.exception))
 
     def test_angles_flag(self):
         # The angles follow the delays only with angles=True: 3 or 7 outputs, 2 or 6 with complex=True

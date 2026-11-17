@@ -131,5 +131,9 @@ class test_acdf(unittest.TestCase):
             quadriga_lib.tools.acdf(data, n_bins=1)
 
 
+    def test_none_for_mandatory_arrays(self):
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.acdf(None)
+
 if __name__ == '__main__':
     unittest.main()

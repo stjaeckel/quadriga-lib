@@ -127,7 +127,7 @@ class test_case(unittest.TestCase):
             npt.assert_allclose(val, ref, atol=1e-6, rtol=0)  # float32 input
 
         # Integer and bool scalars
-        val = quadriga_lib.sos.val(*args, spatial_freq_scale_b=1, uniform=0, use_kernel=np.int32(1))
+        val = quadriga_lib.sos.val(*args, spatial_freq_scale_b=1, uniform=np.bool_(False), use_kernel=np.int32(1))
         npt.assert_array_equal(val, ref)
         val = quadriga_lib.sos.val(*args, uniform=np.bool_(True), use_kernel=1)
         npt.assert_array_equal(val, quadriga_lib.sos.val(*args, uniform=True, use_kernel=1))
@@ -178,6 +178,16 @@ class test_case(unittest.TestCase):
             with self.assertRaises(TypeError):
                 quadriga_lib.sos.val(*bad)
 
+
+    def test_none_and_flag_types(self):
+        # uniform: None selects the default (False), other types than bool raise TypeError
+        ref = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, use_kernel=1)
+        val = quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, uniform=None, use_kernel=1)
+        npt.assert_array_equal(val, ref)
+        for bad in (2.5, 1):
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.sos.val(self.spatial_freq, self.phase, self.pos, uniform=bad)
+            self.assertIn("'uniform'", str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()

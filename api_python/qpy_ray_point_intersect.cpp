@@ -37,7 +37,7 @@ hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig,
 - **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
-  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`
+  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
   3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is
   available, else AVX2, else GENERIC; default: 0
@@ -60,7 +60,7 @@ py::tuple ray_point_intersect(const py::array_t<double> &orig,
                               const py::array_t<double> &trivec,
                               const py::array_t<double> &tridir,
                               const py::array_t<double> &points,
-                              const py::array_t<unsigned> &sub_cloud_ind,
+                              const py::handle &sub_cloud_ind,
                               int use_kernel,
                               int gpu_id)
 {
@@ -69,7 +69,7 @@ py::tuple ray_point_intersect(const py::array_t<double> &orig,
     const auto trivec_arma = qd_python_numpy2arma_Mat(trivec, true);
     const auto tridir_arma = qd_python_numpy2arma_Mat(tridir, true);
     const auto points_arma = qd_python_numpy2arma_Mat(points, true);
-    const auto sub_cloud_ind_arma = qd_python_numpy2arma_Col(sub_cloud_ind, true);
+    const auto sub_cloud_ind_arma = qd_python_numpy2arma_Col<unsigned>(sub_cloud_ind, true);
 
     // Both sizes are known up front, so the library writes straight into the
     // numpy buffers. Sizing them exactly prevents a resize inside the library,

@@ -82,7 +82,7 @@ class test_case(unittest.TestCase):
         for value in ["yes", 1, 0]:
             with self.assertRaises(TypeError) as ctx:
                 quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], value)
-            self.assertIn("Input 'parse_shortnames' must be a bool or None.", str(ctx.exception))
+            self.assertIn("'parse_shortnames'", str(ctx.exception))
 
     def test_dirs_path_like(self):
         # pathlib.Path and bytes, alone and in a list, give the same result; file_dirs holds the str form

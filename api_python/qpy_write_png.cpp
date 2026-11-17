@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Miscellaneous / Tools
@@ -42,7 +41,7 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 
 ## Arguments:
 - **`fn`**<br>
-  Filename of the PNG file, string, required
+  Filename of the PNG file, required
 
 - **`data`**<br>
   Data matrix, required, size `[N, M]` 
@@ -62,13 +61,17 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
   Default: false (disabled)
 MD!*/
 
-void write_png(const std::string &fn,           // Output file name
+void write_png(const py::handle &fn,            // Output file name
                const py::array_t<double> &data, // Data matrix
                const std::string &colormap,     // Colormap
                double min_val,                  // Lower clipping bound, NaN = data minimum
                double max_val,                  // Upper clipping bound, NaN = data maximum
-               bool log_transform)              // Transform data to log-domain (10*log10(data))
+               py::handle log_transform)        // Transform data to log-domain (10*log10(data))
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
+    const bool log_transform_b = qd_python_flag(log_transform, false, "log_transform");
+
     auto data_arma = qd_python_numpy2arma_Mat(data, true);
-    quadriga_lib::write_png(data_arma, fn, colormap, min_val, max_val, log_transform);
+    quadriga_lib::write_png(data_arma, fn_s, colormap, min_val, max_val, log_transform_b);
 }

@@ -46,7 +46,6 @@ Compute channel coefficients for spherical waves across multiple frequencies
   grid and gives wrong phases
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im`
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Usage:
 ```
@@ -107,12 +106,15 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                  const py::array_t<double> &rx_orientation,
                                  const py::array_t<double> &freq,
                                  const py::array_t<double> &freq_new,
-                                 const bool use_absolute_delays,
-                                 const bool add_fake_los_path,
+                                 py::handle use_absolute_delays,
+                                 py::handle add_fake_los_path,
                                  const double propagation_speed,
                                  py::handle complex,
                                  const int use_kernel)
 {
+    const bool use_absolute_delays_b = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
+    const bool add_fake_los_path_b = qd_python_flag(add_fake_los_path, false, "add_fake_los_path");
+
     const bool want_complex = qd_python_flag(complex, true, "complex");
 
     // Parse antenna dictionaries (3D single-freq or 4D multi-freq handled internally)
@@ -135,7 +137,7 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
     // Derived output sizes
     arma::uword n_ports_tx = ant_tx_vec[0].n_ports();
     arma::uword n_ports_rx = ant_rx_vec[0].n_ports();
-    arma::uword n_path = add_fake_los_path ? fbs_pos_a.n_cols + 1 : fbs_pos_a.n_cols;
+    arma::uword n_path = add_fake_los_path_b ? fbs_pos_a.n_cols + 1 : fbs_pos_a.n_cols;
     arma::uword n_freq_new = freq_new_a.n_elem;
 
     std::vector<arma::cube> coeff_re, coeff_im, delay;
@@ -152,7 +154,7 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                                      fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
                                                      freq_a, freq_new_a,
                                                      coeff_re, coeff_im, delay,
-                                                     use_absolute_delays, add_fake_los_path, propagation_speed, &coeff,
+                                                     use_absolute_delays_b, add_fake_los_path_b, propagation_speed, &coeff,
                                                      use_kernel);
         return py::make_tuple(coeff_py, delay_py);
     }
@@ -168,7 +170,7 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                                  fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
                                                  freq_a, freq_new_a,
                                                  coeff_re, coeff_im, delay,
-                                                 use_absolute_delays, add_fake_los_path, propagation_speed, nullptr,
+                                                 use_absolute_delays_b, add_fake_los_path_b, propagation_speed, nullptr,
                                                  use_kernel);
 
     return py::make_tuple(coeff_re_py, coeff_im_py, delay_py);

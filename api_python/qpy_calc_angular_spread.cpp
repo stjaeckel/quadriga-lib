@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel statistics
@@ -54,10 +53,13 @@ MD!*/
 py::tuple calc_angular_spread(py::list az,
                               py::list el,
                               py::list powers,
-                              bool wrapping,
-                              bool calc_bank_angle,
+                              py::handle wrapping,
+                              py::handle calc_bank_angle,
                               double quantize_deg)
 {
+    const bool wrapping_b = qd_python_flag(wrapping, false, "wrapping");
+    const bool calc_bank_angle_b = qd_python_flag(calc_bank_angle, false, "calc_bank_angle");
+
     // Convert inputs to std::vector<arma::vec>
     std::vector<arma::vec> az_a = qd_python_list2vector_Col<double>(az);
     std::vector<arma::vec> el_a = qd_python_list2vector_Col<double>(el);
@@ -71,7 +73,7 @@ py::tuple calc_angular_spread(py::list az,
     // Call library function
     quadriga_lib::calc_angular_spread<double>(az_a, el_a, powers_a,
                                               &azimuth_spread, &elevation_spread, &orientation,
-                                              &phi, &theta, wrapping, calc_bank_angle, quantize_deg);
+                                              &phi, &theta, wrapping_b, calc_bank_angle_b, quantize_deg);
 
     // Convert to Python
     auto azimuth_spread_py = qd_python_copy2numpy(&azimuth_spread);

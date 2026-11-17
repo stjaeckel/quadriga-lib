@@ -24,7 +24,7 @@ quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, color
 ```
 
 ## Inputs:
-- **`fn`** — Output OBJ filename; str; must not be empty and must end in `.obj`
+- **`fn`** — Output OBJ filename; must not be empty and must end in `.obj`
 - **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
 - **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
@@ -34,7 +34,7 @@ quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, color
 - **`i_freq`** — Frequency index to export from a frequency-dependent antenna; must satisfy `0 <= i_freq < n_freq`; default: 0
 MD!*/
 
-void arrayant_export_obj_file(const std::string &fn,
+void arrayant_export_obj_file(const py::handle &fn,
                               const py::dict &arrayant,
                               double directivity_range_dB,
                               const std::string &colormap,
@@ -43,6 +43,8 @@ void arrayant_export_obj_file(const std::string &fn,
                               py::handle i_element,
                               arma::uword i_freq)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     // Element indices (0-based); empty uvec = export all elements
     const arma::uvec i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
 
@@ -52,5 +54,5 @@ void arrayant_export_obj_file(const std::string &fn,
     if (i_freq >= ant.size())
         throw std::invalid_argument("'i_freq' is out of bound.");
 
-    quadriga_lib::arrayant_export_obj_file(fn, ant[i_freq], directivity_range_dB, colormap, object_radius, icosphere_n_div, &i_element_a);
+    quadriga_lib::arrayant_export_obj_file(fn_s, ant[i_freq], directivity_range_dB, colormap, object_radius, icosphere_n_div, &i_element_a);
 }

@@ -80,7 +80,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 ## Inputs (ula, 3gpp):
 - **`pattern`** — Custom per-element pattern dict (same field layout as the output);
   overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element positions,
-  coupling and center frequency of the pattern are ignored; default: empty dict (use built-in pattern)
+  coupling and center frequency of the pattern are ignored; default: `None` (use built-in pattern)
 
 ## Inputs (multibeam only):
 - **`beam_az`** — Azimuth beam angles in degrees; `(n_beams,)`; default: `[0.0]`
@@ -124,10 +124,20 @@ py::dict arrayant_generate(const std::string &type,
                            py::handle beam_az,
                            py::handle beam_el,
                            py::handle beam_weight,
-                           bool separate_beams,
-                           bool apply_weights,
-                           const py::dict &pattern)
+                           py::handle separate_beams,
+                           py::handle apply_weights,
+                           const py::handle &pattern)
 {
+    const bool separate_beams_b = qd_python_flag(separate_beams, false, "separate_beams");
+    const bool apply_weights_b = qd_python_flag(apply_weights, false, "apply_weights");
+
+    py::dict pattern_d;
+    if (!pattern.is_none())
+    {
+        if (!py::isinstance<py::dict>(pattern))
+            throw py::type_error("Input 'pattern' must be a dict or None.");
+        pattern_d = py::reinterpret_borrow<py::dict>(pattern);
+    }
     const arma::uvec el_0 = {0}, el_1 = {1}; // Elements turned by the polarization rotations of custom patterns
 
     // Set default resolution by type when res == 0
@@ -152,9 +162,9 @@ py::dict arrayant_generate(const std::string &type,
     }
     else if (type == "ula")
     {
-        if (pattern.size() != 0) // Use custom pattern dict
+        if (!pattern_d.empty()) // Use custom pattern dict
         {
-            const auto custom_array = qd_python_dict2arrayant(pattern, true);
+            const auto custom_array = qd_python_dict2arrayant(pattern_d, true);
             arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array);
         }
         else if (pol == 2 || pol == 5 || pol == 3 || pol == 6) // Dual-polarized base pattern
@@ -177,9 +187,9 @@ py::dict arrayant_generate(const std::string &type,
     }
     else if (type == "3GPP" || type == "3gpp")
     {
-        if (pattern.size() != 0) // Use custom pattern dict
+        if (!pattern_d.empty()) // Use custom pattern dict
         {
-            auto custom_array = qd_python_dict2arrayant(pattern, true);
+            auto custom_array = qd_python_dict2arrayant(pattern_d, true);
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing,
                                                                     Mg, Ng, dgv, dgh, &custom_array);
         }
@@ -224,7 +234,7 @@ py::dict arrayant_generate(const std::string &type,
         arrayant = quadriga_lib::generate_arrayant_multibeam<double>(M, N, az_use, el_use, weight_use,
                                                                      freq, pol, spacing,
                                                                      az_bw, el_bw, rear_gain_lin, res,
-                                                                     separate_beams, apply_weights);
+                                                                     separate_beams_b, apply_weights_b);
     }
     else
         throw std::invalid_argument("Array type not supported!");

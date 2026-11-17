@@ -96,7 +96,7 @@ class test_case(unittest.TestCase):
 
         Mirrors the MATLAB test: each point is hit by exactly one beam.
         """
-        orig, _, trivec, tridir = quadriga_lib.RTtools.icosphere(n_div, 1.0, 1)
+        orig, _, trivec, tridir = quadriga_lib.RTtools.icosphere(n_div, 1.0, True)
         orig = orig - np.array([10.0, 20.0, 30.0])
 
         pts = np.zeros((4, 3))
@@ -349,6 +349,20 @@ class test_case(unittest.TestCase):
         self.assertEqual(
             self._csr_to_sets(idx_a, off_a, n), self._csr_to_sets(idx_c, off_c, n)
         )
+
+    def test_none_inputs(self):
+        """The mandatory arrays refuse None; sub_cloud_ind=None equals omitted."""
+        orig, trivec, tridir, _, _ = self._two_beam_setup()
+        points = np.array([[0.0, 0.0, 1.0], [0.06, 0.0, 2.0]])
+        args = (orig, trivec, tridir, points)
+        ref = quadriga_lib.RTtools.ray_point_intersect(*args)
+        out = quadriga_lib.RTtools.ray_point_intersect(*args, None)
+        for a, b in zip(ref, out):
+            npt.assert_array_equal(a, b)
+        for i, name in enumerate(["orig", "trivec", "tridir", "points"]):
+            with self.subTest(input=name):
+                with self.assertRaises(TypeError):
+                    quadriga_lib.RTtools.ray_point_intersect(*args[:i], None, *args[i + 1:])
 
     def test_integration_with_point_cloud_segmentation(self):
         """Permuted point cloud + auto-generated sub_cloud_ind must match unsegmented after un-permuting."""

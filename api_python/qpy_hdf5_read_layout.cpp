@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -26,7 +25,7 @@ storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 
 ## Outputs:
 - **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `(4,)`; int64
@@ -37,11 +36,13 @@ storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 - [[hdf5_read_channel]] (for reading channel data)
 MD!*/
 
-py::tuple hdf5_read_layout(const std::string &fn)
+py::tuple hdf5_read_layout(const py::handle &fn)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     // Read the storage layout and the per-slot channel IDs
     arma::Col<unsigned> channel_id;
-    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channel_id);
+    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn_s, &channel_id);
 
     const unsigned nx = storage_space.at(0), ny = storage_space.at(1),
                    nz = storage_space.at(2), nw = storage_space.at(3);

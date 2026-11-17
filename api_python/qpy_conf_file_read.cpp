@@ -112,9 +112,8 @@ rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. 
 deliberate library choices: the SOS preset `Comb256` with bias removal ([[gbsm.init_phases]], [[gbsm.draw]]) and
 `method = "quadriga"` of [[gbsm.rays_from_paths]]; QuaDRiGa variants are options. Units: frequencies in Hz, path loss
 in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file keys and
-`scenpar` keys have the units of the file comments (e.g. `PerClusterDS` in ns). Flags take a `bool` or `numpy.bool_`;
-`None` selects the default, any other type raises `TypeError`. Messages name the real and
-imaginary part of `gr_eps` `gr_eps_re` and `gr_eps_im`.
+`scenpar` keys have the units of the file comments (e.g. `PerClusterDS` in ns). Messages name the real and imaginary part of `gr_eps`
+`gr_eps_re` and `gr_eps_im`.
 SECTION_DESC!*/
 
 /*!MD
@@ -147,7 +146,7 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 ```
 
 ## Inputs:
-- **`fn`** — Path to the conf file; str, bytes or path-like object (e.g. `pathlib.Path`)
+- **`fn`** — Path to the conf file
 - **`validate`** — `True`: apply the value checks of [[scenpar_validate]]; `False`: only the line
   grammar is checked; default: True
 
@@ -170,7 +169,7 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 - [[conf_file_write]] (write a conf file)
 MD!*/
 
-py::tuple conf_file_read(py::object fn,
+py::tuple conf_file_read(const py::handle &fn,
                          py::handle validate)
 {
     // Read inputs

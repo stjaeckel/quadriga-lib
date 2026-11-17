@@ -442,6 +442,24 @@ class test_case(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(xpr)))
         self.assertTrue(np.all(np.isfinite(coord)))
 
+    def test_none_and_flag_types(self):
+        # Flags: None selects the default (False), a non-bool raises TypeError.
+        args = (self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 10e9, 2)
+        g_def, x_def, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args)
+        for flag in ('scalar_mode', 'apply_fspl', 'apply_phase'):
+            with self.subTest(flag=flag):
+                g, x, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args, **{flag: None})
+                npt.assert_array_equal(g, g_def)
+                npt.assert_array_equal(x, x_def)
+                with self.assertRaises(TypeError) as ctx:
+                    quadriga_lib.RTtools.calc_diffraction_gain(*args, **{flag: 2.5})
+                self.assertIn(f"'{flag}'", str(ctx.exception))
+
+        # Mandatory arrays refuse None.
+        for i in range(5):
+            with self.assertRaises(TypeError):
+                quadriga_lib.RTtools.calc_diffraction_gain(*args[:i], None, *args[i + 1:])
+
     # --- Error handling ---
     # pybind11 re-raises std::exception as RuntimeError; the reference tests match
     # only that an exception is raised, not the message text (library-layer

@@ -4,6 +4,7 @@
 
 import sys
 import os
+import pathlib
 import shutil
 import tempfile
 import unittest
@@ -205,6 +206,24 @@ class test_channel_export_obj_file(unittest.TestCase):
         # duplicate indices are allowed
         fn = self._export('isnap_dup.obj', i_snap=np.array([0, 2], dtype=np.uint64), **common)
         self.assertGreater(len(_significant_lines(fn)), 0)
+
+    def test_none_defaults_and_path_fn(self):
+        d = _make_inputs(n_snap=1)
+        common = dict(rx_pos=d['rx_pos'], tx_pos=d['tx_pos'], center_freq=d['center_freq'],
+                      n_interact=d['n_interact'], interact_coord=d['interact_coord'],
+                      coeff=d['coeff_re'] + 1j * d['coeff_im'])
+        ref = _significant_lines(self._export('omit.obj', **common))
+        self.assertEqual(_significant_lines(self._export('none.obj', i_snap=None, **common)), ref)
+        fn = pathlib.Path(self._path('path.obj'))
+        quadriga_lib.channel.export_obj_file(fn, **common)
+        self.assertEqual(_significant_lines(str(fn)), ref)
+
+        # n_interact / interact_coord: None behaves as omitted (both are needed with coefficients)
+        for key in ('n_interact', 'interact_coord'):
+            kw = {k: v for k, v in common.items() if k != key}
+            for extra in ({}, {key: None}):
+                with self.assertRaises(ValueError):
+                    self._export('missing.obj', **kw, **extra)
 
     def test_scalar_params(self):
         # mirror the happy-path scalar variations from the MATLAB test

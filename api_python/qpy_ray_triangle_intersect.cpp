@@ -36,9 +36,9 @@ fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, d
 - **`orig`** — Ray origins in GCS; `(n_ray, 3)`
 - **`dest`** — Ray destinations in GCS; `(n_ray, 3)`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `(n_mesh, 9)`
-- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`
+- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`; default: `None`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
-  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`
+  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`; default: `None`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
   throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2,
   else GENERIC.
@@ -62,16 +62,16 @@ MD!*/
 py::tuple ray_triangle_intersect(const py::array_t<double> &orig,
                                  const py::array_t<double> &dest,
                                  const py::array_t<double> &mesh,
-                                 const py::array_t<unsigned> &sub_mesh_ind,
-                                 const py::array_t<double> &aabb,
+                                 const py::handle &sub_mesh_ind,
+                                 const py::handle &aabb,
                                  int use_kernel,
                                  int gpu_id)
 {
     const auto orig_arma = qd_python_numpy2arma_Mat(orig, true);
     const auto dest_arma = qd_python_numpy2arma_Mat(dest, true);
     const auto triangles_arma = qd_python_numpy2arma_Mat(mesh, true);
-    const auto sub_mesh_index_arma = qd_python_numpy2arma_Col(sub_mesh_ind, true);
-    const auto aabb_arma = qd_python_numpy2arma_Mat(aabb, true);
+    const auto sub_mesh_index_arma = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true);
+    const auto aabb_arma = qd_python_numpy2arma_Mat<double>(aabb, true);
 
     arma::uword n_ray = orig_arma.n_rows;
 

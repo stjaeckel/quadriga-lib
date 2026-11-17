@@ -36,7 +36,6 @@ Calculate MIMO channel coefficients for planar wave paths
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`.
 
 ## Usage:
 ```
@@ -50,8 +49,9 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 ```
 
 ## Inputs:
-- **`ant_tx`** — Transmit arrayant dict; see [[generate]]
-- **`ant_rx`** — Receive arrayant dict; see [[generate]]
+- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate]]; a 4D dict raises
+  `ValueError` (use [[channel.multifreq]])
+- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
 - **`aod`** — Departure azimuth angles in rad; `(n_path,)`
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
@@ -102,12 +102,14 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                               const py::array_t<double> &rx_pos,
                               const py::array_t<double> &rx_orientation,
                               py::handle center_freq,
-                              const bool use_absolute_delays,
-                              const bool add_fake_los_path,
+                              py::handle use_absolute_delays,
+                              py::handle add_fake_los_path,
                               py::handle complex,
                               const arma::uword i_freq,
                               const int use_kernel)
 {
+    const bool use_absolute_delays_b = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
+    const bool add_fake_los_path_b = qd_python_flag(add_fake_los_path, false, "add_fake_los_path");
     const bool want_complex = qd_python_flag(complex, true, "complex");
 
     // Parse input arguments
@@ -131,7 +133,7 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
     arma::uword n_ports_rx = ant_rx_a.n_ports();
     arma::uword n_path_in = aod_a.n_elem;
     arma::uword n_freq = path_gain_a.n_cols;
-    arma::uword n_path = add_fake_los_path ? n_path_in + 1 : n_path_in;
+    arma::uword n_path = add_fake_los_path_b ? n_path_in + 1 : n_path_in;
 
     // Check multi-frequency data consistency, path counts are validated by the C++ core
     if (M_a.n_slices != n_freq)
@@ -160,7 +162,7 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                                                   tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
                                                   aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, M_f,
                                                   coeff_re, coeff_im, delay,
-                                                  center_freq_sel, use_absolute_delays, add_fake_los_path,
+                                                  center_freq_sel, use_absolute_delays_b, add_fake_los_path_b,
                                                   &rx_Doppler, use_kernel);
 
         auto coeff_p = qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
@@ -175,7 +177,7 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                                               tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
                                               aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, M_f,
                                               coeff_re, coeff_im, delay,
-                                              center_freq_sel, use_absolute_delays, add_fake_los_path,
+                                              center_freq_sel, use_absolute_delays_b, add_fake_los_path_b,
                                               &rx_Doppler, use_kernel);
 
     return py::make_tuple(coeff_re_p, coeff_im_p, delay_p, rx_Doppler_p);

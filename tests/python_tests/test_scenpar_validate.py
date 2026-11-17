@@ -100,7 +100,7 @@ class test_case(unittest.TestCase):
         for value in ["yes", 1, 0.0]:
             with self.assertRaises(TypeError) as ctx:
                 quadriga_lib.gbsm.scenpar_validate(bad, value)
-            self.assertIn("Input 'validate' must be a bool or None.", str(ctx.exception))
+            self.assertIn("'validate'", str(ctx.exception))
 
     def test_validate(self):
         # Default is validate = True

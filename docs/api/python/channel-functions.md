@@ -120,7 +120,7 @@ quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, c
 ```
 
 ### Inputs:
-- **`fn`** — Output `.obj` file path; str
+- **`fn`** — Output `.obj` file path
 - **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
 - **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
@@ -143,7 +143,7 @@ quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, c
   must be paired with `coeff_im`; default: None
 - **`coeff_im`** — Imaginary part of the channel coefficients; same format as `coeff_re`;
   must be paired with `coeff_re`; default: None
-- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: None
+- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: `None`
 
 ### Outputs:
 - None; the OBJ file is written directly to disk
@@ -168,7 +168,7 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file to create; str
+- **`fn`** — Filename of the HDF5 file to create
 - **`nx`** — Number of elements on the x-dimension; default: 65536
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
@@ -209,7 +209,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — 0-based slot indices along dimension X; scalar or vector; default: `0 ... nx-1`
 - **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
@@ -270,7 +270,7 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -306,7 +306,7 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -341,7 +341,7 @@ storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 
 ### Outputs:
 - **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `(4,)`; int64
@@ -372,7 +372,7 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file to create; str
+- **`fn`** — Filename of the HDF5 file
 - **`nx`** — Number of elements on the x-dimension; default: 65536
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
@@ -410,7 +410,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`chan`** — Structured channel data; a channel dict or a list of channel dicts; field layout matches [hdf5_read_channel](#hdf5_read_channel)
 - **`par`** — Unstructured data; a dict or a list of dicts with the same number of entries as `chan`. Dict keys become HDF5 dataset
   names per slot; `None` values are skipped. Pass `None` to disable; default: `None`
@@ -455,7 +455,7 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
 ```
 
 ### Input Arguments:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -593,7 +593,6 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [MATLAB](../mex/c
   supplying both forms is an error. The input and output forms are independent
 - `complex=True` (default) returns one combined complex coefficient output; `complex=False` returns
   separate real `coeff_re_q` and `coeff_im_q`
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`

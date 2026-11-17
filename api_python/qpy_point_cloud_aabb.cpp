@@ -26,7 +26,7 @@ aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
 ## Input Arguments:
 - **`points`** — 3D point coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based row indices marking the start of each sub-cloud;
-  use [[point_cloud_segmentation]] to generate; uint32; `(n_sub,)`
+  use [[point_cloud_segmentation]] to generate; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
 ## Output Argument:
@@ -38,12 +38,12 @@ aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
 MD!*/
 
 py::array_t<double> point_cloud_aabb(const py::array_t<double> &points,
-                                     const py::array_t<unsigned> &sub_cloud_ind,
+                                     const py::handle &sub_cloud_ind,
                                      arma::uword vec_size)
 
 {
     const auto points_arma = qd_python_numpy2arma_Mat(points, true);
-    const auto sub_cloud_ind_arma = qd_python_numpy2arma_Col(sub_cloud_ind, true);
+    const auto sub_cloud_ind_arma = qd_python_numpy2arma_Col<unsigned>(sub_cloud_ind, true);
 
     arma::mat aabb;
     quadriga_lib::point_cloud_aabb(points_arma, aabb, &sub_cloud_ind_arma, vec_size);

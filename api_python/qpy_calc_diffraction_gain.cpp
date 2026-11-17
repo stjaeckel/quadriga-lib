@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -95,11 +94,15 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
                                 const py::handle &sub_mesh_ind,
                                 int use_kernel,
                                 int gpu_id,
-                                bool scalar_mode,
+                                py::handle scalar_mode,
                                 double thin_slab_threshold,
-                                bool apply_fspl,
-                                bool apply_phase)
+                                py::handle apply_fspl,
+                                py::handle apply_phase)
 {
+    const bool scalar_mode_b = qd_python_flag(scalar_mode, false, "scalar_mode");
+    const bool apply_fspl_b = qd_python_flag(apply_fspl, false, "apply_fspl");
+    const bool apply_phase_b = qd_python_flag(apply_phase, false, "apply_phase");
+
     const auto orig_a = qd_python_numpy2arma_Mat<double>(orig, true);
     const auto dest_a = qd_python_numpy2arma_Mat<double>(dest, true);
     const auto mesh_a = qd_python_numpy2arma_Mat<double>(mesh, true);
@@ -115,19 +118,19 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     arma::mat xprmat;
     arma::cube coord;
     auto gain_p = qd_python_init_output(n_pos, &gain);
-    auto xprmat_p = qd_python_init_output((scalar_mode ? 2 : 8), n_pos, &xprmat);
+    auto xprmat_p = qd_python_init_output((scalar_mode_b ? 2 : 8), n_pos, &xprmat);
 
     // Resolve optional pointer
     const arma::u32_vec *p_sub_mesh_index = sub_mesh_index_a.empty() ? nullptr : &sub_mesh_index_a;
 
     // Scalar mode: the public API takes true acoustic Hz, the core works in EM-equivalent Hz
     // (c_light / f_eq == acoustic wavelength). Must match qd_atmospheric_absorption.hpp.
-    const double center_freq_core = scalar_mode ? center_freq * (3.0e8 / 343.0) : center_freq;
+    const double center_freq_core = scalar_mode_b ? center_freq * (3.0e8 / 343.0) : center_freq;
 
     quadriga_lib::calc_diffraction_gain<double>(orig_a, dest_a, mesh_a, mtl_ind_a, mtl_prop_map,
                                                 center_freq_core, lod, &gain, &xprmat, &coord, verbose,
-                                                p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
-                                                thin_slab_threshold, apply_fspl, apply_phase);
+                                                p_sub_mesh_index, use_kernel, gpu_id, scalar_mode_b,
+                                                thin_slab_threshold, apply_fspl_b, apply_phase_b);
 
     return py::make_tuple(gain_p, xprmat_p, qd_python_copy2numpy(&coord));
 }

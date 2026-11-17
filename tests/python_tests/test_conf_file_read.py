@@ -161,7 +161,7 @@ class test_case(unittest.TestCase):
         for value in ["yes", 1, 0, 1.0]:
             with self.assertRaises(TypeError) as ctx:
                 quadriga_lib.gbsm.conf_file_read(fn, value)
-            self.assertIn("Input 'validate' must be a bool or None.", str(ctx.exception))
+            self.assertIn("'validate'", str(ctx.exception))
 
     def test_path_like(self):
         # str, bytes and os.PathLike give the same result

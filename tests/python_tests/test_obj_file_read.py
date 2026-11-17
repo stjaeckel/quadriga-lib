@@ -487,6 +487,28 @@ class test_case(unittest.TestCase):
             if os.path.isfile(fn):
                 os.remove(fn)
 
+    # fn and fn_csv take a pathlib.Path; csv_strict=None selects the default, a non-bool raises
+    def test_path_and_flag_types(self):
+        import pathlib
+        fn = "cube.obj"
+        csv_fn = "custom_materials.csv"
+        cleanup(fn, csv_fn)
+        with open(csv_fn, "w") as f:
+            f.write("name,a\n")
+            f.write("custom_material_1,2.5\n")
+        create_cube_with_materials(fn, "custom_material_1", "not_a_real_material")
+        try:
+            ref = quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
+            out = quadriga_lib.RTtools.obj_file_read(pathlib.Path(fn), pathlib.Path(csv_fn), None)
+            npt.assert_array_equal(out[0], ref[0])
+            npt.assert_array_equal(out[8], ref[8])
+            self.assertEqual(list(out[9]), list(ref[9]))
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.RTtools.obj_file_read(fn, csv_fn, 2.5)
+            self.assertIn("'csv_strict'", str(ctx.exception))
+        finally:
+            cleanup(fn, csv_fn)
+
 
 if __name__ == "__main__":
     unittest.main()

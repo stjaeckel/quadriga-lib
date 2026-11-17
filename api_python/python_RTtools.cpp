@@ -26,11 +26,11 @@ namespace py = pybind11;
 void quadriga_lib_RTtools(py::module_ &m)
 {
     m.def("calc_diffraction_gain", &calc_diffraction_gain,
-          py::arg("orig"),
-          py::arg("dest"),
-          py::arg("mesh"),
-          py::arg("mtl_ind"),
-          py::arg("mtl_prop"),
+          py::arg("orig").none(false),
+          py::arg("dest").none(false),
+          py::arg("mesh").none(false),
+          py::arg("mtl_ind").none(false),
+          py::arg("mtl_prop").none(false),
           py::arg("center_freq"),
           py::arg("lod") = 2,
           py::arg("verbose") = 0,
@@ -53,18 +53,18 @@ void quadriga_lib_RTtools(py::module_ &m)
 
     m.def("mitsuba_xml_file_write", &mitsuba_xml_file_write,
           py::arg("fn"),
-          py::arg("vert_list") = py::array_t<double>(),
-          py::arg("face_ind") = py::array_t<arma::uword>(),
-          py::arg("obj_ind") = py::array_t<arma::uword>(),
-          py::arg("mtl_ind") = py::array_t<arma::uword>(),
-          py::arg("obj_names") = py::list(),
-          py::arg("mtl_names") = py::list(),
-          py::arg("bsdf") = py::array_t<double>(),
+          py::arg("vert_list").none(false),
+          py::arg("face_ind").none(false),
+          py::arg("obj_ind").none(false),
+          py::arg("mtl_ind").none(false),
+          py::arg("obj_names").none(false),
+          py::arg("mtl_names").none(false),
+          py::arg("bsdf") = py::none(),
           py::arg("map_to_itu") = false);
 
     m.def("obj_file_read", &obj_file_read,
-          py::arg("fn") = std::string(""),
-          py::arg("fn_csv") = std::string(""),
+          py::arg("fn") = "",
+          py::arg("fn_csv") = "",
           py::arg("csv_strict") = false);
 
     m.def("obj_file_write", &obj_file_write,
@@ -91,46 +91,46 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("n_div") = 1);
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
-          py::arg("points") = py::array_t<double>(),
-          py::arg("sub_cloud_ind") = py::array_t<unsigned>(),
+          py::arg("points").none(false),
+          py::arg("sub_cloud_ind") = py::none(),
           py::arg("vec_size") = 1);
 
     m.def("point_cloud_segmentation", &point_cloud_segmentation,
-          py::arg("points") = py::array_t<double>(),
+          py::arg("points").none(false),
           py::arg("target_size") = 1024,
           py::arg("vec_size") = 1);
 
     m.def("point_inside_mesh", &point_inside_mesh,
-          py::arg("points"),
-          py::arg("mesh"),
+          py::arg("points").none(false),
+          py::arg("mesh").none(false),
           py::arg("obj_ind") = py::none(),
           py::arg("distance") = 0.0);
 
     m.def("ray_point_intersect", &ray_point_intersect,
-          py::arg("orig") = py::array_t<double>(),
-          py::arg("trivec") = py::array_t<double>(),
-          py::arg("tridir") = py::array_t<double>(),
-          py::arg("points") = py::array_t<double>(),
-          py::arg("sub_cloud_ind") = py::array_t<unsigned>(),
+          py::arg("orig").none(false),
+          py::arg("trivec").none(false),
+          py::arg("tridir").none(false),
+          py::arg("points").none(false),
+          py::arg("sub_cloud_ind") = py::none(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0);
 
     m.def("ray_triangle_intersect", &ray_triangle_intersect,
-          py::arg("orig") = py::array_t<double>(),
-          py::arg("dest") = py::array_t<double>(),
-          py::arg("mesh") = py::array_t<double>(),
-          py::arg("sub_mesh_ind") = py::array_t<unsigned>(),
-          py::arg("aabb") = py::array_t<double>(),
+          py::arg("orig").none(false),
+          py::arg("dest").none(false),
+          py::arg("mesh").none(false),
+          py::arg("sub_mesh_ind") = py::none(),
+          py::arg("aabb") = py::none(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0);
 
     m.def("triangle_mesh_aabb", &triangle_mesh_aabb,
-          py::arg("triangles") = py::array_t<double>(),
-          py::arg("sub_mesh_ind") = py::array_t<unsigned>(),
+          py::arg("triangles").none(false),
+          py::arg("sub_mesh_ind") = py::none(),
           py::arg("vec_size") = 1);
 
     m.def("triangle_mesh_segmentation", &triangle_mesh_segmentation,
-          py::arg("triangles"),
+          py::arg("triangles").none(false),
           py::arg("target_size") = 1024,
           py::arg("vec_size") = 1,
           py::arg("mtl_ind") = py::none());

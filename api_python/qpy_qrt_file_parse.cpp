@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -43,8 +42,10 @@ n_cir, n_orig, n_dest, n_freq, cir_offset, orig_names, dest_names, version, cent
 - **`orig_orientation`** — Origin (TX) orientations as Euler angles; `(n_orig, 3)`
 MD!*/
 
-py::tuple qrt_file_parse(const std::string &fn)
+py::tuple qrt_file_parse(const py::handle &fn)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     // Declare outputs
     arma::uword n_cir, n_orig, n_dest, n_freq;
     arma::uvec cir_offset;
@@ -54,7 +55,7 @@ py::tuple qrt_file_parse(const std::string &fn)
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
     // Call library function
-    quadriga_lib::qrt_file_parse(fn, &n_cir, &n_orig, &n_dest, &n_freq, &cir_offset,
+    quadriga_lib::qrt_file_parse(fn_s, &n_cir, &n_orig, &n_dest, &n_freq, &cir_offset,
                                  &orig_names, &dest_names, &version, &center_freq,
                                  &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 

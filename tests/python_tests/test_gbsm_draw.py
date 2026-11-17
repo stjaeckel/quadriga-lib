@@ -114,7 +114,7 @@ class test_lsf(unittest.TestCase):
             for bad in (2.5, 0, "no"):
                 with self.assertRaises(TypeError) as ctx:
                     f(*args, **{name: bad})
-                self.assertIn(f"Input '{name}' must be a bool or None.", str(ctx.exception))
+                self.assertIn(f"'{name}'", str(ctx.exception))
 
     def test_horizontal_and_preset(self):
         f = quadriga_lib.gbsm.draw

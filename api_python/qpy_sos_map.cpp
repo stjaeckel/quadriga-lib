@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -52,9 +51,11 @@ py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
                             const py::array_t<double> &x,
                             py::handle y,
                             py::handle z,
-                            bool uniform,
+                            py::handle uniform,
                             int use_kernel)
 {
+    const bool uniform_b = qd_python_flag(uniform, false, "uniform");
+
     // Read inputs
     const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
     const auto phase_a = qd_python_numpy2arma_Mat<double>(phase, true);
@@ -74,7 +75,7 @@ py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
     const arma::vec *p_z = z_a.is_empty() ? nullptr : &z_a;
 
     // Call library function
-    quadriga_lib::sos_map<double>(freq_a, phase_a, x_a, map, p_y, p_z, uniform, use_kernel);
+    quadriga_lib::sos_map<double>(freq_a, phase_a, x_a, map, p_y, p_z, uniform_b, use_kernel);
 
     return map_py;
 }

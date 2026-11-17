@@ -156,6 +156,10 @@ class test_case(unittest.TestCase):
                 with self.assertRaises(Exception):
                     RTtools.point_cloud_segmentation(pts, target_size=64, vec_size=8)
 
+    def test_points_none_raises(self):
+        with self.assertRaises(TypeError):
+            RTtools.point_cloud_segmentation(None)
+
 
 if __name__ == "__main__":
     unittest.main()

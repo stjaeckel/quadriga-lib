@@ -123,8 +123,6 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [MATL
 - `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
-- The flags `use_absolute_delays`, `angles` and `complex` take a bool or `numpy.bool_`; `None` selects the default, any
-  other type raises `TypeError`
 
 ### Usage:
 ```python
@@ -238,7 +236,6 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
   grid and gives wrong phases
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im`
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Usage:
 ```python
@@ -316,7 +313,6 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`.
 
 ### Usage:
 ```python
@@ -330,8 +326,9 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict; see [generate](array-antenna-functions.md#generate)
-- **`ant_rx`** — Receive arrayant dict; see [generate](array-antenna-functions.md#generate)
+- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](array-antenna-functions.md#generate); a 4D dict raises
+  `ValueError` (use [channel.multifreq](#channel.multifreq))
+- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
 - **`aod`** — Departure azimuth angles in rad; `(n_path,)`
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
@@ -402,7 +399,6 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
   mode).
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Batch mode:
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
@@ -433,8 +429,9 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict; see [generate](array-antenna-functions.md#generate)
-- **`ant_rx`** — Receive arrayant dict; see [generate](array-antenna-functions.md#generate)
+- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](array-antenna-functions.md#generate); a 4D dict raises
+  `ValueError` (use [channel.multifreq](#channel.multifreq))
+- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode

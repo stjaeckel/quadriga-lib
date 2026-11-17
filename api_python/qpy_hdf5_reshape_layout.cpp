@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -27,14 +26,16 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file to create; str
+- **`fn`** — Filename of the HDF5 file
 - **`nx`** — Number of elements on the x-dimension; default: 65536
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
 - **`nw`** — Number of elements on the w-dimension; default: 1
 MD!*/
 
-void hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
+void hdf5_reshape_layout(const py::handle &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
-    quadriga_lib::hdf5_reshape_layout(fn, nx, ny, nz, nw);
+    const std::string fn_s = qd_python_path(fn, "fn");
+
+    quadriga_lib::hdf5_reshape_layout(fn_s, nx, ny, nz, nw);
 }

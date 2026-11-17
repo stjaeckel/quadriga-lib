@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -68,7 +67,7 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 - [[mitsuba_xml_file_write]] (for exporting to Mitsuba scene file format)
 MD!*/
 
-py::tuple obj_file_write(const std::string &fn,
+py::tuple obj_file_write(const py::handle &fn,
                          py::handle mesh,
                          py::handle obj_ind,
                          py::handle mtl_ind,
@@ -81,9 +80,14 @@ py::tuple obj_file_write(const std::string &fn,
                          py::handle csv_ind,
                          py::handle csv_names,
                          py::handle csv_prop,
-                         bool csv_write_defaults,
-                         bool split_loose_parts)
+                         py::handle csv_write_defaults,
+                         py::handle split_loose_parts)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
+    const bool csv_write_defaults_b = qd_python_flag(csv_write_defaults, false, "csv_write_defaults");
+    const bool split_loose_parts_b = qd_python_flag(split_loose_parts, false, "split_loose_parts");
+
     // Convert inputs (empty Armadillo object when the handle is None)
     const auto mesh_a = qd_python_numpy2arma_Mat<double>(mesh, true);
     const auto obj_ind_a = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true);
@@ -119,10 +123,10 @@ py::tuple obj_file_write(const std::string &fn,
     arma::umat face_ind_out;
 
     // Call library function
-    quadriga_lib::obj_file_write<double>(fn, p_mesh, p_obj_ind, p_mtl_ind, p_obj_names, p_mtl_names,
+    quadriga_lib::obj_file_write<double>(fn_s, p_mesh, p_obj_ind, p_mtl_ind, p_obj_names, p_mtl_names,
                                          &vert_list_out, &face_ind_out, p_vert_list, p_face_ind,
                                          p_bsdf, threshold, p_csv_ind, p_csv_names, p_csv_prop,
-                                         csv_write_defaults, split_loose_parts);
+                                         csv_write_defaults_b, split_loose_parts_b);
 
     // Copy to python (face indices stay 0-based)
     auto vert_list_out_py = qd_python_copy2numpy(&vert_list_out);

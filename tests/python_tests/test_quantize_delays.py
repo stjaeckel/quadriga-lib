@@ -419,7 +419,7 @@ class test_quantize_delays(unittest.TestCase):
             npt.assert_array_equal(coeff_n[s], coeff_q[s])
         with self.assertRaises(TypeError) as ctx:
             quadriga_lib.channel.quantize_delays(coeff_re=cre, coeff_im=cim, delay=dl, complex=2.5)
-        self.assertIn("Input 'complex' must be a bool or None.", str(ctx.exception))
+        self.assertIn("'complex'", str(ctx.exception))
 
     def test_complex_in_complex_out(self):
         """Complex input with complex output returns a list of complex arrays."""
@@ -453,6 +453,16 @@ class test_quantize_delays(unittest.TestCase):
             npt.assert_allclose(cre_s[:, :, :, s], cre_l[s], atol=1e-12, rtol=0)
             npt.assert_allclose(cim_s[:, :, :, s], cim_l[s], atol=1e-12, rtol=0)
             npt.assert_allclose(dl_s[:, :, :, s], dl_l[s], atol=1e-20, rtol=0)
+
+        # 'stack' is a flag: None selects the default (False), other types raise TypeError
+        cre_n, _, _ = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=None, complex=False)
+        self.assertIsInstance(cre_n, list)
+        for s in range(n_snap):
+            npt.assert_array_equal(cre_n[s], cre_l[s])
+        with self.assertRaises(TypeError) as ctx:
+            quadriga_lib.channel.quantize_delays(coeff_re=cre, coeff_im=cim, delay=dl, stack=2.5)
+        self.assertIn("'stack'", str(ctx.exception))
 
     def test_stack_complex_output(self):
         """stack=True with complex=True returns one complex 4D array matching the split stack."""

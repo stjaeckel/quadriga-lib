@@ -59,7 +59,7 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 
 ### Arguments:
 - **`fn`**\
-  Filename of the PNG file, string, required
+  Filename of the PNG file, required
 
 - **`data`**\
   Data matrix, required, size `[N, M]` 

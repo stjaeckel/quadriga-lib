@@ -532,6 +532,41 @@ class test_case(unittest.TestCase):
         npt.assert_(not os.path.isfile(fn))
         npt.assert_(not os.path.isfile("cube.txt"))
 
+    def test_path_and_flag_types(self):
+        # fn takes a pathlib.Path; flags: None selects the default, a non-bool raises TypeError
+        import pathlib
+        fn = "cube.obj"
+        _rm(fn)
+        mesh = make_mesh(cube_vertices(), cube_faces())
+        try:
+            quadriga_lib.RTtools.obj_file_write(fn, mesh)
+            ref = read_lines(fn)
+            _rm(fn)
+            quadriga_lib.RTtools.obj_file_write(pathlib.Path(fn), mesh)
+            self.assertEqual(read_lines(fn), ref)
+        finally:
+            _rm(fn)
+
+        # Both flags act only on the written files: two loose cubes in one object, with a material table
+        mesh = np.vstack([mesh, mesh + 5.0])
+        z, one = np.zeros(24, dtype=np.uint64), np.ones(24, dtype=np.uint64)
+        kw = dict(obj_ind=z, mtl_ind=one, obj_names=["Cube"], mtl_names=["slab"], csv_ind=one,
+                  csv_names=["slab"], csv_prop={"c": np.array([0.05])})
+        fn = "loose.obj"
+        try:
+            quadriga_lib.RTtools.obj_file_write(fn, mesh, **kw)
+            ref = read_lines(fn) + read_lines("loose.csv")
+            for flag in ("csv_write_defaults", "split_loose_parts"):
+                with self.subTest(flag=flag):
+                    quadriga_lib.RTtools.obj_file_write(fn, mesh, **kw, **{flag: None})
+                    self.assertEqual(read_lines(fn) + read_lines("loose.csv"), ref)
+                    with self.assertRaises(TypeError) as ctx:
+                        quadriga_lib.RTtools.obj_file_write("", mesh, **{flag: 2.5})
+                    self.assertIn(f"'{flag}'", str(ctx.exception))
+        finally:
+            for f in (fn, "loose.mtl", "loose.csv"):
+                _rm(f)
+
     def test_no_material_roundtrip(self):
         # A face without material (mtl_ind = 0) after a face with material is marked "usemtl (null)" and reads back as 0
         fn = "null_mtl.obj"

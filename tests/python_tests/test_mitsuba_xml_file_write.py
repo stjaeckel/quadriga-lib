@@ -109,6 +109,39 @@ class test_case(unittest.TestCase):
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
+    def test_path_none_and_flag_types(self):
+        """fn takes a pathlib.Path, bsdf=None equals omitted, flag types, mandatory inputs."""
+        import tempfile, shutil, pathlib
+        d = tempfile.mkdtemp()
+        try:
+            fn = os.path.join(d, 's.xml')
+            vert = np.array([[0., 0, 0], [1, 0, 0], [0, 1, 0]])
+            face = np.array([[0, 1, 2]], dtype=np.uint64)
+            one = np.array([0], dtype=np.uint64)
+            args = (vert, face, one, one + 1, ['a'], ['concrete'])
+            write = quadriga_lib.RTtools.mitsuba_xml_file_write
+
+            write(fn, *args)
+            ref = open(fn).read()
+            write(pathlib.Path(fn), *args)
+            self.assertEqual(open(fn).read(), ref)
+            write(fn, *args, bsdf=None, map_to_itu=None)
+            self.assertEqual(open(fn).read(), ref)
+
+            with self.assertRaises(TypeError) as ctx:
+                write(fn, *args, map_to_itu=2.5)
+            self.assertIn("'map_to_itu'", str(ctx.exception))
+
+            with self.assertRaises(TypeError):
+                write(fn, *args[:-1])  # mtl_names omitted
+            names = ['vert_list', 'face_ind', 'obj_ind', 'mtl_ind', 'obj_names', 'mtl_names']
+            for i, name in enumerate(names):
+                with self.subTest(input=name):
+                    with self.assertRaises(TypeError):
+                        write(fn, *args[:i], None, *args[i + 1:])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
     def test_index_lengths_must_match_faces(self):
         """obj_ind and mtl_ind with more or fewer entries than face_ind has rows are rejected."""
         import tempfile, shutil

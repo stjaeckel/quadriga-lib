@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -25,7 +24,6 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
   supplying both forms is an error. The input and output forms are independent
 - `complex=True` (default) returns one combined complex coefficient output; `complex=False` returns
   separate real `coeff_re_q` and `coeff_im_q`
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -84,17 +82,19 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re
   shape only for shared delay input with `fix_taps` 1 or 2
 MD!*/
 
-py::tuple quantize_delays(const py::object &coeff_re,
-                          const py::object &coeff_im,
-                          const py::object &delay,
+py::tuple quantize_delays(const py::handle &coeff_re,
+                          const py::handle &coeff_im,
+                          const py::handle &delay,
                           double tap_spacing,
                           arma::uword max_taps,
                           double power_exponent,
                           int fix_taps,
-                          bool stack,
+                          py::handle stack,
                           py::handle complex,
-                          const py::object &coeff)
+                          const py::handle &coeff)
 {
+    const bool stack_b = qd_python_flag(stack, false, "stack");
+
     const bool want_complex = qd_python_flag(complex, true, "complex");
 
     // Coefficient input mode: complex 'coeff' or split 'coeff_re'/'coeff_im'
@@ -144,7 +144,7 @@ py::tuple quantize_delays(const py::object &coeff_re,
 
     // Delay output (always real); list (stack=False) or 4D array (stack=True)
     py::object delay_q_py;
-    if (stack)
+    if (stack_b)
         delay_q_py = qd_python_stack2numpy(&delay_q);
     else
         delay_q_py = qd_python_copy2list(&delay_q);
@@ -153,7 +153,7 @@ py::tuple quantize_delays(const py::object &coeff_re,
     if (want_complex)
     {
         py::object coeff_q_py;
-        if (stack)
+        if (stack_b)
             coeff_q_py = qd_python_stack2numpy<double, std::complex<double>>(&coeff_re_q, &coeff_im_q);
         else
             coeff_q_py = qd_python_copy2list<arma::Cube<double>, std::complex<double>>(&coeff_re_q, &coeff_im_q);
@@ -161,7 +161,7 @@ py::tuple quantize_delays(const py::object &coeff_re,
     }
 
     py::object coeff_re_q_py, coeff_im_q_py;
-    if (stack)
+    if (stack_b)
     {
         coeff_re_q_py = qd_python_stack2numpy(&coeff_re_q);
         coeff_im_q_py = qd_python_stack2numpy(&coeff_im_q);

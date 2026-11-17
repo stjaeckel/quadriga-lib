@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -64,19 +63,24 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 - [[triangle_mesh_segmentation]] (used to calculate indexed mesh for faster processing)
 MD!*/
 
-py::tuple obj_file_read(const std::string &fn,
-                        const std::string &fn_csv,
-                        bool csv_strict)
+py::tuple obj_file_read(const py::handle &fn,
+                        const py::handle &fn_csv,
+                        py::handle csv_strict)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+    const std::string fn_csv_s = qd_python_path(fn_csv, "fn_csv");
+
+    const bool csv_strict_b = qd_python_flag(csv_strict, false, "csv_strict");
+
     arma::mat mesh, vert_list, bsdf;
     arma::umat face_ind;
     arma::uvec obj_ind, mtl_ind, csv_ind;
     std::vector<std::string> obj_names, mtl_names, csv_names;
     std::unordered_map<std::string, std::vector<double>> csv_prop;
 
-    quadriga_lib::obj_file_read<double>(fn, &mesh, &vert_list, &face_ind, &obj_ind, &obj_names,
+    quadriga_lib::obj_file_read<double>(fn_s, &mesh, &vert_list, &face_ind, &obj_ind, &obj_names,
                                         &mtl_ind, &mtl_names, &bsdf,
-                                        fn_csv, &csv_ind, &csv_names, &csv_prop, csv_strict);
+                                        fn_csv_s, &csv_ind, &csv_names, &csv_prop, csv_strict_b);
 
     // Stable dict key order: standard EM columns first, then any extra CSV columns
     std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h", "thk",

@@ -4,6 +4,7 @@
 
 import sys
 import os
+import pathlib
 import unittest
 import numpy as np
 import numpy.testing as npt
@@ -260,6 +261,20 @@ class test_case(unittest.TestCase):
         r_dl = channel.qrt_file_read(FN_V4, [0], 0, False)
         npt.assert_array_equal(r0[1], r_dl[1])
         npt.assert_array_equal(r0[3], r_dl[3])
+
+    def test_path_fn_and_uplink_flag(self):
+        ref = channel.qrt_file_read(FN_V4, [1])
+        for out in (channel.qrt_file_read(pathlib.Path(FN_V4), [1]), channel.qrt_file_read(FN_V4, [1], uplink=None)):
+            for x, y in zip(out[:5], ref[:5]):
+                npt.assert_array_equal(x, y)
+        with self.assertRaises(TypeError) as ctx:
+            channel.qrt_file_read(FN_V4, [1], uplink=2.5)
+        self.assertIn("'uplink'", str(ctx.exception))
+
+        a = channel.qrt_file_parse(pathlib.Path(FN_V4))
+        b = channel.qrt_file_parse(FN_V4)
+        for x, y in zip(a, b):
+            npt.assert_array_equal(x, y)
 
     # ------------------------------------------------------------------
     # qrt_file_read - error handling

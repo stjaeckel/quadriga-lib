@@ -33,7 +33,18 @@ class test_case(unittest.TestCase):
             with self.subTest(radius=r):
                 with self.assertRaises(ValueError):
                     RTtools.icosphere(1, r)
-       
+
+    def test_none_and_flag_types(self):
+        # direction_xyz: None selects the default (False), a non-bool raises TypeError
+        ref = RTtools.icosphere(2, 1.0)
+        out = RTtools.icosphere(2, 1.0, None)
+        for a, b in zip(ref, out):
+            np.testing.assert_array_equal(a, b)
+        with self.assertRaises(TypeError) as ctx:
+            RTtools.icosphere(2, 1.0, 2.5)
+        self.assertIn("'direction_xyz'", str(ctx.exception))
+
+
 class test_n_div_too_large(unittest.TestCase):
 
     # Checked before the outputs are allocated: 20 * n_div^2 wraps to a huge but representable count for 2^31 + 1

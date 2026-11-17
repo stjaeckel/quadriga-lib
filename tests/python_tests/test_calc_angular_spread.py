@@ -23,7 +23,7 @@ class test_case(unittest.TestCase):
         el = [np.array([0.3])]
         powers = [np.array([1.0])]
 
-        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         self.assertEqual(a_s.shape, (1,))
         npt.assert_allclose(a_s[0], 0.0, atol=1e-10, rtol=0)
@@ -36,7 +36,7 @@ class test_case(unittest.TestCase):
         el = [np.array([0.0, 0.0])]
         powers = [np.array([1.0, 1.0])]
 
-        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         npt.assert_allclose(a_s[0], 0.1, atol=1e-6, rtol=0)
         npt.assert_allclose(e_s[0], 0.0, atol=1e-6, rtol=0)
@@ -47,7 +47,7 @@ class test_case(unittest.TestCase):
         el = [np.array([0.2, -0.2])]
         powers = [np.array([1.0, 1.0])]
 
-        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         self.assertGreaterEqual(a_s[0] + 1e-6, e_s[0])
         total = np.sqrt(a_s[0]**2 + e_s[0]**2)
@@ -58,7 +58,7 @@ class test_case(unittest.TestCase):
         el = [np.array([1.4, 1.4, 1.4, 1.4])]
         powers = [np.array([1.0, 1.0, 1.0, 1.0])]
 
-        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         self.assertLess(a_s[0], 0.5)
         self.assertLess(e_s[0], 0.5)
@@ -74,7 +74,7 @@ class test_case(unittest.TestCase):
                   np.array([1.0, 1.0, 1.0]),
                   np.array([1.0, 1.0, 1.0, 1.0, 1.0])]
 
-        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         self.assertEqual(a_s.shape, (3,))
         self.assertEqual(len(phi), 3)
@@ -90,9 +90,9 @@ class test_case(unittest.TestCase):
         powers = [np.array([1.0, 1.0])]
 
         a_bank, e_bank, o_bank, _, _ = quadriga_lib.tools.calc_angular_spread(
-            az, el, powers, 1, calc_bank_angle=True)
+            az, el, powers, True, calc_bank_angle=True)
         a_nobank, e_nobank, o_nobank, _, _ = quadriga_lib.tools.calc_angular_spread(
-            az, el, powers, 1, calc_bank_angle=False)
+            az, el, powers, True, calc_bank_angle=False)
 
         npt.assert_allclose(o_nobank[0, 0], 0.0, atol=1e-10, rtol=0)
         self.assertGreaterEqual(a_bank[0] + 1e-6, a_nobank[0])
@@ -115,8 +115,8 @@ class test_case(unittest.TestCase):
         el = [np.array([0.0, 0.0])]
         powers = [np.array([1.0, 1.0])]
 
-        a_raw, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=0.0)
-        a_quant, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=3.0)
+        a_raw, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True, quantize_deg=0.0)
+        a_quant, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True, quantize_deg=3.0)
 
         self.assertLessEqual(a_quant[0], a_raw[0] + 1e-8)
 
@@ -125,7 +125,7 @@ class test_case(unittest.TestCase):
         el = [np.array([0.0, 0.0])]
         powers = [np.array([1.0, 1.0])]
 
-        a_s, e_s, orient, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        a_s, e_s, orient, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         gap = 2.0 * (np.pi - 3.0)
         self.assertLess(a_s[0], gap)
@@ -136,7 +136,7 @@ class test_case(unittest.TestCase):
         el = [np.array([0.1, -0.1, 0.05, -0.05, 0.0])]
         powers = [np.array([1.0, 1.0, 1.0, 1.0, 1.0])]
 
-        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        a_s, e_s, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         self.assertEqual(a_s.shape, (1,))
         self.assertEqual(e_s.shape, (1,))
@@ -151,7 +151,7 @@ class test_case(unittest.TestCase):
         el = [np.array([0.1, -0.1, 0.05, -0.05, 0.0])]
         powers = [np.array([1.0, 1.0, 1.0, 1.0, 1.0])]
 
-        _, _, _, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1)
+        _, _, _, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True)
 
         phi_arr = np.asarray(phi[0])
         theta_arr = np.asarray(theta[0])
@@ -166,10 +166,24 @@ class test_case(unittest.TestCase):
         powers = [np.array([1.0, 1.0])]
         for q in [1e-8, -1.0, np.nan, np.inf]:
             with self.assertRaises(ValueError):
-                quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=q)
-        a_s, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=1e-3)
+                quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True, quantize_deg=q)
+        a_s, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, True, True, quantize_deg=1e-3)
         self.assertTrue(np.isfinite(a_s[0]))
 
+
+    def test_none_and_flag_types(self):
+        # wrapping and calc_bank_angle: None selects the default (False), other types than bool raise TypeError
+        az, el, pw = [np.array([0.1, 2.9, -3.0])], [np.array([0.1, -0.2, 0.3])], [np.array([1, 0.8, 0.5])]
+        # calc_bank_angle acts only with wrapping=True
+        for wrapping in (False, True):
+            ref = quadriga_lib.tools.calc_angular_spread(az, el, pw, wrapping)
+            out = quadriga_lib.tools.calc_angular_spread(az, el, pw, wrapping or None, None)
+            for a, b in zip(out[:3], ref[:3]):
+                npt.assert_array_equal(a, b)
+        for name in ("wrapping", "calc_bank_angle"):
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.calc_angular_spread(az, el, pw, **{name: 2.5})
+            self.assertIn("'" + name + "'", str(ctx.exception))
 
 class test_defaults(unittest.TestCase):
 

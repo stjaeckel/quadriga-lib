@@ -372,6 +372,20 @@ class TestRayTriangleIntersect(unittest.TestCase):
     # ------------------------------------------------------------------ #
     #  GENERIC kernel with explicit skip of optional args                 #
     # ------------------------------------------------------------------ #
+    def test_none_inputs(self):
+        # Mandatory arrays refuse None and cannot be omitted; sub_mesh_ind=None, aabb=None equal omitted
+        args = (self.orig, self.dest, self.cube)
+        ref = RTtools.ray_triangle_intersect(*args)
+        out = RTtools.ray_triangle_intersect(*args, None, None)
+        for a, b in zip(ref, out):
+            npt.assert_array_equal(a, b)
+        with self.assertRaises(TypeError):
+            RTtools.ray_triangle_intersect(self.orig, self.dest)
+        for i, name in enumerate(["orig", "dest", "mesh"]):
+            with self.subTest(input=name):
+                with self.assertRaises(TypeError):
+                    RTtools.ray_triangle_intersect(*args[:i], None, *args[i + 1:])
+
     def test_generic_kernel_skip_optional_args(self):
         fbs_ref, _, _, _, _ = RTtools.ray_triangle_intersect(
             self.orig, self.dest, self.cube)

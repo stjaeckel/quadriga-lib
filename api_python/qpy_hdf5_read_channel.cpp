@@ -33,7 +33,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — 0-based slot indices along dimension X; scalar or vector; default: `0 ... nx-1`
 - **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
@@ -93,13 +93,17 @@ static arma::u32_vec parse_idx(const py::handle &h, unsigned n, const char *name
     return idx;
 }
 
-py::tuple hdf5_read_channel(const std::string &fn,
+py::tuple hdf5_read_channel(const py::handle &fn,
                             py::handle ix, py::handle iy, py::handle iz, py::handle iw,
-                            py::handle i_snap, bool stack)
+                            py::handle i_snap, py::handle stack)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
+    const bool stack_b = qd_python_flag(stack, false, "stack");
+
     // Read the storage layout: 4D slot grid + per-slot occupancy (channel_id == 0 -> empty)
     arma::u32_vec channel_id;
-    const arma::u32_vec storage = quadriga_lib::hdf5_read_layout(fn, &channel_id);
+    const arma::u32_vec storage = quadriga_lib::hdf5_read_layout(fn_s, &channel_id);
 
     const unsigned nx = storage.at(0), ny = storage.at(1),
                    nz = storage.at(2), nw = storage.at(3);
@@ -135,7 +139,7 @@ py::tuple hdf5_read_channel(const std::string &fn,
                     if (channel_id.at(lin) == 0) // empty slot -> skip
                         continue;
 
-                    const auto channel = quadriga_lib::hdf5_read_channel<double>(fn, x, y, z, w);
+                    const auto channel = quadriga_lib::hdf5_read_channel<double>(fn_s, x, y, z, w);
 
                     // Defensive: a slot flagged occupied but holding nothing -> skip
                     if (channel.empty() && channel.par_names.empty())
@@ -150,7 +154,7 @@ py::tuple hdf5_read_channel(const std::string &fn,
                     }
 
                     // Structured channel data -> dict
-                    chan.append(qd_python_channel2dict(channel, i_snap_a, false, stack));
+                    chan.append(qd_python_channel2dict(channel, i_snap_a, false, stack_b));
 
                     // Unstructured datasets -> dict
                     py::dict par;

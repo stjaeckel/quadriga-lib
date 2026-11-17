@@ -14,7 +14,7 @@ lang: en-US
 - Array inputs take numpy arrays in any memory order; lists, scalars and other numeric dtypes are converted (copied). Outputs are numpy arrays: float64 for real values, complex128 for complex values; integer outputs have the dtype stated at the output.
 - Complex data: many functions take or return complex arrays where C++ uses separate `_re` / `_im` arrays or interleaved rows; some select the form with a `complex` flag. Each function states its form.
 - Data structures (array antennas, channels, scenario parameters, ray data) are dicts; the function that defines one lists its keys. Each call builds a new arrayant from an arrayant dict, so its data is checked in full on every call.
-- Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Several outputs are returned as a tuple in the order of the Usage line.
+- Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Flags (bool options) take a `bool` or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`. File names take a `str`, `bytes` or path-like object (e.g. `pathlib.Path`). Several outputs are returned as a tuple in the order of the Usage line.
 - Errors: invalid inputs (shape/domain, an index outside the layout of a file) raise `ValueError`, a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) `RuntimeError`, an index out of range of an input array `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument.
 
 # Function Index
@@ -331,7 +331,7 @@ quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, color
 ```
 
 ### Inputs:
-- **`fn`** — Output OBJ filename; str; must not be empty and must end in `.obj`
+- **`fn`** — Output OBJ filename; must not be empty and must end in `.obj`
 - **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
 - **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
@@ -415,7 +415,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 ### Inputs (ula, 3gpp):
 - **`pattern`** — Custom per-element pattern dict (same field layout as the output);
   overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element positions,
-  coupling and center frequency of the pattern are ignored; default: empty dict (use built-in pattern)
+  coupling and center frequency of the pattern are ignored; default: `None` (use built-in pattern)
 
 ### Inputs (multibeam only):
 - **`beam_az`** — Azimuth beam angles in degrees; `(n_beams,)`; default: `[0.0]`
@@ -553,8 +553,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [MATLAB](quadrig
   field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
   2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
   elevation; auto selects GENERIC in this version, which may change in a later version
-- The flags `dist`, `local_angles`, `fast_access` and `complex` take a bool or `numpy.bool_`; `None` selects the
-  default, any other type raises `TypeError`
 
 ### Usage:
 ```python
@@ -643,7 +641,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id )
 ```
 
 ### Inputs:
-- **`fn`** — path to the QDANT file; str; must not be empty
+- **`fn`** — path to the QDANT file; must not be empty
 - **`id`** — 1-based ID of the entry to read, >= 1; `None` reads all entries (see above); default: None
 
 ### Outputs:
@@ -694,7 +692,7 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
 ```
 
 ### Inputs:
-- **`fn`** — Output QDANT filename; str; must not be empty
+- **`fn`** — Output QDANT filename; must not be empty
 - **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may
   be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`; 4D input
   requires `center_freq` with one value per frequency entry `(n_freq,)`
@@ -866,7 +864,7 @@ quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, c
 ```
 
 ### Inputs:
-- **`fn`** — Output `.obj` file path; str
+- **`fn`** — Output `.obj` file path
 - **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
 - **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
@@ -889,7 +887,7 @@ quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, c
   must be paired with `coeff_im`; default: None
 - **`coeff_im`** — Imaginary part of the channel coefficients; same format as `coeff_re`;
   must be paired with `coeff_re`; default: None
-- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: None
+- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: `None`
 
 ### Outputs:
 - None; the OBJ file is written directly to disk
@@ -914,7 +912,7 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file to create; str
+- **`fn`** — Filename of the HDF5 file to create
 - **`nx`** — Number of elements on the x-dimension; default: 65536
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
@@ -955,7 +953,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — 0-based slot indices along dimension X; scalar or vector; default: `0 ... nx-1`
 - **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
@@ -1016,7 +1014,7 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -1052,7 +1050,7 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -1087,7 +1085,7 @@ storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 
 ### Outputs:
 - **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `(4,)`; int64
@@ -1118,7 +1116,7 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file to create; str
+- **`fn`** — Filename of the HDF5 file
 - **`nx`** — Number of elements on the x-dimension; default: 65536
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
@@ -1156,7 +1154,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 ```
 
 ### Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`chan`** — Structured channel data; a channel dict or a list of channel dicts; field layout matches [hdf5_read_channel](#hdf5_read_channel)
 - **`par`** — Unstructured data; a dict or a list of dicts with the same number of entries as `chan`. Dict keys become HDF5 dataset
   names per slot; `None` values are skipped. Pass `None` to disable; default: `None`
@@ -1201,7 +1199,7 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
 ```
 
 ### Input Arguments:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -1339,7 +1337,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [MATLAB](quadriga_lib
   supplying both forms is an error. The input and output forms are independent
 - `complex=True` (default) returns one combined complex coefficient output; `complex=False` returns
   separate real `coeff_re_q` and `coeff_im_q`
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -1515,8 +1512,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [MATLAB](quadriga_li
 - `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
-- The flags `use_absolute_delays`, `angles` and `complex` take a bool or `numpy.bool_`; `None` selects the default, any
-  other type raises `TypeError`
 
 ### Usage:
 ```python
@@ -1630,7 +1625,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadr
   grid and gives wrong phases
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im`
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Usage:
 ```python
@@ -1708,7 +1702,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [MATLAB](quadriga
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`.
 
 ### Usage:
 ```python
@@ -1722,8 +1715,9 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict; see [generate](#generate)
-- **`ant_rx`** — Receive arrayant dict; see [generate](#generate)
+- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](#generate); a 4D dict raises
+  `ValueError` (use [channel.multifreq](#channel.multifreq))
+- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
 - **`aod`** — Departure azimuth angles in rad; `(n_path,)`
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
@@ -1794,7 +1788,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [MATLAB](quadr
   mode).
 - `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
   separate real `coeff_re` and `coeff_im` via a zero-copy fast path
-- The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Batch mode:
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
@@ -1825,8 +1818,9 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict; see [generate](#generate)
-- **`ant_rx`** — Receive arrayant dict; see [generate](#generate)
+- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](#generate); a 4D dict raises
+  `ValueError` (use [channel.multifreq](#channel.multifreq))
+- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
@@ -2194,9 +2188,8 @@ rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. 
 deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm.init_phases](#gbsm.init_phases), [gbsm.draw](#gbsm.draw)) and
 `method = "quadriga"` of [gbsm.rays_from_paths](#gbsm.rays_from_paths); QuaDRiGa variants are options. Units: frequencies in Hz, path loss
 in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file keys and
-`scenpar` keys have the units of the file comments (e.g. `PerClusterDS` in ns). Flags take a `bool` or `numpy.bool_`;
-`None` selects the default, any other type raises `TypeError`. Messages name the real and
-imaginary part of `gr_eps` `gr_eps_re` and `gr_eps_im`.
+`scenpar` keys have the units of the file comments (e.g. `PerClusterDS` in ns). Messages name the real and imaginary part of `gr_eps`
+`gr_eps_re` and `gr_eps_im`.
 
 ---
 <a id="conf_file_list"></a>
@@ -2269,7 +2262,7 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 ```
 
 ### Inputs:
-- **`fn`** — Path to the conf file; str, bytes or path-like object (e.g. `pathlib.Path`)
+- **`fn`** — Path to the conf file
 - **`validate`** — `True`: apply the value checks of [scenpar_validate](#scenpar_validate); `False`: only the line
   grammar is checked; default: True
 
@@ -2322,7 +2315,7 @@ quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec
 ```
 
 ### Inputs:
-- **`fn`** — Path of the conf file to write; str, bytes or path-like object (e.g. `pathlib.Path`)
+- **`fn`** — Path of the conf file to write
 - **`scenpar`** — Scenario parameters; dict with any subset of the keys returned by
   [conf_file_read](#conf_file_read); real scalars (int, float, bool or a numpy value with one element); missing keys
   have their default; `None` or `{}` writes the default set
@@ -3338,7 +3331,7 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 
 ### Arguments:
 - **`fn`**\
-  Filename of the PNG file, string, required
+  Filename of the PNG file, required
 
 - **`data`**\
   Data matrix, required, size `[N, M]` 
@@ -3538,8 +3531,8 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`mtl_ind`** — 1-based material index per triangle (0 = no material); length `mtl_names` must be ≥ `max(mtl_ind)`; uint64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
 - **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`
-- **`map_to_itu`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`; default: `None`
+- **`map_to_itu`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (source for mesh data and BSDF field layout)
@@ -3715,7 +3708,7 @@ aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
 ### Input Arguments:
 - **`points`** — 3D point coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based row indices marking the start of each sub-cloud;
-  use [point_cloud_segmentation](#point_cloud_segmentation) to generate; uint32; `(n_sub,)`
+  use [point_cloud_segmentation](#point_cloud_segmentation) to generate; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
 ### Output Argument:
@@ -3826,7 +3819,7 @@ hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig,
 - **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
-  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`
+  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
   3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is
   available, else AVX2, else GENERIC; default: 0
@@ -3874,9 +3867,9 @@ fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, d
 - **`orig`** — Ray origins in GCS; `(n_ray, 3)`
 - **`dest`** — Ray destinations in GCS; `(n_ray, 3)`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `(n_mesh, 9)`
-- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`
+- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`; default: `None`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
-  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`
+  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`; default: `None`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
   throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2,
   else GENERIC.
@@ -3915,8 +3908,8 @@ aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_ind, vec_siz
 
 ### Inputs:
 - **`triangles`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
-- **`sub_mesh_ind`** *(optional)* — 1-based start indices of sub-meshes; if omitted, the AABB
-  of the entire mesh is returned; uint32; `(n_sub,)`
+- **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB
+  of the entire mesh is returned; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
 
 ### Output:

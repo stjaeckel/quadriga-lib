@@ -157,6 +157,10 @@ class test_case(unittest.TestCase):
                                              np.random.rand(4, 1))
         self.assertIn("equal in size", str(ctx.exception))
 
+        # None for the mandatory input is rejected by pybind11
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.fast_cart2geo(None)
+
         # Only one of y / z provided
         with self.assertRaises(ValueError):
             quadriga_lib.tools.fast_cart2geo(np.random.rand(4, 1), None, np.random.rand(4, 1))

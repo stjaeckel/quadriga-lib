@@ -96,3 +96,10 @@ class test_case(unittest.TestCase):
         self.assertEqual(res.shape, (2,))
         res = RTtools.point_inside_mesh(np.zeros((1, 3)), RTtools.cube(), np.ones(12, dtype=np.uint64))
         self.assertEqual(res.dtype, np.int64)
+
+    def test_none_inputs(self):
+        """The mandatory arrays refuse None."""
+        with self.assertRaises(TypeError):
+            RTtools.point_inside_mesh(None, RTtools.cube())
+        with self.assertRaises(TypeError):
+            RTtools.point_inside_mesh(np.zeros((1, 3)), None)

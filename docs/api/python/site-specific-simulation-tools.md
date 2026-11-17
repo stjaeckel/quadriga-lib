@@ -195,8 +195,8 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`mtl_ind`** — 1-based material index per triangle (0 = no material); length `mtl_names` must be ≥ `max(mtl_ind)`; uint64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
 - **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`
-- **`map_to_itu`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`; default: `None`
+- **`map_to_itu`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (source for mesh data and BSDF field layout)
@@ -372,7 +372,7 @@ aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
 ### Input Arguments:
 - **`points`** — 3D point coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based row indices marking the start of each sub-cloud;
-  use [point_cloud_segmentation](#point_cloud_segmentation) to generate; uint32; `(n_sub,)`
+  use [point_cloud_segmentation](#point_cloud_segmentation) to generate; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 
 ### Output Argument:
@@ -483,7 +483,7 @@ hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig,
 - **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
-  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`
+  `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
   3 = CUDA; throws if unavailable and for other values; auto mode selects CUDA when `n_points >= 500` and CUDA is
   available, else AVX2, else GENERIC; default: 0
@@ -531,9 +531,9 @@ fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, d
 - **`orig`** — Ray origins in GCS; `(n_ray, 3)`
 - **`dest`** — Ray destinations in GCS; `(n_ray, 3)`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; further columns are ignored; `(n_mesh, 9)`
-- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`
+- **`sub_mesh_ind`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`; default: `None`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
-  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`
+  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`; default: `None`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
   throws if unavailable and for other values; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2,
   else GENERIC.
@@ -572,8 +572,8 @@ aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_ind, vec_siz
 
 ### Inputs:
 - **`triangles`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
-- **`sub_mesh_ind`** *(optional)* — 1-based start indices of sub-meshes; if omitted, the AABB
-  of the entire mesh is returned; uint32; `(n_sub,)`
+- **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB
+  of the entire mesh is returned; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
 
 ### Output:

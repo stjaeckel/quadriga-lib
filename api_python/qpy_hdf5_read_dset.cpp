@@ -28,7 +28,7 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -45,12 +45,14 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
 - [[hdf5_read_channel]] (for reading structured channel data)
 MD!*/
 
-py::object hdf5_read_dset(const std::string &fn,
+py::object hdf5_read_dset(const py::handle &fn,
                           unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                           const std::string &name,
                           const std::string &prefix)
 {
-    std::any dset = quadriga_lib::hdf5_read_dset(fn, name, ix, iy, iz, iw, prefix);
+    const std::string fn_s = qd_python_path(fn, "fn");
+
+    std::any dset = quadriga_lib::hdf5_read_dset(fn_s, name, ix, iy, iz, iw, prefix);
 
     // Convert to numpy array / scalar / str; None if the dataset is missing
     return qd_python_any2numpy(dset);

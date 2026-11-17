@@ -9,6 +9,7 @@
 
 import sys
 import os
+import pathlib
 import shutil
 import tempfile
 import unittest
@@ -220,6 +221,15 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(v_default, v0, atol=1e-9, rtol=0)
 
     # ---- error handling ----
+
+    def test_path_fn(self):
+        ant = quadriga_lib.arrayant.generate("omni", 30)
+        p = self._export(ant, icosphere_n_div=1)
+        p_path = pathlib.Path(self._obj_path())
+        quadriga_lib.arrayant.export_obj_file(p_path, ant, icosphere_n_div=1)
+        npt.assert_array_equal(self._read(str(p_path)).mesh, self._read(p).mesh)
+        with self.assertRaises(TypeError):
+            quadriga_lib.arrayant.export_obj_file(5, ant)
 
     def test_errors(self):
         base = quadriga_lib.arrayant.generate("3gpp", res=10)

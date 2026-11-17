@@ -4,6 +4,8 @@
 
 import sys
 import os
+import pathlib
+import tempfile
 import unittest
 import numpy as np
 import numpy.testing as npt
@@ -83,3 +85,23 @@ class test_case(unittest.TestCase):
             quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), "jet", -np.inf)
         self.assertFalse(os.path.exists(out_file))
 
+    def test_path_none_and_flag_types(self):
+        data = np.array([[0.0, 1.0, 2.0], [3.0, 4.0, 6.0]])
+        with tempfile.TemporaryDirectory() as tmp:
+            # fn as str and as pathlib.Path; log_transform None selects the default (False)
+            fn_str = os.path.join(tmp, "a.png")
+            fn_path = pathlib.Path(tmp) / "b.png"
+            quadriga_lib.tools.write_png(fn_str, data)
+            quadriga_lib.tools.write_png(fn_path, data, log_transform=None)
+            with open(fn_str, "rb") as fa, open(fn_path, "rb") as fb:
+                self.assertEqual(fa.read(), fb.read())
+
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.tools.write_png(fn_str, data, log_transform=2.5)
+            self.assertIn("'log_transform'", str(ctx.exception))
+
+            # data is mandatory
+            with self.assertRaises(TypeError):
+                quadriga_lib.tools.write_png(fn_str)
+            with self.assertRaises(TypeError):
+                quadriga_lib.tools.write_png(fn_str, None)

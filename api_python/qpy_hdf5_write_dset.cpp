@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -34,7 +33,7 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
 ```
 
 ## Input Arguments:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -48,12 +47,13 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
 - [[hdf5_read_dset]] (for reading individual unstructured datasets)
 MD!*/
 
-void hdf5_write_dset(const std::string fn,
+void hdf5_write_dset(const py::handle &fn,
                      unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                      const std::string name = "",
                      const py::handle data = py::none(),
                      const std::string prefix = "par_")
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
 
     // Check if data is None
     if (data.is_none())
@@ -66,7 +66,7 @@ void hdf5_write_dset(const std::string fn,
     auto any_data = qd_python_anycast(data, name);
 
     // Read the storage space from the file - returns [0,0,0,0] if file does not exist
-    auto storage_space = quadriga_lib::hdf5_read_layout(fn);
+    auto storage_space = quadriga_lib::hdf5_read_layout(fn_s);
 
     if (storage_space.at(0) == 0)
         throw std::runtime_error("File does not exist.");
@@ -75,5 +75,5 @@ void hdf5_write_dset(const std::string fn,
         throw std::invalid_argument("Location exceeds storage space in HDF file.");
 
     // Write to file
-    quadriga_lib::hdf5_write_dset(fn, name, &any_data, ix, iy, iz, iw, prefix);
+    quadriga_lib::hdf5_write_dset(fn_s, name, &any_data, ix, iy, iz, iw, prefix);
 }

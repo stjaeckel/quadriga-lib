@@ -20,12 +20,12 @@ namespace py = pybind11;
 void quadriga_lib_tools(py::module_ &m)
 {
     m.def("acdf", &acdf,
-          py::arg("data"),
+          py::arg("data").none(false),
           py::arg("bins") = py::none(),
           py::arg("n_bins") = 201);
 
     m.def("fast_cart2geo", &fast_cart2geo,
-          py::arg("cart"),
+          py::arg("cart").none(false),
           py::arg("y") = py::none(),
           py::arg("z") = py::none(),
           py::arg("combine") = true,
@@ -33,7 +33,7 @@ void quadriga_lib_tools(py::module_ &m)
 
     m.def("write_png", &write_png,
           py::arg("fn"),
-          py::arg("data") = py::array_t<double>(),
+          py::arg("data").none(false),
           py::arg("colormap") = "jet",
           py::arg("min_val") = NAN,
           py::arg("max_val") = NAN,
@@ -56,21 +56,21 @@ void quadriga_lib_tools(py::module_ &m)
     m.def("calc_rician_k_factor", &calc_rician_k_factor,
           py::arg("powers"),
           py::arg("path_length"),
-          py::arg("tx_pos"),
-          py::arg("rx_pos"),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
           py::arg("window_size") = 0.01);
 
     m.def("calc_cross_polarization_ratio", &calc_cross_polarization_ratio,
           py::arg("powers"),
           py::arg("M"),
           py::arg("path_length"),
-          py::arg("tx_pos"),
-          py::arg("rx_pos"),
+          py::arg("tx_pos").none(false),
+          py::arg("rx_pos").none(false),
           py::arg("include_los") = false,
           py::arg("window_size") = 0.01);
 
     m.def("fast_geo2cart", &fast_geo2cart,
-          py::arg("az"),
+          py::arg("az").none(false),
           py::arg("el") = py::none(),
           py::arg("len") = py::none(),
           py::arg("combine") = true,

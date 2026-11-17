@@ -116,7 +116,7 @@ class test_case(unittest.TestCase):
         ]
         for fn in variants:
             out = quadriga_lib.sos.generate(fn(self.acf), fn(self.dist), np.uint32(2), np.int32(1), np.bool_(True),
-                                            np.int64(10), 1, 0, 0, np.int32(3))
+                                            np.int64(10), True, 0, 0, np.int32(3))
             for a, b in zip(out, ref):
                 self.assertEqual(a.dtype, np.float64)
                 npt.assert_array_equal(a, b)
@@ -166,6 +166,17 @@ class test_case(unittest.TestCase):
             with self.assertRaises(TypeError):
                 quadriga_lib.sos.generate(*bad)
 
+
+    def test_none_and_flag_types(self):
+        # uniform_smp and random_init: None selects the default (True), other types than bool raise TypeError
+        ref = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, True, 7, True, 0.0, 0.0, 5)
+        out = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, None, 7, None, 0.0, 0.0, 5)
+        for a, b in zip(out, ref):
+            npt.assert_array_equal(a, b)
+        for name in ("uniform_smp", "random_init"):
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, n_dir=7, seed=5, **{name: 2.5})
+            self.assertIn("'" + name + "'", str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()

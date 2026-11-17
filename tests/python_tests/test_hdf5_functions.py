@@ -10,6 +10,7 @@
 import sys
 import os
 import copy
+import pathlib
 import pickle
 import shutil
 import tempfile
@@ -377,7 +378,6 @@ class test_case(unittest.TestCase):
         c = minimal_channel()
         cases = [  # (chan, keyword arguments, expected message); all std::invalid_argument -> ValueError
             ([], {}, "Input 'chan' must contain at least one channel."),
-            (None, {}, "Input 'chan' must contain at least one channel."),
             ('abc', {}, 'Channel input must be a dict or a list of dicts.'),
             (['abc'], {}, 'Each channel list entry must be a dict.'),
             (dict(c, coeff_re=[np.ones((1, 1, 1))]), {}, "provide either 'coeff' (complex) or 'coeff_re'/'coeff_im'"),
@@ -407,6 +407,8 @@ class test_case(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             channel.hdf5_write_channel(fn)
+        with self.assertRaises(TypeError):
+            channel.hdf5_write_channel(fn, None)
         with self.assertRaises(TypeError):
             channel.hdf5_write_channel(fn, c, no_such_argument=1)
 
@@ -524,6 +526,25 @@ class test_case(unittest.TestCase):
 
         chan, _ = channel.hdf5_read_channel(fn, i_snap=[1], stack=True)
         self.assertEqual(chan[0]['coeff'].shape, (2, 3, 2, 1))
+
+    def test_path_fn_and_stack_flag(self):
+        fn = pathlib.Path(self.fn('path.hdf5'))
+        npt.assert_array_equal(channel.hdf5_create_file(fn, 2), [2, 1, 1, 1])
+        channel.hdf5_reshape_layout(fn, 1, 2)
+        npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [1, 2, 1, 1])
+        channel.hdf5_write_channel(fn, minimal_channel('p'))
+        channel.hdf5_write_dset(fn, name='x', data=2.0)
+        self.assertEqual(channel.hdf5_read_dset_names(fn), ['x'])
+        self.assertEqual(channel.hdf5_read_dset(fn, name='x'), 2.0)
+        chan, par = channel.hdf5_read_channel(fn)
+        self.assertEqual(chan[0]['name'], 'p')
+        self.assert_same(list(channel.hdf5_read_channel(str(fn))), [chan, par])
+
+        # 'stack' is a flag: None selects the default (False), other types raise TypeError
+        self.assert_same(list(channel.hdf5_read_channel(fn, stack=None)), [chan, par])
+        with self.assertRaises(TypeError) as ctx:
+            channel.hdf5_read_channel(fn, stack=2.5)
+        self.assertIn("'stack'", str(ctx.exception))
 
     def test_read_channel_errors(self):
         fn = self.fn('read_err.hdf5')

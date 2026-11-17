@@ -139,6 +139,12 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
 {
     quadriga_lib::arrayant<double> ant;
 
+    // A 4D pattern is multi-frequency data, which has its own converter
+    const auto e_theta_re_arr = py::array::ensure(arrayant["e_theta_re"]);
+    if (e_theta_re_arr && e_theta_re_arr.ndim() == 4)
+        throw std::invalid_argument("Arrayant dict has 4D (multi-frequency) patterns; this function takes "
+                                    "single-frequency (3D) patterns.");
+
     // Mandatory fields
     ant.e_theta_re = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_re"], view, strict);
     ant.e_theta_im = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_im"], view, strict);

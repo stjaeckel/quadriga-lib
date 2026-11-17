@@ -100,5 +100,25 @@ class test_case(unittest.TestCase):
             arrayant.generate("bla")
         self.assertEqual(str(context.exception), "Array type not supported!")
             
+    def test_none_and_flag_types(self):
+        # The flags only act on 'multibeam', 'pattern' only on '3gpp' and 'ula'
+        mb = dict(M=2, N=2, beam_az=[0.0, 40.0], beam_el=[0.0, 0.0], res=30)
+        ref = arrayant.generate("multibeam", **mb)
+        out = arrayant.generate("multibeam", **mb, separate_beams=None, apply_weights=None)
+        for key in ("e_theta_re", "e_phi_re", "coupling_re"):
+            npt.assert_array_equal(out[key], ref[key])
+        ref = arrayant.generate("3gpp", res=30)
+        for kw in ({"pattern": None}, {"pattern": {}}):
+            npt.assert_array_equal(arrayant.generate("3gpp", res=30, **kw)["e_theta_re"], ref["e_theta_re"])
+
+        for name in ("separate_beams", "apply_weights"):
+            with self.assertRaises(TypeError) as context:
+                arrayant.generate("multibeam", **mb, **{name: 2.5})
+            self.assertIn("'" + name + "'", str(context.exception))
+
+        with self.assertRaises(TypeError) as context:
+            arrayant.generate("3gpp", pattern=[1.0])
+        self.assertIn("Input 'pattern' must be a dict or None.", str(context.exception))
+
 if __name__ == '__main__':
     unittest.main()

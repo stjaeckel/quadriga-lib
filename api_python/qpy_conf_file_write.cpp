@@ -36,7 +36,7 @@ quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec
 ```
 
 ## Inputs:
-- **`fn`** — Path of the conf file to write; str, bytes or path-like object (e.g. `pathlib.Path`)
+- **`fn`** — Path of the conf file to write
 - **`scenpar`** — Scenario parameters; dict with any subset of the keys returned by
   [[conf_file_read]]; real scalars (int, float, bool or a numpy value with one element); missing keys
   have their default; `None` or `{}` writes the default set
@@ -60,7 +60,7 @@ quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec
 - [[scenpar_validate]] (value checks and defaults)
 MD!*/
 
-void conf_file_write(py::object fn,
+void conf_file_write(const py::handle &fn,
                      py::handle scenpar,
                      py::handle plpar,
                      py::handle short_names,

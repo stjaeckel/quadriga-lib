@@ -148,5 +148,15 @@ class test_case(unittest.TestCase):
             quadriga_lib.tools.calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, 0.01)
 
 
+    def test_none_for_mandatory_arrays(self):
+        """None for tx_pos / rx_pos is rejected by pybind11"""
+        powers = [np.array([1.0])]
+        path_length = [np.array([10.0])]
+        pos = np.zeros((3, 1))
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.calc_rician_k_factor(powers, path_length, None, pos)
+        with self.assertRaises(TypeError):
+            quadriga_lib.tools.calc_rician_k_factor(powers, path_length, pos, None)
+
 if __name__ == '__main__':
     unittest.main()

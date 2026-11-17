@@ -39,7 +39,7 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
 ```
 
 ## Inputs:
-- **`fn`** — Output QDANT filename; str; must not be empty
+- **`fn`** — Output QDANT filename; must not be empty
 - **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may
   be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`; 4D input
   requires `center_freq` with one value per frequency entry `(n_freq,)`
@@ -58,11 +58,13 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#qdant">QDANT</a>)
 MD!*/
 
-py::ssize_t qdant_write(const std::string &fn,
+py::ssize_t qdant_write(const py::handle &fn,
                                  const py::dict &arrayant,
                                  unsigned id,
                                  py::handle layout)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     // Parse the (possibly frequency-dependent) antenna via the unified multi-freq reader
     auto ant_vec = qd_python_dict2arrayant_multi(arrayant, true, false, true);
 
@@ -72,13 +74,13 @@ py::ssize_t qdant_write(const std::string &fn,
     // Frequency-dependent input: write every entry with sequential 1-based IDs.
     if (ant_vec.size() > 1)
     {
-        if (std::filesystem::exists(fn))
+        if (std::filesystem::exists(fn_s))
             throw std::runtime_error("File exists. Writing a frequency-dependent arrayant to an existing file is not allowed.");
-        quadriga_lib::qdant_write_multi(fn, ant_vec);
+        quadriga_lib::qdant_write_multi(fn_s, ant_vec);
         return 0;
     }
 
     // Single-frequency input: write one entry at the requested ID.
     const auto layout_a = qd_python_numpy2arma_Mat<unsigned>(layout, true);
-    return (py::ssize_t)quadriga_lib::qdant_write(fn, ant_vec[0], id, &layout_a);
+    return (py::ssize_t)quadriga_lib::qdant_write(fn_s, ant_vec[0], id, &layout_a);
 }

@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -81,13 +80,16 @@ py::tuple sos_generate(const py::array_t<double> &acf,
                        const py::array_t<double> &dist,
                        arma::uword n_coeff,
                        arma::uword n_dim,
-                       bool uniform_smp,
+                       py::handle uniform_smp,
                        arma::uword n_dir,
-                       bool random_init,
+                       py::handle random_init,
                        double spatial_freq_min,
                        double spatial_freq_max,
                        arma::sword seed)
 {
+    const bool uniform_smp_b = qd_python_flag(uniform_smp, true, "uniform_smp");
+    const bool random_init_b = qd_python_flag(random_init, true, "random_init");
+
     // Read inputs
     const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
     const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
@@ -97,8 +99,8 @@ py::tuple sos_generate(const py::array_t<double> &acf,
     arma::vec ase;
 
     // Call library function
-    quadriga_lib::sos_generate<double>(acf_a, dist_a, n_coeff, spatial_freq, &ase, &test_dir, n_dim, uniform_smp,
-                                       n_dir, random_init, spatial_freq_min, spatial_freq_max, seed);
+    quadriga_lib::sos_generate<double>(acf_a, dist_a, n_coeff, spatial_freq, &ase, &test_dir, n_dim, uniform_smp_b,
+                                       n_dir, random_init_b, spatial_freq_min, spatial_freq_max, seed);
 
     // Copy to python
     auto freq_py = qd_python_copy2numpy(&spatial_freq);

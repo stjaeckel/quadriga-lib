@@ -485,7 +485,26 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         np.testing.assert_array_equal(quadriga_lib.channel.multifreq(*args, complex=None)[0], c)
         with self.assertRaises(TypeError) as ctx:
             quadriga_lib.channel.multifreq(*args, complex=2.5)
-        self.assertIn("Input 'complex' must be a bool or None.", str(ctx.exception))
+        self.assertIn("'complex'", str(ctx.exception))
+
+    def test_none_and_flag_types(self):
+        ant = gen_omni()
+        fbs = np.array([[5.0], [5.0], [0.0]])
+        args = (ant, ant, fbs, fbs, np.ones(1), np.zeros(1), np.ones((8, 1)), np.zeros(3), np.zeros(3),
+                np.array([10.0, 0.0, 0.0]), np.zeros(3), np.array([1e9]), np.array([1e9]))
+        ref = quadriga_lib.channel.multifreq(*args)
+        for name in ("use_absolute_delays", "add_fake_los_path"):
+            out = quadriga_lib.channel.multifreq(*args, **{name: None})
+            for a, b in zip(out, ref):
+                np.testing.assert_array_equal(a, b)
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.channel.multifreq(*args, **{name: 2.5})
+            self.assertIn("'" + name + "'", str(ctx.exception))
+
+        # Mandatory arrays refuse None (path data, freq, freq_new)
+        for i in (2, 11, 12):
+            with self.assertRaises(TypeError):
+                quadriga_lib.channel.multifreq(*args[:i], None, *args[i + 1:])
 
     # ============================================================================
     # SECTION 9: GHz antenna with frequency-dependent pattern

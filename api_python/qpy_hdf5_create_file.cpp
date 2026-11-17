@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -26,7 +25,7 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file to create; str
+- **`fn`** — Filename of the HDF5 file to create
 - **`nx`** — Number of elements on the x-dimension; default: 65536
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
@@ -40,14 +39,16 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 - [[hdf5_write_dset]] (for writing arbitrary unstructured data)
 MD!*/
 
-py::array_t<py::ssize_t> hdf5_create_file(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
+py::array_t<py::ssize_t> hdf5_create_file(const py::handle &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     // Fail if the file exists: hdf5_read_layout returns zeros only for a missing file and throws for any other file
     // it cannot read (files of older versions, other files, unreadable files)
     bool exists = true;
     try
     {
-        exists = quadriga_lib::hdf5_read_layout(fn).at(0) != 0;
+        exists = quadriga_lib::hdf5_read_layout(fn_s).at(0) != 0;
     }
     catch (const std::exception &)
     {
@@ -56,7 +57,7 @@ py::array_t<py::ssize_t> hdf5_create_file(const std::string &fn, unsigned nx, un
         throw std::runtime_error("File already exists.");
 
     // Create file with the requested storage layout
-    quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw);
+    quadriga_lib::hdf5_create_file(fn_s, nx, ny, nz, nw);
 
     // Return the storage layout that was used
     arma::u32_vec storage_space = {nx, ny, nz, nw};

@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -39,30 +38,34 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`mtl_ind`** — 1-based material index per triangle (0 = no material); length `mtl_names` must be ≥ `max(mtl_ind)`; uint64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
 - **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
-- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `(mtl_names.size(), 17)`
-- **`map_to_itu`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `(mtl_names.size(), 17)`; default: `None`
+- **`map_to_itu`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
 
 ## See also:
 - [[obj_file_read]] (source for mesh data and BSDF field layout)
 MD!*/
 
-void mitsuba_xml_file_write(const std::string &fn,
+void mitsuba_xml_file_write(const py::handle &fn,
                             py::array_t<double> vert_list,
                             py::array_t<arma::uword> face_ind,
                             py::array_t<arma::uword> obj_ind,
                             py::array_t<arma::uword> mtl_ind,
                             py::list obj_names,
                             py::list mtl_names,
-                            py::array_t<double> bsdf,
-                            bool map_to_itu)
+                            const py::handle &bsdf,
+                            py::handle map_to_itu)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
+    const bool map_to_itu_b = qd_python_flag(map_to_itu, false, "map_to_itu");
+
     const arma::mat vert_list_a = qd_python_numpy2arma_Mat(vert_list, true);
     const arma::umat face_ind_a = qd_python_numpy2arma_Mat(face_ind, true);
     const arma::uvec obj_ind_a = qd_python_numpy2arma_Col(obj_ind, true);
     const arma::uvec mtl_ind_a = qd_python_numpy2arma_Col(mtl_ind, true);
     const std::vector<std::string> obj_names_a = qd_python_list2vector_Strings(obj_names);
     const std::vector<std::string> mtl_names_a = qd_python_list2vector_Strings(mtl_names);
-    const arma::mat bsdf_a = qd_python_numpy2arma_Mat(bsdf, true);
+    const arma::mat bsdf_a = qd_python_numpy2arma_Mat<double>(bsdf, true);
 
-    quadriga_lib::mitsuba_xml_file_write(fn, vert_list_a, face_ind_a, obj_ind_a, mtl_ind_a, obj_names_a, mtl_names_a, &bsdf_a, map_to_itu);
+    quadriga_lib::mitsuba_xml_file_write(fn_s, vert_list_a, face_ind_a, obj_ind_a, mtl_ind_a, obj_names_a, mtl_names_a, &bsdf_a, map_to_itu_b);
 }

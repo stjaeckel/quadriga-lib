@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -29,7 +28,7 @@ quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, c
 ```
 
 ## Inputs:
-- **`fn`** — Output `.obj` file path; str
+- **`fn`** — Output `.obj` file path
 - **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
 - **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 - **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
@@ -52,13 +51,13 @@ quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, c
   must be paired with `coeff_im`; default: None
 - **`coeff_im`** — Imaginary part of the channel coefficients; same format as `coeff_re`;
   must be paired with `coeff_re`; default: None
-- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: None
+- **`i_snap`** — Snapshot indices to include; 0-based; `None` or empty exports all; default: `None`
 
 ## Outputs:
 - None; the OBJ file is written directly to disk
 MD!*/
 
-void channel_export_obj_file(const std::string &fn,
+void channel_export_obj_file(const py::handle &fn,
                              size_t max_paths,
                              double gain_max_dB,
                              double gain_min_dB,
@@ -76,6 +75,8 @@ void channel_export_obj_file(const std::string &fn,
                              py::handle coeff_im,
                              py::handle i_snap)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     // Construct channel object from input data
     auto c = quadriga_lib::channel<double>();
 
@@ -156,5 +157,5 @@ void channel_export_obj_file(const std::string &fn,
     arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, true);
 
     // Call library function
-    c.write_paths_to_obj_file(fn, max_paths, gain_max_dB, gain_min_dB, colormap, &i_snap_a, radius_max, radius_min, n_edges);
+    c.write_paths_to_obj_file(fn_s, max_paths, gain_max_dB, gain_min_dB, colormap, &i_snap_a, radius_max, radius_min, n_edges);
 }

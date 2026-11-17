@@ -154,5 +154,15 @@ class test_case(unittest.TestCase):
                 quadriga_lib.sos.map(*bad)
 
 
+    def test_none_and_flag_types(self):
+        # uniform: None selects the default (False), other types than bool raise TypeError
+        ref = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, use_kernel=1)
+        out = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, uniform=None, use_kernel=1)
+        npt.assert_array_equal(out, ref)
+        for bad in (2.5, 1):
+            with self.assertRaises(TypeError) as ctx:
+                quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, uniform=bad)
+            self.assertIn("'uniform'", str(ctx.exception))
+
 if __name__ == "__main__":
     unittest.main()

@@ -41,8 +41,6 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - `center_freq = 0` gives the coefficients at f = 0: the delay phase exp(-j·2π·f·τ) is 1, the antenna and polarization phases remain; delays are computed as usual
 - If `use_absolute_delays == False`, the LOS delay between the TX and RX phase centres (direct distance, not via the IRS)
   is subtracted from all paths; per-element delays can be slightly negative when the IRS is close to the TX-RX line
-- The flags `use_absolute_delays`, `angles` and `complex` take a bool or `numpy.bool_`; `None` selects the default, any
-  other type raises `TypeError`
 
 ## Usage:
 ```

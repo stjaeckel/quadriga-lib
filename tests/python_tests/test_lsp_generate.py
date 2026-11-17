@@ -143,7 +143,7 @@ class test_case(unittest.TestCase):
             for bad in (2.5, 1, "yes"):
                 with self.assertRaises(TypeError) as ctx:
                     self.call(*args, **{name: bad})
-                self.assertIn(f"Input '{name}' must be a bool or None.", str(ctx.exception))
+                self.assertIn(f"'{name}'", str(ctx.exception))
 
     def test_scenpar(self):
         # DS_VS changes the InF delay spread by lg(a·V/S + b) (DS_VS_a = 30, DS_VS_b = 32 in the InF files)

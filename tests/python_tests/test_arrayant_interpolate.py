@@ -197,7 +197,7 @@ class test_case(unittest.TestCase):
             for bad in (1, 2.5, "yes"):
                 with self.assertRaises(TypeError) as ctx:
                     quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, **{flag: bad})
-                self.assertIn("Input '%s' must be a bool or None." % flag, str(ctx.exception))
+                self.assertIn("'%s'" % flag, str(ctx.exception))
 
     def test_memory_layout_and_dtype(self):
         ant = quadriga_lib.arrayant.generate("3gpp", M=2, N=2, pol=2, res=10.0)

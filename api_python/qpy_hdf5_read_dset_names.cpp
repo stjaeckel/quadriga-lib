@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -26,7 +25,7 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
@@ -42,11 +41,13 @@ names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
 - [[hdf5_write_dset]] (for writing individual unstructured datasets)
 MD!*/
 
-py::list hdf5_read_dset_names(const std::string &fn,
+py::list hdf5_read_dset_names(const py::handle &fn,
                               unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                               const std::string &prefix)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     std::vector<std::string> par_names;
-    quadriga_lib::hdf5_read_dset_names(fn, &par_names, ix, iy, iz, iw, prefix);
+    quadriga_lib::hdf5_read_dset_names(fn_s, &par_names, ix, iy, iz, iw, prefix);
     return qd_python_copy2list(par_names);
 }

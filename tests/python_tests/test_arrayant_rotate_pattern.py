@@ -415,6 +415,10 @@ class TestRotatePatternConvention(unittest.TestCase):
         with self.assertRaises(ValueError):
             arrayant.rotate_pattern(make_single_freq_ant(), [0.0, 0.0])
 
+    def test_orientation_none_throws(self):
+        with self.assertRaises(TypeError):
+            arrayant.rotate_pattern(make_single_freq_ant(), None)
+
 
 if __name__ == '__main__':
     unittest.main()

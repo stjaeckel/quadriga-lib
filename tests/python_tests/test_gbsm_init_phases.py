@@ -109,7 +109,7 @@ class test_lsf(unittest.TestCase):
             for bad in (2.5, 1, "yes", np.array([True])):
                 with self.assertRaises(TypeError) as ctx:
                     f(self.scenpar, "lsf", 7, rx_pos=self.rx_pos, **{name: bad})
-                self.assertIn(f"Input '{name}' must be a bool or None.", str(ctx.exception))
+                self.assertIn(f"'{name}'", str(ctx.exception))
 
     def test_scenpar(self):
         f = quadriga_lib.gbsm.init_phases

@@ -124,9 +124,8 @@ rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. 
 deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm.init_phases](#gbsm.init_phases), [gbsm.draw](#gbsm.draw)) and
 `method = "quadriga"` of [gbsm.rays_from_paths](#gbsm.rays_from_paths); QuaDRiGa variants are options. Units: frequencies in Hz, path loss
 in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file keys and
-`scenpar` keys have the units of the file comments (e.g. `PerClusterDS` in ns). Flags take a `bool` or `numpy.bool_`;
-`None` selects the default, any other type raises `TypeError`. Messages name the real and
-imaginary part of `gr_eps` `gr_eps_re` and `gr_eps_im`.
+`scenpar` keys have the units of the file comments (e.g. `PerClusterDS` in ns). Messages name the real and imaginary part of `gr_eps`
+`gr_eps_re` and `gr_eps_im`.
 
 ---
 <a id="conf_file_list"></a>
@@ -199,7 +198,7 @@ scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
 ```
 
 ### Inputs:
-- **`fn`** — Path to the conf file; str, bytes or path-like object (e.g. `pathlib.Path`)
+- **`fn`** — Path to the conf file
 - **`validate`** — `True`: apply the value checks of [scenpar_validate](#scenpar_validate); `False`: only the line
   grammar is checked; default: True
 
@@ -252,7 +251,7 @@ quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec
 ```
 
 ### Inputs:
-- **`fn`** — Path of the conf file to write; str, bytes or path-like object (e.g. `pathlib.Path`)
+- **`fn`** — Path of the conf file to write
 - **`scenpar`** — Scenario parameters; dict with any subset of the keys returned by
   [conf_file_read](#conf_file_read); real scalars (int, float, bool or a numpy value with one element); missing keys
   have their default; `None` or `{}` writes the default set

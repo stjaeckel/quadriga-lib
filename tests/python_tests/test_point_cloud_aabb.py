@@ -135,6 +135,15 @@ class test_case(unittest.TestCase):
         self.assertEqual(a.shape, (2, 6))
         npt.assert_allclose(a[0, ::2], pts[:10].min(axis=0))
 
+    def test_none_inputs(self):
+        """points is mandatory and refuses None; sub_cloud_ind=None equals omitted."""
+        pts = np.array([[1.0, 2.0, 3.0], [4.0, -5.0, 6.0]])
+        npt.assert_array_equal(RTtools.point_cloud_aabb(pts, None), RTtools.point_cloud_aabb(pts))
+        with self.assertRaises(TypeError):
+            RTtools.point_cloud_aabb()
+        with self.assertRaises(TypeError):
+            RTtools.point_cloud_aabb(None)
+
 
 if __name__ == '__main__':
     unittest.main()

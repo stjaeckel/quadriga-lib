@@ -37,7 +37,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 ```
 
 ## Inputs:
-- **`fn`** — Filename of the HDF5 file; str
+- **`fn`** — Filename of the HDF5 file
 - **`chan`** — Structured channel data; a channel dict or a list of channel dicts; field layout matches [[hdf5_read_channel]]
 - **`par`** — Unstructured data; a dict or a list of dicts with the same number of entries as `chan`. Dict keys become HDF5 dataset
   names per slot; `None` values are skipped. Pass `None` to disable; default: `None`
@@ -55,7 +55,7 @@ storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, i
 - [[hdf5_read_channel]] (for reading channel data)
 MD!*/
 
-py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
+py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
                                          py::handle chan,
                                          py::handle par,
                                          py::handle ix,
@@ -63,6 +63,8 @@ py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
                                          py::handle iz,
                                          py::handle iw)
 {
+    const std::string fn_s = qd_python_path(fn, "fn");
+
     // Convert the channel input (single dict or list of dicts) to channel objects
     std::vector<quadriga_lib::channel<double>> channels = qd_python_list2channel(chan, true);
     const arma::uword n_chan = (arma::uword)channels.size();
@@ -119,7 +121,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
     const arma::Col<unsigned> iw_vec = parse_idx(iw, "iw", false);
 
     // Read the storage layout (returns [0,0,0,0] if the file does not exist)
-    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn);
+    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn_s);
 
     // Create the file with a default layout if it does not exist
     if (storage_space.at(0) == 0)
@@ -128,7 +130,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
         unsigned ny = iy_vec.max() + 1u;
         unsigned nz = iz_vec.max() + 1u;
         unsigned nw = iw_vec.max() + 1u;
-        quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw);
+        quadriga_lib::hdf5_create_file(fn_s, nx, ny, nz, nw);
         storage_space.at(0) = nx;
         storage_space.at(1) = ny;
         storage_space.at(2) = nz;
@@ -159,7 +161,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const std::string &fn,
         unsigned cw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
 
         // Write (indices are 0-based, passed through unchanged)
-        int return_code = quadriga_lib::hdf5_write_channel(&c, fn, cx, cy, cz, cw);
+        int return_code = quadriga_lib::hdf5_write_channel(&c, fn_s, cx, cy, cz, cw);
         if (return_code == 1)
             any_overwrite = true;
     }

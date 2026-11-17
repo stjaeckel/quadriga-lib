@@ -4,6 +4,8 @@
 
 import sys
 import os
+import pathlib
+import tempfile
 import unittest
 import numpy as np
 import numpy.testing as npt
@@ -53,6 +55,18 @@ class test_case(unittest.TestCase):
 
         os.remove("test_py.qdant")
 
-        
-
+    def test_path_fn(self):
+        ant = arrayant.generate("xpol", 30)
+        with tempfile.TemporaryDirectory() as d:
+            fn = pathlib.Path(d) / "ant.qdant"
+            self.assertEqual(arrayant.qdant_write(fn, ant), 1)
+            data_path = arrayant.qdant_read(fn)
+            data_str = arrayant.qdant_read(str(fn))
+            npt.assert_array_equal(data_path["e_theta_re"], data_str["e_theta_re"])
+            npt.assert_array_equal(data_path["e_phi_re"], data_str["e_phi_re"])
+        with self.assertRaises(TypeError) as ctx:
+            arrayant.qdant_write(5, ant)
+        self.assertIn("Input 'fn' must be a str or path-like object.", str(ctx.exception))
+        with self.assertRaises(TypeError):
+            arrayant.qdant_read(5)
 

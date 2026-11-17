@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Site-specific simulation tools
@@ -42,15 +41,17 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
   `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `(n_faces, 6)` or `[n_faces, 9)`
 MD!*/
 
-py::tuple icosphere(arma::uword n_div, double radius, bool direction_xyz)
+py::tuple icosphere(arma::uword n_div, double radius, py::handle direction_xyz)
 {
+    const bool direction_xyz_b = qd_python_flag(direction_xyz, false, "direction_xyz");
+
     // The largest output (20 * n_div^2 faces, 9 values each) must fit into 64 bits, checked before the outputs are
     // allocated (same check and message as in C++)
     const arma::uword uword_max = std::numeric_limits<arma::uword>::max();
     if (n_div != 0 && (n_div > uword_max / n_div || n_div * n_div > uword_max / 180))
         throw std::invalid_argument("Input 'n_div' is too large.");
     const arma::uword n_faces = 20 * n_div * n_div;
-    const arma::uword n_dir_cols = direction_xyz ? 9 : 6;
+    const arma::uword n_dir_cols = direction_xyz_b ? 9 : 6;
 
     arma::mat center, vert, direction;
     arma::vec length;
@@ -60,7 +61,7 @@ py::tuple icosphere(arma::uword n_div, double radius, bool direction_xyz)
     auto vert_p = qd_python_init_output(n_faces, 9, &vert);
     auto cdirection_p = qd_python_init_output(n_faces, n_dir_cols, &direction);
 
-    quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz);
+    quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz_b);
 
     return py::make_tuple(center_p, length_p, vert_p, cdirection_p);
 }

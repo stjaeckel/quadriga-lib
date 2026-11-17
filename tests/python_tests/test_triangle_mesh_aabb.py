@@ -64,7 +64,7 @@ class test_case(unittest.TestCase):
     def test_entire_mesh_aabb_single_triangle(self):
         tri = np.array([[0, 0, 0, 2, 0, 0, 1, 3, -1]], dtype=np.float64)
         expected = aabb_numpy(tri)
-        # Use empty index array (None not supported)
+        # An empty index array works as None does
         got = RTtools.triangle_mesh_aabb(tri, np.array([], dtype=int), 1)
         self.assertEqual(got.dtype, np.float64)
         npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
@@ -92,6 +92,15 @@ class test_case(unittest.TestCase):
         expected = aabb_numpy(self.triangles, self.sub_mesh_ind)
         npt.assert_allclose(got[:2], expected, rtol=0, atol=1e-12)
         npt.assert_allclose(got[2:], 0.0, rtol=0, atol=0.0)
+
+    def test_none_inputs(self):
+        # triangles is mandatory and refuses None; sub_mesh_ind=None equals omitted
+        npt.assert_array_equal(RTtools.triangle_mesh_aabb(self.triangles, None),
+                               RTtools.triangle_mesh_aabb(self.triangles))
+        with self.assertRaises(TypeError):
+            RTtools.triangle_mesh_aabb()
+        with self.assertRaises(TypeError):
+            RTtools.triangle_mesh_aabb(None)
 
     def test_output_always_float64(self):
         # Inputs as float32 should still yield float64 output

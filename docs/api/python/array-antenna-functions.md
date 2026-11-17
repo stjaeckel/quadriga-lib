@@ -237,7 +237,7 @@ quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, color
 ```
 
 ### Inputs:
-- **`fn`** — Output OBJ filename; str; must not be empty and must end in `.obj`
+- **`fn`** — Output OBJ filename; must not be empty and must end in `.obj`
 - **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
 - **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
@@ -321,7 +321,7 @@ ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
 ### Inputs (ula, 3gpp):
 - **`pattern`** — Custom per-element pattern dict (same field layout as the output);
   overrides default 3GPP/ULA element pattern; only the radiation pattern is used: element positions,
-  coupling and center frequency of the pattern are ignored; default: empty dict (use built-in pattern)
+  coupling and center frequency of the pattern are ignored; default: `None` (use built-in pattern)
 
 ### Inputs (multibeam only):
 - **`beam_az`** — Azimuth beam angles in degrees; `(n_beams,)`; default: `[0.0]`
@@ -459,8 +459,6 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [MATLA
   field value and 2e-6 rad in the angles; at a distance d (in rad) from a pole of the local frame up to about
   2e-7 / d rad in the local azimuth and the polarization angle and 1e-7 / d rad (at most 4e-4 rad) in the local
   elevation; auto selects GENERIC in this version, which may change in a later version
-- The flags `dist`, `local_angles`, `fast_access` and `complex` take a bool or `numpy.bool_`; `None` selects the
-  default, any other type raises `TypeError`
 
 ### Usage:
 ```python
@@ -549,7 +547,7 @@ data = quadriga_lib.arrayant.qdant_read( fn, id )
 ```
 
 ### Inputs:
-- **`fn`** — path to the QDANT file; str; must not be empty
+- **`fn`** — path to the QDANT file; must not be empty
 - **`id`** — 1-based ID of the entry to read, >= 1; `None` reads all entries (see above); default: None
 
 ### Outputs:
@@ -600,7 +598,7 @@ quadriga_lib.arrayant.qdant_write( fn, arrayant )
 ```
 
 ### Inputs:
-- **`fn`** — Output QDANT filename; str; must not be empty
+- **`fn`** — Output QDANT filename; must not be empty
 - **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may
   be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`; 4D input
   requires `center_freq` with one value per frequency entry `(n_freq,)`
