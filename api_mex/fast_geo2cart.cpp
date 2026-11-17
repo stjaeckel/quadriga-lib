@@ -15,7 +15,7 @@ SECTION!*/
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
 - Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
-- Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
+- Optional outputs `sin_az`, `cos_az`, `sin_el`, `cos_el` return intermediate sin/cos values; omit from the
   output list to skip their computation
 - Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
   MATLAB's default numeric type
@@ -26,7 +26,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 ## Usage:
 ```
 split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+[ x, y, z, sin_az, cos_az, sin_el, cos_el ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 
 split = false;
 cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
@@ -46,10 +46,10 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
   along the first dim, `[3, n, m]`
 - **`y`** — Y-coordinates; `[n, m]` or empty
 - **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sAZ`** — sin(az); `[n, m]` or empty
-- **`cAZ`** — cos(az); `[n, m]` or empty
-- **`sEL`** — sin(el); `[n, m]` or empty
-- **`cEL`** — cos(el); `[n, m]` or empty
+- **`sin_az`** — sin(az); `[n, m]` or empty
+- **`cos_az`** — cos(az); `[n, m]` or empty
+- **`sin_el`** — sin(el); `[n, m]` or empty
+- **`cos_el`** — cos(el); `[n, m]` or empty
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -79,7 +79,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::cube cart;
-    arma::mat x, y, z, sAZ, cAZ, sEL, cEL;
+    arma::mat x, y, z, sin_az, cos_az, sin_el, cos_el;
 
     if (split)
     {
@@ -99,13 +99,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             z.set_size(n, m);
 
         if (nlhs > 3)
-            plhs[3] = qd_mex_init_output(&sAZ, n, m);
+            plhs[3] = qd_mex_init_output(&sin_az, n, m);
         if (nlhs > 4)
-            plhs[4] = qd_mex_init_output(&cAZ, n, m);
+            plhs[4] = qd_mex_init_output(&cos_az, n, m);
         if (nlhs > 5)
-            plhs[5] = qd_mex_init_output(&sEL, n, m);
+            plhs[5] = qd_mex_init_output(&sin_el, n, m);
         if (nlhs > 6)
-            plhs[6] = qd_mex_init_output(&cEL, n, m);
+            plhs[6] = qd_mex_init_output(&cos_el, n, m);
     }
     else
     {
@@ -123,21 +123,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec x_vec(x.memptr(), nm, false, true);
     arma::vec y_vec(y.memptr(), nm, false, true);
     arma::vec z_vec(z.memptr(), nm, false, true);
-    arma::vec sAZ_vec = sAZ.empty() ? arma::vec() : arma::vec(sAZ.memptr(), nm, false, true);
-    arma::vec cAZ_vec = cAZ.empty() ? arma::vec() : arma::vec(cAZ.memptr(), nm, false, true);
-    arma::vec sEL_vec = sEL.empty() ? arma::vec() : arma::vec(sEL.memptr(), nm, false, true);
-    arma::vec cEL_vec = cEL.empty() ? arma::vec() : arma::vec(cEL.memptr(), nm, false, true);
+    arma::vec sin_az_vec = sin_az.empty() ? arma::vec() : arma::vec(sin_az.memptr(), nm, false, true);
+    arma::vec cos_az_vec = cos_az.empty() ? arma::vec() : arma::vec(cos_az.memptr(), nm, false, true);
+    arma::vec sin_el_vec = sin_el.empty() ? arma::vec() : arma::vec(sin_el.memptr(), nm, false, true);
+    arma::vec cos_el_vec = cos_el.empty() ? arma::vec() : arma::vec(cos_el.memptr(), nm, false, true);
 
     // Wrap optional pointers
     const arma::vec *p_len = len_vec.empty() ? nullptr : &len_vec;
-    arma::vec *p_sAZ = sAZ_vec.empty() ? nullptr : &sAZ_vec;
-    arma::vec *p_cAZ = cAZ_vec.empty() ? nullptr : &cAZ_vec;
-    arma::vec *p_sEL = sEL_vec.empty() ? nullptr : &sEL_vec;
-    arma::vec *p_cEL = cEL_vec.empty() ? nullptr : &cEL_vec;
+    arma::vec *p_sin_az = sin_az_vec.empty() ? nullptr : &sin_az_vec;
+    arma::vec *p_cos_az = cos_az_vec.empty() ? nullptr : &cos_az_vec;
+    arma::vec *p_sin_el = sin_el_vec.empty() ? nullptr : &sin_el_vec;
+    arma::vec *p_cos_el = cos_el_vec.empty() ? nullptr : &cos_el_vec;
 
     // Call library function
     CALL_QD(quadriga_lib::fast_geo2cart<double>(az_vec, el_vec, x_vec, y_vec, z_vec,
-                                                p_sAZ, p_cAZ, p_sEL, p_cEL, p_len, use_kernel));
+                                                p_sin_az, p_cos_az, p_sin_el, p_cos_el, p_len, use_kernel));
 
     // Combine outputs
     if (!split && nlhs > 0)

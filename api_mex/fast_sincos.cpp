@@ -14,11 +14,9 @@ SECTION!*/
 # FAST_SINCOS
 Compute elementwise approximate sine and/or cosine of a vector
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for
   abs(x) <= 1e10 (the argument is reduced in double precision where single precision is not enough)
 - Results stay in [-1, 1] for all finite x; Inf and NaN give NaN
-- Either `s` or `c` may be `nullptr` to skip that computation
 - Works on vectors, matrices, and 3-D arrays
 - Accepts any numeric input class; best performance with single precision
 - Outputs are always single precision, also for double input
@@ -27,23 +25,25 @@ Compute elementwise approximate sine and/or cosine of a vector
 
 ## Usage:
 ```
-[s, c] = quadriga_lib.fast_sincos(x);
-s = quadriga_lib.fast_sincos(x);
-c = quadriga_lib.fast_sincos(x, true);
+[sin_x, cos_x] = quadriga_lib.fast_sincos(x);
+sin_x = quadriga_lib.fast_sincos(x);
+cos_x = quadriga_lib.fast_sincos(x, true);
+[sin_x, cos_x] = quadriga_lib.fast_sincos(x, [], use_kernel);
 ```
 
 ## Inputs:
 - **`x`** (input) — Input angles; radians; `[n_elem]`
 - **`cos_only`** — For a single output: `true` returns `cos(x)`; `false` or `[]` returns `sin(x)`; default: false
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ## Outputs:
-- **`s`** — sin(x); single; `[n_elem]`
-- **`c`** — cos(x); single; `[n_elem]`
+- **`sin_x`** — sin(x); single; `[n_elem]`
+- **`cos_x`** — cos(x); single; `[n_elem]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || nrhs > 2)
+    if (nrhs < 1 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 2)
@@ -76,7 +76,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_elem = use_double_input ? Xd.n_elem : Xs.n_elem;
 
     // Check if we want to get only the cosine
-    bool cos_only = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "cosineOnly", false);
+    bool cos_only = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "cos_only", false);
+    const int use_kernel = (nrhs < 3) ? 0 : qd_mex_get_scalar<int>(prhs[2], "use_kernel", 0);
 
     // Allocate memory for the outputs
     arma::fcube P, Q;
@@ -87,10 +88,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[1] = qd_mex_init_output(&Q, n_rows, n_cols, n_slices);
     else if (nlhs > 1 && cos_only)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Cannot have 2 outputs in cosine-only mode.");
-
-    // Empty input
-    if (n_elem == 0)
-        return;
 
     // Serialize cubes to vectors (map memory)
     arma::fvec xs;
@@ -109,7 +106,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::fvec p = arma::fvec(P.memptr(), n_elem, false, true);
 
     arma::fvec q;
-    if (n_elem != 0)
+    if (Q.n_elem != 0)
     {
         q.~Col<float>();
         ::new (&q) arma::fvec(Q.memptr(), n_elem, false, true);
@@ -119,19 +116,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (use_double_input)
     {
         if (cos_only)
-            CALL_QD(quadriga_lib::fast_sincos(xd, nullptr, &p));
+            CALL_QD(quadriga_lib::fast_sincos(xd, nullptr, &p, use_kernel));
         else if (nlhs > 1)
-            CALL_QD(quadriga_lib::fast_sincos(xd, &p, &q));
+            CALL_QD(quadriga_lib::fast_sincos(xd, &p, &q, use_kernel));
         else
-            CALL_QD(quadriga_lib::fast_sincos(xd, &p));
+            CALL_QD(quadriga_lib::fast_sincos(xd, &p, nullptr, use_kernel));
     }
     else
     {
         if (cos_only)
-            CALL_QD(quadriga_lib::fast_sincos(xs, nullptr, &p));
+            CALL_QD(quadriga_lib::fast_sincos(xs, nullptr, &p, use_kernel));
         else if (nlhs > 1)
-            CALL_QD(quadriga_lib::fast_sincos(xs, &p, &q));
+            CALL_QD(quadriga_lib::fast_sincos(xs, &p, &q, use_kernel));
         else
-            CALL_QD(quadriga_lib::fast_sincos(xs, &p));
+            CALL_QD(quadriga_lib::fast_sincos(xs, &p, nullptr, use_kernel));
     }
 }

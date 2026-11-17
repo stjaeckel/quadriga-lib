@@ -105,20 +105,10 @@ inline void qd_arrayant_coupling_block_diag(const arma::Mat<dtype> &coupling_re1
 // values (int32 gather offsets of the AVX2 kernel); n_pattern_values: number of values of the largest pattern cube
 static inline int qd_arrayant_interpolate_kernel(int use_kernel, unsigned long long n_pattern_values)
 {
-    if (use_kernel < 0 || use_kernel > 2)
-        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
-    if (use_kernel != 2)
-        return 1; // Auto selects GENERIC
-#if BUILD_WITH_AVX2
-    const bool avx2_available = runtime_AVX2_Check();
-#else
-    const bool avx2_available = false;
-#endif
-    if (!avx2_available)
-        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
-    if (n_pattern_values > (unsigned long long)INT_MAX)
+    const int kernel = qd_kernel_auto_avx2(use_kernel == 0 ? 1 : use_kernel); // Auto selects GENERIC
+    if (kernel == 2 && n_pattern_values > (unsigned long long)INT_MAX)
         throw std::invalid_argument("AVX2 kernel requested, but the antenna pattern has more than INT_MAX samples.");
-    return 2;
+    return kernel;
 }
 
 // Interpolates the pattern of 'ant' (arrayant_interpolate without its argument handling), for library functions that

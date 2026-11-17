@@ -35,7 +35,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
-    i_irs, threshold_dB, center_freq, use_absolute_delays, active_path_in, ant_irs_2 );
+    i_irs, threshold_dB, center_freq, use_absolute_delays, active_path_in, ant_irs_2, use_kernel );
 ```
 
 ## Inputs:
@@ -66,6 +66,8 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`active_path_in`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
 - **`ant_irs_2`** — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns
+- **`use_kernel`** — Kernel of both segments, as in [[get_channels_spherical]]: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision; error if unavailable); auto selects GENERIC in this version; default: 0
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
@@ -94,7 +96,7 @@ static mxArray *copy_cube(const arma::cube &c)
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 19 || nrhs > 25)
+    if (nrhs < 19 || nrhs > 26)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 8)
@@ -139,6 +141,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool use_alternative_irs = (nrhs > 24) && !mxIsEmpty(prhs[24]);
     if (use_alternative_irs)
         ant_irs_2 = qd_mex_struct2arrayant(prhs[24]);
+    const int use_kernel = (nrhs < 26) ? 0 : qd_mex_get_scalar<int>(prhs[25], "use_kernel", 0);
 
     // Codebook port index: 1-based (MATLAB) -> 0-based (C++)
     const arma::uword n_codebook = ant_irs.coupling_re.n_cols; // 0 = missing coupling, reported by C++
@@ -168,7 +171,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                                      fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
                                                                      coeff_re, coeff_im, delay,
                                                                      i_irs, threshold_dB, center_freq, use_absolute_delays,
-                                                                     p_aod, p_eod, p_aoa, p_eoa, p_irs_array_2, p_active_path));
+                                                                     p_aod, p_eod, p_aoa, p_eoa, p_irs_array_2, p_active_path, use_kernel));
 
     // Write to MATLAB
     if (nlhs > 0)

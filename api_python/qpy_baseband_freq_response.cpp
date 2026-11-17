@@ -76,6 +76,7 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   `use_absolute_delays = True`: the coefficients of the generators carry the phase of the absolute path length also
   when `delay` is relative, and with relative delays the phase of the TX-RX distance is interpolated across `freq`,
   which gives wrong phases (magnitudes stay right); default: `True`
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (raises if unavailable); default: 0
 
 ## Outputs:
 - **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`,
@@ -105,8 +106,15 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                                                          const py::object &coeff_im,
                                                          py::handle freq,
                                                          py::handle freq_new,
-                                                         bool remove_delay_phase)
+                                                         bool remove_delay_phase,
+                                                         int use_kernel)
 {
+    // Kernel, checked here because empty snapshots skip the C++ call
+    if (use_kernel < 0 || use_kernel > 2)
+        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
+    if (use_kernel == 2 && !quadriga_lib::quadriga_lib_has_AVX2())
+        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+
     // Input mode detection and basic validation
     bool have_coeff = !coeff.is_none();
     bool have_cre = !coeff_re.is_none();
@@ -553,7 +561,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                                                              &pilot_grid_arma, bandwidth,
                                                              (arma::Cube<double> *)nullptr,
                                                              (arma::Cube<double> *)nullptr,
-                                                             &hmat_vec[ii]);
+                                                             &hmat_vec[ii], use_kernel);
             }
             catch (...)
             {
@@ -641,7 +649,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     (arma::Cube<double> *)nullptr,
                     (arma::Cube<double> *)nullptr,
                     &hmat_vec[ii],
-                    remove_delay_phase);
+                    remove_delay_phase, use_kernel);
             }
             catch (...)
             {

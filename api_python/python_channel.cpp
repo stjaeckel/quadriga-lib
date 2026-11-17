@@ -39,7 +39,8 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("coeff_im") = py::none(),
           py::arg("freq") = py::none(),
           py::arg("freq_new") = py::none(),
-          py::arg("remove_delay_phase") = true);
+          py::arg("remove_delay_phase") = true,
+          py::arg("use_kernel") = 0);
 
     m.def("export_obj_file", &channel_export_obj_file,
           py::arg("fn"),
@@ -150,7 +151,8 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("complex") = true,
-          py::arg("i_freq") = 0);
+          py::arg("i_freq") = 0,
+          py::arg("use_kernel") = 0);
 
     m.def("spherical", &get_channels_spherical,
           py::arg("ant_tx"),
@@ -189,7 +191,8 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("propagation_speed") = 299792458.0,
-          py::arg("complex") = true);
+          py::arg("complex") = true,
+          py::arg("use_kernel") = 0);
 
     m.def("quantize_delays", &quantize_delays,
           py::arg("coeff_re") = py::none(),

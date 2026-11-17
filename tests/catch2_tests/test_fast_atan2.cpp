@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_math.hpp"
+#include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <cmath>
 #include <cstdint>
 
@@ -299,4 +300,32 @@ TEST_CASE("fast_atan2 - Outputs that alias inputs")
     // The output uses the memory of an input
     arma::fvec x_view(x.memptr(), 9, false, true);
     CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, x_view), std::invalid_argument);
+}
+
+TEST_CASE("fast_atan2 - GENERIC and AVX2 meet the documented error, auto is AVX2 if available")
+{
+    // Both kernels stay within the documented error of the exact values; auto is AVX2 when available, else GENERIC
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    const arma::vec phi = arma::linspace<arma::vec>(-3.14, 3.14, 1003);
+    const arma::vec y = arma::sin(phi) * 3.0, x = arma::cos(phi) * 3.0;
+    arma::fvec a_auto;
+    quadriga_lib::fast_atan2(y, x, a_auto);
+    for (int k : {1, 2})
+    {
+        arma::fvec a;
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, a, k), std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::fast_atan2(y, x, a, k);
+        double err = 0.0;
+        for (arma::uword i = 0; i < phi.n_elem; ++i)
+            err = std::max(err, std::abs((double)a[i] - std::atan2(y[i], x[i])));
+        CHECK(err < 4e-7);
+        if (k == (avx2 ? 2 : 1))
+            CHECK(arma::approx_equal(a, a_auto, "absdiff", 0.0f));
+    }
+    arma::fvec a;
+    CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, a, 3), std::invalid_argument);
 }

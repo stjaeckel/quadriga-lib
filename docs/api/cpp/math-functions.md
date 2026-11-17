@@ -54,20 +54,22 @@ Compute elementwise approximate arc-cosine of a vector
 
 Not in: MATLAB, Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7), both kernels; values outside [-1, 1] produce NaN
+- Double input is rounded to float first; near ±1 this adds up to 6e-8 / sqrt(1 - x²) (at most 3.5e-4 rad)
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &c);
-void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &c);
+void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &acos_x, int use_kernel = 0);
+void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &acos_x, int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`c`** — acos(x); `[n_elem]`
+- **`acos_x`** — acos(x); `[n_elem]`
 
 ---
 <a id="fast_asin"></a>
@@ -76,20 +78,22 @@ Compute elementwise approximate arc-sine of a vector
 
 Not in: MATLAB, Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7), both kernels; values outside [-1, 1] produce NaN
+- Double input is rounded to float first; near ±1 this adds up to 6e-8 / sqrt(1 - x²) (at most 3.5e-4 rad)
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &s);
-void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &s);
+void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &asin_x, int use_kernel = 0);
+void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &asin_x, int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`s`** — asin(x); `[n_elem]`
+- **`asin_x`** — asin(x); `[n_elem]`
 
 ---
 <a id="fast_atan2"></a>
@@ -98,23 +102,24 @@ Compute elementwise approximate two-argument arc-tangent of two vectors
 
 Not in: MATLAB, Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Returns angles in [-pi, pi]; max error ~3 ULP (~3.6e-7)
+- Returns angles in [-pi, pi]; max error ~3 ULP (~3.6e-7), both kernels
 - Special values as std::atan2 (both kernels): atan2(±0, +0) = ±0, atan2(±0, -0) = ±pi, atan2(±0, x < 0) = ±pi,
   atan2(±inf, ±inf) = ±pi/4 or ±3pi/4; NaN in x or y gives NaN
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fvec &a);
-void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fvec &a);
+void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fvec &atan2_yx, int use_kernel = 0);
+void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fvec &atan2_yx, int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`y`** — Y-coordinates (numerator); `[n_elem]`
 - **`x`** — X-coordinates (denominator); `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`a`** — atan2(y, x); `[n_elem]`
+- **`atan2_yx`** — atan2(y, x); `[n_elem]`
 
 ---
 <a id="fast_cart2geo"></a>
@@ -163,8 +168,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 Also in: [MATLAB](../mex/math-functions.md#fast_geo2cart) · [Python](../python/math-functions.md#fast_geo2cart)
 
 - Conversion: x = cos(el)*cos(az)*len, y = cos(el)*sin(az)*len, z = sin(el)*len
-- Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Optional pointer outputs `sin_az`, `cos_az`, `sin_el`, `cos_el` return intermediate sin/cos values; pass `nullptr` to skip
 - Precision: GENERIC kernel uses full `dtype` precision (double or float).
 - AVX2 kernel computes sine and cosine in single precision (max. error about 1.3e-7 for angles up to 1e10;
   `dtype=double` angles are reduced in double precision first), results widened back. Use `use_kernel=1` to force
@@ -178,10 +182,10 @@ void fast_geo2cart(
     arma::Col<dtype> &x,
     arma::Col<dtype> &y,
     arma::Col<dtype> &z,
-    arma::Col<dtype> *sAZ = nullptr,
-    arma::Col<dtype> *cAZ = nullptr,
-    arma::Col<dtype> *sEL = nullptr,
-    arma::Col<dtype> *cEL = nullptr,
+    arma::Col<dtype> *sin_az = nullptr,
+    arma::Col<dtype> *cos_az = nullptr,
+    arma::Col<dtype> *sin_el = nullptr,
+    arma::Col<dtype> *cos_el = nullptr,
     const arma::Col<dtype> *len = nullptr,
     int use_kernel = 0);
 ```
@@ -196,10 +200,10 @@ void fast_geo2cart(
 - **`x`** — X-coordinates; `[n_elem]`
 - **`y`** — Y-coordinates; `[n_elem]`
 - **`z`** — Z-coordinates; `[n_elem]`
-- **`sAZ`** *(optional)* — sin(az); `[n_elem]` or `nullptr`
-- **`cAZ`** *(optional)* — cos(az); `[n_elem]` or `nullptr`
-- **`sEL`** *(optional)* — sin(el); `[n_elem]` or `nullptr`
-- **`cEL`** *(optional)* — cos(el); `[n_elem]` or `nullptr`
+- **`sin_az`** *(optional)* — sin(az); `[n_elem]` or `nullptr`
+- **`cos_az`** *(optional)* — cos(az); `[n_elem]` or `nullptr`
+- **`sin_el`** *(optional)* — sin(el); `[n_elem]` or `nullptr`
+- **`cos_el`** *(optional)* — cos(el); `[n_elem]` or `nullptr`
 
 ### See also:
 - [fast_cart2geo](#fast_cart2geo) (inverse conversion)
@@ -211,25 +215,29 @@ Compute elementwise approximate sine and/or cosine of a vector
 
 Also in: [MATLAB](../mex/math-functions.md#fast_sincos) · Not in: Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for |x| <= 1e10
   (both kernels; the argument is reduced in double precision where single precision is not enough)
 - Results stay in [-1, 1] for all finite x; inf and NaN give NaN
 - The AVX2 kernel is fastest for |x| <= 2^22 (4.2e6); larger arguments take about 1.5 times as long
-- Either `s` or `c` may be `nullptr` to skip that computation
+- Either `sin_x` or `cos_x` may be `nullptr` to skip that computation
+- Outputs are single precision also for double input: the fast_* functions are meant for very large arrays, where a
+  double output would add a pass and a copy that doubles the peak memory; double-precision callers use the standard library
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_sincos(const arma::fvec &x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
-void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *s = nullptr, arma::fvec *c = nullptr);
+void quadriga_lib::fast_sincos(const arma::fvec &x, arma::fvec *sin_x = nullptr, arma::fvec *cos_x = nullptr,
+                               int use_kernel = 0);
+void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *sin_x = nullptr, arma::fvec *cos_x = nullptr,
+                               int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`x`** — Input angles; `[n_elem]`
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
-- **`s`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
-- **`c`** *(optional)* — cos(x); `[n_elem]` or `nullptr`
+- **`sin_x`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
+- **`cos_x`** *(optional)* — cos(x); `[n_elem]` or `nullptr`
 
 ---
 <a id="fast_slerp"></a>
@@ -243,33 +251,34 @@ Not in: MATLAB, Python
 - Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
 - If both input amplitudes are negligible (below 1.19e-7), output is zero
 - Max relative error vs. double-precision reference about 5e-7 for phase differences up to 2 rad, 1.2e-5 up to
-  3 rad; larger towards the near-antipodal transition to linear interpolation
+  3 rad (both kernels); larger towards the near-antipodal transition to linear interpolation
 - The result of an element does not depend on the other elements
-- AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_slerp(const arma::fvec &Ar, const arma::fvec &Ai,
-                              const arma::fvec &Br, const arma::fvec &Bi,
+void quadriga_lib::fast_slerp(const arma::fvec &A_re, const arma::fvec &A_im,
+                              const arma::fvec &B_re, const arma::fvec &B_im,
                               const arma::fvec &w,
-                              arma::fvec &Xr, arma::fvec &Xi);
+                              arma::fvec &X_re, arma::fvec &X_im, int use_kernel = 0);
 
-void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
-                              const arma::vec &Br, const arma::vec &Bi,
+void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
+                              const arma::vec &B_re, const arma::vec &B_im,
                               const arma::vec &w,
-                              arma::fvec &Xr, arma::fvec &Xi);
+                              arma::fvec &X_re, arma::fvec &X_im, int use_kernel = 0);
 ```
 
 ### Inputs:
-- **`Ar`** — Real part of source A; `[n_elem]`
-- **`Ai`** — Imaginary part of source A; `[n_elem]`
-- **`Br`** — Real part of source B; `[n_elem]`
-- **`Bi`** — Imaginary part of source B; `[n_elem]`
+- **`A_re`** — Real part of source A; `[n_elem]`
+- **`A_im`** — Imaginary part of source A; `[n_elem]`
+- **`B_re`** — Real part of source B; `[n_elem]`
+- **`B_im`** — Imaginary part of source B; `[n_elem]`
 - **`w`** — Per-element interpolation weight in [0, 1]; `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`Xr`** — Real part of interpolated result; `[n_elem]`
-- **`Xi`** — Imaginary part of interpolated result; `[n_elem]`
+- **`X_re`** — Real part of interpolated result; `[n_elem]`
+- **`X_im`** — Imaginary part of interpolated result; `[n_elem]`
 
 ---
 <a id="interp_2D"></a>

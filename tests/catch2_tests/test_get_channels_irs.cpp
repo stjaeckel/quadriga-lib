@@ -898,3 +898,47 @@ TEST_CASE("Get Channels IRS - A second IRS array leaves the first one unchanged"
     CHECK(arma::approx_equal(cr_3, cr_1, "absdiff", 1e-6));
     CHECK(arma::approx_equal(ci_3, ci_1, "absdiff", 1e-6));
 }
+
+TEST_CASE("Get Channels IRS - AVX2 in both segments agrees with GENERIC, auto is GENERIC")
+{
+    // The kernel reaches both segments: AVX2 agrees with GENERIC; auto selects GENERIC (identical results); invalid
+    // values throw
+    const auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
+    const auto rx = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    auto irs = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    quadriga_lib::arrayant_copy_element(irs, 0, {1, 2});
+    irs.element_pos(1, 0) = 0.05, irs.element_pos(1, 2) = -0.05;
+    irs.coupling_re.ones(3, 1), irs.coupling_im.reset();
+    const arma::mat f1 = arma::randu<arma::mat>(3, 4) * 20.0, f2 = arma::randu<arma::mat>(3, 3) * 20.0 + 20.0;
+    const arma::vec g1(4, arma::fill::ones), g2(3, arma::fill::ones), l1(4, arma::fill::zeros), l2(3, arma::fill::zeros);
+    const arma::mat M1 = arma::randn<arma::mat>(8, 4), M2 = arma::randn<arma::mat>(8, 3);
+
+    arma::cube cr[3], ci[3], dl[3];
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    for (int k : {0, 1, 2})
+    {
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
+                                                                   f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[k], ci[k], dl[k], 0, -200.0,
+                                                                   3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k),
+                            std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
+                                               f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[k], ci[k], dl[k], 0, -200.0,
+                                               3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k);
+    }
+    REQUIRE(cr[1].n_slices == 12);
+    CHECK((arma::approx_equal(cr[0], cr[1], "absdiff", 0.0) && arma::approx_equal(ci[0], ci[1], "absdiff", 0.0)));
+    if (avx2)
+    {
+        const double amax = arma::sqrt(arma::square(cr[1]) + arma::square(ci[1])).max();
+        CHECK(arma::sqrt(arma::square(cr[2] - cr[1]) + arma::square(ci[2] - ci[1])).max() < 1e-5 * amax);
+        CHECK(arma::approx_equal(dl[2], dl[1], "absdiff", 1e-12));
+    }
+    CHECK_THROWS_AS(quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
+                                                           f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[0], ci[0], dl[0], 0, -200.0,
+                                                           3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 3),
+                    std::invalid_argument);
+}

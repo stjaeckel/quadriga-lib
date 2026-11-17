@@ -83,8 +83,7 @@ Also in: [MATLAB](../mex/channel-functions.md#baseband_freq_response) · [Python
 - `pilot_grid` values are normalized to bandwidth: `0.0` = center frequency, `1.0` = center + bandwidth
 - The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
   before sin / cos are evaluated in single precision, so long (absolute) delays keep their accuracy; coefficients and
-  sums are single precision; uses AVX2 for 8-carrier parallel computation; double inputs are narrowed to float
-  internally, results widened back
+  sums are single precision (both kernels); double inputs are narrowed to float internally, results widened back
 - Safe to call in a loop over snapshots and parallelize with OpenMP
 
 ### Declaration:
@@ -97,7 +96,8 @@ void quadriga_lib::baseband_freq_response(
     const double bandwidth,
     arma::Cube<dtype> *hmat_re,
     arma::Cube<dtype> *hmat_im,
-    arma::Cube<std::complex<dtype>> *hmat = nullptr);
+    arma::Cube<std::complex<dtype>> *hmat = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -106,6 +106,7 @@ void quadriga_lib::baseband_freq_response(
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
@@ -146,7 +147,8 @@ void quadriga_lib::baseband_freq_response_multi(
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
-    bool remove_delay_phase = true);
+    bool remove_delay_phase = true,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -162,6 +164,7 @@ void quadriga_lib::baseband_freq_response_multi(
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
   across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
+- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -195,7 +198,8 @@ void quadriga_lib::baseband_freq_response_vec(
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec *i_snap = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -205,6 +209,7 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
 - **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`

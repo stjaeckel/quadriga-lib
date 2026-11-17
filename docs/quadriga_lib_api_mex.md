@@ -747,7 +747,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [Python](quadr
 ### Usage:
 ```matlab
 [ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, ...
-    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap );
+    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap, use_kernel );
 ```
 
 ### Dispatch modes:
@@ -773,6 +773,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [Python](quadr
   `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
 - **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based
   indices processes the selected subset. Omitting this argument or passing `[]` keeps the function in single/multi-frequency mode.
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
 - **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -1416,7 +1417,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · Not in: Python
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
-    i_irs, threshold_dB, center_freq, use_absolute_delays, active_path_in, ant_irs_2 );
+    i_irs, threshold_dB, center_freq, use_absolute_delays, active_path_in, ant_irs_2, use_kernel );
 ```
 
 ### Inputs:
@@ -1447,6 +1448,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · Not in: Python
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`active_path_in`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
 - **`ant_irs_2`** — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns
+- **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision; error if unavailable); auto selects GENERIC in this version; default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
@@ -1505,7 +1508,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 ```matlab
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed );
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
 
 ### Inputs:
@@ -1528,6 +1531,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
+  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](#arrayant_interpolate); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
@@ -1569,7 +1574,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 ```matlab
 [ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    center_freq, use_absolute_delays, add_fake_los_path );
+    center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ### Inputs:
@@ -1590,6 +1595,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
+  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](#arrayant_interpolate); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -3091,7 +3098,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 Also in: [C++](quadriga_lib_api_cpp.md#fast_geo2cart) · [Python](quadriga_lib_api_python.md#fast_geo2cart)
 
 - Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
-- Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
+- Optional outputs `sin_az`, `cos_az`, `sin_el`, `cos_el` return intermediate sin/cos values; omit from the
   output list to skip their computation
 - Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
   MATLAB's default numeric type
@@ -3102,7 +3109,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_geo2cart) · [Python](quadriga_lib_a
 ### Usage:
 ```matlab
 split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+[ x, y, z, sin_az, cos_az, sin_el, cos_el ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 
 split = false;
 cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
@@ -3122,10 +3129,10 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
   along the first dim, `[3, n, m]`
 - **`y`** — Y-coordinates; `[n, m]` or empty
 - **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sAZ`** — sin(az); `[n, m]` or empty
-- **`cAZ`** — cos(az); `[n, m]` or empty
-- **`sEL`** — sin(el); `[n, m]` or empty
-- **`cEL`** — cos(el); `[n, m]` or empty
+- **`sin_az`** — sin(az); `[n, m]` or empty
+- **`cos_az`** — cos(az); `[n, m]` or empty
+- **`sin_el`** — sin(el); `[n, m]` or empty
+- **`cos_el`** — cos(el); `[n, m]` or empty
 
 ---
 <a id="fast_sincos"></a>
@@ -3134,11 +3141,9 @@ Compute elementwise approximate sine and/or cosine of a vector
 
 Also in: [C++](quadriga_lib_api_cpp.md#fast_sincos) · Not in: Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for
   abs(x) <= 1e10 (the argument is reduced in double precision where single precision is not enough)
 - Results stay in [-1, 1] for all finite x; Inf and NaN give NaN
-- Either `s` or `c` may be `nullptr` to skip that computation
 - Works on vectors, matrices, and 3-D arrays
 - Accepts any numeric input class; best performance with single precision
 - Outputs are always single precision, also for double input
@@ -3147,18 +3152,20 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_sincos) · Not in: Python
 
 ### Usage:
 ```matlab
-[s, c] = quadriga_lib.fast_sincos(x);
-s = quadriga_lib.fast_sincos(x);
-c = quadriga_lib.fast_sincos(x, true);
+[sin_x, cos_x] = quadriga_lib.fast_sincos(x);
+sin_x = quadriga_lib.fast_sincos(x);
+cos_x = quadriga_lib.fast_sincos(x, true);
+[sin_x, cos_x] = quadriga_lib.fast_sincos(x, [], use_kernel);
 ```
 
 ### Inputs:
 - **`x`** (input) — Input angles; radians; `[n_elem]`
 - **`cos_only`** — For a single output: `true` returns `cos(x)`; `false` or `[]` returns `sin(x)`; default: false
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
-- **`s`** — sin(x); single; `[n_elem]`
-- **`c`** — cos(x); single; `[n_elem]`
+- **`sin_x`** — sin(x); single; `[n_elem]`
+- **`cos_x`** — cos(x); single; `[n_elem]`
 
 ---
 <a id="interp"></a>
@@ -3288,7 +3295,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [Python](quadri
 - **`verbose`** — Verbosity level; default: 0 (no output)
 - **`sub_mesh_ind`** — 1-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation);  `[n_mesh, 1]`;
   default: `[]` (not using sub-meshes)
-- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
+- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [ray_triangle_intersect](#ray_triangle_intersect); default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).

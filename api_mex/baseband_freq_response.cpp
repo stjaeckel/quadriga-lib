@@ -46,7 +46,7 @@ Compute the baseband frequency response of a MIMO channel
 ## Usage:
 ```
 [ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, ...
-    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap );
+    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap, use_kernel );
 ```
 
 ## Dispatch modes:<br>
@@ -72,6 +72,7 @@ Compute the baseband frequency response of a MIMO channel
   `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
 - **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based
   indices processes the selected subset. Omitting this argument or passing `[]` keeps the function in single/multi-frequency mode.
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ## Outputs:
 - **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -97,7 +98,7 @@ static void carriers_to_pilot_grid(const arma::vec &carrier_freq, double f_ref, 
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 5 || nrhs > 8)
+    if (nrhs < 5 || nrhs > 9)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -110,6 +111,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double bandwidth = qd_mex_get_scalar<double>(prhs[4], "bandwidth", 0.0);
     const auto center_freq = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
     const auto carrier_freq_in = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6]);
+    const int use_kernel = (nrhs < 9) ? 0 : qd_mex_get_scalar<int>(prhs[8], "use_kernel", 0);
 
     // i_snap signals multi-snap mode. Scalar 0 = all snapshots; non-empty
     // positive vector = subset (1-based). Omitted or [] -> single/multi-freq mode.
@@ -211,7 +213,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(&coeff_re, &coeff_im, &delay,
                                                                  &pilot_grid, bw, p_hmat_re_v, p_hmat_im_v,
-                                                                 i_snap.is_empty() ? nullptr : &i_snap));
+                                                                 i_snap.is_empty() ? nullptr : &i_snap, use_kernel));
     }
     else if (n_slab == 1) // Single-frequency backend
     {
@@ -227,7 +229,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
 
         CALL_QD(quadriga_lib::baseband_freq_response<double>(&coeff_re[0], &coeff_im[0], &delay[0],
-                                                             &pilot_grid, bw, p_hmat_re, p_hmat_im));
+                                                             &pilot_grid, bw, p_hmat_re, p_hmat_im, nullptr, use_kernel));
     }
     else // Multi-frequency backend
     {
@@ -239,6 +241,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             carrier_freq = center_freq.at(0) + pilot_grid_in * bandwidth;
 
         CALL_QD(quadriga_lib::baseband_freq_response_multi<double>(coeff_re, coeff_im, delay,
-                                                                   center_freq, carrier_freq, p_hmat_re, p_hmat_im));
+                                                                   center_freq, carrier_freq, p_hmat_re, p_hmat_im, nullptr, true, use_kernel));
     }
 }

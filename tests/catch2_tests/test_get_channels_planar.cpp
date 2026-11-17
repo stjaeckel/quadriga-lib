@@ -472,3 +472,48 @@ TEST_CASE("Get Channels Planar - Position and orientation shapes")
             CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
         }
 }
+
+TEST_CASE("Get Channels Planar - AVX2 interpolation agrees with GENERIC, auto is GENERIC")
+{
+    // AVX2 antenna interpolation agrees with GENERIC; auto selects GENERIC (identical results); invalid values throw
+    auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    tx.element_pos(1, 1) = 0.1;
+    const auto rx = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    const arma::uword n = 19;
+    const arma::vec aod = arma::randu<arma::vec>(n) * 6.0 - 3.0, eod = arma::randu<arma::vec>(n) * 2.0 - 1.0;
+    const arma::vec aoa = arma::randu<arma::vec>(n) * 6.0 - 3.0, eoa = arma::randu<arma::vec>(n) * 2.0 - 1.0;
+    const arma::vec gain(n, arma::fill::ones), len = arma::randu<arma::vec>(n) * 50.0 + 60.0;
+    const arma::mat M = arma::randn<arma::mat>(8, n);
+
+    arma::cube cr[3], ci[3], dl[3];
+    arma::vec dop[3];
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    for (int k : {0, 1, 2})
+    {
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::get_channels_planar<double>(tx, rx, {0, 0, 10}, {0, 0.1, 0.5}, {50, 0, 1.5}, {0, 0, 2.0},
+                                                                      aod, eod, aoa, eoa, gain, len, M, cr[k], ci[k], dl[k],
+                                                                      3e9, false, false, &dop[k], k),
+                            std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::get_channels_planar<double>(tx, rx, {0, 0, 10}, {0, 0.1, 0.5}, {50, 0, 1.5}, {0, 0, 2.0},
+                                                  aod, eod, aoa, eoa, gain, len, M, cr[k], ci[k], dl[k], 3e9, false, false, &dop[k], k);
+    }
+    CHECK((arma::approx_equal(cr[0], cr[1], "absdiff", 0.0) && arma::approx_equal(ci[0], ci[1], "absdiff", 0.0)));
+    CHECK(arma::approx_equal(dl[0], dl[1], "absdiff", 0.0));
+    if (avx2)
+    {
+        const double amax = arma::sqrt(arma::square(cr[1]) + arma::square(ci[1])).max();
+        CHECK(arma::sqrt(arma::square(cr[2] - cr[1]) + arma::square(ci[2] - ci[1])).max() < 1e-5 * amax);
+        CHECK(arma::approx_equal(dl[2], dl[1], "absdiff", 1e-12));
+        CHECK(arma::approx_equal(dop[2], dop[1], "absdiff", 1e-5));
+    }
+
+    CHECK_THROWS_AS(quadriga_lib::get_channels_planar<double>(tx, rx, {0, 0, 10}, {0, 0, 0}, {50, 0, 1.5}, {0, 0, 0},
+                                                              aod, eod, aoa, eoa, gain, len, M, cr[0], ci[0], dl[0],
+                                                              3e9, false, false, nullptr, 3),
+                    std::invalid_argument);
+}

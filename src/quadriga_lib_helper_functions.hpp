@@ -801,4 +801,25 @@ static inline const dtype *qd_xyz(const arma::Mat<dtype> &xyz, const char *name)
     return p;
 }
 
+#if BUILD_WITH_AVX2
+bool runtime_AVX2_Check();
+#endif
+
+// Resolves the kernel selector 'use_kernel' of a function with a GENERIC and an AVX2 kernel whose auto (0) selects AVX2
+// when it is available: returns 1 (GENERIC) or 2 (AVX2). Throws std::invalid_argument for values other than 0, 1, 2
+// and for 2 when the AVX2 kernel is not available (BUILD_WITH_AVX2 and the CPU check)
+static inline int qd_kernel_auto_avx2(int use_kernel)
+{
+    if (use_kernel < 0 || use_kernel > 2)
+        throw std::invalid_argument("Input 'use_kernel' must be 0, 1 or 2.");
+#if BUILD_WITH_AVX2
+    const bool avx2_available = runtime_AVX2_Check();
+#else
+    const bool avx2_available = false;
+#endif
+    if (use_kernel == 2 && !avx2_available)
+        throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+    return (use_kernel == 1 || !avx2_available) ? 1 : 2;
+}
+
 #endif

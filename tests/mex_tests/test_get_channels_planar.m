@@ -131,4 +131,20 @@ assertEqual( size(ci), size(cr) );
 assertEqual( size(dl), size(cr) );
 assertTrue( isempty(dop) );
 
+
+% use_kernel (input 17) reaches C++: 0 and 1 give the default result (auto = GENERIC), 3 is rejected by C++
+tx = quadriga_lib.arrayant_generate('custom', 10, [], 90, 90, 0);
+args = { tx, tx, [0.1, 0.5], [0, 0.2], [3, 2.5], [0, -0.2], [1, 0.5], [60, 70], [1, 1; 0, 0; 0, 0; 0, 0; 0, 0; 0, 0; -1, -1; 0, 0], ...
+    [0;0;10], [0;0;0], [50;0;1.5], [0;0;0], 3e9, false, false };
+cr_d = quadriga_lib.get_channels_planar( args{:} );
+assertEqual( quadriga_lib.get_channels_planar( args{:}, 0 ), cr_d );
+assertEqual( quadriga_lib.get_channels_planar( args{:}, 1 ), cr_d );
+try
+    quadriga_lib.get_channels_planar( args{:}, 3 );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'Input ''use_kernel'' must be 0, 1 or 2.')) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "use_kernel", GOT: "', ME.message, '"']);
+    end
+end
 end

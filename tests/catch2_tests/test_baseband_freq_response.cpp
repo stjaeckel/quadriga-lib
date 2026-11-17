@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
+#include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <iostream>
 #include <cmath>
 #include <complex>
@@ -205,8 +206,8 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
 {
     // 2x2 MIMO with per-antenna delays from 1 us to 10 s, 64 carriers over 100 MHz. The reference evaluates
     // exp(-j * 2 * pi * x) with x = (-B * p) * tau in double, reduced to x - round(x), as the library does;
-    // the library then evaluates sin / cos in single precision. Each build (AVX2 and generic) stays within
-    // 5e-7 of the reference, so both agree to 1e-6.
+    // the library then evaluates sin / cos in single precision. Each kernel (GENERIC and, where available, AVX2)
+    // stays within 5e-7 of the reference, so both agree to 1e-6.
     const double B = 1.0e8;
     arma::uword n_rx = 2, n_tx = 2, n_path = 4, n_ant = n_rx * n_tx;
     arma::cube cr(n_rx, n_tx, n_path), ci(n_rx, n_tx, n_path), dl(n_rx, n_tx, n_path);
@@ -222,8 +223,12 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
     arma::vec pg = arma::linspace<arma::vec>(0.0, 1.0, 64);
     pg(17) = 0.123456789, pg(40) = 0.987654321;
 
+    for (int kernel : {1, 2})
+    {
+    if (kernel == 2 && !quadriga_lib::quadriga_lib_has_AVX2())
+        continue;
     arma::cx_cube h;
-    quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, B, nullptr, nullptr, &h);
+    quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, B, nullptr, nullptr, &h, kernel);
     REQUIRE(h.n_slices == pg.n_elem);
 
     double err = 0.0;
@@ -240,6 +245,7 @@ TEST_CASE("Baseband Frequency Response - Delays up to 10 s against a double-prec
             err = std::max(err, std::abs(h(a + k * n_ant) - ref));
         }
     CHECK(err < 5.0e-7);
+    }
 
     // Planar-wave delays [1, 1, n_path] give the same result as identical per-antenna delays
     arma::cube dl1(1, 1, n_path), dlx(n_rx, n_tx, n_path);
@@ -375,4 +381,39 @@ TEST_CASE("Baseband Frequency Response - Non-finite bandwidth or pilots throw")
         REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response(&coeff_re, &coeff_im, &delay, &p, 1.0e8, &hr, &hi), std::invalid_argument);
         REQUIRE_THROWS_AS(quadriga_lib::baseband_freq_response_vec(&vr, &vi, &vd, &p, 1.0e8, &vhr, &vhi), std::invalid_argument);
     }
+}
+
+TEST_CASE("baseband_freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 if available")
+{
+    // Auto is AVX2 when available, else GENERIC; _vec passes the kernel to every snapshot; invalid values throw
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    arma::cube cr = arma::randn<arma::cube>(2, 3, 9), ci = arma::randn<arma::cube>(2, 3, 9);
+    arma::cube dl = arma::randu<arma::cube>(1, 1, 9) * 1e-6;
+    arma::vec pg = arma::linspace<arma::vec>(0.0, 1.0, 13);
+    arma::cube hr_auto, hi_auto;
+    quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, 1e8, &hr_auto, &hi_auto);
+    const std::vector<arma::cube> vcr = {cr, cr}, vci = {ci, ci}, vdl = {dl, dl};
+    for (int k : {1, 2})
+    {
+        arma::cube hr, hi;
+        std::vector<arma::cube> vhr, vhi;
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, 1e8, &hr, &hi, nullptr, k), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(&vcr, &vci, &vdl, &pg, 1e8, &vhr, &vhi, nullptr, k), std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, 1e8, &hr, &hi, nullptr, k);
+        quadriga_lib::baseband_freq_response_vec<double>(&vcr, &vci, &vdl, &pg, 1e8, &vhr, &vhi, nullptr, k);
+        CHECK(arma::approx_equal(hr, hr_auto, "absdiff", 1e-5));
+        CHECK(arma::approx_equal(hi, hi_auto, "absdiff", 1e-5));
+        CHECK(arma::approx_equal(vhr[1], hr, "absdiff", 0.0));
+        CHECK(arma::approx_equal(vhi[1], hi, "absdiff", 0.0));
+        if (k == (avx2 ? 2 : 1))
+            CHECK((arma::approx_equal(hr, hr_auto, "absdiff", 0.0) && arma::approx_equal(hi, hi_auto, "absdiff", 0.0)));
+    }
+    arma::cube hr;
+    std::vector<arma::cube> vhr;
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(&cr, &ci, &dl, &pg, 1e8, &hr, nullptr, nullptr, 3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(&vcr, &vci, &vdl, &pg, 1e8, &vhr, nullptr, nullptr, -1), std::invalid_argument);
 }

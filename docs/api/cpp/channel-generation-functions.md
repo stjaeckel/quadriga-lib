@@ -159,7 +159,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *aoa = nullptr,
     arma::Cube<dtype> *eoa = nullptr,
     const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
-    const std::vector<bool> *active_path = nullptr);
+    const std::vector<bool> *active_path = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -190,6 +191,9 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](array-antenna-class.md#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
+- **`use_kernel`** *(optional)* — Kernel of both segments, passed to [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
+  this version
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
@@ -270,7 +274,8 @@ void quadriga_lib::get_channels_multifreq(
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     dtype propagation_speed = dtype(299792458.0),
-    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr);
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -293,6 +298,9 @@ void quadriga_lib::get_channels_multifreq(
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
+  [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)
 
 ### Outputs:
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_new`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
@@ -357,7 +365,8 @@ void quadriga_lib::get_channels_planar(
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
-    arma::Col<dtype> *rx_Doppler = nullptr);
+    arma::Col<dtype> *rx_Doppler = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -378,6 +387,9 @@ void quadriga_lib::get_channels_planar(
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
+  [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate)
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`

@@ -296,7 +296,7 @@ end
 
 % ---- Error: too many input arguments ---------------------------------
 try
-    quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, 28e9, carrier_freq, [], true );
+    quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), delay, pilots, fc, 28e9, carrier_freq, [], 0, true );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments';
@@ -393,4 +393,21 @@ for snap = [false true]   % single-frequency and multi-snapshot branch
     assertTrue( failed );
 end
 
+
+% use_kernel (input 9) reaches C++ in all three modes: 1 is accepted, 3 is rejected by C++
+cr = reshape(sin(1:24), 2, 3, 4); ci = reshape(cos(1:24), 2, 3, 4); dl = reshape((1:4) * 1e-8, 1, 1, 4);
+pg = linspace(0, 1, 5)'; fr = [3e9; 3.2e9]; fo = [3e9; 3.1e9];
+modes = { {cr, ci, dl, pg, 1e8, [], [], []}, {cat(4, cr, cr), cat(4, ci, ci), cat(4, dl, dl), pg, 1e8, [], [], 0}, ...
+    {cat(4, cr, cr), cat(4, ci, ci), cat(4, dl, dl), [], [], fr, fo, []} };
+for m = 1:3
+    [~] = quadriga_lib.baseband_freq_response( modes{m}{:}, 1 );
+    try
+        quadriga_lib.baseband_freq_response( modes{m}{:}, 3 );
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    catch ME
+        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'Input ''use_kernel'' must be 0, 1 or 2.')) %#ok<STREMP>
+            error('moxunit:exceptionNotRaised', ['EXPECTED: "use_kernel", GOT: "', ME.message, '"']);
+        end
+    end
+end
 end

@@ -1053,5 +1053,22 @@ class test_zero_paths_fake_los(unittest.TestCase):
                 self.assertEqual(np.shape(x), (2, 2, 0, 2))
 
 
+class test_use_kernel(unittest.TestCase):
+    # use_kernel (after complex) reaches C++: 0 and 1 give the default result (auto = GENERIC), 3 raises from C++
+    def test(self):
+        fbs = np.array([[20.0], [5.0], [3.0]])
+        M = np.zeros((8, 1, 2))
+        M[0], M[6] = 1.0, -1.0
+        args = (gen_xpol(), gen_xpol(), fbs, fbs, np.ones((1, 2)), np.zeros(1), M, [0, 0, 10], [0, 0, 0], [50, 0, 1.5],
+                [0, 0, 0], np.array([3e9, 3.6e9]), np.array([3e9, 3.3e9]))
+        ref = quadriga_lib.channel.multifreq(*args, complex=False)
+        for k in (0, 1):
+            for a, b in zip(quadriga_lib.channel.multifreq(*args, complex=False, use_kernel=k), ref):
+                npt.assert_array_equal(a, b)
+        with self.assertRaises(ValueError) as ctx:
+            quadriga_lib.channel.multifreq(*args, use_kernel=3)
+        self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -331,7 +331,8 @@ namespace quadriga_lib
                                 const double bandwidth,                           // The baseband bandwidth in [Hz]
                                 arma::Cube<dtype> *hmat_re = nullptr,             // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
                                 arma::Cube<dtype> *hmat_im = nullptr,             // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
-                                arma::Cube<std::complex<dtype>> *hmat = nullptr); // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carriers]
+                                arma::Cube<std::complex<dtype>> *hmat = nullptr,  // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carriers]
+                                int use_kernel = 0);                              // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
     // - Interpolates multi-frequency coefficients from a coarse input grid to a dense output grid using SLERP
@@ -351,7 +352,8 @@ namespace quadriga_lib
                                       arma::Cube<dtype> *hmat_re = nullptr,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
                                       arma::Cube<dtype> *hmat_im = nullptr,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
                                       arma::Cube<std::complex<dtype>> *hmat = nullptr, // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
-                                      bool remove_delay_phase = true);                 // Remove baked-in delay phase before SLERP interpolation
+                                      bool remove_delay_phase = true,                  // Remove baked-in delay phase before SLERP interpolation
+                                      int use_kernel = 0);                             // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Compute the baseband frequency response of multiple MIMO channels
     // - Batch wrapper around [[baseband_freq_response]], applying it across snapshots in parallel via OpenMP
@@ -366,7 +368,8 @@ namespace quadriga_lib
                                     const double bandwidth,                            // Total baseband bandwidth
                                     std::vector<arma::Cube<dtype>> *hmat_re = nullptr, // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carriers]
                                     std::vector<arma::Cube<dtype>> *hmat_im = nullptr, // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
-                                    const arma::uvec *i_snap = nullptr);               // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
+                                    const arma::uvec *i_snap = nullptr,                // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
+                                    int use_kernel = 0);                               // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fixes the path delays to a grid of delay bins
     template <typename dtype>
@@ -566,7 +569,8 @@ namespace quadriga_lib
                                 bool use_absolute_delays = false,             // If true, include LOS delay in all paths
                                 bool add_fake_los_path = false,               // Add one path, slot 0 = LOS path (zero power if none was present)
                                 dtype propagation_speed = 299792458.0,        // Wave propagation speed [m/s]
-                                std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr); // Optional output: complex coeff_re / coeff_im (then left empty)
+                                std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr, // Optional output: complex coeff_re / coeff_im (then left empty)
+                                int use_kernel = 0);                          // Kernel of the antenna interpolation: 0 = auto (GENERIC), 1 = GENERIC, 2 = AVX2
 
     // Calculate channels for Intelligent Reflective Surfaces (IRS)
     // - IRS is provided as a 3rd array antenna model comprised of 'n_irs' elements
@@ -610,7 +614,8 @@ namespace quadriga_lib
                                        arma::Cube<dtype> *aoa = nullptr,                // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path_irs]
                                        arma::Cube<dtype> *eoa = nullptr,                // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path_irs]
                                        const arrayant<dtype> *irs_array_2 = nullptr,    // Optional input: Transmit IRS for the second segment with 'n_irs' elements
-                                       const std::vector<bool> *active_path = nullptr); // Optional input: Switch to activate individual paths, ignores threshold_dB
+                                       const std::vector<bool> *active_path = nullptr,  // Optional input: Switch to activate individual paths, ignores threshold_dB
+                                       int use_kernel = 0);                             // Kernel of both segments (get_channels_spherical): 0 = auto (GENERIC), 1 = GENERIC, 2 = AVX2
 
     // Calculate channel coefficients for planar waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
@@ -644,7 +649,8 @@ namespace quadriga_lib
                              dtype center_freq = dtype(0.0),          // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
                              bool use_absolute_delays = false,        // Option: If true, the LOS delay is included for all paths
                              bool add_fake_los_path = false,          // Option: Add one path, slot 0 = LOS path (zero power if none was present)
-                             arma::Col<dtype> *rx_Doppler = nullptr); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
+                             arma::Col<dtype> *rx_Doppler = nullptr,  // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
+                             int use_kernel = 0);                     // Kernel of the antenna interpolation: 0 = auto (GENERIC), 1 = GENERIC, 2 = AVX2
 
     // Channel generation function for IEEE TGn, TGac, TGax and TGah indoor channel models
     // - Returns vector of channel objects, length n_users

@@ -57,7 +57,7 @@ Also in: [C++](../cpp/channel-functions.md#baseband_freq_response) · [Python](.
 ### Usage:
 ```matlab
 [ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, ...
-    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap );
+    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap, use_kernel );
 ```
 
 ### Dispatch modes:
@@ -83,6 +83,7 @@ Also in: [C++](../cpp/channel-functions.md#baseband_freq_response) · [Python](.
   `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
 - **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based
   indices processes the selected subset. Omitting this argument or passing `[]` keeps the function in single/multi-frequency mode.
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
 - **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`

@@ -4,7 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
-#include "quadriga_lib.hpp" // get_channels_multifreq
+#include "quadriga_lib.hpp" // get_channels_multifreq, quadriga_lib_has_AVX2
 
 #include <cmath>
 #include <complex>
@@ -1122,4 +1122,34 @@ TEST_CASE("baseband_freq_response_multi - Non-finite frequencies throw")
         fin = {v, 2.0e9};
         CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi(cre, cim, dl, fin, fout, &Hr, &Hi), std::invalid_argument);
     }
+}
+
+TEST_CASE("baseband_freq_response_multi - GENERIC and AVX2 agree, auto is AVX2 if available")
+{
+    // The kernel reaches fast_sincos and fast_slerp: GENERIC and AVX2 agree to single precision, auto is AVX2 when
+    // available, else GENERIC; invalid values throw
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    const arma::vec freq = {3.0e9, 3.1e9, 3.3e9}, freq_new = arma::linspace<arma::vec>(2.95e9, 3.35e9, 21);
+    std::vector<arma::cube> cre(3), cim(3);
+    for (arma::uword f = 0; f < 3; ++f)
+        cre[f] = arma::randn<arma::cube>(2, 2, 5), cim[f] = arma::randn<arma::cube>(2, 2, 5);
+    const arma::cube tau = arma::randu<arma::cube>(2, 2, 5) * 1e-6;
+    const auto dl = build_spherical_delays(2, 2, 5, 3, tau);
+
+    arma::cx_cube h_auto, h_gen;
+    quadriga_lib::baseband_freq_response_multi<double>(cre, cim, dl, freq, freq_new, nullptr, nullptr, &h_auto);
+    quadriga_lib::baseband_freq_response_multi<double>(cre, cim, dl, freq, freq_new, nullptr, nullptr, &h_gen, true, 1);
+    if (avx2)
+    {
+        arma::cx_cube h_avx;
+        quadriga_lib::baseband_freq_response_multi<double>(cre, cim, dl, freq, freq_new, nullptr, nullptr, &h_avx, true, 2);
+        CHECK(arma::abs(h_avx - h_gen).max() < 1e-5 * arma::abs(h_gen).max());
+        CHECK(arma::approx_equal(h_avx, h_auto, "absdiff", 0.0));
+    }
+    else
+    {
+        CHECK(arma::approx_equal(h_gen, h_auto, "absdiff", 0.0));
+        CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi<double>(cre, cim, dl, freq, freq_new, nullptr, nullptr, &h_gen, true, 2), std::invalid_argument);
+    }
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi<double>(cre, cim, dl, freq, freq_new, nullptr, nullptr, &h_gen, true, 3), std::invalid_argument);
 }

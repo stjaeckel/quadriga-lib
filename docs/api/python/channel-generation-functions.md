@@ -172,6 +172,8 @@ coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `True`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
+  unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate); `int`; default: 0
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
@@ -250,6 +252,8 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
   separate `coeff_re` and `coeff_im`; default: `True`
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
+  unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate); `int`; default: 0
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`

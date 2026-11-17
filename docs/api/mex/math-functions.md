@@ -74,7 +74,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 Also in: [C++](../cpp/math-functions.md#fast_geo2cart) · [Python](../python/math-functions.md#fast_geo2cart)
 
 - Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
-- Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
+- Optional outputs `sin_az`, `cos_az`, `sin_el`, `cos_el` return intermediate sin/cos values; omit from the
   output list to skip their computation
 - Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
   MATLAB's default numeric type
@@ -85,7 +85,7 @@ Also in: [C++](../cpp/math-functions.md#fast_geo2cart) · [Python](../python/mat
 ### Usage:
 ```matlab
 split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+[ x, y, z, sin_az, cos_az, sin_el, cos_el ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 
 split = false;
 cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
@@ -105,10 +105,10 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
   along the first dim, `[3, n, m]`
 - **`y`** — Y-coordinates; `[n, m]` or empty
 - **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sAZ`** — sin(az); `[n, m]` or empty
-- **`cAZ`** — cos(az); `[n, m]` or empty
-- **`sEL`** — sin(el); `[n, m]` or empty
-- **`cEL`** — cos(el); `[n, m]` or empty
+- **`sin_az`** — sin(az); `[n, m]` or empty
+- **`cos_az`** — cos(az); `[n, m]` or empty
+- **`sin_el`** — sin(el); `[n, m]` or empty
+- **`cos_el`** — cos(el); `[n, m]` or empty
 
 ---
 <a id="fast_sincos"></a>
@@ -117,11 +117,9 @@ Compute elementwise approximate sine and/or cosine of a vector
 
 Also in: [C++](../cpp/math-functions.md#fast_sincos) · Not in: Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for
   abs(x) <= 1e10 (the argument is reduced in double precision where single precision is not enough)
 - Results stay in [-1, 1] for all finite x; Inf and NaN give NaN
-- Either `s` or `c` may be `nullptr` to skip that computation
 - Works on vectors, matrices, and 3-D arrays
 - Accepts any numeric input class; best performance with single precision
 - Outputs are always single precision, also for double input
@@ -130,18 +128,20 @@ Also in: [C++](../cpp/math-functions.md#fast_sincos) · Not in: Python
 
 ### Usage:
 ```matlab
-[s, c] = quadriga_lib.fast_sincos(x);
-s = quadriga_lib.fast_sincos(x);
-c = quadriga_lib.fast_sincos(x, true);
+[sin_x, cos_x] = quadriga_lib.fast_sincos(x);
+sin_x = quadriga_lib.fast_sincos(x);
+cos_x = quadriga_lib.fast_sincos(x, true);
+[sin_x, cos_x] = quadriga_lib.fast_sincos(x, [], use_kernel);
 ```
 
 ### Inputs:
 - **`x`** (input) — Input angles; radians; `[n_elem]`
 - **`cos_only`** — For a single output: `true` returns `cos(x)`; `false` or `[]` returns `sin(x)`; default: false
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (error if unavailable); default: 0
 
 ### Outputs:
-- **`s`** — sin(x); single; `[n_elem]`
-- **`c`** — cos(x); single; `[n_elem]`
+- **`sin_x`** — sin(x); single; `[n_elem]`
+- **`cos_x`** — cos(x); single; `[n_elem]`
 
 ---
 <a id="interp"></a>

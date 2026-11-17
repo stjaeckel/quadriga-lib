@@ -47,7 +47,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 ```
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed );
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
 
 ## Inputs:
@@ -70,6 +70,8 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
+  unavailable); auto selects GENERIC in this version, see [[arrayant_interpolate]]; default: 0
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
@@ -83,7 +85,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 13 || nrhs > 16)
+    if (nrhs < 13 || nrhs > 17)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 3)
@@ -113,6 +115,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool use_absolute_delays = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "use_absolute_delays", false);
     bool add_fake_los_path = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "add_fake_los_path", false);
     double propagation_speed = (nrhs < 16) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[15], "propagation_speed", 299792458.0);
+    const int use_kernel = (nrhs < 17) ? 0 : qd_mex_get_scalar<int>(prhs[16], "use_kernel", 0);
 
     // Derived sizes
     arma::uword n_ports_tx = ant_tx[0].n_ports();
@@ -138,5 +141,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          freq, freq_new,
                                                          coeff_re, coeff_im, delay,
                                                          use_absolute_delays, add_fake_los_path,
-                                                         propagation_speed));
+                                                         propagation_speed, nullptr, use_kernel));
 }

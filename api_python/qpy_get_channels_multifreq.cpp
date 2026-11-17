@@ -80,6 +80,8 @@ coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
   separate `coeff_re` and `coeff_im`; default: `True`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
+  unavailable); auto selects GENERIC in this version, see [[interpolate]]; `int`; default: 0
 
 ## Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
@@ -108,7 +110,8 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                  const bool use_absolute_delays,
                                  const bool add_fake_los_path,
                                  const double propagation_speed,
-                                 py::handle complex)
+                                 py::handle complex,
+                                 const int use_kernel)
 {
     const bool want_complex = qd_python_flag(complex, true, "complex");
 
@@ -149,7 +152,8 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                                      fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
                                                      freq_a, freq_new_a,
                                                      coeff_re, coeff_im, delay,
-                                                     use_absolute_delays, add_fake_los_path, propagation_speed, &coeff);
+                                                     use_absolute_delays, add_fake_los_path, propagation_speed, &coeff,
+                                                     use_kernel);
         return py::make_tuple(coeff_py, delay_py);
     }
 
@@ -164,7 +168,8 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                                  fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
                                                  freq_a, freq_new_a,
                                                  coeff_re, coeff_im, delay,
-                                                 use_absolute_delays, add_fake_los_path, propagation_speed);
+                                                 use_absolute_delays, add_fake_los_path, propagation_speed, nullptr,
+                                                 use_kernel);
 
     return py::make_tuple(coeff_re_py, coeff_im_py, delay_py);
 }

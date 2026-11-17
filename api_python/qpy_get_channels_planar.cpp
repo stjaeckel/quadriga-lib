@@ -72,6 +72,8 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
   separate `coeff_re` and `coeff_im`; default: `True`
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; default: `0`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
+  unavailable); auto selects GENERIC in this version, see [[interpolate]]; `int`; default: 0
 
 ## Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
@@ -103,7 +105,8 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                               const bool use_absolute_delays,
                               const bool add_fake_los_path,
                               py::handle complex,
-                              const arma::uword i_freq)
+                              const arma::uword i_freq,
+                              const int use_kernel)
 {
     const bool want_complex = qd_python_flag(complex, true, "complex");
 
@@ -158,7 +161,7 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                                                   aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, M_f,
                                                   coeff_re, coeff_im, delay,
                                                   center_freq_sel, use_absolute_delays, add_fake_los_path,
-                                                  &rx_Doppler);
+                                                  &rx_Doppler, use_kernel);
 
         auto coeff_p = qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im);
         return py::make_tuple(coeff_p, delay_p, rx_Doppler_p);
@@ -173,7 +176,7 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                                               aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, M_f,
                                               coeff_re, coeff_im, delay,
                                               center_freq_sel, use_absolute_delays, add_fake_los_path,
-                                              &rx_Doppler);
+                                              &rx_Doppler, use_kernel);
 
     return py::make_tuple(coeff_re_p, coeff_im_p, delay_p, rx_Doppler_p);
 }

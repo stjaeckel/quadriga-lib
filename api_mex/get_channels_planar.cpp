@@ -36,7 +36,7 @@ Calculate MIMO channel coefficients for planar wave paths
 ```
 [ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    center_freq, use_absolute_delays, add_fake_los_path );
+    center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ## Inputs:
@@ -57,6 +57,8 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
+  unavailable); auto selects GENERIC in this version, see [[arrayant_interpolate]]; default: 0
 
 
 ## Outputs:
@@ -75,7 +77,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 13 || nrhs > 16)
+    if (nrhs < 13 || nrhs > 17)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 4)
@@ -100,6 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double center_freq = (nrhs < 14) ? 0.0 : qd_mex_get_scalar<double>(prhs[13], "center_freq", 0.0);
     bool use_absolute_delays = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "use_absolute_delays", false);
     bool add_fake_los_path = (nrhs < 16) ? false : qd_mex_get_scalar<bool>(prhs[15], "add_fake_los_path", false);
+    const int use_kernel = (nrhs < 17) ? 0 : qd_mex_get_scalar<int>(prhs[16], "use_kernel", 0);
 
     // Derived inputs
     arma::uword n_ports_tx = ant_tx.n_ports();
@@ -126,5 +129,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                       aod, eod, aoa, eoa, path_gain, path_length, M,
                                                       coeff_re, coeff_im, delay,
                                                       center_freq, use_absolute_delays, add_fake_los_path,
-                                                      &rx_Doppler));
+                                                      &rx_Doppler, use_kernel));
 }

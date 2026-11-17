@@ -1662,3 +1662,48 @@ TEST_CASE("Get Channels Multifreq - Position and orientation shapes")
             CHECK(arma::approx_equal(d[0], dl[0], "absdiff", 0.0));
         }
 }
+
+TEST_CASE("Get Channels Multifreq - AVX2 interpolation agrees with GENERIC, auto is GENERIC")
+{
+    // AVX2 antenna interpolation agrees with GENERIC; auto selects GENERIC (identical results); invalid values throw
+    auto tx = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0, 5.0);
+    auto tx2 = quadriga_lib::generate_arrayant_custom<double>(70.0, 70.0, 0.0, 5.0);
+    const auto rx = quadriga_lib::generate_arrayant_xpol<double>(10.0);
+    const std::vector<quadriga_lib::arrayant<double>> txv = {tx, tx2}, rxv = {rx, rx};
+    const arma::uword n = 13;
+    arma::mat fbs = arma::randu<arma::mat>(3, n) * 60.0 - 30.0;
+    fbs.row(0) += 25.0;
+    const arma::mat gain(n, 2, arma::fill::ones);
+    const arma::vec len(n, arma::fill::zeros), freq = {3.0e9, 3.6e9}, freq_new = {3.0e9, 3.3e9, 3.6e9};
+    const arma::cube M = arma::randn<arma::cube>(8, n, 2);
+
+    std::vector<arma::cube> cr[3], ci[3], dl[3];
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    for (int k : {0, 1, 2})
+    {
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(txv, rxv, {0, 0, 10}, {0, 0.1, 0.5}, {50, 0, 1.5}, {0, 0, 2.0},
+                                                                         fbs, fbs, gain, len, M, freq, freq_new, cr[k], ci[k], dl[k],
+                                                                         false, false, 299792458.0, nullptr, k),
+                            std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::get_channels_multifreq<double>(txv, rxv, {0, 0, 10}, {0, 0.1, 0.5}, {50, 0, 1.5}, {0, 0, 2.0},
+                                                     fbs, fbs, gain, len, M, freq, freq_new, cr[k], ci[k], dl[k],
+                                                     false, false, 299792458.0, nullptr, k);
+    }
+    for (arma::uword f = 0; f < freq_new.n_elem; ++f)
+    {
+        CHECK((arma::approx_equal(cr[0][f], cr[1][f], "absdiff", 0.0) && arma::approx_equal(ci[0][f], ci[1][f], "absdiff", 0.0)));
+        if (!avx2)
+            continue;
+        const double amax = arma::sqrt(arma::square(cr[1][f]) + arma::square(ci[1][f])).max();
+        CHECK(arma::sqrt(arma::square(cr[2][f] - cr[1][f]) + arma::square(ci[2][f] - ci[1][f])).max() < 1e-5 * amax);
+        CHECK(arma::approx_equal(dl[2][f], dl[1][f], "absdiff", 1e-12));
+    }
+    CHECK_THROWS_AS(quadriga_lib::get_channels_multifreq<double>(txv, rxv, {0, 0, 10}, {0, 0, 0}, {50, 0, 1.5}, {0, 0, 0},
+                                                                 fbs, fbs, gain, len, M, freq, freq_new, cr[0], ci[0], dl[0],
+                                                                 false, false, 299792458.0, nullptr, -1),
+                    std::invalid_argument);
+}

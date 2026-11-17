@@ -123,7 +123,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · Not i
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
-    i_irs, threshold_dB, center_freq, use_absolute_delays, active_path_in, ant_irs_2 );
+    i_irs, threshold_dB, center_freq, use_absolute_delays, active_path_in, ant_irs_2, use_kernel );
 ```
 
 ### Inputs:
@@ -154,6 +154,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · Not i
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`active_path_in`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
 - **`ant_irs_2`** — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns
+- **`use_kernel`** — Kernel of both segments, as in [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision; error if unavailable); auto selects GENERIC in this version; default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
@@ -212,7 +214,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 ```matlab
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed );
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
 
 ### Inputs:
@@ -235,6 +237,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `false`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
+  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_new]`
@@ -276,7 +280,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
 ```matlab
 [ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
-    center_freq, use_absolute_delays, add_fake_los_path );
+    center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ### Inputs:
@@ -297,6 +301,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [P
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; Default: `false`
+- **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; error if
+  unavailable); auto selects GENERIC in this version, see [arrayant_interpolate](array-antenna-functions.md#arrayant_interpolate); default: 0
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`

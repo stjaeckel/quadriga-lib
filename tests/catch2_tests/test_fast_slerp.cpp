@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_math.hpp"
+#include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <cmath>
 
 // Helper: scalar double-precision SLERP reference (matches slerp_complex_mf logic)
@@ -337,4 +338,40 @@ TEST_CASE("fast_slerp - Outputs that alias inputs")
     // An output uses the memory of an input
     arma::fvec Bi_view(Bi.memptr(), 9, false, true);
     CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Bi_view), std::invalid_argument);
+}
+
+TEST_CASE("fast_slerp - GENERIC and AVX2 meet the documented error, auto is AVX2 if available")
+{
+    // Phase differences up to 2 rad: both kernels stay within the documented relative error of the double-precision
+    // reference; auto is AVX2 when available, else GENERIC
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    const arma::uword n = 1003;
+    arma::vec Ar(n), Ai(n), Br(n), Bi(n), w = arma::linspace<arma::vec>(0.0, 1.0, n), Xr_ref(n), Xi_ref(n);
+    for (arma::uword i = 0; i < n; ++i)
+    {
+        const double ph = 0.01 * (double)i, dph = -2.0 + 4.0 * (double)i / (double)(n - 1), r = 0.5 + 0.001 * (double)i;
+        Ar[i] = r * std::cos(ph), Ai[i] = r * std::sin(ph);
+        Br[i] = 1.5 * std::cos(ph + dph), Bi[i] = 1.5 * std::sin(ph + dph);
+        slerp_ref(Ar[i], Ai[i], Br[i], Bi[i], w[i], Xr_ref[i], Xi_ref[i]);
+    }
+    arma::fvec Xr_auto, Xi_auto;
+    quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr_auto, Xi_auto);
+    for (int k : {1, 2})
+    {
+        arma::fvec Xr, Xi;
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi, k), std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi, k);
+        double err = 0.0;
+        for (arma::uword i = 0; i < n; ++i)
+            err = std::max(err, std::hypot((double)Xr[i] - Xr_ref[i], (double)Xi[i] - Xi_ref[i]) / std::hypot(Xr_ref[i], Xi_ref[i]));
+        CHECK(err < 5e-7);
+        if (k == (avx2 ? 2 : 1))
+            CHECK((arma::approx_equal(Xr, Xr_auto, "absdiff", 0.0f) && arma::approx_equal(Xi, Xi_auto, "absdiff", 0.0f)));
+    }
+    arma::fvec Xr, Xi;
+    CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi, 3), std::invalid_argument);
 }

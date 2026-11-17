@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_math.hpp"
+#include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <cmath>
 
 // Helper: compute max absolute error between fast result (float) and reference (double)
@@ -469,4 +470,38 @@ TEST_CASE("fast_asin / fast_acos - Outputs that alias inputs")
     arma::fvec x_part(buf.memptr(), 9, false, true), y_part(buf.memptr() + 1, 9, false, true);
     CHECK_THROWS_AS(quadriga_lib::fast_asin(x_part, y_part), std::invalid_argument);
     CHECK_THROWS_AS(quadriga_lib::fast_acos(x_part, y_part), std::invalid_argument);
+}
+
+TEST_CASE("fast_asin / fast_acos - GENERIC and AVX2 meet the documented error, auto is AVX2 if available")
+{
+    // Both kernels stay within the documented error of the exact values of the float-rounded input; auto is AVX2
+    // when available, else GENERIC
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    const arma::vec x = arma::linspace<arma::vec>(-1.0, 1.0, 1003);
+    const arma::vec xr = arma::conv_to<arma::vec>::from(arma::conv_to<arma::fvec>::from(x));
+    arma::fvec as_auto, ac_auto;
+    quadriga_lib::fast_asin(x, as_auto);
+    quadriga_lib::fast_acos(x, ac_auto);
+    for (int k : {1, 2})
+    {
+        arma::fvec as, ac;
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::fast_asin(x, as, k), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::fast_acos(x, ac, k), std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::fast_asin(x, as, k);
+        quadriga_lib::fast_acos(x, ac, k);
+        CHECK(max_abs_error(as, arma::asin(xr)) < 3e-7);
+        CHECK(max_abs_error(ac, arma::acos(xr)) < 3e-7);
+        if (k == (avx2 ? 2 : 1))
+        {
+            CHECK(arma::approx_equal(as, as_auto, "absdiff", 0.0f));
+            CHECK(arma::approx_equal(ac, ac_auto, "absdiff", 0.0f));
+        }
+    }
+    arma::fvec a;
+    CHECK_THROWS_AS(quadriga_lib::fast_asin(x, a, 3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::fast_acos(x, a, -1), std::invalid_argument);
 }

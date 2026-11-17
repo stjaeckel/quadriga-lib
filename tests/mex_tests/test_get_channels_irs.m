@@ -52,6 +52,21 @@ i_irs = 1; thr_keep_all = -300; f0_zero = 0; use_abs=false; active_path_in=[];
     tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
     i_irs, thr_keep_all, f0_zero, use_abs, active_path_in, [] );
 
+% use_kernel (input 26) reaches C++: 0 and 1 give the default result (auto = GENERIC), 3 is rejected by C++
+args = { ant_tx, ant_rx, ant_irs, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, tx_pos, tx_ori, rx_pos, rx_ori, irs_pos, irs_ori, ...
+    i_irs, thr_keep_all, f0_zero, use_abs, active_path_in, [] };
+assertEqual( quadriga_lib.get_channels_irs( args{:}, 0 ), cr0 );
+assertEqual( quadriga_lib.get_channels_irs( args{:}, 1 ), cr0 );
+try
+    quadriga_lib.get_channels_irs( args{:}, 3 );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'Input ''use_kernel'' must be 0, 1 or 2.')) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "use_kernel", GOT: "', ME.message, '"']);
+    end
+end
+
 % Sizes
 assertEqual(size(cr0), [n_ports_rx, n_ports_tx, 4]);
 assertEqual(size(ci0), [n_ports_rx, n_ports_tx, 4]);

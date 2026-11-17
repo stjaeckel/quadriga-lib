@@ -4,7 +4,7 @@
 
 // Channel coefficient tools on fuzzed coefficient and delay cubes (consistent or mismatched sizes): quantize_delays
 // (also with outputs that alias inputs), baseband_freq_response, baseband_freq_response_vec and
-// baseband_freq_response_multi
+// baseband_freq_response_multi, with the available kernels
 
 #include "fuzz_target.hpp"
 
@@ -44,6 +44,7 @@ static void run(fz::input &in)
 
     // Outputs: nullptr or an object, sometimes with a stale size
     const uint8_t out_mask = in.ConsumeIntegral<uint8_t>();
+    const int use_kernel = in.ConsumeIntegralInRange<int>(0, quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1);
     arma::Col<T> pilot = in.col<T>(in.size(16));
     const double bandwidth = in.value<double>();
 
@@ -58,7 +59,7 @@ static void run(fz::input &in)
             h_re.set_size(in.size(3), in.size(3), in.size(3)), h.set_size(in.size(3), in.size(3), in.size(3));
         fz::clean([&] { quadriga_lib::baseband_freq_response(&a, &b, &d, (out_mask & 16) ? nullptr : &pilot, bandwidth,
                                                              (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
-                                                             (out_mask & 4) ? &h : nullptr); });
+                                                             (out_mask & 4) ? &h : nullptr, use_kernel); });
     }
 
     // baseband_freq_response_vec on all or some snapshots
@@ -71,7 +72,7 @@ static void run(fz::input &in)
             h_re.resize(in.size(3));
         fz::clean([&] { quadriga_lib::baseband_freq_response_vec(&cre, &cim, &dl, &pilot, bandwidth,
                                                                  (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
-                                                                 (out_mask & 32) ? &i_snap : nullptr); });
+                                                                 (out_mask & 32) ? &i_snap : nullptr, use_kernel); });
     }
 
     // baseband_freq_response_multi with the snapshots as input frequencies
@@ -86,7 +87,7 @@ static void run(fz::input &in)
         const bool remove_phase = in.ConsumeBool();
         fz::clean([&] { quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, (out_mask & 1) ? &h_re : nullptr,
                                                                    (out_mask & 2) ? &h_im : nullptr, (out_mask & 4) ? &h : nullptr,
-                                                                   remove_phase); });
+                                                                   remove_phase, use_kernel); });
     }
 }
 

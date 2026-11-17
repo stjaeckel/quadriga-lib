@@ -52,5 +52,5 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 **Kernel selection**
 
-- `use_kernel`: compute kernel; `0` = auto (CUDA if available and problem large enough, else AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2, `3` = CUDA. Throws if the requested kernel is unavailable.
+- `use_kernel`: compute kernel of a function with more than one kernel; `0` = auto, `1` = GENERIC, `2` = AVX2, `3` = CUDA (only where a CUDA kernel exists). Auto selects per function, as stated in each function; where it is not the fastest kernel, the function says so. Throws if the requested kernel is unavailable.
 - `gpu_id`: CUDA device ID; only read when `use_kernel` resolves to CUDA.

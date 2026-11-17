@@ -57,7 +57,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 **Kernel selection**
 
-- `use_kernel`: compute kernel; `0` = auto (CUDA if available and problem large enough, else AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2, `3` = CUDA. Throws if the requested kernel is unavailable.
+- `use_kernel`: compute kernel of a function with more than one kernel; `0` = auto, `1` = GENERIC, `2` = AVX2, `3` = CUDA (only where a CUDA kernel exists). Auto selects per function, as stated in each function; where it is not the fastest kernel, the function says so. Throws if the requested kernel is unavailable.
 - `gpu_id`: CUDA device ID; only read when `use_kernel` resolves to CUDA.
 
 # Function Index
@@ -1751,8 +1751,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#baseband_freq_response) · [Python](qu
 - `pilot_grid` values are normalized to bandwidth: `0.0` = center frequency, `1.0` = center + bandwidth
 - The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
   before sin / cos are evaluated in single precision, so long (absolute) delays keep their accuracy; coefficients and
-  sums are single precision; uses AVX2 for 8-carrier parallel computation; double inputs are narrowed to float
-  internally, results widened back
+  sums are single precision (both kernels); double inputs are narrowed to float internally, results widened back
 - Safe to call in a loop over snapshots and parallelize with OpenMP
 
 ### Declaration:
@@ -1765,7 +1764,8 @@ void quadriga_lib::baseband_freq_response(
     const double bandwidth,
     arma::Cube<dtype> *hmat_re,
     arma::Cube<dtype> *hmat_im,
-    arma::Cube<std::complex<dtype>> *hmat = nullptr);
+    arma::Cube<std::complex<dtype>> *hmat = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -1774,6 +1774,7 @@ void quadriga_lib::baseband_freq_response(
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
@@ -1814,7 +1815,8 @@ void quadriga_lib::baseband_freq_response_multi(
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
-    bool remove_delay_phase = true);
+    bool remove_delay_phase = true,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -1830,6 +1832,7 @@ void quadriga_lib::baseband_freq_response_multi(
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
   across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
+- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -1863,7 +1866,8 @@ void quadriga_lib::baseband_freq_response_vec(
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec *i_snap = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -1873,6 +1877,7 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
 - **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
@@ -2941,7 +2946,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *aoa = nullptr,
     arma::Cube<dtype> *eoa = nullptr,
     const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
-    const std::vector<bool> *active_path = nullptr);
+    const std::vector<bool> *active_path = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -2972,6 +2978,9 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](#arrayant)
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
+- **`use_kernel`** *(optional)* — Kernel of both segments, passed to [get_channels_spherical](#get_channels_spherical): 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
+  this version
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
@@ -3052,7 +3061,8 @@ void quadriga_lib::get_channels_multifreq(
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
     dtype propagation_speed = dtype(299792458.0),
-    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr);
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -3075,6 +3085,9 @@ void quadriga_lib::get_channels_multifreq(
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
+  [arrayant_interpolate](#arrayant_interpolate)
 
 ### Outputs:
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_new`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
@@ -3139,7 +3152,8 @@ void quadriga_lib::get_channels_planar(
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
-    arma::Col<dtype> *rx_Doppler = nullptr);
+    arma::Col<dtype> *rx_Doppler = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Inputs:
@@ -3160,6 +3174,9 @@ void quadriga_lib::get_channels_planar(
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
+  [arrayant_interpolate](#arrayant_interpolate)
 
 ### Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -4844,20 +4861,22 @@ Compute elementwise approximate arc-cosine of a vector
 
 Not in: MATLAB, Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7), both kernels; values outside [-1, 1] produce NaN
+- Double input is rounded to float first; near ±1 this adds up to 6e-8 / sqrt(1 - x²) (at most 3.5e-4 rad)
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &c);
-void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &c);
+void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &acos_x, int use_kernel = 0);
+void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &acos_x, int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`c`** — acos(x); `[n_elem]`
+- **`acos_x`** — acos(x); `[n_elem]`
 
 ---
 <a id="fast_asin"></a>
@@ -4866,20 +4885,22 @@ Compute elementwise approximate arc-sine of a vector
 
 Not in: MATLAB, Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7), both kernels; values outside [-1, 1] produce NaN
+- Double input is rounded to float first; near ±1 this adds up to 6e-8 / sqrt(1 - x²) (at most 3.5e-4 rad)
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &s);
-void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &s);
+void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &asin_x, int use_kernel = 0);
+void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &asin_x, int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`x`** — Input values in [-1, 1]; `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`s`** — asin(x); `[n_elem]`
+- **`asin_x`** — asin(x); `[n_elem]`
 
 ---
 <a id="fast_atan2"></a>
@@ -4888,23 +4909,24 @@ Compute elementwise approximate two-argument arc-tangent of two vectors
 
 Not in: MATLAB, Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Returns angles in [-pi, pi]; max error ~3 ULP (~3.6e-7)
+- Returns angles in [-pi, pi]; max error ~3 ULP (~3.6e-7), both kernels
 - Special values as std::atan2 (both kernels): atan2(±0, +0) = ±0, atan2(±0, -0) = ±pi, atan2(±0, x < 0) = ±pi,
   atan2(±inf, ±inf) = ±pi/4 or ±3pi/4; NaN in x or y gives NaN
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fvec &a);
-void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fvec &a);
+void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fvec &atan2_yx, int use_kernel = 0);
+void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fvec &atan2_yx, int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`y`** — Y-coordinates (numerator); `[n_elem]`
 - **`x`** — X-coordinates (denominator); `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`a`** — atan2(y, x); `[n_elem]`
+- **`atan2_yx`** — atan2(y, x); `[n_elem]`
 
 ---
 <a id="fast_cart2geo"></a>
@@ -4953,8 +4975,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 Also in: [MATLAB](quadriga_lib_api_mex.md#fast_geo2cart) · [Python](quadriga_lib_api_python.md#fast_geo2cart)
 
 - Conversion: x = cos(el)*cos(az)*len, y = cos(el)*sin(az)*len, z = sin(el)*len
-- Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Optional pointer outputs `sin_az`, `cos_az`, `sin_el`, `cos_el` return intermediate sin/cos values; pass `nullptr` to skip
 - Precision: GENERIC kernel uses full `dtype` precision (double or float).
 - AVX2 kernel computes sine and cosine in single precision (max. error about 1.3e-7 for angles up to 1e10;
   `dtype=double` angles are reduced in double precision first), results widened back. Use `use_kernel=1` to force
@@ -4968,10 +4989,10 @@ void fast_geo2cart(
     arma::Col<dtype> &x,
     arma::Col<dtype> &y,
     arma::Col<dtype> &z,
-    arma::Col<dtype> *sAZ = nullptr,
-    arma::Col<dtype> *cAZ = nullptr,
-    arma::Col<dtype> *sEL = nullptr,
-    arma::Col<dtype> *cEL = nullptr,
+    arma::Col<dtype> *sin_az = nullptr,
+    arma::Col<dtype> *cos_az = nullptr,
+    arma::Col<dtype> *sin_el = nullptr,
+    arma::Col<dtype> *cos_el = nullptr,
     const arma::Col<dtype> *len = nullptr,
     int use_kernel = 0);
 ```
@@ -4986,10 +5007,10 @@ void fast_geo2cart(
 - **`x`** — X-coordinates; `[n_elem]`
 - **`y`** — Y-coordinates; `[n_elem]`
 - **`z`** — Z-coordinates; `[n_elem]`
-- **`sAZ`** *(optional)* — sin(az); `[n_elem]` or `nullptr`
-- **`cAZ`** *(optional)* — cos(az); `[n_elem]` or `nullptr`
-- **`sEL`** *(optional)* — sin(el); `[n_elem]` or `nullptr`
-- **`cEL`** *(optional)* — cos(el); `[n_elem]` or `nullptr`
+- **`sin_az`** *(optional)* — sin(az); `[n_elem]` or `nullptr`
+- **`cos_az`** *(optional)* — cos(az); `[n_elem]` or `nullptr`
+- **`sin_el`** *(optional)* — sin(el); `[n_elem]` or `nullptr`
+- **`cos_el`** *(optional)* — cos(el); `[n_elem]` or `nullptr`
 
 ### See also:
 - [fast_cart2geo](#fast_cart2geo) (inverse conversion)
@@ -5001,25 +5022,29 @@ Compute elementwise approximate sine and/or cosine of a vector
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#fast_sincos) · Not in: Python
 
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for |x| <= 1e10
   (both kernels; the argument is reduced in double precision where single precision is not enough)
 - Results stay in [-1, 1] for all finite x; inf and NaN give NaN
 - The AVX2 kernel is fastest for |x| <= 2^22 (4.2e6); larger arguments take about 1.5 times as long
-- Either `s` or `c` may be `nullptr` to skip that computation
+- Either `sin_x` or `cos_x` may be `nullptr` to skip that computation
+- Outputs are single precision also for double input: the fast_* functions are meant for very large arrays, where a
+  double output would add a pass and a copy that doubles the peak memory; double-precision callers use the standard library
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_sincos(const arma::fvec &x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
-void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *s = nullptr, arma::fvec *c = nullptr);
+void quadriga_lib::fast_sincos(const arma::fvec &x, arma::fvec *sin_x = nullptr, arma::fvec *cos_x = nullptr,
+                               int use_kernel = 0);
+void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *sin_x = nullptr, arma::fvec *cos_x = nullptr,
+                               int use_kernel = 0);
 ```
 
 ### Inputs:
 - **`x`** — Input angles; `[n_elem]`
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
-- **`s`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
-- **`c`** *(optional)* — cos(x); `[n_elem]` or `nullptr`
+- **`sin_x`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
+- **`cos_x`** *(optional)* — cos(x); `[n_elem]` or `nullptr`
 
 ---
 <a id="fast_slerp"></a>
@@ -5033,33 +5058,34 @@ Not in: MATLAB, Python
 - Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
 - If both input amplitudes are negligible (below 1.19e-7), output is zero
 - Max relative error vs. double-precision reference about 5e-7 for phase differences up to 2 rad, 1.2e-5 up to
-  3 rad; larger towards the near-antipodal transition to linear interpolation
+  3 rad (both kernels); larger towards the near-antipodal transition to linear interpolation
 - The result of an element does not depend on the other elements
-- AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
+- Single-precision output also for double input, as [fast_sincos](#fast_sincos)
 
 ### Declaration:
 ```cpp
-void quadriga_lib::fast_slerp(const arma::fvec &Ar, const arma::fvec &Ai,
-                              const arma::fvec &Br, const arma::fvec &Bi,
+void quadriga_lib::fast_slerp(const arma::fvec &A_re, const arma::fvec &A_im,
+                              const arma::fvec &B_re, const arma::fvec &B_im,
                               const arma::fvec &w,
-                              arma::fvec &Xr, arma::fvec &Xi);
+                              arma::fvec &X_re, arma::fvec &X_im, int use_kernel = 0);
 
-void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
-                              const arma::vec &Br, const arma::vec &Bi,
+void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
+                              const arma::vec &B_re, const arma::vec &B_im,
                               const arma::vec &w,
-                              arma::fvec &Xr, arma::fvec &Xi);
+                              arma::fvec &X_re, arma::fvec &X_im, int use_kernel = 0);
 ```
 
 ### Inputs:
-- **`Ar`** — Real part of source A; `[n_elem]`
-- **`Ai`** — Imaginary part of source A; `[n_elem]`
-- **`Br`** — Real part of source B; `[n_elem]`
-- **`Bi`** — Imaginary part of source B; `[n_elem]`
+- **`A_re`** — Real part of source A; `[n_elem]`
+- **`A_im`** — Imaginary part of source A; `[n_elem]`
+- **`B_re`** — Real part of source B; `[n_elem]`
+- **`B_im`** — Imaginary part of source B; `[n_elem]`
 - **`w`** — Per-element interpolation weight in [0, 1]; `[n_elem]`
+- **`use_kernel`** — Kernel, as in [fast_sincos](#fast_sincos); default `0`
 
 ### Outputs:
-- **`Xr`** — Real part of interpolated result; `[n_elem]`
-- **`Xi`** — Imaginary part of interpolated result; `[n_elem]`
+- **`X_re`** — Real part of interpolated result; `[n_elem]`
+- **`X_im`** — Imaginary part of interpolated result; `[n_elem]`
 
 ---
 <a id="interp_2D"></a>
@@ -5242,7 +5268,7 @@ void calc_diffraction_gain(
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths)
 - **`verbose`** — Verbosity level
 - **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
-- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
+- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [ray_triangle_intersect](#ray_triangle_intersect)
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects

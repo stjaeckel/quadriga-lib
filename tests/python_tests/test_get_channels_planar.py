@@ -572,5 +572,20 @@ class test_zero_paths_fake_los(unittest.TestCase):
         self.assertEqual(c.shape, (2, 2, 0))
 
 
+class test_use_kernel(unittest.TestCase):
+    # use_kernel (after i_freq) reaches C++: 0 and 1 give the default result (auto = GENERIC), 3 raises from C++
+    def test(self):
+        ang = np.array([0.1, 0.5])
+        args = (xpol(), xpol(), ang, ang, -ang, ang, np.ones(2), np.array([60.0, 70.0]), make_M(2),
+                [0, 0, 10], [0, 0, 0], [50, 0, 1.5], [0, 0, 0], 3e9)
+        ref = channel.planar(*args, complex=False)
+        for k in (0, 1):
+            for a, b in zip(channel.planar(*args, complex=False, use_kernel=k), ref):
+                npt.assert_array_equal(a, b)
+        with self.assertRaises(ValueError) as ctx:
+            channel.planar(*args, use_kernel=3)
+        self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
+
+
 if __name__ == '__main__':
     unittest.main()

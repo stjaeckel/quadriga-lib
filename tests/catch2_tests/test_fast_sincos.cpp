@@ -6,9 +6,11 @@
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_approx.hpp>           // Catch::Approx (Catch2 v3)
 #include "quadriga_math.hpp"                // declares quadriga_lib::sincos_approx
+#include "quadriga_lib.hpp"                 // quadriga_lib_has_AVX2
 #include <armadillo>
 #include <cmath>
 #include <vector>
+#include <cstring>
 
 static inline float ref_sin(float x) { return std::sin(x); }
 static inline float ref_cos(float x) { return std::cos(x); }
@@ -156,4 +158,35 @@ TEST_CASE("fast_sincos - Outputs that alias inputs")
     arma::fvec buf = arma::linspace<arma::fvec>(-1.0f, 1.0f, 10);
     arma::fvec x_part(buf.memptr(), 9, false, true), s_part(buf.memptr() + 1, 9, false, true);
     CHECK_THROWS_AS(quadriga_lib::fast_sincos(x_part, &s_part), std::invalid_argument);
+}
+
+TEST_CASE("fast_sincos - GENERIC and AVX2 meet the documented error, auto is AVX2 if available")
+{
+    // Both kernels stay within the documented error of the exact values; auto is AVX2 when available, else GENERIC
+    const bool avx2 = quadriga_lib::quadriga_lib_has_AVX2();
+    const arma::vec x = arma::linspace<arma::vec>(-1.0e4, 1.0e4, 1003);
+    arma::fvec s_auto, c_auto;
+    quadriga_lib::fast_sincos(x, &s_auto, &c_auto);
+    for (int k : {1, 2})
+    {
+        arma::fvec s, c;
+        if (k == 2 && !avx2)
+        {
+            CHECK_THROWS_AS(quadriga_lib::fast_sincos(x, &s, &c, k), std::invalid_argument);
+            continue;
+        }
+        quadriga_lib::fast_sincos(x, &s, &c, k);
+        double err = 0.0;
+        for (arma::uword i = 0; i < x.n_elem; ++i)
+            err = std::max({err, std::abs((double)s[i] - std::sin(x[i])), std::abs((double)c[i] - std::cos(x[i]))});
+        CHECK(err < 1.5e-7);
+        if (k == (avx2 ? 2 : 1))
+        {
+            CHECK(std::memcmp(s.memptr(), s_auto.memptr(), x.n_elem * sizeof(float)) == 0);
+            CHECK(std::memcmp(c.memptr(), c_auto.memptr(), x.n_elem * sizeof(float)) == 0);
+        }
+    }
+    arma::fvec s;
+    CHECK_THROWS_AS(quadriga_lib::fast_sincos(x, &s, nullptr, 3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::fast_sincos(x, &s, nullptr, -1), std::invalid_argument);
 }

@@ -73,10 +73,17 @@ assert_close(s1, sin(x), 1e-6);
 
 %% Malformed input is rejected by the MEX helpers
 assert_cpp_error( @() quadriga_lib.fast_sincos( sparse([0 0 1.5]) ), 'Sparse inputs are not supported.' );
-assert_cpp_error( @() quadriga_lib.fast_sincos( [0 0 1.5], sparse(true) ), 'Input ''cosineOnly'' is sparse' );
+assert_cpp_error( @() quadriga_lib.fast_sincos( [0 0 1.5], sparse(true) ), 'Input ''cos_only'' is sparse' );
 assert_cpp_error( @() quadriga_lib.fast_sincos( ones(2,2,2,2,2) ), 'Inputs with more than 4 dimensions are not supported.' );
 s = quadriga_lib.fast_sincos( ones(2,2,2,2) );                  % 4 dimensions are supported (all 16 values)
 assertEqual( numel(s), 16 );
+
+%% use_kernel (input 3) reaches C++: 1 is accepted, 3 is rejected by C++, also for empty input
+x = linspace(-100, 100, 101);
+[s1, c1] = quadriga_lib.fast_sincos(x, [], 1);
+assertEqual( size(s1), size(x) );
+assert_cpp_error( @() quadriga_lib.fast_sincos(zeros(0, 1), [], 3), 'Input ''use_kernel'' must be 0, 1 or 2.' );
+assert_cpp_error( @() quadriga_lib.fast_sincos(x, [], 3), 'Input ''use_kernel'' must be 0, 1 or 2.' );
 end
 
 % Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).

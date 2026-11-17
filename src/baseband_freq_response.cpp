@@ -27,8 +27,7 @@ Compute the baseband frequency response of a MIMO channel
 - `pilot_grid` values are normalized to bandwidth: `0.0` = center frequency, `1.0` = center + bandwidth
 - The phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to one period
   before sin / cos are evaluated in single precision, so long (absolute) delays keep their accuracy; coefficients and
-  sums are single precision; uses AVX2 for 8-carrier parallel computation; double inputs are narrowed to float
-  internally, results widened back
+  sums are single precision (both kernels); double inputs are narrowed to float internally, results widened back
 - Safe to call in a loop over snapshots and parallelize with OpenMP
 
 ## Declaration:
@@ -41,7 +40,8 @@ void quadriga_lib::baseband_freq_response(
     const double bandwidth,
     arma::Cube<dtype> *hmat_re,
     arma::Cube<dtype> *hmat_im,
-    arma::Cube<std::complex<dtype>> *hmat = nullptr);
+    arma::Cube<std::complex<dtype>> *hmat = nullptr,
+    int use_kernel = 0);
 ```
 
 ## Inputs:
@@ -50,6 +50,7 @@ void quadriga_lib::baseband_freq_response(
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
@@ -71,8 +72,10 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
                                           const double bandwidth,                // The baseband bandwidth in [Hz]
                                           arma::Cube<dtype> *hmat_re,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
                                           arma::Cube<dtype> *hmat_im,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
-                                          arma::Cube<std::complex<dtype>> *hmat) // Output: Channel matrix (H), Size [n_rx, n_tx, n_carriers]
+                                          arma::Cube<std::complex<dtype>> *hmat, // Output: Channel matrix (H), Size [n_rx, n_tx, n_carriers]
+                                          int use_kernel)                        // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 {
+    [[maybe_unused]] const int kernel = qd_kernel_auto_avx2(use_kernel);
 
     // Input validation
     if (coeff_re == nullptr || coeff_im == nullptr || delay == nullptr || pilot_grid == nullptr)
@@ -150,20 +153,13 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
 
     // Call DFT function
 #if BUILD_WITH_AVX2
-    if (runtime_AVX2_Check()) // CPU support for AVX2
-    {
+    if (kernel == 2)
         qd_DFT_AVX2(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
                     n_ant, n_path, planar_wave, freq, n_carrier_s, Hr, Hi);
-    }
     else
-    {
+#endif
         qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
                        n_ant, n_path, planar_wave, freq, n_carrier_s, Hr, Hi);
-    }
-#else // AVX2 disabled
-    qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                   n_ant, n_path, planar_wave, freq, n_carrier_s, Hr, Hi);
-#endif
 
     // Copy data to output
     bool use_re = hmat_re != nullptr, use_im = hmat_im != nullptr, use_cplx = hmat != nullptr;
@@ -189,11 +185,11 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
 
 template void quadriga_lib::baseband_freq_response(const arma::Cube<float> *coeff_re, const arma::Cube<float> *coeff_im, const arma::Cube<float> *delay,
                                                    const arma::Col<float> *pilot_grid, const double bandwidth,
-                                                   arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im, arma::Cube<std::complex<float>> *hmat);
+                                                   arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im, arma::Cube<std::complex<float>> *hmat, int use_kernel);
 
 template void quadriga_lib::baseband_freq_response(const arma::Cube<double> *coeff_re, const arma::Cube<double> *coeff_im, const arma::Cube<double> *delay,
                                                    const arma::Col<double> *pilot_grid, const double bandwidth,
-                                                   arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im, arma::Cube<std::complex<double>> *hmat);
+                                                   arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im, arma::Cube<std::complex<double>> *hmat, int use_kernel);
 
 /*!MD
 # baseband_freq_response_vec
@@ -214,7 +210,8 @@ void quadriga_lib::baseband_freq_response_vec(
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
-    const arma::uvec *i_snap = nullptr);
+    const arma::uvec *i_snap = nullptr,
+    int use_kernel = 0);
 ```
 
 ## Inputs:
@@ -224,6 +221,7 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
 - **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
+- **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
@@ -238,8 +236,11 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> *coeff_re, const std::vector<arma::Cube<dtype>> *coeff_im,
                                               const std::vector<arma::Cube<dtype>> *delay, const arma::Col<dtype> *pilot_grid, const double bandwidth,
-                                              std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im, const arma::uvec *i_snap)
+                                              std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im, const arma::uvec *i_snap,
+                                              int use_kernel)
 {
+    qd_kernel_auto_avx2(use_kernel); // Checked here, before the parallel loop
+
     if (coeff_re == nullptr || coeff_im == nullptr || delay == nullptr || pilot_grid == nullptr)
         throw std::invalid_argument("Arguments cannot be NULL.");
 
@@ -341,7 +342,7 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
                           &coeff_re->at(js), &coeff_im->at(js), &delay->at(js),
                           pilot_grid, bandwidth,
                           hmat_re != nullptr ? &(*hmat_re)[i] : nullptr,
-                          hmat_im != nullptr ? &(*hmat_im)[i] : nullptr));
+                          hmat_im != nullptr ? &(*hmat_im)[i] : nullptr, nullptr, use_kernel));
     }
     if (omp_failed)
         throw std::runtime_error(omp_error);
@@ -349,11 +350,11 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
 
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<float>> *coeff_re, const std::vector<arma::Cube<float>> *coeff_im,
                                                        const std::vector<arma::Cube<float>> *delay, const arma::Col<float> *pilot_grid, const double bandwidth,
-                                                       std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im, const arma::uvec *i_snap);
+                                                       std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im, const arma::uvec *i_snap, int use_kernel);
 
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<double>> *coeff_re, const std::vector<arma::Cube<double>> *coeff_im,
                                                        const std::vector<arma::Cube<double>> *delay, const arma::Col<double> *pilot_grid, const double bandwidth,
-                                                       std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im, const arma::uvec *i_snap);
+                                                       std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im, const arma::uvec *i_snap, int use_kernel);
 
 /*!MD
 # baseband_freq_response_multi
@@ -380,7 +381,8 @@ void quadriga_lib::baseband_freq_response_multi(
     arma::Cube<dtype> *hmat_re = nullptr,
     arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
-    bool remove_delay_phase = true);
+    bool remove_delay_phase = true,
+    int use_kernel = 0);
 ```
 
 ## Inputs:
@@ -396,6 +398,7 @@ void quadriga_lib::baseband_freq_response_multi(
   relative delays. With relative delays the phase of the TX-RX distance stays in the coefficients and is interpolated
   across the `freq` grid, which gives wrong phases (magnitudes stay right) unless the `freq` spacing is far
   below `c / (TX-RX distance)`
+- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
@@ -417,8 +420,11 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
                                                 arma::Cube<dtype> *hmat_re,                     // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
                                                 arma::Cube<dtype> *hmat_im,                     // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
                                                 arma::Cube<std::complex<dtype>> *hmat,          // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
-                                                bool remove_delay_phase)                        // Remove baked-in delay phase before SLERP interpolation
+                                                bool remove_delay_phase,                        // Remove baked-in delay phase before SLERP interpolation
+                                                int use_kernel)                                 // Kernel of the sin / cos and SLERP evaluation
 {
+    use_kernel = qd_kernel_auto_avx2(use_kernel); // Resolved once, passed to fast_sincos and fast_slerp
+
     // --- Input validation ---
 
     size_t n_freq = (size_t)freq.n_elem;
@@ -630,7 +636,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
             double *p_theta = theta.memptr();
             for (size_t k = 0; k < n_carrier; ++k)
                 p_theta[k] = phasor[k] * dl_planar;
-            quadriga_lib::fast_sincos(theta, &s_dl, &c_dl); // double input: range-reduced internally
+            quadriga_lib::fast_sincos(theta, &s_dl, &c_dl, use_kernel); // double input: range-reduced internally
         }
 
         for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
@@ -650,7 +656,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
                 double *p_theta = theta.memptr();
                 for (size_t k = 0; k < n_carrier; ++k)
                     p_theta[k] = phasor[k] * dl;
-                quadriga_lib::fast_sincos(theta, &s_dl, &c_dl);
+                quadriga_lib::fast_sincos(theta, &s_dl, &c_dl, use_kernel);
             }
 
             // --- Extract coefficient envelope samples ---
@@ -703,7 +709,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
                     pBi[k] = (dtype)env_im[s + 1];
                 }
 
-                quadriga_lib::fast_slerp(slerp_Ar, slerp_Ai, slerp_Br, slerp_Bi, w_vec, Xr, Xi);
+                quadriga_lib::fast_slerp(slerp_Ar, slerp_Ai, slerp_Br, slerp_Bi, w_vec, Xr, Xi, use_kernel);
                 pXr = Xr.memptr();
                 pXi = Xi.memptr();
             }
@@ -745,9 +751,9 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
                                                          const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &freq,
                                                          const arma::Col<float> &freq_new, arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im,
-                                                         arma::Cube<std::complex<float>> *hmat, bool remove_delay_phase);
+                                                         arma::Cube<std::complex<float>> *hmat, bool remove_delay_phase, int use_kernel);
 
 template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
                                                          const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq,
                                                          const arma::Col<double> &freq_new, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
-                                                         arma::Cube<std::complex<double>> *hmat, bool remove_delay_phase);
+                                                         arma::Cube<std::complex<double>> *hmat, bool remove_delay_phase, int use_kernel);

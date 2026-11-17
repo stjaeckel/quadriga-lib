@@ -221,4 +221,20 @@ for x = {cr0, ci0, dl0}
     assertEqual( [size(x{1}, 1), size(x{1}, 2), size(x{1}, 3), size(x{1}, 4)], [2, 2, 0, 2] );
 end
 
+
+% use_kernel (input 17) reaches C++: 0 and 1 give the default result (auto = GENERIC), 3 is rejected by C++
+tx = quadriga_lib.arrayant_generate('custom', 10, [], 90, 90, 0);
+args = { tx, tx, [20; 5; 3], [20; 5; 3], [1, 1], 0, repmat([1;0;0;0;0;0;-1;0], [1, 1, 2]), [0;0;10], [0;0;0], [50;0;1.5], [0;0;0], ...
+    [3e9; 3.6e9], [3e9; 3.3e9], false, false, 299792458.0 };
+cr_d = quadriga_lib.get_channels_multifreq( args{:} );
+assertEqual( quadriga_lib.get_channels_multifreq( args{:}, 0 ), cr_d );
+assertEqual( quadriga_lib.get_channels_multifreq( args{:}, 1 ), cr_d );
+try
+    quadriga_lib.get_channels_multifreq( args{:}, 3 );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'Input ''use_kernel'' must be 0, 1 or 2.')) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "use_kernel", GOT: "', ME.message, '"']);
+    end
+end
 end

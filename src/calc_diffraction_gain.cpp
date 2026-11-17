@@ -78,7 +78,7 @@ void calc_diffraction_gain(
   1–7 as in the table of [[generate_diffraction_paths]]
 - **`verbose`** — Verbosity level
 - **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
-- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
+- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [[ray_triangle_intersect]]
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
 - **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects

@@ -28,35 +28,40 @@ namespace quadriga_lib
 
     // Fast, approximate sine/cosine for single-precision vectors
     template <typename dtype>
-    void fast_sincos(const arma::Col<dtype> &x, // Input angles in radians; n = x.n_elem, float or double
-                     arma::fvec *s = nullptr,   // [out] If non-null, set to sin(x). Resized to length n if needed
-                     arma::fvec *c = nullptr);  // [out] If non-null, set to cos(x). Resized to length n if needed
+    void fast_sincos(const arma::Col<dtype> &x,     // Input angles in radians; n = x.n_elem, float or double
+                     arma::fvec *sin_x = nullptr,   // [out] If non-null, set to sin(x). Resized to length n if needed
+                     arma::fvec *cos_x = nullptr,   // [out] If non-null, set to cos(x). Resized to length n if needed
+                     int use_kernel = 0);           // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate arc-sine for single-precision vectors
     template <typename dtype>
     void fast_asin(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
-                   arma::fvec &s);            // [out] Set to asin(x). Resized to length n if needed
+                   arma::fvec &asin_x,        // [out] Set to asin(x). Resized to length n if needed
+                   int use_kernel = 0);       // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate arc-cosine for single-precision vectors
     template <typename dtype>
     void fast_acos(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
-                   arma::fvec &c);            // [out] Set to acos(x). Resized to length n if needed
+                   arma::fvec &acos_x,        // [out] Set to acos(x). Resized to length n if needed
+                   int use_kernel = 0);       // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate atan2(y, x) for single-precision vectors
     template <typename dtype>
     void fast_atan2(const arma::Col<dtype> &y, // Input y-coordinates, Length [n], float or double
                     const arma::Col<dtype> &x, // Input x-coordinates, Length [n], float or double
-                    arma::fvec &a);            // [out] Set to atan2(y, x) in radians. Resized to length n if needed
+                    arma::fvec &atan2_yx,      // [out] Set to atan2(y, x) in radians. Resized to length n if needed
+                    int use_kernel = 0);       // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate spherical interpolation (SLERP) for complex value pairs
     template <typename dtype>
-    void fast_slerp(const arma::Col<dtype> &Ar, // Real part of source A, Length [n]
-                    const arma::Col<dtype> &Ai, // Imaginary part of source A, Length [n]
-                    const arma::Col<dtype> &Br, // Real part of source B, Length [n]
-                    const arma::Col<dtype> &Bi, // Imaginary part of source B, Length [n]
-                    const arma::Col<dtype> &w,  // Per-element interpolation weight in [0,1], 0 = A, 1 = B, Length [n]
-                    arma::fvec &Xr,             // [out] Real part of interpolated result, Length [n]
-                    arma::fvec &Xi);            // [out] Imaginary part of interpolated result, Length [n]
+    void fast_slerp(const arma::Col<dtype> &A_re, // Real part of source A, Length [n]
+                    const arma::Col<dtype> &A_im, // Imaginary part of source A, Length [n]
+                    const arma::Col<dtype> &B_re, // Real part of source B, Length [n]
+                    const arma::Col<dtype> &B_im, // Imaginary part of source B, Length [n]
+                    const arma::Col<dtype> &w,    // Per-element interpolation weight in [0,1], 0 = A, 1 = B, Length [n]
+                    arma::fvec &X_re,             // [out] Real part of interpolated result, Length [n]
+                    arma::fvec &X_im,             // [out] Imaginary part of interpolated result, Length [n]
+                    int use_kernel = 0);          // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate geographic-to-Cartesian conversion
     template <typename dtype>
@@ -65,12 +70,12 @@ namespace quadriga_lib
                        arma::Col<dtype> &x,                   // Output x-coordinates, Length [n]
                        arma::Col<dtype> &y,                   // Output y-coordinates, Length [n]
                        arma::Col<dtype> &z,                   // Output z-coordinates, Length [n]
-                       arma::Col<dtype> *sAZ = nullptr,       // Optional output: sin(az), Length [n]
-                       arma::Col<dtype> *cAZ = nullptr,       // Optional output: cos(az), Length [n]
-                       arma::Col<dtype> *sEL = nullptr,       // Optional output: sin(el), Length [n]
-                       arma::Col<dtype> *cEL = nullptr,       // Optional output: cos(el), Length [n]
+                       arma::Col<dtype> *sin_az = nullptr,    // Optional output: sin(az), Length [n]
+                       arma::Col<dtype> *cos_az = nullptr,    // Optional output: cos(az), Length [n]
+                       arma::Col<dtype> *sin_el = nullptr,    // Optional output: sin(el), Length [n]
+                       arma::Col<dtype> *cos_el = nullptr,    // Optional output: cos(el), Length [n]
                        const arma::Col<dtype> *len = nullptr, // Optional input vector length, Length [n]
-                       int use_kernel = 0);                   // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
+                       int use_kernel = 0);                   // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate Cartesian-to-geographic conversion
     template <typename dtype>
@@ -80,7 +85,7 @@ namespace quadriga_lib
                        arma::Col<dtype> &az,            // Output azimuth angles in radians, Length [n]
                        arma::Col<dtype> &el,            // Output elevation angles in radians, Length [n]
                        arma::Col<dtype> *len = nullptr, // Vector length, Length [n]
-                       int use_kernel = 0);             // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
+                       int use_kernel = 0);             // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // 2D linear interpolation of multiple data sets
     template <typename dtype>

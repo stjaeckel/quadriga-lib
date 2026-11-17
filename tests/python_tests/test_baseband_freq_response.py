@@ -544,5 +544,24 @@ class test_carrier_frequencies(unittest.TestCase):
             run(np.array([f0, f0]), f0)
 
 
+class test_use_kernel(unittest.TestCase):
+    # use_kernel (last argument) reaches C++ in the single- and multi-frequency modes: 1 is accepted, 3 raises, also
+    # when all snapshots are empty
+    def test(self):
+        coeff, delay = [np.ones((2, 3, 4), dtype=complex)], [np.zeros((1, 1, 4))]
+        coeff_mf, delay_mf = [np.ones((2, 3, 4, 2), dtype=complex)], [np.zeros((1, 1, 4, 2))]
+        f, f_new = np.array([3e9, 3.2e9]), np.array([3e9, 3.1e9])
+        channel.baseband_freq_response(coeff, delay, 1e8, carriers=5, use_kernel=1)
+        channel.baseband_freq_response(coeff_mf, delay_mf, freq=f, freq_new=f_new, use_kernel=1)
+        calls = (lambda: channel.baseband_freq_response(coeff, delay, 1e8, carriers=5, use_kernel=3),
+                 lambda: channel.baseband_freq_response(coeff_mf, delay_mf, freq=f, freq_new=f_new, use_kernel=3),
+                 lambda: channel.baseband_freq_response([np.ones((2, 3, 0), dtype=complex)], [np.zeros((1, 1, 0))], 1e8,
+                                                        carriers=5, use_kernel=3))
+        for call in calls:
+            with self.assertRaises(ValueError) as ctx:
+                call()
+            self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
+
+
 if __name__ == '__main__':
     unittest.main()

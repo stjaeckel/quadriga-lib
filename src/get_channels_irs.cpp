@@ -72,7 +72,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *aoa = nullptr,
     arma::Cube<dtype> *eoa = nullptr,
     const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
-    const std::vector<bool> *active_path = nullptr);
+    const std::vector<bool> *active_path = nullptr,
+    int use_kernel = 0);
 ```
 
 ## Inputs:
@@ -103,6 +104,9 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [[arrayant]]
 - **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
+- **`use_kernel`** *(optional)* — Kernel of both segments, passed to [[get_channels_spherical]]: 0 = auto, 1 = GENERIC,
+  2 = AVX2 (single precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in
+  this version
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
@@ -136,7 +140,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array
                                                  arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
                                                  arma::uword i_irs, dtype threshold_dB, dtype center_freq, bool use_absolute_delays,
                                                  arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
-                                                 const arrayant<dtype> *irs_array_2, const std::vector<bool> *active_path)
+                                                 const arrayant<dtype> *irs_array_2, const std::vector<bool> *active_path,
+                                                 int use_kernel)
 {
     // Positions and orientations, checked here so that an error names the argument (the segment calls of
     // get_channels_spherical would report 'irs_pos' as 'rx_pos' or 'tx_pos')
@@ -222,12 +227,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array
     if (calc_angles)
     {
         quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, &aod_1, &eod_1, nullptr, nullptr, 1);
+                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, &aod_1, &eod_1, nullptr, nullptr, use_kernel);
     }
     else
     {
         quadriga_lib::get_channels_spherical<dtype>(tx_array, irs, tx_pos, tx_orientation, irs_pos, irs_orientation, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
+                                                    coeff_re_1, coeff_im_1, delay_1, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, use_kernel);
     }
 
     // Calculate channel coefficients of the second segment from the IRS to the RX
@@ -235,12 +240,12 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array
     if (calc_angles)
     {
         quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, &aoa_2, &eoa_2, 1);
+                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, &aoa_2, &eoa_2, use_kernel);
     }
     else
     {
         quadriga_lib::get_channels_spherical<dtype>(irs_rx, rx_array, irs_pos, irs_orientation, rx_pos, rx_orientation, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, 1);
+                                                    coeff_re_2, coeff_im_2, delay_2, center_freq, true, false, nullptr, nullptr, nullptr, nullptr, use_kernel);
     }
 
     // Calculate the LOS delay between TX and RX
@@ -394,7 +399,7 @@ template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<float> 
                                                           arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
                                                           arma::uword i_irs, float threshold_dB, float center_freq, bool use_absolute_delays,
                                                           arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
-                                                          const arrayant<float> *irs_array_2, const std::vector<bool> *active_path);
+                                                          const arrayant<float> *irs_array_2, const std::vector<bool> *active_path, int use_kernel);
 
 template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double> &tx_array, const arrayant<double> &rx_array, const arrayant<double> &irs_array,
                                                           const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
@@ -407,4 +412,4 @@ template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double>
                                                           arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
                                                           arma::uword i_irs, double threshold_dB, double center_freq, bool use_absolute_delays,
                                                           arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
-                                                          const arrayant<double> *irs_array_2, const std::vector<bool> *active_path);
+                                                          const arrayant<double> *irs_array_2, const std::vector<bool> *active_path, int use_kernel);

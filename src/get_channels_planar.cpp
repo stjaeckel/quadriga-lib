@@ -63,7 +63,8 @@ void quadriga_lib::get_channels_planar(
     dtype center_freq = dtype(0.0),
     bool use_absolute_delays = false,
     bool add_fake_los_path = false,
-    arma::Col<dtype> *rx_Doppler = nullptr);
+    arma::Col<dtype> *rx_Doppler = nullptr,
+    int use_kernel = 0);
 ```
 
 ## Inputs:
@@ -84,6 +85,9 @@ void quadriga_lib::get_channels_planar(
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot
+- **`use_kernel`** *(optional)* — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
+  precision, also for `double`; throws if unavailable); other values throw; auto selects GENERIC in this version, see
+  [[arrayant_interpolate]]
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
@@ -108,7 +112,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
                                        const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &M,
                                        arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
                                        dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
-                                       arma::Col<dtype> *rx_Doppler)
+                                       arma::Col<dtype> *rx_Doppler, int use_kernel)
 {
     // Constants
     constexpr dtype los_limit = dtype(1.0e-4);
@@ -124,6 +128,9 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
     const dtype Rx = p_rp[0], Ry = p_rp[1], Rz = p_rp[2], Rb = p_ro[0], Rt = p_ro[1], Rh = p_ro[2];
     std::string error_message;
+
+    // Kernel of the antenna interpolation, checked before any early return
+    const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
 
     qd_check_alias(rx_Doppler, "rx_Doppler", &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M);
     qd_check_alias_list({&coeff_re, &coeff_im, &delay}, {"coeff_re", "coeff_im", "delay"},
@@ -151,7 +158,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
         quadriga_lib::get_channels_planar<dtype>(tx_array, rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation,
                                                  aod_d, eod_d, aoa_d, eoa_d, gain_d, length_d, M_d,
                                                  cr, ci, dl, center_freq, use_absolute_delays, true,
-                                                 rx_Doppler == nullptr ? nullptr : &doppler);
+                                                 rx_Doppler == nullptr ? nullptr : &doppler, kernel);
 
         const arma::uword n_ports = cr.n_rows * cr.n_cols;
         if (coeff_re.n_rows != cr.n_rows || coeff_re.n_cols != cr.n_cols || coeff_re.n_slices != 1ULL)
@@ -285,7 +292,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
         std::memcpy(element_pos_interp.memptr(), tx_array.element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
 
     qd_arrayant_interpolate_dispatch<dtype>(tx_array, AOD, EOD, i_element, tx_ori, element_pos_interp,
-                                            Vt_re, Vt_im, Ht_re, Ht_im, &Pt, nullptr, nullptr, nullptr, 1);
+                                            Vt_re, Vt_im, Ht_re, Ht_im, &Pt, nullptr, nullptr, nullptr, kernel);
 
     i_element = arma::regspace<arma::uvec>(0, n_rx - 1);
     element_pos_interp.zeros(3ULL, n_rx);
@@ -294,7 +301,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
 
     qd_arrayant_interpolate_dispatch<dtype>(rx_array, AOA, EOA, i_element, rx_ori, element_pos_interp,
                                             Vr_re, Vr_im, Hr_re, Hr_im, &Pr, rx_Doppler == nullptr ? nullptr : &AOA_loc,
-                                            rx_Doppler == nullptr ? nullptr : &EOA_loc, nullptr, 1);
+                                            rx_Doppler == nullptr ? nullptr : &EOA_loc, nullptr, kernel);
 
     element_pos_interp.reset();
 
@@ -447,7 +454,7 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<flo
                                                 const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &M,
                                                 arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
                                                 float center_freq, bool use_absolute_delays, bool add_fake_los_path,
-                                                arma::Col<float> *rx_Doppler);
+                                                arma::Col<float> *rx_Doppler, int use_kernel);
 
 template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
                                                 const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
@@ -456,4 +463,4 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dou
                                                 const arma::Col<double> &path_gain, const arma::Col<double> &path_length, const arma::Mat<double> &M,
                                                 arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
                                                 double center_freq, bool use_absolute_delays, bool add_fake_los_path,
-                                                arma::Col<double> *rx_Doppler);
+                                                arma::Col<double> *rx_Doppler, int use_kernel);
