@@ -64,8 +64,8 @@ Also in: [MATLAB](../mex/channel-statistics.md#calc_angular_spread) · [Python](
 - With wrapping (`wrapping = true`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
 - When `calc_bank_angle = true` (with wrapping), an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
 - When `wrapping = false` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
-- When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
-  `quantize` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
+- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
+  `quantize_deg` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
 
 ### Declaration:
 ```cpp
@@ -80,7 +80,7 @@ void quadriga_lib::calc_angular_spread(
     std::vector<arma::Col<dtype>> *theta = nullptr,
     bool wrapping = false,
     bool calc_bank_angle = false,
-    dtype quantize = (dtype)0);
+    dtype quantize_deg = (dtype)0);
 ```
 
 ### Inputs:
@@ -91,7 +91,7 @@ void quadriga_lib::calc_angular_spread(
   computing the spreads; if false, computes the spreads from the raw angles; default: `false`
 - **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when
   `wrapping = true`; default: `false`
-- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
+- **`quantize_deg`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
   otherwise it must be finite and >= 1e-3 deg, else `std::invalid_argument` is thrown
 
 ### Outputs:
@@ -180,7 +180,7 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
 Also in: [MATLAB](../mex/channel-statistics.md#calc_delay_spread) · [Python](../python/channel-statistics.md#calc_delay_spread)
 
-- Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; default threshold of 100 dB effectively includes all paths.
+- Paths with power below `p_max / 10^(0.1 * threshold_dB)` are excluded; default of 100 dB effectively includes all paths.
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their powers summed before computing the spread; function recurses on the binned profile.
   The bins are placed on a grid common to all CIRs; only occupied bins are stored, so memory does not grow with the delay span.
   All delays must then be finite, and the global delay span divided by `granularity` must be below 2^53.
@@ -190,7 +190,7 @@ Also in: [MATLAB](../mex/channel-statistics.md#calc_delay_spread) · [Python](..
 arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
-    dtype threshold = 100.0,
+    dtype threshold_dB = 100.0,
     dtype granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
 ```
@@ -198,7 +198,7 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
 ### Inputs:
 - **`delays`** — Delays in [s] per CIR; `[n_cir]` vector, each element a column vector of length `n_path`
 - **`powers`** — Path powers in linear scale [W]; same structure as `delays`
-- **`threshold`** *(optional)* — Power threshold in [dB] relative to strongest path; paths below threshold are excluded
+- **`threshold_dB`** *(optional)* — Power threshold in [dB] relative to strongest path; paths below it are excluded
 - **`granularity`** *(optional)* — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping; must be finite
   and non-negative; when > 0, non-finite delays or a span / granularity of 2^53 or more throw `std::invalid_argument`
 

@@ -146,8 +146,8 @@ namespace quadriga_lib
     dtype sos_calc_mse(const arma::Mat<dtype> &spatial_freq, // Spatial frequencies in [1/m], [n_coeff, n_dim]
                        const arma::Col<dtype> &acf,          // Target ACF, [n_acf]
                        const arma::Col<dtype> &dist,         // Sample points of the ACF in [m], equally spaced, [n_acf]
-                       dtype *mse_core = nullptr,            // Optional output: Error within the core radius in [dB]
-                       dtype *mse_all = nullptr,             // Optional output: Error on the complete grid in [dB]
+                       dtype *mse_core_dB = nullptr,         // Optional output: Error within the core radius in [dB]
+                       dtype *mse_all_dB = nullptr,          // Optional output: Error on the complete grid in [dB]
                        arma::Col<dtype> *acf_tail = nullptr, // Optional output: Approximated ACF beyond the fitted range, [4]
                        arma::Mat<dtype> *test_dir = nullptr, // Optional output: Test directions in [rad], [n_dir, 2] = {azimuth, elevation}; [n_dir, 1] for n_dim = 2; empty for n_dim = 1
                        arma::uword n_dir = 10);              // Number of test directions, must be > 0

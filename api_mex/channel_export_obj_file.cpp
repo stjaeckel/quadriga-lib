@@ -16,22 +16,22 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
-- Paths below `gain_min` are excluded; `max_paths` limits the total number of exported paths
+- Paths below `gain_min_dB` are excluded; `max_paths` limits the total number of exported paths
 - Paths with non-finite coordinates are skipped
 - The function takes raw channel data fields directly; no MATLAB channel struct is needed
 
 ## Usage:
 ```
-quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max, gain_min, colormap, radius_max, ...
+quadriga_lib.channel_export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, colormap, radius_max, ...
      radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff_re, ...
     coeff_im, i_snap );
 ```
 
 ## Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
-- **`gain_max`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
-- **`gain_min`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
+- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
+- **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
+- **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01
@@ -63,8 +63,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto fn = qd_mex_get_string(prhs[0]);
 
     const auto max_paths = qd_mex_get_scalar<arma::uword>(prhs[1], "max_paths", 0);
-    const auto gain_max = qd_mex_get_scalar<double>(prhs[2], "gain_max", -60.0);
-    const auto gain_min = qd_mex_get_scalar<double>(prhs[3], "gain_min", -140.0);
+    const auto gain_max_dB = qd_mex_get_scalar<double>(prhs[2], "gain_max_dB", -60.0);
+    const auto gain_min_dB = qd_mex_get_scalar<double>(prhs[3], "gain_min_dB", -140.0);
     const auto colormap = qd_mex_get_string(prhs[4], "jet");
     const auto radius_max = qd_mex_get_scalar<double>(prhs[5], "radius_max", 0.05);
     const auto radius_min = qd_mex_get_scalar<double>(prhs[6], "radius_min", 0.01);
@@ -111,6 +111,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Call quadriga-lib function
-    CALL_QD(c.write_paths_to_obj_file(fn, max_paths, gain_max, gain_min, colormap,
+    CALL_QD(c.write_paths_to_obj_file(fn, max_paths, gain_max_dB, gain_min_dB, colormap,
                                       &i_snap, radius_max, radius_min, n_edges));
 }

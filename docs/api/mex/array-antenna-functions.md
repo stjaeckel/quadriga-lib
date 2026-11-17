@@ -207,7 +207,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_export_obj_file) · [P
 
 ### Usage:
 ```matlab
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap,  object_radius, ...
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap,  object_radius, ...
    icosphere_n_div, i_element, i_freq );
 ```
 
@@ -215,7 +215,7 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 - **`fn`** — Output OBJ filename; must not be empty; filename must end in `.obj`
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in
   [arrayant_generate](#arrayant_generate); a struct array may contain a frequency-dependent model
-- **`directivity_range`** — Dynamic range of the visualized directivity pattern in dB; default: 30 dB
+- **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30 dB
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object; default: 1 m
 - **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [icosphere](site-specific-simulation-tools.md#icosphere); default: 4
@@ -473,7 +473,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [Python](.
   responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
-- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`.
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB - 85) / 20)`.
 - If `center_freq` is empty, third-octave band center frequencies are auto-generated from one band
   below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz.
 - Speed of sound assumed to be 343 m/s.
@@ -488,36 +488,36 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [Python](.
   - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
   - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `horn`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
+- For `horn`, `hor_coverage_deg`, `ver_coverage_deg` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
   and `f_ctrl = c/(2pi·radius)`.
 
 ### Usage:
 ```matlab
 arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upper_cutoff, ...
-    lower_rolloff_slope, upper_rolloff_slope, sensitivity, radiation_type, hor_coverage, ...
-    ver_coverage, horn_control_freq, baffle_width, baffle_height, center_freq, ...
-    angular_resolution );
+    lower_rolloff_slope_dB, upper_rolloff_slope_dB, sensitivity_dB, radiation_type, hor_coverage_deg, ...
+    ver_coverage_deg, horn_control_freq, baffle_width, baffle_height, center_freq, ...
+    angular_resolution_deg );
 ```
 
 ### Inputs:
-- **`driver_type`** - Driver directivity model: `piston`, `horn`, or `omni`; default: `piston`
-- **`radius`** - Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn; default: 0.05
-- **`lower_cutoff`** - Lower -3 dB bandpass frequency in Hz, > 0; default: 80
-- **`upper_cutoff`** - Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`; default: 12000
-- **`lower_rolloff_slope`** - Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth); default: 12
-- **`upper_rolloff_slope`** - High-frequency rolloff in dB/octave, > 0; default: 12
-- **`sensitivity`** - On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
-- **`radiation_type`** - Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`; default: `hemisphere`
-- **`hor_coverage`** - Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; default: NaN
-- **`ver_coverage`** - Horn vertical coverage angle in degrees; NaN or <= 0: default 60; default: NaN
-- **`horn_control_freq`** - Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
-- **`baffle_width`** - Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
-- **`baffle_height`** - Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
-- **`center_freq`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
-- **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
+- **`driver_type`** — Driver directivity model: `piston`, `horn`, or `omni`; default: `piston`
+- **`radius`** — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn; default: 0.05
+- **`lower_cutoff`** — Lower -3 dB bandpass frequency in Hz, > 0; default: 80
+- **`upper_cutoff`** — Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`; default: 12000
+- **`lower_rolloff_slope_dB`** — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth); default: 12
+- **`upper_rolloff_slope_dB`** — High-frequency rolloff in dB/octave, > 0; default: 12
+- **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
+- **`radiation_type`** — Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`; default: `hemisphere`
+- **`hor_coverage_deg`** — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; default: NaN
+- **`ver_coverage_deg`** — Horn vertical coverage angle in degrees; NaN or <= 0: default 60; default: NaN
+- **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`; default: NaN
+- **`baffle_width`** — Baffle width in m, > 0; used by `hemisphere` model; default: 0.15
+- **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
+- **`center_freq`** — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`angular_resolution_deg`** — Azimuth and elevation sampling grid resolution in degrees, 0.1 to 90; default: 5
 
 ### Outputs:
-- **`arrayant`** - Struct array with one arrayant per frequency sample; directivity is stored in
+- **`arrayant`** — Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
   see [arrayant_generate](#arrayant_generate) for struct fields; `[n_freq]`
 

@@ -131,7 +131,7 @@ Path loss and shadow-fading standard deviation of a set of links
     constant beyond) if `usePLa != 0`
   - empty `pl_model`: 0
 - Where the model gives no `sf` (an `SF` or `sig` key not set, or a model without one): the SF std of [[lsp_generate]]
-  at the geometric distance, so that passing `sf_sigma` to [[lsp_generate]] is neutral
+  at the geometric distance, so that passing `sf_sigma_dB` to [[lsp_generate]] is neutral
 - `hE_rand != 0` with `rnd_he` given: the random environment height of TR 38.901 Table 7.4.1-1 note 1, drawn from
   `rnd_he`, which makes it spatially consistent at the decorrelation distance `SF_lambda` (the TR draws it
   independently per link); the UT height is then clamped at `hE + 0.1` instead of `1.1·hE`. Along a track the loss
@@ -150,8 +150,8 @@ void quadriga_lib::path_loss(
     const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    arma::mat &pl,
-    arma::mat *sf_sigma = nullptr,
+    arma::mat &pl_dB,
+    arma::mat *sf_sigma_dB = nullptr,
     const arma::vec *d2d_in = nullptr,
     const arma::vec *rnd_he = nullptr);
 ```
@@ -169,11 +169,11 @@ void quadriga_lib::path_loss(
   [[gbsm_draw]] (`"lsf"`); `[n_link]`
 
 ## Outputs:
-- **`pl`** — Path loss in [dB]; `[n_link, n_freq]`
-- **`sf_sigma`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
+- **`pl_dB`** — Path loss in [dB]; `[n_link, n_freq]`
+- **`sf_sigma_dB`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
 
 ## See also:
-- [[lsp_generate]] (takes `sf_sigma`)
+- [[lsp_generate]] (takes `sf_sigma_dB`)
 - [[o2i_loss]] (penetration loss and indoor distance)
 MD!*/
 
@@ -183,8 +183,8 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                              const arma::vec &center_freq,
                              const arma::mat &tx_pos,
                              const arma::mat &rx_pos,
-                             arma::mat &pl,
-                             arma::mat *sf_sigma,
+                             arma::mat &pl_dB,
+                             arma::mat *sf_sigma_dB,
                              const arma::vec *d2d_in,
                              const arma::vec *rnd_he)
 {
@@ -202,9 +202,9 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         for (arma::uword l = 0; l < n_link; ++l)
             if (!((*rnd_he)(l) >= 0.0 && (*rnd_he)(l) <= 1.0))
                 throw std::invalid_argument("Input 'rnd_he' must be in the range from 0 to 1.");
-    qd_check_alias(&pl, "pl", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
-    qd_check_alias(sf_sigma, "sf_sigma", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
-    qd_check_alias_outputs(&pl, "pl", sf_sigma, "sf_sigma");
+    qd_check_alias(&pl_dB, "pl_dB", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
+    qd_check_alias(sf_sigma_dB, "sf_sigma_dB", &center_freq, &tx_pos, &rx_pos, d2d_in, rnd_he);
+    qd_check_alias_outputs(&pl_dB, "pl_dB", sf_sigma_dB, "sf_sigma_dB");
 
     // Model, index into 'names'; the empty name is "no model"
     enum model_t
@@ -376,7 +376,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
 
     // Default shadow-fading std: the SF std of the LSP formula (only SF evaluated and checked, only if requested)
-    qd_gbsm_lsp_stats sf_stats(sp, center_freq, (sf_sigma != nullptr) ? 1u << 2 : 0u);
+    qd_gbsm_lsp_stats sf_stats(sp, center_freq, (sf_sigma_dB != nullptr) ? 1u << 2 : 0u);
 
     // UMa environment height of TR 38.901 Table 7.4.1-1, note 1, from a Uniform(0,1) value u
     // - d: 2D distance in [m], hUT: raw UT height in [m]
@@ -400,10 +400,10 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     };
 
     // Outputs
-    if (pl.n_rows != n_link || pl.n_cols != n_freq)
-        pl.set_size(n_link, n_freq);
-    if (sf_sigma != nullptr && (sf_sigma->n_rows != n_link || sf_sigma->n_cols != n_freq))
-        sf_sigma->set_size(n_link, n_freq);
+    if (pl_dB.n_rows != n_link || pl_dB.n_cols != n_freq)
+        pl_dB.set_size(n_link, n_freq);
+    if (sf_sigma_dB != nullptr && (sf_sigma_dB->n_rows != n_link || sf_sigma_dB->n_cols != n_freq))
+        sf_sigma_dB->set_size(n_link, n_freq);
 
     const bool tx_single = tx_pos.n_rows != n_link;
     for (arma::uword l = 0; l < n_link; ++l)
@@ -413,7 +413,7 @@ void quadriga_lib::path_loss(const std::string &pl_model,
         const double hBS = tx_pos(t, 2), hUT = rx_pos(l, 2);
         const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1), dz = hUT - hBS;
         double d2 = std::sqrt(dx * dx + dy * dy), d3 = std::sqrt(dx * dx + dy * dy + dz * dz);
-        if (sf_sigma != nullptr)
+        if (sf_sigma_dB != nullptr)
             sf_stats.set_link(d2, hBS, hUT);
         // Legacy outdoor distance (QuaDRiGa): the indoor part d3in = d3·din/d2 is removed from both distances, with a
         // minimum outdoor distance of 10 m; outdoor links (d2d_in = 0) keep the geometric distances
@@ -555,15 +555,15 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                 break;
             }
             }
-            pl(l, k) = loss;
-            if (sf_sigma != nullptr)
+            pl_dB(l, k) = loss;
+            if (sf_sigma_dB != nullptr)
             {
                 if (!set_sf)
                 {
                     double mu = 0.0;
                     sf_stats.get(2, k, mu, sf);
                 }
-                (*sf_sigma)(l, k) = sf;
+                (*sf_sigma_dB)(l, k) = sf;
             }
         }
     }

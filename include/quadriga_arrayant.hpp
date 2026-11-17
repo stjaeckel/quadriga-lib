@@ -103,7 +103,7 @@ namespace quadriga_lib
     template <typename dtype>
     void arrayant_export_obj_file(const std::string &fn,                  // Output OBJ filename; must end in .obj
                                   const arrayant<dtype> &ant,             // Valid arrayant
-                                  dtype directivity_range = 30.0,         // Dynamic range of the visualized directivity pattern in dB
+                                  dtype directivity_range_dB = 30.0,      // Dynamic range of the visualized directivity pattern in dB
                                   const std::string &colormap = "jet",    // Colormap for the visualization
                                   dtype object_radius = 1.0,              // Radius of the exported object
                                   arma::uword icosphere_n_div = 4,        // Icosphere subdivision count; higher = finer mesh
@@ -355,7 +355,7 @@ namespace quadriga_lib
     //   and combining the results via arrayant_concat and element_pos
     // - Supported driver types: "piston" (cone/dome), "horn" (constant directivity), "omni" (subwoofer)
     // - Supported radiation types: "monopole" (4pi), "hemisphere" (2pi, sealed box), "dipole" (figure-8), "cardioid"
-    // - Horn parameters that are NaN (the default) or <= 0: hor_coverage and ver_coverage default to 90 and 60 deg, horn_control_freq is derived from radius
+    // - Horn parameters that are NaN (the default) or <= 0: hor_coverage_deg and ver_coverage_deg default to 90 and 60 deg, horn_control_freq is derived from radius
     // - Frequency samples are in Hz; if nullptr or empty, third-octave bands from lower_cutoff to upper_cutoff are used
     // - Angular resolution is in degrees; used to generate azimuth_grid and elevation_grid
     template <typename dtype>
@@ -363,17 +363,17 @@ namespace quadriga_lib
                                                   dtype radius = 0.05,                               // Effective radiating radius in [m] (piston: cone, horn: mouth)
                                                   dtype lower_cutoff = 80.0,                         // Lower -3 dB frequency in [Hz]
                                                   dtype upper_cutoff = 12000.0,                      // Upper -3 dB frequency in [Hz]
-                                                  dtype lower_rolloff_slope = 12.0,                  // Low-frequency rolloff in [dB/octave]
-                                                  dtype upper_rolloff_slope = 12.0,                  // High-frequency rolloff in [dB/octave]
-                                                  dtype sensitivity = 85.0,                          // On-axis sensitivity in [dB SPL] at 1W/1m
+                                                  dtype lower_rolloff_slope_dB = 12.0,               // Low-frequency rolloff in [dB/octave]
+                                                  dtype upper_rolloff_slope_dB = 12.0,               // High-frequency rolloff in [dB/octave]
+                                                  dtype sensitivity_dB = 85.0,                       // On-axis sensitivity in [dB SPL] at 1W/1m
                                                   const std::string &radiation_type = "hemisphere",  // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
-                                                  dtype hor_coverage = NAN,                          // Horizontal coverage angle in [deg], horn only, NaN or <= 0 = 90
-                                                  dtype ver_coverage = NAN,                          // Vertical coverage angle in [deg], horn only, NaN or <= 0 = 60
+                                                  dtype hor_coverage_deg = NAN,                      // Horizontal coverage angle in [deg], horn only, NaN or <= 0 = 90
+                                                  dtype ver_coverage_deg = NAN,                      // Vertical coverage angle in [deg], horn only, NaN or <= 0 = 60
                                                   dtype horn_control_freq = NAN,                     // Horn pattern control frequency in [Hz], NaN or <= 0 = c / (2 pi radius)
                                                   dtype baffle_width = 0.15,                         // Enclosure baffle width in [m], piston only
                                                   dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
                                                   const arma::Col<dtype> *center_freq = nullptr,     // Frequency sample points in [Hz]; nullptr or empty = auto third-octave
-                                                  dtype angular_resolution = 5.0);                   // Angular grid resolution in [deg]
+                                                  dtype angular_resolution_deg = 5.0);               // Angular grid resolution in [deg]
 
 }
 

@@ -50,7 +50,7 @@ Large-scale parameters of a set of links from normalized random values
 ## Usage:
 ```
 [ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, lsp_sigma ] = ... 
-    quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, ...
+    quadriga_lib.lsp_generate( scenpar, center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, ...
     clip_spreads );
 ```
 
@@ -61,7 +61,7 @@ Large-scale parameters of a set of links from normalized random values
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [[gbsm_draw]] (`'lsf'`), finite; column 10 in [0, 1] when 3 or more
   outputs are requested; column 11 is not used; `[n_link, 11]`
-- **`sf_sigma`** — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite and >= 0;
+- **`sf_sigma_dB`** — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite and >= 0;
   replaces the value from `scenpar`, also in `lsp_sigma`; `[n_link, n_freq]`; default: the scenario
   value
 - **`cholesky`** — `true`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS,
@@ -70,18 +70,20 @@ Large-scale parameters of a set of links from normalized random values
   7.5 step 4); `lsp_mu` and `lsp_sigma` are not affected; default: true
 
 ## Outputs:
-- **`lsp`** — Large-scale parameters; slices: 1 DS in [s], 2 KF, 3 SF, 4 ASD, 5 ASA, 6 ESD, 7 ESA in
-  [deg], 8 XPR; `[n_link, n_freq, 8]`
+- **`lsp`** — Large-scale parameters; slices: 1 DS in [s]; 2 KF, 3 SF and 8 XPR linear; 4 ASD, 5 ASA, 6 ESD,
+  7 ESA in [deg]; `[n_link, n_freq, 8]`
 - **`abs_toa`** — Absolute TOA offset in [s], 0 if not active; `[n_link, 1]`
 - **`gr_eps_re`**, **`gr_eps_im`** — Relative permittivity of the ground, real part and imaginary part >= 0; the
   complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** — EoD offset in [deg], positive = up; `[n_link, n_freq]`
-- **`lsp_mu`** — Mean `mu` in the log domain; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
-- **`lsp_sigma`** — Standard deviation `sigma` in the log domain, >= 0; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
+- **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of [s] for DS, lg of [deg] for the angular
+  spreads, [dB] for KF, SF and XPR; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
+- **`lsp_sigma`** — Standard deviation `sigma` in the log domain of `lsp_mu`, >= 0; required by [[ssf_rays]];
+  `[n_link, n_freq, 8]`
 
 ## See also:
 - [[gbsm_draw]] (the random values `rnd`)
-- [[path_loss]] (the SF standard deviation `sf_sigma`)
+- [[path_loss]] (the SF standard deviation `sf_sigma_dB`)
 - [[ssf_clusters]] (the clusters from the LSPs)
 - [[ssf_rays]] (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 MD!*/
@@ -100,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2]);
     const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[3]);
     const arma::mat rnd = qd_mex_get_Mat<double>(prhs[4]);
-    const arma::mat sf_sigma = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5]);
+    const arma::mat sf_sigma_dB = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5]);
     const bool cholesky = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "cholesky", true);
     const bool clip_spreads = (nrhs < 8) ? true : qd_mex_get_scalar<bool>(prhs[7], "clip_spreads", true);
 
@@ -126,7 +128,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[6] = qd_mex_init_output(&lsp_sigma, n_link, n_freq, 8);
 
     // Wrap optional pointers
-    const arma::mat *p_sf_sigma = sf_sigma.empty() ? nullptr : &sf_sigma;
+    const arma::mat *p_sf_sigma = sf_sigma_dB.empty() ? nullptr : &sf_sigma_dB;
     arma::vec *p_abs_toa = (nlhs > 1) ? &abs_toa : nullptr;
     arma::mat *p_gr_eps_re = (nlhs > 2) ? &gr_eps_re : nullptr;
     arma::mat *p_gr_eps_im = (nlhs > 3) ? &gr_eps_im : nullptr;

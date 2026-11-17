@@ -18,7 +18,7 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 ## Usage:
 ```
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap,  object_radius, ...
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range_dB, colormap,  object_radius, ...
    icosphere_n_div, i_element, i_freq );
 ```
 
@@ -26,7 +26,7 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 - **`fn`** — Output OBJ filename; must not be empty; filename must end in `.obj`
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in
   [[arrayant_generate]]; a struct array may contain a frequency-dependent model
-- **`directivity_range`** — Dynamic range of the visualized directivity pattern in dB; default: 30 dB
+- **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30 dB
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object; default: 1 m
 - **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [[icosphere]]; default: 4
@@ -53,7 +53,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Parse scalar / string inputs
     std::string fn = qd_mex_get_string(prhs[0]);
-    double directivity_range = (nrhs < 3) ? 30.0 : qd_mex_get_scalar<double>(prhs[2], "directivity_range", 30.0);
+    double directivity_range_dB = (nrhs < 3) ? 30.0 : qd_mex_get_scalar<double>(prhs[2], "directivity_range_dB", 30.0);
     std::string colormap = (nrhs < 4) ? "jet" : qd_mex_get_string(prhs[3], "jet");
     double object_radius = (nrhs < 5) ? 1.0 : qd_mex_get_scalar<double>(prhs[4], "object_radius", 1.0);
     arma::uword icosphere_n_div = (nrhs < 6) ? 4 : qd_mex_get_scalar<arma::uword>(prhs[5], "icosphere_n_div", 4);
@@ -83,5 +83,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         ant = qd_mex_struct2arrayant(prhs[1], true);
 
-    CALL_QD(quadriga_lib::arrayant_export_obj_file(fn, ant, directivity_range, colormap, object_radius, icosphere_n_div, &element_ind));
+    CALL_QD(quadriga_lib::arrayant_export_obj_file(fn, ant, directivity_range_dB, colormap, object_radius, icosphere_n_div, &element_ind));
 }

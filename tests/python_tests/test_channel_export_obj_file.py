@@ -214,7 +214,7 @@ class test_channel_export_obj_file(unittest.TestCase):
                       n_interact=d['n_interact'], interact_coord=d['interact_coord'],
                       center_freq=d['center_freq'], coeff=coeff)
 
-        self.assertTrue(os.path.isfile(self._export('gain.obj', gain_max=10.0, gain_min=6.0, **common)))
+        self.assertTrue(os.path.isfile(self._export('gain.obj', gain_max_dB=10.0, gain_min_dB=6.0, **common)))
         self.assertTrue(os.path.isfile(self._export('cmap.obj', colormap='parula', **common)))
         # zero radius -> paths without a volume
         self.assertTrue(os.path.isfile(self._export('flat.obj', radius_max=0.0, radius_min=0.0, **common)))
@@ -287,7 +287,7 @@ class test_channel_export_obj_file(unittest.TestCase):
     def test_interact_coord_too_few_columns(self):
         """interact_coord needs at least sum(n_interact) columns of 3 rows."""
         common = dict(rx_pos=np.array([[1.0], [0], [0]]), tx_pos=np.zeros((3, 1)), center_freq=np.array([1e9]),
-                      coeff=[np.ones((1, 1, 3), complex) * 1e-4], gain_min=-300)
+                      coeff=[np.ones((1, 1, 3), complex) * 1e-4], gain_min_dB=-300)
         ni = [np.array([1, 0, 2], dtype=np.uint32)]
         for ic in ([np.zeros((3, 0))], [np.zeros((3, 2))], [np.zeros((2, 3))], np.zeros((3, 2, 1))):
             with self.assertRaises(ValueError):
@@ -308,7 +308,7 @@ class test_channel_export_obj_file(unittest.TestCase):
             quadriga_lib.channel.export_obj_file(
                 self._path('wrap.obj'), rx_pos=np.array([[10.0], [0], [1]]), tx_pos=np.array([[0.0], [0], [10]]),
                 n_interact=ni, interact_coord=np.ones((3, 6, 1)), center_freq=np.array([3e9]),
-                coeff_re=np.ones((1, 1, 2, 1)), coeff_im=np.zeros((1, 1, 2, 1)), gain_min=-500.0, gain_max=0.0)
+                coeff_re=np.ones((1, 1, 2, 1)), coeff_im=np.zeros((1, 1, 2, 1)), gain_min_dB=-500.0, gain_max_dB=0.0)
 
 if __name__ == '__main__':
     unittest.main()

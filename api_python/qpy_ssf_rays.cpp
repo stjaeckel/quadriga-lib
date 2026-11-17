@@ -84,8 +84,8 @@ rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, ls
 - **`tx_pos`** — Tx positions in m; `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
 - **`center_freq`** — Carrier frequencies in Hz; `(n_freq,)`
-- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]]; used: the ESD mean
-  and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `(n_link, n_freq, 8)`
+- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]], slices and units as
+  there; used: the ESD mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `(n_link, n_freq, 8)`
 - **`delay`**, **`power`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays, powers and angles, outputs 0 to
   5 of [[ssf_clusters]] in this order (`n_slot` slots); `power` `(n_link, n_slot, n_freq)`, the others
   `(n_link, n_slot, n_freq)` for `"38.901_MF"`, else `(n_link, n_slot, 1)`

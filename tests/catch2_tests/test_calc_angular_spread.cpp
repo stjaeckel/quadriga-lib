@@ -294,7 +294,7 @@ TEST_CASE("calc_angular_spread - Selective outputs (nullptr)")
     CHECK(as(0) > 0.0);
 }
 
-TEST_CASE("calc_angular_spread - quantize must be 0 or a finite value >= 1e-3 deg")
+TEST_CASE("calc_angular_spread - quantize_deg must be 0 or a finite value >= 1e-3 deg")
 {
     std::vector<arma::vec> az = {{0.1, 0.2}}, el = {{0.0, 0.05}}, pw = {{1.0, 1.0}};
     arma::vec as;
@@ -307,7 +307,7 @@ TEST_CASE("calc_angular_spread - quantize must be 0 or a finite value >= 1e-3 de
         INFO("wrapping " << wrap);
         for (double q : {1.0e-8, 9.99e-4, -1.0, -1.0e-8, (double)NAN, (double)INFINITY, -(double)INFINITY})
         {
-            INFO("quantize " << q);
+            INFO("quantize_deg " << q);
             CHECK_THROWS_AS(run(q, wrap), std::invalid_argument);
         }
         CHECK_NOTHROW(run(0.0, wrap));

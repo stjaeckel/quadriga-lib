@@ -14,20 +14,20 @@ SECTION!*/
 # CALC_DELAY_SPREAD
 Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
-- Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; the default threshold
+- Paths with power below `p_max / 10^(0.1 * threshold_dB)` are excluded; the default
   of 100 dB effectively includes all paths
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have
   their powers summed before computing the spread; binning is applied before the spread calculation
 
 ## Usage:
 ```
-[ ds, mean_delay ] = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
+[ ds, mean_delay ] = quadriga_lib.calc_delay_spread( delays, powers, threshold_dB, granularity );
 ```
 
 ## Inputs:
 - **`delays`** — Delays in [s] per CIR; `[n_path, n_cir]`
 - **`powers`** — Path powers on linear scale in [W]; `[n_path, n_cir]`
-- **`threshold`** — Power threshold in [dB] relative to strongest path; paths below threshold are excluded; default: 100
+- **`threshold_dB`** — Power threshold in [dB] relative to strongest path; paths below it are excluded; default: 100
 - **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping); must be finite
   and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53, else an
   error is raised
@@ -52,7 +52,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read inputs
     const std::vector<arma::vec> delays = qd_mex_matlab2vector_Col<double>(prhs[0], 1);
     const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[1], 1);
-    const double threshold = (nrhs < 3) ? 100.0 : qd_mex_get_scalar<double>(prhs[2], "threshold", 100.0);
+    const double threshold_dB = (nrhs < 3) ? 100.0 : qd_mex_get_scalar<double>(prhs[2], "threshold_dB", 100.0);
     const double granularity = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "granularity", 0.0);
 
     // Declare outputs
@@ -63,7 +63,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_mean_delay = (nlhs > 1) ? &mean_delay : nullptr;
 
     // Call library function
-    CALL_QD(ds = quadriga_lib::calc_delay_spread<double>(delays, powers, threshold, granularity, p_mean_delay));
+    CALL_QD(ds = quadriga_lib::calc_delay_spread<double>(delays, powers, threshold_dB, granularity, p_mean_delay));
 
     // Write outputs
     if (nlhs > 0)

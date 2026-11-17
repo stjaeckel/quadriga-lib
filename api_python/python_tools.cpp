@@ -45,12 +45,12 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("powers"),
           py::arg("wrapping") = false,
           py::arg("calc_bank_angle") = false,
-          py::arg("quantize") = 0.0);
+          py::arg("quantize_deg") = 0.0);
 
     m.def("calc_delay_spread", &calc_delay_spread,
           py::arg("delays"),
           py::arg("powers"),
-          py::arg("threshold") = 100.0,
+          py::arg("threshold_dB") = 100.0,
           py::arg("granularity") = 0.0);
 
     m.def("calc_rician_k_factor", &calc_rician_k_factor,

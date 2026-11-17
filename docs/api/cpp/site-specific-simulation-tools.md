@@ -1382,7 +1382,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     uint8_t max_transmissions = 10,
     uint8_t max_subdivisions = 2,
     float min_gain_dB = -140.0f,
-    float subdivision_tolerance_m = 3.0f,
+    float subdivision_tolerance = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
     bool scalar_mode = false,
@@ -1409,7 +1409,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
   counter `nSUB` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
-- **`subdivision_tolerance_m`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
+- **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
@@ -1421,7 +1421,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; `[n_ray]`, indexed in the full ray
   set (unlike everything else, which is compacted first). When supplied it is the authority on what gets
   subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been
-  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance_m` is unused. Pass the
+  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance` is unused. Pass the
   output of [ray_subdivide_flag](#ray_subdivide_flag) to reproduce the internal decision exactly; a hand-built list overrides it.
   Requires beam mode; conflicts with `max_subdivisions` = 0
 
@@ -1684,7 +1684,7 @@ Not in: MATLAB, Python
 
 - Projects the three vertex rays of each beam tube onto the plane of the first-bounce face and
   measures the longest edge of the resulting wavefront triangle
-- Flags a ray when that edge exceeds `subdivision_tolerance_m` and the ray is still eligible to be
+- Flags a ray when that edge exceeds `subdivision_tolerance` and the ray is still eligible to be
   split, i.e. it travels outside a medium and has not reached its subdivision or interaction limit
 - The decision is purely geometric: the vertex origins on the face are the same for reflection,
   transmission and refraction, so no material data, second-bounce index or frequency is needed
@@ -1706,7 +1706,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::Col<short> &mtl_ind_current,
     uint8_t max_interactions = 20,
     uint8_t max_subdivisions = 2,
-    float subdivision_tolerance_m = 3.0f);
+    float subdivision_tolerance = 3.0f);
 ```
 
 ### Inputs:
@@ -1724,7 +1724,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
 - **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
   the returned flags are all `false`
-- **`subdivision_tolerance_m`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
+- **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
 
 ### Output:

@@ -430,7 +430,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#arrayant_export_obj_file) ·
 void quadriga_lib::arrayant_export_obj_file(
     const std::string &fn,
     const arrayant<dtype> &ant,
-    dtype directivity_range = 30.0,
+    dtype directivity_range_dB = 30.0,
     const std::string &colormap = "jet",
     dtype object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
@@ -440,7 +440,7 @@ void quadriga_lib::arrayant_export_obj_file(
 ### Inputs:
 - **`fn`** — Output OBJ filename; must end in .obj; the colormap is written to a .mtl file of the same name
 - **`ant`** — Valid arrayant
-- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
+- **`directivity_range_dB`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
 - **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
 - **`object_radius`** *(optional)* — Radius of the exported object
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](site-specific-simulation-tools.md#icosphere)
@@ -1037,7 +1037,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
   via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
-- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
 - If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
@@ -1050,7 +1050,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
   - `hemisphere` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W·H))`
   - `dipole` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere
   - `cardioid` — `R = 0.5·(1+cos(θ_off))`
-- For `"horn"`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
+- For `"horn"`, `hor_coverage_deg`, `ver_coverage_deg` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
   60° and `f_ctrl = c/(2π·radius)`.
 
 ### Declaration:
@@ -1060,17 +1060,17 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype radius = 0.05,
         dtype lower_cutoff = 80.0,
         dtype upper_cutoff = 12000.0,
-        dtype lower_rolloff_slope = 12.0,
-        dtype upper_rolloff_slope = 12.0,
-        dtype sensitivity = 85.0,
+        dtype lower_rolloff_slope_dB = 12.0,
+        dtype upper_rolloff_slope_dB = 12.0,
+        dtype sensitivity_dB = 85.0,
         const std::string &radiation_type = "hemisphere",
-        dtype hor_coverage = NAN,
-        dtype ver_coverage = NAN,
+        dtype hor_coverage_deg = NAN,
+        dtype ver_coverage_deg = NAN,
         dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         const arma::Col<dtype> *center_freq = nullptr,
-        dtype angular_resolution = 5.0);
+        dtype angular_resolution_deg = 5.0);
 ```
 
 ### Inputs:
@@ -1078,17 +1078,17 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`radius`** *(optional)* — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn
 - **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz, > 0
 - **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz, larger than `lower_cutoff`
-- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
-- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave, > 0
-- **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
+- **`lower_rolloff_slope_dB`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
+- **`upper_rolloff_slope_dB`** *(optional)* — High-frequency rolloff in dB/octave, > 0
+- **`sensitivity_dB`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
-- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
-- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
+- **`hor_coverage_deg`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
+- **`ver_coverage_deg`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
 - **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
 - **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; nullptr or empty: third-octave bands
-- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
+- **`angular_resolution_deg`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion

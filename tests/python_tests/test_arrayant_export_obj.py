@@ -185,13 +185,13 @@ class test_case(unittest.TestCase):
             self.assertTrue(os.path.exists(p))
             self.assertTrue(os.path.exists(p[:-4] + ".mtl"))
 
-    # ---- directivity_range ----
+    # ---- directivity_range_dB ----
 
     def test_directivity_range(self):
         ant = quadriga_lib.arrayant.generate("3gpp", res=10)
         for drange in (10.0, 30.0, 50.0):
             p = self._export(
-                ant, directivity_range=drange, object_radius=1.0, icosphere_n_div=2
+                ant, directivity_range_dB=drange, object_radius=1.0, icosphere_n_div=2
             )
             self.assertTrue(os.path.exists(p))
 

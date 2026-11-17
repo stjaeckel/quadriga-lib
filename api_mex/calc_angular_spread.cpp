@@ -26,13 +26,13 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
 - When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived
   analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered
   angles; only used when `wrapping = true`
-- When `quantize > 0`, paths within that angular distance are grouped and their powers
+- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers
   summed before computing spreads
 
 ## Usage:
 ```
 [ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spread( az, el, powers, ...
-    wrapping, calc_bank_angle, quantize );
+    wrapping, calc_bank_angle, quantize_deg );
 ```
 
 ## Inputs:
@@ -41,7 +41,7 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
 - **`powers`** — Path powers in [W]; `[n_path, n_cir]`
 - **`wrapping`** — If true, enables spherical rotation; default: false
 - **`calc_bank_angle`** — If true, computes optimal bank angle analytically; only used when `wrapping = true`; default: false
-- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization);
+- **`quantize_deg`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization);
   otherwise it must be finite and >= 1e-3 deg, else an error is raised
 
 ## Outputs:
@@ -68,7 +68,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     const bool wrapping = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "wrapping", false);
     const bool calc_bank_angle = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "calc_bank_angle", false);
-    const double quantize = (nrhs < 6) ? 0.0 : qd_mex_get_scalar<double>(prhs[5], "quantize", 0.0);
+    const double quantize_deg = (nrhs < 6) ? 0.0 : qd_mex_get_scalar<double>(prhs[5], "quantize_deg", 0.0);
 
     // Declare output variables
     arma::vec azimuth_spread, elevation_spread;
@@ -85,7 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Call library function (double precision only)
     CALL_QD(quadriga_lib::calc_angular_spread<double>(
         az, el, powers, p_as, p_es, p_orient, p_phi, p_theta,
-        wrapping, calc_bank_angle, quantize));
+        wrapping, calc_bank_angle, quantize_deg));
 
     // Write outputs to MATLAB
     if (nlhs > 0)

@@ -120,8 +120,8 @@ namespace quadriga_lib
                    const arma::vec &center_freq,                                         // Carrier frequencies in [Hz], [n_freq]
                    const arma::mat &tx_pos,                                              // Tx positions, [1, 3] or [n_link, 3]
                    const arma::mat &rx_pos,                                              // Rx positions, [n_link, 3]
-                   arma::mat &pl,                                                        // Output: Path loss in [dB], [n_link, n_freq]
-                   arma::mat *sf_sigma = nullptr,                                        // Optional output: SF standard deviation in [dB], [n_link, n_freq]
+                   arma::mat &pl_dB,                                                     // Output: Path loss in [dB], [n_link, n_freq]
+                   arma::mat *sf_sigma_dB = nullptr,                                     // Optional output: SF standard deviation in [dB], [n_link, n_freq]
                    const arma::vec *d2d_in = nullptr,                                    // Optional: Indoor 2D distance in [m], [n_link]; given = outdoor distance only (legacy); 0 = outdoor link, geometric distance
                    const arma::vec *rnd_he = nullptr);                                   // Optional: Uniform(0,1) per link for the random hE, column 10 of gbsm_draw ("lsf"), [n_link]
 
@@ -135,7 +135,7 @@ namespace quadriga_lib
                       const arma::mat &rx_pos,                                // Rx positions, [n_link, 3]
                       const arma::mat &rnd,                                   // Random values from gbsm_draw ("lsf"), [n_link, 11]
                       arma::cube &lsp,                                        // Output: [n_link, n_freq, 8]: DS [s], KF, SF [linear], ASD, ASA, ESD, ESA [deg], XPR [linear]
-                      const arma::mat *sf_sigma = nullptr,                    // Optional: SF std in [dB] from path_loss, replaces the scenpar value, [n_link, n_freq]
+                      const arma::mat *sf_sigma_dB = nullptr,                 // Optional: SF std in [dB] from path_loss, replaces the scenpar value, [n_link, n_freq]
                       arma::vec *abs_toa = nullptr,                           // Optional output: Absolute TOA offset in [s], 0 if disabled, [n_link]
                       arma::mat *gr_eps_re = nullptr,                         // Optional output: Ground permittivity, real part, [n_link, n_freq]
                       arma::mat *gr_eps_im = nullptr,                         // Optional output: Ground permittivity, imaginary part, [n_link, n_freq]
@@ -170,7 +170,7 @@ namespace quadriga_lib
                   const arma::mat &rnd,                      // Random values per UT, [n_ut, 4]: U model, U d2D-in 1, U d2D-in 2, N deviation
                   const std::vector<std::string> &models,    // Models to mix, [n_model]
                   const arma::vec &weights,                  // Probability of each model, sum 1, [n_model]
-                  arma::mat &loss,                           // Output: Penetration loss in [dB], [n_ut, n_freq]
+                  arma::mat &loss_dB,                        // Output: Penetration loss in [dB], [n_ut, n_freq]
                   double d2d_in_max = 25.0,                  // Maximum indoor 2D distance in [m] (key O2I_d2D_in_max)
                   arma::vec *d2d_in = nullptr,               // Optional output: Indoor 2D distance in [m], 0 for car models, [n_ut]
                   arma::uvec *model_ind = nullptr);          // Optional output: Chosen model per UT, 0-based index into 'models', [n_ut]

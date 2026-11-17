@@ -129,7 +129,7 @@ void quadriga_lib::lsp_generate(
     const arma::mat &rx_pos,
     const arma::mat &rnd,
     arma::cube &lsp,
-    const arma::mat *sf_sigma = nullptr,
+    const arma::mat *sf_sigma_dB = nullptr,
     arma::vec *abs_toa = nullptr,
     arma::mat *gr_eps_re = nullptr,
     arma::mat *gr_eps_im = nullptr,
@@ -147,7 +147,7 @@ void quadriga_lib::lsp_generate(
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [[gbsm_draw]] (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
   is requested; column 10 is not used; `[n_link, 11]`
-- **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite and >= 0; replaces
+- **`sf_sigma_dB`** *(optional)* — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite and >= 0; replaces
   the value from `scenpar`, also in `lsp_sigma`; `[n_link, n_freq]`
 - **`cholesky`** *(optional)* — `true`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS, ASD,
   ASA, ESD, ESA; XPR last); `false`: symmetric square root (legacy QuaDRiGa)
@@ -155,19 +155,20 @@ void quadriga_lib::lsp_generate(
   step 4); `lsp_mu` and `lsp_sigma` are not affected
 
 ## Outputs:
-- **`lsp`** — Large-scale parameters; slices: 0 DS in [s], 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA in [deg], 7 XPR;
-  `[n_link, n_freq, 8]`
+- **`lsp`** — Large-scale parameters; slices: 0 DS in [s]; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA
+  in [deg]; `[n_link, n_freq, 8]`
 - **`abs_toa`** *(optional)* — Absolute TOA offset in [s], 0 if not active; `[n_link]`
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary
   part >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
-- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
-- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; required by [[ssf_rays]];
-  `[n_link, n_freq, 8]`
+- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain, slices as `lsp`: lg of [s] for DS, lg of [deg] for the
+  angular spreads, [dB] for KF, SF and XPR; required by [[ssf_rays]]; `[n_link, n_freq, 8]`
+- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain of `lsp_mu`, >= 0; required by
+  [[ssf_rays]]; `[n_link, n_freq, 8]`
 
 ## See also:
 - [[gbsm_draw]] (the random values `rnd`)
-- [[path_loss]] (the SF standard deviation `sf_sigma`)
+- [[path_loss]] (the SF standard deviation `sf_sigma_dB`)
 - [[ssf_clusters]] (the clusters from the LSPs)
 - [[ssf_rays]] (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 MD!*/
@@ -178,7 +179,7 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                                 const arma::mat &rx_pos,
                                 const arma::mat &rnd,
                                 arma::cube &lsp,
-                                const arma::mat *sf_sigma,
+                                const arma::mat *sf_sigma_dB,
                                 arma::vec *abs_toa,
                                 arma::mat *gr_eps_re,
                                 arma::mat *gr_eps_im,
@@ -197,20 +198,20 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
         throw std::invalid_argument("Input 'rnd' must have size [n_link, 11].");
     if (!rnd.is_finite())
         throw std::invalid_argument("Input 'rnd' must be finite.");
-    if (sf_sigma != nullptr)
+    if (sf_sigma_dB != nullptr)
     {
-        if (sf_sigma->n_rows != n_link || sf_sigma->n_cols != n_freq)
-            throw std::invalid_argument("Input 'sf_sigma' must have size [n_link, n_freq].");
-        if (!sf_sigma->is_finite() || arma::any(arma::vectorise(*sf_sigma) < 0.0))
-            throw std::invalid_argument("Input 'sf_sigma' must be finite and >= 0.");
+        if (sf_sigma_dB->n_rows != n_link || sf_sigma_dB->n_cols != n_freq)
+            throw std::invalid_argument("Input 'sf_sigma_dB' must have size [n_link, n_freq].");
+        if (!sf_sigma_dB->is_finite() || arma::any(arma::vectorise(*sf_sigma_dB) < 0.0))
+            throw std::invalid_argument("Input 'sf_sigma_dB' must be finite and >= 0.");
     }
-    qd_check_alias(&lsp, "lsp", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(abs_toa, "abs_toa", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(gr_eps_re, "gr_eps_re", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(gr_eps_im, "gr_eps_im", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(eod_offset_deg, "eod_offset_deg", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(lsp_mu, "lsp_mu", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
-    qd_check_alias(lsp_sigma, "lsp_sigma", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma);
+    qd_check_alias(&lsp, "lsp", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
+    qd_check_alias(abs_toa, "abs_toa", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
+    qd_check_alias(gr_eps_re, "gr_eps_re", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
+    qd_check_alias(gr_eps_im, "gr_eps_im", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
+    qd_check_alias(eod_offset_deg, "eod_offset_deg", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
+    qd_check_alias(lsp_mu, "lsp_mu", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
+    qd_check_alias(lsp_sigma, "lsp_sigma", &center_freq, &tx_pos, &rx_pos, &rnd, sf_sigma_dB);
     qd_check_alias_outputs(&lsp, "lsp", lsp_mu, "lsp_mu");
     qd_check_alias_outputs(&lsp, "lsp", lsp_sigma, "lsp_sigma");
     qd_check_alias_outputs(lsp_mu, "lsp_mu", lsp_sigma, "lsp_sigma");
@@ -312,8 +313,8 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
             {
                 double mu = 0.0, sigma = 0.0;
                 stats.get(i, k, mu, sigma);
-                if (i == 2 && sf_sigma != nullptr)
-                    sigma = (*sf_sigma)(l, k);
+                if (i == 2 && sf_sigma_dB != nullptr)
+                    sigma = (*sf_sigma_dB)(l, k);
                 const double v = mu + sigma * x[i];
                 double val = in_db[i] ? std::pow(10.0, 0.1 * v) : std::pow(10.0, v);
                 if (clip_spreads && clip[i] > 0.0)

@@ -10,10 +10,10 @@ acf = 0.5 * ( cos( 2*pi * 0.04 * dist ) + cos( 2*pi * 0.13 * dist ) );
 other = exp( -dist / 5 );
 
 %% Basic call, 1-D
-[ mse, mse_core, mse_all, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( spatial_freq, acf, dist );
-assertTrue( isa(mse, 'double') && isscalar(mse) && isscalar(mse_core) && isscalar(mse_all) );
-assertTrue( mse > 250 && mse_core > 250 );
-assertTrue( mse_all > 0 && mse_all < 30 );
+[ mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir ] = quadriga_lib.sos_calc_mse( spatial_freq, acf, dist );
+assertTrue( isa(mse_dB, 'double') && isscalar(mse_dB) && isscalar(mse_core_dB) && isscalar(mse_all_dB) );
+assertTrue( mse_dB > 250 && mse_core_dB > 250 );
+assertTrue( mse_all_dB > 0 && mse_all_dB < 30 );
 assertEqual( size(acf_tail), [4, 1] );
 assertTrue( isempty(test_dir) );
 tail = 0.5 * ( cos( 2*pi * 0.04 * 20 * [2; 4; 10; 20] ) + cos( 2*pi * 0.13 * 20 * [2; 4; 10; 20] ) );

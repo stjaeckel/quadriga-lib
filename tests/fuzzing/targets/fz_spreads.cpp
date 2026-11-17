@@ -86,11 +86,11 @@ static void run(fz::input &in)
     // Delay spread
     {
         auto delays = cols<T>(in, n_path), powers = cols<T>(in, n_path);
-        const T threshold = in.ConsumeBool() ? T(100) : in.value<T>();
+        const T threshold_dB = in.ConsumeBool() ? T(100) : in.value<T>();
         const T granularity = in.ConsumeBool() ? T(0) : in.value<T>();
         arma::Col<T> mean_delay(in.size(2));
         const bool use_mean = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::calc_delay_spread<T>(delays, powers, threshold, granularity, use_mean ? &mean_delay : nullptr); });
+        fz::clean([&] { quadriga_lib::calc_delay_spread<T>(delays, powers, threshold_dB, granularity, use_mean ? &mean_delay : nullptr); });
     }
 
     // Angular spreads, with and without wrapping, bank angle and quantization
@@ -101,11 +101,11 @@ static void run(fz::input &in)
         std::vector<arma::Col<T>> phi(in.size(2)), theta;
         const int mask = in.ConsumeIntegralInRange<int>(0, 31);
         const bool wrapping = in.ConsumeBool(), calc_bank_angle = in.ConsumeBool();
-        const T quantize = in.ConsumeBool() ? T(0) : in.value<T>();
+        const T quantize_deg = in.ConsumeBool() ? T(0) : in.value<T>();
         fz::clean([&]
                   { quadriga_lib::calc_angular_spread<T>(az, el, powers, (mask & 1) ? &as : nullptr, (mask & 2) ? &es : nullptr,
                                                                  (mask & 4) ? &orientation : nullptr, (mask & 8) ? &phi : nullptr,
-                                                                 (mask & 16) ? &theta : nullptr, wrapping, calc_bank_angle, quantize); });
+                                                                 (mask & 16) ? &theta : nullptr, wrapping, calc_bank_angle, quantize_deg); });
     }
 
     // Rician K-factor and cross-polarization ratio

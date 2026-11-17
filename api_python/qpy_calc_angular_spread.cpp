@@ -25,12 +25,12 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
 - When `calc_bank_angle = True`, an optimal bank angle maximizing azimuth spread is derived
   analytically from eigenvectors of the 2x2 power-weighted covariance matrix; only used when
   `wrapping = True`
-- When `quantize > 0`, paths within that angular distance are grouped and their powers summed
+- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers summed
 
 ## Usage:
 ```
 azimuth_spread, elevation_spread, orientation, phi, theta = \
-    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize )
+    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize_deg )
 ```
 
 ## Inputs:
@@ -39,7 +39,7 @@ azimuth_spread, elevation_spread, orientation, phi, theta = \
 - **`powers`** — Path powers; list of length `n_cir`, each element a 1D array of length `n_path`
 - **`wrapping`** — If True, enables spherical rotation; default: False
 - **`calc_bank_angle`** — If True, computes the optimal bank angle analytically; only used when `wrapping = True`; default: False
-- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization);
+- **`quantize_deg`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization);
   otherwise it must be finite and >= 1e-3 deg, else a `ValueError` is raised
 
 ## Outputs:
@@ -56,7 +56,7 @@ py::tuple calc_angular_spread(py::list az,
                               py::list powers,
                               bool wrapping,
                               bool calc_bank_angle,
-                              double quantize)
+                              double quantize_deg)
 {
     // Convert inputs to std::vector<arma::vec>
     std::vector<arma::vec> az_a = qd_python_list2vector_Col<double>(az);
@@ -71,7 +71,7 @@ py::tuple calc_angular_spread(py::list az,
     // Call library function
     quadriga_lib::calc_angular_spread<double>(az_a, el_a, powers_a,
                                               &azimuth_spread, &elevation_spread, &orientation,
-                                              &phi, &theta, wrapping, calc_bank_angle, quantize);
+                                              &phi, &theta, wrapping, calc_bank_angle, quantize_deg);
 
     // Convert to Python
     auto azimuth_spread_py = qd_python_copy2numpy(&azimuth_spread);

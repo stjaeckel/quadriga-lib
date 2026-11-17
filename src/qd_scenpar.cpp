@@ -717,7 +717,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 1. [[conf_file_read]]: the scenarios, one per LOS and indoor state
 2. Per link, by the caller with own SOS generators ([[sos_init_phases]], [[sos_rand]], [[sos_randn]]): the indoor
    state, a Uniform(0,1) value at the decorrelation distance `IO_state_lambda` of the O2I files below an indoor ratio
-   of the caller's choice (e.g. TR 38.901 Table 7.2-1), and for indoor UTs [[o2i_loss]] (`loss`, `d2d_in`); then the
+   of the caller's choice (e.g. TR 38.901 Table 7.2-1), and for indoor UTs [[o2i_loss]] (`loss_dB`, `d2d_in`); then the
    LOS state, a Uniform(0,1) value at `LOS_state_lambda` of the NLOS file below `p_los` of [[los_probability]] at
    `d2d_out = max(d2D - d2d_in, 0)`. The caller chooses the `los_probability` model and the `o2i_loss` models and
    weights (TR 38.901 Tables 7.4.2-1, 7.4.3-2). The states assign each link to a scenario and give the `o2i` flags of
@@ -725,8 +725,8 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 3. Per BS site and scenario, once, with one seed for all sets: [[gbsm_init_phases]] of the random sets in the table
    below; `"lsf"` with the link positions for the bias removal
 4. [[gbsm_draw]] of each set at the links (the shared `"ray"` set with `center_freq`, the list later passed to
-   [[ssf_rays]]); [[path_loss]] (`pl`, `sf_sigma`; column 10 of the `"lsf"` set as `rnd_he`); [[lsp_generate]] with
-   `sf_sigma` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
+   [[ssf_rays]]); [[path_loss]] (`pl_dB`, `sf_sigma_dB`; column 10 of the `"lsf"` set as `rnd_he`); [[lsp_generate]]
+   with `sf_sigma_dB` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [[ssf_clusters]] (`n_cluster` is the caller's choice) and [[ssf_rays]] (one [[gbsm_rays]] object per link), called
    as in the table below
 6. Per link and segment: .[[solve_scatterers]] if the mobility is `drift`; then [[gbsm_single_link_channel]] with the
@@ -764,7 +764,7 @@ KF(drop) from slice 1 of `lsp`. Ray data can also come from path data, with [[gb
 | scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
 | coefficient power | power of a ray without link gain and oxygen loss (`gbsm_rays.power`): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [[ssf_clusters]] sets it; for data from paths the path gain |
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
-| link gain | `-pl - loss + 10·lg(SF)` in dB of a link at a position and frequency (`link_gain_dB`), with `pl` of [[path_loss]], `loss` of [[o2i_loss]] (0 outdoors) and SF the linear shadow fading, slice 2 of `lsp` |
+| link gain | `-pl_dB - loss_dB + 10·lg(SF)` in dB of a link at a position and frequency (`link_gain_dB`), with `pl_dB` of [[path_loss]], `loss_dB` of [[o2i_loss]] (0 outdoors) and SF the linear shadow fading, slice 2 of `lsp` |
 | random set | the spatially correlated random values of one `set_type` and `set_id` (table in [[gbsm_draw]]) |
 | generator | one spatially correlated random field, a [sum-of-sinusoids (SOS)](cpp_api.html#sec-sum-of-sinusoids-random-number-generator) generator; one column of a random set |
 | SOS phases | the random phases of the sinusoids of the generators of a random set (`phase`); evaluated at positions, they give its random values. "Phase" alone is the phase of a coefficient or ray |

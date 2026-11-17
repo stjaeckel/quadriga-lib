@@ -761,7 +761,7 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min` are excluded; `max_paths` limits total count
+- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
 - Paths with non-finite coordinates are skipped
 
 ## Declaration:
@@ -769,8 +769,8 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     const std::string &fn,
     arma::uword max_paths = 0,
-    dtype gain_max = -60.0,
-    dtype gain_min = -140.0,
+    dtype gain_max_dB = -60.0,
+    dtype gain_min_dB = -140.0,
     const std::string &colormap = "jet",
     const arma::uvec *i_snap = nullptr,
     dtype radius_max = 0.05,
@@ -780,9 +780,9 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 
 ## Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
-- **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
+- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
+- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
 - **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
@@ -797,7 +797,7 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn,
                                                            arma::uword max_paths,
-                                                           dtype gain_max, dtype gain_min,
+                                                           dtype gain_max_dB, dtype gain_min_dB,
                                                            const std::string &colormap,
                                                            const arma::uvec *i_snap_in,
                                                            dtype radius_max, dtype radius_min,
@@ -822,8 +822,8 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
         throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
 
     // Input validation
-    if (!std::isfinite(gain_max) || !std::isfinite(gain_min) || !(gain_max > gain_min))
-        throw std::invalid_argument("Inputs 'gain_max' and 'gain_min' must be finite, with 'gain_max' larger than 'gain_min'.");
+    if (!std::isfinite(gain_max_dB) || !std::isfinite(gain_min_dB) || !(gain_max_dB > gain_min_dB))
+        throw std::invalid_argument("Inputs 'gain_max_dB' and 'gain_min_dB' must be finite, with 'gain_max_dB' larger than 'gain_min_dB'.");
 
     std::string fn_suffix = ".obj";
     std::string fn_mtl;
@@ -929,7 +929,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
         arma::Col<dtype> path_power_dB(n_path);
         arma::s32_vec color_index(n_path);
 
-        dtype scl = (dtype)63.0 / (gain_max - gain_min); // gain_max > gain_min, checked at the start
+        dtype scl = (dtype)63.0 / (gain_max_dB - gain_min_dB); // gain_max_dB > gain_min_dB, checked at the start
         for (arma::uword i_path = 0ULL; i_path < n_path; ++i_path)
         {
             // Lambda to calculate the power and check if the pattern has any entry > -200 dB
@@ -956,14 +956,14 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
             path_power_dB(i_path) = p;
 
             dtype x = p;
-            x = (x < gain_min) ? gain_min : x;
-            x = (x > gain_max) ? gain_max : x;
-            x = x - gain_min;
+            x = (x < gain_min_dB) ? gain_min_dB : x;
+            x = (x > gain_max_dB) ? gain_max_dB : x;
+            x = x - gain_min_dB;
             x = x * scl;
             x = (x > (dtype)63.0) ? (dtype)63.0 : x;
             x = std::round(x);
 
-            color_index(i_path) = (p >= gain_min) ? (int)x : -1; // NaN power is excluded
+            color_index(i_path) = (p >= gain_min_dB) ? (int)x : -1; // NaN power is excluded
 
             // Paths with non-finite coordinates cannot be drawn
             if (!path_coord[i_path].is_finite())
@@ -1020,7 +1020,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
         }
 
         // Write OBJ elements
-        scl = radius_max / (gain_max - gain_min);
+        scl = radius_max / (gain_max_dB - gain_min_dB);
         for (arma::uword i_path = 0ULL; i_path < n_path; ++i_path)
         {
             arma::uword i_path_sorted = i_pow_sorted[i_path];
@@ -1028,7 +1028,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
             {
                 // Calculate radius
                 dtype p = path_power_dB(i_path_sorted);
-                dtype radius = p - gain_min;
+                dtype radius = p - gain_min_dB;
                 radius = radius * scl;
                 radius = (radius > radius_max) ? radius_max : radius;
                 radius = (radius < radius_min) ? radius_min : radius;

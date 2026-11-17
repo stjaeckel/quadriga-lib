@@ -78,7 +78,7 @@ class test_case(unittest.TestCase):
 
     def test_keyword_arguments(self):
         ok = self.call(scenpar=self.sp, center_freq=self.fc, tx_pos=self.tx_pos, rx_pos=self.rx_pos, rnd=self.rnd,
-                       sf_sigma=None, cholesky=True, clip_spreads=True, complex=True)
+                       sf_sigma_dB=None, cholesky=True, clip_spreads=True, complex=True)
         op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True, True)
         for a, b, c in zip(ok, op, self.out):
             npt.assert_array_equal(a, c)
@@ -157,7 +157,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(self.call(None, self.fc, self.tx_pos, self.rx_pos, self.rnd)[0].shape, (3, 2, 8))
 
     def test_conf_file_chain(self):
-        # conf_file_read -> path_loss (sf_sigma) -> lsp_generate
+        # conf_file_read -> path_loss (sf_sigma_dB) -> lsp_generate
         sp, plpar = quadriga_lib.gbsm.conf_file_read(os.path.join(config_dir, "3GPP_38.901_v19_UMa_NLOS.conf"))[:2]
         pl, sf = quadriga_lib.gbsm.path_loss(plpar, sp, self.fc, self.tx_pos, self.rx_pos)
         lsp, _, _, _, _, sig = self.call(sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf)
@@ -203,7 +203,7 @@ class test_case(unittest.TestCase):
         self.assertIn("Input 'rnd' must have size [n_link, 11].", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, -np.ones((3, 2)))
-        self.assertIn("Input 'sf_sigma' must be finite and >= 0.", str(ctx.exception))
+        self.assertIn("Input 'sf_sigma_dB' must be finite and >= 0.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             self.call({"ds_kf": 0.9, "ds_sf": 0.9, "sf_kf": -0.9}, self.fc, self.tx_pos, self.rx_pos, self.rnd)
         self.assertIn("LSP cross-correlation matrix in 'scenpar' is not positive definite.", str(ctx.exception))

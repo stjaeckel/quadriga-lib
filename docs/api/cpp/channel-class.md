@@ -129,7 +129,7 @@ Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Pytho
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min` are excluded; `max_paths` limits total count
+- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
 - Paths with non-finite coordinates are skipped
 
 ### Declaration:
@@ -137,8 +137,8 @@ Also in: [MATLAB](../mex/channel-functions.md#channel_export_obj_file) · [Pytho
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     const std::string &fn,
     arma::uword max_paths = 0,
-    dtype gain_max = -60.0,
-    dtype gain_min = -140.0,
+    dtype gain_max_dB = -60.0,
+    dtype gain_min_dB = -140.0,
     const std::string &colormap = "jet",
     const arma::uvec *i_snap = nullptr,
     dtype radius_max = 0.05,
@@ -148,9 +148,9 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
-- **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
+- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
+- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](site-specific-simulation-tools.md#colormap) for supported options
 - **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain

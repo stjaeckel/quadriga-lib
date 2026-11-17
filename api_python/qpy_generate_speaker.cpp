@@ -19,7 +19,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   crossover behavior emerges from overlapping bandpass responses
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies
-- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB - 85) / 20)`
 - If `center_freq` is None or empty, third-octave band centers are auto-generated from one band below
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz
 - Speed of sound assumed to be 343 m/s
@@ -32,7 +32,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
   - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `horn`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
+- For `horn`, `hor_coverage_deg`, `ver_coverage_deg` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
   and `f_ctrl = c/(2pi·radius)`
 
 ## Usage:
@@ -42,16 +42,16 @@ speaker = quadriga_lib.arrayant.generate_speaker()
 
 # Horn tweeter with custom coverage
 speaker = quadriga_lib.arrayant.generate_speaker(driver_type='horn', radius=0.025, \
-    lower_cutoff=1500.0, upper_cutoff=20000.0, hor_coverage=90.0, ver_coverage=60.0)
+    lower_cutoff=1500.0, upper_cutoff=20000.0, hor_coverage_deg=90.0, ver_coverage_deg=60.0)
 
 # Omnidirectional subwoofer with steep rolloff
 speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.165, \
-    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope=24.0, upper_rolloff_slope=24.0, \
-    sensitivity=90.0, radiation_type='monopole')
+    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope_dB=24.0, upper_rolloff_slope_dB=24.0, \
+    sensitivity_dB=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
 speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, \
-    10000.0]), angular_resolution=5.0)
+    10000.0]), angular_resolution_deg=5.0)
 ```
 
 ## Inputs:
@@ -61,15 +61,15 @@ speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 5
 - **`lower_cutoff`** — Lower -3 dB bandpass frequency in Hz, > 0; default: 80
 - **`upper_cutoff`** — Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`;
   default: 12000
-- **`lower_rolloff_slope`** — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth);
+- **`lower_rolloff_slope_dB`** — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth);
   default: 12
-- **`upper_rolloff_slope`** — High-frequency rolloff in dB/octave, > 0; default: 12
-- **`sensitivity`** — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
+- **`upper_rolloff_slope_dB`** — High-frequency rolloff in dB/octave, > 0; default: 12
+- **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** — Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`;
   default: `hemisphere`
-- **`hor_coverage`** — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; horn only;
+- **`hor_coverage_deg`** — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; horn only;
   default: NaN
-- **`ver_coverage`** — Horn vertical coverage angle in degrees; NaN or <= 0: default 60; horn only;
+- **`ver_coverage_deg`** — Horn vertical coverage angle in degrees; NaN or <= 0: default 60; horn only;
   default: NaN
 - **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`;
   horn only; default: NaN
@@ -77,7 +77,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 5
 - **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
 - **`center_freq`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
   `(n_freq,)` or None; default: None
-- **`angular_resolution`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
+- **`angular_resolution_deg`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
 
 ## Outputs:
 - **`speaker`** — Multi-frequency arrayant dict with the fields below; for `n_freq = 1` the pattern fields
@@ -101,26 +101,26 @@ py::dict generate_speaker(const std::string &driver_type,
                           double radius,
                           double lower_cutoff,
                           double upper_cutoff,
-                          double lower_rolloff_slope,
-                          double upper_rolloff_slope,
-                          double sensitivity,
+                          double lower_rolloff_slope_dB,
+                          double upper_rolloff_slope_dB,
+                          double sensitivity_dB,
                           const std::string &radiation_type,
-                          double hor_coverage,
-                          double ver_coverage,
+                          double hor_coverage_deg,
+                          double ver_coverage_deg,
                           double horn_control_freq,
                           double baffle_width,
                           double baffle_height,
                           py::handle center_freq,
-                          double angular_resolution)
+                          double angular_resolution_deg)
 {
     // Empty arma::vec when center_freq is None or empty
     const auto freq_vec = qd_python_numpy2arma_Col<double>(center_freq, true);
 
     auto speaker = quadriga_lib::generate_speaker<double>(
         driver_type, radius, lower_cutoff, upper_cutoff,
-        lower_rolloff_slope, upper_rolloff_slope, sensitivity,
-        radiation_type, hor_coverage, ver_coverage, horn_control_freq,
-        baffle_width, baffle_height, &freq_vec, angular_resolution);
+        lower_rolloff_slope_dB, upper_rolloff_slope_dB, sensitivity_dB,
+        radiation_type, hor_coverage_deg, ver_coverage_deg, horn_control_freq,
+        baffle_width, baffle_height, &freq_vec, angular_resolution_deg);
 
     return qd_python_arrayant2dict_multi(speaker);
 }

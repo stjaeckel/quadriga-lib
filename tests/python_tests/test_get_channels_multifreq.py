@@ -61,10 +61,10 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         tx_woofer = quadriga_lib.arrayant.generate_speaker(
             driver_type='piston', radius=0.083,
             lower_cutoff=50.0, upper_cutoff=3000.0,
-            lower_rolloff_slope=12.0, upper_rolloff_slope=24.0, sensitivity=87.0,
+            lower_rolloff_slope_dB=12.0, upper_rolloff_slope_dB=24.0, sensitivity_dB=87.0,
             radiation_type='hemisphere', baffle_width=0.20, baffle_height=0.30,
             center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
-            angular_resolution=10.0)
+            angular_resolution_deg=10.0)
 
         # Omnidirectional microphone as RX (single-frequency, clamped for all output frequencies)
         rx = quadriga_lib.arrayant.generate('omni')
@@ -539,10 +539,10 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         """Acoustic speaker: verify output shape and finite values."""
         tx_woofer = quadriga_lib.arrayant.generate_speaker(
             driver_type='piston', radius=0.083, lower_cutoff=50.0, upper_cutoff=3000.0,
-            lower_rolloff_slope=12.0, upper_rolloff_slope=24.0, sensitivity=87.0,
+            lower_rolloff_slope_dB=12.0, upper_rolloff_slope_dB=24.0, sensitivity_dB=87.0,
             radiation_type='hemisphere', baffle_width=0.20, baffle_height=0.30,
             center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
-            angular_resolution=10.0)
+            angular_resolution_deg=10.0)
 
         # Note: arrayant_concat_multi is not yet available in Python, so we test
         # each driver individually to confirm the API works with generate_speaker output

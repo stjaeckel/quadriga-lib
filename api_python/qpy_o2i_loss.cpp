@@ -14,7 +14,7 @@ SECTION!*/
 O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 - Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier frequency; the
-  caller adds `loss` to the path loss of the UT
+  caller adds `loss_dB` to the path loss of the UT
 - Models of TR 38.901 v19.5.0: `low`, `high`, `low_A` (Table 7.4.3-2 with the materials of Table 7.4.3-1), `legacy_6GHz`
   (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz), `car` and `car_metal` (clause 7.4.3.2, metallized windows)
 - Model of UT `u`: the first model `j` with `rnd(u, 0)` below the sum of the weights up to `j`, else the last model with
@@ -29,7 +29,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 ## Usage:
 ```
-loss, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
+loss_dB, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
 ```
 
 ## Inputs:
@@ -43,7 +43,7 @@ loss, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, 
   files; TR: 25 m for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings); default: 25.0
 
 ## Outputs:
-- **`loss`** — Penetration loss in dB; `(n_ut, n_freq)`
+- **`loss_dB`** — Penetration loss in dB; `(n_ut, n_freq)`
 - **`d2d_in`** — Indoor 2D distance in m, 0 for the car models; `(n_ut,)`
 - **`model_ind`** — Chosen model per UT, 0-based index into `models`; uint64; `(n_ut,)`
 
@@ -65,15 +65,15 @@ py::tuple o2i_loss(const py::array_t<double> &center_freq,
     const auto weights_a = qd_python_numpy2arma_Col<double>(weights, true);
 
     // Output allocation
-    arma::mat loss;
+    arma::mat loss_dB;
     arma::vec d2d_in;
     arma::uvec model_ind;
-    auto loss_py = qd_python_init_output(rnd_a.n_rows, center_freq_a.n_elem, &loss);
+    auto loss_py = qd_python_init_output(rnd_a.n_rows, center_freq_a.n_elem, &loss_dB);
     auto d2d_in_py = qd_python_init_output(rnd_a.n_rows, &d2d_in);
     auto model_index_py = qd_python_init_output(rnd_a.n_rows, &model_ind);
 
     // Call library function
-    quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, loss, d2d_in_max, &d2d_in, &model_ind);
+    quadriga_lib::o2i_loss(center_freq_a, rnd_a, models_a, weights_a, loss_dB, d2d_in_max, &d2d_in, &model_ind);
 
     return py::make_tuple(loss_py, d2d_in_py, model_index_py);
 }

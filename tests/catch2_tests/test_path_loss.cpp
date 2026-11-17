@@ -951,7 +951,7 @@ TEST_CASE("path_loss - distances below 0.1 m are clamped")
     CHECK(close_rel(pl(2, 0), 40.0 * lg(0.1) + 10.0, 1e-12));
 }
 
-TEST_CASE("path_loss - default sf_sigma follows the LSP formula")
+TEST_CASE("path_loss - default sf_sigma_dB follows the LSP formula")
 {
     // sigma = max(0, max(0, SF_sigma + SF_delta lg(SF_omega + f')) + SF_kappa lg d + SF_tau lg h + SF_beta lg a),
     // d = max(d2D, 1e-4), h = max(hBS, 1e-4), a = atan(h / d), f' = max(f, LSP_fc_min)
@@ -973,7 +973,7 @@ TEST_CASE("path_loss - default sf_sigma follows the LSP formula")
     const arma::vec fc = {3.0e9, 10.0e9};
     arma::mat pl, sf;
     quadriga_lib::path_loss("logdist", p, s1, fc, tx, rx, pl, &sf);
-    QD_DIAG("\n# diag: path_loss default sf_sigma\nlink,f,sf,ref\n");
+    QD_DIAG("\n# diag: path_loss default sf_sigma_dB\nlink,f,sf,ref\n");
     for (arma::uword l = 0; l < 3; ++l)
     {
         double d2, d3, hBS, hUT;
@@ -1092,8 +1092,8 @@ TEST_CASE("path_loss - input validation")
         arma::mat r = rx, t = tx, sf;
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &sf));
         CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, tx, r, r), std::invalid_argument);        // pl is 'rx_pos'
-        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, t, rx, pl, &t), std::invalid_argument);   // sf_sigma is 'tx_pos'
-        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &pl), std::invalid_argument); // sf_sigma is 'pl'
+        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, t, rx, pl, &t), std::invalid_argument);   // sf_sigma_dB is 'tx_pos'
+        CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, tx, rx, pl, &pl), std::invalid_argument); // sf_sigma_dB is 'pl'
         arma::mat on_rx(r.memptr(), 3, 2, false, true);
         CHECK_THROWS_AS(quadriga_lib::path_loss(model, plpar, sp, fc, tx, r, on_rx), std::invalid_argument);
         CHECK(arma::approx_equal(r, rx, "absdiff", 0.0));
@@ -1246,16 +1246,16 @@ TEST_CASE("path_loss - input validation")
         CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl), std::invalid_argument,
                              Message("Unknown key 'SF_sigmaX' in 'scenpar'."));
     }
-    SECTION("SF frequency term of the default sf_sigma")
+    SECTION("SF frequency term of the default sf_sigma_dB")
     {
-        // Checked only when sf_sigma is requested; f' = max(f, LSP_fc_min) = 3.5 GHz gives SF_omega + f' = 0
+        // Checked only when sf_sigma_dB is requested; f' = max(f, LSP_fc_min) = 3.5 GHz gives SF_omega + f' = 0
         scen_t bad = sp;
         bad["SF_omega"] = -3.5, bad["SF_delta"] = 1.0, bad["LSP_fc_min"] = 0.0;
         arma::mat sf;
         CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl, &sf), std::invalid_argument,
                              Message("Scenario parameter 'SF_omega' plus the frequency in GHz must be > 0 where 'SF_delta' is not 0."));
         CHECK_NOTHROW(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl));
-        // Infinite SF coefficients (Inf·0 = NaN), also checked only when sf_sigma is requested
+        // Infinite SF coefficients (Inf·0 = NaN), also checked only when sf_sigma_dB is requested
         bad = sp;
         bad["SF_kappa"] = INFINITY;
         CHECK_THROWS_MATCHES(quadriga_lib::path_loss(model, plpar, bad, fc, tx, rx, pl, &sf), std::invalid_argument,

@@ -67,12 +67,12 @@ Also in: [C++](../cpp/channel-statistics.md#calc_angular_spread) · [MATLAB](../
 - When `calc_bank_angle = True`, an optimal bank angle maximizing azimuth spread is derived
   analytically from eigenvectors of the 2x2 power-weighted covariance matrix; only used when
   `wrapping = True`
-- When `quantize > 0`, paths within that angular distance are grouped and their powers summed
+- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers summed
 
 ### Usage:
 ```python
 azimuth_spread, elevation_spread, orientation, phi, theta = \
-    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize )
+    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize_deg )
 ```
 
 ### Inputs:
@@ -81,7 +81,7 @@ azimuth_spread, elevation_spread, orientation, phi, theta = \
 - **`powers`** — Path powers; list of length `n_cir`, each element a 1D array of length `n_path`
 - **`wrapping`** — If True, enables spherical rotation; default: False
 - **`calc_bank_angle`** — If True, computes the optimal bank angle analytically; only used when `wrapping = True`; default: False
-- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization);
+- **`quantize_deg`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization);
   otherwise it must be finite and >= 1e-3 deg, else a `ValueError` is raised
 
 ### Outputs:
@@ -166,21 +166,21 @@ Also in: [C++](../cpp/channel-statistics.md#calc_delay_spread) · [MATLAB](../me
 
 - Computes RMS delay spread from a set of delays and corresponding linear-scale powers per CIR
 - Inputs are lists of 1D arrays so each CIR can have a different number of paths
-- Paths with power below `p_max / 10^(0.1 · threshold)` are excluded; the default threshold of
+- Paths with power below `p_max / 10^(0.1 · threshold_dB)` are excluded; the default of
   100 dB effectively includes all paths
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their
   powers summed before the spread is computed
 
 ### Usage:
 ```python
-ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, threshold, granularity )
+ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, threshold_dB, granularity )
 ```
 
 ### Inputs:
 - **`delays`** — Delays per CIR; list of length `n_cir`, each element a 1D array of length `n_path`
 - **`powers`** — Path powers on linear scale per CIR; list of length `n_cir`, each element a 1D
   array of length `n_path`
-- **`threshold`** — Power threshold in [dB] relative to the strongest path; paths below threshold
+- **`threshold_dB`** — Power threshold in [dB] relative to the strongest path; paths below it
   are excluded; default: 100.0
 - **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0.0 (no grouping); must be
   finite and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53,

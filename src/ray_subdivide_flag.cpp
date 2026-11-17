@@ -20,7 +20,7 @@ Compute the per-ray subdivision decision from the beam-tube footprint at the fir
 
 - Projects the three vertex rays of each beam tube onto the plane of the first-bounce face and
   measures the longest edge of the resulting wavefront triangle
-- Flags a ray when that edge exceeds `subdivision_tolerance_m` and the ray is still eligible to be
+- Flags a ray when that edge exceeds `subdivision_tolerance` and the ray is still eligible to be
   split, i.e. it travels outside a medium and has not reached its subdivision or interaction limit
 - The decision is purely geometric: the vertex origins on the face are the same for reflection,
   transmission and refraction, so no material data, second-bounce index or frequency is needed
@@ -42,7 +42,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::Col<short> &mtl_ind_current,
     uint8_t max_interactions = 20,
     uint8_t max_subdivisions = 2,
-    float subdivision_tolerance_m = 3.0f);
+    float subdivision_tolerance = 3.0f);
 ```
 
 ## Inputs:
@@ -60,7 +60,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
 - **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
   the returned flags are all `false`
-- **`subdivision_tolerance_m`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
+- **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
 
 ## Output:
@@ -101,7 +101,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
                                                    const arma::Col<short> &mtl_ind_current,
                                                    uint8_t max_interactions,
                                                    uint8_t max_subdivisions,
-                                                   float subdivision_tolerance_m)
+                                                   float subdivision_tolerance)
 {
     // Validate mesh
     if (mesh.n_elem == 0)
@@ -133,8 +133,8 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
         throw std::invalid_argument("Number of elements in 'mtl_ind_current' does not match number of rows in 'orig'.");
 
     // Validate the tolerance
-    if (!std::isfinite(subdivision_tolerance_m) || subdivision_tolerance_m <= 0.0f)
-        throw std::invalid_argument("Input 'subdivision_tolerance_m' must be larger than 0.");
+    if (!std::isfinite(subdivision_tolerance) || subdivision_tolerance <= 0.0f)
+        throw std::invalid_argument("Input 'subdivision_tolerance' must be larger than 0.");
 
     // Nothing can be split, skip the geometry entirely
     if (max_subdivisions == 0 || max_interactions == 0)
@@ -149,7 +149,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
     const unsigned *p_fbs_ind = fbs_ind.memptr();
     const short *p_current = mtl_ind_current.memptr();
 
-    const double tolerance = (double)subdivision_tolerance_m;
+    const double tolerance = (double)subdivision_tolerance;
     const size_t max_seg = (size_t)max_interactions;
 
     // One byte per ray so the geometry loop can run in parallel; the bit-packed result is written

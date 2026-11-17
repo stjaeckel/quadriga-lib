@@ -80,10 +80,10 @@ class TestCalcDelaySpread(unittest.TestCase):
         powers = [np.array([1.0, 0.001, 0.5])]
 
         # 20 dB threshold -> path at -30 dB excluded
-        ds_20, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold=20.0)
+        ds_20, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold_dB=20.0)
 
         # 100 dB threshold -> all paths included
-        ds_all, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold=100.0)
+        ds_all, _ = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold_dB=100.0)
 
         self.assertGreater(ds_all[0], ds_20[0])
 

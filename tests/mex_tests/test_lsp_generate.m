@@ -46,7 +46,7 @@ rnd_t(:, 9) = [ 0; 1; -1 ];
 absTOA_sigma = sp_nlos.absTOA_sigma;
 assertElementsAlmostEqual( toa, 10.^( -7.4 + absTOA_sigma * [ 0; 1; -1 ] ), 'relative', 1e-12 );
 
-%% Optional inputs: sf_sigma
+%% Optional inputs: sf_sigma_dB
 [ lsp2, ~, ~, ~, ~, ~, sig2 ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, [] );
 assertEqual( lsp2, lsp );
 assertEqual( sig2, lsp_sigma );
@@ -119,7 +119,7 @@ assert_throws( @() out8( sp, fc, tx_pos, rx_pos, rnd ), 'Wrong number of output 
 assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd(:, 1:10) ), ...
     'Input ''rnd'' must have size [n_link, 11].' );                                                 % C++
 assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, rnd, -sf_in ), ...
-    'Input ''sf_sigma'' must be finite and >= 0.' );                                                % C++
+    'Input ''sf_sigma_dB'' must be finite and >= 0.' );                                                % C++
 assert_throws( @() quadriga_lib.lsp_generate( struct( 'ds_kf', 0.9, 'ds_sf', 0.9, 'sf_kf', -0.9 ), fc, tx_pos, ...
     rx_pos, rnd ), 'LSP cross-correlation matrix in ''scenpar'' is not positive definite.' );       % C++
 assert_throws( @() quadriga_lib.lsp_generate( sp, [], tx_pos, rx_pos, rnd ), 'Input ''center_freq'' cannot be empty.' );

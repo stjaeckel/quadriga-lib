@@ -74,7 +74,7 @@ namespace quadriga_lib
         const arma::Col<short> &mtl_ind_current,      // Current medium (0 = outside), [n_ray]
         uint8_t max_interactions = 20,                // Total number of interactions per ray, 0-255
         uint8_t max_subdivisions = 2,                 // Number of subdivisions, 0-255
-        float subdivision_tolerance_m = 3.0f);        // Max. beam edge length before subdivision
+        float subdivision_tolerance = 3.0f);          // Max. beam edge length in [m] before subdivision
 
     // Progress rays to next iteration step
     // - Retuns number of rays in new launch configuration
@@ -104,7 +104,7 @@ namespace quadriga_lib
         uint8_t max_transmissions = 10,                                      // Number of transmissions / refractions, 0-255
         uint8_t max_subdivisions = 2,                                        // Number of subdivisions, 0-255
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated
-        float subdivision_tolerance_m = 3.0f,                                // Max. beam edge length before subdivision
+        float subdivision_tolerance = 3.0f,                                  // Max. beam edge length in [m] before subdivision
         float thin_slab_threshold = 0.15f,                                   // Resolve threshold on the round-trip in-slab amplitude
         bool refraction_mode = true,                                         // Switch for straight-path / refraction
         bool scalar_mode = false,                                            // Switch for EM mode or scalar mode

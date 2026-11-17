@@ -131,7 +131,7 @@ acf_own = np.exp(-np.square(dist_own / 5))
 freq_own, ase, test_dir = quadriga_lib.sos.generate(acf_own, dist_own, 256, n_dir=300, spatial_freq_min=0.01, seed=1)
 
 # Approximation error in dB, larger is better; about 35 dB for this example
-mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse(freq_own, acf_own, dist_own)
+mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse(freq_own, acf_own, dist_own)
 ```
 
 The result is used like a preset: draw phases with [[sos.init_phases]] and evaluate with [[sos.val]]. To

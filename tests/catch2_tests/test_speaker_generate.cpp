@@ -344,7 +344,7 @@ TEST_CASE("Speaker - Horn auto-derivation of parameters")
 {
     // NaN (the default) or a value <= 0 selects the default of each horn parameter:
     // horn_control_freq = c / (2*pi*radius) = 344 / (2*pi*0.1) = 547.4 Hz
-    // hor_coverage = 90°, ver_coverage = 60°
+    // hor_coverage_deg = 90°, ver_coverage_deg = 60°
 
     arma::vec freqs = {300.0, 5000.0}; // below and above horn_control_freq
 

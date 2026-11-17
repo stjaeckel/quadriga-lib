@@ -372,7 +372,7 @@ class TestRotatePatternMultiFreq(unittest.TestCase):
     def test_rotate_generated_speaker(self):
         """Rotate a generated speaker and verify output structure."""
         speaker = arrayant.generate_speaker(center_freq=np.array([500.0, 2000.0]),
-                                            angular_resolution=10.0)
+                                            angular_resolution_deg=10.0)
         out = arrayant.rotate_pattern(speaker, [0.0, np.pi / 12, 0.0], usage=3)
         self.assertEqual(out['e_theta_re'].ndim, 4)
         self.assertEqual(out['e_theta_re'].shape, speaker['e_theta_re'].shape)

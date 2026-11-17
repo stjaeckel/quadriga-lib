@@ -19,14 +19,14 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 ## Usage:
 ```
-quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius, \
+quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, \
     icosphere_n_div, i_element, i_freq )
 ```
 
 ## Inputs:
 - **`fn`** — Output OBJ filename; str; must not be empty and must end in `.obj`
 - **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`directivity_range`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
+- **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object in meters; default: 1.0
 - **`icosphere_n_div`** — Icosphere subdivision count; higher gives a finer mesh; see [[icosphere]]; default: 4
@@ -36,7 +36,7 @@ MD!*/
 
 void arrayant_export_obj_file(const std::string &fn,
                               const py::dict &arrayant,
-                              double directivity_range,
+                              double directivity_range_dB,
                               const std::string &colormap,
                               double object_radius,
                               arma::uword icosphere_n_div,
@@ -52,5 +52,5 @@ void arrayant_export_obj_file(const std::string &fn,
     if (i_freq >= ant.size())
         throw std::invalid_argument("'i_freq' is out of bound.");
 
-    quadriga_lib::arrayant_export_obj_file(fn, ant[i_freq], directivity_range, colormap, object_radius, icosphere_n_div, &i_element_a);
+    quadriga_lib::arrayant_export_obj_file(fn, ant[i_freq], directivity_range_dB, colormap, object_radius, icosphere_n_div, &i_element_a);
 }

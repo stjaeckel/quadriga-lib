@@ -63,8 +63,8 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
   `GR_enabled`
 - **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
-- **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0, KF (slice 2) >= 0;
-  `'38.901'`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
+- **`lsp`** — LSPs from [[lsp_generate]], slices and units as there; DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0,
+  KF (slice 2) >= 0; `'38.901'`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [[gbsm_draw]] (`'cluster'`, `set_id = 0`), columns 1 to N in [0, 1];
   `[n_link, 9·N]`
 - **`method`** — `'38.901'`, `'38.901_MF'` or `'quadriga'`; default: `'38.901'`

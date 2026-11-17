@@ -112,7 +112,7 @@ catch ME
 end
 assertTrue( failed );
 
-% --- quantize must be 0 or a finite value >= 1e-3 deg ---
+% --- quantize_deg must be 0 or a finite value >= 1e-3 deg ---
 failed = false;
 try
     [as_q] = quadriga_lib.calc_angular_spread([0.1; 0.2], [0; 0.05], [1; 1], 1, 1, 1e-8);

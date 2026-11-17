@@ -232,14 +232,14 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_export_obj_file) · [M
 
 ### Usage:
 ```python
-quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius, \
+quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, \
     icosphere_n_div, i_element, i_freq )
 ```
 
 ### Inputs:
 - **`fn`** — Output OBJ filename; str; must not be empty and must end in `.obj`
 - **`arrayant`** — Dict with the array antenna data; keys as in [generate](#generate); pattern fields may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
-- **`directivity_range`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
+- **`directivity_range_dB`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
 - **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
 - **`object_radius`** — Radius of the exported object in meters; default: 1.0
 - **`icosphere_n_div`** — Icosphere subdivision count; higher gives a finer mesh; see [icosphere](site-specific-simulation-tools.md#icosphere); default: 4
@@ -360,7 +360,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [MATLAB](.
   crossover behavior emerges from overlapping bandpass responses
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies
-- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB - 85) / 20)`
 - If `center_freq` is None or empty, third-octave band centers are auto-generated from one band below
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz
 - Speed of sound assumed to be 343 m/s
@@ -373,7 +373,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_speaker) · [MATLAB](.
   - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
   - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `horn`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
+- For `horn`, `hor_coverage_deg`, `ver_coverage_deg` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°, 60°
   and `f_ctrl = c/(2pi·radius)`
 
 ### Usage:
@@ -383,16 +383,16 @@ speaker = quadriga_lib.arrayant.generate_speaker()
 
 # Horn tweeter with custom coverage
 speaker = quadriga_lib.arrayant.generate_speaker(driver_type='horn', radius=0.025, \
-    lower_cutoff=1500.0, upper_cutoff=20000.0, hor_coverage=90.0, ver_coverage=60.0)
+    lower_cutoff=1500.0, upper_cutoff=20000.0, hor_coverage_deg=90.0, ver_coverage_deg=60.0)
 
 # Omnidirectional subwoofer with steep rolloff
 speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.165, \
-    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope=24.0, upper_rolloff_slope=24.0, \
-    sensitivity=90.0, radiation_type='monopole')
+    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope_dB=24.0, upper_rolloff_slope_dB=24.0, \
+    sensitivity_dB=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
 speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, \
-    10000.0]), angular_resolution=5.0)
+    10000.0]), angular_resolution_deg=5.0)
 ```
 
 ### Inputs:
@@ -402,15 +402,15 @@ speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 5
 - **`lower_cutoff`** — Lower -3 dB bandpass frequency in Hz, > 0; default: 80
 - **`upper_cutoff`** — Upper -3 dB bandpass frequency in Hz, larger than `lower_cutoff`;
   default: 12000
-- **`lower_rolloff_slope`** — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth);
+- **`lower_rolloff_slope_dB`** — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth);
   default: 12
-- **`upper_rolloff_slope`** — High-frequency rolloff in dB/octave, > 0; default: 12
-- **`sensitivity`** — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
+- **`upper_rolloff_slope_dB`** — High-frequency rolloff in dB/octave, > 0; default: 12
+- **`sensitivity_dB`** — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
 - **`radiation_type`** — Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`;
   default: `hemisphere`
-- **`hor_coverage`** — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; horn only;
+- **`hor_coverage_deg`** — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90; horn only;
   default: NaN
-- **`ver_coverage`** — Horn vertical coverage angle in degrees; NaN or <= 0: default 60; horn only;
+- **`ver_coverage_deg`** — Horn vertical coverage angle in degrees; NaN or <= 0: default 60; horn only;
   default: NaN
 - **`horn_control_freq`** — Horn pattern control frequency in Hz; NaN or <= 0: default `c/(2pi·radius)`;
   horn only; default: NaN
@@ -418,7 +418,7 @@ speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 5
 - **`baffle_height`** — Baffle height in m, > 0; used by `hemisphere` model; default: 0.25
 - **`center_freq`** — Frequency sample points in Hz; auto-generated third-octave bands if None;
   `(n_freq,)` or None; default: None
-- **`angular_resolution`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
+- **`angular_resolution_deg`** — Azimuth and elevation grid resolution in degrees, 0.1 to 90; default: 5
 
 ### Outputs:
 - **`speaker`** — Multi-frequency arrayant dict with the fields below; for `n_freq = 1` the pattern fields

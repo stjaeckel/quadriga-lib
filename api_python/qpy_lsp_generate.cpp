@@ -45,7 +45,7 @@ Large-scale parameters of a set of links from normalized random values
 ```
 # complex=True (default)
 lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
-    center_freq, tx_pos, rx_pos, rnd, sf_sigma, cholesky, clip_spreads, complex=True )
+    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads, complex=True )
 
 # complex=False
 lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
@@ -59,7 +59,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
 - **`rx_pos`** — Rx positions in m; `(n_link, 3)`
 - **`rnd`** — Random values from [[gbsm.draw]] (`"lsf"`), finite; column 9 in [0, 1] (the permittivity is always
   computed); column 10 is not used; `(n_link, 11)`
-- **`sf_sigma`** — SF standard deviation in dB (e.g. from [[path_loss]]), finite and >= 0; replaces the value from
+- **`sf_sigma_dB`** — SF standard deviation in dB (e.g. from [[path_loss]]), finite and >= 0; replaces the value from
   `scenpar`, also in `lsp_sigma`; `None` or empty = the scenario value; `(n_link, n_freq)`; default: None
 - **`cholesky`** — `True`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS, ASD, ASA, ESD, ESA;
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
@@ -68,19 +68,21 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
 - **`complex`** — See the description; default: True
 
 ## Outputs:
-- **`lsp`** — Large-scale parameters; slices: 0 DS in s, 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA in deg, 7 XPR; `(n_link,
-  n_freq, 8)`
+- **`lsp`** — Large-scale parameters; slices: 0 DS in s; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA in
+  deg; `(n_link, n_freq, 8)`
 - **`abs_toa`** — Absolute TOA offset in s, 0 if not active; `(n_link,)`
 - **`gr_eps`** — Relative permittivity of the ground (`complex=True`), imaginary part >= 0; the complex value of TR
   38.901 eq. (7.6-40) is `gr_eps.conj()`; complex128; `(n_link, n_freq)`
 - **`gr_eps_re`**, **`gr_eps_im`** — Real and imaginary part instead of `gr_eps` (`complex=False`); `(n_link, n_freq)`
 - **`eod_offset_deg`** — EoD offset in deg, positive = up; `(n_link, n_freq)`
-- **`lsp_mu`** — Mean `mu` in the log domain; required by [[ssf_rays]]; `(n_link, n_freq, 8)`
-- **`lsp_sigma`** — Standard deviation `sigma` in the log domain, >= 0; required by [[ssf_rays]]; `(n_link, n_freq, 8)`
+- **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of s for DS, lg of deg for the angular spreads, dB
+  for KF, SF and XPR; required by [[ssf_rays]]; `(n_link, n_freq, 8)`
+- **`lsp_sigma`** — Standard deviation `sigma` in the log domain of `lsp_mu`, >= 0; required by [[ssf_rays]];
+  `(n_link, n_freq, 8)`
 
 ## See also:
 - [[gbsm.draw]] (the random values `rnd`)
-- [[path_loss]] (the SF standard deviation `sf_sigma`)
+- [[path_loss]] (the SF standard deviation `sf_sigma_dB`)
 - [[ssf_clusters]] (the clusters from the LSPs)
 - [[ssf_rays]] (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 MD!*/
@@ -90,7 +92,7 @@ py::tuple lsp_generate(py::handle scenpar,
                        const py::array_t<double> &tx_pos,
                        const py::array_t<double> &rx_pos,
                        const py::array_t<double> &rnd,
-                       py::handle sf_sigma,
+                       py::handle sf_sigma_dB,
                        py::handle cholesky,
                        py::handle clip_spreads,
                        py::handle complex)
@@ -104,7 +106,7 @@ py::tuple lsp_generate(py::handle scenpar,
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
     const auto rnd_a = qd_python_numpy2arma_Mat<double>(rnd, true);
-    const auto sf_sigma_a = qd_python_numpy2arma_Mat<double>(sf_sigma, true);
+    const auto sf_sigma_a = qd_python_numpy2arma_Mat<double>(sf_sigma_dB, true);
 
     // Output allocation
     const arma::uword n_link = rx_pos_a.n_rows, n_freq = center_freq_a.n_elem;

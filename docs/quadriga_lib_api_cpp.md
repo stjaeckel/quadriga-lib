@@ -27,7 +27,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 - Shapes: `[a, b, c]` means `[rows, cols, slices]`, `[rows, cols]` a matrix and `[n]` a vector; arrays are column-major (C++: `arma::Cube`, `arma::Mat`, `arma::Col` / `arma::Row`).
 - Index base: 0-based unless the field is explicitly called "1-based" (which applies to `mtl_ind`, `fbs_ind`, `sbs_ind`, `point_ind`, `forward_ind`, `mesh_ind`, and QDANT `id`).
-- Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
+- Units: SI units, angles in radians, powers and gains linear. A value in dB, dBi or degrees carries the unit in its name (`threshold_dB`, `directivity_dBi`, `quantize_deg`); a value in the default unit carries no suffix. Other non-SI units keep their suffix, e.g. `speed_station_kmh`.
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation as in 3GPP TR 38.901 (bearing, downtilt, slant), so that orientations from TR 38.901 are entered as published: a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down, a positive bank turns the y-axis toward z.
 - Complex data: separate real and imaginary arrays (`_re` / `_im`), or interleaved along the rows where documented (e.g. `M`), for compatibility with older Octave versions, whose MEX interface has no interleaved complex arrays. Some functions also offer an optional `std::complex` output, which replaces the split pair (then left empty).
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
@@ -718,7 +718,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#arrayant_export_obj_file) · [Python](
 void quadriga_lib::arrayant_export_obj_file(
     const std::string &fn,
     const arrayant<dtype> &ant,
-    dtype directivity_range = 30.0,
+    dtype directivity_range_dB = 30.0,
     const std::string &colormap = "jet",
     dtype object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
@@ -728,7 +728,7 @@ void quadriga_lib::arrayant_export_obj_file(
 ### Inputs:
 - **`fn`** — Output OBJ filename; must end in .obj; the colormap is written to a .mtl file of the same name
 - **`ant`** — Valid arrayant
-- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
+- **`directivity_range_dB`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
 - **`object_radius`** *(optional)* — Radius of the exported object
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](#icosphere)
@@ -1325,7 +1325,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
   via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
 - Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
   where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
-- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
 - If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
@@ -1338,7 +1338,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
   - `hemisphere` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W·H))`
   - `dipole` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere
   - `cardioid` — `R = 0.5·(1+cos(θ_off))`
-- For `"horn"`, `hor_coverage`, `ver_coverage` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
+- For `"horn"`, `hor_coverage_deg`, `ver_coverage_deg` and `horn_control_freq` set to NaN (the default) or <= 0 select 90°,
   60° and `f_ctrl = c/(2π·radius)`.
 
 ### Declaration:
@@ -1348,17 +1348,17 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype radius = 0.05,
         dtype lower_cutoff = 80.0,
         dtype upper_cutoff = 12000.0,
-        dtype lower_rolloff_slope = 12.0,
-        dtype upper_rolloff_slope = 12.0,
-        dtype sensitivity = 85.0,
+        dtype lower_rolloff_slope_dB = 12.0,
+        dtype upper_rolloff_slope_dB = 12.0,
+        dtype sensitivity_dB = 85.0,
         const std::string &radiation_type = "hemisphere",
-        dtype hor_coverage = NAN,
-        dtype ver_coverage = NAN,
+        dtype hor_coverage_deg = NAN,
+        dtype ver_coverage_deg = NAN,
         dtype horn_control_freq = NAN,
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         const arma::Col<dtype> *center_freq = nullptr,
-        dtype angular_resolution = 5.0);
+        dtype angular_resolution_deg = 5.0);
 ```
 
 ### Inputs:
@@ -1366,17 +1366,17 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
 - **`radius`** *(optional)* — Effective radiating radius in m, > 0; cone/dome radius for piston, mouth radius for horn
 - **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz, > 0
 - **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz, larger than `lower_cutoff`
-- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
-- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave, > 0
-- **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
+- **`lower_rolloff_slope_dB`** *(optional)* — Low-frequency rolloff in dB/octave, > 0 (12 dB/oct = 2nd-order Butterworth)
+- **`upper_rolloff_slope_dB`** *(optional)* — High-frequency rolloff in dB/octave, > 0
+- **`sensitivity_dB`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
-- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
-- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
+- **`hor_coverage_deg`** *(optional)* — Horn horizontal coverage angle in degrees; NaN or <= 0: default 90°
+- **`ver_coverage_deg`** *(optional)* — Horn vertical coverage angle in degrees; NaN or <= 0: default 60°
 - **`horn_control_freq`** *(optional)* — Horn pattern control frequency; NaN or <= 0: default `c/(2π·radius)`
 - **`baffle_width`** *(optional)* — Baffle width in m, > 0; used by `"hemisphere"` model
 - **`baffle_height`** *(optional)* — Baffle height in m, > 0; used by `"hemisphere"` model
 - **`center_freq`** *(optional)* — Frequency sample points in Hz, `[n_freq]`; nullptr or empty: third-octave bands
-- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
+- **`angular_resolution_deg`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees; 0.1 to 90
 
 ### Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion
@@ -1657,7 +1657,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](q
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
-- Paths below `gain_min` are excluded; `max_paths` limits total count
+- Paths below `gain_min_dB` are excluded; `max_paths` limits total count
 - Paths with non-finite coordinates are skipped
 
 ### Declaration:
@@ -1665,8 +1665,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#channel_export_obj_file) · [Python](q
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     const std::string &fn,
     arma::uword max_paths = 0,
-    dtype gain_max = -60.0,
-    dtype gain_min = -140.0,
+    dtype gain_max_dB = -60.0,
+    dtype gain_min_dB = -140.0,
     const std::string &colormap = "jet",
     const arma::uvec *i_snap = nullptr,
     dtype radius_max = 0.05,
@@ -1676,9 +1676,9 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
-- **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
-- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max`
+- **`max_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min_dB`
+- **`gain_max_dB`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
+- **`gain_min_dB`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; must be smaller than `gain_max_dB`
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
 - **`i_snap`** *(optional)* — 0-based snapshot indices to include; nullptr or empty exports all snapshots
 - **`radius_max`** *(optional)* — Tube radius at maximum gain
@@ -3328,8 +3328,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_angular_spread) · [Python](quadr
 - With wrapping (`wrapping = true`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
 - When `calc_bank_angle = true` (with wrapping), an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
 - When `wrapping = false` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
-- When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
-  `quantize` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
+- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
+  `quantize_deg` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
 
 ### Declaration:
 ```cpp
@@ -3344,7 +3344,7 @@ void quadriga_lib::calc_angular_spread(
     std::vector<arma::Col<dtype>> *theta = nullptr,
     bool wrapping = false,
     bool calc_bank_angle = false,
-    dtype quantize = (dtype)0);
+    dtype quantize_deg = (dtype)0);
 ```
 
 ### Inputs:
@@ -3355,7 +3355,7 @@ void quadriga_lib::calc_angular_spread(
   computing the spreads; if false, computes the spreads from the raw angles; default: `false`
 - **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when
   `wrapping = true`; default: `false`
-- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
+- **`quantize_deg`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
   otherwise it must be finite and >= 1e-3 deg, else `std::invalid_argument` is thrown
 
 ### Outputs:
@@ -3444,7 +3444,7 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread) · [Python](quadriga_lib_api_python.md#calc_delay_spread)
 
-- Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; default threshold of 100 dB effectively includes all paths.
+- Paths with power below `p_max / 10^(0.1 * threshold_dB)` are excluded; default of 100 dB effectively includes all paths.
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their powers summed before computing the spread; function recurses on the binned profile.
   The bins are placed on a grid common to all CIRs; only occupied bins are stored, so memory does not grow with the delay span.
   All delays must then be finite, and the global delay span divided by `granularity` must be below 2^53.
@@ -3454,7 +3454,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread) · [Python](quadrig
 arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
-    dtype threshold = 100.0,
+    dtype threshold_dB = 100.0,
     dtype granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
 ```
@@ -3462,7 +3462,7 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
 ### Inputs:
 - **`delays`** — Delays in [s] per CIR; `[n_cir]` vector, each element a column vector of length `n_path`
 - **`powers`** — Path powers in linear scale [W]; same structure as `delays`
-- **`threshold`** *(optional)* — Power threshold in [dB] relative to strongest path; paths below threshold are excluded
+- **`threshold_dB`** *(optional)* — Power threshold in [dB] relative to strongest path; paths below it are excluded
 - **`granularity`** *(optional)* — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping; must be finite
   and non-negative; when > 0, non-finite delays or a span / granularity of 2^53 or more throw `std::invalid_argument`
 
@@ -3536,7 +3536,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 1. [conf_file_read](#conf_file_read): the scenarios, one per LOS and indoor state
 2. Per link, by the caller with own SOS generators ([sos_init_phases](#sos_init_phases), [sos_rand](#sos_rand), [sos_randn](#sos_randn)): the indoor
    state, a Uniform(0,1) value at the decorrelation distance `IO_state_lambda` of the O2I files below an indoor ratio
-   of the caller's choice (e.g. TR 38.901 Table 7.2-1), and for indoor UTs [o2i_loss](#o2i_loss) (`loss`, `d2d_in`); then the
+   of the caller's choice (e.g. TR 38.901 Table 7.2-1), and for indoor UTs [o2i_loss](#o2i_loss) (`loss_dB`, `d2d_in`); then the
    LOS state, a Uniform(0,1) value at `LOS_state_lambda` of the NLOS file below `p_los` of [los_probability](#los_probability) at
    `d2d_out = max(d2D - d2d_in, 0)`. The caller chooses the `los_probability` model and the `o2i_loss` models and
    weights (TR 38.901 Tables 7.4.2-1, 7.4.3-2). The states assign each link to a scenario and give the `o2i` flags of
@@ -3544,8 +3544,8 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 3. Per BS site and scenario, once, with one seed for all sets: [gbsm_init_phases](#gbsm_init_phases) of the random sets in the table
    below; `"lsf"` with the link positions for the bias removal
 4. [gbsm_draw](#gbsm_draw) of each set at the links (the shared `"ray"` set with `center_freq`, the list later passed to
-   [ssf_rays](#ssf_rays)); [path_loss](#path_loss) (`pl`, `sf_sigma`; column 10 of the `"lsf"` set as `rnd_he`); [lsp_generate](#lsp_generate) with
-   `sf_sigma` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
+   [ssf_rays](#ssf_rays)); [path_loss](#path_loss) (`pl_dB`, `sf_sigma_dB`; column 10 of the `"lsf"` set as `rnd_he`); [lsp_generate](#lsp_generate)
+   with `sf_sigma_dB` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [ssf_clusters](#ssf_clusters) (`n_cluster` is the caller's choice) and [ssf_rays](#ssf_rays) (one [gbsm_rays](#gbsm_rays) object per link), called
    as in the table below
 6. Per link and segment: [.solve_scatterers](#.solve_scatterers) if the mobility is `drift`; then [gbsm_single_link_channel](#gbsm_single_link_channel) with the
@@ -3583,7 +3583,7 @@ KF(drop) from slice 1 of `lsp`. Ray data can also come from path data, with [gbs
 | scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
 | coefficient power | power of a ray without link gain and oxygen loss (`gbsm_rays.power`): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [ssf_clusters](#ssf_clusters) sets it; for data from paths the path gain |
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
-| link gain | `-pl - loss + 10·lg(SF)` in dB of a link at a position and frequency (`link_gain_dB`), with `pl` of [path_loss](#path_loss), `loss` of [o2i_loss](#o2i_loss) (0 outdoors) and SF the linear shadow fading, slice 2 of `lsp` |
+| link gain | `-pl_dB - loss_dB + 10·lg(SF)` in dB of a link at a position and frequency (`link_gain_dB`), with `pl_dB` of [path_loss](#path_loss), `loss_dB` of [o2i_loss](#o2i_loss) (0 outdoors) and SF the linear shadow fading, slice 2 of `lsp` |
 | random set | the spatially correlated random values of one `set_type` and `set_id` (table in [gbsm_draw](#gbsm_draw)) |
 | generator | one spatially correlated random field, a [sum-of-sinusoids (SOS)](#sec-sum-of-sinusoids-random-number-generator) generator; one column of a random set |
 | SOS phases | the random phases of the sinusoids of the generators of a random set (`phase`); evaluated at positions, they give its random values. "Phase" alone is the phase of a coefficient or ray |
@@ -4230,7 +4230,7 @@ void quadriga_lib::lsp_generate(
     const arma::mat &rx_pos,
     const arma::mat &rnd,
     arma::cube &lsp,
-    const arma::mat *sf_sigma = nullptr,
+    const arma::mat *sf_sigma_dB = nullptr,
     arma::vec *abs_toa = nullptr,
     arma::mat *gr_eps_re = nullptr,
     arma::mat *gr_eps_im = nullptr,
@@ -4248,7 +4248,7 @@ void quadriga_lib::lsp_generate(
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [gbsm_draw](#gbsm_draw) (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
   is requested; column 10 is not used; `[n_link, 11]`
-- **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite and >= 0; replaces
+- **`sf_sigma_dB`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite and >= 0; replaces
   the value from `scenpar`, also in `lsp_sigma`; `[n_link, n_freq]`
 - **`cholesky`** *(optional)* — `true`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS, ASD,
   ASA, ESD, ESA; XPR last); `false`: symmetric square root (legacy QuaDRiGa)
@@ -4256,19 +4256,20 @@ void quadriga_lib::lsp_generate(
   step 4); `lsp_mu` and `lsp_sigma` are not affected
 
 ### Outputs:
-- **`lsp`** — Large-scale parameters; slices: 0 DS in [s], 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA in [deg], 7 XPR;
-  `[n_link, n_freq, 8]`
+- **`lsp`** — Large-scale parameters; slices: 0 DS in [s]; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA
+  in [deg]; `[n_link, n_freq, 8]`
 - **`abs_toa`** *(optional)* — Absolute TOA offset in [s], 0 if not active; `[n_link]`
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary
   part >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
-- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; required by [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
-- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; required by [ssf_rays](#ssf_rays);
-  `[n_link, n_freq, 8]`
+- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain, slices as `lsp`: lg of [s] for DS, lg of [deg] for the
+  angular spreads, [dB] for KF, SF and XPR; required by [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
+- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain of `lsp_mu`, >= 0; required by
+  [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
 
 ### See also:
 - [gbsm_draw](#gbsm_draw) (the random values `rnd`)
-- [path_loss](#path_loss) (the SF standard deviation `sf_sigma`)
+- [path_loss](#path_loss) (the SF standard deviation `sf_sigma_dB`)
 - [ssf_clusters](#ssf_clusters) (the clusters from the LSPs)
 - [ssf_rays](#ssf_rays) (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 
@@ -4280,7 +4281,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 Also in: [MATLAB](quadriga_lib_api_mex.md#o2i_loss) · [Python](quadriga_lib_api_python.md#o2i_loss)
 
 - Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier frequency; the
-  caller adds `loss` to the path loss of the UT
+  caller adds `loss_dB` to the path loss of the UT
 - Models of TR 38.901 v19.5.0: `low`, `high`, `low_A` (Table 7.4.3-2 with the materials of Table 7.4.3-1),
   `legacy_6GHz` (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz), `car` and `car_metal` (clause 7.4.3.2,
   metallized windows)
@@ -4301,7 +4302,7 @@ void quadriga_lib::o2i_loss(
     const arma::mat &rnd,
     const std::vector<std::string> &models,
     const arma::vec &weights,
-    arma::mat &loss,
+    arma::mat &loss_dB,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -4317,7 +4318,7 @@ void quadriga_lib::o2i_loss(
   for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings)
 
 ### Outputs:
-- **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
+- **`loss_dB`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
 - **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
 
@@ -4367,7 +4368,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#path_loss) · [Python](quadriga_lib_ap
     constant beyond) if `usePLa != 0`
   - empty `pl_model`: 0
 - Where the model gives no `sf` (an `SF` or `sig` key not set, or a model without one): the SF std of [lsp_generate](#lsp_generate)
-  at the geometric distance, so that passing `sf_sigma` to [lsp_generate](#lsp_generate) is neutral
+  at the geometric distance, so that passing `sf_sigma_dB` to [lsp_generate](#lsp_generate) is neutral
 - `hE_rand != 0` with `rnd_he` given: the random environment height of TR 38.901 Table 7.4.1-1 note 1, drawn from
   `rnd_he`, which makes it spatially consistent at the decorrelation distance `SF_lambda` (the TR draws it
   independently per link); the UT height is then clamped at `hE + 0.1` instead of `1.1·hE`. Along a track the loss
@@ -4386,8 +4387,8 @@ void quadriga_lib::path_loss(
     const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    arma::mat &pl,
-    arma::mat *sf_sigma = nullptr,
+    arma::mat &pl_dB,
+    arma::mat *sf_sigma_dB = nullptr,
     const arma::vec *d2d_in = nullptr,
     const arma::vec *rnd_he = nullptr);
 ```
@@ -4405,11 +4406,11 @@ void quadriga_lib::path_loss(
   [gbsm_draw](#gbsm_draw) (`"lsf"`); `[n_link]`
 
 ### Outputs:
-- **`pl`** — Path loss in [dB]; `[n_link, n_freq]`
-- **`sf_sigma`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
+- **`pl_dB`** — Path loss in [dB]; `[n_link, n_freq]`
+- **`sf_sigma_dB`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
 
 ### See also:
-- [lsp_generate](#lsp_generate) (takes `sf_sigma`)
+- [lsp_generate](#lsp_generate) (takes `sf_sigma_dB`)
 - [o2i_loss](#o2i_loss) (penetration loss and indoor distance)
 
 ---
@@ -4545,8 +4546,8 @@ void quadriga_lib::ssf_clusters(
   `LNS_ksi`, `GR_enabled`
 - **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
-- **`lsp`** — LSPs from [lsp_generate](#lsp_generate); DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
-  `"38.901"`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
+- **`lsp`** — LSPs from [lsp_generate](#lsp_generate), slices and units as there; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0,
+  KF (slice 1) >= 0; `"38.901"`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [gbsm_draw](#gbsm_draw) (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
   `[n_link, 9·N]`
 - **`method`** *(optional)* — `"38.901"` (default), `"38.901_MF"` or `"quadriga"`
@@ -4740,8 +4741,8 @@ void quadriga_lib::ssf_rays(
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
-- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [lsp_generate](#lsp_generate); used: the ESD
-  mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`
+- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [lsp_generate](#lsp_generate), slices and units as
+  there; used: the ESD mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`
 - **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [ssf_clusters](#ssf_clusters)
   (`n_slot` slots); `[n_link, n_slot, n_freq]` for `"38.901_MF"`, else `[n_link, n_slot, 1]`
 - **`power`** — Cluster powers from [ssf_clusters](#ssf_clusters); `[n_link, n_slot, n_freq]`
@@ -6533,7 +6534,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     uint8_t max_transmissions = 10,
     uint8_t max_subdivisions = 2,
     float min_gain_dB = -140.0f,
-    float subdivision_tolerance_m = 3.0f,
+    float subdivision_tolerance = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
     bool scalar_mode = false,
@@ -6560,7 +6561,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
   counter `nSUB` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
-- **`subdivision_tolerance_m`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
+- **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
@@ -6572,7 +6573,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; `[n_ray]`, indexed in the full ray
   set (unlike everything else, which is compacted first). When supplied it is the authority on what gets
   subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been
-  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance_m` is unused. Pass the
+  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance` is unused. Pass the
   output of [ray_subdivide_flag](#ray_subdivide_flag) to reproduce the internal decision exactly; a hand-built list overrides it.
   Requires beam mode; conflicts with `max_subdivisions` = 0
 
@@ -6835,7 +6836,7 @@ Not in: MATLAB, Python
 
 - Projects the three vertex rays of each beam tube onto the plane of the first-bounce face and
   measures the longest edge of the resulting wavefront triangle
-- Flags a ray when that edge exceeds `subdivision_tolerance_m` and the ray is still eligible to be
+- Flags a ray when that edge exceeds `subdivision_tolerance` and the ray is still eligible to be
   split, i.e. it travels outside a medium and has not reached its subdivision or interaction limit
 - The decision is purely geometric: the vertex origins on the face are the same for reflection,
   transmission and refraction, so no material data, second-bounce index or frequency is needed
@@ -6857,7 +6858,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::Col<short> &mtl_ind_current,
     uint8_t max_interactions = 20,
     uint8_t max_subdivisions = 2,
-    float subdivision_tolerance_m = 3.0f);
+    float subdivision_tolerance = 3.0f);
 ```
 
 ### Inputs:
@@ -6875,7 +6876,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
 - **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
   the returned flags are all `false`
-- **`subdivision_tolerance_m`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
+- **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
 
 ### Output:
@@ -7663,16 +7664,16 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#sos_calc_mse) · [Python](quadriga_lib
   `n_dim = 3`: `n_dir` directions on a spiral (Fibonacci) lattice on the upper hemisphere,
   `sin(elevation) = ( i + 0.5 ) / n_dir`, azimuth `i · pi · ( 3 - sqrt(5) )`. A direction and its opposite
   give the same ACF
-- `mse_core`: error on the grid of [sos_acf_approx](#sos_acf_approx) against [sos_acf_2d](#sos_acf_2d), for the grid points within a
+- `mse_core_dB`: error on the grid of [sos_acf_approx](#sos_acf_approx) against [sos_acf_2d](#sos_acf_2d), for the grid points within a
   radius of `n_acf` grid steps around the center; for `n_dim = 3` the mean squared error is averaged over
   the three planes
-- `mse_all`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond `Dmax`
-- For `n_dim = 1`, `mse_core` is evaluated on the sample points `dist`, `mse_all` on the axis from
-  `-2·Dmax` to `2·Dmax`, and the return value equals `mse_core`
+- `mse_all_dB`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond `Dmax`
+- For `n_dim = 1`, `mse_core_dB` is evaluated on the sample points `dist`, `mse_all_dB` on the axis from
+  `-2·Dmax` to `2·Dmax`, and the return value equals `mse_core_dB`
 - `acf_tail`: approximated ACF, averaged over the test directions, at 2, 4, 10 and 20 times `Dmax`. The
   target is 0 there; sinusoids with a frequency near zero show up as a plateau of height
   `n_low / n_coeff`, which adds a constant offset to all values of a large area
-- `mse_core` and `mse_all` need the 2-D grids and are only computed when requested
+- `mse_core_dB` and `mse_all_dB` need the 2-D grids and are only computed when requested
 - A perfect fit has a mean squared error of 0 and is returned as +Inf dB; this happens for a target that
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
 - The test directions are evaluated in parallel; the result does not depend on the number of threads
@@ -7684,8 +7685,8 @@ dtype quadriga_lib::sos_calc_mse(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    dtype *mse_core = nullptr,
-    dtype *mse_all = nullptr,
+    dtype *mse_core_dB = nullptr,
+    dtype *mse_all_dB = nullptr,
     arma::Col<dtype> *acf_tail = nullptr,
     arma::Mat<dtype> *test_dir = nullptr,
     arma::uword n_dir = 10);
@@ -7698,8 +7699,8 @@ dtype quadriga_lib::sos_calc_mse(
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
 
 ### Outputs:
-- **`mse_core`** *(optional)* — Error within the core radius in [dB]
-- **`mse_all`** *(optional)* — Error on the complete grid in [dB]
+- **`mse_core_dB`** *(optional)* — Error within the core radius in [dB]
+- **`mse_all_dB`** *(optional)* — Error on the complete grid in [dB]
 - **`acf_tail`** *(optional)* — Approximated ACF beyond the fitted range; `[4]`
 - **`test_dir`** *(optional)* — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}`
   for `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`

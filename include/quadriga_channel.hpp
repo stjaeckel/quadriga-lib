@@ -83,8 +83,8 @@ namespace quadriga_lib
         // - e.g. for visualization in Blender
         void write_paths_to_obj_file(const std::string &fn,               // Filename of the OBJ file
                                      arma::uword max_paths = 0,           // Maximum number of paths to be shown, Default: all
-                                     dtype gain_max = -60.0,              // Maximum path gain in dB (only for color-coding)
-                                     dtype gain_min = -140.0,             // Minimum path gain in dB (only for color-coding and path selection)
+                                     dtype gain_max_dB = -60.0,           // Maximum path gain in dB (only for color-coding)
+                                     dtype gain_min_dB = -140.0,          // Minimum path gain in dB (only for color-coding and path selection)
                                      const std::string &colormap = "jet", // Colormap for the visualization
                                      const arma::uvec *i_snap = nullptr,  // Snapshot indices, 0-based; nullptr or empty = export all
                                      dtype radius_max = 0.05,             // Maximum tube radius in meters

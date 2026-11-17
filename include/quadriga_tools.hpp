@@ -43,7 +43,7 @@ namespace quadriga_lib
     template <typename dtype>
     arma::Col<dtype> calc_delay_spread(const std::vector<arma::Col<dtype>> &delays, // Delays in [s], Vector (n_cir) of vectors of length [n_path]
                                        const std::vector<arma::Col<dtype>> &powers, // Path powers, linear scale, Vector (n_cir) of vectors of length [n_path]
-                                       dtype threshold = 100.0,                     // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold are excluded
+                                       dtype threshold_dB = 100.0,                  // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold_dB are excluded
                                        dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
                                        arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
 
@@ -62,7 +62,7 @@ namespace quadriga_lib
                              std::vector<arma::Col<dtype>> *theta = nullptr, // Rotated elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
                              bool wrapping = false,                          // Rotate the mean direction to the equator before the spread calculation
                              bool calc_bank_angle = false,                   // Compute optimal bank angle analytically (only for wrapping = true)
-                             dtype quantize = 0.0);                          // Angular quantization step in [deg], 0 = disabled
+                             dtype quantize_deg = 0.0);                      // Angular quantization step in [deg], 0 = disabled
 
     // Calculate the Rician K-Factor
     // - KF = ratio of signal power in the dominant line-of-sight (LOS) path to the power in the scattered (non-line-of-sight, or NLOS) paths

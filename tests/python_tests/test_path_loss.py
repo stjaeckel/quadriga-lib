@@ -33,7 +33,7 @@ class test_case(unittest.TestCase):
         self.rx_pos = np.array([[100.0, 0.0, 10.0], [0.0, 1000.0, 10.0], [30.0, 40.0, 10.0]])
         self.fc = np.array([1e9, 10e9])
         self.ref = 20 * np.log10([[100.0], [1000.0], [50.0]]) + 30 + 20 * np.log10(self.fc / 1e9)
-        self.pl, self.sf = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
+        self.pl_dB, self.sf = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
 
         # A v19 file read with conf_file_read: dual_slope (LOS) and nlos (NLOS) with the random hE
         out = quadriga_lib.gbsm.conf_file_read(os.path.join(config_dir, "3GPP_38.901_v19_UMa_LOS.conf"))
@@ -47,26 +47,26 @@ class test_case(unittest.TestCase):
         out = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 2)
-        pl, sf = out
-        for x in (pl, sf):
+        pl_dB, sf = out
+        for x in (pl_dB, sf):
             self.assertIsInstance(x, np.ndarray)
             self.assertEqual(x.shape, (3, 2))
             self.assertEqual(x.dtype, np.float64)
-        self.assertAlmostEqual(pl[0, 0], 70.0, delta=1e-12)  # 100 m, 1 GHz
-        npt.assert_allclose(pl, self.ref, atol=1e-12, rtol=0)
+        self.assertAlmostEqual(pl_dB[0, 0], 70.0, delta=1e-12)  # 100 m, 1 GHz
+        npt.assert_allclose(pl_dB, self.ref, atol=1e-12, rtol=0)
         npt.assert_array_equal(sf, np.full((3, 2), 3.0))  # SF_sigma of scenpar
 
     def test_keyword_arguments(self):
-        pl, sf = quadriga_lib.gbsm.path_loss(plpar=self.plpar, scenpar=self.scenpar, center_freq=self.fc, tx_pos=self.tx_pos,
+        pl_dB, sf = quadriga_lib.gbsm.path_loss(plpar=self.plpar, scenpar=self.scenpar, center_freq=self.fc, tx_pos=self.tx_pos,
                                              rx_pos=self.rx_pos, d2d_in=None, rnd_he=None)
-        npt.assert_array_equal(pl, self.pl)
+        npt.assert_array_equal(pl_dB, self.pl_dB)
         npt.assert_array_equal(sf, self.sf)
 
     def test_dict_inputs(self):
         f = quadriga_lib.gbsm.path_loss
         plpar_sf = dict(self.plpar, SF=5.0)  # sf from the model
         pl2, sf2 = f(plpar_sf, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
-        npt.assert_array_equal(pl2, self.pl)
+        npt.assert_array_equal(pl2, self.pl_dB)
         npt.assert_array_equal(sf2, np.full((3, 2), 5.0))
         _, sf3 = f(self.plpar, None, self.fc, self.tx_pos, self.rx_pos)  # scenpar None: default SF_sigma
         npt.assert_array_equal(sf3, np.full((3, 2), 8.0))
@@ -74,7 +74,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(f({}, self.scenpar, self.fc, self.tx_pos, self.rx_pos)[0], np.zeros((3, 2)))
         npt.assert_array_equal(f({"A": 20.0}, self.scenpar, self.fc, self.tx_pos, self.rx_pos)[0], np.zeros((3, 2)))
         plpar_t = {"model": "logdist", "A": 20, "B": np.float32(30), "C": np.array([20])}  # int, float32, array
-        npt.assert_array_equal(f(plpar_t, {"SF_sigma": 3}, self.fc, self.tx_pos, self.rx_pos)[0], self.pl)
+        npt.assert_array_equal(f(plpar_t, {"SF_sigma": 3}, self.fc, self.tx_pos, self.rx_pos)[0], self.pl_dB)
 
     def test_conf_file(self):
         f = quadriga_lib.gbsm.path_loss
@@ -90,11 +90,11 @@ class test_case(unittest.TestCase):
     def test_d2d_in(self):
         f = quadriga_lib.gbsm.path_loss
         args = (self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
-        npt.assert_array_equal(f(*args, None)[0], self.pl)
-        npt.assert_array_equal(f(*args, np.zeros(0))[0], self.pl)  # empty = geometric distance
-        npt.assert_array_equal(f(*args, np.zeros(3))[0], self.pl)  # 0 = outdoor link
+        npt.assert_array_equal(f(*args, None)[0], self.pl_dB)
+        npt.assert_array_equal(f(*args, np.zeros(0))[0], self.pl_dB)  # empty = geometric distance
+        npt.assert_array_equal(f(*args, np.zeros(3))[0], self.pl_dB)  # 0 = outdoor link
         pl_in = f(*args, [0.0, 20.0, 0.0])[0]  # legacy outdoor distance
-        npt.assert_array_equal(pl_in[[0, 2]], self.pl[[0, 2]])
+        npt.assert_array_equal(pl_in[[0, 2]], self.pl_dB[[0, 2]])
         npt.assert_allclose(pl_in[1], 20 * np.log10(980.0) + 30 + 20 * np.log10(self.fc / 1e9), atol=1e-12, rtol=0)
         npt.assert_array_equal(f(*args, np.array([0, 20, 0], dtype=np.int32))[0], pl_in)
         npt.assert_array_equal(f(*args, np.array([0, 20, 0], dtype=np.float32))[0], pl_in)
@@ -114,21 +114,21 @@ class test_case(unittest.TestCase):
     def test_array_layout_and_dtype(self):
         f = quadriga_lib.gbsm.path_loss
         args = (self.plpar, self.scenpar, self.fc, self.tx_pos)
-        npt.assert_array_equal(f(*args, np.asfortranarray(self.rx_pos))[0], self.pl)
-        npt.assert_array_equal(f(*args, np.ascontiguousarray(self.rx_pos))[0], self.pl)
+        npt.assert_array_equal(f(*args, np.asfortranarray(self.rx_pos))[0], self.pl_dB)
+        npt.assert_array_equal(f(*args, np.ascontiguousarray(self.rx_pos))[0], self.pl_dB)
         big = np.zeros((6, 6))
         big[::2, ::2] = self.rx_pos
-        npt.assert_array_equal(f(*args, big[::2, ::2])[0], self.pl)
+        npt.assert_array_equal(f(*args, big[::2, ::2])[0], self.pl_dB)
         pl_t = f(self.plpar, self.scenpar, self.fc.astype(np.float32), self.tx_pos.astype(np.float32),
                  self.rx_pos.astype(np.float32))[0]
-        npt.assert_allclose(pl_t, self.pl, atol=1e-12, rtol=0)  # values exact in float32
-        npt.assert_array_equal(f(self.plpar, self.scenpar, self.fc.tolist(), self.tx_pos, self.rx_pos)[0], self.pl)
+        npt.assert_allclose(pl_t, self.pl_dB, atol=1e-12, rtol=0)  # values exact in float32
+        npt.assert_array_equal(f(self.plpar, self.scenpar, self.fc.tolist(), self.tx_pos, self.rx_pos)[0], self.pl_dB)
         npt.assert_array_equal(f(self.plpar, self.scenpar, self.fc, np.tile(self.tx_pos, (3, 1)), self.rx_pos)[0],
-                               self.pl)  # (n_link, 3)
+                               self.pl_dB)  # (n_link, 3)
 
     def test_zero_links(self):
-        pl, sf = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, np.zeros((0, 3)))
-        self.assertEqual(pl.shape, (0, 2))
+        pl_dB, sf = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, np.zeros((0, 3)))
+        self.assertEqual(pl_dB.shape, (0, 2))
         self.assertEqual(sf.shape, (0, 2))
 
     def test_inputs_not_modified(self):

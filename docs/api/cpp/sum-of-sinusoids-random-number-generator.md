@@ -347,16 +347,16 @@ Also in: [MATLAB](../mex/sum-of-sinusoids-random-number-generator.md#sos_calc_ms
   `n_dim = 3`: `n_dir` directions on a spiral (Fibonacci) lattice on the upper hemisphere,
   `sin(elevation) = ( i + 0.5 ) / n_dir`, azimuth `i · pi · ( 3 - sqrt(5) )`. A direction and its opposite
   give the same ACF
-- `mse_core`: error on the grid of [sos_acf_approx](#sos_acf_approx) against [sos_acf_2d](#sos_acf_2d), for the grid points within a
+- `mse_core_dB`: error on the grid of [sos_acf_approx](#sos_acf_approx) against [sos_acf_2d](#sos_acf_2d), for the grid points within a
   radius of `n_acf` grid steps around the center; for `n_dim = 3` the mean squared error is averaged over
   the three planes
-- `mse_all`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond `Dmax`
-- For `n_dim = 1`, `mse_core` is evaluated on the sample points `dist`, `mse_all` on the axis from
-  `-2·Dmax` to `2·Dmax`, and the return value equals `mse_core`
+- `mse_all_dB`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond `Dmax`
+- For `n_dim = 1`, `mse_core_dB` is evaluated on the sample points `dist`, `mse_all_dB` on the axis from
+  `-2·Dmax` to `2·Dmax`, and the return value equals `mse_core_dB`
 - `acf_tail`: approximated ACF, averaged over the test directions, at 2, 4, 10 and 20 times `Dmax`. The
   target is 0 there; sinusoids with a frequency near zero show up as a plateau of height
   `n_low / n_coeff`, which adds a constant offset to all values of a large area
-- `mse_core` and `mse_all` need the 2-D grids and are only computed when requested
+- `mse_core_dB` and `mse_all_dB` need the 2-D grids and are only computed when requested
 - A perfect fit has a mean squared error of 0 and is returned as +Inf dB; this happens for a target that
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
 - The test directions are evaluated in parallel; the result does not depend on the number of threads
@@ -368,8 +368,8 @@ dtype quadriga_lib::sos_calc_mse(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    dtype *mse_core = nullptr,
-    dtype *mse_all = nullptr,
+    dtype *mse_core_dB = nullptr,
+    dtype *mse_all_dB = nullptr,
     arma::Col<dtype> *acf_tail = nullptr,
     arma::Mat<dtype> *test_dir = nullptr,
     arma::uword n_dir = 10);
@@ -382,8 +382,8 @@ dtype quadriga_lib::sos_calc_mse(
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
 
 ### Outputs:
-- **`mse_core`** *(optional)* — Error within the core radius in [dB]
-- **`mse_all`** *(optional)* — Error on the complete grid in [dB]
+- **`mse_core_dB`** *(optional)* — Error within the core radius in [dB]
+- **`mse_all_dB`** *(optional)* — Error on the complete grid in [dB]
 - **`acf_tail`** *(optional)* — Approximated ACF beyond the fitted range; `[4]`
 - **`test_dir`** *(optional)* — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}`
   for `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`

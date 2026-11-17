@@ -35,19 +35,19 @@ class test_case(unittest.TestCase):
         out = self.out
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 3)
-        loss, d2d_in, model_ind = out
-        self.assertEqual(loss.shape, (3, 3))
+        loss_dB, d2d_in, model_ind = out
+        self.assertEqual(loss_dB.shape, (3, 3))
         self.assertEqual(d2d_in.shape, (3,))
         self.assertEqual(model_ind.shape, (3,))
-        self.assertEqual(loss.dtype, np.float64)
+        self.assertEqual(loss_dB.dtype, np.float64)
         self.assertEqual(d2d_in.dtype, np.float64)
         self.assertEqual(model_ind.dtype, np.uint64)
         npt.assert_array_equal(model_ind, [0, 1, 2])  # 0-based
         npt.assert_allclose(d2d_in, [0.3 * 25, 0.0, 0.2 * 25], atol=1e-14, rtol=0)
-        npt.assert_allclose(loss[1], [3.0, 3.0, 3.0], atol=1e-14, rtol=0)  # car: 9 + 5·N, N = -1.2
+        npt.assert_allclose(loss_dB[1], [3.0, 3.0, 3.0], atol=1e-14, rtol=0)  # car: 9 + 5·N, N = -1.2
         f = self.fc / 1e9  # low-loss model of UT 0
         tw = 5 - 10 * np.log10(0.3 * 10 ** (-(2 + 0.2 * f) / 10) + 0.7 * 10 ** (-(5 + 4 * f) / 10))
-        npt.assert_allclose(loss[0], tw + 0.5 * 7.5 + 4.4 * 0.1, atol=1e-12, rtol=0)
+        npt.assert_allclose(loss_dB[0], tw + 0.5 * 7.5 + 4.4 * 0.1, atol=1e-12, rtol=0)
 
     def test_keyword_arguments(self):
         ok = quadriga_lib.gbsm.o2i_loss(center_freq=self.fc, rnd=self.rnd, models=self.models, weights=self.weights,
@@ -92,8 +92,8 @@ class test_case(unittest.TestCase):
                                self.out[0])
 
     def test_zero_uts(self):
-        loss, d2d_in, idx = quadriga_lib.gbsm.o2i_loss(self.fc, np.zeros((0, 4)), self.models, self.weights)
-        self.assertEqual(loss.shape, (0, 3))
+        loss_dB, d2d_in, idx = quadriga_lib.gbsm.o2i_loss(self.fc, np.zeros((0, 4)), self.models, self.weights)
+        self.assertEqual(loss_dB.shape, (0, 3))
         self.assertEqual(d2d_in.shape, (0,))
         self.assertEqual(idx.shape, (0,))
 

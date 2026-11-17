@@ -12,7 +12,7 @@
 // 0, LSP_fc_min, the ESD terms and floor, the V/S term of the delay spread), TR spot checks of four v19 files, the
 // EoD offset, the transformation 10^(mu + sigma·x) of the eight LSPs, the root of the cross-correlation matrix
 // (Cholesky in TR order, symmetric square root), the sample covariance of the log values, the clipping of the
-// spreads, one random vector for all frequencies, the replacement of the SF std by 'sf_sigma', the absolute TOA,
+// spreads, one random vector for all frequencies, the replacement of the SF std by 'sf_sigma_dB', the absolute TOA,
 // the ground permittivity, the optional outputs, sizes, pre-sized outputs and the input validation.
 // Left to test_conf_files_v19.cpp: the key values of the 23 v19 files against TR 38.901 Tables 7.5-6 to 7.5-12.
 // Oracles, independent of the function:
@@ -808,7 +808,7 @@ TEST_CASE("lsp_generate - the same random values apply to all frequencies")
         }
 }
 
-TEST_CASE("lsp_generate - sf_sigma from path_loss replaces the SF standard deviation")
+TEST_CASE("lsp_generate - sf_sigma_dB from path_loss replaces the SF standard deviation")
 {
     const scen_t sp = conf("UMa_NLOS");
     const arma::mat tx = {{0.0, 0.0, 25.0}}, rx = {{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}};
@@ -1172,17 +1172,17 @@ TEST_CASE("lsp_generate - input validation")
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, bad, lsp), std::invalid_argument,
                              Message("Input 'rnd' must be finite."));
     }
-    SECTION("sf_sigma")
+    SECTION("sf_sigma_dB")
     {
         arma::mat sf(3, 1, arma::fill::value(4.0));
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
-                             Message("Input 'sf_sigma' must have size [n_link, n_freq]."));
+                             Message("Input 'sf_sigma_dB' must have size [n_link, n_freq]."));
         sf.set_size(3, 2), sf.fill(4.0), sf(1, 1) = -1.0;
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
-                             Message("Input 'sf_sigma' must be finite and >= 0."));
+                             Message("Input 'sf_sigma_dB' must be finite and >= 0."));
         sf(1, 1) = NAN;
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, &sf), std::invalid_argument,
-                             Message("Input 'sf_sigma' must be finite and >= 0."));
+                             Message("Input 'sf_sigma_dB' must be finite and >= 0."));
     }
     SECTION("scenpar")
     {

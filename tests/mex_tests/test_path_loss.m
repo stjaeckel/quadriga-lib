@@ -16,19 +16,19 @@ conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'co
 [ sp_nlos, pl_nlos ] = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMa_NLOS.conf' ) );
 
 %% Basic call and values
-[ pl, sf_sigma ] = quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos );
-assertEqual( size(pl), [3, 2] );
-assertEqual( size(sf_sigma), [3, 2] );
-assertTrue( isa(pl, 'double') && isa(sf_sigma, 'double') );
-assertElementsAlmostEqual( pl(1, 1), 70, 'absolute', 1e-12 );                % 100 m, 1 GHz
-assertElementsAlmostEqual( pl, ref, 'absolute', 1e-12 );
-assertEqual( sf_sigma, 3 * ones(3, 2) );                                       % SF_sigma of scenpar
+[ pl_dB, sf_sigma_dB ] = quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos );
+assertEqual( size(pl_dB), [3, 2] );
+assertEqual( size(sf_sigma_dB), [3, 2] );
+assertTrue( isa(pl_dB, 'double') && isa(sf_sigma_dB, 'double') );
+assertElementsAlmostEqual( pl_dB(1, 1), 70, 'absolute', 1e-12 );                % 100 m, 1 GHz
+assertElementsAlmostEqual( pl_dB, ref, 'absolute', 1e-12 );
+assertEqual( sf_sigma_dB, 3 * ones(3, 2) );                                       % SF_sigma of scenpar
 
 %% Struct inputs
 plpar_sf = plpar;
 plpar_sf.SF = 5;                                                               % sf from the model
 [ pl2, sf2 ] = quadriga_lib.path_loss( plpar_sf, scenpar, fc, tx_pos, rx_pos );
-assertEqual( pl2, pl );
+assertEqual( pl2, pl_dB );
 assertEqual( sf2, 5 * ones(3, 2) );
 [ ~, sf3 ] = quadriga_lib.path_loss( plpar, [], fc, tx_pos, rx_pos );          % scenpar []: default SF_sigma
 assertEqual( sf3, 8 * ones(3, 2) );
@@ -47,10 +47,10 @@ assertTrue( pn >= pa );                                                        %
 assertTrue( abs( quadriga_lib.path_loss( pl_nlos, sp_nlos, 1e9, rx_u, tx_u ) - pn ) > 0.1 );  % Tx and Rx differ
 
 %% Optional inputs: d2d_in (omitted or [] = geometric distance, 0 = outdoor link)
-assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos, [] ), pl );
-assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos, zeros(3, 1) ), pl );
+assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos, [] ), pl_dB );
+assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos, zeros(3, 1) ), pl_dB );
 pl_in = quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos, [ 0, 20, 0 ] );         % row vector
-assertEqual( pl_in([1, 3], :), pl([1, 3], :) );
+assertEqual( pl_in([1, 3], :), pl_dB([1, 3], :) );
 assertElementsAlmostEqual( pl_in(2, :), 20 * log10(980) + 30 + 20 * log10( fc / 1e9 ), 'absolute', 1e-12 );
 
 %% Optional inputs: rnd_he (UMa: hE = 1 m for u < p1, hE = 18 m for u near 1 at hUT = 20 m)
@@ -62,7 +62,7 @@ assertEqual( quadriga_lib.path_loss( pl_los, sp_los, 1e9, tx_u, rx_u, 0, 0.999 )
 
 %% Outputs: none and fewer
 quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos );
-assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos ), pl );
+assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos ), pl_dB );
 
 %% Type handling and orientation
 plpar_t = struct( 'model', 'logdist', 'A', int32(20), 'B', single(30), 'C', uint32(20) );
@@ -70,8 +70,8 @@ plpar_t = struct( 'model', 'logdist', 'A', int32(20), 'B', single(30), 'C', uint
     single(tx_pos), single(rx_pos), single([ 0; 20; 0 ]) );                   % values exact in single
 assertTrue( isa(pl_t, 'double') && isa(sf_t, 'double') );
 assertElementsAlmostEqual( pl_t, pl_in, 'absolute', 1e-12 );
-assertEqual( sf_t, sf_sigma );
-assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, repmat(tx_pos, 3, 1), rx_pos ), pl );  % [n_link, 3]
+assertEqual( sf_t, sf_sigma_dB );
+assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, repmat(tx_pos, 3, 1), rx_pos ), pl_dB );  % [n_link, 3]
 
 %% Errors
 assert_throws( @() quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos ), 'Wrong number of input arguments.' );

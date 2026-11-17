@@ -762,7 +762,7 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 void quadriga_lib::arrayant_export_obj_file(
     const std::string &fn,
     const arrayant<dtype> &ant,
-    dtype directivity_range = 30.0,
+    dtype directivity_range_dB = 30.0,
     const std::string &colormap = "jet",
     dtype object_radius = 1.0,
     arma::uword icosphere_n_div = 4,
@@ -772,7 +772,7 @@ void quadriga_lib::arrayant_export_obj_file(
 ## Inputs:
 - **`fn`** — Output OBJ filename; must end in .obj; the colormap is written to a .mtl file of the same name
 - **`ant`** — Valid arrayant
-- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
+- **`directivity_range_dB`** *(optional)* — Dynamic range of the visualized directivity pattern in dB
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
 - **`object_radius`** *(optional)* — Radius of the exported object
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [[icosphere]]
@@ -785,7 +785,7 @@ void quadriga_lib::arrayant_export_obj_file(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayant<dtype> &ant, dtype directivity_range,
+void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayant<dtype> &ant, dtype directivity_range_dB,
                                             const std::string &colormap, dtype object_radius,
                                             arma::uword icosphere_n_div, const arma::uvec *i_element_in)
 {
@@ -818,7 +818,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     else
         fn_mtl_base = fn_mtl;
 
-    double range = -std::abs((double)directivity_range);
+    double range = -std::abs((double)directivity_range_dB);
     if (range == 0.0 || !std::isfinite(range))
         throw std::invalid_argument("Directivity range must be finite and not 0.");
 

@@ -37,13 +37,13 @@ class test_case(unittest.TestCase):
         out = quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf, self.dist)
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 5)
-        mse, mse_core, mse_all, acf_tail, test_dir = out
+        mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = out
 
-        for x in (mse, mse_core, mse_all):
+        for x in (mse_dB, mse_core_dB, mse_all_dB):
             self.assertIsInstance(x, float)
-        self.assertGreater(mse, 250.0)
-        self.assertEqual(mse_core, mse)  # 1-D: both are evaluated on the sample points
-        self.assertTrue(0.0 < mse_all < 30.0)
+        self.assertGreater(mse_dB, 250.0)
+        self.assertEqual(mse_core_dB, mse_dB)  # 1-D: both are evaluated on the sample points
+        self.assertTrue(0.0 < mse_all_dB < 30.0)
 
         self.assertEqual(acf_tail.shape, (4,))
         self.assertEqual(acf_tail.dtype, np.float64)

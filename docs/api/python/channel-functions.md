@@ -105,7 +105,7 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../
 
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g. for use in Blender)
 - Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
-- Paths below `gain_min` are excluded; `max_paths` caps the total number of exported paths
+- Paths below `gain_min_dB` are excluded; `max_paths` caps the total number of exported paths
 - Paths with non-finite coordinates are skipped
 - Takes raw channel data fields directly; no channel dict is required
 - The per-snapshot fields `n_interact`, `interact_coord` and `coeff` each accept either a `list`
@@ -113,16 +113,16 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../
 
 ### Usage:
 ```python
-quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max, gain_min, colormap, \
+quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, colormap, \
     radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
     coeff_re, coeff_im, i_snap )
 ```
 
 ### Inputs:
 - **`fn`** — Output `.obj` file path; str
-- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
-- **`gain_max`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
-- **`gain_min`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
+- **`max_paths`** — Max paths to export; 0 includes all paths above `gain_min_dB`; default: 0
+- **`gain_max_dB`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
+- **`gain_min_dB`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 - **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
 - **`radius_max`** — Tube radius at maximum gain; default: 0.05
 - **`radius_min`** — Tube radius at minimum gain; default: 0.01

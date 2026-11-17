@@ -46,7 +46,7 @@ Path loss and shadow-fading standard deviation of a set of links
     constant beyond) if `usePLa != 0`
   - no model (`plpar` is `None`, `{}` or has no entry `model`): 0
 - Where the model gives no `sf` (an `SF` or `sig` key not set, or a model without one): the SF std of [[lsp_generate]]
-  at the geometric distance, so that passing `sf_sigma` to [[lsp_generate]] is neutral
+  at the geometric distance, so that passing `sf_sigma_dB` to [[lsp_generate]] is neutral
 - `hE_rand != 0` with `rnd_he` given: the random environment height of TR 38.901 Table 7.4.1-1 note 1, drawn from
   `rnd_he`, which makes it spatially consistent at the decorrelation distance `SF_lambda` (the TR draws it independently
   per link); the UT height is then clamped at `hE + 0.1` instead of `1.1·hE`. Along a track the loss beyond the
@@ -58,7 +58,7 @@ Path loss and shadow-fading standard deviation of a set of links
 
 ## Usage:
 ```
-pl, sf_sigma = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he )
+pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he )
 ```
 
 ## Inputs:
@@ -75,11 +75,11 @@ pl, sf_sigma = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos,
   `None` or empty = fixed `hE`; `(n_link,)`; default: None
 
 ## Outputs:
-- **`pl`** — Path loss in dB; `(n_link, n_freq)`
-- **`sf_sigma`** — Shadow-fading standard deviation in dB; `(n_link, n_freq)`
+- **`pl_dB`** — Path loss in dB; `(n_link, n_freq)`
+- **`sf_sigma_dB`** — Shadow-fading standard deviation in dB; `(n_link, n_freq)`
 
 ## See also:
-- [[lsp_generate]] (takes `sf_sigma`)
+- [[lsp_generate]] (takes `sf_sigma_dB`)
 - [[o2i_loss]] (penetration loss, added by the caller)
 MD!*/
 
@@ -103,16 +103,16 @@ py::tuple path_loss(py::handle plpar,
     const auto rnd_he_a = qd_python_numpy2arma_Col<double>(rnd_he, true);
 
     // Output allocation
-    arma::mat pl, sf_sigma;
-    auto pl_py = qd_python_init_output(rx_pos_a.n_rows, center_freq_a.n_elem, &pl);
-    auto sf_sigma_py = qd_python_init_output(rx_pos_a.n_rows, center_freq_a.n_elem, &sf_sigma);
+    arma::mat pl_dB, sf_sigma_dB;
+    auto pl_py = qd_python_init_output(rx_pos_a.n_rows, center_freq_a.n_elem, &pl_dB);
+    auto sf_sigma_py = qd_python_init_output(rx_pos_a.n_rows, center_freq_a.n_elem, &sf_sigma_dB);
 
     // Wrap optional pointers
     const arma::vec *p_d2d_in = d2d_in_a.is_empty() ? nullptr : &d2d_in_a;
     const arma::vec *p_rnd_he = rnd_he_a.is_empty() ? nullptr : &rnd_he_a;
 
     // Call library function
-    quadriga_lib::path_loss(pl_model, plpar_a, scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, pl, &sf_sigma, p_d2d_in,
+    quadriga_lib::path_loss(pl_model, plpar_a, scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, pl_dB, &sf_sigma_dB, p_d2d_in,
                             p_rnd_he);
 
     return py::make_tuple(pl_py, sf_sigma_py);

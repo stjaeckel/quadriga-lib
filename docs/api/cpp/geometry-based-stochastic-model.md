@@ -43,7 +43,7 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 1. [conf_file_read](#conf_file_read): the scenarios, one per LOS and indoor state
 2. Per link, by the caller with own SOS generators ([sos_init_phases](sum-of-sinusoids-random-number-generator.md#sos_init_phases), [sos_rand](sum-of-sinusoids-random-number-generator.md#sos_rand), [sos_randn](sum-of-sinusoids-random-number-generator.md#sos_randn)): the indoor
    state, a Uniform(0,1) value at the decorrelation distance `IO_state_lambda` of the O2I files below an indoor ratio
-   of the caller's choice (e.g. TR 38.901 Table 7.2-1), and for indoor UTs [o2i_loss](#o2i_loss) (`loss`, `d2d_in`); then the
+   of the caller's choice (e.g. TR 38.901 Table 7.2-1), and for indoor UTs [o2i_loss](#o2i_loss) (`loss_dB`, `d2d_in`); then the
    LOS state, a Uniform(0,1) value at `LOS_state_lambda` of the NLOS file below `p_los` of [los_probability](#los_probability) at
    `d2d_out = max(d2D - d2d_in, 0)`. The caller chooses the `los_probability` model and the `o2i_loss` models and
    weights (TR 38.901 Tables 7.4.2-1, 7.4.3-2). The states assign each link to a scenario and give the `o2i` flags of
@@ -51,8 +51,8 @@ comments. The functions that read `scenpar` complete a copy with the defaults of
 3. Per BS site and scenario, once, with one seed for all sets: [gbsm_init_phases](#gbsm_init_phases) of the random sets in the table
    below; `"lsf"` with the link positions for the bias removal
 4. [gbsm_draw](#gbsm_draw) of each set at the links (the shared `"ray"` set with `center_freq`, the list later passed to
-   [ssf_rays](#ssf_rays)); [path_loss](#path_loss) (`pl`, `sf_sigma`; column 10 of the `"lsf"` set as `rnd_he`); [lsp_generate](#lsp_generate) with
-   `sf_sigma` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
+   [ssf_rays](#ssf_rays)); [path_loss](#path_loss) (`pl_dB`, `sf_sigma_dB`; column 10 of the `"lsf"` set as `rnd_he`); [lsp_generate](#lsp_generate)
+   with `sf_sigma_dB` (`lsp`, `abs_toa`, `gr_eps_re`, `gr_eps_im`, `eod_offset_deg`, `lsp_mu`, `lsp_sigma` for step 5)
 5. [ssf_clusters](#ssf_clusters) (`n_cluster` is the caller's choice) and [ssf_rays](#ssf_rays) (one [gbsm_rays](#gbsm_rays) object per link), called
    as in the table below
 6. Per link and segment: [.solve_scatterers](#.solve_scatterers) if the mobility is `drift`; then [gbsm_single_link_channel](#gbsm_single_link_channel) with the
@@ -90,7 +90,7 @@ KF(drop) from slice 1 of `lsp`. Ray data can also come from path data, with [gbs
 | scatterer | first-bounce (FBS) and last-bounce (LBS) interaction point of a ray; one point for LOS (direct line) and GR (ground) (QuaDRiGa) |
 | coefficient power | power of a ray without link gain and oxygen loss (`gbsm_rays.power`): the powers of TR 38.901 eq. (7.5-30) split over the rays, GR as [ssf_clusters](#ssf_clusters) sets it; for data from paths the path gain |
 | path gain | linear power gain of a path incl. link gain and oxygen loss |
-| link gain | `-pl - loss + 10·lg(SF)` in dB of a link at a position and frequency (`link_gain_dB`), with `pl` of [path_loss](#path_loss), `loss` of [o2i_loss](#o2i_loss) (0 outdoors) and SF the linear shadow fading, slice 2 of `lsp` |
+| link gain | `-pl_dB - loss_dB + 10·lg(SF)` in dB of a link at a position and frequency (`link_gain_dB`), with `pl_dB` of [path_loss](#path_loss), `loss_dB` of [o2i_loss](#o2i_loss) (0 outdoors) and SF the linear shadow fading, slice 2 of `lsp` |
 | random set | the spatially correlated random values of one `set_type` and `set_id` (table in [gbsm_draw](#gbsm_draw)) |
 | generator | one spatially correlated random field, a [sum-of-sinusoids (SOS)](sum-of-sinusoids-random-number-generator.md) generator; one column of a random set |
 | SOS phases | the random phases of the sinusoids of the generators of a random set (`phase`); evaluated at positions, they give its random values. "Phase" alone is the phase of a coefficient or ray |
@@ -737,7 +737,7 @@ void quadriga_lib::lsp_generate(
     const arma::mat &rx_pos,
     const arma::mat &rnd,
     arma::cube &lsp,
-    const arma::mat *sf_sigma = nullptr,
+    const arma::mat *sf_sigma_dB = nullptr,
     arma::vec *abs_toa = nullptr,
     arma::mat *gr_eps_re = nullptr,
     arma::mat *gr_eps_im = nullptr,
@@ -755,7 +755,7 @@ void quadriga_lib::lsp_generate(
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`rnd`** — Random values from [gbsm_draw](#gbsm_draw) (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
   is requested; column 10 is not used; `[n_link, 11]`
-- **`sf_sigma`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite and >= 0; replaces
+- **`sf_sigma_dB`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite and >= 0; replaces
   the value from `scenpar`, also in `lsp_sigma`; `[n_link, n_freq]`
 - **`cholesky`** *(optional)* — `true`: Cholesky root in the order of TR 38.901 clause 7.5 step 4 (SF, KF, DS, ASD,
   ASA, ESD, ESA; XPR last); `false`: symmetric square root (legacy QuaDRiGa)
@@ -763,19 +763,20 @@ void quadriga_lib::lsp_generate(
   step 4); `lsp_mu` and `lsp_sigma` are not affected
 
 ### Outputs:
-- **`lsp`** — Large-scale parameters; slices: 0 DS in [s], 1 KF, 2 SF, 3 ASD, 4 ASA, 5 ESD, 6 ESA in [deg], 7 XPR;
-  `[n_link, n_freq, 8]`
+- **`lsp`** — Large-scale parameters; slices: 0 DS in [s]; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA
+  in [deg]; `[n_link, n_freq, 8]`
 - **`abs_toa`** *(optional)* — Absolute TOA offset in [s], 0 if not active; `[n_link]`
 - **`gr_eps_re`**, **`gr_eps_im`** *(optional)* — Relative permittivity of the ground, real part and imaginary
   part >= 0; the complex value of TR 38.901 eq. (7.6-40) is `gr_eps_re - j·gr_eps_im`; `[n_link, n_freq]`
 - **`eod_offset_deg`** *(optional)* — EoD offset in [deg], positive = up; `[n_link, n_freq]`
-- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain; required by [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
-- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain, >= 0; required by [ssf_rays](#ssf_rays);
-  `[n_link, n_freq, 8]`
+- **`lsp_mu`** *(optional)* — Mean `mu` in the log domain, slices as `lsp`: lg of [s] for DS, lg of [deg] for the
+  angular spreads, [dB] for KF, SF and XPR; required by [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
+- **`lsp_sigma`** *(optional)* — Standard deviation `sigma` in the log domain of `lsp_mu`, >= 0; required by
+  [ssf_rays](#ssf_rays); `[n_link, n_freq, 8]`
 
 ### See also:
 - [gbsm_draw](#gbsm_draw) (the random values `rnd`)
-- [path_loss](#path_loss) (the SF standard deviation `sf_sigma`)
+- [path_loss](#path_loss) (the SF standard deviation `sf_sigma_dB`)
 - [ssf_clusters](#ssf_clusters) (the clusters from the LSPs)
 - [ssf_rays](#ssf_rays) (takes `lsp`, `lsp_mu` and `lsp_sigma`)
 
@@ -787,7 +788,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#o2i_loss) · [Python](../python/geometry-based-stochastic-model.md#o2i_loss)
 
 - Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier frequency; the
-  caller adds `loss` to the path loss of the UT
+  caller adds `loss_dB` to the path loss of the UT
 - Models of TR 38.901 v19.5.0: `low`, `high`, `low_A` (Table 7.4.3-2 with the materials of Table 7.4.3-1),
   `legacy_6GHz` (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz), `car` and `car_metal` (clause 7.4.3.2,
   metallized windows)
@@ -808,7 +809,7 @@ void quadriga_lib::o2i_loss(
     const arma::mat &rnd,
     const std::vector<std::string> &models,
     const arma::vec &weights,
-    arma::mat &loss,
+    arma::mat &loss_dB,
     double d2d_in_max = 25.0,
     arma::vec *d2d_in = nullptr,
     arma::uvec *model_ind = nullptr);
@@ -824,7 +825,7 @@ void quadriga_lib::o2i_loss(
   for UMa, UMi and SMa commercial buildings, 10 m for RMa and SMa residential buildings)
 
 ### Outputs:
-- **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
+- **`loss_dB`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m], 0 for the car models; `[n_ut]`
 - **`model_ind`** *(optional)* — Chosen model per UT, 0-based index into `models`; `[n_ut]`
 
@@ -874,7 +875,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#path_loss) · [Pytho
     constant beyond) if `usePLa != 0`
   - empty `pl_model`: 0
 - Where the model gives no `sf` (an `SF` or `sig` key not set, or a model without one): the SF std of [lsp_generate](#lsp_generate)
-  at the geometric distance, so that passing `sf_sigma` to [lsp_generate](#lsp_generate) is neutral
+  at the geometric distance, so that passing `sf_sigma_dB` to [lsp_generate](#lsp_generate) is neutral
 - `hE_rand != 0` with `rnd_he` given: the random environment height of TR 38.901 Table 7.4.1-1 note 1, drawn from
   `rnd_he`, which makes it spatially consistent at the decorrelation distance `SF_lambda` (the TR draws it
   independently per link); the UT height is then clamped at `hE + 0.1` instead of `1.1·hE`. Along a track the loss
@@ -893,8 +894,8 @@ void quadriga_lib::path_loss(
     const arma::vec &center_freq,
     const arma::mat &tx_pos,
     const arma::mat &rx_pos,
-    arma::mat &pl,
-    arma::mat *sf_sigma = nullptr,
+    arma::mat &pl_dB,
+    arma::mat *sf_sigma_dB = nullptr,
     const arma::vec *d2d_in = nullptr,
     const arma::vec *rnd_he = nullptr);
 ```
@@ -912,11 +913,11 @@ void quadriga_lib::path_loss(
   [gbsm_draw](#gbsm_draw) (`"lsf"`); `[n_link]`
 
 ### Outputs:
-- **`pl`** — Path loss in [dB]; `[n_link, n_freq]`
-- **`sf_sigma`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
+- **`pl_dB`** — Path loss in [dB]; `[n_link, n_freq]`
+- **`sf_sigma_dB`** *(optional)* — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
 
 ### See also:
-- [lsp_generate](#lsp_generate) (takes `sf_sigma`)
+- [lsp_generate](#lsp_generate) (takes `sf_sigma_dB`)
 - [o2i_loss](#o2i_loss) (penetration loss and indoor distance)
 
 ---
@@ -1052,8 +1053,8 @@ void quadriga_lib::ssf_clusters(
   `LNS_ksi`, `GR_enabled`
 - **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
-- **`lsp`** — LSPs from [lsp_generate](#lsp_generate); DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
-  `"38.901"`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
+- **`lsp`** — LSPs from [lsp_generate](#lsp_generate), slices and units as there; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0,
+  KF (slice 1) >= 0; `"38.901"`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [gbsm_draw](#gbsm_draw) (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
   `[n_link, 9·N]`
 - **`method`** *(optional)* — `"38.901"` (default), `"38.901_MF"` or `"quadriga"`
@@ -1247,8 +1248,8 @@ void quadriga_lib::ssf_rays(
 - **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
 - **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
 - **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
-- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [lsp_generate](#lsp_generate); used: the ESD
-  mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`
+- **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [lsp_generate](#lsp_generate), slices and units as
+  there; used: the ESD mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`
 - **`delay`**, **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Cluster delays and angles from [ssf_clusters](#ssf_clusters)
   (`n_slot` slots); `[n_link, n_slot, n_freq]` for `"38.901_MF"`, else `[n_link, n_slot, 1]`
 - **`power`** — Cluster powers from [ssf_clusters](#ssf_clusters); `[n_link, n_slot, n_freq]`

@@ -140,7 +140,7 @@ acf_own = np.exp(-np.square(dist_own / 5))
 freq_own, ase, test_dir = quadriga_lib.sos.generate(acf_own, dist_own, 256, n_dir=300, spatial_freq_min=0.01, seed=1)
 
 # Approximation error in dB, larger is better; about 35 dB for this example
-mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse(freq_own, acf_own, dist_own)
+mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse(freq_own, acf_own, dist_own)
 ```
 
 The result is used like a preset: draw phases with [sos.init_phases](#sos.init_phases) and evaluate with [sos.val](#sos.val). To
@@ -320,29 +320,29 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_calc_mse) 
 - Compares the autocorrelation function (ACF) produced by the sinusoids,
   `R(dx) = (1/n_coeff) · sum_n cos( 2·pi · f_n·dx )`, with the target ACF
 - All errors are returned as `-10·log10( mean squared error )`; larger is better
-- `mse`: error along the test directions on the sample points `dist`. `n_dim = 1`: one direction;
+- `mse_dB`: error along the test directions on the sample points `dist`. `n_dim = 1`: one direction;
   `n_dim = 2`: `n_dir` directions equally spaced on the half circle, azimuth `pi · i / n_dir`;
   `n_dim = 3`: `n_dir` directions on a spiral (Fibonacci) lattice on the upper hemisphere,
   `sin(elevation) = ( i + 0.5 ) / n_dir`, azimuth `i · pi · ( 3 - sqrt(5) )`, with `i` counted
   from 0. A direction and its opposite give the same ACF
-- `mse_core`: error on the grid of [sos.acf_approx](#sos.acf_approx) against [sos.acf_2d](#sos.acf_2d), for the grid points
+- `mse_core_dB`: error on the grid of [sos.acf_approx](#sos.acf_approx) against [sos.acf_2d](#sos.acf_2d), for the grid points
   within a radius of `n_acf` grid steps around the center; for `n_dim = 3` the mean squared error
   is averaged over the three planes
-- `mse_all`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond
+- `mse_all_dB`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond
   `Dmax`
-- For `n_dim = 1`, `mse_core` is evaluated on the sample points `dist`, `mse_all` on the axis from
-  `-2·Dmax` to `2·Dmax`, and `mse` equals `mse_core`
+- For `n_dim = 1`, `mse_core_dB` is evaluated on the sample points `dist`, `mse_all_dB` on the axis from
+  `-2·Dmax` to `2·Dmax`, and `mse_dB` equals `mse_core_dB`
 - `acf_tail`: approximated ACF, averaged over the test directions, at 2, 4, 10 and 20 times `Dmax`.
   The target is 0 there; sinusoids with a frequency near zero show up as a plateau of height
   `n_low / n_coeff`, which adds a constant offset to all values of a large area
-- All outputs are always computed, including the 2-D grids behind `mse_core` and `mse_all`
+- All outputs are always computed, including the 2-D grids behind `mse_core_dB` and `mse_all_dB`
 - A perfect fit has a mean squared error of 0 and is returned as `inf`; this happens for a target
   that the sinusoids reproduce exactly at all sample points
 - Equally spaced has the meaning given in [sos.acf_2d](#sos.acf_2d)
 
 ### Usage:
 ```python
-mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, dist, n_dir )
+mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, dist, n_dir )
 ```
 
 ### Inputs:
@@ -352,9 +352,9 @@ mse, mse_core, mse_all, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_
 - **`n_dir`** — Number of test directions; `int`; must be > 0; ignored for `n_dim = 1`; default: 10
 
 ### Outputs:
-- **`mse`** — Error along the test directions in [dB]; `float`
-- **`mse_core`** — Error within the core radius in [dB]; `float`
-- **`mse_all`** — Error on the complete grid in [dB]; `float`
+- **`mse_dB`** — Error along the test directions in [dB]; `float`
+- **`mse_core_dB`** — Error within the core radius in [dB]; `float`
+- **`mse_all_dB`** — Error on the complete grid in [dB]; `float`
 - **`acf_tail`** — Approximated ACF beyond the fitted range; `(4,)`
 - **`test_dir`** — Test directions; `(n_dir, 2)` with columns `(azimuth, elevation)` for
   `n_dim = 3`; `(n_dir, 1)` with the azimuth for `n_dim = 2`; empty `(0, 0)` for `n_dim = 1`

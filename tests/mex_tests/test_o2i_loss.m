@@ -10,25 +10,25 @@ models = { 'low', 'car', 'high' };
 weights = [ 0.5, 0.3, 0.2 ];                                                    % UT 1: low, UT 2: car, UT 3: high
 
 %% Basic call and values
-[ loss, d2d_in, model_ind ] = quadriga_lib.o2i_loss( fc, rnd, models, weights );
-assertEqual( size(loss), [3, 3] );
+[ loss_dB, d2d_in, model_ind ] = quadriga_lib.o2i_loss( fc, rnd, models, weights );
+assertEqual( size(loss_dB), [3, 3] );
 assertEqual( size(d2d_in), [3, 1] );
-assertTrue( isa(loss, 'double') && isa(d2d_in, 'double') );
+assertTrue( isa(loss_dB, 'double') && isa(d2d_in, 'double') );
 assertEqual( model_ind, uint64( [1; 2; 3] ) );                               % 1-based
 assertElementsAlmostEqual( d2d_in, [ 0.3 * 25; 0; 0.2 * 25 ], 'absolute', 1e-14 );
-assertElementsAlmostEqual( loss(2, :), [3, 3, 3], 'absolute', 1e-14 );          % car: 9 + 5·N, N = -1.2
+assertElementsAlmostEqual( loss_dB(2, :), [3, 3, 3], 'absolute', 1e-14 );          % car: 9 + 5·N, N = -1.2
 f = fc / 1e9;                                                                   % low-loss model of UT 1
 tw = 5 - 10 * log10( 0.3 * 10.^( -(2 + 0.2 * f) / 10 ) + 0.7 * 10.^( -(5 + 4 * f) / 10 ) );
-assertElementsAlmostEqual( loss(1, :), tw + 0.5 * 7.5 + 4.4 * 0.1, 'absolute', 1e-12 );
+assertElementsAlmostEqual( loss_dB(1, :), tw + 0.5 * 7.5 + 4.4 * 0.1, 'absolute', 1e-12 );
 
 %% Optional inputs: d2d_in_max
 [ loss2, d2d_in2 ] = quadriga_lib.o2i_loss( fc, rnd, models, weights, [] );
-assertEqual( loss2, loss );
+assertEqual( loss2, loss_dB );
 assertEqual( d2d_in2, d2d_in );
-assertEqual( quadriga_lib.o2i_loss( fc, rnd, models, weights, 25 ), loss );
+assertEqual( quadriga_lib.o2i_loss( fc, rnd, models, weights, 25 ), loss_dB );
 [ loss3, d2d_in3 ] = quadriga_lib.o2i_loss( fc, rnd, models, weights, 10 );
 assertElementsAlmostEqual( d2d_in3, [ 3; 0; 2 ], 'absolute', 1e-14 );
-assertElementsAlmostEqual( loss3(1, :) - loss(1, :), 0.5 * (3 - 7.5) * [1, 1, 1], 'absolute', 1e-12 );
+assertElementsAlmostEqual( loss3(1, :) - loss_dB(1, :), 0.5 * (3 - 7.5) * [1, 1, 1], 'absolute', 1e-12 );
 
 %% Models as one string or as a cell array; the model index points into 'models'
 [ l_c, ~, i_c ] = quadriga_lib.o2i_loss( fc, rnd, 'car', 1 );
@@ -41,14 +41,14 @@ assertEqual( i_r, uint64( [1; 2; 3] ) );
 
 %% Outputs: none and fewer
 quadriga_lib.o2i_loss( fc, rnd, models, weights );
-assertEqual( quadriga_lib.o2i_loss( fc, rnd, models, weights ), loss );
+assertEqual( quadriga_lib.o2i_loss( fc, rnd, models, weights ), loss_dB );
 [ ~, d2d_in4 ] = quadriga_lib.o2i_loss( fc, rnd, models, weights );
 assertEqual( d2d_in4, d2d_in );
 
 %% Type handling and orientation
 [ l_t, d_t, i_t ] = quadriga_lib.o2i_loss( single(fc'), single(rnd), models', single(weights'), int32(25) );
 assertTrue( isa(l_t, 'double') && isa(i_t, 'uint64') );
-assertElementsAlmostEqual( l_t, loss, 'absolute', 1e-5 );                      % rnd rounded to single
+assertElementsAlmostEqual( l_t, loss_dB, 'absolute', 1e-5 );                      % rnd rounded to single
 assertElementsAlmostEqual( d_t, d2d_in, 'absolute', 1e-5 );
 assertEqual( i_t, model_ind );
 

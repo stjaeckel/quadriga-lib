@@ -115,8 +115,8 @@ class test_case(unittest.TestCase):
         el = [np.array([0.0, 0.0])]
         powers = [np.array([1.0, 1.0])]
 
-        a_raw, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize=0.0)
-        a_quant, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize=3.0)
+        a_raw, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=0.0)
+        a_quant, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=3.0)
 
         self.assertLessEqual(a_quant[0], a_raw[0] + 1e-8)
 
@@ -166,8 +166,8 @@ class test_case(unittest.TestCase):
         powers = [np.array([1.0, 1.0])]
         for q in [1e-8, -1.0, np.nan, np.inf]:
             with self.assertRaises(ValueError):
-                quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize=q)
-        a_s, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize=1e-3)
+                quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=q)
+        a_s, _, _, _, _ = quadriga_lib.tools.calc_angular_spread(az, el, powers, 1, 1, quantize_deg=1e-3)
         self.assertTrue(np.isfinite(a_s[0]))
 
 

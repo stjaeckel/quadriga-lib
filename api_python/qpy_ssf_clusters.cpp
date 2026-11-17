@@ -59,8 +59,8 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
   `GR_enabled`
 - **`tx_pos`** — Tx positions in m; z >= 0 with ground reflection; `(1, 3)` or `(n_link, 3)`
 - **`rx_pos`** — Rx positions in m; z >= 0 with ground reflection; `(n_link, 3)`
-- **`lsp`** — LSPs from [[lsp_generate]]; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0, KF (slice 1) >= 0;
-  `"38.901"`: one frequency, call once per frequency; `(n_link, n_freq, 8)`
+- **`lsp`** — LSPs from [[lsp_generate]], slices and units as there; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0,
+  KF (slice 1) >= 0; `"38.901"`: one frequency, call once per frequency; `(n_link, n_freq, 8)`
 - **`rnd`** — Shared cluster set of [[gbsm.draw]] (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
   `(n_link, 9·N)`
 - **`method`** — `"38.901"`, `"38.901_MF"` or `"quadriga"`; default: `"38.901"`

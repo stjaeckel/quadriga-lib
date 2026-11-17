@@ -91,7 +91,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
           py::arg("rnd").none(false),
-          py::arg("sf_sigma") = py::none(),
+          py::arg("sf_sigma_dB") = py::none(),
           py::arg("cholesky") = true,
           py::arg("clip_spreads") = true,
           py::arg("complex") = true);

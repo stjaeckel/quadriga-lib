@@ -76,7 +76,7 @@ for cmap = {'jet', 'parula', 'winter', 'hot', 'turbo', 'copper', 'spring', 'cool
     delete('test_mex.obj'); delete('test_mex.mtl');
 end
 
-% --- directivity_range: different range values, file still valid ---
+% --- directivity_range_dB: different range values, file still valid ---
 for drange = [10, 30, 50]
     quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, drange, 'jet', 1.0, 2);
     assertTrue(exist('test_mex.obj', 'file') == 2);

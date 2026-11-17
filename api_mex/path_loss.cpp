@@ -52,7 +52,7 @@ Path loss and shadow-fading standard deviation of a set of links
     atmospheric gases over `sa` (1 to 100 GHz, constant beyond) if `usePLa != 0`
   - no model (`plpar` empty or without the field `model`): 0
 - Where the model gives no `sf` (an `SF` or `sig` field not set, or a model without one): the SF std of
-  [[lsp_generate]] at the geometric distance, so that passing `sf_sigma` to [[lsp_generate]] is neutral
+  [[lsp_generate]] at the geometric distance, so that passing `sf_sigma_dB` to [[lsp_generate]] is neutral
 - `hE_rand != 0` with `rnd_he` given: the random environment height of TR 38.901 Table 7.4.1-1 note
   1, drawn from `rnd_he`, which makes it spatially consistent at the decorrelation distance
   `SF_lambda` (the TR draws it independently per link); the UT height is then clamped at `hE + 0.1`
@@ -66,7 +66,7 @@ Path loss and shadow-fading standard deviation of a set of links
 
 ## Usage:
 ```
-[ pl, sf_sigma ] = quadriga_lib.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he );
+[ pl_dB, sf_sigma_dB ] = quadriga_lib.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he );
 ```
 
 ## Inputs:
@@ -84,11 +84,11 @@ Path loss and shadow-fading standard deviation of a set of links
   [[gbsm_draw]] (`'lsf'`); `[n_link]`; default: fixed `hE`
 
 ## Outputs:
-- **`pl`** — Path loss in [dB]; `[n_link, n_freq]`
-- **`sf_sigma`** — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
+- **`pl_dB`** — Path loss in [dB]; `[n_link, n_freq]`
+- **`sf_sigma_dB`** — Shadow-fading standard deviation in [dB]; `[n_link, n_freq]`
 
 ## See also:
-- [[lsp_generate]] (takes `sf_sigma`)
+- [[lsp_generate]] (takes `sf_sigma_dB`)
 - [[o2i_loss]] (penetration loss, added by the caller)
 MD!*/
 
@@ -112,17 +112,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec rnd_he = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6]);
 
     // Output allocation
-    arma::mat pl, sf_sigma;
+    arma::mat pl_dB, sf_sigma_dB;
     if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&pl, rx_pos.n_rows, center_freq.n_elem);
+        plhs[0] = qd_mex_init_output(&pl_dB, rx_pos.n_rows, center_freq.n_elem);
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&sf_sigma, rx_pos.n_rows, center_freq.n_elem);
+        plhs[1] = qd_mex_init_output(&sf_sigma_dB, rx_pos.n_rows, center_freq.n_elem);
 
     // Wrap optional pointers
-    arma::mat *p_sf_sigma = (nlhs > 1) ? &sf_sigma : nullptr;
+    arma::mat *p_sf_sigma = (nlhs > 1) ? &sf_sigma_dB : nullptr;
     const arma::vec *p_d2d_in = d2d_in.empty() ? nullptr : &d2d_in;
     const arma::vec *p_rnd_he = rnd_he.empty() ? nullptr : &rnd_he;
 
     // Call library function
-    CALL_QD(quadriga_lib::path_loss(pl_model, plpar, scenpar, center_freq, tx_pos, rx_pos, pl, p_sf_sigma, p_d2d_in, p_rnd_he));
+    CALL_QD(quadriga_lib::path_loss(pl_model, plpar, scenpar, center_freq, tx_pos, rx_pos, pl_dB, p_sf_sigma, p_d2d_in, p_rnd_he));
 }

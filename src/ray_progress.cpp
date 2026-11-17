@@ -227,7 +227,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
     uint8_t max_transmissions = 10,
     uint8_t max_subdivisions = 2,
     float min_gain_dB = -140.0f,
-    float subdivision_tolerance_m = 3.0f,
+    float subdivision_tolerance = 3.0f,
     float thin_slab_threshold = 0.15f,
     bool refraction_mode = true,
     bool scalar_mode = false,
@@ -254,7 +254,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
   counter `nSUB` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
-- **`subdivision_tolerance_m`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
+- **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [[ray_state_update]] as its `eps`; see there. Default 0.15
 - **`refraction_mode`** — `true` = refraction (Snell-bent transmission), `false` = straight-path transmission
 - **`scalar_mode`** — `true` = scalar (acoustic) layout, `false` = EM (2×2 Jones). Must match the layout of `paths`
@@ -266,7 +266,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`subdiv_flag_in`** *(optional)* — Flags that mark rays for subdivision; `[n_ray]`, indexed in the full ray
   set (unlike everything else, which is compacted first). When supplied it is the authority on what gets
   subdivided: a flagged ray is split regardless of whether it hit the mesh, how often it has already been
-  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance_m` is unused. Pass the
+  subdivided, or whether it is travelling inside a medium, and `subdivision_tolerance` is unused. Pass the
   output of [[ray_subdivide_flag]] to reproduce the internal decision exactly; a hand-built list overrides it.
   Requires beam mode; conflicts with `max_subdivisions` = 0
 
@@ -331,7 +331,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                    uint8_t max_transmissions,
                                                    uint8_t max_subdivisions,
                                                    float min_gain_dB,
-                                                   float subdivision_tolerance_m,
+                                                   float subdivision_tolerance,
                                                    float thin_slab_threshold,
                                                    bool refraction_mode,
                                                    bool scalar_mode,
@@ -482,8 +482,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         throw std::invalid_argument("Input 'min_gain_dB' must be finite.");
     float min_gain_linear = std::pow(10.0f, 0.1f * min_gain_dB);
 
-    if (subdivision_tolerance_m <= 0.0f)
-        throw std::invalid_argument("Input 'subdivision_tolerance_m' must be > 0.");
+    if (subdivision_tolerance <= 0.0f)
+        throw std::invalid_argument("Input 'subdivision_tolerance' must be > 0.");
 
     if (thin_slab_threshold < 0.0f || thin_slab_threshold > 1.0f)
         throw std::invalid_argument("Input 'thin_slab_threshold' must be >= 0 and <= 1.");
@@ -602,7 +602,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         if (beam_mode && max_subdivisions && subdiv_flag_in == nullptr)
             subdiv_flag = quadriga_lib::ray_subdivide_flag(mesh, orig, dest, *p_fi, *trivec, *tridir,
                                                            paths, mtl_ind_current, max_interactions,
-                                                           max_subdivisions, subdivision_tolerance_m);
+                                                           max_subdivisions, subdivision_tolerance);
 
         p_sf = (subdiv_flag_in != nullptr) ? subdiv_flag_in : &subdiv_flag;
         has_flag = (p_sf->size() == n_ray);

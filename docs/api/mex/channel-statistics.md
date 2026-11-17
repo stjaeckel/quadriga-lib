@@ -67,13 +67,13 @@ Also in: [C++](../cpp/channel-statistics.md#calc_angular_spread) · [Python](../
 - When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived
   analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered
   angles; only used when `wrapping = true`
-- When `quantize > 0`, paths within that angular distance are grouped and their powers
+- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers
   summed before computing spreads
 
 ### Usage:
 ```matlab
 [ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spread( az, el, powers, ...
-    wrapping, calc_bank_angle, quantize );
+    wrapping, calc_bank_angle, quantize_deg );
 ```
 
 ### Inputs:
@@ -82,7 +82,7 @@ Also in: [C++](../cpp/channel-statistics.md#calc_angular_spread) · [Python](../
 - **`powers`** — Path powers in [W]; `[n_path, n_cir]`
 - **`wrapping`** — If true, enables spherical rotation; default: false
 - **`calc_bank_angle`** — If true, computes optimal bank angle analytically; only used when `wrapping = true`; default: false
-- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization);
+- **`quantize_deg`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization);
   otherwise it must be finite and >= 1e-3 deg, else an error is raised
 
 ### Outputs:
@@ -160,20 +160,20 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
 Also in: [C++](../cpp/channel-statistics.md#calc_delay_spread) · [Python](../python/channel-statistics.md#calc_delay_spread)
 
-- Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; the default threshold
+- Paths with power below `p_max / 10^(0.1 * threshold_dB)` are excluded; the default
   of 100 dB effectively includes all paths
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have
   their powers summed before computing the spread; binning is applied before the spread calculation
 
 ### Usage:
 ```matlab
-[ ds, mean_delay ] = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
+[ ds, mean_delay ] = quadriga_lib.calc_delay_spread( delays, powers, threshold_dB, granularity );
 ```
 
 ### Inputs:
 - **`delays`** — Delays in [s] per CIR; `[n_path, n_cir]`
 - **`powers`** — Path powers on linear scale in [W]; `[n_path, n_cir]`
-- **`threshold`** — Power threshold in [dB] relative to strongest path; paths below threshold are excluded; default: 100
+- **`threshold_dB`** — Power threshold in [dB] relative to strongest path; paths below it are excluded; default: 100
 - **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping); must be finite
   and non-negative; when > 0, all delays must be finite and the delay span / granularity must be below 2^53, else an
   error is raised

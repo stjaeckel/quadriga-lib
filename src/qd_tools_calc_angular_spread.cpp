@@ -106,8 +106,8 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
 - With wrapping (`wrapping = true`), the mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
 - When `calc_bank_angle = true` (with wrapping), an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
 - When `wrapping = false` (the default), spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
-- When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
-  `quantize` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
+- When `quantize_deg > 0`, paths within that angular distance are grouped and their powers summed before computing spreads;
+  `quantize_deg` must be 0 or a finite value >= 1e-3 deg (negative, NaN, Inf and smaller positive values throw).
 
 ## Declaration:
 ```
@@ -122,7 +122,7 @@ void quadriga_lib::calc_angular_spread(
     std::vector<arma::Col<dtype>> *theta = nullptr,
     bool wrapping = false,
     bool calc_bank_angle = false,
-    dtype quantize = (dtype)0);
+    dtype quantize_deg = (dtype)0);
 ```
 
 ## Inputs:
@@ -133,7 +133,7 @@ void quadriga_lib::calc_angular_spread(
   computing the spreads; if false, computes the spreads from the raw angles; default: `false`
 - **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when
   `wrapping = true`; default: `false`
-- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
+- **`quantize_deg`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping;
   otherwise it must be finite and >= 1e-3 deg, else `std::invalid_argument` is thrown
 
 ## Outputs:
@@ -157,7 +157,7 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
                                        std::vector<arma::Col<dtype>> *theta_out,
                                        bool wrapping,
                                        bool calc_bank_angle,
-                                       dtype quantize)
+                                       dtype quantize_deg)
 {
     arma::uword N = (arma::uword)az.size();
 
@@ -182,9 +182,9 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
             throw std::invalid_argument("Element " + std::to_string(n) + " of 'powers' must have the same length as 'az'.");
     }
 
-    // quantize: 0 (off) or a finite step >= 1e-3 deg, so that the bin count stays below 360 000 + 2
-    if (!(quantize == (dtype)0 || (std::isfinite(quantize) && quantize >= (dtype)1e-3)))
-        throw std::invalid_argument("Input 'quantize' must be 0 (off) or a finite value >= 1e-3 deg.");
+    // quantize_deg: 0 (off) or a finite step >= 1e-3 deg, so that the bin count stays below 360 000 + 2
+    if (!(quantize_deg == (dtype)0 || (std::isfinite(quantize_deg) && quantize_deg >= (dtype)1e-3)))
+        throw std::invalid_argument("Input 'quantize_deg' must be 0 (off) or a finite value >= 1e-3 deg.");
 
     qd_check_alias(phi_out, "phi", &az, &el, &powers);
     qd_check_alias(theta_out, "theta", &az, &el, &powers);
@@ -197,7 +197,7 @@ void quadriga_lib::calc_angular_spread(const std::vector<arma::Col<dtype>> &az,
             qd_check_alias(elevation_spread, "elevation_spread", &az[n], &el[n], &powers[n]),
             qd_check_alias(orientation, "orientation", &az[n], &el[n], &powers[n]);
 
-    dtype quantize_rad = quantize * (dtype)(3.14159265358979323846 / 180.0);
+    dtype quantize_rad = quantize_deg * (dtype)(3.14159265358979323846 / 180.0);
     dtype pi_val = (dtype)3.14159265358979323846;
 
     // --- Allocate outputs ---

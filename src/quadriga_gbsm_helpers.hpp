@@ -178,7 +178,7 @@ static inline void qd_gbsm_specular_point(const double *T, const double *R, doub
 // - The inner limit at 0 is QuaDRiGa's; the outer one is the library's: QuaDRiGa added the distance, height and
 //   elevation terms after its limit, so the std could become negative, which flips the sign of the realization and
 //   of its cross-correlations. The TR 38.901 files have no _kappa, _tau or _beta terms, so the outer limit never
-//   acts for them; the default sf_sigma of path_loss is always >= 0, as lsp_generate requires
+//   acts for them; the default sf_sigma_dB of path_loss is always >= 0, as lsp_generate requires
 // - The keys that do not exist for SF (SF_mu, SF_gamma, SF_epsilon, SF_zeta, SF_alpha) count as 0, so the SF mean
 //   is 0. A frequency term with P_gamma = 0 (P_delta = 0) contributes 0 to mu (s)
 // - The constructor reads the coefficients and evaluates the frequency terms at 'center_freq' for the LSPs in

@@ -15,7 +15,7 @@ SECTION!*/
 O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 - Draws for each UT one of the given penetration-loss models and evaluates its loss at each carrier
-  frequency; the caller adds `loss` to the path loss of the UT
+  frequency; the caller adds `loss_dB` to the path loss of the UT
 - Models of TR 38.901 v19.5.0: `low`, `high`, `low_A` (Table 7.4.3-2 with the materials of Table
   7.4.3-1), `legacy_6GHz` (Table 7.4.3-3, single-frequency UMa and UMi below 6 GHz), `car` and
   `car_metal` (clause 7.4.3.2, metallized windows)
@@ -31,7 +31,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
 
 ## Usage:
 ```
-[ loss, d2d_in, model_ind ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
+[ loss_dB, d2d_in, model_ind ] = quadriga_lib.o2i_loss( center_freq, rnd, models, weights, d2d_in_max );
 ```
 
 ## Inputs:
@@ -47,7 +47,7 @@ O2I building or car penetration loss of a set of UTs, TR 38.901 clause 7.4.3
   default: 25
 
 ## Outputs:
-- **`loss`** — Penetration loss in [dB]; `[n_ut, n_freq]`
+- **`loss_dB`** — Penetration loss in [dB]; `[n_ut, n_freq]`
 - **`d2d_in`** — Indoor 2D distance in [m], 0 for the car models; `[n_ut, 1]`
 - **`model_ind`** — Chosen model per UT, 1-based index into `models`; uint64; `[n_ut, 1]`
 
@@ -72,11 +72,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const double d2d_in_max = (nrhs < 5) ? 25.0 : qd_mex_get_scalar<double>(prhs[4], "d2d_in_max", 25.0);
 
     // Output allocation
-    arma::mat loss;
+    arma::mat loss_dB;
     arma::vec d2d_in;
     arma::uvec model_ind;
     if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&loss, rnd.n_rows, center_freq.n_elem);
+        plhs[0] = qd_mex_init_output(&loss_dB, rnd.n_rows, center_freq.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&d2d_in, rnd.n_rows);
     if (nlhs > 2)
@@ -87,7 +87,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uvec *p_model_index = (nlhs > 2) ? &model_ind : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::o2i_loss(center_freq, rnd, models, weights, loss, d2d_in_max, p_d2d_in, p_model_index));
+    CALL_QD(quadriga_lib::o2i_loss(center_freq, rnd, models, weights, loss_dB, d2d_in_max, p_d2d_in, p_model_index));
 
     // Model index: 0-based (C++) -> 1-based (MATLAB)
     if (nlhs > 2)

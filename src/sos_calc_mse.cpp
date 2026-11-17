@@ -25,16 +25,16 @@ Approximation error of the ACF of a set of sinusoids
   `n_dim = 3`: `n_dir` directions on a spiral (Fibonacci) lattice on the upper hemisphere,
   `sin(elevation) = ( i + 0.5 ) / n_dir`, azimuth `i · pi · ( 3 - sqrt(5) )`. A direction and its opposite
   give the same ACF
-- `mse_core`: error on the grid of [[sos_acf_approx]] against [[sos_acf_2d]], for the grid points within a
+- `mse_core_dB`: error on the grid of [[sos_acf_approx]] against [[sos_acf_2d]], for the grid points within a
   radius of `n_acf` grid steps around the center; for `n_dim = 3` the mean squared error is averaged over
   the three planes
-- `mse_all`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond `Dmax`
-- For `n_dim = 1`, `mse_core` is evaluated on the sample points `dist`, `mse_all` on the axis from
-  `-2·Dmax` to `2·Dmax`, and the return value equals `mse_core`
+- `mse_all_dB`: same on the complete grid, which extends to `2·Dmax` and has a target of 0 beyond `Dmax`
+- For `n_dim = 1`, `mse_core_dB` is evaluated on the sample points `dist`, `mse_all_dB` on the axis from
+  `-2·Dmax` to `2·Dmax`, and the return value equals `mse_core_dB`
 - `acf_tail`: approximated ACF, averaged over the test directions, at 2, 4, 10 and 20 times `Dmax`. The
   target is 0 there; sinusoids with a frequency near zero show up as a plateau of height
   `n_low / n_coeff`, which adds a constant offset to all values of a large area
-- `mse_core` and `mse_all` need the 2-D grids and are only computed when requested
+- `mse_core_dB` and `mse_all_dB` need the 2-D grids and are only computed when requested
 - A perfect fit has a mean squared error of 0 and is returned as +Inf dB; this happens for a target that
   the sinusoids reproduce exactly at all sample points, e.g. sinusoids at zero frequency and a target of 1
 - The test directions are evaluated in parallel; the result does not depend on the number of threads
@@ -46,8 +46,8 @@ dtype quadriga_lib::sos_calc_mse(
     const arma::Mat<dtype> &spatial_freq,
     const arma::Col<dtype> &acf,
     const arma::Col<dtype> &dist,
-    dtype *mse_core = nullptr,
-    dtype *mse_all = nullptr,
+    dtype *mse_core_dB = nullptr,
+    dtype *mse_all_dB = nullptr,
     arma::Col<dtype> *acf_tail = nullptr,
     arma::Mat<dtype> *test_dir = nullptr,
     arma::uword n_dir = 10);
@@ -60,8 +60,8 @@ dtype quadriga_lib::sos_calc_mse(
 - **`n_dir`** *(optional)* — Number of test directions; must be > 0; ignored for `n_dim = 1`
 
 ## Outputs:
-- **`mse_core`** *(optional)* — Error within the core radius in [dB]
-- **`mse_all`** *(optional)* — Error on the complete grid in [dB]
+- **`mse_core_dB`** *(optional)* — Error within the core radius in [dB]
+- **`mse_all_dB`** *(optional)* — Error on the complete grid in [dB]
 - **`acf_tail`** *(optional)* — Approximated ACF beyond the fitted range; `[4]`
 - **`test_dir`** *(optional)* — Test directions in [rad]; `[n_dir, 2]` with columns `{azimuth, elevation}`
   for `n_dim = 3`; `[n_dir, 1]` with the azimuth for `n_dim = 2`; empty for `n_dim = 1`
@@ -78,8 +78,8 @@ template <typename dtype>
 dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
                                  const arma::Col<dtype> &acf,
                                  const arma::Col<dtype> &dist,
-                                 dtype *mse_core,
-                                 dtype *mse_all,
+                                 dtype *mse_core_dB,
+                                 dtype *mse_all_dB,
                                  arma::Col<dtype> *acf_tail,
                                  arma::Mat<dtype> *test_dir,
                                  arma::uword n_dir)
@@ -92,7 +92,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
     qd_check_alias(acf_tail, "acf_tail", &spatial_freq, &acf, &dist);
     qd_check_alias(test_dir, "test_dir", &spatial_freq, &acf, &dist);
     qd_check_alias_outputs(acf_tail, "acf_tail", test_dir, "test_dir");
-    qd_check_alias_outputs(mse_core, "mse_core", mse_all, "mse_all");
+    qd_check_alias_outputs(mse_core_dB, "mse_core_dB", mse_all_dB, "mse_all_dB");
     if (!qd_sos_equally_spaced(dist))
         throw std::invalid_argument("Input 'dist' must be equally spaced.");
     if (n_dir == 0)
@@ -149,7 +149,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
         err += sq.at(i);
     const double mse = -10.0 * std::log10(err / (double)(n_test * n_acf));
 
-    if (mse_core != nullptr || mse_all != nullptr)
+    if (mse_core_dB != nullptr || mse_all_dB != nullptr)
     {
         const arma::mat freq_d = arma::conv_to<arma::mat>::from(spatial_freq);
         const arma::vec acf_d = arma::conv_to<arma::vec>::from(acf), dist_d = arma::conv_to<arma::vec>::from(dist);
@@ -191,10 +191,10 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
                 all += sum_all / (double)((2 * half + 1) * (2 * half + 1)) / (double)approx.n_slices;
             }
         }
-        if (mse_core != nullptr)
-            *mse_core = (n_dim == 1) ? (dtype)mse : (dtype)(-10.0 * std::log10(core));
-        if (mse_all != nullptr)
-            *mse_all = (dtype)(-10.0 * std::log10(all));
+        if (mse_core_dB != nullptr)
+            *mse_core_dB = (n_dim == 1) ? (dtype)mse : (dtype)(-10.0 * std::log10(core));
+        if (mse_all_dB != nullptr)
+            *mse_all_dB = (dtype)(-10.0 * std::log10(all));
     }
 
     if (acf_tail != nullptr)
@@ -232,7 +232,7 @@ dtype quadriga_lib::sos_calc_mse(const arma::Mat<dtype> &spatial_freq,
     return (dtype)mse;
 }
 
-template float quadriga_lib::sos_calc_mse(const arma::Mat<float> &spatial_freq, const arma::Col<float> &acf, const arma::Col<float> &dist, float *mse_core, float *mse_all,
+template float quadriga_lib::sos_calc_mse(const arma::Mat<float> &spatial_freq, const arma::Col<float> &acf, const arma::Col<float> &dist, float *mse_core_dB, float *mse_all_dB,
                                           arma::Col<float> *acf_tail, arma::Mat<float> *test_dir, arma::uword n_dir);
-template double quadriga_lib::sos_calc_mse(const arma::Mat<double> &spatial_freq, const arma::Col<double> &acf, const arma::Col<double> &dist, double *mse_core, double *mse_all,
+template double quadriga_lib::sos_calc_mse(const arma::Mat<double> &spatial_freq, const arma::Col<double> &acf, const arma::Col<double> &dist, double *mse_core_dB, double *mse_all_dB,
                                            arma::Col<double> *acf_tail, arma::Mat<double> *test_dir, arma::uword n_dir);

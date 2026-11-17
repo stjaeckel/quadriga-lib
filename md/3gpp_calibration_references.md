@@ -66,7 +66,7 @@ Points to know [V unless marked]:
 | `path_loss` (all scenarios, frequency terms) | Coupling-loss CDF of the large-scale campaigns at each frequency | The shift between the 6/30/70 GHz curves isolates the frequency terms |
 | `los_probability` | Shape (bimodality) of the coupling-loss CDF, geometry; InF clutter parameters | Indirect only, no LOS-fraction metric is reported [I] |
 | `o2i_loss` | UMa/UMi large-scale (50 % low / 50 % high loss); SMa 7 GHz (low-loss A, car window, 90 % residential / 10 % commercial) | SMa is the only campaign that checks the Rel-19 O2I variants |
-| SF (`lsp_generate` with `sf_sigma` of `path_loss`) | Tails of the coupling-loss CDF, geometry spread | |
+| SF (`lsp_generate` with `sf_sigma_dB` of `path_loss`) | Tails of the coupling-loss CDF, geometry spread | |
 | `lsp_generate` DS, ASD, ASA, ESD (ZSD), ESA (ZSA) | Serving-link spread CDFs of the full calibrations, InF spreads | The spreads come from the generated clusters and rays and are affected by serving-cell selection and the K-factor; an LSP-only check is approximate [I]: closest for DS and ZSD, worst for ASA/ASD in LOS |
 | ESD distance and height terms | ZSD CDF of the full calibration (UMa median about 1.8 to 1.9°, UMi about 0.9°) [V] | |
 | `eod_offset_deg` (ZOD offset) | No direct metric [I]: spreads are invariant to a common shift; the offset enters only coupling loss and SIR of the full calibration with a down-tilted array | CR 0043 postdates all calibrations: unit tests against TR Tables 7.5-7 to 7.5-12 are the only exact check |
