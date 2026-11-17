@@ -304,7 +304,7 @@ TEST_CASE("hdf5_create_file - input validation")
     }
     SECTION("file cannot be created")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_create_file("test_hdf5_no_such_dir/x.hdf5", 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_create_file("test_hdf5_no_such_dir/x.hdf5", 2), std::runtime_error);
     }
 }
 
@@ -345,7 +345,7 @@ TEST_CASE("hdf5_read_layout - input validation")
     SECTION("not an HDF5 file")
     {
         std::ofstream(f.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_layout(f.fn), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_layout(f.fn), std::runtime_error);
     }
 }
 
@@ -392,12 +392,12 @@ TEST_CASE("hdf5_reshape_layout - input validation")
 
     SECTION("missing file")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout("test_hdf5_reshape_missing.hdf5", 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout("test_hdf5_reshape_missing.hdf5", 1), std::runtime_error);
     }
     SECTION("not an HDF5 file")
     {
         std::ofstream(f.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout(f.fn, 65536), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout(f.fn, 65536), std::runtime_error);
     }
     SECTION("different number of slots, the layout is unchanged")
     {
@@ -892,7 +892,7 @@ TEST_CASE("hdf5_write_channel - input validation")
     {
         test_file g("test_hdf5_write_validation.txt");
         std::ofstream(g.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, g.fn), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, g.fn), std::runtime_error);
     }
     CHECK(arma::all(channel_ids(f.fn) == id_before));
 }
@@ -921,14 +921,14 @@ TEST_CASE("hdf5_read_channel - input validation")
 
     SECTION("missing file")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>("test_hdf5_read_channel_missing.hdf5"), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>("test_hdf5_read_channel_missing.hdf5"), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>("test_hdf5_read_channel_missing.hdf5"), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>("test_hdf5_read_channel_missing.hdf5"), std::runtime_error);
     }
     SECTION("not an HDF5 file")
     {
         std::ofstream(f.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(f.fn), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(f.fn), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(f.fn), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(f.fn), std::runtime_error);
     }
 }
 
@@ -1016,7 +1016,7 @@ TEST_CASE("hdf5_write_dset - input validation")
     SECTION("existing name, no overwrite")
     {
         std::any w = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "valid", &w, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "valid", &w, 1), std::runtime_error);
         CHECK(std::any_cast<arma::vec>(quadriga_lib::hdf5_read_dset(f.fn, "valid", 1)).n_elem == 2);
     }
     SECTION("index out of range in each dimension")
@@ -1030,7 +1030,7 @@ TEST_CASE("hdf5_write_dset - input validation")
     {
         test_file g("test_hdf5_write_dset_validation.txt");
         std::ofstream(g.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(g.fn, "a", &v), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(g.fn, "a", &v), std::runtime_error);
     }
     CHECK(arma::all(channel_ids(f.fn) == id_before));
     CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr, 1) == 1);
@@ -1062,12 +1062,12 @@ TEST_CASE("hdf5_read_dset - input validation")
 
     SECTION("missing file")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset("test_hdf5_read_dset_missing.hdf5", "a"), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset("test_hdf5_read_dset_missing.hdf5", "a"), std::runtime_error);
     }
     SECTION("not an HDF5 file")
     {
         std::ofstream(f.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(f.fn, "a"), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(f.fn, "a"), std::runtime_error);
     }
 }
 
@@ -1112,16 +1112,16 @@ TEST_CASE("hdf5_read_dset_names - input validation")
 
     SECTION("missing file")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names("test_hdf5_read_dset_names_missing.hdf5", nullptr), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names("test_hdf5_read_dset_names_missing.hdf5", nullptr), std::runtime_error);
     }
     SECTION("not an HDF5 file")
     {
         std::ofstream(f.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr), std::runtime_error);
     }
 }
 
-TEST_CASE("hdf5_write_channel - files that cannot be opened for writing throw std::invalid_argument")
+TEST_CASE("hdf5_write_channel - files that cannot be opened for writing throw std::runtime_error")
 {
     test_file f("test_hdf5_read_only.hdf5");
     quadriga_lib::hdf5_create_file(f.fn, 2);
@@ -1135,10 +1135,10 @@ TEST_CASE("hdf5_write_channel - files that cannot be opened for writing throw st
     {
         auto c = small_channel("c");
         std::any v = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, f.fn), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout(f.fn, 1, 2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_create_file(f.fn, 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, f.fn), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout(f.fn, 1, 2), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_create_file(f.fn, 2), std::runtime_error);
         CHECK(arma::all(quadriga_lib::hdf5_read_layout(f.fn) == arma::u32_vec({2, 1, 1, 1})));
     }
     fs::permissions(f.fn, fs::perms::owner_write, fs::perm_options::add);

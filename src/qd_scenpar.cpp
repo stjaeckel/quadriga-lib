@@ -269,37 +269,38 @@ static const char *qd_scenpar_check_value(qd_scenpar_class cls, double v)
 
 // Value checks of a complete parameter set, 'val' has qd_scenpar_n_key elements in table order
 // - 'fn' and 'line' (1-based line per key, 0 = not in the file) are used for the messages of the file reader
-// - Throws std::invalid_argument at the first violation
+// - Throws at the first violation: std::invalid_argument for a parameter set from the arguments, std::runtime_error
+//   with file name and line for one read from a file
 static void qd_scenpar_check(const double *val, const std::string &fn = "", const arma::uword *line = nullptr)
 {
     // From the reader a failing key always has a line: defaults pass every check, the cross-key checks name a key
     // that was set in the file
-    auto where = [&fn](arma::uword ln) -> std::string
-    { return fn.empty() ? "" : fn + ", line " + std::to_string(ln) + ": "; };
+    auto fail = [&fn, line](arma::uword i_key, const std::string &msg)
+    {
+        if (fn.empty())
+            throw std::invalid_argument(msg);
+        throw std::runtime_error(fn + ", line " + std::to_string(line == nullptr ? 0 : line[i_key]) + ": " + msg);
+    };
 
     for (arma::uword i = 0; i < qd_scenpar_n_key; ++i)
     {
         const char *rule = qd_scenpar_check_value(qd_scenpar_keys[i].cls, val[i]);
         if (rule != nullptr)
-            throw std::invalid_argument(where(line == nullptr ? 0 : line[i]) + "Value of '" +
-                                        qd_scenpar_keys[i].name + "' " + rule + ".");
+            fail(i, std::string("Value of '") + qd_scenpar_keys[i].name + "' " + rule + ".");
     }
 
     // Checks that involve two keys
     const arma::uword i_ncl = qd_scenpar_find("NumClusters"), i_min = qd_scenpar_find("NumClusters_min");
     if (val[i_min] > val[i_ncl])
-        throw std::invalid_argument(where(line == nullptr ? 0 : line[i_min]) +
-                                    "Value of 'NumClusters_min' must not exceed 'NumClusters'.");
+        fail(i_min, "Value of 'NumClusters_min' must not exceed 'NumClusters'.");
 
     const arma::uword i_alpha = qd_scenpar_find("NF_alpha"), i_beta = qd_scenpar_find("NF_beta");
     if ((val[i_alpha] > 0.0) != (val[i_beta] > 0.0))
-        throw std::invalid_argument(where(line == nullptr ? 0 : line[val[i_alpha] > 0.0 ? i_alpha : i_beta]) +
-                                    "Values of 'NF_alpha' and 'NF_beta' must be both 0 or both > 0.");
+        fail(val[i_alpha] > 0.0 ? i_alpha : i_beta, "Values of 'NF_alpha' and 'NF_beta' must be both 0 or both > 0.");
 
     const arma::uword i_vs = qd_scenpar_find("DS_VS"), i_vsa = qd_scenpar_find("DS_VS_a"), i_vsb = qd_scenpar_find("DS_VS_b");
     if (val[i_vs] > 0.0 && val[i_vsa] == 0.0 && val[i_vsb] == 0.0)
-        throw std::invalid_argument(where(line == nullptr ? 0 : line[i_vs]) +
-                                    "Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.");
+        fail(i_vs, "Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.");
 }
 
 // LSP cross-correlation matrix from a complete parameter set, 'X' has 64 elements (8 x 8, symmetric)
@@ -813,7 +814,7 @@ Read and validate a QuaDRiGa scenario configuration file
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read
   independent of the global locale; `Inf`, `+Inf` and `-Inf` in any case
 - Throws `std::runtime_error` if the file cannot be opened or is a directory
-- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment and not
+- Throws `std::runtime_error` with file name and line number for a line that is not blank, not a comment and not
   a well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required
   or the reverse, text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a
   `ShortName` value stated twice), and with `validate = true` for a value that fails [[scenpar_validate]]
@@ -896,9 +897,9 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
     {
         const qd_conf_num res = qd_conf_parse_number(text, v);
         if (res == QD_NUM_RANGE)
-            throw std::invalid_argument(where + "Value of '" + key + "' is out of range.");
+            throw std::runtime_error(where + "Value of '" + key + "' is out of range.");
         if (res != QD_NUM_OK)
-            throw std::invalid_argument(where + "Value of '" + key + "' is not a number.");
+            throw std::runtime_error(where + "Value of '" + key + "' is not a number.");
     };
 
     std::string key, value;
@@ -910,35 +911,35 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
         if (kind == 0)
             continue;
         if (kind == 2)
-            throw std::invalid_argument(where + "Line is not a comment and has no '='.");
+            throw std::runtime_error(where + "Line is not a comment and has no '='.");
         if (kind == 3)
-            throw std::invalid_argument(where + "Text before the '=' must be one key name.");
+            throw std::runtime_error(where + "Text before the '=' must be one key name.");
 
         if (key == "ShortName")
         {
             if (!qd_conf_is_name(value))
-                throw std::invalid_argument(where + "Value of 'ShortName' must be one name.");
+                throw std::runtime_error(where + "Value of 'ShortName' must be one name.");
             if (!short_set.insert(value).second)
-                throw std::invalid_argument(where + "ShortName '" + value + "' is stated twice.");
+                throw std::runtime_error(where + "ShortName '" + value + "' is stated twice.");
             l_short_names.push_back(value);
         }
         else if (key.compare(0, 3, "PL_") == 0)
         {
             const std::string name = key.substr(3);
             if (name.empty())
-                throw std::invalid_argument(where + "Key 'PL_' has no parameter name.");
+                throw std::runtime_error(where + "Key 'PL_' has no parameter name.");
 
             if (name == "model")
             {
                 if (!qd_conf_is_name(value))
-                    throw std::invalid_argument(where + "Value of 'PL_model' must be one name.");
+                    throw std::runtime_error(where + "Value of 'PL_model' must be one name.");
                 l_pl_model = value;
                 continue;
             }
 
             const std::vector<std::string> tok = qd_conf_tokens(value);
             if (tok.empty())
-                throw std::invalid_argument(where + "Value of '" + key + "' is missing.");
+                throw std::runtime_error(where + "Value of '" + key + "' is missing.");
 
             std::vector<double> v(tok.size());
             for (size_t i = 0; i < tok.size(); ++i)
@@ -951,8 +952,8 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
         else if (key == "SubpathMethod") // Line of QuaDRiGa's files, accepted and ignored
         {
             if (value != "legacy")
-                throw std::invalid_argument(where + "Value '" + value +
-                                            "' of 'SubpathMethod' is not supported; only 'legacy' is accepted.");
+                throw std::runtime_error(where + "Value '" + value +
+                                         "' of 'SubpathMethod' is not supported; only 'legacy' is accepted.");
         }
         else
         {
@@ -964,7 +965,7 @@ bool quadriga_lib::conf_file_read(const std::string &fn,
                 continue;
             }
             if (value.empty())
-                throw std::invalid_argument(where + "Value of '" + key + "' is missing.");
+                throw std::runtime_error(where + "Value of '" + key + "' is missing.");
             number(value, val[ind], where, key);
             val_line[ind] = i_line + 1;
         }
@@ -1088,8 +1089,8 @@ List the scenarios defined by the conf files in a set of directories
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
 - With `parse_shortnames = true` every line `ShortName = name` that is not a comment adds an entry right after its
   file; other lines are not examined
-- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier short
-  name, or if a `ShortName` value is not one name; `std::runtime_error` if a listed file cannot be opened
+- Throws `std::runtime_error` if a short name equals an earlier entry, if a file name equals an earlier short
+  name, if a `ShortName` value is not one name, or if a listed file cannot be opened
 - A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
   current directory. A failed call leaves the outputs untouched
 
@@ -1163,8 +1164,8 @@ arma::uword quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
             if (file_set.count(scen) != 0) // Defined by an earlier directory
                 continue;
             if (short_set.count(scen) != 0)
-                throw std::invalid_argument("File name '" + name + "' is ambiguous, an earlier file defines '" +
-                                            scen + "' as its short name.");
+                throw std::runtime_error("File name '" + name + "' is ambiguous, an earlier file defines '" +
+                                         scen + "' as its short name.");
 
             file_set.insert(scen);
             l_scenarios.push_back(scen);
@@ -1184,9 +1185,9 @@ arma::uword quadriga_lib::conf_file_list(const std::vector<std::string> &dirs,
 
                 const std::string where = fn + ", line " + std::to_string(i_line + 1) + ": ";
                 if (!qd_conf_is_name(value))
-                    throw std::invalid_argument(where + "Value of 'ShortName' must be one name.");
+                    throw std::runtime_error(where + "Value of 'ShortName' must be one name.");
                 if (file_set.count(value) != 0 || short_set.count(value) != 0)
-                    throw std::invalid_argument(where + "ShortName '" + value + "' is ambiguous.");
+                    throw std::runtime_error(where + "ShortName '" + value + "' is ambiguous.");
 
                 short_set.insert(value);
                 l_scenarios.push_back(value);
@@ -1286,9 +1287,9 @@ void quadriga_lib::conf_file_write(const std::string &fn,
     // The path-loss section has the formula blocks of logdist, dual_slope, nlos and tripple_slope, then PL_model and
     // the plpar keys with the prefix PL_, known keys with a comment that can depend on the model.
 
-    // Input validation
+    // Input validation; an empty file name cannot be opened (checked here, before a temporary file is written)
     if (fn.empty())
-        throw std::invalid_argument("Input 'fn' cannot be empty.");
+        throw std::runtime_error("Cannot open file '' for writing.");
 
     // Scenario name in the header: the file name without the extension ".conf"
     std::string scenario = std::filesystem::path(fn).filename().string();

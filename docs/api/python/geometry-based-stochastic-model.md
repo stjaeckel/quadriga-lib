@@ -41,8 +41,8 @@ meaning and unit of each key; [conf_file_write](#conf_file_write) with `write_de
 these comments. Every function that takes `scenpar` accepts the dict of [conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate) or
 any subset of its keys (`None` = all defaults), completes a copy with the defaults of missing keys and validates it with
 [scenpar_validate](#scenpar_validate), whose messages pass through, also for keys the function does not use. A key `SubpathMethod`
-(QuaDRiGa's structs) must be `"legacy"`. Invalid input raises `ValueError`, a failure to read or write a file
-`RuntimeError`.
+(QuaDRiGa's structs) must be `"legacy"`. Invalid input raises `ValueError`, a problem with a file's access or
+content `RuntimeError`.
 
 **Workflow** for one drop of a set of links (terms: see Terms below):
 
@@ -141,8 +141,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#conf_file_list) · [MAT
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
 - With `parse_shortnames = True` every line `ShortName = name` that is not a comment adds an entry right after its file;
   other lines are not examined
-- Raises `ValueError` if a short name equals an earlier entry, if a file name equals an earlier short name, or if a
-  `ShortName` value is not one name; `RuntimeError` if a listed file cannot be opened
+- Raises `RuntimeError` if a short name equals an earlier entry, if a file name equals an earlier short name, if a
+  `ShortName` value is not one name, or if a listed file cannot be opened
 - A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string `""` is the
   current directory
 
@@ -183,11 +183,11 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#conf_file_read) · [MAT
 - Any other key is reported in `ignored_keys` and its value is not examined; this includes the QuaDRiGa key `GR_epsilon`
   (the complex ground permittivity comes from [lsp_generate](#lsp_generate)). A key stated more than once has its last value
 - The line `SubpathMethod = legacy` of QuaDRiGa's files is accepted and ignored; another value of `SubpathMethod` raises
-  `ValueError`, also with `validate = False`
+  `RuntimeError`, also with `validate = False`
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read independent of
   the locale; `Inf`, `+Inf` and `-Inf` in any case
 - Raises `RuntimeError` if the file cannot be opened or is a directory
-- Raises `ValueError` with file name and line number for a line that is not blank, not a comment and not a well-formed
+- Raises `RuntimeError` with file name and line number for a line that is not blank, not a comment and not a well-formed
   assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required or the reverse,
   text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a `ShortName` value
   stated twice), and with `validate = True` for a value that fails [scenpar_validate](#scenpar_validate)

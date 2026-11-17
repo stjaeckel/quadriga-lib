@@ -260,11 +260,9 @@ class test_case(unittest.TestCase):
         npt.assert_equal(mtl_names[0], "itu_wood")
 
         # Missing file raises
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(RuntimeError) as context:
             quadriga_lib.RTtools.obj_file_read("bla.obj")
-        self.assertEqual(
-            str(context.exception), "Error opening file: 'bla.obj' does not exist."
-        )
+        self.assertIn("'bla.obj' does not exist", str(context.exception))
 
         os.remove(fn)
 
@@ -336,14 +334,14 @@ class test_case(unittest.TestCase):
 
         create_cube_with_materials(fn, "custom_material_1")
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
 
         # Non-existent CSV file -> error
         cleanup(fn, csv_fn)
         create_cube_with_materials(fn, "custom_material_1")
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             quadriga_lib.RTtools.obj_file_read(fn, "nonexistent.csv")
 
         cleanup(fn, csv_fn)
@@ -483,7 +481,7 @@ class test_case(unittest.TestCase):
             npt.assert_(np.all(csv_ind == 0))                      # resolved to no material
 
             # strict: raises because the material is absent from the table
-            with self.assertRaises(ValueError):
+            with self.assertRaises(RuntimeError):
                 quadriga_lib.RTtools.obj_file_read(fn, "", True)
         finally:
             if os.path.isfile(fn):

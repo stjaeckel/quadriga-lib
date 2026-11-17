@@ -39,7 +39,7 @@ SECTION!*/
 //   link of the new channel group, 'ChannelRef' and 'Order' of the slot, and (overwrite) the removal of the old link.
 //   Every intermediate state is a valid file. All inputs and all file structures a writer needs are checked before
 //   the first byte is written.
-// - Malformed files give std::invalid_argument, failing writes std::runtime_error.
+// - Problems with the file (missing, cannot be opened, malformed, unsupported, failing writes) give std::runtime_error.
 
 // Element type of a numeric unstructured data type (type IDs of quadriga_lib::any_type_id); false if unsupported
 static bool qHDF_par_type(int datatype_id, h5::dtype &t)
@@ -123,7 +123,7 @@ static bool qHDF_open(qHDF_file &h, const std::string &fn, bool update, const ch
     {
         if (!h5::file::exists(fn))
             return false;
-        throw std::invalid_argument(open_error);
+        throw std::runtime_error(open_error);
     }
     const h5::superblock sb = h5::read_superblock(h.f);
     h.eof = sb.eof;
@@ -175,11 +175,11 @@ static bool qHDF_open(qHDF_file &h, const std::string &fn, bool update, const ch
     uint8_t value[16];
     h5::read_raw(h.f, d, value);
     if (h5::get_le(value, 4) != 3)
-        throw std::invalid_argument("Unsupported channel file version " + std::to_string(h5::get_le(value, 4)) +
-                                    "; this version of quadriga-lib reads version 3 only.");
+        throw std::runtime_error("Unsupported channel file version " + std::to_string(h5::get_le(value, 4)) +
+                                 "; this version of quadriga-lib reads version 3 only.");
 
     // Storage index: layout, then 'Order' and 'ChannelRef' with one contiguous entry per slot
-    const std::invalid_argument corrupted("Storage index in HDF file is corrupted.");
+    const std::runtime_error corrupted("Storage index in HDF file is corrupted.");
     d = root_dataset(0);
     if (d.type != h5::uint32 || d.rank != 1 || d.dims[0] != 4 || d.compact)
         throw corrupted;
@@ -539,7 +539,7 @@ void quadriga_lib::hdf5_create_file(const std::string &fn, unsigned nx, unsigned
 
     h5::file f;
     if (!f.open(fn, "wb"))
-        throw std::invalid_argument("Error creating file. It may be already opened.");
+        throw std::runtime_error("Error creating file. It may be already opened.");
 
     // Root chunk 0 with the links to the root datasets and room for the directory of the root links; the datasets
     // follow it: 'ChannelDims', 'Version', 'Order' (all slots empty), 'ChannelRef' (null references)
@@ -813,7 +813,7 @@ int quadriga_lib::hdf5_write_channel(const quadriga_lib::channel<dtype> *ch, con
         names.push_back("par_" + ch->par_names[i]);
         qHDF_check_par(names[i], &ch->par_data[i]);
         if (!unique.insert(names[i]).second)
-            throw std::invalid_argument("Dataset '" + names[i] + "' already exists.");
+            throw std::invalid_argument("Input 'par_names' contains '" + ch->par_names[i] + "' twice.");
     }
 
     // Open the file (created with the default layout if it does not exist), the slot and its old channel group
@@ -823,7 +823,7 @@ int quadriga_lib::hdf5_write_channel(const quadriga_lib::channel<dtype> *ch, con
     {
         quadriga_lib::hdf5_create_file(fn);
         if (!qHDF_open(h, fn, true, open_error)) // Only if the file was removed in between
-            throw std::invalid_argument(open_error);
+            throw std::runtime_error(open_error);
     }
     const long long slot = qHDF_slot(h, ix, iy, iz, iw);
     if (slot < 0)
@@ -873,7 +873,7 @@ Read a channel object from an HDF5 file at a specified 4D index
 - Round trip with [[hdf5_write_channel]]: every per-snapshot field comes back with one entry per snapshot, also for
   snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
   with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
-- Throws `std::invalid_argument` if the file is malformed (e.g. a dataset does not have the size given by the
+- Throws `std::runtime_error` if the file is malformed (e.g. a dataset does not have the size given by the
   attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3
   written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified
   with other HDF5 tools are not supported and may be rejected.
@@ -911,7 +911,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(const std::string &
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
-        throw std::invalid_argument("File does not exist.");
+        throw std::runtime_error("File does not exist.");
     const uint64_t ref = qHDF_channel_ref(h, qHDF_slot(h, ix, iy, iz, iw));
     if (ref == 0)
         return quadriga_lib::channel<dtype>();
@@ -1211,14 +1211,14 @@ MD!*/
 void quadriga_lib::hdf5_reshape_layout(const std::string &fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
     if (!h5::file::exists(fn))
-        throw std::invalid_argument("File does not exist.");
+        throw std::runtime_error("File does not exist.");
 
     // Checked in 64 bits, before the file is opened
     const unsigned long long n_data_new = qHDF_slot_count(nx, ny, nz, nw);
 
     qHDF_file h;
     if (!qHDF_open(h, fn, true)) // Only if the file was removed in between
-        throw std::invalid_argument("File does not exist.");
+        throw std::runtime_error("File does not exist.");
     if (n_data_new != h.n_slot)
         throw std::invalid_argument("Mismatch in number of elements in storage index.");
 
@@ -1281,7 +1281,7 @@ std::any quadriga_lib::hdf5_read_dset(const std::string &fn, const std::string &
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
-        throw std::invalid_argument("File does not exist.");
+        throw std::runtime_error("File does not exist.");
     qHDF_group data;
     if (!qHDF_read_data_group(h, ix, iy, iz, iw, data))
         return std::any();
@@ -1333,7 +1333,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(const std::string &fn, std::vecto
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
-        throw std::invalid_argument("File does not exist.");
+        throw std::runtime_error("File does not exist.");
     qHDF_group data;
     if (!qHDF_read_data_group(h, ix, iy, iz, iw, data))
         return 0ULL;
@@ -1410,7 +1410,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &par
     {
         quadriga_lib::hdf5_create_file(fn);
         if (!qHDF_open(h, fn, true)) // Only if the file was removed in between
-            throw std::invalid_argument("Error opening file.");
+            throw std::runtime_error("Error opening file.");
     }
     const long long slot = qHDF_slot(h, ix, iy, iz, iw);
     if (slot < 0)
@@ -1443,7 +1443,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &par
         data.load(h.f, data_link->target, h.eof);
         qHDF_check_chunks(h, data.ranges());
         if (data.find(name) != nullptr)
-            throw std::invalid_argument("Dataset '" + name + "' already exists.");
+            throw std::runtime_error("Dataset '" + name + "' already exists.");
         data.check_insert(name.size(), true);
     }
     else

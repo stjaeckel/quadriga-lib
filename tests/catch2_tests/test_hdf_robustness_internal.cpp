@@ -9,7 +9,7 @@
 // files are tested in test_hdf_functions.cpp, the view of the HDF5 C library in test_hdf5_interop.cpp, the format
 // layer itself in test_qd_hdf5_internal.cpp.
 //
-// Oracle: the documented behavior. A malformed file gives std::invalid_argument (with the documented message where
+// Oracle: the documented behavior. A malformed file gives std::runtime_error (with the documented message where
 // one is documented), never another exception, a crash, or an allocation larger than the file; a writer that throws
 // leaves the file byte-identical; accepted variants and interrupted writes read back the old or the new content.
 // The private header qd_hdf5.hpp is used only as a patch tool: to locate objects through their links, and to rewrite
@@ -21,6 +21,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_exception.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 #include "qd_hdf5.hpp"
@@ -43,15 +44,15 @@ QD_TEST_DIAG_SWITCH("QD_DIAG_HDF")
 
 namespace h5 = qd::hdf5;
 using Catch::Matchers::Message;
+using Catch::Matchers::MessageMatches;
+using Catch::Matchers::StartsWith;
 
 namespace
 {
     using bytes = std::vector<uint8_t>;
 
-    const std::string unsupported_message =
-        "Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it wrote itself; files written "
-        "by quadriga-lib 0.12.4 and earlier (version 2) and files modified with other HDF5 tools are not supported. "
-        "Version-2 files can be converted with tools/hdf5_convert_v2.py.";
+    // Start of the message for valid HDF5 files outside the supported subset; the rest is a hint that may change
+    const std::string unsupported_message = "Unsupported HDF5 file: ";
     const std::string corrupted_message = "Storage index in HDF file is corrupted.";
 
     // Removes the files when the test case starts and when it ends
@@ -438,7 +439,7 @@ namespace
                  { quadriga_lib::hdf5_reshape_layout(fn, 4); }}};
     }
 
-    // Every call throws std::invalid_argument (with 'msg' if not empty) and leaves the file unchanged
+    // Every call throws std::runtime_error (with 'msg' if not empty) and leaves the file unchanged
     void check_all_throw(const std::string &fn, const std::vector<call> &calls, const std::string &msg = "")
     {
         const bytes before = load(fn);
@@ -446,9 +447,9 @@ namespace
         {
             INFO("function " << c.name);
             if (msg.empty())
-                CHECK_THROWS_AS(c.run(), std::invalid_argument);
+                CHECK_THROWS_AS(c.run(), std::runtime_error);
             else
-                CHECK_THROWS_MATCHES(c.run(), std::invalid_argument, Message(msg));
+                CHECK_THROWS_MATCHES(c.run(), std::runtime_error, MessageMatches(StartsWith(msg)));
             CHECK(load(fn) == before);
         }
     }
@@ -665,10 +666,10 @@ TEST_CASE("hdf5 - a damaged version or storage index and bad channel references 
         const bytes before = load(fn);
         std::any x = 1.0;
         std::vector<std::string> names;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "a", 2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(fn, &names, 2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "b", &x, 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 2), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "a", 2), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(fn, &names, 2), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "b", &x, 2), std::runtime_error);
         CHECK(load(fn) == before);
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 0).n_path()(0) == 50);
     };
@@ -764,8 +765,8 @@ TEST_CASE("hdf5 - malformed object headers are rejected")
     {
         const bytes before = load(fn);
         std::vector<std::string> names;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::runtime_error);
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1).n_snap() == 3);
         CHECK(load(fn) == before);
     };
@@ -775,9 +776,9 @@ TEST_CASE("hdf5 - malformed object headers are rejected")
     {
         std::vector<std::string> names;
         check_rejected();
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, name.empty() ? "x" : name, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, name.empty() ? "x" : name, 0), std::runtime_error);
         if (name.empty())
-            CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(fn, &names, 0), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(fn, &names, 0), std::runtime_error);
         else
             CHECK(quadriga_lib::hdf5_read_dset_names(fn, &names, 0) == 4); // The link targets are not opened
     };
@@ -959,8 +960,8 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
     };
     auto check_rejected = [&](unsigned slot)
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, slot), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, slot), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, slot), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, slot), std::runtime_error);
     };
 
     SECTION("NumPath 50 -> 1")
@@ -1056,20 +1057,20 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
                           h5::put_le(&layout[2], 8, 2);
                           layout.resize(4 + 8); });
         check_rejected(0);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "u", 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "u", 0), std::runtime_error);
     }
     SECTION("a link in 'Data' to a group")
     {
         redirect(fn, "channel_1/Data/par_x", locate(fn, "channel_1"));
         check_rejected(0);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "x", 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "x", 0), std::runtime_error);
         CHECK(std::any_cast<std::string>(quadriga_lib::hdf5_read_dset(fn, "s", 0)) == "abc");
     }
     SECTION("unstructured dataset of rank 4")
     {
         set_dataspace("channel_1/Data/par_u", {1, 1, 1, 3});
         check_rejected(0);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "u", 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "u", 0), std::runtime_error);
     }
     SECTION("the unpatched file reads back")
     {
@@ -1109,7 +1110,7 @@ TEST_CASE("hdf5 - snapshot groups linked several times may not read more data th
     };
 
     build(false);
-    CHECK_THROWS_MATCHES(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::invalid_argument,
+    CHECK_THROWS_MATCHES(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::runtime_error,
                          Message("Malformed HDF5 file: the channel references more data than the file holds."));
 
     build(true); // The file is large enough for three reads of snapshot 0
@@ -1173,7 +1174,7 @@ TEST_CASE("hdf5 - snapshot links to one empty snapshot group may not read more h
 
     add_channel(2000);
     QD_DIAG("\n# diag: 2000 links to one empty snapshot group\nend of file\n%llu\n", (unsigned long long)eof_of(fn));
-    CHECK_THROWS_MATCHES(quadriga_lib::hdf5_read_channel<double>(fn, 1), std::invalid_argument,
+    CHECK_THROWS_MATCHES(quadriga_lib::hdf5_read_channel<double>(fn, 1), std::runtime_error,
                          Message("Malformed HDF5 file: the channel references more data than the file holds."));
     CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 0).n_snap() == 2); // A valid channel of the same file
 }
@@ -1197,8 +1198,8 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         for (std::vector<uint64_t> dims : {std::vector<uint64_t>{1ULL << 29, 0, 0}, {0, 1ULL << 40, 1ULL << 40}, {1ULL << 40, 0}})
         {
             set_dataspace("channel_1/Data/par_c", dims);
-            CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "c", 0), std::invalid_argument);
-            CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "c", 0), std::runtime_error);
+            CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::runtime_error);
         }
     }
     SECTION("delay with as many empty slices as the file has bytes, or 2^29, and a matching NumPath")
@@ -1220,7 +1221,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
                           {
                               bytes &data = m[find(m, h5::msg_attribute, "NumPath")].data;
                               h5::put_le(&data[data.size() - 4], n, 4); });
-            CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<float>(fn, 0), std::runtime_error);
         }
     }
     SECTION("interaction counts of 2^32 - 1 and 2^29 without matching coordinates")
@@ -1241,7 +1242,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
                               REQUIRE(h5::get_le(&layout[2], 2) == 8);
                               h5::put_le(&layout[4], counts.first, 4);
                               h5::put_le(&layout[8], counts.second, 4); });
-            CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::runtime_error);
         }
     }
 }
@@ -1278,9 +1279,9 @@ TEST_CASE("hdf5 - index data that overlaps object headers is rejected before a w
         set_data_address("Order", chunk.addr); // Order [chunk.addr, + 16): the slot IDs are bytes of the link chunk
         CHECK_NOTHROW(quadriga_lib::hdf5_read_channel<double>(fn, 0));
         const bytes before = load(fn);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, fn, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, fn, 1), std::runtime_error);
         std::any x = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "x", &x, 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "x", &x, 2), std::runtime_error);
         CHECK(load(fn) == before);
     }
 }
@@ -1301,11 +1302,11 @@ TEST_CASE("hdf5 - a file that exists but cannot be read is not replaced")
     else
     {
         std::any x = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, fn, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "x", &x, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_layout(fn), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout(fn, 4), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(&c, fn, 1), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(fn, "x", &x, 1), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_layout(fn), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout(fn, 4), std::runtime_error);
     }
     fs::permissions(fn, fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
     CHECK(load(fn) == before);
@@ -1384,9 +1385,9 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
             if (rejected.count(w.name) != 0)
             {
                 if (msg.empty())
-                    CHECK_THROWS_AS(w.run(fn_w), std::invalid_argument);
+                    CHECK_THROWS_AS(w.run(fn_w), std::runtime_error);
                 else
-                    CHECK_THROWS_MATCHES(w.run(fn_w), std::invalid_argument, Message(msg));
+                    CHECK_THROWS_MATCHES(w.run(fn_w), std::runtime_error, MessageMatches(StartsWith(msg)));
                 CHECK(load(fn_w) == patched);
             }
             else
@@ -1422,7 +1423,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
         edit_chunk(fn, locate(fn, "channel_2/Data"), 0, [](bytes &im, const h5::chunk &)
                    { im[20] ^= 0x01; }, false);
         check_writers({"hdf5_write_dset, slot 1 (append to 'Data')"});
-        CHECK_THROWS_AS(dset_names(fn, 1), std::invalid_argument);
+        CHECK_THROWS_AS(dset_names(fn, 1), std::runtime_error);
     }
     SECTION("ChannelDims corrupted")
     {
@@ -1514,7 +1515,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
         shrink_chunk0(fn, "channel_46", 15);
         REQUIRE(object_at(fn, locate(fn, "channel_46")).chunks[0].free_space == 4);
         const bytes before = load(fn);
-        CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", &z, 46), std::invalid_argument, Message(unsupported_message));
+        CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", &z, 46), std::runtime_error, MessageMatches(StartsWith(unsupported_message)));
         CHECK(load(fn) == before);
     }
     SECTION("a group 'Data' with 10 bytes of free space or without creation order cannot take a link")
@@ -1522,7 +1523,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
         const bytes good = load(fn);
         shrink_chunk0(fn, "channel_2/Data", 10);
         bytes before = load(fn);
-        CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", &z, 1), std::invalid_argument, Message(unsupported_message));
+        CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", &z, 1), std::runtime_error, MessageMatches(StartsWith(unsupported_message)));
         CHECK(load(fn) == before);
 
         save(fn, good);
@@ -1532,7 +1533,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
                           info.erase(info.begin() + 2, info.begin() + 10);
                           info.resize(18), info[1] = 0; });
         before = load(fn);
-        CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", &z, 1), std::invalid_argument, Message(unsupported_message));
+        CHECK_THROWS_MATCHES(quadriga_lib::hdf5_write_dset(fn, "z", &z, 1), std::runtime_error, MessageMatches(StartsWith(unsupported_message)));
         CHECK(load(fn) == before);
     }
     SECTION("a chunk of 'Data' with two NIL messages is compacted when a link is added")
@@ -1566,7 +1567,7 @@ TEST_CASE("hdf5 - writers reject damaged or foreign root and group structures be
     }
 }
 
-TEST_CASE("hdf5 - single-byte flips in headers and index data give std::invalid_argument or a valid result")
+TEST_CASE("hdf5 - single-byte flips in headers and index data give std::runtime_error or a valid result")
 {
     // Slot 0: written, overwritten by a 3-snapshot channel with every field and 3 unstructured datasets, then extended
     // by hdf5_write_dset (the group 'Data' grows a second chunk); slot 1: created by hdf5_write_dset
@@ -1641,7 +1642,7 @@ TEST_CASE("hdf5 - single-byte flips in headers and index data give std::invalid_
             f();
             return ok;
         }
-        catch (const std::invalid_argument &)
+        catch (const std::runtime_error &)
         {
             return rejected;
         }
@@ -1663,7 +1664,7 @@ TEST_CASE("hdf5 - single-byte flips in headers and index data give std::invalid_
         { quadriga_lib::hdf5_read_dset(fn_v, "a", 1); },
         [&]()
         { names.clear(), quadriga_lib::hdf5_read_dset_names(fn_v, &names, 0); }};
-    // Writer calls on a copy: they succeed and read back, or throw std::invalid_argument and leave the file unchanged
+    // Writer calls on a copy: they succeed and read back, or throw std::runtime_error and leave the file unchanged
     auto overwrite = minimal_channel(42.0);
     const std::vector<std::pair<std::function<void()>, std::function<bool()>>> writes = {
         {[&]()

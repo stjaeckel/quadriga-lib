@@ -193,14 +193,14 @@ namespace
         return read_all(f.fn, validate);
     }
 
-    // Message of the std::invalid_argument for 'content'; "<no error>" if the file is accepted
+    // Message of the std::runtime_error for 'content'; "<no error>" if the file is accepted
     std::string read_error(const std::string &content, bool validate = true)
     {
         try
         {
             read_text(content, validate);
         }
-        catch (const std::invalid_argument &e)
+        catch (const std::runtime_error &e)
         {
             return e.what();
         }
@@ -220,7 +220,7 @@ namespace
     void rejects_value(const std::string &line)
     {
         INFO("line: " << line);
-        CHECK_THROWS_AS(read_text(line + "\n"), std::invalid_argument);
+        CHECK_THROWS_AS(read_text(line + "\n"), std::runtime_error);
         CHECK_NOTHROW(read_text(line + "\n", false));
     }
 
@@ -235,8 +235,8 @@ namespace
     void rejects_grammar(const std::string &line)
     {
         INFO("line: " << line);
-        CHECK_THROWS_AS(read_text(line + "\n"), std::invalid_argument);
-        CHECK_THROWS_AS(read_text(line + "\n", false), std::invalid_argument);
+        CHECK_THROWS_AS(read_text(line + "\n"), std::runtime_error);
+        CHECK_THROWS_AS(read_text(line + "\n", false), std::runtime_error);
     }
 
     // Correlation keys of 3GPP_38.901_UMa_LOS.conf (v16.1.0), typed from the shipped file
@@ -803,7 +803,7 @@ TEST_CASE("conf_file_read - error messages name the file and the line")
         {
             quadriga_lib::conf_file_read(f.fn, sp);
         }
-        catch (const std::invalid_argument &e)
+        catch (const std::runtime_error &e)
         {
             return e.what();
         }
@@ -852,12 +852,12 @@ TEST_CASE("conf_file_read - a failed call leaves all outputs untouched")
     SECTION("grammar error in the last line")
     {
         CHECK_THROWS_AS(call("DS_mu = -7\nPL_model = nlos\nPL_A = 3\nShortName = Ab\nFoo = 1\nKF_mu = x\n"),
-                        std::invalid_argument);
+                        std::runtime_error);
     }
     SECTION("value check")
     {
         CHECK_THROWS_AS(call("DS_mu = -7\nPL_model = nlos\nPL_A = 3\nShortName = Ab\nFoo = 1\nr_DS = 0\n"),
-                        std::invalid_argument);
+                        std::runtime_error);
     }
     SECTION("missing file")
     {

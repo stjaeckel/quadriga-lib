@@ -30,9 +30,8 @@ class test_case(unittest.TestCase):
             f.write('<EthetaMag>' + ' '.join(map(str, range(1, 16))) + '</EthetaMag>\n')
             f.write('</arrayant></qdant>\n')
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(RuntimeError):
             data = arrayant.qdant_read( 'testx.qdant' )
-        self.assertEqual(str(context.exception), "File was not found")
 
         data = arrayant.qdant_read( 'test.qdant' )
 

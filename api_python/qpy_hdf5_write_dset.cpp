@@ -69,7 +69,7 @@ void hdf5_write_dset(const std::string fn,
     auto storage_space = quadriga_lib::hdf5_read_layout(fn);
 
     if (storage_space.at(0) == 0)
-        throw std::invalid_argument("File does not exist.");
+        throw std::runtime_error("File does not exist.");
 
     if (ix > storage_space.at(0) || iy > storage_space.at(1) || iz > storage_space.at(2) || iw > storage_space.at(3))
         throw std::invalid_argument("Location exceeds storage space in HDF file.");

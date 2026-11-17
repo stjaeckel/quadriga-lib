@@ -243,7 +243,7 @@ TEST_CASE("Test OBJ File Read - Unknown materials and strict flag")
     CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
                                                         nullptr, &mtl_names, nullptr,
                                                         "", &csv_ind, &csv_names, &csv_prop, true),
-                    std::invalid_argument);
+                    std::runtime_error);
 
     std::remove("cube.obj");
 }
@@ -342,7 +342,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
                                                             nullptr, &mtl_names, nullptr,
                                                             "custom_materials.csv", &csv_ind, &csv_names, &csv_prop),
-                        std::invalid_argument);
+                        std::runtime_error);
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -388,7 +388,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
                                                             nullptr, &mtl_names, nullptr,
                                                             "custom_materials.csv", &csv_ind, &csv_names, &csv_prop),
-                        std::invalid_argument);
+                        std::runtime_error);
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -401,7 +401,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
                                                             nullptr, &mtl_names, nullptr,
                                                             "nonexistent.csv", &csv_ind, &csv_names, &csv_prop),
-                        std::invalid_argument);
+                        std::runtime_error);
 
         std::remove("cube.obj");
     }
@@ -560,7 +560,7 @@ TEST_CASE("Test OBJ File Read - CSV cells must be one finite number")
             quadriga_lib::obj_file_read<double>("", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                                 "cells.csv", nullptr, &cn, &prop);
         }
-        catch (const std::invalid_argument &e)
+        catch (const std::runtime_error &e)
         {
             msg = e.what();
         }
@@ -627,7 +627,7 @@ TEST_CASE("Test OBJ File Read - Invalid face indices and quads throw for every o
         for (int k = 0; k <= 11; ++k)
         {
             INFO("file " << i << ", output combination " << k);
-            CHECK_THROWS_AS(read_obj_combo("bad.obj", k), std::invalid_argument);
+            CHECK_THROWS_AS(read_obj_combo("bad.obj", k), std::runtime_error);
         }
     }
     std::remove("bad.obj");

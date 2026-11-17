@@ -290,7 +290,7 @@ namespace
             {
                 orig = read_back(dir + "/" + name);
             }
-            catch (const std::invalid_argument &)
+            catch (const std::runtime_error &)
             {
                 skipped.push_back(name);
                 QD_DIAG("%s,-,-,-,rejected by conf_file_read,-\n", name.c_str());
@@ -841,7 +841,7 @@ TEST_CASE("conf_file_write - input validation")
 
     SECTION("fn")
     {
-        rejects([&]() { quadriga_lib::conf_file_write("", sp); });
+        CHECK_THROWS_AS(quadriga_lib::conf_file_write("", sp), std::runtime_error); // An empty name cannot be opened
         CHECK_THROWS_AS(quadriga_lib::conf_file_write("test_conf_file_write_no_such_dir/x.conf", sp), std::runtime_error);
         CHECK(!std::filesystem::exists("test_conf_file_write_no_such_dir"));
 

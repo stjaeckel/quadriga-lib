@@ -297,17 +297,17 @@ TEST_CASE("QDANT Multi - Write empty filename throws")
                                                        12.0, 12.0, 85.0, "monopole",
                                                        0.0, 0.0, 0.0, 0.15, 0.25, &freqs, 10.0);
 
-    REQUIRE_THROWS_AS(quadriga_lib::qdant_write_multi("", spk), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::qdant_write_multi("", spk), std::runtime_error);
 }
 
 TEST_CASE("QDANT Multi - Read empty filename throws")
 {
-    REQUIRE_THROWS_AS(quadriga_lib::qdant_read_multi<double>(""), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::qdant_read_multi<double>(""), std::runtime_error);
 }
 
 TEST_CASE("QDANT Multi - Read non-existent file throws")
 {
-    REQUIRE_THROWS_AS(quadriga_lib::qdant_read_multi<double>("does_not_exist_12345.qdant"), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::qdant_read_multi<double>("does_not_exist_12345.qdant"), std::runtime_error);
 }
 
 TEST_CASE("QDANT Multi - Read without layout pointer")

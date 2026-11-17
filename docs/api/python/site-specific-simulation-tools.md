@@ -210,7 +210,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_read) · [MATLA
 
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
-  vertex). Index 0, or an index beyond the vertices defined before the face, raises a `ValueError`, for any requested outputs
+  vertex). Index 0, or an index beyond the vertices defined before the face, raises a `RuntimeError`, for any requested outputs
 - Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV)
 - Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.

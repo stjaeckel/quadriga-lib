@@ -29,6 +29,7 @@ N = numel( tests );
 
 clc
 disp(['Running ',num2str(N),' tests'])
+all_passed = true;
 if single_run % Run tests one-by-one
     for n = 1 : N
         subFunctionName = tests(n).name(1:end-2);
@@ -36,7 +37,9 @@ if single_run % Run tests one-by-one
         test_suite=MOxUnitTestSuite();
         test_case = MOxUnitFunctionHandleTestCase(subFunctionName,'run_mex_tests', str2func( subFunctionName ));
         test_suite=addTest(test_suite, test_case);
-        disp(run(test_suite));
+        test_report = run(test_suite);
+        disp(test_report);
+        all_passed = all_passed && wasSuccessful(test_report);
     end
 else % Run all tests
     test_suite=MOxUnitTestSuite();
@@ -47,8 +50,15 @@ else % Run all tests
         test_suite=addTest(test_suite, test_case);
     end
     tic
-    disp(run(test_suite));
+    test_report = run(test_suite);
+    disp(test_report);
     toc
+    all_passed = wasSuccessful(test_report);
+end
+
+% End Octave or MATLAB with an error, so that "make test" and CI runs stop on a failed test
+if ~all_passed
+    error('quadriga_lib_mex_tests: some tests failed');
 end
 
 

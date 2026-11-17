@@ -53,7 +53,7 @@ py::array_t<py::ssize_t> hdf5_create_file(const std::string &fn, unsigned nx, un
     {
     }
     if (exists)
-        throw std::invalid_argument("File already exists.");
+        throw std::runtime_error("File already exists.");
 
     // Create file with the requested storage layout
     quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw);

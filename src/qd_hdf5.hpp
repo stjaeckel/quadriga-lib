@@ -17,7 +17,7 @@
 // (version 3), Object Header Continuation, Attribute Info (version 0); "Appendix C: Jenkins' lookup3 Hash Function".
 //
 // Supported subset (the writer produces only these structures; the reader accepts only these and throws
-// std::invalid_argument for anything else, e.g. older superblocks, version 1 object headers, dense link or attribute
+// std::runtime_error for anything else, e.g. older superblocks, version 1 object headers, dense link or attribute
 // storage, chunked layouts, filters, variable-length or NUL-padded strings, compound types, shared messages):
 // - Superblock version 2 at address 0 with 8-byte offsets and lengths, no superblock extension.
 // - Version 2 object headers: chunk 0 ("OHDR") and continuation chunks ("OCHK"), each with a lookup3 checksum and a
@@ -111,16 +111,16 @@ namespace qd
         // ---- Errors ----
         [[noreturn]] static inline void malformed(const std::string &what)
         {
-            throw std::invalid_argument("Malformed HDF5 file: " + what + ".");
+            throw std::runtime_error("Malformed HDF5 file: " + what + ".");
         }
 
         // A valid HDF5 file that uses structures outside the subset (written or modified by other tools)
         [[noreturn]] static inline void unsupported()
         {
-            throw std::invalid_argument("Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it "
-                                        "wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2) and "
-                                        "files modified with other HDF5 tools are not supported. Version-2 files can be "
-                                        "converted with tools/hdf5_convert_v2.py.");
+            throw std::runtime_error("Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it "
+                                     "wrote itself; files written by quadriga-lib 0.12.4 and earlier (version 2) and "
+                                     "files modified with other HDF5 tools are not supported. Version-2 files can be "
+                                     "converted with tools/hdf5_convert_v2.py.");
         }
 
         // ---- Checksum ----
@@ -333,8 +333,8 @@ namespace qd
 
         // ---- File access ----
         // A file opened unbuffered, so that every write reaches the operating system in program order. Reads are
-        // bounds-checked against the size at open; seek or read failures throw std::invalid_argument, write and close
-        // failures std::runtime_error. Object headers of unknown length are read through a 16 KiB window that starts up to
+        // bounds-checked against the size at open; seek, read, write and close failures throw
+        // std::runtime_error. Object headers of unknown length are read through a 16 KiB window that starts up to
         // 4 KiB before the header (a snapshot group header follows its datasets).
         class file
         {
@@ -518,7 +518,7 @@ namespace qd
             const size_t n = (size_t)std::min(f.size(), (uint64_t)superblock_size);
             f.read(0, b, n);
             if (n < 8 || std::memcmp(b, signature, 8) != 0)
-                throw std::invalid_argument("Not an HDF5 file.");
+                throw std::runtime_error("Not an HDF5 file.");
             if (n < superblock_size)
                 malformed("the superblock is truncated");
             if (b[8] != 2 || b[9] != 8 || b[10] != 8 || get_le(b + 12, 8) != 0 || get_le(b + 20, 8) != undef)

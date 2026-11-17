@@ -687,7 +687,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     // Write .obj (per-object self-contained vertex blocks)
     std::ofstream obj(obj_path, std::ios::out | std::ios::trunc);
     if (!obj.is_open())
-        throw std::invalid_argument("Error opening file: failed to open '" + fn + "'.");
+        throw std::runtime_error("Error opening file: failed to open '" + fn + "'.");
 
     obj << "# Wavefront OBJ file written by quadriga-lib\n";
     if (write_materials)
@@ -825,7 +825,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     {
         std::ofstream mtl(mtl_path, std::ios::out | std::ios::trunc);
         if (!mtl.is_open())
-            throw std::invalid_argument("Error opening file: failed to open '" + mtl_path.string() + "'.");
+            throw std::runtime_error("Error opening file: failed to open '" + mtl_path.string() + "'.");
 
         mtl << "# Wavefront MTL file written by quadriga-lib\n";
 
@@ -921,7 +921,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
         std::ofstream csv(csv_path, std::ios::out | std::ios::trunc);
         if (!csv.is_open())
-            throw std::invalid_argument("Error opening file: failed to open '" + csv_path.string() + "'.");
+            throw std::runtime_error("Error opening file: failed to open '" + csv_path.string() + "'.");
 
         csv << "name";
         for (const std::string &col : columns)

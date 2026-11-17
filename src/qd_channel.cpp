@@ -884,7 +884,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
         outFile.close();
     }
     else
-        throw std::invalid_argument("Could not write material file.");
+        throw std::runtime_error("Could not write material file.");
 
     // Export paths to OBJ file
     outFile = std::ofstream(fn);
@@ -895,7 +895,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
         outFile << "mtllib " << fn_mtl_base << "\n";
     }
     else
-        throw std::invalid_argument("Could not write OBJ file.");
+        throw std::runtime_error("Could not write OBJ file.");
 
     bool moving_tx = this->tx_pos.n_cols != 1ULL;
     bool moving_rx = this->rx_pos.n_cols != 1ULL;

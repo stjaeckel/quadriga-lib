@@ -12,7 +12,7 @@ lead = "%%GAP: Reference for the C++17 library, version {{ version }}. All funct
 - Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - An output cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation.
-- Invalid inputs (shape/domain) cause a `std::invalid_argument`; I/O failures a `std::runtime_error`.
+- Invalid inputs (shape/domain, an index outside the layout of a file) cause a `std::invalid_argument`; a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) a `std::runtime_error`.
 - Conventions and the names of shared quantities: see the [Glossary](#glossary).
 
 ## Glossary

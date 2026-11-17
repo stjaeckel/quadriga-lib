@@ -81,8 +81,11 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                    arma::Mat<dtype> *element_pos,
                                    arma::Mat<dtype> *coupling_re, arma::Mat<dtype> *coupling_im,
                                    dtype *center_freq,
-                                   arma::Mat<unsigned> *layout)
+                                   arma::Mat<unsigned> *layout,
+                                   bool *input_error)
 {
+    if (input_error != nullptr)
+        *input_error = false;
     pugi::xml_document doc;
     pugi::xml_parse_result result = doc.load_file(fn.c_str());
 
@@ -163,7 +166,11 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
             node_arrayant = node_first;
     }
     if (node_arrayant.empty())
+    {
+        if (input_error != nullptr)
+            *input_error = true;
         return "Could not find an arrayant object with ID " + attr_value + " in the file.";
+    }
 
     // Read name
     node_name = pfx + "name";
@@ -397,7 +404,8 @@ template std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                             arma::Mat<float> *element_pos,
                                             arma::Mat<float> *coupling_re, arma::Mat<float> *coupling_im,
                                             float *center_freq,
-                                            arma::Mat<unsigned> *layout);
+                                            arma::Mat<unsigned> *layout,
+                                            bool *input_error);
 
 template std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                             std::string *name,
@@ -407,7 +415,8 @@ template std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                             arma::Mat<double> *element_pos,
                                             arma::Mat<double> *coupling_re, arma::Mat<double> *coupling_im,
                                             double *center_freq,
-                                            arma::Mat<unsigned> *layout);
+                                            arma::Mat<unsigned> *layout,
+                                            bool *input_error);
 
 // The number formatters below use snprintf / strtof instead of the std::to_chars float overloads, which need
 // GLIBCXX_3.4.29 (GCC 11) and cannot be loaded by MATLAB versions that ship an older libstdc++ (R2024a). They write
@@ -657,8 +666,11 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                     const arma::Mat<dtype> *coupling_re, const arma::Mat<dtype> *coupling_im,
                                     const dtype *center_freq,
                                     const arma::Mat<unsigned> *layout,
-                                    unsigned *id_in_file)
+                                    unsigned *id_in_file,
+                                    bool *input_error)
 {
+    if (input_error != nullptr)
+        *input_error = false;
 
     std::string pfx = ""; // Set the default prefix
     int ID = id;          // Copy ID
@@ -973,7 +985,11 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
         layout->for_each(layout_validator);
 
         if (!valid)
+        {
+            if (input_error != nullptr)
+                *input_error = true;
             return "Layout contains reference to non-existing array antenna!";
+        }
 
         strm.str("");
         layout->t().raw_print(strm);
@@ -1002,7 +1018,8 @@ template std::string qd_arrayant_qdant_write(const std::string &fn, const int id
                                              const arma::Mat<float> *coupling_re, const arma::Mat<float> *coupling_im,
                                              const float *center_freq,
                                              const arma::Mat<unsigned> *layout,
-                                             unsigned *id_in_file);
+                                             unsigned *id_in_file,
+                                             bool *input_error);
 
 template std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                              const std::string *name,
@@ -1013,4 +1030,5 @@ template std::string qd_arrayant_qdant_write(const std::string &fn, const int id
                                              const arma::Mat<double> *coupling_re, const arma::Mat<double> *coupling_im,
                                              const double *center_freq,
                                              const arma::Mat<unsigned> *layout,
-                                             unsigned *id_in_file);
+                                             unsigned *id_in_file,
+                                             bool *input_error);

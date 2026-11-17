@@ -132,8 +132,8 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#conf_file_list) · [
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
 - With `parse_shortnames = true` every line `ShortName = name` that is not a comment adds an entry right after its
   file; other lines are not examined
-- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier short
-  name, or if a `ShortName` value is not one name; `std::runtime_error` if a listed file cannot be opened
+- Throws `std::runtime_error` if a short name equals an earlier entry, if a file name equals an earlier short
+  name, if a `ShortName` value is not one name, or if a listed file cannot be opened
 - A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
   current directory. A failed call leaves the outputs untouched
 
@@ -185,7 +185,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#conf_file_read) · [
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read
   independent of the global locale; `Inf`, `+Inf` and `-Inf` in any case
 - Throws `std::runtime_error` if the file cannot be opened or is a directory
-- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment and not
+- Throws `std::runtime_error` with file name and line number for a line that is not blank, not a comment and not
   a well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required
   or the reverse, text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a
   `ShortName` value stated twice), and with `validate = true` for a value that fails [scenpar_validate](#scenpar_validate)

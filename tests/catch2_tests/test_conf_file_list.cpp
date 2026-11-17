@@ -273,7 +273,7 @@ TEST_CASE("conf_file_list - input validation")
     SECTION("short name equals an earlier file name")
     {
         a.add("N.conf", "ShortName = M\n");
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name, b.name}, scen, &files, &dirs), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name, b.name}, scen, &files, &dirs), std::runtime_error);
         CHECK(scen == marker); // outputs untouched
         CHECK(files == marker);
         CHECK(dirs == marker);
@@ -284,38 +284,38 @@ TEST_CASE("conf_file_list - input validation")
     SECTION("short name equals its own file name")
     {
         a.add("N.conf", "ShortName = N\n");
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::runtime_error);
     }
 
     SECTION("short name equals an earlier short name, same file")
     {
         a.add("N.conf", "ShortName = Ns\nShortName = Ns\n");
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::runtime_error);
     }
 
     SECTION("short name equals an earlier short name, other directory")
     {
         b.add("P.conf", "ShortName = Ms\n");
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name, b.name}, scen, &files, &dirs), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name, b.name}, scen, &files, &dirs), std::runtime_error);
         CHECK(scen == marker);
     }
 
     SECTION("file name equals an earlier short name")
     {
         a.add("Ms.conf"); // sorted after M.conf, which defines the short name 'Ms'
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::runtime_error);
         b.add("Ns.conf");
         std::filesystem::remove(a.name + "/Ms.conf");
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name, b.name}, scen), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name, b.name}, scen), std::runtime_error);
         CHECK(scen == marker);
     }
 
     SECTION("malformed ShortName line")
     {
         a.add("N.conf", "ShortName =\n");
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::runtime_error);
         a.add("N.conf", "ShortName = two words\n");
-        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::conf_file_list({a.name}, scen), std::runtime_error);
         CHECK(scen == marker);
     }
 }

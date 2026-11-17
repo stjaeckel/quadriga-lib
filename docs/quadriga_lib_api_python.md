@@ -15,7 +15,7 @@ lang: en-US
 - Complex data: many functions take or return complex arrays where C++ uses separate `_re` / `_im` arrays or interleaved rows; some select the form with a `complex` flag. Each function states its form.
 - Data structures (array antennas, channels, scenario parameters, ray data) are dicts; the function that defines one lists its keys. Each call builds a new arrayant from an arrayant dict, so its data is checked in full on every call.
 - Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Several outputs are returned as a tuple in the order of the Usage line.
-- Errors: invalid inputs (shape/domain) raise `ValueError`, I/O failures `RuntimeError`, an index out of range `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument.
+- Errors: invalid inputs (shape/domain, an index outside the layout of a file) raise `ValueError`, a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) `RuntimeError`, an index out of range of an input array `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument.
 
 # Function Index
 
@@ -2011,8 +2011,8 @@ meaning and unit of each key; [conf_file_write](#conf_file_write) with `write_de
 these comments. Every function that takes `scenpar` accepts the dict of [conf_file_read](#conf_file_read) or [scenpar_validate](#scenpar_validate) or
 any subset of its keys (`None` = all defaults), completes a copy with the defaults of missing keys and validates it with
 [scenpar_validate](#scenpar_validate), whose messages pass through, also for keys the function does not use. A key `SubpathMethod`
-(QuaDRiGa's structs) must be `"legacy"`. Invalid input raises `ValueError`, a failure to read or write a file
-`RuntimeError`.
+(QuaDRiGa's structs) must be `"legacy"`. Invalid input raises `ValueError`, a problem with a file's access or
+content `RuntimeError`.
 
 **Workflow** for one drop of a set of links (terms: see Terms below):
 
@@ -2111,8 +2111,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_list) · [MATLAB](quadriga_lib_
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
 - With `parse_shortnames = True` every line `ShortName = name` that is not a comment adds an entry right after its file;
   other lines are not examined
-- Raises `ValueError` if a short name equals an earlier entry, if a file name equals an earlier short name, or if a
-  `ShortName` value is not one name; `RuntimeError` if a listed file cannot be opened
+- Raises `RuntimeError` if a short name equals an earlier entry, if a file name equals an earlier short name, if a
+  `ShortName` value is not one name, or if a listed file cannot be opened
 - A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string `""` is the
   current directory
 
@@ -2153,11 +2153,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_read) · [MATLAB](quadriga_lib_
 - Any other key is reported in `ignored_keys` and its value is not examined; this includes the QuaDRiGa key `GR_epsilon`
   (the complex ground permittivity comes from [lsp_generate](#lsp_generate)). A key stated more than once has its last value
 - The line `SubpathMethod = legacy` of QuaDRiGa's files is accepted and ignored; another value of `SubpathMethod` raises
-  `ValueError`, also with `validate = False`
+  `RuntimeError`, also with `validate = False`
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read independent of
   the locale; `Inf`, `+Inf` and `-Inf` in any case
 - Raises `RuntimeError` if the file cannot be opened or is a directory
-- Raises `ValueError` with file name and line number for a line that is not blank, not a comment and not a well-formed
+- Raises `RuntimeError` with file name and line number for a line that is not blank, not a comment and not a well-formed
   assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required or the reverse,
   text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a `ShortName` value
   stated twice), and with `validate = True` for a value that fails [scenpar_validate](#scenpar_validate)
@@ -3453,7 +3453,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_read) · [MATLAB](quadriga_lib_a
 
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
-  vertex). Index 0, or an index beyond the vertices defined before the face, raises a `ValueError`, for any requested outputs
+  vertex). Index 0, or an index beyond the vertices defined before the face, raises a `RuntimeError`, for any requested outputs
 - Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV)
 - Two independent material systems are returned:
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.

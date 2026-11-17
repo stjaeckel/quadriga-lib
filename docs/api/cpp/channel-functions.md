@@ -271,7 +271,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_channel) · [Python](../
 - Round trip with [hdf5_write_channel](#hdf5_write_channel): every per-snapshot field comes back with one entry per snapshot, also for
   snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
   with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
-- Throws `std::invalid_argument` if the file is malformed (e.g. a dataset does not have the size given by the
+- Throws `std::runtime_error` if the file is malformed (e.g. a dataset does not have the size given by the
   attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3
   written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified
   with other HDF5 tools are not supported and may be rejected.
@@ -762,7 +762,8 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_parse) · [Python](../pyt
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 - When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp
@@ -820,7 +821,8 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_read) · [Python](../pyth
 - `fn` is ignored when both `file` and `cache` are provided.
 - Reading a TX slot that was reserved by [qrt_file_init](#qrt_file_init) but not yet written by [qrt_file_append](#qrt_file_append) returns
   empty path outputs with zeroed positions, rather than throwing; an out-of-range index still throws.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp
@@ -925,7 +927,8 @@ Not in: MATLAB, Python
   (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [qrt_file_init](#qrt_file_init) but never written by [qrt_file_append](#qrt_file_append) returns an empty vector.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 - For tight loops over many origins, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache to avoid
   re-parsing the header on each call.
 
@@ -1018,7 +1021,8 @@ Not in: MATLAB, Python
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 - For a TX slot reserved by [qrt_file_init](#qrt_file_init) but not yet written, `orig_index` and `path_data_offset`
   are `0`; [qrt_file_read](#qrt_file_read) treats that as an empty (unwritten) origin.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp

@@ -252,7 +252,7 @@ try
     quadriga_lib.arrayant_concat( [ant1, ant1], [ant_bad, ant_bad] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Second input invalid: Entry 0: Values of ''azimuth_grid'' must be between -pi and pi';
+    expectedErrorMessage = 'Values of ''azimuth_grid'' must be between -pi and pi';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -265,7 +265,7 @@ try
     quadriga_lib.arrayant_concat( [ant1, ant1], [ant_bad, ant_bad] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Second input invalid: Entry 0: Values of ''elevation_grid'' must be between -pi/2 and pi/2';
+    expectedErrorMessage = 'Values of ''elevation_grid'' must be between -pi/2 and pi/2';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

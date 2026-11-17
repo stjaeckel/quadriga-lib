@@ -502,7 +502,7 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#obj_file_read) · [Py
 
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
-  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::invalid_argument`. The file is
+  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::runtime_error`. The file is
   parsed and validated for any combination of requested outputs, also when no output is requested.
 - Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV).
 - Two independent material systems are returned:

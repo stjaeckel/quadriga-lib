@@ -6,6 +6,7 @@
 #include "quadriga_tools.hpp"
 #include "qd_atmospheric_absorption.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include <cstring>
 #include <limits>
 
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
@@ -20,14 +21,14 @@ namespace
     {
         std::streamoff n = (std::streamoff)f.rdbuf()->pubseekoff(0, std::ios::end, std::ios::in);
         if (n < 0)
-            throw std::invalid_argument("Cannot determine the size of the QRT file.");
+            throw std::runtime_error("Cannot determine the size of the QRT file.");
         return (size_t)n;
     }
 
     inline void qrt_check_stream(const std::ifstream &f)
     {
         if (!f)
-            throw std::invalid_argument("QRT file truncated or corrupt.");
+            throw std::runtime_error("QRT file truncated or corrupt.");
     }
 
     // Throws if 'count' items of 'item_bytes' bytes each do not fit into the file from byte 'pos' on
@@ -35,8 +36,8 @@ namespace
     {
         size_t remaining = pos < file_size ? file_size - pos : 0;
         if (count != 0 && count > remaining / item_bytes)
-            throw std::invalid_argument(std::string("QRT file truncated or corrupt: ") + what + " = " +
-                                        std::to_string(count) + " does not fit into the file.");
+            throw std::runtime_error(std::string("QRT file truncated or corrupt: ") + what + " = " +
+                                     std::to_string(count) + " does not fit into the file.");
     }
 
     // Same, after checking that the reads so far succeeded; the readers track 'pos' themselves (tellg costs a syscall)
@@ -50,7 +51,21 @@ namespace
     inline void qrt_check_offset(size_t file_size, size_t offset, const char *what)
     {
         if (offset >= file_size)
-            throw std::invalid_argument(std::string("QRT file truncated or corrupt: ") + what + " points past the end of the file.");
+            throw std::runtime_error(std::string("QRT file truncated or corrupt: ") + what + " points past the end of the file.");
+    }
+
+    // Reads the ID "#QRT-BINv" and the two-digit version from the start of the file; returns the version (4, 5 or 6)
+    inline int qrt_read_header(std::ifstream &f)
+    {
+        char id[11];
+        f.read(id, 11);
+        if (f.gcount() < 9 || std::memcmp(id, "#QRT-BINv", 9) != 0)
+            throw std::runtime_error("Invalid file format: missing QRT-BIN header.");
+        qrt_check_stream(f);
+        int ver = (id[9] >= '0' && id[9] <= '9' && id[10] >= '0' && id[10] <= '9') ? 10 * (id[9] - '0') + (id[10] - '0') : 0;
+        if (ver != 4 && ver != 5 && ver != 6)
+            throw std::runtime_error("Only QRT versions 4, 5 and 6 are supported.");
+        return ver;
     }
 
     // Number of stored orientation columns (bank, tilt, head) for a format byte, as the readers decode it
@@ -79,7 +94,8 @@ Initialize a QRT read cache for fast repeated access
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 - For a TX slot reserved by [[qrt_file_init]] but not yet written, `orig_index` and `path_data_offset`
   are `0`; [[qrt_file_read]] treats that as an empty (unwritten) origin.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ## Declaration:
 ```
@@ -124,28 +140,14 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::invalid_argument("Cannot open file.");
+            throw std::runtime_error("Cannot open file.");
     }
     const size_t file_size = qrt_file_size(fileR);
     fileR.seekg(0, std::ios::beg);
     if (!own_stream && !fileR.good())
-        throw std::invalid_argument("Supplied ifstream is not in a good state.");
+        throw std::runtime_error("Supplied ifstream is not in a good state.");
 
-    // Read and validate the header
-    const std::string bin_id_prefix = "#QRT-BINv";
-    std::string bin_id_file(bin_id_prefix.size(), '\0');
-    fileR.read(&bin_id_file[0], (std::streamsize)bin_id_prefix.size());
-
-    if (bin_id_file != bin_id_prefix)
-        throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
-
-    std::string version_str(2, '\0');
-    fileR.read(&version_str[0], 2);
-    qrt_check_stream(fileR);
-    cache.version = std::stoi(version_str);
-
-    if (cache.version != 4 && cache.version != 5 && cache.version != 6)
-        throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
+    cache.version = qrt_read_header(fileR);
 
     // Global counters
     fileR.read((char *)&cache.no_orig, sizeof(unsigned));
@@ -334,27 +336,27 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
                                  bool scalar_mode)
 {
     if (center_freq.n_elem == 0 || center_freq.n_elem > 127)
-        throw std::invalid_argument("qrt_file_init: 'center_freq' must hold 1..127 frequencies.");
+        throw std::invalid_argument("Input 'center_freq' must have 1 to 127 elements.");
     if (n_orig == 0)
-        throw std::invalid_argument("qrt_file_init: 'n_orig' must be at least 1.");
+        throw std::invalid_argument("Input 'n_orig' must be at least 1.");
 
     // All inputs are checked here, before the file is opened, so that a rejected call leaves an existing file unchanged
     if (cir_pos.n_cols != 3)
-        throw std::invalid_argument("qrt_file_init: 'cir_pos' must be [n_cir, 3].");
+        throw std::invalid_argument("Input 'cir_pos' must have size [n_cir, 3].");
     if ((unsigned long long)cir_pos.n_rows > (unsigned long long)std::numeric_limits<unsigned>::max())
-        throw std::invalid_argument("qrt_file_init: 'cir_pos' has too many rows.");
+        throw std::invalid_argument("Input 'cir_pos' has too many rows.");
     unsigned n_cir = (unsigned)cir_pos.n_rows;
     if (cir_orientation.n_elem != 0 && (cir_orientation.n_rows != n_cir || cir_orientation.n_cols != 3))
-        throw std::invalid_argument("qrt_file_init: 'cir_orientation' must be empty or [n_cir, 3].");
+        throw std::invalid_argument("Input 'cir_orientation' must be empty or have size [n_cir, 3].");
     if (dest_names.size() != cir_offset.n_elem)
-        throw std::invalid_argument("qrt_file_init: 'dest_names' and 'cir_offset' length mismatch.");
+        throw std::invalid_argument("Inputs 'dest_names' and 'cir_offset' must have the same length.");
     if ((unsigned long long)dest_names.size() > (unsigned long long)std::numeric_limits<unsigned>::max())
-        throw std::invalid_argument("qrt_file_init: 'dest_names' has too many entries.");
+        throw std::invalid_argument("Input 'dest_names' has too many entries.");
     if (cir_offset.n_elem != 0 && cir_offset[0] != 0)
-        throw std::invalid_argument("qrt_file_init: 'cir_offset' must start with 0.");
+        throw std::invalid_argument("Input 'cir_offset' must start with 0.");
     for (const auto &name : dest_names)
         if (name.size() > 255)
-            throw std::invalid_argument("qrt_file_init: RX name exceeds 255 characters.");
+            throw std::invalid_argument("Entries of 'dest_names' cannot exceed 255 characters.");
 
     unsigned n_dest = (unsigned)dest_names.size();
     unsigned n_freq = (unsigned)center_freq.n_elem;
@@ -390,7 +392,7 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
 
     std::ofstream fileW(fn, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!fileW.is_open())
-        throw std::invalid_argument("qrt_file_init: cannot open output file.");
+        throw std::runtime_error("Cannot open file for writing.");
 
     std::string bin_id = scalar_mode ? "#QRT-BINv06" : "#QRT-BINv05";
     fileW.write(bin_id.c_str(), (std::streamsize)bin_id.size());
@@ -437,7 +439,7 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
 
     fileW.close();
     if (!fileW)
-        throw std::runtime_error("qrt_file_init: write error.");
+        throw std::runtime_error("Cannot write file.");
 }
 
 template void quadriga_lib::qrt_file_init<float>(const std::string &fn, const arma::Col<float> &center_freq, const arma::Mat<float> &cir_pos,
@@ -496,23 +498,23 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     const dtype *p_pos = qd_xyz(orig_pos, "orig_pos");
     const dtype *p_ori = orig_orientation ? qd_xyz(*orig_orientation, "orig_orientation") : zeros;
     if (orig_name.size() > 255)
-        throw std::invalid_argument("qrt_file_append: 'orig_name' exceeds 255 characters.");
+        throw std::invalid_argument("Input 'orig_name' cannot exceed 255 characters.");
 
     std::fstream f(fn, std::ios::in | std::ios::out | std::ios::binary);
     if (!f.is_open())
-        throw std::invalid_argument("qrt_file_append: cannot open file.");
+        throw std::runtime_error("Cannot open file.");
 
     // Recover metadata via the existing header parser (open the file read-only for it).
     quadriga_lib::qrt_read_cache cache;
     {
         std::ifstream fr(fn, std::ios::in | std::ios::binary);
         if (!fr.is_open())
-            throw std::invalid_argument("qrt_file_append: cannot open file for metadata.");
+            throw std::runtime_error("Cannot open file.");
         cache = quadriga_lib::qrt_read_cache_init(fn, &fr);
     }
 
     if (cache.version != 5 && cache.version != 6)
-        throw std::invalid_argument("qrt_file_append: only v5/6 files can be appended to.");
+        throw std::runtime_error("Only QRT versions 5 and 6 can be appended to.");
 
     unsigned n_cir = cache.no_cir;
     unsigned n_freq = cache.no_freq;
@@ -533,7 +535,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
         f.seekg((std::streamoff)off, std::ios::beg);
         f.read((char *)&cir_fmt, sizeof(uint8_t));
         if (!f)
-            throw std::invalid_argument("qrt_file_append: file truncated or corrupt.");
+            throw std::runtime_error("QRT file truncated or corrupt.");
         size_t cols = 3 + qrt_orientation_columns(cir_fmt);
         off += 1 + cols * n_cir * sizeof(float);
     }
@@ -548,7 +550,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
             f.seekg((std::streamoff)len, std::ios::cur);
         }
         if (!f)
-            throw std::invalid_argument("qrt_file_append: file truncated or corrupt.");
+            throw std::runtime_error("QRT file truncated or corrupt.");
         off = (size_t)f.tellg();
     }
     size_t orig_pos_base = off + 1;                                       // skip orig_fmt byte
@@ -559,11 +561,11 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     for (const auto &p : path_data)
     {
         if ((unsigned)p.iC >= n_cir)
-            throw std::out_of_range("qrt_file_append: path CIR index (iC) exceeds n_cir.");
+            throw std::invalid_argument("Entries of 'path_data' must have a CIR index 'iC' below the number of CIRs in the file.");
         if ((unsigned)p.n_freq() != n_freq)
-            throw std::invalid_argument("qrt_file_append: path frequency count does not match file.");
+            throw std::invalid_argument("Entries of 'path_data' must have as many frequencies as the file.");
         if (p.is_scalar() != scalar)
-            throw std::invalid_argument("qrt_file_append: path layout mode does not match file.");
+            throw std::invalid_argument("Entries of 'path_data' must match the scalar or polarimetric mode of the file.");
         ++no_hit[p.iC];
     }
     unsigned max_paths = 0;
@@ -585,7 +587,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
         size_t v = 0;
         f.read((char *)&v, sizeof(size_t));
         if (!f)
-            throw std::invalid_argument("qrt_file_append: file truncated or corrupt.");
+            throw std::runtime_error("QRT file truncated or corrupt.");
         if (v == 0)
         {
             slot = i;
@@ -593,7 +595,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
         }
     }
     if (slot == n_orig)
-        throw std::runtime_error("qrt_file_append: BS index table is full; no free slot.");
+        throw std::runtime_error("All origin slots of the file are written.");
 
     // Patch this TX's position/orientation row (columns x,y,z,bank,tilt,head; orig_fmt = 7).
     auto patch_col = [&](unsigned col, float v)
@@ -686,7 +688,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
 
     f.close();
     if (!f)
-        throw std::runtime_error("qrt_file_append: write error.");
+        throw std::runtime_error("Cannot write file.");
     return total_paths;
 }
 
@@ -706,7 +708,8 @@ Read metadata from a QRT file
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 - When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ## Declaration:
 ```
@@ -779,31 +782,16 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::invalid_argument("Cannot open file.");
+            throw std::runtime_error("Cannot open file.");
     }
 
     // Rewind the stream to the beginning
     const size_t file_size = qrt_file_size(fileR);
     fileR.seekg(0, std::ios::beg);
     if (!own_stream && !fileR.good())
-        throw std::invalid_argument("Supplied ifstream is not in a good state.");
+        throw std::runtime_error("Supplied ifstream is not in a good state.");
 
-    // Read and validate the header
-    const std::string bin_id_prefix = "#QRT-BINv";
-    std::string bin_id_file(bin_id_prefix.size(), '\0');
-    fileR.read(&bin_id_file[0], (std::streamsize)bin_id_prefix.size());
-
-    if (bin_id_file != bin_id_prefix)
-        throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
-
-    // Version number (2 ASCII digits)
-    std::string version_str(2, '\0');
-    fileR.read(&version_str[0], 2);
-    qrt_check_stream(fileR);
-    int ver = std::stoi(version_str);
-
-    if (ver != 4 && ver != 5 && ver != 6)
-        throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
+    int ver = qrt_read_header(fileR);
 
     // Global counters
     unsigned l_no_orig = 0, l_no_cir = 0, l_no_dest = 0, l_no_freq = 1;
@@ -921,7 +909,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
         *version = ver;
 
     if (l_cir_index.n_elem == 0 || l_cir_index[0] != 0)
-        throw std::invalid_argument("Invalid CIR index in QRT file. Potential file corruption.");
+        throw std::runtime_error("Invalid CIR index in QRT file. Potential file corruption.");
 
     if (cir_offset)
     {
@@ -1009,7 +997,8 @@ Read ray-tracing CIR data from a QRT file
 - `fn` is ignored when both `file` and `cache` are provided.
 - Reading a TX slot that was reserved by [[qrt_file_init]] but not yet written by [[qrt_file_append]] returns
   empty path outputs with zeroed positions, rather than throwing; an out-of-range index still throws.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ## Declaration:
 ```
@@ -1139,7 +1128,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::invalid_argument("Cannot open file.");
+            throw std::runtime_error("Cannot open file.");
     }
     const size_t file_size = qrt_file_size(fileR);
 
@@ -1189,23 +1178,9 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     {
         fileR.seekg(0, std::ios::beg);
         if (!fileR.good())
-            throw std::invalid_argument("Supplied ifstream is not in a good state.");
+            throw std::runtime_error("Supplied ifstream is not in a good state.");
 
-        // Read and validate the header
-        const std::string bin_id_prefix = "#QRT-BINv";
-        std::string bin_id_file(bin_id_prefix.size(), '\0');
-        fileR.read(&bin_id_file[0], (std::streamsize)bin_id_prefix.size());
-
-        if (bin_id_file != bin_id_prefix)
-            throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
-
-        std::string version_str(2, '\0');
-        fileR.read(&version_str[0], 2);
-        qrt_check_stream(fileR);
-        ver = std::stoi(version_str);
-
-        if (ver != 4 && ver != 5 && ver != 6)
-            throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
+        ver = qrt_read_header(fileR);
 
         // Global counters
         unsigned l_no_orig = 0, l_no_dest = 0;
@@ -1215,8 +1190,8 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         fileR.read((char *)&l_no_dest, sizeof(unsigned));
         qrt_check_stream(fileR);
 
-        if (l_no_orig == 0 || l_no_cir == 0)
-            throw std::out_of_range("File does not contain any origins or CIRs.");
+        if (l_no_orig == 0) // qrt_file_init writes at least one origin; a file without CIRs is valid
+            throw std::runtime_error("File does not contain any origins.");
         if (i_cir >= (arma::uword)l_no_cir)
             throw std::invalid_argument("CIR index exceeds number of CIRs in file.");
         if (i_orig >= (arma::uword)l_no_orig)
@@ -1790,7 +1765,8 @@ Read raw ray-tracing path data from a QRT file into path objects
   (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [[qrt_file_init]] but never written by [[qrt_file_append]] returns an empty vector.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 - For tight loops over many origins, pass a pre-opened `std::ifstream` and a [[qrt_read_cache_init]]-populated cache to avoid
   re-parsing the header on each call.
 
@@ -1833,10 +1809,10 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
     {
         fileR.open(fn, std::ios::in | std::ios::binary);
         if (!fileR.is_open())
-            throw std::invalid_argument("qrt_file_read_raw: cannot open file.");
+            throw std::runtime_error("Cannot open file.");
     }
     else if (!fileR.good())
-        throw std::invalid_argument("qrt_file_read_raw: supplied ifstream is not in a good state.");
+        throw std::runtime_error("Supplied ifstream is not in a good state.");
 
     // Metadata: use the supplied cache, or build a local one.
     quadriga_lib::qrt_read_cache local_cache;
@@ -1848,9 +1824,9 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
     }
 
     if (c->version != 5 && c->version != 6)
-        throw std::invalid_argument("qrt_file_read_raw: only v5/6 files can be read as raw paths.");
+        throw std::runtime_error("Only QRT versions 5 and 6 can be read as raw paths.");
     if (i_orig >= (arma::uword)c->no_orig)
-        throw std::out_of_range("qrt_file_read_raw: origin index exceeds n_orig.");
+        throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
 
     unsigned n_cir = c->no_cir;
     unsigned n_freq = c->no_freq;
@@ -1918,7 +1894,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
             fileR.read((char *)types.data(), (std::streamsize)sum_int);
 
         if (!fileR)
-            throw std::invalid_argument("qrt_file_read_raw: unexpected end of file in path block.");
+            throw std::runtime_error("QRT file truncated or corrupt: unexpected end of file in path block.");
 
         // Reassemble one path object per stored path.
         // Grow the output geometrically: a reserve of exactly the next size per CIR would move all paths read so far

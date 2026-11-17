@@ -286,9 +286,9 @@ class test_case(unittest.TestCase):
                 channel.qrt_file_read(fn, [1], 0)
             with open(fn, 'wb') as f:
                 f.write(data[:40])
-            with self.assertRaisesRegex(ValueError, "truncated or corrupt"):
+            with self.assertRaisesRegex(RuntimeError, "truncated or corrupt"):
                 channel.qrt_file_parse(fn)
-            with self.assertRaisesRegex(ValueError, "truncated or corrupt"):
+            with self.assertRaisesRegex(RuntimeError, "truncated or corrupt"):
                 channel.qrt_file_read(fn, [0], 0)
 
 

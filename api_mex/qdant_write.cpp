@@ -63,8 +63,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     unsigned id = (nrhs < 3) ? 0 : qd_mex_get_scalar<unsigned>(prhs[2], "id", 0);
     arma::u32_mat layout = (nrhs < 4) ? arma::u32_mat() : qd_mex_typecast_Mat<unsigned>(prhs[3], "layout");
 
-    if (fn.empty())
-         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File name cannot be empty.");
     if (!mxIsStruct(prhs[1]) || mxGetNumberOfElements(prhs[1]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be an arrayant struct or struct array.");
 

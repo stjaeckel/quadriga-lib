@@ -148,7 +148,7 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
     std::string line;
 
     if (!std::getline(in, line))
-        throw std::invalid_argument("Error reading materials: '" + src + "' is empty.");
+        throw std::runtime_error("Error reading materials: '" + src + "' is empty.");
 
     // Strip UTF-8 BOM if present
     if (line.size() >= 3 && (unsigned char)line[0] == 0xEF &&
@@ -157,7 +157,7 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
 
     std::vector<std::string> header = split_csv(line);
     if (header.empty())
-        throw std::invalid_argument("Error reading materials: '" + src + "' has an empty header.");
+        throw std::runtime_error("Error reading materials: '" + src + "' has an empty header.");
 
     // Locate the mandatory "name" column
     arma::uword name_col = (arma::uword)header.size();
@@ -168,7 +168,7 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
             break;
         }
     if (name_col == (arma::uword)header.size())
-        throw std::invalid_argument("Error reading materials: '" + src + "' is missing required column 'name'.");
+        throw std::runtime_error("Error reading materials: '" + src + "' is missing required column 'name'.");
 
     // Collect numeric columns, preserving CSV order
     std::vector<arma::uword> num_pos;
@@ -176,7 +176,7 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
         if (k != name_col)
         {
             if (header[k].empty())
-                throw std::invalid_argument("Error reading materials: '" + src + "' has an empty column name in the header.");
+                throw std::runtime_error("Error reading materials: '" + src + "' has an empty column name in the header.");
             T.columns.push_back(header[k]);
             num_pos.push_back(k);
         }
@@ -197,10 +197,10 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
 
         const std::string &nm = cell[name_col];
         if (nm.empty())
-            throw std::invalid_argument("Error reading materials: '" + src + "' line " +
-                                        std::to_string(line_num) + " has an empty material name.");
+            throw std::runtime_error("Error reading materials: '" + src + "' line " +
+                                     std::to_string(line_num) + " has an empty material name.");
         if (!seen.insert(nm).second)
-            throw std::invalid_argument("Error reading materials: duplicate material name '" + nm + "' in '" + src + "'.");
+            throw std::runtime_error("Error reading materials: duplicate material name '" + nm + "' in '" + src + "'.");
 
         T.index[nm] = (arma::uword)T.names.size();
         T.names.push_back(nm);
@@ -221,16 +221,16 @@ static MtlTable parse_mtl_table(std::istream &in, const std::string &src)
                     n_read = 0;
                 }
                 if (n_read != v.size() || !std::isfinite(d)) // the whole cell must be one finite number
-                    throw std::invalid_argument("Error reading materials: '" + src + "' line " +
-                                                std::to_string(line_num) + " column '" + T.columns[c] +
-                                                "' is not numeric ('" + v + "').");
+                    throw std::runtime_error("Error reading materials: '" + src + "' line " +
+                                             std::to_string(line_num) + " column '" + T.columns[c] +
+                                             "' is not numeric ('" + v + "').");
             }
             T.values[c].push_back(d);
         }
     }
 
     if (T.names.empty())
-        throw std::invalid_argument("Error reading materials: '" + src + "' contains no material rows.");
+        throw std::runtime_error("Error reading materials: '" + src + "' contains no material rows.");
 
     return T;
 }
@@ -244,10 +244,10 @@ static MtlTable load_mtl_table(const std::string &fn_csv)
         return parse_mtl_table(ss, "<default materials>");
     }
     if (!std::filesystem::exists(fn_csv))
-        throw std::invalid_argument("Error opening file: CSV file '" + fn_csv + "' does not exist.");
+        throw std::runtime_error("Error opening file: CSV file '" + fn_csv + "' does not exist.");
     std::ifstream f(fn_csv);
     if (!f.is_open())
-        throw std::invalid_argument("Error opening file: failed to open CSV file '" + fn_csv + "'.");
+        throw std::runtime_error("Error opening file: failed to open CSV file '" + fn_csv + "'.");
     return parse_mtl_table(f, fn_csv);
 }
 
@@ -273,7 +273,7 @@ static void read_mtl_bsdf(const std::filesystem::path &obj_file, const std::stri
 
     std::ifstream fileR{mtl_file, std::ios::in};
     if (!fileR.is_open())
-        throw std::invalid_argument("Error opening file: failed to open '" + mtl_file.filename().string() + "'.");
+        throw std::runtime_error("Error opening file: failed to open '" + mtl_file.filename().string() + "'.");
 
     const size_t n_mtl = names.size();
     bsdf->set_size(n_mtl, 17);
@@ -452,7 +452,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
-  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::invalid_argument`. The file is
+  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::runtime_error`. The file is
   parsed and validated for any combination of requested outputs, also when no output is requested.
 - Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV).
 - Two independent material systems are returned:
@@ -603,13 +603,13 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     // Open the .obj file
     std::filesystem::path obj_file{fn_obj};
     if (!std::filesystem::exists(obj_file))
-        throw std::invalid_argument("Error opening file: '" + fn_obj + "' does not exist.");
+        throw std::runtime_error("Error opening file: '" + fn_obj + "' does not exist.");
     if (!std::filesystem::is_regular_file(obj_file))
-        throw std::invalid_argument("Error opening file: '" + fn_obj + "' is not a regular file.");
+        throw std::runtime_error("Error opening file: '" + fn_obj + "' is not a regular file.");
 
     std::ifstream fileR{obj_file, std::ios::in};
     if (!fileR.is_open())
-        throw std::invalid_argument("Error opening file: failed to open '" + fn_obj + "'.");
+        throw std::runtime_error("Error opening file: failed to open '" + fn_obj + "'.");
 
     // Pass 1: count vertices and faces
     arma::uword n_vert = 0, n_faces = 0;
@@ -731,7 +731,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
                 return it2->second + 1;
         }
         if (csv_strict)
-            throw std::invalid_argument("Error: material '" + raw + "' referenced in '" + fn_obj + "' is not present in the material table.");
+            throw std::runtime_error("Material '" + raw + "' referenced in '" + fn_obj + "' is not present in the material table.");
         return 0; // 0 = no material (outside)
     };
 
@@ -762,7 +762,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         if (line.length() > 2 && line[0] == 'v' && line[1] == ' ')
         {
             if (i_vert >= n_vert)
-                throw std::invalid_argument("Error reading vertex data in '" + fn_obj + "'.");
+                throw std::runtime_error("Error reading vertex data in '" + fn_obj + "'.");
             if (need_vert)
             {
                 double x = 0.0, y = 0.0, z = 0.0;
@@ -779,24 +779,24 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         if (line.length() > 2 && line[0] == 'f' && line[1] == ' ')
         {
             if (i_face >= n_faces)
-                throw std::invalid_argument("Error reading face data in '" + fn_obj + "'.");
+                throw std::runtime_error("Error reading face data in '" + fn_obj + "'.");
 
             unsigned long long mag[4];
             bool neg[4];
             const int n_ref = parse_face_refs(line.c_str(), mag, neg);
             if (n_ref < 3)
-                throw std::invalid_argument("Error reading face data in '" + fn_obj + "'.");
+                throw std::runtime_error("Error reading face data in '" + fn_obj + "'.");
             if (n_ref > 3)
-                throw std::invalid_argument("Mesh in '" + fn_obj + "' is not triangulated (quads/n-gons unsupported).");
+                throw std::runtime_error("Mesh in '" + fn_obj + "' is not triangulated (quads/n-gons unsupported).");
 
             // 0-based vertex index; index 0 and indices beyond the vertices defined so far are invalid
             arma::uword abc[3];
             for (int k = 0; k < 3; ++k)
             {
                 if (mag[k] == 0 || mag[k] > (unsigned long long)i_vert)
-                    throw std::invalid_argument("Error reading face data in '" + fn_obj + "': face " + std::to_string(i_face + 1) +
-                                                " references a vertex that is 0 or beyond the " + std::to_string(i_vert) +
-                                                " vertices defined before it.");
+                    throw std::runtime_error("Error reading face data in '" + fn_obj + "': face " + std::to_string(i_face + 1) +
+                                             " references a vertex that is 0 or beyond the " + std::to_string(i_vert) +
+                                             " vertices defined before it.");
                 abc[k] = neg[k] ? i_vert - (arma::uword)mag[k] : (arma::uword)mag[k] - 1;
             }
 

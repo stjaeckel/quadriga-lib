@@ -30,7 +30,8 @@ inline dtype qd_arrayant_grid_resolution(dtype res, dtype res_default, const cha
     return (res <= (dtype)0.0) ? res_default : (res > (dtype)90.0 ? (dtype)90.0 : res);
 }
 
-// Returns empty string if there was no error or an error message otherwise
+// Returns empty string if there was no error or an error message otherwise; 'input_error' is set to true when the
+// error is in the arguments (no entry with the given ID), false when it is in the file
 template <typename dtype> // float or double
 std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                    std::string *name,
@@ -44,9 +45,11 @@ std::string qd_arrayant_qdant_read(const std::string &fn, const int id,
                                    arma::Mat<dtype> *coupling_re,
                                    arma::Mat<dtype> *coupling_im,
                                    dtype *center_freq,
-                                   arma::Mat<unsigned> *layout);
+                                   arma::Mat<unsigned> *layout,
+                                   bool *input_error = nullptr);
 
-// Returns empty string if there was no error or an error message otherwise
+// Returns empty string if there was no error or an error message otherwise; 'input_error' is set to true when the
+// error is in the arguments (layout refers to an ID that is not in the file), false when it is in the file
 template <typename dtype> // float or double
 std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                     const std::string *name,
@@ -61,7 +64,8 @@ std::string qd_arrayant_qdant_write(const std::string &fn, const int id,
                                     const arma::Mat<dtype> *coupling_im,
                                     const dtype *center_freq,
                                     const arma::Mat<unsigned> *layout,
-                                    unsigned *id_in_file);
+                                    unsigned *id_in_file,
+                                    bool *input_error = nullptr);
 
 // Block-diagonal coupling [C1 0; 0 C2] of two arrays with n_el1 and n_el2 elements (arrayant::append and
 // arrayant_concat_multi). An empty coupling_re is an identity block (one port per element); an empty coupling_im is

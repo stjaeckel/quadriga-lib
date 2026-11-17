@@ -7,6 +7,19 @@
 
 #include <cstdio>
 
+// A missing file is a file problem (std::runtime_error); an index outside the file's layout an argument error
+TEST_CASE("QRT Reader - missing file and index outside the file")
+{
+    const std::string missing = "tests/data/test_qrt_missing_file.qrt";
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_parse(missing), std::runtime_error);
+    CHECK_THROWS_AS(quadriga_lib::qrt_read_cache_init(missing), std::runtime_error);
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(missing), std::runtime_error);
+
+    arma::uword n_cir = 0;
+    quadriga_lib::qrt_file_parse("tests/data/test.qrt", &n_cir);
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>("tests/data/test.qrt", n_cir), std::invalid_argument);
+}
+
 TEST_CASE("QRT Reader")
 {
     std::string fn = "tests/data/test.qrt";
@@ -492,8 +505,8 @@ TEST_CASE("QRT Reader - index of 2^32 or more")
         }
         if (cache.version != 4)
         {
-            CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, big), std::out_of_range);
-            CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, big, &f, &cache), std::out_of_range);
+            CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, big), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, big, &f, &cache), std::invalid_argument);
         }
     }
 }

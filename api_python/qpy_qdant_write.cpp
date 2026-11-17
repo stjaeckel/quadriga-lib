@@ -63,9 +63,6 @@ py::ssize_t qdant_write(const std::string &fn,
                                  unsigned id,
                                  py::handle layout)
 {
-    if (fn.empty())
-        throw std::invalid_argument("File name cannot be empty.");
-
     // Parse the (possibly frequency-dependent) antenna via the unified multi-freq reader
     auto ant_vec = qd_python_dict2arrayant_multi(arrayant, true, false, true);
 

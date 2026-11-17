@@ -15,7 +15,7 @@ lang: en-US
 - Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - An output cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation.
-- Invalid inputs (shape/domain) cause a `std::invalid_argument`; I/O failures a `std::runtime_error`.
+- Invalid inputs (shape/domain, an index outside the layout of a file) cause a `std::invalid_argument`; a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) a `std::runtime_error`.
 - Conventions and the names of shared quantities: see the [Glossary](#glossary).
 
 <a id="glossary"></a>
@@ -1404,10 +1404,11 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qdant_read) · [Python](quadriga_lib_a
 - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
 - Throws `std::invalid_argument` if the file has no entry with the given ID. The first entry of a file is ID 1 only
   if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
-- Malformed files throw `std::invalid_argument`. The number of elements (`NoElements`) must be backed by data in the
-  file (element positions, coupling, or pattern nodes of the last element). Elements without pattern nodes read as
-  zeros; their zero patterns, and the identity coupling of a file without `CouplingAbs`, are limited to 2^24 values
-  each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without coupling).
+- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`NoElements`) must be
+  backed by data in the file (element positions, coupling, or pattern nodes of the last element). Elements without
+  pattern nodes read as zeros; their zero patterns, and the identity coupling of a file without `CouplingAbs`, are
+  limited to 2^24 values each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without
+  coupling).
 
 ### Declaration:
 ```cpp
@@ -1941,7 +1942,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_channel) · [Python](quadrig
 - Round trip with [hdf5_write_channel](#hdf5_write_channel): every per-snapshot field comes back with one entry per snapshot, also for
   snapshots without paths (empty entries keep their shape); a channel written without `center_freq` comes back
   with an empty `center_freq`; empty `tx_orientation` / `rx_orientation` come back as `[3, 1]` zeros.
-- Throws `std::invalid_argument` if the file is malformed (e.g. a dataset does not have the size given by the
+- Throws `std::runtime_error` if the file is malformed (e.g. a dataset does not have the size given by the
   attributes of the channel, or a required dataset or attribute is missing) or is not a channel file of version 3
   written by quadriga-lib: files written by quadriga-lib 0.12.4 and earlier (version 2) are rejected; files modified
   with other HDF5 tools are not supported and may be rejected.
@@ -2432,7 +2433,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_parse) · [Python](quadriga_l
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 - When `n_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp
@@ -2490,7 +2492,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#qrt_file_read) · [Python](quadriga_li
 - `fn` is ignored when both `file` and `cache` are provided.
 - Reading a TX slot that was reserved by [qrt_file_init](#qrt_file_init) but not yet written by [qrt_file_append](#qrt_file_append) returns
   empty path outputs with zeroed positions, rather than throwing; an out-of-range index still throws.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp
@@ -2595,7 +2598,8 @@ Not in: MATLAB, Python
   (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [qrt_file_init](#qrt_file_init) but never written by [qrt_file_append](#qrt_file_append) returns an empty vector.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 - For tight loops over many origins, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache to avoid
   re-parsing the header on each call.
 
@@ -2688,7 +2692,8 @@ Not in: MATLAB, Python
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 - For a TX slot reserved by [qrt_file_init](#qrt_file_init) but not yet written, `orig_index` and `path_data_offset`
   are `0`; [qrt_file_read](#qrt_file_read) treats that as an empty (unwritten) origin.
-- Throws `std::invalid_argument` if the file is truncated, or if a count or offset in it does not fit the file size.
+- Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
+  or if a count or offset in it does not fit the file size.
 
 ### Declaration:
 ```cpp
@@ -3709,8 +3714,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#conf_file_list) · [Python](quadriga_l
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
 - With `parse_shortnames = true` every line `ShortName = name` that is not a comment adds an entry right after its
   file; other lines are not examined
-- Throws `std::invalid_argument` if a short name equals an earlier entry, if a file name equals an earlier short
-  name, or if a `ShortName` value is not one name; `std::runtime_error` if a listed file cannot be opened
+- Throws `std::runtime_error` if a short name equals an earlier entry, if a file name equals an earlier short
+  name, if a `ShortName` value is not one name, or if a listed file cannot be opened
 - A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string is the
   current directory. A failed call leaves the outputs untouched
 
@@ -3762,7 +3767,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#conf_file_read) · [Python](quadriga_l
 - Numbers are decimal with an optional sign, decimal point and exponent (`-6.28`, `.5`, `6.2e-07`), read
   independent of the global locale; `Inf`, `+Inf` and `-Inf` in any case
 - Throws `std::runtime_error` if the file cannot be opened or is a directory
-- Throws `std::invalid_argument` with file name and line number for a line that is not blank, not a comment and not
+- Throws `std::runtime_error` with file name and line number for a line that is not blank, not a comment and not
   a well-formed assignment (no `=`, not one name before the `=`, a missing value, a word where a number is required
   or the reverse, text after the value, `NaN`, a number beyond the range of a double, a `PL_` key without a name, a
   `ShortName` value stated twice), and with `validate = true` for a value that fails [scenpar_validate](#scenpar_validate)
@@ -5739,7 +5744,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#obj_file_read) · [Python](quadriga_li
 
 - Parses a triangulated `.obj`; quads and n-gons are rejected. Face references may be `v`, `v/vt`, `v//vn` or
   `v/vt/vn`; a negative (relative) index counts back from the last vertex defined before the face line (`-1` = that
-  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::invalid_argument`. The file is
+  vertex). Index 0, or an index beyond the vertices defined before the face, throws `std::runtime_error`. The file is
   parsed and validated for any combination of requested outputs, also when no output is requested.
 - Lines may end in LF or CRLF (`.obj`, `.mtl` and material CSV).
 - Two independent material systems are returned:

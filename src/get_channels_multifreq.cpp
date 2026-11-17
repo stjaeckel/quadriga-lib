@@ -231,9 +231,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
     // Input validation
     if (tx_array.empty())
-        throw std::invalid_argument("get_channels_multifreq: TX array vector is empty.");
+        throw std::invalid_argument("Input 'tx_array' cannot be empty.");
     if (rx_array.empty())
-        throw std::invalid_argument("get_channels_multifreq: RX array vector is empty.");
+        throw std::invalid_argument("Input 'rx_array' cannot be empty.");
     const dtype *p_tp = qd_xyz(tx_pos, "tx_pos"), *p_to = qd_xyz(tx_orientation, "tx_orientation");
     const dtype *p_rp = qd_xyz(rx_pos, "rx_pos"), *p_ro = qd_xyz(rx_orientation, "rx_orientation");
     const dtype Tx = p_tp[0], Ty = p_tp[1], Tz = p_tp[2], Tb = p_to[0], Tt = p_to[1], Th = p_to[2];
@@ -283,10 +283,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     {
         std::string err = qd_arrayant_check_multi(tx_array);
         if (!err.empty())
-            throw std::invalid_argument("get_channels_multifreq: TX array validation failed: " + err);
+            throw std::invalid_argument("Input 'tx_array' is not valid: " + err);
         err = qd_arrayant_check_multi(rx_array);
         if (!err.empty())
-            throw std::invalid_argument("get_channels_multifreq: RX array validation failed: " + err);
+            throw std::invalid_argument("Input 'rx_array' is not valid: " + err);
     }
 
     // 0 paths: all path inputs empty; 'fbs_pos' of size [0, n] with n > 0 gives n paths without data (missing data)
@@ -340,13 +340,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     // 0 paths without add_fake_los_path: the path inputs are not checked, the outputs are empty [n_rx, n_tx, 0]
     if (!no_paths && (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 ||
                       path_length.n_elem == 0 || M.n_elem == 0))
-        throw std::invalid_argument("get_channels_multifreq: Missing path data.");
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' cannot be empty.");
 
     if (!no_paths && (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3))
-        throw std::invalid_argument("get_channels_multifreq: 'fbs_pos' and 'lbs_pos' must have 3 rows.");
+        throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows.");
 
     if (!no_paths && M.n_rows != 8 && M.n_rows != 2)
-        throw std::invalid_argument("get_channels_multifreq: 'M' must have 8 rows (full polarimetric) or 2 rows (scalar pressure).");
+        throw std::invalid_argument("Input 'M' must have 8 rows (full polarimetric) or 2 rows (scalar pressure).");
 
     const bool scalar_M = (M.n_rows == 2);
 
@@ -356,20 +356,20 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     const arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path;
 
     if (n_freq == 0)
-        throw std::invalid_argument("get_channels_multifreq: 'freq' is empty.");
+        throw std::invalid_argument("Input 'freq' cannot be empty.");
     if (n_freq_new == 0)
-        throw std::invalid_argument("get_channels_multifreq: 'freq_new' is empty.");
+        throw std::invalid_argument("Input 'freq_new' cannot be empty.");
 
     if (!no_paths && lbs_pos.n_cols != n_path)
-        throw std::invalid_argument("get_channels_multifreq: 'lbs_pos' must have n_path columns.");
+        throw std::invalid_argument("Input 'lbs_pos' must have n_path columns.");
     if (!no_paths && (path_gain.n_rows != n_path || path_gain.n_cols != n_freq))
-        throw std::invalid_argument("get_channels_multifreq: 'path_gain' must have size [n_path, n_freq].");
+        throw std::invalid_argument("Input 'path_gain' must have size [n_path, n_freq].");
     if (!no_paths && path_length.n_elem != n_path)
-        throw std::invalid_argument("get_channels_multifreq: 'path_length' must have n_path elements.");
+        throw std::invalid_argument("Input 'path_length' must have n_path elements.");
     if (!no_paths && (M.n_cols != n_path || M.n_slices != n_freq))
-        throw std::invalid_argument("get_channels_multifreq: 'M' must have size [8|2, n_path, n_freq].");
+        throw std::invalid_argument("Input 'M' must have size [8|2, n_path, n_freq].");
     if (propagation_speed <= zero)
-        throw std::invalid_argument("get_channels_multifreq: 'propagation_speed' must be positive.");
+        throw std::invalid_argument("Input 'propagation_speed' must be positive.");
 
     // Antenna dimensions (from first entry, consistent across all entries by validation)
     const arma::uword n_tx = tx_array[0].n_elements();

@@ -24,6 +24,7 @@ TEST_CASE("Arrayant OBJ Export")
 
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file("testantenna.obx", ant), std::invalid_argument);
     REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file<float>("testantenna.obj", ant, 0.0), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::arrayant_export_obj_file("test_no_such_dir_ant/testantenna.obj", ant), std::runtime_error);
 
     // Non-finite range or radius would give NaN or Inf vertex coordinates
     const float inf = std::numeric_limits<float>::infinity(), nan = std::numeric_limits<float>::quiet_NaN();

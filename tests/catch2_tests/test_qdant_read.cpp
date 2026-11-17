@@ -215,7 +215,9 @@ TEST_CASE("Arrayant reading from QDANT file - Missing ID throws")
     f.close();
     CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::invalid_argument);
 
+    // A missing file is a file problem, a missing ID an argument error
     std::remove(fn.c_str());
+    CHECK_THROWS_AS(quadriga_lib::qdant_read<double>(fn, 1), std::runtime_error);
 }
 
 // Writes the given text to a file and returns the exception type of qdant_read (or "none")
@@ -233,6 +235,10 @@ static std::string qdant_read_exception(const std::string &fn, const std::string
     {
         return "invalid_argument";
     }
+    catch (const std::runtime_error &)
+    {
+        return "runtime_error";
+    }
     catch (const std::bad_alloc &)
     {
         return "bad_alloc";
@@ -245,7 +251,7 @@ static std::string qdant_read_exception(const std::string &fn, const std::string
 }
 
 // The reader allocated memory from counts in the file without checking them against the data
-TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw invalid_argument")
+TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw runtime_error")
 {
     const std::string fn = "test_qdant_malformed.qdant";
     const std::string grid = "<ElevationGrid>0</ElevationGrid><AzimuthGrid>0</AzimuthGrid>";
@@ -253,25 +259,25 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw invalid_arg
     { return "<qdant><arrayant id=\"1\">" + body + "</arrayant></qdant>\n"; };
 
     // The 138-byte file of the report: 2e8 elements, no data
-    CHECK(qdant_read_exception(fn, ant("<NoElements>200000000</NoElements>" + grid)) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant("<NoElements>200000000</NoElements>" + grid)) == "runtime_error");
 
     // Element count not backed by positions, coupling or pattern data
-    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements>" + grid)) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements>" + grid)) == "runtime_error");
 
     // Invalid element counts
     for (std::string n : {"0", "-1", "abc", "1e3", "2.5", "99999999999999999999999"})
-        CHECK(qdant_read_exception(fn, ant("<NoElements>" + n + "</NoElements>" + grid)) == "invalid_argument");
+        CHECK(qdant_read_exception(fn, ant("<NoElements>" + n + "</NoElements>" + grid)) == "runtime_error");
 
     // Element positions that do not match the element count
-    CHECK(qdant_read_exception(fn, ant("<NoElements>3</NoElements><ElementPosition>0,0,0 1,1,1</ElementPosition>" + grid)) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant("<NoElements>3</NoElements><ElementPosition>0,0,0 1,1,1</ElementPosition>" + grid)) == "runtime_error");
 
     // Coupling without entries, or with a number of entries that is not a multiple of the element count
-    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements><CouplingAbs> </CouplingAbs>" + grid)) == "invalid_argument");
-    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements><CouplingAbs>1,0,0</CouplingAbs>" + grid)) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements><CouplingAbs> </CouplingAbs>" + grid)) == "runtime_error");
+    CHECK(qdant_read_exception(fn, ant("<NoElements>2</NoElements><CouplingAbs>1,0,0</CouplingAbs>" + grid)) == "runtime_error");
 
     // Element count backed only by a pattern node whose text is too short for the grid
     CHECK(qdant_read_exception(fn, ant("<NoElements>3</NoElements><ElevationGrid>-90 0 90</ElevationGrid>"
-                                       "<AzimuthGrid>-90 0 90</AzimuthGrid><EthetaMag el=\"3\">0</EthetaMag>")) == "invalid_argument");
+                                       "<AzimuthGrid>-90 0 90</AzimuthGrid><EthetaMag el=\"3\">0</EthetaMag>")) == "runtime_error");
 
     // Many elements without pattern data on a fine grid (positions present, 300 x 181 x 361 zero samples)
     {
@@ -288,24 +294,24 @@ TEST_CASE("Arrayant reading from QDANT file - Malformed counts throw invalid_arg
             cpl += i == 0 ? "1" : " 1";
         CHECK(qdant_read_exception(fn, ant("<NoElements>300</NoElements><ElementPosition>" + pos + "</ElementPosition>" +
                                            "<CouplingAbs>" + cpl + "</CouplingAbs>"
-                                           "<ElevationGrid>" + el_grid + "</ElevationGrid><AzimuthGrid>" + az_grid + "</AzimuthGrid>")) == "invalid_argument");
+                                           "<ElevationGrid>" + el_grid + "</ElevationGrid><AzimuthGrid>" + az_grid + "</AzimuthGrid>")) == "runtime_error");
 
         // 5000 elements without coupling: the identity coupling alone would have 25 million entries
         pos.clear();
         for (int i = 0; i < 5000; ++i)
             pos += i == 0 ? "0,0,0" : " 0,0,0";
-        CHECK(qdant_read_exception(fn, ant("<NoElements>5000</NoElements><ElementPosition>" + pos + "</ElementPosition>" + grid)) == "invalid_argument");
+        CHECK(qdant_read_exception(fn, ant("<NoElements>5000</NoElements><ElementPosition>" + pos + "</ElementPosition>" + grid)) == "runtime_error");
     }
 
     // Malformed number lists (Armadillo reports them as std::logic_error)
-    CHECK(qdant_read_exception(fn, ant("<ElevationGrid>0 1;2</ElevationGrid><AzimuthGrid>0</AzimuthGrid>")) == "invalid_argument");
-    CHECK(qdant_read_exception(fn, ant(grid + "<EthetaMag>1 2;3</EthetaMag>")) == "invalid_argument");
-    CHECK(qdant_read_exception(fn, ant("<ElementPosition>0,0;0</ElementPosition>" + grid)) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, ant("<ElevationGrid>0 1;2</ElevationGrid><AzimuthGrid>0</AzimuthGrid>")) == "runtime_error");
+    CHECK(qdant_read_exception(fn, ant(grid + "<EthetaMag>1 2;3</EthetaMag>")) == "runtime_error");
+    CHECK(qdant_read_exception(fn, ant("<ElementPosition>0,0;0</ElementPosition>" + grid)) == "runtime_error");
 
     // Malformed layout and IDs
-    CHECK(qdant_read_exception(fn, "<qdant><layout>1,2 3</layout><arrayant id=\"1\">" + grid + "</arrayant></qdant>\n") == "invalid_argument");
-    CHECK(qdant_read_exception(fn, "<qdant><arrayant id=\"abc\">" + grid + "</arrayant></qdant>\n", 2) == "invalid_argument");
-    CHECK(qdant_read_exception(fn, "<qdant><arrayant id=\"99999999999\">" + grid + "</arrayant></qdant>\n", 2) == "invalid_argument");
+    CHECK(qdant_read_exception(fn, "<qdant><layout>1,2 3</layout><arrayant id=\"1\">" + grid + "</arrayant></qdant>\n") == "runtime_error");
+    CHECK(qdant_read_exception(fn, "<qdant><arrayant id=\"abc\">" + grid + "</arrayant></qdant>\n", 2) == "runtime_error");
+    CHECK(qdant_read_exception(fn, "<qdant><arrayant id=\"99999999999\">" + grid + "</arrayant></qdant>\n", 2) == "runtime_error");
 
     // Valid files: an element count backed by positions only (elements without pattern data read as zeros)
     {

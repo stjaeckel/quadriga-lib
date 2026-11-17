@@ -77,6 +77,7 @@ TEST_CASE("Channel - OBJ Export")
     c.write_paths_to_obj_file("test_chan.obj", 1);
     c.write_paths_to_obj_file("test_chan.obj", 0, -50.0);
     c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6);
+    REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_no_such_dir_chan/test_chan.obj"), std::runtime_error);
 
     REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "bla"), std::invalid_argument);
 

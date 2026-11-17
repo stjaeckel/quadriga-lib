@@ -843,7 +843,8 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
 
     // Export colormap to material file
     std::ofstream outFile(fn_mtl);
-    if (outFile.is_open())
+    if (!outFile.is_open())
+        throw std::runtime_error("Cannot open file '" + fn_mtl + "' for writing.");
     {
         // Write some text to the file
         outFile << "# QuaDRiGa " << "antenna pattern colormap\n\n";
@@ -959,7 +960,8 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
 
     // Write OBJ File
     outFile = std::ofstream(fn);
-    if (outFile.is_open())
+    if (!outFile.is_open())
+        throw std::runtime_error("Cannot open file '" + fn + "' for writing.");
     {
         outFile << "# QuaDRiGa " << "antenna pattern\n";
         outFile << "mtllib " << fn_mtl_base << "\n";
@@ -1661,13 +1663,17 @@ unsigned quadriga_lib::qdant_write(const std::string &fn, const arrayant<dtype> 
 
     const arma::u32_mat layout_empty;
     unsigned id_in_file = 0;
+    bool input_error = false;
     error_message = qd_arrayant_qdant_write(fn, id, &ant.name, &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
                                             &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
                                             &ant.coupling_re, &ant.coupling_im, &ant.center_freq,
-                                            layout == nullptr ? &layout_empty : layout, &id_in_file);
+                                            layout == nullptr ? &layout_empty : layout, &id_in_file, &input_error);
 
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+    // A layout with an ID that is not in the file is an error in the arguments; everything else is a problem with the file
+    if (!error_message.empty() && input_error)
+        throw std::invalid_argument(error_message);
+    if (!error_message.empty())
+        throw std::runtime_error(error_message);
 
     return id_in_file;
 }

@@ -397,6 +397,11 @@ TEST_CASE("Test OBJ File Write - Error handling")
                                                          &vlo, &fio),
                     std::invalid_argument);
 
+    // The folder does not exist: a file problem, not an argument error
+    CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("test_no_such_dir_obj/cube.obj", &mesh, nullptr, nullptr,
+                                                         nullptr, nullptr, &vlo, &fio),
+                    std::runtime_error);
+
     // obj_names too short for obj_ind (0-based: max index 1 needs 2 names)
     {
         arma::uvec obj_ind = arma::join_cols(arma::zeros<arma::uvec>(6), arma::ones<arma::uvec>(6));

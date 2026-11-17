@@ -1114,10 +1114,11 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#qdant_read) · [Python](../p
 - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
 - Throws `std::invalid_argument` if the file has no entry with the given ID. The first entry of a file is ID 1 only
   if it has no `id` attribute (files written by other tools); otherwise ID 1 must exist.
-- Malformed files throw `std::invalid_argument`. The number of elements (`NoElements`) must be backed by data in the
-  file (element positions, coupling, or pattern nodes of the last element). Elements without pattern nodes read as
-  zeros; their zero patterns, and the identity coupling of a file without `CouplingAbs`, are limited to 2^24 values
-  each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without coupling).
+- A missing, unreadable or malformed file throws `std::runtime_error`. The number of elements (`NoElements`) must be
+  backed by data in the file (element positions, coupling, or pattern nodes of the last element). Elements without
+  pattern nodes read as zeros; their zero patterns, and the identity coupling of a file without `CouplingAbs`, are
+  limited to 2^24 values each (e.g. 256 elements without pattern data on a 1-degree grid, 4096 elements without
+  coupling).
 
 ### Declaration:
 ```cpp

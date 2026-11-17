@@ -242,7 +242,7 @@ TEST_CASE("qd_hdf5 - chunks follow the tail rule")
             {
                 h5::chunk bad = c;
                 bad.image[i] ^= 0x01;
-                CHECK_THROWS_AS(h5::parse_chunk(bad), std::invalid_argument);
+                CHECK_THROWS_AS(h5::parse_chunk(bad), std::runtime_error);
             }
         }
 
@@ -253,7 +253,7 @@ TEST_CASE("qd_hdf5 - chunks follow the tail rule")
     std::vector<uint8_t> msgs = link;
     msgs.insert(msgs.end(), nil.begin(), nil.end());
     h5::encode_chunk(c.image, false, msgs.data(), msgs.size(), msgs.size() + 2);
-    CHECK_THROWS_AS(h5::parse_chunk(c), std::invalid_argument);
+    CHECK_THROWS_AS(h5::parse_chunk(c), std::runtime_error);
 }
 
 TEST_CASE("qd_hdf5 - header::emit splits at 65535 bytes and keeps the reserve in the last chunk")
@@ -356,8 +356,8 @@ TEST_CASE("qd_hdf5 - chain_links grows groups in place and by continuation chunk
         h5::chain_links g;
         g.load(file, channel_addr, sb.eof);
         CHECK_NOTHROW(g.check_insert(4, false));
-        CHECK_THROWS_AS(g.check_insert(5, false), std::invalid_argument);
-        CHECK_THROWS_AS(g.check_insert(4, true), std::invalid_argument); // No creation order
+        CHECK_THROWS_AS(g.check_insert(5, false), std::runtime_error);
+        CHECK_THROWS_AS(g.check_insert(4, true), std::runtime_error); // No creation order
         h5::output o(file, sb.eof);
         commit(file, o, sb.root, g.prepare_insert("Data", data_addr, false, o.buf, o.base));
         sb = h5::read_superblock(file);
@@ -511,11 +511,11 @@ TEST_CASE("qd_hdf5 - file reads are bounds-checked and the header window returns
     uint8_t buf[70000];
 
     // Outside the file, also where addr + n would wrap
-    CHECK_THROWS_AS(file.read(content.size() - 3, buf, 4), std::invalid_argument);
-    CHECK_THROWS_AS(file.read(h5::undef, buf, 16), std::invalid_argument);
-    CHECK_THROWS_AS(file.read(1ULL << 63, buf, 16), std::invalid_argument);
-    CHECK_THROWS_AS(file.read_header(1ULL << 63, buf, (size_t)1 << 20), std::invalid_argument);
-    CHECK_THROWS_AS(file.read_header(content.size() - 3, buf, 4), std::invalid_argument);
+    CHECK_THROWS_AS(file.read(content.size() - 3, buf, 4), std::runtime_error);
+    CHECK_THROWS_AS(file.read(h5::undef, buf, 16), std::runtime_error);
+    CHECK_THROWS_AS(file.read(1ULL << 63, buf, 16), std::runtime_error);
+    CHECK_THROWS_AS(file.read_header(1ULL << 63, buf, (size_t)1 << 20), std::runtime_error);
+    CHECK_THROWS_AS(file.read_header(content.size() - 3, buf, 4), std::runtime_error);
 
     // Header reads inside, across the end of and outside the window, and longer than the window
     for (auto r : std::vector<std::pair<uint64_t, size_t>>{{1000, 100}, {1100, 300}, {1000 + 65530, 20}, {150000, 8},
@@ -599,15 +599,15 @@ TEST_CASE("qd_hdf5 - decimal names and the superblock checks")
     CHECK(sb.eof == 1000);
     CHECK(sb.root == 48);
     CHECK_NOTHROW(check_superblock(h5::superblock_bytes(1000, 48), 5000));                         // Bytes after EOF
-    CHECK_THROWS_AS(check_superblock(h5::superblock_bytes(1000, 48), 999), std::invalid_argument);  // EOF > size
-    CHECK_THROWS_AS(check_superblock(h5::superblock_bytes(1000, 1000), 1000), std::invalid_argument); // Root at EOF
-    CHECK_THROWS_AS(check_superblock(bytes({0x89, 'H', 'D'}), 3), std::invalid_argument);
+    CHECK_THROWS_AS(check_superblock(h5::superblock_bytes(1000, 48), 999), std::runtime_error);  // EOF > size
+    CHECK_THROWS_AS(check_superblock(h5::superblock_bytes(1000, 1000), 1000), std::runtime_error); // Root at EOF
+    CHECK_THROWS_AS(check_superblock(bytes({0x89, 'H', 'D'}), 3), std::runtime_error);
     auto sb0 = h5::superblock_bytes(1000, 48);
     sb0[8] = 0; // Version 0 (written by the HDF5 library by default)
-    CHECK_THROWS_AS(check_superblock(sb0, 1000), std::invalid_argument);
+    CHECK_THROWS_AS(check_superblock(sb0, 1000), std::runtime_error);
     sb0 = h5::superblock_bytes(1000, 48);
     sb0[40] ^= 1; // Checksum
-    CHECK_THROWS_AS(check_superblock(sb0, 1000), std::invalid_argument);
+    CHECK_THROWS_AS(check_superblock(sb0, 1000), std::runtime_error);
 }
 
 TEST_CASE("qd_hdf5 - a dataset without elements must not declare extents larger than the file")
@@ -634,6 +634,6 @@ TEST_CASE("qd_hdf5 - a dataset without elements must not declare extents larger 
     };
     const uint64_t eof = 4096;
     CHECK(h5::decode_dataset(dataset_object(0, 5), eof).n_elem == 0); // Small empty extents stay valid
-    CHECK_THROWS_AS(h5::decode_dataset(dataset_object(0, 1ULL << 62), eof), std::invalid_argument);
-    CHECK_THROWS_AS(h5::decode_dataset(dataset_object(1ULL << 62, 0), eof), std::invalid_argument);
+    CHECK_THROWS_AS(h5::decode_dataset(dataset_object(0, 1ULL << 62), eof), std::runtime_error);
+    CHECK_THROWS_AS(h5::decode_dataset(dataset_object(1ULL << 62, 0), eof), std::runtime_error);
 }

@@ -146,8 +146,8 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 
 ## Input validation
 - Validate first, compute second: all checks run before any output is resized or written, so that a failed call leaves the outputs untouched.
-- Throw `std::invalid_argument` for invalid input (null, empty, wrong shape, out-of-range value, inconsistent sizes). Use `std::runtime_error` for I/O and other runtime failures. `std::out_of_range` is used for index arguments in a few places; prefer `std::invalid_argument` unless the contract says otherwise.
-- Message style: a full sentence naming the argument in single quotes, e.g.
+- Throw `std::invalid_argument` for invalid input (null, empty, wrong shape, out-of-range value or index, inconsistent sizes), also for an index outside the layout of a file or a name the file does not contain. Throw `std::runtime_error` for a problem with a file's access or content (missing, cannot be opened or written, already exists where that is refused, truncated, malformed, unsupported version; also a value in a file that fails a check) and for other runtime failures. An empty file name is a file that cannot be opened; it needs no separate check.
+- Message style: a full sentence naming the argument in single quotes, without the function name as a prefix, e.g.
   - `"Input 'orig' cannot be NULL."`
   - `"Input 'mesh' cannot be empty."`
   - `"Input 'mesh' must have 9 columns."`

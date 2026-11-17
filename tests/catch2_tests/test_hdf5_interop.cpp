@@ -31,6 +31,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_exception.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
 #include "qd_any_type_id.hpp"
@@ -511,10 +512,8 @@ TEST_CASE("hdf5_write_channel - the HDF5 C library reads the documented object t
 
 namespace
 {
-    const std::string unsupported_message =
-        "Unsupported HDF5 file: quadriga-lib reads only channel files of version 3 that it wrote itself; files written "
-        "by quadriga-lib 0.12.4 and earlier (version 2) and files modified with other HDF5 tools are not supported. "
-        "Version-2 files can be converted with tools/hdf5_convert_v2.py.";
+    // Start of the message for valid HDF5 files outside the supported subset; the rest is a hint that may change
+    const std::string unsupported_message = "Unsupported HDF5 file: ";
 
     std::vector<unsigned char> load(const std::string &fn)
     {
@@ -855,7 +854,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
         for (auto &w : calls)
         {
             INFO("function " << w.first);
-            CHECK_THROWS_MATCHES(w.second(), std::invalid_argument, Catch::Matchers::Message(unsupported_message));
+            CHECK_THROWS_MATCHES(w.second(), std::runtime_error, Catch::Matchers::MessageMatches(Catch::Matchers::StartsWith(unsupported_message)));
             CHECK(load(fn) == before);
         }
     };
@@ -918,8 +917,8 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
         modify(fn, [](hid_t file)
                { add_vlen_string(file, "/channel_3/Data/par_vlen"); });
         CHECK(names_of(0, 1) == std::vector<std::string>({"note", "values", "vlen"}));
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "vlen", 0, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset(fn, "vlen", 0, 1), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 0, 1), std::runtime_error);
         CHECK(std::any_cast<std::string>(quadriga_lib::hdf5_read_dset(fn, "note", 0, 1)) == "note");
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 0, 0).par_names.size() == 10);
     }

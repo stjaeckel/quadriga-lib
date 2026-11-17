@@ -126,27 +126,27 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
 
     // --- Input validation ---
     if (driver_type != "piston" && driver_type != "horn" && driver_type != "omni")
-        throw std::invalid_argument("generate_speaker: driver_type must be 'piston', 'horn', or 'omni'.");
+        throw std::invalid_argument("Input 'driver_type' must be 'piston', 'horn', or 'omni'.");
 
     if (radiation_type != "monopole" && radiation_type != "hemisphere" && radiation_type != "dipole" && radiation_type != "cardioid")
-        throw std::invalid_argument("generate_speaker: radiation_type must be 'monopole', 'hemisphere', 'dipole', or 'cardioid'.");
+        throw std::invalid_argument("Input 'radiation_type' must be 'monopole', 'hemisphere', 'dipole', or 'cardioid'.");
 
     // The horn parameters default to NaN, which selects the value derived below; all other scalars must be valid
     for (dtype v : {radius, lower_rolloff_slope_dB, upper_rolloff_slope_dB, baffle_width, baffle_height, lower_cutoff})
         if (!std::isfinite(v) || v <= dtype(0.0))
-            throw std::invalid_argument("generate_speaker: radius, slopes, baffle size and lower_cutoff must be finite and > 0.");
+            throw std::invalid_argument("Inputs 'radius', 'lower_rolloff_slope_dB', 'upper_rolloff_slope_dB', 'baffle_width', 'baffle_height' and 'lower_cutoff' must be finite and > 0.");
     if (!std::isfinite(upper_cutoff) || upper_cutoff <= lower_cutoff)
-        throw std::invalid_argument("generate_speaker: upper_cutoff must be finite and larger than lower_cutoff.");
+        throw std::invalid_argument("Input 'upper_cutoff' must be finite and larger than 'lower_cutoff'.");
     if (!std::isfinite(sensitivity_dB))
-        throw std::invalid_argument("generate_speaker: sensitivity_dB must be finite.");
+        throw std::invalid_argument("Input 'sensitivity_dB' must be finite.");
     if (angular_resolution_deg <= dtype(0.0))
-        throw std::invalid_argument("generate_speaker: angular_resolution_deg must be in the range from 0.1 to 90 deg.");
+        throw std::invalid_argument("Input 'angular_resolution_deg' must be in the range from 0.1 to 90 deg.");
     for (dtype v : {hor_coverage_deg, ver_coverage_deg, horn_control_freq})
         if (std::isinf(v))
-            throw std::invalid_argument("generate_speaker: coverage and horn_control_freq must be finite or NaN.");
+            throw std::invalid_argument("Inputs 'hor_coverage_deg', 'ver_coverage_deg' and 'horn_control_freq' must be finite or NaN.");
     for (dtype f : center_freq)
         if (!std::isfinite(f) || f <= dtype(0.0))
-            throw std::invalid_argument("generate_speaker: center_freq must be finite and positive.");
+            throw std::invalid_argument("Entries of 'center_freq' must be finite and positive.");
 
     angular_resolution_deg = qd_arrayant_grid_resolution(angular_resolution_deg, dtype(5.0), "angular_resolution_deg");
 
@@ -180,7 +180,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(const 
         }
 
         if (freq_vec.empty())
-            throw std::invalid_argument("generate_speaker: Could not generate frequency samples in the audible range.");
+            throw std::invalid_argument("Could not generate frequency samples in the audible range.");
 
         center_freq.set_size((arma::uword)freq_vec.size());
         for (arma::uword i = 0; i < (arma::uword)freq_vec.size(); ++i)

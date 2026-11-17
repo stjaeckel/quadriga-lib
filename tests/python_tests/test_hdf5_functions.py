@@ -190,7 +190,7 @@ class test_case(unittest.TestCase):
     def test_create_file_errors(self):
         fn = self.fn('create_err.hdf5')
         channel.hdf5_create_file(fn, 2)
-        with self.assertRaises(ValueError) as ctx:  # thrown by the wrapper
+        with self.assertRaises(RuntimeError) as ctx:  # thrown by the wrapper
             channel.hdf5_create_file(fn, 2)
         self.assertIn('File already exists.', str(ctx.exception))
 
@@ -238,7 +238,7 @@ class test_case(unittest.TestCase):
         fn = self.fn('not_hdf5.txt')
         with open(fn, 'w') as f:
             f.write('This is not HDF5 data')
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(RuntimeError) as ctx:
             channel.hdf5_read_layout(fn)
         self.assertIn('Not an HDF5 file', str(ctx.exception))
         with self.assertRaises(TypeError):
@@ -271,7 +271,7 @@ class test_case(unittest.TestCase):
 
     def test_reshape_layout_errors(self):
         fn = self.fn('reshape_err.hdf5')
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(RuntimeError) as ctx:
             channel.hdf5_reshape_layout(fn, 4)
         self.assertIn('File does not exist.', str(ctx.exception))
         channel.hdf5_create_file(fn, 4, 3)
@@ -658,7 +658,7 @@ class test_case(unittest.TestCase):
         fn = self.fn('dset_err.hdf5')
         for f, kwargs in [(channel.hdf5_write_dset, {'name': 'x', 'data': 1.0}),
                           (channel.hdf5_read_dset, {'name': 'x'}), (channel.hdf5_read_dset_names, {})]:
-            with self.assertRaises(ValueError) as ctx:
+            with self.assertRaises(RuntimeError) as ctx:
                 f(fn, **kwargs)
             self.assertIn('File does not exist.', str(ctx.exception))
 
@@ -669,12 +669,14 @@ class test_case(unittest.TestCase):
                             ({'ix': 3, 'name': 'y', 'data': 1.0}, 'Location exceeds storage space in HDF file.'),
                             ({'ix': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),  # thrown by C++
                             ({'iy': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
-                            ({'name': 'x', 'data': 2.0}, "Dataset 'par_x' already exists."),
                             ({'name': 'a b', 'data': 1.0}, 'Parameter name must only contain letters'),
                             ({'name': 'y', 'data': np.ones(2, complex)}, "Input 'y' has an unsupported type.")]:
             with self.assertRaises(ValueError, msg=msg) as ctx:
                 channel.hdf5_write_dset(fn, **kwargs)
             self.assertIn(msg, str(ctx.exception))
+        with self.assertRaises(RuntimeError) as ctx:  # a dataset the file already has: a file problem
+            channel.hdf5_write_dset(fn, name='x', data=2.0)
+        self.assertIn("Dataset 'par_x' already exists.", str(ctx.exception))
         self.assertEqual(channel.hdf5_read_dset_names(fn), ['x'])  # nothing else was written
 
         # Rejected by pybind11: 'name' has no default

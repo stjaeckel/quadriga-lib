@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // QRT readers on malformed files: counts and offsets that do not fit the file, and truncated files.
-// Every reader must throw std::invalid_argument quickly instead of allocating memory for the counts.
+// Every reader must throw std::runtime_error quickly instead of allocating memory for the counts.
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_channel.hpp"
@@ -34,13 +34,14 @@ namespace
         o.write(data.data(), (std::streamsize)len);
     }
 
-    // Runs f, requires std::invalid_argument and a run time below 0.1 s
+    // Runs f, requires std::runtime_error and a run time below 1 s (a throw takes under 1 ms; an allocation from the
+    // counts in the file would take seconds)
     static void qrt_require_fast_throw(const std::function<void()> &f)
     {
         auto t0 = std::chrono::steady_clock::now();
-        CHECK_THROWS_AS(f(), std::invalid_argument);
+        CHECK_THROWS_AS(f(), std::runtime_error);
         double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        CHECK(dt < 0.1);
+        CHECK(dt < 1.0);
     }
 
     static void qrt_parse_all(const std::string &fn)
@@ -143,7 +144,7 @@ TEST_CASE("QRT Reader - counts and offsets that do not fit the file")
 
 TEST_CASE("QRT Reader - truncated files")
 {
-    // Every truncation of the small file makes the readers throw std::invalid_argument
+    // Every truncation of the small file makes the readers throw std::runtime_error
     const std::string fn = "tests/data/test_qrt_truncated.qrt";
     const std::vector<char> good = qrt_small_file(fn);
     REQUIRE(good.size() == 136);

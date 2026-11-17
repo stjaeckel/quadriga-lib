@@ -18,8 +18,8 @@ List the scenarios defined by the conf files in a set of directories
 - A file name found in an earlier directory is skipped, so a local folder can override the files of a shared one
 - With `parse_shortnames = True` every line `ShortName = name` that is not a comment adds an entry right after its file;
   other lines are not examined
-- Raises `ValueError` if a short name equals an earlier entry, if a file name equals an earlier short name, or if a
-  `ShortName` value is not one name; `RuntimeError` if a listed file cannot be opened
+- Raises `RuntimeError` if a short name equals an earlier entry, if a file name equals an earlier short name, if a
+  `ShortName` value is not one name, or if a listed file cannot be opened
 - A directory that does not exist, is not a directory or cannot be listed is skipped; an empty string `""` is the
   current directory
 

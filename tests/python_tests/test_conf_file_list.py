@@ -134,10 +134,10 @@ class test_case(unittest.TestCase):
         self.assertEqual(file_dirs, [config_dir] * 23)
 
     def test_errors(self):
-        # Thrown by C++: std::invalid_argument -> ValueError
+        # Thrown by C++: std::runtime_error -> RuntimeError
         with open(os.path.join(self.d2, "D.conf"), "w") as f:
             f.write("ShortName = Bs\n")
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(RuntimeError) as ctx:
             quadriga_lib.gbsm.conf_file_list([self.d1, self.d2])
         self.assertIn("ShortName 'Bs' is ambiguous", str(ctx.exception))
 

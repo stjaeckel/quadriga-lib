@@ -371,7 +371,7 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     CHECK(path_length.n_elem == 0);
 
     // Out-of-range origin still throws.
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, 3), std::out_of_range);
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_read_raw(fn, 3), std::invalid_argument);
 
     std::remove(fn.c_str());
 }
@@ -416,7 +416,7 @@ TEST_CASE("QRT Write - append validates path against file")
     // iC out of range (file has 2 CIRs).
     {
         std::vector<path> bad = {make_em_path(5, 1, 2, {1})};
-        CHECK_THROWS_AS(quadriga_lib::qrt_file_append<float>(fn, bad, tx_pos), std::out_of_range);
+        CHECK_THROWS_AS(quadriga_lib::qrt_file_append<float>(fn, bad, tx_pos), std::invalid_argument);
     }
     // Frequency count mismatch (path has 1 freq, file has 2).
     {
@@ -596,7 +596,7 @@ TEST_CASE("QRT Write - append to a v4 file is rejected")
         o.write(before.data(), (std::streamsize)before.size());
     }
     std::vector<path> paths = {make_em_path(0, 1, 1, {1})};
-    CHECK_THROWS_AS(quadriga_lib::qrt_file_append<double>(fn, paths, arma::vec{0.0, 0.0, 0.0}), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::qrt_file_append<double>(fn, paths, arma::vec{0.0, 0.0, 0.0}), std::runtime_error);
     std::ifstream i(fn, std::ios::binary);
     std::vector<char> after((std::istreambuf_iterator<char>(i)), std::istreambuf_iterator<char>());
     CHECK(after == before);

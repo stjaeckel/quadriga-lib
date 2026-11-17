@@ -169,6 +169,9 @@ TEST_CASE("Arrayant writing to QDANT file - Complex test")
     layout = {{1, 2, 112}, {112, 112, 6}};
     REQUIRE_THROWS_AS(quadriga_lib::qdant_write("test.qdant", ant, 5, &layout), std::invalid_argument);
 
+    // A file that cannot be written (the folder does not exist)
+    REQUIRE_THROWS_AS(quadriga_lib::qdant_write("test_no_such_dir_qdant/test.qdant", ant), std::runtime_error);
+
     id = quadriga_lib::qdant_write("test.qdant", ant, 6, &layout);
     CHECK(id == 6);
 

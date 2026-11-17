@@ -133,10 +133,10 @@ class test_case(unittest.TestCase):
         fn = self.write("conf_file_read_invalid.conf", "r_DS = -1\n")
 
         # Default is validate = True
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(RuntimeError) as ctx:
             quadriga_lib.gbsm.conf_file_read(fn)
         self.assertIn("r_DS", str(ctx.exception))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             quadriga_lib.gbsm.conf_file_read(fn, True)
 
         # validate = False only checks the grammar
@@ -147,7 +147,7 @@ class test_case(unittest.TestCase):
         # None selects the default (True); bool and numpy.bool_ are accepted; anything else is a TypeError
         fn = self.write("conf_file_read_invalid.conf", "r_DS = -1\n")
         for args, kwargs in [((fn, None), {}), ((fn,), {"validate": None}), ((fn, np.bool_(True)), {})]:
-            with self.assertRaises(ValueError) as ctx:
+            with self.assertRaises(RuntimeError) as ctx:
                 quadriga_lib.gbsm.conf_file_read(*args, **kwargs)
             self.assertIn("r_DS", str(ctx.exception))
         self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, np.bool_(False))[0]["r_DS"], -1.0)
@@ -198,7 +198,7 @@ class test_case(unittest.TestCase):
 
         # A number beyond the range of a double is an error, below it reads as 0
         fn = self.write("conf_file_read_range.conf", "DS_sigma = 0.3\nDS_mu = 1e400\n")
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(RuntimeError) as ctx:
             quadriga_lib.gbsm.conf_file_read(fn)
         self.assertIn("line 2: Value of 'DS_mu' is out of range.", str(ctx.exception))
         fn = self.write("conf_file_read_underflow.conf", "DS_mu = -1e-400\n")
@@ -228,16 +228,16 @@ class test_case(unittest.TestCase):
             quadriga_lib.gbsm.conf_file_read(os.path.join(self.tmp.name, "no_such_file.conf"))
         self.assertIn("Cannot open file", str(ctx.exception))
 
-        # Thrown by C++: std::invalid_argument -> ValueError, with file name and line number
+        # Thrown by C++: std::runtime_error -> RuntimeError, with file name and line number
         fn = self.write("conf_file_read_grammar.conf", "% comment\nDS_mu = abc\n")
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(RuntimeError) as ctx:
             quadriga_lib.gbsm.conf_file_read(fn, False)
         self.assertIn("line 2", str(ctx.exception))
         self.assertIn("DS_mu", str(ctx.exception))
 
         # Cross-key check: DS_VS > 0 needs DS_VS_a or DS_VS_b > 0; the message names the line of DS_VS
         fn = self.write("conf_file_read_ds_vs.conf", "DS_mu = -9.44\nDS_VS = 4\n")
-        with self.assertRaises(ValueError) as ctx:
+        with self.assertRaises(RuntimeError) as ctx:
             quadriga_lib.gbsm.conf_file_read(fn)
         self.assertIn("line 2", str(ctx.exception))
         self.assertIn("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.", str(ctx.exception))
@@ -246,7 +246,7 @@ class test_case(unittest.TestCase):
         # SubpathMethod: only 'legacy' is accepted, also without validation
         fn = self.write("conf_file_read_subpath.conf", "DS_mu = -7\nSubpathMethod = mmMAGIC\n")
         for validate in (True, False):
-            with self.assertRaises(ValueError) as ctx:
+            with self.assertRaises(RuntimeError) as ctx:
                 quadriga_lib.gbsm.conf_file_read(fn, validate)
             self.assertIn("line 2: Value 'mmMAGIC' of 'SubpathMethod' is not supported; only 'legacy' is accepted.",
                           str(ctx.exception))
