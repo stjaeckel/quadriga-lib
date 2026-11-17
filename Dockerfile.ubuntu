@@ -81,6 +81,9 @@ RUN CODENAME=$(cat /etc/build-codename) && \
         mv "$f" "${f%_amd64.deb}+${CODENAME}_amd64.deb"; \
     done
 
+# The MATLAB MEX files must load with the C++ runtime of the oldest supported MATLAB release
+RUN bash tests/check_mex_symbol_versions.sh obj-$(dpkg-architecture -qDEB_HOST_GNU_TYPE)-matlab
+
 # ---- 5. Inspect the result ----
 RUN echo "=== Package contents ===" && \
     dpkg-deb -c /build/quadriga-lib_*.deb | head -80 && \

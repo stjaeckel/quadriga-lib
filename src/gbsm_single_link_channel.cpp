@@ -239,8 +239,10 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
 
     // Runs f(i) for i < n, in parallel when 'par'. The serial branch opens no parallel region, so that
     // get_channels_* keep their own threads (an inactive region would make them start new nested teams). The first
-    // exception of the parallel branch is rethrown after the loop with its type: OMP_SAFE_CALL keeps only the
-    // message, and the "drift" errors of ssf_paths must stay std::invalid_argument.
+    // exception of the parallel branch is rethrown after the loop as std::invalid_argument or std::runtime_error:
+    // OMP_SAFE_CALL keeps only the message, and the "drift" errors of ssf_paths must stay std::invalid_argument.
+    // std::exception_ptr is not used: it needs libstdc++ symbols (CXXABI_1.3.13) that the libstdc++ bundled with
+    // older MATLAB releases lacks, so the MEX file would not load there.
     auto loop = [](int n, bool par, const auto &f)
     {
         if (!par)
@@ -249,7 +251,18 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
                 f((arma::uword)i);
             return;
         }
-        std::exception_ptr err;
+        bool failed = false, invalid_arg = false;
+        std::string msg;
+        auto keep = [&](bool is_invalid_arg, const char *what)
+        {
+#pragma omp critical
+            if (!failed)
+            {
+                failed = true;
+                invalid_arg = is_invalid_arg;
+                msg = what;
+            }
+        };
 #pragma omp parallel for
         for (int i = 0; i < n; ++i)
         {
@@ -257,15 +270,19 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
             {
                 f((arma::uword)i);
             }
-            catch (...)
+            catch (const std::invalid_argument &e)
             {
-#pragma omp critical
-                if (!err)
-                    err = std::current_exception();
+                keep(true, e.what());
+            }
+            catch (const std::exception &e)
+            {
+                keep(false, e.what());
             }
         }
-        if (err)
-            std::rethrow_exception(err);
+        if (failed && invalid_arg)
+            throw std::invalid_argument(msg);
+        if (failed)
+            throw std::runtime_error(msg);
     };
 
     // "phase" (TR 38.901 eq. (7.5-22)): c_r(t) = c_r(unit gain, orientations of t) · sqrt(g_r(t)) · exp(j·phi_r(t))

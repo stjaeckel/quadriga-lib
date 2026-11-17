@@ -198,6 +198,7 @@ for (long long i = 0; i < n_iter; ++i)
 if (omp_failed)
     throw std::runtime_error(omp_error);
 ```
+- Where the exception type must survive the region, keep the type and the message and rethrow that type (see `gbsm_single_link_channel.cpp`). Do not use `std::exception_ptr`: it needs a libstdc++ symbol version (`CXXABI_1.3.13`) that the libstdc++ bundled with MATLAB R2024a lacks, so the MEX files would not load there. `make test` runs `tests/check_mex_symbol_versions.sh`, which fails when a MEX file needs a symbol version newer than that release provides.
 - The result must not depend on the number of threads (same values, same order). If a parallel and a serial path exist, a test compares them.
 
 ## AVX2 and CUDA kernels

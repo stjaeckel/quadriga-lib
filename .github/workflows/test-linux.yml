@@ -53,6 +53,10 @@ jobs:
           make all octave=OFF python=OFF
           make moxunit-lib
 
+      # The MEX files must not need libstdc++ or libgcc_s symbol versions that MATLAB R2024a does not bundle
+      - name: Check MEX symbol versions
+        run: bash tests/check_mex_symbol_versions.sh build_linux
+
       # R2024a is the oldest supported release; MEX files built against it also load in newer releases
       - uses: matlab-actions/setup-matlab@f9e43010f1ae678f7cfa0542fe2a4f60f7d1ad8d # v3.1.0
         with:
