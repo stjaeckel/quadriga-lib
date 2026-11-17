@@ -164,7 +164,7 @@ Not in: MATLAB, Python
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
 - Interaction coordinates use a compressed format: `n_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
-- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [get_channels_irs](channel-generation-functions.md#get_channels_irs)) reduces this to active combinations only
+- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the `active_path_out` output of [get_channels_irs](channel-generation-functions.md#get_channels_irs)) reduces this to active combinations only
 - Typically used after [get_channels_irs](channel-generation-functions.md#get_channels_irs) to produce interaction data for path visualization (e.g. in Blender) via [coord2path](#coord2path)
 
 ### Declaration:
@@ -192,7 +192,7 @@ void quadriga_lib::combine_irs_coord(
   `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
-- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [get_channels_irs](channel-generation-functions.md#get_channels_irs) directly; `[n_path_1 × n_path_2]`
+- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the `active_path_out` output of [get_channels_irs](channel-generation-functions.md#get_channels_irs) directly; `[n_path_1 × n_path_2]`
 
 ### Outputs:
 - **`n_interact`** — Number of interaction points per combined path; `[n_path_irs]`
@@ -653,7 +653,7 @@ Detect overlapping 3D objects in a triangular mesh
 
 Not in: MATLAB, Python
 
-- Returns the IDs (as given in `obj_ind`) of all objects that intersect at least one other object
+- Gives the IDs (as given in `obj_ind`) of all objects that intersect at least one other object
 - Touching faces or edges are not considered overlapping
 - Checks for intersecting triangle faces and vertices/edges penetrating another object's bounding volume
 - Overlaps smaller than `tolerance` are ignored to account for numerical imprecision
@@ -661,9 +661,10 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-arma::uvec quadriga_lib::obj_overlap_test(
-    const arma::Mat<dtype> *mesh,
-    const arma::uvec *obj_ind,
+void quadriga_lib::obj_overlap_test(
+    const arma::Mat<dtype> &mesh,
+    const arma::uvec &obj_ind,
+    arma::uvec &overlap_ind,
     std::vector<std::string> *reason = nullptr,
     dtype tolerance = 0.0005);
 ```
@@ -671,12 +672,12 @@ arma::uvec quadriga_lib::obj_overlap_test(
 ### Inputs:
 - **`mesh`** — Triangular mesh; each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object ID of each triangle; any values, e.g. the 0-based `obj_ind` output of [obj_file_read](#obj_file_read); `[n_mesh]`
-- **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
-  overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
 
-### Returns:
-- `arma::uvec`: IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+### Outputs:
+- **`overlap_ind`** — IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+- **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
+  overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (reads mesh data from files and generates `obj_ind` input)
@@ -768,8 +769,9 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_cloud_aabb) · 
 
 ### Declaration:
 ```cpp
-arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
-    const arma::Mat<dtype> *points,
+void quadriga_lib::point_cloud_aabb(
+    const arma::Mat<dtype> &points,
+    arma::Mat<dtype> &aabb,
     const arma::u32_vec *sub_cloud_ind = nullptr,
     arma::uword vec_size = 1);
 ```
@@ -779,8 +781,8 @@ arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
 - **`sub_cloud_ind`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
-### Returns:
-- Bounding box matrix; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+### Output:
+- **`aabb`** — Bounding boxes, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [point_cloud_segmentation](#point_cloud_segmentation) (generate sub-cloud indices)
@@ -883,13 +885,14 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#point_inside_mesh) ·
 - A point is inside if any ray hits a face with a negative incidence angle, or if the ray
   thickness at FBS is below 1 mm (surface proximity)
 - Mesh must be watertight with all normals pointing outward
-- If `obj_ind` is provided, returns the 1-based enclosing object index instead of binary 0/1
+- If `obj_ind` is provided, `result` holds the 1-based enclosing object index instead of binary 0/1
 
 ### Declaration:
 ```cpp
-arma::uvec quadriga_lib::point_inside_mesh(
-    const arma::Mat<dtype> *points,
-    const arma::Mat<dtype> *mesh,
+void quadriga_lib::point_inside_mesh(
+    const arma::Mat<dtype> &points,
+    const arma::Mat<dtype> &mesh,
+    arma::uvec &result,
     const arma::uvec *obj_ind = nullptr,
     dtype distance = 0.0);
 ```
@@ -902,8 +905,8 @@ arma::uvec quadriga_lib::point_inside_mesh(
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m (default: 0)
 
-### Returns:
-- `arma::uvec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
+### Output:
+- **`result`** — `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
@@ -1695,7 +1698,7 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-std::vector<bool> quadriga_lib::ray_subdivide_flag(
+void quadriga_lib::ray_subdivide_flag(
     const arma::fmat &mesh,
     const arma::fmat &orig,
     const arma::fmat &dest,
@@ -1704,6 +1707,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::fmat &tridir,
     const std::vector<quadriga_lib::path> &paths,
     const arma::Col<short> &mtl_ind_current,
+    std::vector<bool> &subdiv_flag,
     uint8_t max_interactions = 20,
     uint8_t max_subdivisions = 2,
     float subdivision_tolerance = 3.0f);
@@ -1723,7 +1727,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
 - **`max_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
 - **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
-  the returned flags are all `false`
+  all flags are `false`
 - **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
 
@@ -1939,8 +1943,9 @@ Also in: [MATLAB](../mex/site-specific-simulation-tools.md#triangle_mesh_aabb) �
 
 ### Declaration:
 ```cpp
-arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
-    const arma::Mat<dtype> *mesh,
+void quadriga_lib::triangle_mesh_aabb(
+    const arma::Mat<dtype> &mesh,
+    arma::Mat<dtype> &aabb,
     const arma::u32_vec *sub_mesh_ind = nullptr,
     arma::uword vec_size = 1);
 ```
@@ -1950,8 +1955,8 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
-### Returns:
-- `arma::Mat<dtype>` of shape `[n_sub_aligned, 6]`, one AABB per sub-mesh row
+### Output:
+- **`aabb`** — Bounding boxes, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [ray_triangle_intersect](#ray_triangle_intersect) (consumer of the output)

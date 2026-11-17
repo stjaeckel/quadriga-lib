@@ -63,7 +63,7 @@ namespace quadriga_lib
         bool scalar_mode = false);                        // Switch for EM mode or scalar mode
 
     // Flag rays for subdivision
-    std::vector<bool> ray_subdivide_flag(
+    void ray_subdivide_flag(
         const arma::fmat &mesh,                       // Faces of the triangular mesh, [n_mesh, 9]
         const arma::fmat &orig,                       // Ray origins in GCS, [n_ray, 3]
         const arma::fmat &dest,                       // Ray destinations in GCS, [n_ray, 3]
@@ -72,6 +72,7 @@ namespace quadriga_lib
         const arma::fmat &tridir,                     // Vertex-ray directions, Cartesian [n_ray, 9]
         const std::vector<quadriga_lib::path> &paths, // Path data storage, [n_ray]
         const arma::Col<short> &mtl_ind_current,      // Current medium (0 = outside), [n_ray]
+        std::vector<bool> &subdiv_flag,               // Output: true where the ray must be split, [n_ray]
         uint8_t max_interactions = 20,                // Total number of interactions per ray, 0-255
         uint8_t max_subdivisions = 2,                 // Number of subdivisions, 0-255
         float subdivision_tolerance = 3.0f);          // Max. beam edge length in [m] before subdivision

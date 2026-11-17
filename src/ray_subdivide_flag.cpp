@@ -31,7 +31,7 @@ Compute the per-ray subdivision decision from the beam-tube footprint at the fir
 
 ## Declaration:
 ```
-std::vector<bool> quadriga_lib::ray_subdivide_flag(
+void quadriga_lib::ray_subdivide_flag(
     const arma::fmat &mesh,
     const arma::fmat &orig,
     const arma::fmat &dest,
@@ -40,6 +40,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::fmat &tridir,
     const std::vector<quadriga_lib::path> &paths,
     const arma::Col<short> &mtl_ind_current,
+    std::vector<bool> &subdiv_flag,
     uint8_t max_interactions = 20,
     uint8_t max_subdivisions = 2,
     float subdivision_tolerance = 3.0f);
@@ -59,7 +60,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
 - **`max_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
 - **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
-  the returned flags are all `false`
+  all flags are `false`
 - **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
 
@@ -91,17 +92,18 @@ static inline double qd_normalize(double &x, double &y, double &z)
     return len;
 }
 
-std::vector<bool> quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
-                                                   const arma::fmat &orig,
-                                                   const arma::fmat &dest,
-                                                   const arma::u32_vec &fbs_ind,
-                                                   const arma::fmat &trivec,
-                                                   const arma::fmat &tridir,
-                                                   const std::vector<quadriga_lib::path> &paths,
-                                                   const arma::Col<short> &mtl_ind_current,
-                                                   uint8_t max_interactions,
-                                                   uint8_t max_subdivisions,
-                                                   float subdivision_tolerance)
+void quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
+                                      const arma::fmat &orig,
+                                      const arma::fmat &dest,
+                                      const arma::u32_vec &fbs_ind,
+                                      const arma::fmat &trivec,
+                                      const arma::fmat &tridir,
+                                      const std::vector<quadriga_lib::path> &paths,
+                                      const arma::Col<short> &mtl_ind_current,
+                                      std::vector<bool> &subdiv_flag,
+                                      uint8_t max_interactions,
+                                      uint8_t max_subdivisions,
+                                      float subdivision_tolerance)
 {
     // Validate mesh
     if (mesh.n_elem == 0)
@@ -138,7 +140,10 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
 
     // Nothing can be split, skip the geometry entirely
     if (max_subdivisions == 0 || max_interactions == 0)
-        return std::vector<bool>(n_ray, false);
+    {
+        subdiv_flag.assign(n_ray, false);
+        return;
+    }
 
     // Read pointers, all matrices are [n_ray, k] in column-major order
     const float *p_mesh = mesh.memptr();
@@ -282,9 +287,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
         throw std::invalid_argument("Some values in 'fbs_ind' exceed number of mesh elements.");
 
     // Pack down for the caller, bit-packed writes cannot be parallelized
-    std::vector<bool> subdiv_flag(n_ray);
+    subdiv_flag.resize(n_ray);
     for (arma::uword i_ray = 0; i_ray < n_ray; ++i_ray)
         subdiv_flag[i_ray] = (p_tmp[i_ray] != 0u);
-
-    return subdiv_flag;
 }

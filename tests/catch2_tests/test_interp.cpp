@@ -9,6 +9,25 @@
 #include <cmath>
 #include <random>
 
+// Results of the output-argument forms as values (test convenience): one data set in 1D, a matrix in 2D
+template <typename dtype>
+static arma::Mat<dtype> q_interp_1D(const arma::Col<dtype> &x, const arma::Mat<dtype> &input, const arma::Col<dtype> &x_new)
+{
+    arma::Mat<dtype> output;
+    quadriga_lib::interp_1D(x, input, x_new, output);
+    return output;
+}
+
+template <typename dtype>
+static arma::Mat<dtype> q_interp_2D(const arma::Col<dtype> &x, const arma::Col<dtype> &y, const arma::Mat<dtype> &input,
+                                    const arma::Col<dtype> &x_new, const arma::Col<dtype> &y_new)
+{
+    arma::Cube<dtype> output;
+    quadriga_lib::interp_2D(x, y, arma::Cube<dtype>(const_cast<dtype *>(input.memptr()), input.n_rows, input.n_cols, 1, false, true),
+                            x_new, y_new, output);
+    return output.slice(0);
+}
+
 // Reference: the linear index scan (first grid value > query) with the same weights and the same 4-term sum as interp_2D
 template <typename dtype>
 static void ref_indices(const arma::Col<dtype> &s_in, const arma::Col<dtype> &s_out, arma::uvec &ip_v, arma::uvec &in_v,
@@ -89,17 +108,17 @@ TEST_CASE("interp - binary index search gives the results of the linear scan")
             arma::vec yo = {-0.5, 0.0, 0.3, 0.99, 2.0};
 
             INFO("n = " << n << ", variant " << variant);
-            arma::vec r1 = quadriga_lib::interp_1D<double>(d1, xi, xo);
+            arma::vec r1 = q_interp_1D<double>(xi, d1, xo);
             arma::mat ref1 = ref_interp_2D<double>(arma::mat(d1.t()), xi, arma::vec(1), xo, arma::vec(1));
             CHECK(arma::approx_equal(r1, arma::vec(ref1.row(0).t()), "absdiff", 0.0));
 
-            arma::mat r2 = quadriga_lib::interp_2D<double>(d2, xi, yi, xo, yo);
+            arma::mat r2 = q_interp_2D<double>(xi, yi, d2, xo, yo);
             arma::mat ref2 = ref_interp_2D<double>(d2, xi, yi, xo, yo);
             CHECK(arma::approx_equal(r2, ref2, "absdiff", 0.0));
 
             arma::fvec xif = arma::conv_to<arma::fvec>::from(xi), xof = arma::conv_to<arma::fvec>::from(xo);
             arma::fvec d1f = arma::conv_to<arma::fvec>::from(d1);
-            arma::fvec r1f = quadriga_lib::interp_1D<float>(d1f, xif, xof);
+            arma::fvec r1f = q_interp_1D<float>(xif, d1f, xof);
             arma::fmat ref1f = ref_interp_2D<float>(arma::fmat(d1f.t()), xif, arma::fvec(1), xof, arma::fvec(1));
             CHECK(arma::approx_equal(r1f, arma::fvec(ref1f.row(0).t()), "absdiff", 0.0f));
         }
@@ -108,7 +127,7 @@ TEST_CASE("interp - binary index search gives the results of the linear scan")
 TEST_CASE("interp - a NaN query gives NaN, outside the grid the nearest end value is returned")
 {
     arma::vec xi = {0, 1, 2, 3}, in = {0, 10, 20, 30}, xo = {-1, 0.5, 3.5, NAN, 3.0, 0.0};
-    arma::vec r = quadriga_lib::interp_1D<double>(in, xi, xo);
+    arma::vec r = q_interp_1D<double>(xi, in, xo);
     CHECK(r(0) == 0.0);
     CHECK(r(1) == 5.0);
     CHECK(r(2) == 30.0);
@@ -118,7 +137,7 @@ TEST_CASE("interp - a NaN query gives NaN, outside the grid the nearest end valu
 
     // Unsorted grid and float
     arma::fvec xif = {3, 1, 0, 2}, inf_ = {30, 10, 0, 20}, xof = {-1.0f, NAN, 2.5f};
-    arma::fvec rf = quadriga_lib::interp_1D<float>(inf_, xif, xof);
+    arma::fvec rf = q_interp_1D<float>(xif, inf_, xof);
     CHECK(rf(0) == 0.0f);
     CHECK(std::isnan(rf(1)));
     CHECK(rf(2) == 25.0f);
@@ -127,7 +146,7 @@ TEST_CASE("interp - a NaN query gives NaN, outside the grid the nearest end valu
     arma::vec yi = {0, 1};
     arma::mat d = {{0, 1, 2, 3}, {10, 11, 12, 13}};
     arma::vec xo2 = {0.5, NAN, 2.0}, yo2 = {NAN, 0.5, 2.0};
-    arma::mat r2 = quadriga_lib::interp_2D<double>(d, xi, yi, xo2, yo2);
+    arma::mat r2 = q_interp_2D<double>(xi, yi, d, xo2, yo2);
     for (arma::uword ix = 0; ix < 3; ++ix)
         for (arma::uword iy = 0; iy < 3; ++iy)
         {
@@ -139,13 +158,13 @@ TEST_CASE("interp - a NaN query gives NaN, outside the grid the nearest end valu
 
     // Multiple data sets (1D matrix form)
     arma::mat dm = arma::join_rows(in, 2.0 * in);
-    arma::mat rm = quadriga_lib::interp_1D<double>(dm, xi, xo);
+    arma::mat rm = q_interp_1D<double>(xi, dm, xo);
     CHECK(std::isnan(rm(3, 0)));
     CHECK(std::isnan(rm(3, 1)));
     CHECK(rm(1, 1) == 10.0);
 }
 
-TEST_CASE("interp - non-finite grid values in 'xi' or 'yi' throw")
+TEST_CASE("interp - non-finite grid values in 'x' or 'y' throw")
 {
     // A NaN in a grid that is_sorted() accepts gave NaN at some queries, an unsorted grid with NaN threw inside the
     // sort; the grids are now checked first
@@ -169,13 +188,13 @@ TEST_CASE("interp - non-finite grid values in 'xi' or 'yi' throw")
         {
             arma::vec xi = {0, 1, 2, 3};
             xi(pos) = bad;
-            CHECK(message([&]() { quadriga_lib::interp_1D<double>(in, xi, xo); }) == "Input 'xi' must be finite.");
+            CHECK(message([&]() { q_interp_1D<double>(xi, in, xo); }) == "Input 'x' must be finite.");
             arma::fvec xif = arma::conv_to<arma::fvec>::from(xi), inf_ = arma::conv_to<arma::fvec>::from(in);
-            CHECK(message([&]() { quadriga_lib::interp_1D<float>(inf_, xif, arma::fvec{0.5f}); }) == "Input 'xi' must be finite.");
+            CHECK(message([&]() { q_interp_1D<float>(xif, inf_, arma::fvec{0.5f}); }) == "Input 'x' must be finite.");
         }
         arma::vec xi = {0, 1, 2, 3}, yi = {0, bad};
         arma::mat d = {{0, 1, 2, 3}, {10, 11, 12, 13}};
-        CHECK(message([&]() { quadriga_lib::interp_2D<double>(d, xi, yi, xo, arma::vec{0.5}); }) == "Input 'yi' must be finite.");
+        CHECK(message([&]() { q_interp_2D<double>(xi, yi, d, xo, arma::vec{0.5}); }) == "Input 'y' must be finite.");
     }
 }
 
@@ -184,12 +203,37 @@ TEST_CASE("interp_2D - Outputs that alias inputs")
     arma::cube input(3, 4, 2, arma::fill::randu), output;
     arma::vec xi = arma::linspace<arma::vec>(0.0, 3.0, 4), yi = arma::linspace<arma::vec>(0.0, 2.0, 3);
     arma::vec xo = xi + 0.5, yo = yi + 0.5;
-    CHECK_NOTHROW(quadriga_lib::interp_2D(input, xi, yi, xo, yo, output));
+    CHECK_NOTHROW(quadriga_lib::interp_2D(xi, yi, input, xo, yo, output));
 
     // The output is the input
-    CHECK_THROWS_AS(quadriga_lib::interp_2D(input, xi, yi, xo, yo, input), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::interp_2D(xi, yi, input, xo, yo, input), std::invalid_argument);
 
     // The output uses the memory of the input
     arma::cube view(input.memptr(), 3, 4, 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::interp_2D(input, xi, yi, xo, yo, view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::interp_2D(xi, yi, input, xo, yo, view), std::invalid_argument);
+}
+
+TEST_CASE("interp_1D - Output argument")
+{
+    arma::mat input(4, 2, arma::fill::randu);
+    arma::vec x = arma::linspace<arma::vec>(0.0, 3.0, 4), x_new = {0.5, 1.5, 2.5};
+
+    // A correctly sized output is written in place
+    arma::mat output(3, 2, arma::fill::zeros);
+    const double *p_out = output.memptr();
+    quadriga_lib::interp_1D(x, input, x_new, output);
+    CHECK(output.memptr() == p_out);
+    CHECK(std::abs(output(1, 1) - 0.5 * (input(1, 1) + input(2, 1))) < 1e-14);
+
+    // A wrong size is fixed, a failed call leaves the output untouched
+    arma::mat other(1, 1, arma::fill::value(7.0));
+    quadriga_lib::interp_1D(x, input, x_new, other);
+    CHECK(other.n_rows == 3);
+    CHECK(other.n_cols == 2);
+    arma::mat kept(1, 1, arma::fill::value(7.0));
+    CHECK_THROWS_AS(quadriga_lib::interp_1D(arma::vec{0.0, 1.0}, input, x_new, kept), std::invalid_argument);
+    CHECK(kept.n_elem == 1);
+
+    // The output cannot be the input
+    CHECK_THROWS_AS(quadriga_lib::interp_1D(x, input, x_new, input), std::invalid_argument);
 }

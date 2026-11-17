@@ -142,8 +142,10 @@ namespace
         std::vector<bool> flag(const Scene &S, float tol = 3.0f,
                                uint8_t max_int = 20, uint8_t max_sub = 2) const
         {
-            return quadriga_lib::ray_subdivide_flag(S.mesh, orig, dest, fbs_ind, trivec, tridir,
-                                                    paths, cur, max_int, max_sub, tol);
+            std::vector<bool> f = {true}; // An old result is replaced
+            quadriga_lib::ray_subdivide_flag(S.mesh, orig, dest, fbs_ind, trivec, tridir, paths, cur, f,
+                                             max_int, max_sub, tol);
+            return f;
         }
     };
 

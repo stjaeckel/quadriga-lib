@@ -15,88 +15,85 @@ SECTION!*/
 
 /*!MD
 # interp_2D
-Perform linear interpolation (1D or 2D) on single or multiple data sets
+Perform linear interpolation (1D or 2D) on multiple data sets
 
 - Interpolates given input data at specified output points.
 - Outside the range of the input sample points, the nearest end value is returned (constant extrapolation);
   output sample points that are NaN give NaN.
 - The input sample points need not be sorted (they are sorted internally); repeated values are allowed;
   they must be finite.
-- Supports single and multiple data sets.
-- Returns interpolated results either directly or through reference argument.
+- `interp_1D` interpolates the columns of a matrix; a single data set is a matrix with one column.
 - Data types (`dtype`): `float` or `double`
 
 ## Declarations:
 ```
-void interp_2D(const arma::Cube<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-               const arma::Col<dtype> &xo, const arma::Col<dtype> &yo, arma::Cube<dtype> &output);
+void quadriga_lib::interp_2D(
+    const arma::Col<dtype> &x,
+    const arma::Col<dtype> &y,
+    const arma::Cube<dtype> &input,
+    const arma::Col<dtype> &x_new,
+    const arma::Col<dtype> &y_new,
+    arma::Cube<dtype> &output);
 
-arma::Cube<dtype> interp_2D(const arma::Cube<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                            const arma::Col<dtype> &xo, const arma::Col<dtype> &yo);
-
-arma::Mat<dtype> interp_2D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                           const arma::Col<dtype> &xo, const arma::Col<dtype> &yo);
-
-arma::Mat<dtype> interp_1D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo);
-
-arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo);
+void quadriga_lib::interp_1D(
+    const arma::Col<dtype> &x,
+    const arma::Mat<dtype> &input,
+    const arma::Col<dtype> &x_new,
+    arma::Mat<dtype> &output);
 ```
 
-## Arguments:
-- `input`: Input data array/matrix (size details below)
-- `xi`: Input x-axis sampling points, vector of length `nx`
-- `yi`: Input y-axis sampling points (for 2D only), vector of length `ny`
-- `xo`: Output x-axis sampling points, vector of length `mx`
-- `yo`: Output y-axis sampling points (for 2D only), vector of length `my`
-- `output`: Interpolated data cube (output argument of the first variant)
+## Inputs:
+- **`x`** — Input x-axis sample points; `[nx]`
+- **`y`** — Input y-axis sample points (2D only); `[ny]`
+- **`input`** — Input data; 2D: `[ny, nx, ne]`; 1D: `[nx, ne]`; `ne` = number of data sets
+- **`x_new`** — Output x-axis sample points; `[nx_new]`
+- **`y_new`** — Output y-axis sample points (2D only); `[ny_new]`
 
-## Input / Output size details:
-- 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`
-- 2D interpolation of single dataset (`arma::Mat`): input: `[ny, nx]`; output: `[my, mx]`
-- 1D interpolation of multiple datasets (`arma::Mat`): input: `[nx, ne]`; output: `[mx, ne]`
-- 1D interpolation of single dataset (`arma::Col`): input: `[nx]`, output: `[mx]`
+## Output:
+- **`output`** — Interpolated data; 2D: `[ny_new, nx_new, ne]`; 1D: `[nx_new, ne]`
 
 ## Examples:
 - 2D interpolation example:
 ```
 arma::cube input(5, 5, 2, arma::fill::randu); // example input data
-arma::vec xi = arma::linspace(0, 4, 5);
-arma::vec yi = arma::linspace(0, 4, 5);
-arma::vec xo = arma::linspace(0, 4, 10);
-arma::vec yo = arma::linspace(0, 4, 10);
+arma::vec x = arma::linspace(0, 4, 5);
+arma::vec y = arma::linspace(0, 4, 5);
+arma::vec x_new = arma::linspace(0, 4, 10);
+arma::vec y_new = arma::linspace(0, 4, 10);
 
 arma::cube output;
-quadriga_lib::interp_2D(input, xi, yi, xo, yo, output);
+quadriga_lib::interp_2D(x, y, input, x_new, y_new, output);
 ```
 - 1D interpolation example:
 ```
 arma::vec input = arma::linspace(0, 1, 5);
-arma::vec xi = arma::linspace(0, 4, 5);
-arma::vec xo = arma::linspace(0, 4, 10);
+arma::vec x = arma::linspace(0, 4, 5);
+arma::vec x_new = arma::linspace(0, 4, 10);
 
-auto output = quadriga_lib::interp_1D(input, xi, xo);
+arma::mat output;
+quadriga_lib::interp_1D(x, input, x_new, output);
 ```
 MD!*/
 
 // 2D linear interpolation
 template <typename dtype>
-void quadriga_lib::interp_2D(const arma::Cube<dtype> &input,
-                             const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                             const arma::Col<dtype> &xo, const arma::Col<dtype> &yo,
+void quadriga_lib::interp_2D(const arma::Col<dtype> &x, const arma::Col<dtype> &y,
+                             const arma::Cube<dtype> &input,
+                             const arma::Col<dtype> &x_new, const arma::Col<dtype> &y_new,
                              arma::Cube<dtype> &output)
 {
     const arma::uword nx = input.n_cols;
     const arma::uword ny = input.n_rows;
     const arma::uword ne = input.n_slices;
-    const arma::uword mx = xo.n_elem;
-    const arma::uword my = yo.n_elem;
+    const arma::uword mx = x_new.n_elem;
+    const arma::uword my = y_new.n_elem;
 
-    if (input.n_elem == 0 || xi.n_elem != nx || yi.n_elem != ny || ne == 0)
+    if (input.n_elem == 0 || x.n_elem != nx || y.n_elem != ny || ne == 0)
         throw std::invalid_argument("Data dimensions must match the given number of sample points.");
-    if (!xi.is_finite())
-        throw std::invalid_argument("Input 'xi' must be finite.");
-    if (!yi.is_finite())
-        throw std::invalid_argument("Input 'yi' must be finite.");
+    if (!x.is_finite())
+        throw std::invalid_argument("Input 'x' must be finite.");
+    if (!y.is_finite())
+        throw std::invalid_argument("Input 'y' must be finite.");
     qd_check_alias(&output, "output", &input);
 
     if (output.n_rows != my || output.n_cols != mx || output.n_slices != ne)
@@ -172,14 +169,14 @@ void quadriga_lib::interp_2D(const arma::Cube<dtype> &input,
     arma::uword *i_xn_vec = new arma::uword[mx];
     dtype *xp_vec = new dtype[mx];
     dtype *xn_vec = new dtype[mx];
-    calc_indices(xi, xo, i_xp_vec, i_xn_vec, xp_vec, xn_vec);
+    calc_indices(x, x_new, i_xp_vec, i_xn_vec, xp_vec, xn_vec);
 
     // Calculate the y-interpolation parameters
     arma::uword *i_yp_vec = new arma::uword[my];
     arma::uword *i_yn_vec = new arma::uword[my];
     dtype *yp_vec = new dtype[my];
     dtype *yn_vec = new dtype[my];
-    calc_indices(yi, yo, i_yp_vec, i_yn_vec, yp_vec, yn_vec);
+    calc_indices(y, y_new, i_yp_vec, i_yn_vec, yp_vec, yn_vec);
 
     // Interpolate the input data and write to output memory
     for (arma::uword ie = 0; ie < ne; ++ie)
@@ -217,87 +214,38 @@ void quadriga_lib::interp_2D(const arma::Cube<dtype> &input,
 }
 
 template <typename dtype>
-arma::Cube<dtype> quadriga_lib::interp_2D(const arma::Cube<dtype> &input,
-                                          const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                                          const arma::Col<dtype> &xo, const arma::Col<dtype> &yo)
+void quadriga_lib::interp_1D(const arma::Col<dtype> &x, const arma::Mat<dtype> &input,
+                             const arma::Col<dtype> &x_new, arma::Mat<dtype> &output)
 {
-    arma::Cube<dtype> output;
-    quadriga_lib::interp_2D(input, xi, yi, xo, yo, output);
-    return output;
-}
+    // Validated here, before 'output' is resized; the alias check needs the matrix objects
+    if (input.n_elem == 0 || x.n_elem != input.n_rows)
+        throw std::invalid_argument("Data dimensions must match the given number of sample points.");
+    if (!x.is_finite())
+        throw std::invalid_argument("Input 'x' must be finite.");
+    qd_check_alias(&output, "output", &input);
 
-template <typename dtype>
-arma::Mat<dtype> quadriga_lib::interp_2D(const arma::Mat<dtype> &input,
-                                         const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                                         const arma::Col<dtype> &xo, const arma::Col<dtype> &yo)
-{
-    arma::Mat<dtype> output(yo.n_elem, xo.n_elem, arma::fill::none);
-    arma::Cube<dtype> output_cube(output.memptr(), yo.n_elem, xo.n_elem, 1ULL, false, true);
-    const arma::Cube<dtype> input_cube(const_cast<dtype *>(input.memptr()), input.n_rows, input.n_cols, 1ULL, false, true);
-    quadriga_lib::interp_2D(input_cube, xi, yi, xo, yo, output_cube);
-    return output;
-}
+    if (output.n_rows != x_new.n_elem || output.n_cols != input.n_cols)
+        output.set_size(x_new.n_elem, input.n_cols);
 
-template <typename dtype>
-arma::Mat<dtype> quadriga_lib::interp_1D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo)
-{
-    arma::Col<dtype> y(1, arma::fill::zeros);
-    arma::Mat<dtype> output(xo.n_elem, input.n_cols, arma::fill::none);
-    arma::Cube<dtype> output_cube(output.memptr(), 1ULL, xo.n_elem, input.n_cols, false, true);
+    // The 1D case is the 2D case with one y sample: input [1, nx, ne], output [1, nx_new, ne]
+    const arma::Col<dtype> y(1, arma::fill::zeros);
+    arma::Cube<dtype> output_cube(output.memptr(), 1ULL, x_new.n_elem, input.n_cols, false, true);
     const arma::Cube<dtype> input_cube(const_cast<dtype *>(input.memptr()), 1ULL, input.n_rows, input.n_cols, false, true);
-    quadriga_lib::interp_2D(input_cube, xi, y, xo, y, output_cube);
-    return output;
+    quadriga_lib::interp_2D(x, y, input_cube, x_new, y, output_cube);
 }
 
-template <typename dtype>
-arma::Col<dtype> quadriga_lib::interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo)
-{
-    arma::Col<dtype> y(1, arma::fill::zeros);
-    arma::Col<dtype> output(xo.n_elem, arma::fill::none);
-    arma::Cube<dtype> output_cube(output.memptr(), 1ULL, xo.n_elem, 1ULL, false, true);
-    const arma::Cube<dtype> input_cube(const_cast<dtype *>(input.memptr()), 1ULL, input.n_rows, 1ULL, false, true);
-    quadriga_lib::interp_2D(input_cube, xi, y, xo, y, output_cube);
-    return output;
-}
-
-template void quadriga_lib::interp_2D(const arma::Cube<float> &input,
-                                      const arma::Col<float> &xi, const arma::Col<float> &yi,
-                                      const arma::Col<float> &xo, const arma::Col<float> &yo,
+template void quadriga_lib::interp_2D(const arma::Col<float> &x, const arma::Col<float> &y,
+                                      const arma::Cube<float> &input,
+                                      const arma::Col<float> &x_new, const arma::Col<float> &y_new,
                                       arma::Cube<float> &output);
 
-template void quadriga_lib::interp_2D(const arma::Cube<double> &input,
-                                      const arma::Col<double> &xi, const arma::Col<double> &yi,
-                                      const arma::Col<double> &xo, const arma::Col<double> &yo,
+template void quadriga_lib::interp_2D(const arma::Col<double> &x, const arma::Col<double> &y,
+                                      const arma::Cube<double> &input,
+                                      const arma::Col<double> &x_new, const arma::Col<double> &y_new,
                                       arma::Cube<double> &output);
 
-template arma::Cube<float> quadriga_lib::interp_2D(const arma::Cube<float> &input,
-                                                   const arma::Col<float> &xi, const arma::Col<float> &yi,
-                                                   const arma::Col<float> &xo, const arma::Col<float> &yo);
+template void quadriga_lib::interp_1D(const arma::Col<float> &x, const arma::Mat<float> &input,
+                                      const arma::Col<float> &x_new, arma::Mat<float> &output);
 
-template arma::Cube<double> quadriga_lib::interp_2D(const arma::Cube<double> &input,
-                                                    const arma::Col<double> &xi, const arma::Col<double> &yi,
-                                                    const arma::Col<double> &xo, const arma::Col<double> &yo);
-
-template arma::Mat<float> quadriga_lib::interp_2D(const arma::Mat<float> &input,
-                                                  const arma::Col<float> &xi, const arma::Col<float> &yi,
-                                                  const arma::Col<float> &xo, const arma::Col<float> &yo);
-
-template arma::Mat<double> quadriga_lib::interp_2D(const arma::Mat<double> &input,
-                                                   const arma::Col<double> &xi, const arma::Col<double> &yi,
-                                                   const arma::Col<double> &xo, const arma::Col<double> &yo);
-
-template arma::Mat<float> quadriga_lib::interp_1D(const arma::Mat<float> &input,
-                                                  const arma::Col<float> &xi,
-                                                  const arma::Col<float> &xo);
-
-template arma::Mat<double> quadriga_lib::interp_1D(const arma::Mat<double> &input,
-                                                   const arma::Col<double> &xi,
-                                                   const arma::Col<double> &xo);
-
-template arma::Col<float> quadriga_lib::interp_1D(const arma::Col<float> &input,
-                                                  const arma::Col<float> &xi,
-                                                  const arma::Col<float> &xo);
-
-template arma::Col<double> quadriga_lib::interp_1D(const arma::Col<double> &input,
-                                                   const arma::Col<double> &xi,
-                                                   const arma::Col<double> &xo);
+template void quadriga_lib::interp_1D(const arma::Col<double> &x, const arma::Mat<double> &input,
+                                      const arma::Col<double> &x_new, arma::Mat<double> &output);

@@ -276,7 +276,8 @@ namespace
             d[i] = rv(o.delay, i), p[i] = rv(o.power.slices(0, 0), i), az_d[i] = rv(o.aod, i), el_d[i] = rv(o.eod, i);
             az_a[i] = rv(o.aoa, i), el_a[i] = rv(o.eoa, i);
         }
-        arma::vec ds = quadriga_lib::calc_delay_spread(d, p), as[4];
+        arma::vec ds, as[4];
+        quadriga_lib::calc_delay_spread(d, p, ds);
         quadriga_lib::calc_angular_spread(az_d, el_d, p, &as[0], &as[2]);
         quadriga_lib::calc_angular_spread(az_a, el_a, p, &as[1], &as[3]);
         for (arma::uword i = 0; i < n; ++i)

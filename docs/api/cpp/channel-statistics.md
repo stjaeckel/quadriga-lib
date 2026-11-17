@@ -187,9 +187,10 @@ Also in: [MATLAB](../mex/channel-statistics.md#calc_delay_spread) · [Python](..
 
 ### Declaration:
 ```cpp
-arma::Col<dtype> quadriga_lib::calc_delay_spread(
+void quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
+    arma::Col<dtype> &ds,
     dtype threshold_dB = 100.0,
     dtype granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
@@ -203,10 +204,8 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
   and non-negative; when > 0, non-finite delays or a span / granularity of 2^53 or more throw `std::invalid_argument`
 
 ### Outputs:
+- **`ds`** — RMS delay spread in [s] for each CIR; `[n_cir]`
 - **`mean_delay`** *(optional)* — Mean delay in [s] per CIR; `[n_cir]`
-
-### Returns:
-- RMS delay spread in [s] for each CIR; `[n_cir]`
 
 ### See also:
 - [quantize_delays](channel-functions.md#quantize_delays) (for mapping delays to a fixed tap grid)

@@ -125,7 +125,9 @@ namespace
     {
         const arma::vec grid = {-90, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90};
         const double el = std::atan2(hB, d) * 180.0 / pi;
-        return 0.01 * quadriga_lib::interp_1D<double>(arma::vec(tab, 11), grid, arma::vec{el})(0);
+        arma::mat out;
+        quadriga_lib::interp_1D<double>(grid, arma::vec(tab, 11), arma::vec{el}, out);
+        return 0.01 * out(0);
     }
 
     double ref_industrial(double d, double hB)

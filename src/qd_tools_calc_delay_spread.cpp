@@ -24,9 +24,10 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
 ## Declaration:
 ```
-arma::Col<dtype> quadriga_lib::calc_delay_spread(
+void quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
+    arma::Col<dtype> &ds,
     dtype threshold_dB = 100.0,
     dtype granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
@@ -40,10 +41,8 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
   and non-negative; when > 0, non-finite delays or a span / granularity of 2^53 or more throw `std::invalid_argument`
 
 ## Outputs:
+- **`ds`** — RMS delay spread in [s] for each CIR; `[n_cir]`
 - **`mean_delay`** *(optional)* — Mean delay in [s] per CIR; `[n_cir]`
-
-## Returns:
-- RMS delay spread in [s] for each CIR; `[n_cir]`
 
 ## See also:
 - [[quantize_delays]] (for mapping delays to a fixed tap grid)
@@ -51,11 +50,12 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
 MD!*/
 
 template <typename dtype>
-arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dtype>> &delays,
-                                                 const std::vector<arma::Col<dtype>> &powers,
-                                                 dtype threshold_dB,
-                                                 dtype granularity,
-                                                 arma::Col<dtype> *mean_delay)
+void quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dtype>> &delays,
+                                     const std::vector<arma::Col<dtype>> &powers,
+                                     arma::Col<dtype> &ds,
+                                     dtype threshold_dB,
+                                     dtype granularity,
+                                     arma::Col<dtype> *mean_delay)
 {
     // --- Input validation ---
     arma::uword n_cir = (arma::uword)delays.size();
@@ -72,8 +72,10 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
             throw std::invalid_argument("Delays and powers must have the same number of elements for each CIR.");
         if (delays[i].n_elem == 0)
             throw std::invalid_argument("Delay and power vectors must not be empty.");
+        qd_check_alias(&ds, "ds", &delays[i], &powers[i]);
         qd_check_alias(mean_delay, "mean_delay", &delays[i], &powers[i]);
     }
+    qd_check_alias_outputs(&ds, "ds", mean_delay, "mean_delay");
 
     if (threshold_dB <= (dtype)0.0)
         throw std::invalid_argument("Input 'threshold_dB' must be > 0.");
@@ -142,18 +144,18 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
         }
 
         // Recursive call without granularity
-        return quadriga_lib::calc_delay_spread(binned_delays, binned_powers, threshold_dB, (dtype)0.0, mean_delay);
+        quadriga_lib::calc_delay_spread(binned_delays, binned_powers, ds, threshold_dB, (dtype)0.0, mean_delay);
+        return;
     }
 
     // --- Direct computation (granularity == 0) ---
-    arma::Col<dtype> ds(n_cir);
+    if (ds.n_elem != n_cir)
+        ds.set_size(n_cir);
     dtype *p_ds = ds.memptr();
 
     bool calc_mean = (mean_delay != nullptr);
-    if (calc_mean)
-    {
+    if (calc_mean && mean_delay->n_elem != n_cir)
         mean_delay->set_size(n_cir);
-    }
 
     for (arma::uword i = 0; i < n_cir; ++i)
     {
@@ -214,18 +216,18 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
         dtype ds_sq = sum_pw_tmp2 - sum_pw_tmp * sum_pw_tmp;
         p_ds[i] = (ds_sq > (dtype)0.0) ? std::sqrt(ds_sq) : (dtype)0.0;
     }
-
-    return ds;
 }
 
-template arma::Col<float> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<float>> &delays,
-                                                          const std::vector<arma::Col<float>> &powers,
-                                                          float threshold_dB,
-                                                          float granularity,
-                                                          arma::Col<float> *mean_delay);
+template void quadriga_lib::calc_delay_spread(const std::vector<arma::Col<float>> &delays,
+                                              const std::vector<arma::Col<float>> &powers,
+                                              arma::Col<float> &ds,
+                                              float threshold_dB,
+                                              float granularity,
+                                              arma::Col<float> *mean_delay);
 
-template arma::Col<double> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<double>> &delays,
-                                                           const std::vector<arma::Col<double>> &powers,
-                                                           double threshold_dB,
-                                                           double granularity,
-                                                           arma::Col<double> *mean_delay);
+template void quadriga_lib::calc_delay_spread(const std::vector<arma::Col<double>> &delays,
+                                              const std::vector<arma::Col<double>> &powers,
+                                              arma::Col<double> &ds,
+                                              double threshold_dB,
+                                              double granularity,
+                                              arma::Col<double> *mean_delay);

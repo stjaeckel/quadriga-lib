@@ -8,6 +8,16 @@
 #include <cmath>
 #include <random>
 
+// Result of the output-argument form as a value (test convenience)
+template <typename dtype>
+static arma::Col<dtype> q_ds(const std::vector<arma::Col<dtype>> &delays, const std::vector<arma::Col<dtype>> &powers,
+                             dtype threshold_dB = 100.0, dtype granularity = 0.0, arma::Col<dtype> *mean_delay = nullptr)
+{
+    arma::Col<dtype> ds;
+    quadriga_lib::calc_delay_spread(delays, powers, ds, threshold_dB, granularity, mean_delay);
+    return ds;
+}
+
 TEST_CASE("calc_delay_spread - Basic single CIR")
 {
     // Single CIR with 3 paths: delays = [0, 1e-6, 2e-6], powers = [1.0, 0.5, 0.25]
@@ -18,7 +28,7 @@ TEST_CASE("calc_delay_spread - Basic single CIR")
     std::vector<arma::vec> powers = {pow};
 
     arma::vec mean_delay;
-    arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay);
+    arma::vec ds = q_ds(delays, powers, 100.0, 0.0, &mean_delay);
 
     REQUIRE(ds.n_elem == 1);
     REQUIRE(mean_delay.n_elem == 1);
@@ -41,7 +51,7 @@ TEST_CASE("calc_delay_spread - Single path yields zero spread")
     std::vector<arma::vec> powers = {pow};
 
     arma::vec mean_delay;
-    arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay);
+    arma::vec ds = q_ds(delays, powers, 100.0, 0.0, &mean_delay);
 
     REQUIRE(ds.n_elem == 1);
     CHECK(std::abs(ds(0)) < 1e-20);
@@ -58,7 +68,7 @@ TEST_CASE("calc_delay_spread - Equal power two paths")
     std::vector<arma::vec> powers = {pow};
 
     arma::vec mean_delay;
-    arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay);
+    arma::vec ds = q_ds(delays, powers, 100.0, 0.0, &mean_delay);
 
     REQUIRE(ds.n_elem == 1);
 
@@ -81,7 +91,7 @@ TEST_CASE("calc_delay_spread - Multiple CIRs")
     std::vector<arma::vec> powers = {pow1, pow2};
 
     arma::vec mean_delay;
-    arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay);
+    arma::vec ds = q_ds(delays, powers, 100.0, 0.0, &mean_delay);
 
     REQUIRE(ds.n_elem == 2);
     REQUIRE(mean_delay.n_elem == 2);
@@ -105,10 +115,10 @@ TEST_CASE("calc_delay_spread - Threshold filters weak paths")
     std::vector<arma::vec> powers = {pow};
 
     // With 20 dB threshold, path 2 (-30 dB) should be excluded
-    arma::vec ds_20 = quadriga_lib::calc_delay_spread(delays, powers, 20.0);
+    arma::vec ds_20 = q_ds(delays, powers, 20.0);
 
     // With 100 dB threshold, all paths included
-    arma::vec ds_all = quadriga_lib::calc_delay_spread(delays, powers, 100.0);
+    arma::vec ds_all = q_ds(delays, powers, 100.0);
 
     // DS with all paths should be larger (path at 10e-6 increases spread)
     CHECK(ds_all(0) > ds_20(0));
@@ -124,10 +134,10 @@ TEST_CASE("calc_delay_spread - Granularity bins paths")
     std::vector<arma::vec> powers = {pow};
 
     // Without granularity
-    arma::vec ds_no_gran = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0);
+    arma::vec ds_no_gran = q_ds(delays, powers, 100.0, 0.0);
 
     // With 50 ns granularity - first two paths should be binned together
-    arma::vec ds_gran = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 50e-9);
+    arma::vec ds_gran = q_ds(delays, powers, 100.0, 50e-9);
 
     // Both should produce positive delay spreads
     CHECK(ds_no_gran(0) > 0.0);
@@ -143,7 +153,7 @@ TEST_CASE("calc_delay_spread - Without mean_delay output")
     std::vector<arma::vec> powers = {pow};
 
     // Call without mean_delay pointer
-    arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers);
+    arma::vec ds = q_ds(delays, powers);
 
     REQUIRE(ds.n_elem == 1);
     CHECK(std::abs(ds(0) - 0.5e-6) < 1e-14);
@@ -158,7 +168,7 @@ TEST_CASE("calc_delay_spread - Float precision")
     std::vector<arma::fvec> powers = {pow};
 
     arma::fvec mean_delay;
-    arma::fvec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0f, 0.0f, &mean_delay);
+    arma::fvec ds = q_ds(delays, powers, 100.0f, 0.0f, &mean_delay);
 
     REQUIRE(ds.n_elem == 1);
     CHECK(std::abs(mean_delay(0) - 1e-6f) < 1e-10f);
@@ -171,24 +181,24 @@ TEST_CASE("calc_delay_spread - Input validation")
     std::vector<arma::vec> powers = {{1.0}};
 
     // Empty delays
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(empty_delays, powers), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds(empty_delays, powers), std::invalid_argument);
 
     // Mismatched sizes
     std::vector<arma::vec> delays = {{0.0}, {1e-6}};
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds(delays, powers), std::invalid_argument);
 
     // Mismatched path counts
     std::vector<arma::vec> delays2 = {{0.0, 1e-6}};
     std::vector<arma::vec> powers2 = {{1.0}};
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays2, powers2), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds(delays2, powers2), std::invalid_argument);
 
     // Negative threshold
     std::vector<arma::vec> delays3 = {{0.0}};
     std::vector<arma::vec> powers3 = {{1.0}};
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays3, powers3, -10.0), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds(delays3, powers3, -10.0), std::invalid_argument);
 
     // Negative granularity
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays3, powers3, 100.0, -1.0), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds(delays3, powers3, 100.0, -1.0), std::invalid_argument);
 }
 
 TEST_CASE("calc_delay_spread - Granularity with mean_delay output")
@@ -200,7 +210,7 @@ TEST_CASE("calc_delay_spread - Granularity with mean_delay output")
     std::vector<arma::vec> powers = {pow};
 
     arma::vec mean_delay;
-    arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 100e-9, &mean_delay);
+    arma::vec ds = q_ds(delays, powers, 100.0, 100e-9, &mean_delay);
 
     REQUIRE(ds.n_elem == 1);
     REQUIRE(mean_delay.n_elem == 1);
@@ -237,7 +247,7 @@ static arma::Col<dtype> ds_dense_reference(const std::vector<arma::Col<dtype>> &
         }
         bd[i] = axis, bp[i] = pdp;
     }
-    return quadriga_lib::calc_delay_spread<dtype>(bd, bp, threshold, (dtype)0.0, mean_delay);
+    return q_ds<dtype>(bd, bp, threshold, (dtype)0.0, mean_delay);
 }
 
 TEST_CASE("calc_delay_spread - Granularity: sparse binning equals the dense reference")
@@ -259,7 +269,7 @@ TEST_CASE("calc_delay_spread - Granularity: sparse binning equals the dense refe
         for (double th : {100.0, 20.0})
         {
             arma::vec md, md_ref;
-            arma::vec ds = quadriga_lib::calc_delay_spread<double>(d, p, th, g, &md);
+            arma::vec ds = q_ds<double>(d, p, th, g, &md);
             arma::vec ds_ref = ds_dense_reference<double>(d, p, th, g, &md_ref);
             INFO("granularity " << g << ", threshold " << th);
             CHECK(arma::approx_equal(ds, ds_ref, "absdiff", 0.0));
@@ -271,7 +281,7 @@ TEST_CASE("calc_delay_spread - Granularity: sparse binning equals the dense refe
     for (size_t i = 0; i < d.size(); ++i)
         df[i] = arma::conv_to<arma::fvec>::from(d[i] - 0.5e-6), pf[i] = arma::conv_to<arma::fvec>::from(p[i]);
     arma::fvec mdf, mdf_ref;
-    arma::fvec dsf = quadriga_lib::calc_delay_spread<float>(df, pf, 100.0f, 5.0e-9f, &mdf);
+    arma::fvec dsf = q_ds<float>(df, pf, 100.0f, 5.0e-9f, &mdf);
     arma::fvec dsf_ref = ds_dense_reference<float>(df, pf, 100.0f, 5.0e-9f, &mdf_ref);
     CHECK(arma::approx_equal(dsf, dsf_ref, "absdiff", 0.0f));
     CHECK(arma::approx_equal(mdf, mdf_ref, "absdiff", 0.0f));
@@ -282,7 +292,7 @@ TEST_CASE("calc_delay_spread - Granularity: a 10 s delay span at 1 ns needs no d
     // 1e10 bins over the global span: the dense binning would need 80 GB per CIR
     std::vector<arma::vec> d = {{0.0, 10.0}, {5.0, 5.0 + 2.0e-9}}, p = {{1.0, 1.0}, {1.0, 3.0}};
     arma::vec md;
-    arma::vec ds = quadriga_lib::calc_delay_spread<double>(d, p, 100.0, 1.0e-9, &md);
+    arma::vec ds = q_ds<double>(d, p, 100.0, 1.0e-9, &md);
     CHECK(std::abs(ds(0) - 5.0) < 1e-9);
     CHECK(std::abs(md(0) - 5.0) < 1e-9);
     CHECK(std::abs(ds(1) - std::sqrt(0.1875) * 2.0e-9) < 1e-14); // powers 0.25 / 0.75, 2 ns apart
@@ -292,9 +302,9 @@ TEST_CASE("calc_delay_spread - Granularity and delays must be finite, bin count 
 {
     std::vector<arma::vec> d = {{0.0, 1.0e-6}}, p = {{1.0, 0.5}};
     const double nan = std::nan(""), inf = INFINITY;
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread<double>(d, p, 100.0, nan), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread<double>(d, p, 100.0, inf), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread<double>(d, p, 100.0, -1.0e-9), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds<double>(d, p, 100.0, nan), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds<double>(d, p, 100.0, inf), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds<double>(d, p, 100.0, -1.0e-9), std::invalid_argument);
 
     // Non-finite delays with granularity > 0
     for (double bad : {nan, inf, -inf})
@@ -302,34 +312,42 @@ TEST_CASE("calc_delay_spread - Granularity and delays must be finite, bin count 
         std::vector<arma::vec> db = {{0.0, 1.0e-6}, {2.0e-7, bad}};
         std::vector<arma::vec> pb = {{1.0, 0.5}, {1.0, 0.5}};
         INFO("delay " << bad);
-        CHECK_THROWS_AS(quadriga_lib::calc_delay_spread<double>(db, pb, 100.0, 1.0e-9), std::invalid_argument);
+        CHECK_THROWS_AS(q_ds<double>(db, pb, 100.0, 1.0e-9), std::invalid_argument);
     }
 
     // (global span) / granularity >= 2^53 throws; just below is accepted
     std::vector<arma::vec> dl = {{0.0, 1.0}};
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread<double>(dl, p, 100.0, 1.0e-16), std::invalid_argument);
-    CHECK_NOTHROW(quadriga_lib::calc_delay_spread<double>(dl, p, 100.0, 1.0e-15));
+    CHECK_THROWS_AS(q_ds<double>(dl, p, 100.0, 1.0e-16), std::invalid_argument);
+    CHECK_NOTHROW(q_ds<double>(dl, p, 100.0, 1.0e-15));
 
     // Delay / granularity beyond the floating-point range (the bin grid origin would be infinite)
     std::vector<arma::vec> d1 = {{1.0, 1.0}};
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread<double>(d1, p, 100.0, 1.0e-320), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds<double>(d1, p, 100.0, 1.0e-320), std::invalid_argument);
     std::vector<arma::fvec> df = {{0.1f, 0.1f}}, pf = {{1.0f, 0.5f}};
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread<float>(df, pf, 100.0f, 1.0e-40f), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds<float>(df, pf, 100.0f, 1.0e-40f), std::invalid_argument);
 
     // Without granularity the delays are not checked (as before)
     std::vector<arma::vec> dn = {{0.0, nan}};
-    CHECK_NOTHROW(quadriga_lib::calc_delay_spread<double>(dn, p, 100.0, 0.0));
+    CHECK_NOTHROW(q_ds<double>(dn, p, 100.0, 0.0));
 }
 
 TEST_CASE("calc_delay_spread - outputs that alias inputs")
 {
     std::vector<arma::vec> delays = {arma::vec({0.0, 1.0e-6, 2.0e-6})}, powers = {arma::vec({1.0, 0.5, 0.25})};
     arma::vec mean_delay;
-    CHECK_NOTHROW(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay));
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &delays[0]), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &powers[0]), std::invalid_argument);
+    CHECK_NOTHROW(q_ds(delays, powers, 100.0, 0.0, &mean_delay));
+    CHECK_THROWS_AS(q_ds(delays, powers, 100.0, 0.0, &delays[0]), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds(delays, powers, 100.0, 0.0, &powers[0]), std::invalid_argument);
     CHECK(delays[0].n_elem == 3);
 
     arma::vec view(powers[0].memptr(), 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &view), std::invalid_argument);
+    CHECK_THROWS_AS(q_ds(delays, powers, 100.0, 0.0, &view), std::invalid_argument);
+
+    // The mandatory output 'ds' cannot be an input or the mean delay; a correctly sized 'ds' is written in place
+    arma::vec ds(1, arma::fill::zeros);
+    const double *p_ds = ds.memptr();
+    quadriga_lib::calc_delay_spread(delays, powers, ds);
+    CHECK(ds.memptr() == p_ds);
+    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, delays[0]), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::calc_delay_spread(delays, powers, ds, 100.0, 0.0, &ds), std::invalid_argument);
 }

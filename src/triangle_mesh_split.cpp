@@ -63,7 +63,8 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh,
     qd_check_alias_outputs(meshA, "meshA", meshB, "meshB");
 
     // Calculate bounding box
-    arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(mesh);
+    arma::Mat<dtype> aabb;
+    quadriga_lib::triangle_mesh_aabb(*mesh, aabb);
 
     arma::uword n_face = mesh->n_rows;
     arma::uword n_mesh = 9 * n_face; // First 9 columns (column-major), further columns are ignored

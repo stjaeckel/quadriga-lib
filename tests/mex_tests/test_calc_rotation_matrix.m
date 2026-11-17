@@ -37,7 +37,7 @@ try
     [~] = quadriga_lib.calc_rotation_matrix([]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input cannot be empty.'; 
+    expectedErrorMessage = 'Input ''orientation'' cannot be empty.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -47,7 +47,7 @@ try
     [~] = quadriga_lib.calc_rotation_matrix(eye(2));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input must have 3 rows.'; 
+    expectedErrorMessage = 'Input ''orientation'' must have 3 rows.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -84,9 +84,9 @@ assertElementsAlmostEqual( R, [c,0,-s,0,1,0,s,0,c]', 'absolute', 1e-5 );
 
 %% Malformed input is rejected by the MEX helpers
 assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( sparse([0;0;1]) ), 'Sparse inputs are not supported.' );
-assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], sparse(true) ), 'Input ''transpose'' is sparse' );
+assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], sparse(true) ), 'Input ''transposed'' is sparse' );
 assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( zeros(3,1,1,1,2) ), 'Inputs with more than 4 dimensions are not supported.' );
-assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], [true, false] ), 'Input ''transpose'' must be a scalar.' );
+assert_cpp_error( @() quadriga_lib.calc_rotation_matrix( [0;0;1], [true, false] ), 'Input ''transposed'' must be a scalar.' );
 
 end
 

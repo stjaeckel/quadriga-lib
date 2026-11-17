@@ -93,13 +93,15 @@ static void run(fz::input &in)
     arma::uvec obj_ind = indices(in, near(in, n_mesh));
     T distance = in.ConsumeIntegralInRange<int>(0, 7) == 0 ? in.value<T>() : in.ConsumeFloatingPointInRange<T>(T(0), T(3));
     const bool use_obj = in.ConsumeBool();
-    fz::clean([&] { quadriga_lib::point_inside_mesh<T>(&points, &mesh, use_obj ? &obj_ind : nullptr, distance); });
+    arma::uvec inside;
+    fz::clean([&] { quadriga_lib::point_inside_mesh<T>(points, mesh, inside, use_obj ? &obj_ind : nullptr, distance); });
 
     // Overlap of objects
     std::vector<std::string> reason(in.size(2));
     const T tolerance = in.value<T>();
     const bool use_reason = in.ConsumeBool();
-    fz::clean([&] { quadriga_lib::obj_overlap_test<T>(&mesh, &obj_ind, use_reason ? &reason : nullptr, tolerance); });
+    arma::uvec overlap_ind;
+    fz::clean([&] { quadriga_lib::obj_overlap_test<T>(mesh, obj_ind, overlap_ind, use_reason ? &reason : nullptr, tolerance); });
 
     // Subdivision, also in place
     arma::uvec mtl_ind = indices(in, near(in, n_mesh)), mtl_ind_out(in.size(3));
@@ -132,7 +134,8 @@ static void run(fz::input &in)
     const arma::Mat<T> &aabb_mesh = (in.ConsumeBool() && meshR.n_rows != 0) ? meshR : mesh;
     const arma::u32_vec *aabb_smi = in.ConsumeBool() ? &smi : (in.ConsumeBool() ? &sub_mesh_ind : nullptr);
     const arma::uword vec_size_aabb = in.size(9);
-    fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(&aabb_mesh, aabb_smi, vec_size_aabb); });
+    arma::Mat<T> aabb;
+    fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(aabb_mesh, aabb, aabb_smi, vec_size_aabb); });
 
     // Split along each axis selector, also invalid ones; the outputs may be distinct, the same object, or the input
     arma::Mat<T> split_mesh = mesh, meshA(in.size(2), 9), meshB;

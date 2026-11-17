@@ -39,13 +39,13 @@ namespace quadriga_lib
               arma::uword n_bins = 201);               // Number of auto-generated bins
 
     // Calculate the RMS delay spread in [s]
-    // Returns: RMS delay spread, size: [ n_cir ]
     template <typename dtype>
-    arma::Col<dtype> calc_delay_spread(const std::vector<arma::Col<dtype>> &delays, // Delays in [s], Vector (n_cir) of vectors of length [n_path]
-                                       const std::vector<arma::Col<dtype>> &powers, // Path powers, linear scale, Vector (n_cir) of vectors of length [n_path]
-                                       dtype threshold_dB = 100.0,                  // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold_dB are excluded
-                                       dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
-                                       arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
+    void calc_delay_spread(const std::vector<arma::Col<dtype>> &delays, // Delays in [s], Vector (n_cir) of vectors of length [n_path]
+                           const std::vector<arma::Col<dtype>> &powers, // Path powers, linear scale, Vector (n_cir) of vectors of length [n_path]
+                           arma::Col<dtype> &ds,                        // Output: RMS delay spread in [s], Length [n_cir]
+                           dtype threshold_dB = 100.0,                  // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold_dB are excluded
+                           dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
+                           arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
 
     // Calculate azimuth and elevation angular spreads, optionally with spherical wrapping
     // With wrapping, the power-weighted mean direction is rotated to the equator to decouple spreads,
@@ -253,12 +253,12 @@ namespace quadriga_lib
                         bool split_loose_parts = false);                                               // If `true`, split each object into connected components
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
-    // - Returns: IDs of the overlapping objects as given in obj_ind, unique and ascending, length [ n_overlap ]
     template <typename dtype>                                               // Supported types: float or double
-    arma::uvec obj_overlap_test(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                const arma::uvec *obj_ind,                  // Object ID per triangle (any values, e.g. 0-based from obj_file_read), Size: [ n_mesh ]
-                                std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
-                                dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
+    void obj_overlap_test(const arma::Mat<dtype> &mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                          const arma::uvec &obj_ind,                  // Object ID per triangle (any values, e.g. 0-based from obj_file_read), Size: [ n_mesh ]
+                          arma::uvec &overlap_ind,                    // Output: IDs of the overlapping objects (as in obj_ind), unique, ascending, Length [ n_overlap ]
+                          std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
+                          dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
 
     // Convert paths to tubes
     // - Paths are defined by a list of ordered points
@@ -275,12 +275,12 @@ namespace quadriga_lib
 
     // Calculate the axis-aligned bounding box (AABB) of a point cloud
     // - The point cloud can be composed of sub-clouds, where each new sub-cloud is indicated by an index (= starting row number in points list)
-    // - Returns a [ n_sub, 6 ] matrix with rows containing [ x_min, x_max, y_min, y_max, z_min, z_max ] of each sub-cloud
-    // - The number of rows n_sub is a multiple of vec_size, padded with zeros
+    // - The number of rows of aabb is n_sub padded to a multiple of vec_size; padding rows are zeros
     template <typename dtype>
-    arma::Mat<dtype> point_cloud_aabb(const arma::Mat<dtype> *points,                 // Points in 3D Space, Size: [ n_points, 3 ]
-                                      const arma::u32_vec *sub_cloud_ind = nullptr,   // Sub-cloud index, Length: [ n_sub ]
-                                      arma::uword vec_size = 1);                      // Vector size for SIMD processing (e.g. 8 for AVX2)
+    void point_cloud_aabb(const arma::Mat<dtype> &points,               // Points in 3D Space, Size: [ n_points, 3 ]
+                          arma::Mat<dtype> &aabb,                       // Output: Bounding boxes {x_min, x_max, y_min, y_max, z_min, z_max}, Size: [ n_sub padded to vec_size, 6 ]
+                          const arma::u32_vec *sub_cloud_ind = nullptr, // Sub-cloud index, Length: [ n_sub ]
+                          arma::uword vec_size = 1);                    // Vector size for SIMD processing (e.g. 8 for AVX2)
 
     // Reorganize a point cloud into smaller sub-clouds for faster processing
     // - Recursively calls "point_cloud_split" until number of elements per sub-cloud is below a target size
@@ -315,10 +315,11 @@ namespace quadriga_lib
     // Tests whether points are inside a triangle mesh using raycasting
     // - 0 = outside, 1 = inside any object (no obj_ind), or 1-based object index (with obj_ind)
     template <typename dtype>
-    arma::uvec point_inside_mesh(const arma::Mat<dtype> *points,      // Points in 3D space, size: [n_points, 3]
-                                 const arma::Mat<dtype> *mesh,        // Triangular mesh faces, size: [n_mesh, 9]
-                                 const arma::uvec *obj_ind = nullptr, // Optional object indices, 0-based, size: [n_mesh]
-                                 dtype distance = 0.0);               // Optional minimum distance from objects in [m]
+    void point_inside_mesh(const arma::Mat<dtype> &points,      // Points in 3D space, size: [n_points, 3]
+                           const arma::Mat<dtype> &mesh,        // Triangular mesh faces, size: [n_mesh, 9]
+                           arma::uvec &result,                  // Output: 0 = outside, 1 = inside (or 1-based object index with obj_ind), size: [n_points]
+                           const arma::uvec *obj_ind = nullptr, // Optional object indices, 0-based, size: [n_mesh]
+                           dtype distance = 0.0);               // Optional minimum distance from objects in [m]
 
     // Calculate the interaction of rays (beams) with a triangle mesh
     template <typename dtype>
@@ -467,11 +468,12 @@ namespace quadriga_lib
 
     // Calculate the axis-aligned bounding box (AABB) of a 3D mesh
     // - The mesh can be composed of sub-meshes, where each new sub_mesh is indicated by an index (=row number)
-    // - Output is a [ n_sub, 6 ] matrix with rows containing [ x_min, x_max, y_min, y_max, z_min, z_max ] of each sub-mesh
+    // - The number of rows of aabb is n_sub padded to a multiple of vec_size; padding rows are zeros
     template <typename dtype>
-    arma::Mat<dtype> triangle_mesh_aabb(const arma::Mat<dtype> *mesh,                  // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                        const arma::u32_vec *sub_mesh_ind = nullptr,   // Sub-mesh index, Length: [ n_sub ]
-                                        arma::uword vec_size = 1);                     // Vector size for SIMD processing (e.g. 8 for AVX2)
+    void triangle_mesh_aabb(const arma::Mat<dtype> &mesh,                // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                            arma::Mat<dtype> &aabb,                      // Output: Bounding boxes {x_min, x_max, y_min, y_max, z_min, z_max}, Size: [ n_sub padded to vec_size, 6 ]
+                            const arma::u32_vec *sub_mesh_ind = nullptr, // Sub-mesh index, Length: [ n_sub ]
+                            arma::uword vec_size = 1);                   // Vector size for SIMD processing (e.g. 8 for AVX2)
 
     // Reorganize a 3D mesh into smaller sub-meshes for faster processing
     template <typename dtype>

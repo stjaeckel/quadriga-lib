@@ -127,7 +127,7 @@ Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_irs) · No
 
 ### Declaration:
 ```cpp
-std::vector<bool> quadriga_lib::get_channels_irs(
+void quadriga_lib::get_channels_irs(
     const quadriga_lib::arrayant<dtype> &tx_array,
     const quadriga_lib::arrayant<dtype> &rx_array,
     const quadriga_lib::arrayant<dtype> &irs_array,
@@ -160,6 +160,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *eoa = nullptr,
     const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
     const std::vector<bool> *active_path = nullptr,
+    std::vector<bool> *active_path_out = nullptr,
     int use_kernel = 0);
 ```
 
@@ -203,9 +204,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path_irs]`
 - **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path_irs]`
 - **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path_irs]`
-
-### Returns:
-- Boolean mask of length `n_path_1 * n_path_2` indicating which path combinations were included in the output
+- **`active_path_out`** *(optional)* — Boolean mask indicating which path combinations are in the output (can be passed
+  as `active_path` to a later call or to [combine_irs_coord](site-specific-simulation-tools.md#combine_irs_coord)); `[n_path_1 * n_path_2]`
 
 ### See also:
 - [combine_irs_coord](site-specific-simulation-tools.md#combine_irs_coord) (coordinate setup for IRS geometry)

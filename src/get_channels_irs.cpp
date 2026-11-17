@@ -7,6 +7,7 @@
 #include <iomanip>   // std::setprecision
 #include <algorithm> // std::replace
 #include <iostream>
+#include <utility>   // std::move
 
 #include "quadriga_channel.hpp"
 #include "quadriga_lib_helper_functions.hpp"
@@ -40,7 +41,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 
 ## Declaration:
 ```
-std::vector<bool> quadriga_lib::get_channels_irs(
+void quadriga_lib::get_channels_irs(
     const quadriga_lib::arrayant<dtype> &tx_array,
     const quadriga_lib::arrayant<dtype> &rx_array,
     const quadriga_lib::arrayant<dtype> &irs_array,
@@ -73,6 +74,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *eoa = nullptr,
     const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
     const std::vector<bool> *active_path = nullptr,
+    std::vector<bool> *active_path_out = nullptr,
     int use_kernel = 0);
 ```
 
@@ -116,9 +118,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path_irs]`
 - **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path_irs]`
 - **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path_irs]`
-
-## Returns:
-- Boolean mask of length `n_path_1 * n_path_2` indicating which path combinations were included in the output
+- **`active_path_out`** *(optional)* — Boolean mask indicating which path combinations are in the output (can be passed
+  as `active_path` to a later call or to [[combine_irs_coord]]); `[n_path_1 * n_path_2]`
 
 ## See also:
 - [[combine_irs_coord]] (coordinate setup for IRS geometry)
@@ -129,19 +130,19 @@ MD!*/
 
 // Calculate channels for Intelligent Reflective Surfaces (IRS)
 template <typename dtype>
-std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const arrayant<dtype> &rx_array, const arrayant<dtype> &irs_array,
-                                                 const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
-                                                 const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
-                                                 const arma::Mat<dtype> &irs_pos, const arma::Mat<dtype> &irs_orientation,
-                                                 const arma::Mat<dtype> &fbs_pos_1, const arma::Mat<dtype> &lbs_pos_1,
-                                                 const arma::Col<dtype> &path_gain_1, const arma::Col<dtype> &path_length_1, const arma::Mat<dtype> &M_1,
-                                                 const arma::Mat<dtype> &fbs_pos_2, const arma::Mat<dtype> &lbs_pos_2,
-                                                 const arma::Col<dtype> &path_gain_2, const arma::Col<dtype> &path_length_2, const arma::Mat<dtype> &M_2,
-                                                 arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
-                                                 arma::uword i_irs, dtype threshold_dB, dtype center_freq, bool use_absolute_delays,
-                                                 arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
-                                                 const arrayant<dtype> *irs_array_2, const std::vector<bool> *active_path,
-                                                 int use_kernel)
+void quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array, const arrayant<dtype> &rx_array, const arrayant<dtype> &irs_array,
+                                    const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
+                                    const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
+                                    const arma::Mat<dtype> &irs_pos, const arma::Mat<dtype> &irs_orientation,
+                                    const arma::Mat<dtype> &fbs_pos_1, const arma::Mat<dtype> &lbs_pos_1,
+                                    const arma::Col<dtype> &path_gain_1, const arma::Col<dtype> &path_length_1, const arma::Mat<dtype> &M_1,
+                                    const arma::Mat<dtype> &fbs_pos_2, const arma::Mat<dtype> &lbs_pos_2,
+                                    const arma::Col<dtype> &path_gain_2, const arma::Col<dtype> &path_length_2, const arma::Mat<dtype> &M_2,
+                                    arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
+                                    arma::uword i_irs, dtype threshold_dB, dtype center_freq, bool use_absolute_delays,
+                                    arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
+                                    const arrayant<dtype> *irs_array_2, const std::vector<bool> *active_path,
+                                    std::vector<bool> *active_path_out, int use_kernel)
 {
     // Positions and orientations, checked here so that an error names the argument (the segment calls of
     // get_channels_spherical would report 'irs_pos' as 'rx_pos' or 'tx_pos')
@@ -385,31 +386,32 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> &tx_array
             std::memcpy(eoa->memptr(), eoa_local.memptr(), n_bytes);
     }
 
-    return keep_path;
+    if (active_path_out != nullptr)
+        *active_path_out = std::move(keep_path);
 }
 
-template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<float> &tx_array, const arrayant<float> &rx_array, const arrayant<float> &irs_array,
-                                                          const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
-                                                          const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
-                                                          const arma::Mat<float> &irs_pos, const arma::Mat<float> &irs_orientation,
-                                                          const arma::Mat<float> &fbs_pos_1, const arma::Mat<float> &lbs_pos_1,
-                                                          const arma::Col<float> &path_gain_1, const arma::Col<float> &path_length_1, const arma::Mat<float> &M_1,
-                                                          const arma::Mat<float> &fbs_pos_2, const arma::Mat<float> &lbs_pos_2,
-                                                          const arma::Col<float> &path_gain_2, const arma::Col<float> &path_length_2, const arma::Mat<float> &M_2,
-                                                          arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
-                                                          arma::uword i_irs, float threshold_dB, float center_freq, bool use_absolute_delays,
-                                                          arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
-                                                          const arrayant<float> *irs_array_2, const std::vector<bool> *active_path, int use_kernel);
+template void quadriga_lib::get_channels_irs(const arrayant<float> &tx_array, const arrayant<float> &rx_array, const arrayant<float> &irs_array,
+                                             const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
+                                             const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
+                                             const arma::Mat<float> &irs_pos, const arma::Mat<float> &irs_orientation,
+                                             const arma::Mat<float> &fbs_pos_1, const arma::Mat<float> &lbs_pos_1,
+                                             const arma::Col<float> &path_gain_1, const arma::Col<float> &path_length_1, const arma::Mat<float> &M_1,
+                                             const arma::Mat<float> &fbs_pos_2, const arma::Mat<float> &lbs_pos_2,
+                                             const arma::Col<float> &path_gain_2, const arma::Col<float> &path_length_2, const arma::Mat<float> &M_2,
+                                             arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
+                                             arma::uword i_irs, float threshold_dB, float center_freq, bool use_absolute_delays,
+                                             arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
+                                             const arrayant<float> *irs_array_2, const std::vector<bool> *active_path, std::vector<bool> *active_path_out, int use_kernel);
 
-template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double> &tx_array, const arrayant<double> &rx_array, const arrayant<double> &irs_array,
-                                                          const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
-                                                          const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
-                                                          const arma::Mat<double> &irs_pos, const arma::Mat<double> &irs_orientation,
-                                                          const arma::Mat<double> &fbs_pos_1, const arma::Mat<double> &lbs_pos_1,
-                                                          const arma::Col<double> &path_gain_1, const arma::Col<double> &path_length_1, const arma::Mat<double> &M_1,
-                                                          const arma::Mat<double> &fbs_pos_2, const arma::Mat<double> &lbs_pos_2,
-                                                          const arma::Col<double> &path_gain_2, const arma::Col<double> &path_length_2, const arma::Mat<double> &M_2,
-                                                          arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
-                                                          arma::uword i_irs, double threshold_dB, double center_freq, bool use_absolute_delays,
-                                                          arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
-                                                          const arrayant<double> *irs_array_2, const std::vector<bool> *active_path, int use_kernel);
+template void quadriga_lib::get_channels_irs(const arrayant<double> &tx_array, const arrayant<double> &rx_array, const arrayant<double> &irs_array,
+                                             const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
+                                             const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
+                                             const arma::Mat<double> &irs_pos, const arma::Mat<double> &irs_orientation,
+                                             const arma::Mat<double> &fbs_pos_1, const arma::Mat<double> &lbs_pos_1,
+                                             const arma::Col<double> &path_gain_1, const arma::Col<double> &path_length_1, const arma::Mat<double> &M_1,
+                                             const arma::Mat<double> &fbs_pos_2, const arma::Mat<double> &lbs_pos_2,
+                                             const arma::Col<double> &path_gain_2, const arma::Col<double> &path_length_2, const arma::Mat<double> &M_2,
+                                             arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
+                                             arma::uword i_irs, double threshold_dB, double center_freq, bool use_absolute_delays,
+                                             arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
+                                             const arrayant<double> *irs_array_2, const std::vector<bool> *active_path, std::vector<bool> *active_path_out, int use_kernel);

@@ -161,7 +161,8 @@ template <typename T>
 static void run(fz::input &in)
 {
     arma::Mat<T> points = in.mat<T>(in.size(32), in.ConsumeBool() ? 3 : in.size(4));
-    fz::clean([&] { quadriga_lib::point_cloud_aabb<T>(&points); });
+    arma::Mat<T> aabb;
+    fz::clean([&] { quadriga_lib::point_cloud_aabb<T>(points, aabb); });
 }
 
 void fuzz_one(const uint8_t *data, size_t size)

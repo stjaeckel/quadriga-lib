@@ -115,11 +115,14 @@ static void run(fz::input &in)
         const bool use_irs2 = in.ConsumeBool(), use_active = in.ConsumeBool();
         const arma::Mat<T> irs_pos = {ip[0], ip[1], ip[2]}, irs_orientation = {ip[3], ip[4], ip[5]};
         const int use_kernel = in.ConsumeIntegralInRange<int>(0, quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1);
+        std::vector<bool> active_out;
+        const bool use_active_out = in.ConsumeBool();
         fz::clean([&] { quadriga_lib::get_channels_irs(tx, rx, irs, pos(0), pos(3), pos(6), pos(9), irs_pos, irs_orientation,
                                                        q1.fbs, q1.lbs, q1.gain, q1.length, q1.M, q2.fbs, q2.lbs, q2.gain, q2.length,
                                                        q2.M, c_re, c_im, dl, i_irs, threshold, fc, absolute,
                                                        opt(aod, 3), opt(eod, 4), opt(aoa, 5), opt(eoa, 6),
-                                                       use_irs2 ? &irs2 : nullptr, use_active ? &active : nullptr, use_kernel); });
+                                                       use_irs2 ? &irs2 : nullptr, use_active ? &active : nullptr,
+                                                       use_active_out ? &active_out : nullptr, use_kernel); });
         break;
     }
     default:

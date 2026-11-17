@@ -90,7 +90,8 @@ static void run(fz::input &in)
         const T granularity = in.ConsumeBool() ? T(0) : in.value<T>();
         arma::Col<T> mean_delay(in.size(2));
         const bool use_mean = in.ConsumeBool();
-        fz::clean([&] { quadriga_lib::calc_delay_spread<T>(delays, powers, threshold_dB, granularity, use_mean ? &mean_delay : nullptr); });
+        arma::Col<T> ds;
+        fz::clean([&] { quadriga_lib::calc_delay_spread<T>(delays, powers, ds, threshold_dB, granularity, use_mean ? &mean_delay : nullptr); });
     }
 
     // Angular spreads, with and without wrapping, bank angle and quantization

@@ -164,14 +164,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call library function
     std::vector<bool> active_path_out;
-    CALL_QD(active_path_out = quadriga_lib::get_channels_irs<double>(ant_tx, ant_rx, ant_irs,
-                                                                     tx_pos, tx_orientation, rx_pos, rx_orientation,
-                                                                     irs_pos, irs_orientation,
-                                                                     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                                     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
-                                                                     coeff_re, coeff_im, delay,
-                                                                     i_irs, threshold_dB, center_freq, use_absolute_delays,
-                                                                     p_aod, p_eod, p_aoa, p_eoa, p_irs_array_2, p_active_path, use_kernel));
+    std::vector<bool> *p_active_path_out = (nlhs > 3) ? &active_path_out : nullptr;
+    CALL_QD(quadriga_lib::get_channels_irs<double>(ant_tx, ant_rx, ant_irs,
+                                                   tx_pos, tx_orientation, rx_pos, rx_orientation,
+                                                   irs_pos, irs_orientation,
+                                                   fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
+                                                   fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
+                                                   coeff_re, coeff_im, delay,
+                                                   i_irs, threshold_dB, center_freq, use_absolute_delays,
+                                                   p_aod, p_eod, p_aoa, p_eoa, p_irs_array_2, p_active_path,
+                                                   p_active_path_out, use_kernel));
 
     // Write to MATLAB
     if (nlhs > 0)

@@ -119,13 +119,15 @@ TEST_CASE("Get Channels IRS - Minimal test")
 
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
 
-    auto keep = quadriga_lib::get_channels_irs<double>(ant, ant, irs,
-                                                       {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
-                                                       {40.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
-                                                       {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
-                                                       fbs_pos_1, fbs_pos_1, path_gain, path_length, M,
-                                                       fbs_pos_2, fbs_pos_2, path_gain, path_length, M,
-                                                       coeff_re, coeff_im, delay, 0, -6.0, f0, 1, &aod, &eod, &aoa, &eoa);
+    std::vector<bool> keep = {true}; // An old mask is replaced
+    quadriga_lib::get_channels_irs<double>(ant, ant, irs,
+                                           {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                           {40.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                           {20.0, 0.0, 1.0}, {0.0, 0.0, 0.0},
+                                           fbs_pos_1, fbs_pos_1, path_gain, path_length, M,
+                                           fbs_pos_2, fbs_pos_2, path_gain, path_length, M,
+                                           coeff_re, coeff_im, delay, 0, -6.0, f0, 1, &aod, &eod, &aoa, &eoa,
+                                           nullptr, nullptr, &keep);
 
     // First path should be close to 1.8, 0.2 path gain * 3 * 3 (IRS array gain)
     arma::mat T(3, 3, arma::fill::value(1.8));
@@ -687,10 +689,11 @@ TEST_CASE("Get Channels IRS - A segment without paths gives empty outputs")
     for (int seg = 1; seg <= 2; ++seg)
     {
         const bool s1 = seg == 1;
-        auto keep = quadriga_lib::get_channels_irs<double>(ant, ant, irs, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0}, {5, 5, 0}, {0, 0, 0},
-                                                           *(s1 ? &f0 : &fb), *(s1 ? &f0 : &fb), *(s1 ? &e : &g), *(s1 ? &e : &l), *(s1 ? &M0 : &M),
-                                                           *(s1 ? &fb : &f0), *(s1 ? &fb : &f0), *(s1 ? &g : &e), *(s1 ? &l : &e), *(s1 ? &M : &M0),
-                                                           cr, ci, dl, 0, -140.0, 1e9, false, &ad, &ed, &aa, &ea);
+        std::vector<bool> keep;
+        quadriga_lib::get_channels_irs<double>(ant, ant, irs, {0, 0, 0}, {0, 0, 0}, {10, 0, 0}, {0, 0, 0}, {5, 5, 0}, {0, 0, 0},
+                                               *(s1 ? &f0 : &fb), *(s1 ? &f0 : &fb), *(s1 ? &e : &g), *(s1 ? &e : &l), *(s1 ? &M0 : &M),
+                                               *(s1 ? &fb : &f0), *(s1 ? &fb : &f0), *(s1 ? &g : &e), *(s1 ? &l : &e), *(s1 ? &M : &M0),
+                                               cr, ci, dl, 0, -140.0, 1e9, false, &ad, &ed, &aa, &ea, nullptr, nullptr, &keep);
         CHECK(keep.empty());
         for (const arma::cube *c : {&cr, &ci, &dl, &ad, &ed, &aa, &ea})
         {
@@ -921,13 +924,13 @@ TEST_CASE("Get Channels IRS - AVX2 in both segments agrees with GENERIC, auto is
         {
             CHECK_THROWS_AS(quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
                                                                    f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[k], ci[k], dl[k], 0, -200.0,
-                                                                   3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k),
+                                                                   3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k),
                             std::invalid_argument);
             continue;
         }
         quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
                                                f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[k], ci[k], dl[k], 0, -200.0,
-                                               3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k);
+                                               3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, k);
     }
     REQUIRE(cr[1].n_slices == 12);
     CHECK((arma::approx_equal(cr[0], cr[1], "absdiff", 0.0) && arma::approx_equal(ci[0], ci[1], "absdiff", 0.0)));
@@ -939,6 +942,6 @@ TEST_CASE("Get Channels IRS - AVX2 in both segments agrees with GENERIC, auto is
     }
     CHECK_THROWS_AS(quadriga_lib::get_channels_irs<double>(tx, rx, irs, {0, 0, 1}, {0, 0, 0}, {40, 0, 1}, {0, 0, 0}, {20, 0, 1}, {0, 0, 0},
                                                            f1, f1, g1, l1, M1, f2, f2, g2, l2, M2, cr[0], ci[0], dl[0], 0, -200.0,
-                                                           3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 3),
+                                                           3e9, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 3),
                     std::invalid_argument);
 }

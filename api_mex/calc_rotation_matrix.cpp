@@ -20,12 +20,12 @@ Calculate rotation matrices from Euler angles
 
 ## Usage:
 ```
-rotation = quadriga_lib.calc_rotation_matrix( orientation, transpose );
+rotation = quadriga_lib.calc_rotation_matrix( orientation, transposed );
 ```
 
 ## Inputs:
 - **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`transpose`** — Returns the transpose of the rotation matrix; logical; default: false
+- **`transposed`** — Returns the transpose of the rotation matrix; logical; default: false
 
 ## Outputs:
 - **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
@@ -39,10 +39,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     const arma::cube orientation = qd_mex_get_Cube<double>(prhs[0]);
-    const bool transpose = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "transpose", false);
+    const bool transposed = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "transposed", false);
 
     arma::cube rotation;
-    CALL_QD(rotation = quadriga_lib::calc_rotation_matrix<double>(orientation, transpose));
+    CALL_QD(quadriga_lib::calc_rotation_matrix<double>(orientation, rotation, transposed));
 
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&rotation);

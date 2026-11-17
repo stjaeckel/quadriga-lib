@@ -12,7 +12,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-math-f
 | [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [fast_sincos](#fast_sincos) | Compute elementwise approximate sine and/or cosine of a vector |
 | [fast_slerp](#fast_slerp) | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
-| [interp_2D](#interp_2D) | Perform linear interpolation (1D or 2D) on single or multiple data sets |
+| [interp_2D](#interp_2D) | Perform linear interpolation (1D or 2D) on multiple data sets |
 
 ---
 <a id="calc_rotation_matrix"></a>
@@ -24,28 +24,23 @@ Also in: [MATLAB](../mex/math-functions.md#calc_rotation_matrix) · Not in: Pyth
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
 - R = Rz(heading)·Ry(tilt)·Rx(bank), right-handed as in 3GPP TR 38.901; a positive tilt turns the x-axis down
 - Internally uses double precision regardless of `dtype`
+- A matrix of orientations `[3, n]` is the cube `[3, n, 1]`; wrap it without a copy:
+  `arma::Cube<dtype>(const_cast<dtype *>(mat.memptr()), 3, n, 1, false, true)`
 
 ### Declaration:
 ```cpp
-arma::Cube<dtype> quadriga_lib::calc_rotation_matrix(
+void quadriga_lib::calc_rotation_matrix(
     const arma::Cube<dtype> &orientation,
-    bool transposeR = false);
-
-arma::Mat<dtype> quadriga_lib::calc_rotation_matrix(
-    const arma::Mat<dtype> &orientation,
-    bool transposeR = false);
-
-arma::Col<dtype> quadriga_lib::calc_rotation_matrix(
-    const arma::Col<dtype> &orientation,
-    bool transposeR = false);
+    arma::Cube<dtype> &rotation,
+    bool transposed = false);
 ```
 
 ### Inputs:
-- **`orientation`** — Euler angles (bank, tilt, head); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`transposeR`** *(optional)* — Returns the transpose of the rotation matrix
+- **`orientation`** — Euler angles (bank, tilt, head) in [rad]; `[3, n_row, n_col]`
+- **`transposed`** *(optional)* — Returns the transpose of the rotation matrix
 
-### Returns:
-- Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
+### Output:
+- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]`
 
 ---
 <a id="fast_acos"></a>
@@ -283,7 +278,7 @@ void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
 ---
 <a id="interp_2D"></a>
 ## interp_2D
-Perform linear interpolation (1D or 2D) on single or multiple data sets
+Perform linear interpolation (1D or 2D) on multiple data sets
 
 Also in: [MATLAB](../mex/math-functions.md#interp) · Not in: Python
 
@@ -292,57 +287,54 @@ Also in: [MATLAB](../mex/math-functions.md#interp) · Not in: Python
   output sample points that are NaN give NaN.
 - The input sample points need not be sorted (they are sorted internally); repeated values are allowed;
   they must be finite.
-- Supports single and multiple data sets.
-- Returns interpolated results either directly or through reference argument.
+- `interp_1D` interpolates the columns of a matrix; a single data set is a matrix with one column.
 - Data types (`dtype`): `float` or `double`
 
 ### Declarations:
 ```cpp
-void interp_2D(const arma::Cube<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-               const arma::Col<dtype> &xo, const arma::Col<dtype> &yo, arma::Cube<dtype> &output);
+void quadriga_lib::interp_2D(
+    const arma::Col<dtype> &x,
+    const arma::Col<dtype> &y,
+    const arma::Cube<dtype> &input,
+    const arma::Col<dtype> &x_new,
+    const arma::Col<dtype> &y_new,
+    arma::Cube<dtype> &output);
 
-arma::Cube<dtype> interp_2D(const arma::Cube<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                            const arma::Col<dtype> &xo, const arma::Col<dtype> &yo);
-
-arma::Mat<dtype> interp_2D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                           const arma::Col<dtype> &xo, const arma::Col<dtype> &yo);
-
-arma::Mat<dtype> interp_1D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo);
-
-arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo);
+void quadriga_lib::interp_1D(
+    const arma::Col<dtype> &x,
+    const arma::Mat<dtype> &input,
+    const arma::Col<dtype> &x_new,
+    arma::Mat<dtype> &output);
 ```
 
-### Arguments:
-- `input`: Input data array/matrix (size details below)
-- `xi`: Input x-axis sampling points, vector of length `nx`
-- `yi`: Input y-axis sampling points (for 2D only), vector of length `ny`
-- `xo`: Output x-axis sampling points, vector of length `mx`
-- `yo`: Output y-axis sampling points (for 2D only), vector of length `my`
-- `output`: Interpolated data cube (output argument of the first variant)
+### Inputs:
+- **`x`** — Input x-axis sample points; `[nx]`
+- **`y`** — Input y-axis sample points (2D only); `[ny]`
+- **`input`** — Input data; 2D: `[ny, nx, ne]`; 1D: `[nx, ne]`; `ne` = number of data sets
+- **`x_new`** — Output x-axis sample points; `[nx_new]`
+- **`y_new`** — Output y-axis sample points (2D only); `[ny_new]`
 
-### Input / Output size details:
-- 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`
-- 2D interpolation of single dataset (`arma::Mat`): input: `[ny, nx]`; output: `[my, mx]`
-- 1D interpolation of multiple datasets (`arma::Mat`): input: `[nx, ne]`; output: `[mx, ne]`
-- 1D interpolation of single dataset (`arma::Col`): input: `[nx]`, output: `[mx]`
+### Output:
+- **`output`** — Interpolated data; 2D: `[ny_new, nx_new, ne]`; 1D: `[nx_new, ne]`
 
 ### Examples:
 - 2D interpolation example:
 ```cpp
 arma::cube input(5, 5, 2, arma::fill::randu); // example input data
-arma::vec xi = arma::linspace(0, 4, 5);
-arma::vec yi = arma::linspace(0, 4, 5);
-arma::vec xo = arma::linspace(0, 4, 10);
-arma::vec yo = arma::linspace(0, 4, 10);
+arma::vec x = arma::linspace(0, 4, 5);
+arma::vec y = arma::linspace(0, 4, 5);
+arma::vec x_new = arma::linspace(0, 4, 10);
+arma::vec y_new = arma::linspace(0, 4, 10);
 
 arma::cube output;
-quadriga_lib::interp_2D(input, xi, yi, xo, yo, output);
+quadriga_lib::interp_2D(x, y, input, x_new, y_new, output);
 ```
 - 1D interpolation example:
 ```cpp
 arma::vec input = arma::linspace(0, 1, 5);
-arma::vec xi = arma::linspace(0, 4, 5);
-arma::vec xo = arma::linspace(0, 4, 10);
+arma::vec x = arma::linspace(0, 4, 5);
+arma::vec x_new = arma::linspace(0, 4, 10);
 
-auto output = quadriga_lib::interp_1D(input, xi, xo);
+arma::mat output;
+quadriga_lib::interp_1D(x, input, x_new, output);
 ```

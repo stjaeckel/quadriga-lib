@@ -40,6 +40,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Not given / all: an omitted optional input (C++ `nullptr` or an empty container, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
 - Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity cannot be <= 0 (a size, an angle range, a frequency limit), values <= 0 select it too. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
 - Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_M`, `fix_taps`, `axis`) or strings, each documented by its function.
+- Results (C++): a computed array goes into an output argument, so that the wrappers can write into MATLAB / numpy memory without a copy. Returned are objects from readers, generators and factories (`arrayant`, `channel`, meshes, colormaps, path lists), a count, status or read object (also next to output arguments, e.g. `obj_file_read`, `qdant_read`, `hdf5_read_layout`), and a single computed scalar (e.g. `sos_calc_mse`).
 
 **Frequencies**
 
@@ -158,7 +159,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [fast_geo2cart](#fast_geo2cart) | Math functions | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [fast_sincos](#fast_sincos) | Math functions | Compute elementwise approximate sine and/or cosine of a vector |
 | [fast_slerp](#fast_slerp) | Math functions | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
-| [interp_2D](#interp_2D) | Math functions | Perform linear interpolation (1D or 2D) on single or multiple data sets |
+| [interp_2D](#interp_2D) | Math functions | Perform linear interpolation (1D or 2D) on multiple data sets |
 | [quadriga_lib_has_AVX2](#quadriga_lib_has_AVX2) | Miscellaneous / Tools | Checks whether AVX2 kernels can be used |
 | [quadriga_lib_has_CUDA](#quadriga_lib_has_CUDA) | Miscellaneous / Tools | Checks whether CUDA kernels can be used |
 | [quadriga_lib_version](#quadriga_lib_version) | Miscellaneous / Tools | Returns the quadriga-lib version number |
@@ -2914,7 +2915,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_irs) · Not in: Python
 
 ### Declaration:
 ```cpp
-std::vector<bool> quadriga_lib::get_channels_irs(
+void quadriga_lib::get_channels_irs(
     const quadriga_lib::arrayant<dtype> &tx_array,
     const quadriga_lib::arrayant<dtype> &rx_array,
     const quadriga_lib::arrayant<dtype> &irs_array,
@@ -2947,6 +2948,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     arma::Cube<dtype> *eoa = nullptr,
     const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
     const std::vector<bool> *active_path = nullptr,
+    std::vector<bool> *active_path_out = nullptr,
     int use_kernel = 0);
 ```
 
@@ -2990,9 +2992,8 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path_irs]`
 - **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path_irs]`
 - **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path_irs]`
-
-### Returns:
-- Boolean mask of length `n_path_1 * n_path_2` indicating which path combinations were included in the output
+- **`active_path_out`** *(optional)* — Boolean mask indicating which path combinations are in the output (can be passed
+  as `active_path` to a later call or to [combine_irs_coord](#combine_irs_coord)); `[n_path_1 * n_path_2]`
 
 ### See also:
 - [combine_irs_coord](#combine_irs_coord) (coordinate setup for IRS geometry)
@@ -3468,9 +3469,10 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_delay_spread) · [Python](quadrig
 
 ### Declaration:
 ```cpp
-arma::Col<dtype> quadriga_lib::calc_delay_spread(
+void quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
+    arma::Col<dtype> &ds,
     dtype threshold_dB = 100.0,
     dtype granularity = 0.0,
     arma::Col<dtype> *mean_delay = nullptr);
@@ -3484,10 +3486,8 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
   and non-negative; when > 0, non-finite delays or a span / granularity of 2^53 or more throw `std::invalid_argument`
 
 ### Outputs:
+- **`ds`** — RMS delay spread in [s] for each CIR; `[n_cir]`
 - **`mean_delay`** *(optional)* — Mean delay in [s] per CIR; `[n_cir]`
-
-### Returns:
-- RMS delay spread in [s] for each CIR; `[n_cir]`
 
 ### See also:
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed tap grid)
@@ -4831,28 +4831,23 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#calc_rotation_matrix) · Not in: Pytho
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
 - R = Rz(heading)·Ry(tilt)·Rx(bank), right-handed as in 3GPP TR 38.901; a positive tilt turns the x-axis down
 - Internally uses double precision regardless of `dtype`
+- A matrix of orientations `[3, n]` is the cube `[3, n, 1]`; wrap it without a copy:
+  `arma::Cube<dtype>(const_cast<dtype *>(mat.memptr()), 3, n, 1, false, true)`
 
 ### Declaration:
 ```cpp
-arma::Cube<dtype> quadriga_lib::calc_rotation_matrix(
+void quadriga_lib::calc_rotation_matrix(
     const arma::Cube<dtype> &orientation,
-    bool transposeR = false);
-
-arma::Mat<dtype> quadriga_lib::calc_rotation_matrix(
-    const arma::Mat<dtype> &orientation,
-    bool transposeR = false);
-
-arma::Col<dtype> quadriga_lib::calc_rotation_matrix(
-    const arma::Col<dtype> &orientation,
-    bool transposeR = false);
+    arma::Cube<dtype> &rotation,
+    bool transposed = false);
 ```
 
 ### Inputs:
-- **`orientation`** — Euler angles (bank, tilt, head); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`transposeR`** *(optional)* — Returns the transpose of the rotation matrix
+- **`orientation`** — Euler angles (bank, tilt, head) in [rad]; `[3, n_row, n_col]`
+- **`transposed`** *(optional)* — Returns the transpose of the rotation matrix
 
-### Returns:
-- Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
+### Output:
+- **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]`
 
 ---
 <a id="fast_acos"></a>
@@ -5090,7 +5085,7 @@ void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
 ---
 <a id="interp_2D"></a>
 ## interp_2D
-Perform linear interpolation (1D or 2D) on single or multiple data sets
+Perform linear interpolation (1D or 2D) on multiple data sets
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#interp) · Not in: Python
 
@@ -5099,59 +5094,56 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#interp) · Not in: Python
   output sample points that are NaN give NaN.
 - The input sample points need not be sorted (they are sorted internally); repeated values are allowed;
   they must be finite.
-- Supports single and multiple data sets.
-- Returns interpolated results either directly or through reference argument.
+- `interp_1D` interpolates the columns of a matrix; a single data set is a matrix with one column.
 - Data types (`dtype`): `float` or `double`
 
 ### Declarations:
 ```cpp
-void interp_2D(const arma::Cube<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-               const arma::Col<dtype> &xo, const arma::Col<dtype> &yo, arma::Cube<dtype> &output);
+void quadriga_lib::interp_2D(
+    const arma::Col<dtype> &x,
+    const arma::Col<dtype> &y,
+    const arma::Cube<dtype> &input,
+    const arma::Col<dtype> &x_new,
+    const arma::Col<dtype> &y_new,
+    arma::Cube<dtype> &output);
 
-arma::Cube<dtype> interp_2D(const arma::Cube<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                            const arma::Col<dtype> &xo, const arma::Col<dtype> &yo);
-
-arma::Mat<dtype> interp_2D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,
-                           const arma::Col<dtype> &xo, const arma::Col<dtype> &yo);
-
-arma::Mat<dtype> interp_1D(const arma::Mat<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo);
-
-arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype> &xi, const arma::Col<dtype> &xo);
+void quadriga_lib::interp_1D(
+    const arma::Col<dtype> &x,
+    const arma::Mat<dtype> &input,
+    const arma::Col<dtype> &x_new,
+    arma::Mat<dtype> &output);
 ```
 
-### Arguments:
-- `input`: Input data array/matrix (size details below)
-- `xi`: Input x-axis sampling points, vector of length `nx`
-- `yi`: Input y-axis sampling points (for 2D only), vector of length `ny`
-- `xo`: Output x-axis sampling points, vector of length `mx`
-- `yo`: Output y-axis sampling points (for 2D only), vector of length `my`
-- `output`: Interpolated data cube (output argument of the first variant)
+### Inputs:
+- **`x`** — Input x-axis sample points; `[nx]`
+- **`y`** — Input y-axis sample points (2D only); `[ny]`
+- **`input`** — Input data; 2D: `[ny, nx, ne]`; 1D: `[nx, ne]`; `ne` = number of data sets
+- **`x_new`** — Output x-axis sample points; `[nx_new]`
+- **`y_new`** — Output y-axis sample points (2D only); `[ny_new]`
 
-### Input / Output size details:
-- 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`
-- 2D interpolation of single dataset (`arma::Mat`): input: `[ny, nx]`; output: `[my, mx]`
-- 1D interpolation of multiple datasets (`arma::Mat`): input: `[nx, ne]`; output: `[mx, ne]`
-- 1D interpolation of single dataset (`arma::Col`): input: `[nx]`, output: `[mx]`
+### Output:
+- **`output`** — Interpolated data; 2D: `[ny_new, nx_new, ne]`; 1D: `[nx_new, ne]`
 
 ### Examples:
 - 2D interpolation example:
 ```cpp
 arma::cube input(5, 5, 2, arma::fill::randu); // example input data
-arma::vec xi = arma::linspace(0, 4, 5);
-arma::vec yi = arma::linspace(0, 4, 5);
-arma::vec xo = arma::linspace(0, 4, 10);
-arma::vec yo = arma::linspace(0, 4, 10);
+arma::vec x = arma::linspace(0, 4, 5);
+arma::vec y = arma::linspace(0, 4, 5);
+arma::vec x_new = arma::linspace(0, 4, 10);
+arma::vec y_new = arma::linspace(0, 4, 10);
 
 arma::cube output;
-quadriga_lib::interp_2D(input, xi, yi, xo, yo, output);
+quadriga_lib::interp_2D(x, y, input, x_new, y_new, output);
 ```
 - 1D interpolation example:
 ```cpp
 arma::vec input = arma::linspace(0, 1, 5);
-arma::vec xi = arma::linspace(0, 4, 5);
-arma::vec xo = arma::linspace(0, 4, 10);
+arma::vec x = arma::linspace(0, 4, 5);
+arma::vec x_new = arma::linspace(0, 4, 10);
 
-auto output = quadriga_lib::interp_1D(input, xi, xo);
+arma::mat output;
+quadriga_lib::interp_1D(x, input, x_new, output);
 ```
 
 ---
@@ -5342,7 +5334,7 @@ Not in: MATLAB, Python
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
 - Interaction coordinates use a compressed format: `n_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
-- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [get_channels_irs](#get_channels_irs)) reduces this to active combinations only
+- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the `active_path_out` output of [get_channels_irs](#get_channels_irs)) reduces this to active combinations only
 - Typically used after [get_channels_irs](#get_channels_irs) to produce interaction data for path visualization (e.g. in Blender) via [coord2path](#coord2path)
 
 ### Declaration:
@@ -5370,7 +5362,7 @@ void quadriga_lib::combine_irs_coord(
   `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
-- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [get_channels_irs](#get_channels_irs) directly; `[n_path_1 × n_path_2]`
+- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the `active_path_out` output of [get_channels_irs](#get_channels_irs) directly; `[n_path_1 × n_path_2]`
 
 ### Outputs:
 - **`n_interact`** — Number of interaction points per combined path; `[n_path_irs]`
@@ -5831,7 +5823,7 @@ Detect overlapping 3D objects in a triangular mesh
 
 Not in: MATLAB, Python
 
-- Returns the IDs (as given in `obj_ind`) of all objects that intersect at least one other object
+- Gives the IDs (as given in `obj_ind`) of all objects that intersect at least one other object
 - Touching faces or edges are not considered overlapping
 - Checks for intersecting triangle faces and vertices/edges penetrating another object's bounding volume
 - Overlaps smaller than `tolerance` are ignored to account for numerical imprecision
@@ -5839,9 +5831,10 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-arma::uvec quadriga_lib::obj_overlap_test(
-    const arma::Mat<dtype> *mesh,
-    const arma::uvec *obj_ind,
+void quadriga_lib::obj_overlap_test(
+    const arma::Mat<dtype> &mesh,
+    const arma::uvec &obj_ind,
+    arma::uvec &overlap_ind,
     std::vector<std::string> *reason = nullptr,
     dtype tolerance = 0.0005);
 ```
@@ -5849,12 +5842,12 @@ arma::uvec quadriga_lib::obj_overlap_test(
 ### Inputs:
 - **`mesh`** — Triangular mesh; each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object ID of each triangle; any values, e.g. the 0-based `obj_ind` output of [obj_file_read](#obj_file_read); `[n_mesh]`
-- **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
-  overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
 
-### Returns:
-- `arma::uvec`: IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+### Outputs:
+- **`overlap_ind`** — IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+- **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
+  overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (reads mesh data from files and generates `obj_ind` input)
@@ -5946,8 +5939,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_aabb) · [Python](quadriga
 
 ### Declaration:
 ```cpp
-arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
-    const arma::Mat<dtype> *points,
+void quadriga_lib::point_cloud_aabb(
+    const arma::Mat<dtype> &points,
+    arma::Mat<dtype> &aabb,
     const arma::u32_vec *sub_cloud_ind = nullptr,
     arma::uword vec_size = 1);
 ```
@@ -5957,8 +5951,8 @@ arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
 - **`sub_cloud_ind`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
-### Returns:
-- Bounding box matrix; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
+### Output:
+- **`aabb`** — Bounding boxes, one row per sub-cloud; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [point_cloud_segmentation](#point_cloud_segmentation) (generate sub-cloud indices)
@@ -6061,13 +6055,14 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_inside_mesh) · [Python](quadrig
 - A point is inside if any ray hits a face with a negative incidence angle, or if the ray
   thickness at FBS is below 1 mm (surface proximity)
 - Mesh must be watertight with all normals pointing outward
-- If `obj_ind` is provided, returns the 1-based enclosing object index instead of binary 0/1
+- If `obj_ind` is provided, `result` holds the 1-based enclosing object index instead of binary 0/1
 
 ### Declaration:
 ```cpp
-arma::uvec quadriga_lib::point_inside_mesh(
-    const arma::Mat<dtype> *points,
-    const arma::Mat<dtype> *mesh,
+void quadriga_lib::point_inside_mesh(
+    const arma::Mat<dtype> &points,
+    const arma::Mat<dtype> &mesh,
+    arma::uvec &result,
     const arma::uvec *obj_ind = nullptr,
     dtype distance = 0.0);
 ```
@@ -6080,8 +6075,8 @@ arma::uvec quadriga_lib::point_inside_mesh(
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m (default: 0)
 
-### Returns:
-- `arma::uvec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
+### Output:
+- **`result`** — `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`); `[n_points]`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
@@ -6873,7 +6868,7 @@ Not in: MATLAB, Python
 
 ### Declaration:
 ```cpp
-std::vector<bool> quadriga_lib::ray_subdivide_flag(
+void quadriga_lib::ray_subdivide_flag(
     const arma::fmat &mesh,
     const arma::fmat &orig,
     const arma::fmat &dest,
@@ -6882,6 +6877,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
     const arma::fmat &tridir,
     const std::vector<quadriga_lib::path> &paths,
     const arma::Col<short> &mtl_ind_current,
+    std::vector<bool> &subdiv_flag,
     uint8_t max_interactions = 20,
     uint8_t max_subdivisions = 2,
     float subdivision_tolerance = 3.0f);
@@ -6901,7 +6897,7 @@ std::vector<bool> quadriga_lib::ray_subdivide_flag(
 - **`max_interactions`** *(optional)* — Total interactions per ray, 0 to 255. A ray that has already reached the limit 
   is not split, so it does not expand into four sub-beams that all terminate in the next generation
 - **`max_subdivisions`** *(optional)* — Number of subdivisions per ray, 0 to 255. 0 disables subdivision and 
-  the returned flags are all `false`
+  all flags are `false`
 - **`subdivision_tolerance`** *(optional)* — Maximum beam-tube edge length before a ray is split, in
   metres; must be greater than 0
 
@@ -7117,8 +7113,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_aabb) · [Python](quadri
 
 ### Declaration:
 ```cpp
-arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
-    const arma::Mat<dtype> *mesh,
+void quadriga_lib::triangle_mesh_aabb(
+    const arma::Mat<dtype> &mesh,
+    arma::Mat<dtype> &aabb,
     const arma::u32_vec *sub_mesh_ind = nullptr,
     arma::uword vec_size = 1);
 ```
@@ -7128,8 +7125,8 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
-### Returns:
-- `arma::Mat<dtype>` of shape `[n_sub_aligned, 6]`, one AABB per sub-mesh row
+### Output:
+- **`aabb`** — Bounding boxes, one row per sub-mesh; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
 - [ray_triangle_intersect](#ray_triangle_intersect) (consumer of the output)

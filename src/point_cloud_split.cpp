@@ -67,7 +67,8 @@ int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points,
     qd_check_alias_outputs(pointsA, "pointsA", pointsB, "pointsB");
 
     // Calculate bounding box
-    arma::Mat<dtype> aabb = quadriga_lib::point_cloud_aabb(points);
+    arma::Mat<dtype> aabb;
+    quadriga_lib::point_cloud_aabb(*points, aabb);
 
     size_t n_points_t = (size_t)points->n_rows;
     size_t n_values_t = (size_t)points->n_elem;

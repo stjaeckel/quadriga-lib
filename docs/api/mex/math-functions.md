@@ -23,12 +23,12 @@ Also in: [C++](../cpp/math-functions.md#calc_rotation_matrix) · Not in: Python
 
 ### Usage:
 ```matlab
-rotation = quadriga_lib.calc_rotation_matrix( orientation, transpose );
+rotation = quadriga_lib.calc_rotation_matrix( orientation, transposed );
 ```
 
 ### Inputs:
 - **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`transpose`** — Returns the transpose of the rotation matrix; logical; default: false
+- **`transposed`** — Returns the transpose of the rotation matrix; logical; default: false
 
 ### Outputs:
 - **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
@@ -160,18 +160,18 @@ Also in: [C++](../cpp/math-functions.md#interp_2D) · Not in: Python
 ### Usage:
 
 ```matlab
-dataI = quadriga_lib.interp( x, y, data, xI, yI );      % 2D case
+output = quadriga_lib.interp( x, y, input, x_new, y_new );    % 2D case
 
-dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
+output = quadriga_lib.interp( x, [], input, x_new );           % 1D case
 ```
 
 ### Inputs:
 - **`x`** — Data x-axis sampling points; Length: `[nx]`
 - **`y`** — Data y-axis sampling points; Length: `[ny]`
-- **`data`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
+- **`input`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
   enables interpolation for multiple datasets simultaneously.
-- **`xI`** — Output x-axis sampling points; Length: `[nxI]`
-- **`yI`** — Output y-axis sampling points; Length: `[nyI]`; required when `y` is not empty
+- **`x_new`** — Output x-axis sampling points; Length: `[nx_new]`
+- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty
 
 ### Output:
-- **`dataI`**  —  Interpolated data `[nyI, nxI, ne]` or `[1, nxI, ne]` for 1D case
+- **`output`**  —  Interpolated data `[ny_new, nx_new, ne]` or `[1, nx_new, ne]` for 1D case

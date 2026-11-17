@@ -272,7 +272,7 @@ SECTION!*/
 # obj_overlap_test
 Detect overlapping 3D objects in a triangular mesh
 
-- Returns the IDs (as given in `obj_ind`) of all objects that intersect at least one other object
+- Gives the IDs (as given in `obj_ind`) of all objects that intersect at least one other object
 - Touching faces or edges are not considered overlapping
 - Checks for intersecting triangle faces and vertices/edges penetrating another object's bounding volume
 - Overlaps smaller than `tolerance` are ignored to account for numerical imprecision
@@ -280,9 +280,10 @@ Detect overlapping 3D objects in a triangular mesh
 
 ## Declaration:
 ```
-arma::uvec quadriga_lib::obj_overlap_test(
-    const arma::Mat<dtype> *mesh,
-    const arma::uvec *obj_ind,
+void quadriga_lib::obj_overlap_test(
+    const arma::Mat<dtype> &mesh,
+    const arma::uvec &obj_ind,
+    arma::uvec &overlap_ind,
     std::vector<std::string> *reason = nullptr,
     dtype tolerance = 0.0005);
 ```
@@ -290,12 +291,12 @@ arma::uvec quadriga_lib::obj_overlap_test(
 ## Inputs:
 - **`mesh`** — Triangular mesh; each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object ID of each triangle; any values, e.g. the 0-based `obj_ind` output of [[obj_file_read]]; `[n_mesh]`
-- **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
-  overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
 
-## Returns:
-- `arma::uvec`: IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+## Outputs:
+- **`overlap_ind`** — IDs of all overlapping objects as given in `obj_ind`, unique and ascending; empty for an empty mesh; `[n_overlap]`
+- **`reason`** *(optional)* — Human-readable overlap description per overlapping object: the finding of its first
+  overlapping pair, pairs taken in the order of the sorted object IDs; independent of the number of threads; `[n_overlap]`
 
 ## See also:
 - [[obj_file_read]] (reads mesh data from files and generates `obj_ind` input)
@@ -303,43 +304,42 @@ MD!*/
 
 // Tests if 3D objects overlap (have a shared volume or boolean intersection)
 template <typename dtype>
-arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const arma::uvec *obj_ind,
-                                          std::vector<std::string> *reason, dtype tolerance)
+void quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const arma::uvec &obj_ind, arma::uvec &overlap_ind,
+                                    std::vector<std::string> *reason, dtype tolerance)
 {
     const dtype eps = (dtype)1.0e-5; // Numeric tolerance
 
-    if (mesh == nullptr)
-        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
-    if (obj_ind == nullptr)
-        throw std::invalid_argument("Input 'obj_ind' cannot be NULL.");
+    qd_check_alias(&overlap_ind, "overlap_ind", &mesh, &obj_ind);
 
     // An empty mesh has no overlapping objects
-    if (mesh->n_elem == 0 && obj_ind->n_elem == 0)
+    if (mesh.n_elem == 0 && obj_ind.n_elem == 0)
     {
         if (reason != nullptr)
             reason->clear();
-        return arma::uvec();
+        if (overlap_ind.n_elem != 0)
+            overlap_ind.set_size(0);
+        return;
     }
 
-    if (mesh->n_cols != 9)
+    if (mesh.n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
 
-    const arma::uword n_mesh = mesh->n_rows; // Number of mesh elements
+    const arma::uword n_mesh = mesh.n_rows; // Number of mesh elements
 
-    if (obj_ind->n_elem != n_mesh)
+    if (obj_ind.n_elem != n_mesh)
         throw std::invalid_argument("Number of elements in 'obj_ind' must match number of rows in 'mesh'.");
 
     // Get the unique object IDs
-    arma::uvec obj_ids = arma::unique(*obj_ind);      // Unique object IDs
-    arma::uword n_obj = obj_ids.n_elem;               // Number of objects
-    arma::uword *p_obj_ids = obj_ids.memptr();        // Unique object IDs (pointer)
-    const arma::uword *p_obj_ind = obj_ind->memptr(); // Object IDs (pointer)
+    arma::uvec obj_ids = arma::unique(obj_ind);      // Unique object IDs
+    arma::uword n_obj = obj_ids.n_elem;              // Number of objects
+    arma::uword *p_obj_ids = obj_ids.memptr();       // Unique object IDs (pointer)
+    const arma::uword *p_obj_ind = obj_ind.memptr(); // Object IDs (pointer)
 
     arma::uvec n_faces_per_object(n_obj);
     arma::uword *p_faces_per_object = n_faces_per_object.memptr();
 
     // Direct access to mesh memory
-    const dtype *p_mesh = mesh->memptr();
+    const dtype *p_mesh = mesh.memptr();
 
     arma::Mat<dtype> aabb(6, n_obj, arma::fill::none);
     dtype *box = aabb.memptr(); // Object bounding box
@@ -904,20 +904,19 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     if (want_to_know)
         reason->resize(n_intersecting);
 
-    // Return value: list of intersecting objects
-    arma::uvec obj_ids_intersecting(n_intersecting);
+    // Output: list of intersecting objects
+    if (overlap_ind.n_elem != n_intersecting)
+        overlap_ind.set_size(n_intersecting);
     n_intersecting = 0;
     for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
         if (p_first_pair[i_obj].load(std::memory_order_relaxed) != no_pair)
         {
-            obj_ids_intersecting(n_intersecting) = p_obj_ids[i_obj];
+            overlap_ind(n_intersecting) = p_obj_ids[i_obj];
             if (want_to_know)
                 reason->at(n_intersecting) = why[i_obj];
             ++n_intersecting;
         }
-
-    return obj_ids_intersecting;
 }
 
-template arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<float> *mesh, const arma::uvec *obj_ind, std::vector<std::string> *reason, float tolerance);
-template arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<double> *mesh, const arma::uvec *obj_ind, std::vector<std::string> *reason, double tolerance);
+template void quadriga_lib::obj_overlap_test(const arma::Mat<float> &mesh, const arma::uvec &obj_ind, arma::uvec &overlap_ind, std::vector<std::string> *reason, float tolerance);
+template void quadriga_lib::obj_overlap_test(const arma::Mat<double> &mesh, const arma::uvec &obj_ind, arma::uvec &overlap_ind, std::vector<std::string> *reason, double tolerance);

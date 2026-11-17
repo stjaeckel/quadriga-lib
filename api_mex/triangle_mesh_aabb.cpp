@@ -62,11 +62,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Wrap optional input pointer
     const arma::u32_vec *p_sub_mesh_index = sub_mesh_ind.empty() ? nullptr : &sub_mesh_ind;
 
-    // Output (returned by value, size determined at runtime)
+    // Output (size determined at runtime)
     arma::mat aabb;
 
     // Call library function
-    CALL_QD(aabb = quadriga_lib::triangle_mesh_aabb<double>(&mesh, p_sub_mesh_index, vec_size));
+    CALL_QD(quadriga_lib::triangle_mesh_aabb<double>(mesh, aabb, p_sub_mesh_index, vec_size));
 
     // Copy to MATLAB
     if (nlhs > 0)

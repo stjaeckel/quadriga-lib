@@ -45,7 +45,8 @@ py::array_t<double> point_cloud_aabb(const py::array_t<double> &points,
     const auto points_arma = qd_python_numpy2arma_Mat(points, true);
     const auto sub_cloud_ind_arma = qd_python_numpy2arma_Col(sub_cloud_ind, true);
 
-    arma::mat aabb = quadriga_lib::point_cloud_aabb(&points_arma, &sub_cloud_ind_arma, vec_size);
+    arma::mat aabb;
+    quadriga_lib::point_cloud_aabb(points_arma, aabb, &sub_cloud_ind_arma, vec_size);
 
     return qd_python_copy2numpy(&aabb);
 }

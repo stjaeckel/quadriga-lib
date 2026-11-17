@@ -101,7 +101,7 @@ static void run(fz::input &in)
     if (aabb_mode == 1)
         aabb = geo<T>(in, near(in, std::max(sub_mesh_ind.n_elem, (arma::uword)1)), near(in, 6));
     if (aabb_mode == 2)
-        fz::clean([&] { aabb = quadriga_lib::triangle_mesh_aabb<T>(&mesh, &sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 8)); });
+        fz::clean([&] { quadriga_lib::triangle_mesh_aabb<T>(mesh, aabb, &sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 8)); });
 
     // Outputs: missing, pre-sized wrongly, or the same objects as the inputs
     const int kernel = in.ConsumeIntegralInRange<int>(-1, 4);

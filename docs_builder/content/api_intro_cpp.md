@@ -36,6 +36,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Not given / all: an omitted optional input (C++ `nullptr` or an empty container, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
 - Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity cannot be <= 0 (a size, an angle range, a frequency limit), values <= 0 select it too. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
 - Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_M`, `fix_taps`, `axis`) or strings, each documented by its function.
+- Results (C++): a computed array goes into an output argument, so that the wrappers can write into MATLAB / numpy memory without a copy. Returned are objects from readers, generators and factories (`arrayant`, `channel`, meshes, colormaps, path lists), a count, status or read object (also next to output arguments, e.g. `obj_file_read`, `qdant_read`, `hdf5_read_layout`), and a single computed scalar (e.g. `sos_calc_mse`).
 
 **Frequencies**
 

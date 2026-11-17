@@ -345,8 +345,9 @@ TEST_CASE("ssf_clusters - quadriga delay spread equals the input at one frequenc
                 if (gr) // split powers of the scaling: LOS path minus the ground reflection
                     ps[l](0) -= ps[l](1);
             }
-            const arma::vec ds = quadriga_lib::calc_delay_spread(d, p, 1000.0);
-            const arma::vec ds_split = quadriga_lib::calc_delay_spread(d, ps, 1000.0);
+            arma::vec ds, ds_split;
+            quadriga_lib::calc_delay_spread(d, p, ds, 1000.0);
+            quadriga_lib::calc_delay_spread(d, ps, ds_split, 1000.0);
             int n_clamped = 0;
             double e_max = 0.0;
             arma::vec ratio(n_link);

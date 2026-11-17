@@ -314,7 +314,9 @@ namespace
     // Linear interpolation of the zenith attenuation (interp_1D), constant beyond 1 and 100 GHz
     double zenith_att(double f)
     {
-        return quadriga_lib::interp_1D<double>(arma::vec(zen_a, 93), arma::vec(zen_f, 93), arma::vec{f})(0);
+        arma::mat out;
+        quadriga_lib::interp_1D<double>(arma::vec(zen_f, 93), arma::vec(zen_a, 93), arma::vec{f}, out);
+        return out(0);
     }
 
     // Links with per-link Tx used in the model sections: 4 links, heights below 1.5 m included

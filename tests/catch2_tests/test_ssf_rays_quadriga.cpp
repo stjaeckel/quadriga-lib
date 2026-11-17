@@ -533,8 +533,10 @@ TEST_CASE("Diagnostic - ssf_rays quadriga ray delay spread relative to the slot 
     std::vector<arma::vec> d_slot(200), p_slot(200), d_ray(200), p_ray(200);
     for (arma::uword l = 0; l < 200; ++l)
         d_slot[l] = rv(o.delay, l), p_slot[l] = rv(o.power, l), d_ray[l] = rays[l].delay, p_ray[l] = rays[l].power;
-    const arma::vec ratio =
-        quadriga_lib::calc_delay_spread(d_ray, p_ray) / quadriga_lib::calc_delay_spread(d_slot, p_slot);
+    arma::vec ds_ray, ds_slot;
+    quadriga_lib::calc_delay_spread(d_ray, p_ray, ds_ray);
+    quadriga_lib::calc_delay_spread(d_slot, p_slot, ds_slot);
+    const arma::vec ratio = ds_ray / ds_slot;
     const arma::vec q = arma::quantile(ratio, arma::vec{0.5, 0.9});
     QD_DIAG("\n# diag: quadriga ray DS / slot DS over 200 links: p50 %.4f, p90 %.4f\n", q(0), q(1));
     CHECK(ratio.is_finite());

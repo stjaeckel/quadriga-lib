@@ -1523,7 +1523,8 @@ void quadriga_lib::arrayant_rotate_pattern(arrayant<dtype> &ant, const arma::Mat
     arma::Cube<dtype> orientation_cube(orientation.memptr(), 3, 1, 1);
 
     // Rotation matrix for the element positions
-    const arma::Col<dtype> R = quadriga_lib::calc_rotation_matrix(arma::Col<dtype>(orientation_cube.memptr(), 3));
+    arma::Cube<dtype> R;
+    quadriga_lib::calc_rotation_matrix(orientation_cube, R);
 
     if (usage == 1 || usage == 4)
         azimuth_loc.set_size(n_out, n_ang), elevation_loc.set_size(n_out, n_ang);

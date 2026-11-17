@@ -18,7 +18,7 @@ Combine path interaction coordinates for IRS-assisted TX → RX channels
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
 - Interaction coordinates use a compressed format: `n_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
-- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [[get_channels_irs]]) reduces this to active combinations only
+- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the `active_path_out` output of [[get_channels_irs]]) reduces this to active combinations only
 - Typically used after [[get_channels_irs]] to produce interaction data for path visualization (e.g. in Blender) via [[coord2path]]
 
 ## Declaration:
@@ -46,7 +46,7 @@ void quadriga_lib::combine_irs_coord(
   `interact_coord_1`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
-- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [[get_channels_irs]] directly; `[n_path_1 × n_path_2]`
+- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the `active_path_out` output of [[get_channels_irs]] directly; `[n_path_1 × n_path_2]`
 
 ## Outputs:
 - **`n_interact`** — Number of interaction points per combined path; `[n_path_irs]`

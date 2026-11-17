@@ -249,7 +249,8 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
         if (n_sub_faces % vec_size != 0)
         {
             // Calculate bounding box of current sub-mesh
-            arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(&c[i_sub]);
+            arma::Mat<dtype> aabb;
+            quadriga_lib::triangle_mesh_aabb(c[i_sub], aabb);
             dtype *p_box = aabb.memptr();
 
             dtype x = p_box[0] + (dtype)0.5 * (p_box[1] - p_box[0]);

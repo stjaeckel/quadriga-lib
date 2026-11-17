@@ -63,7 +63,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_mean_delay = (nlhs > 1) ? &mean_delay : nullptr;
 
     // Call library function
-    CALL_QD(ds = quadriga_lib::calc_delay_spread<double>(delays, powers, threshold_dB, granularity, p_mean_delay));
+    CALL_QD(quadriga_lib::calc_delay_spread<double>(delays, powers, ds, threshold_dB, granularity, p_mean_delay));
 
     // Write outputs
     if (nlhs > 0)

@@ -16,15 +16,11 @@ static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned
 namespace quadriga_lib
 {
     // Rotation matrix from Euler angles
+    // - A matrix of orientations [3, n] is the cube [3, n, 1]: arma::Cube<dtype>(const_cast<dtype *>(mat.memptr()), 3, n, 1, false, true)
     template <typename dtype>
-    arma::Cube<dtype> calc_rotation_matrix(const arma::Cube<dtype> &orientation, // Orientation vectors (Euler rotations) in [rad], Size [3, n_row, n_col]
-                                           bool transposeR = false);             // Returns the transpose of R instead of R
-
-    template <typename dtype>
-    arma::Mat<dtype> calc_rotation_matrix(const arma::Mat<dtype> &orientation, bool transposeR = false);
-
-    template <typename dtype>
-    arma::Col<dtype> calc_rotation_matrix(const arma::Col<dtype> &orientation, bool transposeR = false);
+    void calc_rotation_matrix(const arma::Cube<dtype> &orientation, // Orientation vectors (Euler rotations) in [rad], Size [3, n_row, n_col]
+                              arma::Cube<dtype> &rotation,          // Output: Rotation matrices, column-major, Size [9, n_row, n_col]
+                              bool transposed = false);             // Returns the transpose of R instead of R
 
     // Fast, approximate sine/cosine for single-precision vectors
     template <typename dtype>
@@ -89,43 +85,19 @@ namespace quadriga_lib
 
     // 2D linear interpolation of multiple data sets
     template <typename dtype>
-    void interp_2D(const arma::Cube<dtype> &input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
-                   const arma::Col<dtype> &xi,     // x sample points of input; vector length nx
-                   const arma::Col<dtype> &yi,     // y sample points of input; vector length ny
-                   const arma::Col<dtype> &xo,     // x sample points of output; vector length mx
-                   const arma::Col<dtype> &yo,     // y sample points of output; vector length my
-                   arma::Cube<dtype> &output);     // Interpolated data, size [ my, mx, me ]
-
-    // 2D linear interpolation of multiple data sets
-    // - Returns interpolated data, size [ my, mx, me ]
-    template <typename dtype>
-    arma::Cube<dtype> interp_2D(const arma::Cube<dtype> &input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
-                                const arma::Col<dtype> &xi,     // x sample points of input; vector length nx
-                                const arma::Col<dtype> &yi,     // y sample points of input; vector length ny
-                                const arma::Col<dtype> &xo,     // x sample points of output; vector length mx
-                                const arma::Col<dtype> &yo);    // y sample points of output; vector length my
-
-    // 2D linear interpolation of a single data set
-    // - Returns interpolated data, size [ my, mx ]
-    template <typename dtype>
-    arma::Mat<dtype> interp_2D(const arma::Mat<dtype> &input,                           // Input data; size [ ny, nx ]
-                               const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,  // x/y input sample points
-                               const arma::Col<dtype> &xo, const arma::Col<dtype> &yo); // x/y output sample points
+    void interp_2D(const arma::Col<dtype> &x,      // x sample points of input; vector length nx
+                   const arma::Col<dtype> &y,      // y sample points of input; vector length ny
+                   const arma::Cube<dtype> &input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
+                   const arma::Col<dtype> &x_new,  // x sample points of output; vector length nx_new
+                   const arma::Col<dtype> &y_new,  // y sample points of output; vector length ny_new
+                   arma::Cube<dtype> &output);     // Output: Interpolated data, size [ ny_new, nx_new, ne ]
 
     // 1D linear interpolation of multiple data sets
-    // - Returns interpolated data, size [ mx, ne ]
     template <typename dtype>
-    arma::Mat<dtype> interp_1D(const arma::Mat<dtype> &input, // Input data; size [ nx, ne ], ne = multiple data sets
-                               const arma::Col<dtype> &xi,    // Input sample points, vector length nx
-                               const arma::Col<dtype> &xo);   // Output sample points, vector length mx
-
-    // 1D linear interpolation of single data set
-    // - Returns interpolated data, length mx
-    template <typename dtype>
-    arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, // Input data vector, vector length nx
-                               const arma::Col<dtype> &xi,    // Input sample points, vector length nx
-                               const arma::Col<dtype> &xo);   // Output sample points, vector length mx
-
+    void interp_1D(const arma::Col<dtype> &x,     // Input sample points, vector length nx
+                   const arma::Mat<dtype> &input, // Input data; size [ nx, ne ], ne = multiple data sets
+                   const arma::Col<dtype> &x_new, // Output sample points, vector length nx_new
+                   arma::Mat<dtype> &output);     // Output: Interpolated data, size [ nx_new, ne ]
 }
 
 #endif

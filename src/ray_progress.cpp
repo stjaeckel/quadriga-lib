@@ -474,7 +474,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     }
     else if (n_sub)
     {
-        aabb_local = quadriga_lib::triangle_mesh_aabb(&mesh, sub_mesh_ind);
+        quadriga_lib::triangle_mesh_aabb(mesh, aabb_local, sub_mesh_ind);
         aabb_ptr = &aabb_local;
     }
 
@@ -600,9 +600,8 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         // onto), so the internal decision never subdivides a ray that missed the mesh. A delegated
         // flag is authoritative and may.
         if (beam_mode && max_subdivisions && subdiv_flag_in == nullptr)
-            subdiv_flag = quadriga_lib::ray_subdivide_flag(mesh, orig, dest, *p_fi, *trivec, *tridir,
-                                                           paths, mtl_ind_current, max_interactions,
-                                                           max_subdivisions, subdivision_tolerance);
+            quadriga_lib::ray_subdivide_flag(mesh, orig, dest, *p_fi, *trivec, *tridir, paths, mtl_ind_current,
+                                             subdiv_flag, max_interactions, max_subdivisions, subdivision_tolerance);
 
         p_sf = (subdiv_flag_in != nullptr) ? subdiv_flag_in : &subdiv_flag;
         has_flag = (p_sf->size() == n_ray);

@@ -23,31 +23,36 @@ TEST_CASE("Test Point inside Mesh")
     arma::mat points = {{0.0, 0.0, 0.5}, {-1.1, 0.0, 0.0}};
     arma::uvec obj_ind(12, arma::fill::value(1)), res; // 0-based object 1 -> returns 2
 
-    res = quadriga_lib::point_inside_mesh<double>(&points, &mesh, &obj_ind);
+    quadriga_lib::point_inside_mesh<double>(points, mesh, res, &obj_ind);
     CHECK(res.n_elem == 2);
     CHECK(res.at(0) == 2);
     CHECK(res.at(1) == 0);
 
     // A distance outside [0, 20] m throws, NaN included (it used to act as 0)
     for (double d : {arma::datum::nan, -0.1, 20.1, arma::datum::inf})
-        CHECK_THROWS_AS(quadriga_lib::point_inside_mesh<double>(&points, &mesh, &obj_ind, d), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::point_inside_mesh<double>(points, mesh, res, &obj_ind, d), std::invalid_argument);
 
-    res = quadriga_lib::point_inside_mesh(&points, &mesh);
+    // A failed call leaves the output untouched (the empty mesh throws in the mesh segmentation)
+    arma::uvec kept = {7, 8, 9};
+    CHECK_THROWS_AS(quadriga_lib::point_inside_mesh<double>(points, arma::mat(0, 9), kept), std::invalid_argument);
+    CHECK(arma::all(kept == arma::uvec({7, 8, 9})));
+
+    quadriga_lib::point_inside_mesh(points, mesh, res);
     CHECK(res.n_elem == 2);
     CHECK(res.at(0) == 1);
     CHECK(res.at(1) == 0);
 
-    res = quadriga_lib::point_inside_mesh<double>(&points, &mesh, nullptr, 0.12);
+    quadriga_lib::point_inside_mesh<double>(points, mesh, res, nullptr, 0.12);
     CHECK(res.n_elem == 2);
     CHECK(res.at(0) == 1);
     CHECK(res.at(1) == 1);
 
-    res = quadriga_lib::point_inside_mesh<double>(&points, &mesh, &obj_ind, 0.09);
+    quadriga_lib::point_inside_mesh<double>(points, mesh, res, &obj_ind, 0.09);
     CHECK(res.n_elem == 2);
     CHECK(res.at(0) == 2);
     CHECK(res.at(1) == 0);
 
-    res = quadriga_lib::point_inside_mesh<double>(&points, &mesh, &obj_ind, 2.0);
+    quadriga_lib::point_inside_mesh<double>(points, mesh, res, &obj_ind, 2.0);
     CHECK(res.n_elem == 2);
     CHECK(res.at(0) == 2);
     CHECK(res.at(1) == 2);
@@ -72,7 +77,8 @@ TEST_CASE("Test Point inside Mesh - Cube far from the origin")
                     pts(n, ax) += s * (5.0 + dd);
                     expect(n++) = dd < 0.0 ? 1 : 0;
                 }
-        arma::uvec res = quadriga_lib::point_inside_mesh<double>(&pts, &mesh);
+        arma::uvec res;
+        quadriga_lib::point_inside_mesh<double>(pts, mesh, res);
         CHECK(arma::all(res == expect));
     }
 }

@@ -323,15 +323,18 @@ TEST_CASE("Ray-Triangle Intersect - Mesh with extra columns and row count of des
         CHECK(arma::all(fi10 == fi9));
         CHECK(arma::all(si10 == si9));
 
-        arma::mat aabb = quadriga_lib::triangle_mesh_aabb(&mesh10);
-        CHECK(arma::approx_equal(aabb, quadriga_lib::triangle_mesh_aabb(&mesh9), "absdiff", 0.0));
+        arma::mat aabb, aabb9;
+        quadriga_lib::triangle_mesh_aabb(mesh10, aabb);
+        quadriga_lib::triangle_mesh_aabb(mesh9, aabb9);
+        CHECK(arma::approx_equal(aabb, aabb9, "absdiff", 0.0));
         quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh10, &fbs10, &sbs10, &no10, &fi10, &si10, nullptr, &aabb, kernel);
         CHECK(arma::all(fi10 == fi9));
     }
 
     arma::mat mesh8 = mesh9.cols(0, 7);
     CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh8), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_aabb(&mesh8), std::invalid_argument);
+    arma::mat aabb8;
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_aabb(mesh8, aabb8), std::invalid_argument);
 
     arma::mat dest3 = arma::join_cols(dest, dest.row(0)), dest1 = dest.row(0);
     CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest3, &mesh9), std::invalid_argument);

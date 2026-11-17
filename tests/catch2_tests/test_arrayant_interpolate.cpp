@@ -289,7 +289,8 @@ namespace
                                          const arma::Cube<dtype> &orientation, const arma::Mat<dtype> &pos)
     {
         const arma::uword n_out = i_element.n_elem, n_ang = az.n_cols;
-        const arma::cube R = quadriga_lib::calc_rotation_matrix(arma::conv_to<arma::cube>::from(orientation));
+        arma::cube R;
+        quadriga_lib::calc_rotation_matrix(arma::conv_to<arma::cube>::from(orientation), R);
         std::vector<qd_expect> x(n_out * n_ang);
         for (arma::uword a = 0; a < n_ang; ++a)
             for (arma::uword o = 0; o < n_out; ++o)
@@ -1035,7 +1036,8 @@ TEST_CASE("arrayant_interpolate - on the pole of the local frame the polarizatio
     auto check = [&](const auto &ant, int kernel, double bank, double tilt, double heading, double az, double el, double zenith)
     {
         using dtype = typename std::decay<decltype(ant.e_theta_re)>::type::elem_type;
-        const arma::vec R = quadriga_lib::calc_rotation_matrix(arma::vec{bank, tilt, heading}); // Local to GCS, column-major
+        arma::cube R; // Local to GCS, column-major
+        quadriga_lib::calc_rotation_matrix(arma::cube(arma::vec{bank, tilt, heading}.memptr(), 3, 1, 1), R);
         const double tx = std::sin(el) * std::cos(az), ty = std::sin(el) * std::sin(az), tz = -std::cos(el); // Query theta
         const double az_ref = std::atan2(zenith * (R(3) * tx + R(4) * ty + R(5) * tz), zenith * (R(0) * tx + R(1) * ty + R(2) * tz));
         const arma::uword row = zenith > 0.0 ? ant_d.n_elevation() - 1 : 0;
@@ -1058,7 +1060,8 @@ TEST_CASE("arrayant_interpolate - on the pole of the local frame the polarizatio
             for (double zenith : {1.0, -1.0})
             {
                 // Query direction: the local z-axis (third column of R) times zenith, as azimuth and elevation
-                const arma::vec R = quadriga_lib::calc_rotation_matrix(arma::vec{o[0], o[1], o[2]});
+                arma::cube R;
+                quadriga_lib::calc_rotation_matrix(arma::cube(arma::vec{o[0], o[1], o[2]}.memptr(), 3, 1, 1), R);
                 const double az = std::atan2(zenith * R(7), zenith * R(6)), el = std::atan2(zenith * R(8), std::hypot(R(6), R(7)));
                 check(ant_d, kernel, o[0], o[1], o[2], az, el, zenith);
                 check(ant_f, kernel, o[0], o[1], o[2], az, el, zenith);

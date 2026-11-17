@@ -284,12 +284,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     // Calculate azimuth pattern cut
     dtype a = one, d = half, x = limit_inf, delta = limit_inf;
     arma::Col<dtype> C(no_az), D(no_el);
+    arma::Mat<dtype> xn; // Pattern value at the 3 dB angle, [1, 1]
     for (unsigned lp = 0; lp < 5000; ++lp)
     {
         dtype an = (lp == 0) ? a : a + d;
         delta = (lp == 0) ? limit_inf : std::abs(a - an);
         C = rear_gain_lin + (one - rear_gain_lin) * arma::exp(-an * phi_sq);
-        auto xn = quadriga_lib::interp_1D(C, ant.azimuth_grid, az_3dB_rad);
+        quadriga_lib::interp_1D(ant.azimuth_grid, C, az_3dB_rad, xn);
         dtype xm = std::abs(xn.at(0) - half);
         a = xm < x ? an : a;
         d = xm < x ? d : step * d;
@@ -306,7 +307,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
         dtype an = (lp == 0) ? a : a + d;
         delta = (lp == 0) ? limit_inf : std::abs(a - an);
         D = arma::pow(cos_theta, an);
-        auto xn = quadriga_lib::interp_1D(D, ant.elevation_grid, el_3dB_rad);
+        quadriga_lib::interp_1D(ant.elevation_grid, D, el_3dB_rad, xn);
         dtype xm = std::abs(xn.at(0) - half);
         a = xm < x ? an : a;
         d = xm < x ? d : step * d;

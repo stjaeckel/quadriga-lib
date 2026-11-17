@@ -226,7 +226,8 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
         if (n_sub_points % vec_size != 0)
         {
             // Calculate bounding box of current sub-mesh
-            arma::Mat<dtype> aabb = quadriga_lib::point_cloud_aabb(&c[i_sub]);
+            arma::Mat<dtype> aabb;
+            quadriga_lib::point_cloud_aabb(c[i_sub], aabb);
             dtype *p_box = aabb.memptr();
 
             dtype x = p_box[0] + (dtype)0.5 * (p_box[1] - p_box[0]);

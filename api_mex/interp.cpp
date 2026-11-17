@@ -24,21 +24,21 @@ Perform linear interpolation (1D or 2D) on single or multiple data sets
 ## Usage:
 
 ```
-dataI = quadriga_lib.interp( x, y, data, xI, yI );      % 2D case
+output = quadriga_lib.interp( x, y, input, x_new, y_new );    % 2D case
 
-dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
+output = quadriga_lib.interp( x, [], input, x_new );           % 1D case
 ```
 
 ## Inputs:
 - **`x`** — Data x-axis sampling points; Length: `[nx]`
 - **`y`** — Data y-axis sampling points; Length: `[ny]`
-- **`data`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
+- **`input`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
   enables interpolation for multiple datasets simultaneously.
-- **`xI`** — Output x-axis sampling points; Length: `[nxI]`
-- **`yI`** — Output y-axis sampling points; Length: `[nyI]`; required when `y` is not empty
+- **`x_new`** — Output x-axis sampling points; Length: `[nx_new]`
+- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty
 
 ## Output:
-- **`dataI`**  —  Interpolated data `[nyI, nxI, ne]` or `[1, nxI, ne]` for 1D case
+- **`output`**  —  Interpolated data `[ny_new, nx_new, ne]` or `[1, nx_new, ne]` for 1D case
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -51,32 +51,32 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     bool twoD = mxGetNumberOfElements(prhs[1]) != 0;
     if (twoD && nrhs < 5)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'yI' is required when 'y' is given (2D case).");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'y_new' is required when 'y' is given (2D case).");
 
     if (mxIsSingle(prhs[0]) && nlhs > 0)
     {
-        const arma::fvec xi = qd_mex_get_Col<float>(prhs[0]);
-        const arma::fvec yi = twoD ? qd_mex_get_Col<float>(prhs[1]) : arma::fvec(1);
-        const arma::fcube data = qd_mex_get_Cube<float>(prhs[2]);
-        const arma::fvec xo = qd_mex_get_Col<float>(prhs[3]);
-        const arma::fvec yo = (nrhs > 4 && twoD) ? qd_mex_get_Col<float>(prhs[4]) : arma::fvec(1);
+        const arma::fvec x = qd_mex_get_Col<float>(prhs[0]);
+        const arma::fvec y = twoD ? qd_mex_get_Col<float>(prhs[1]) : arma::fvec(1);
+        const arma::fcube input = qd_mex_get_Cube<float>(prhs[2]);
+        const arma::fvec x_new = qd_mex_get_Col<float>(prhs[3]);
+        const arma::fvec y_new = (nrhs > 4 && twoD) ? qd_mex_get_Col<float>(prhs[4]) : arma::fvec(1);
 
         arma::fcube output;
-        plhs[0] = qd_mex_init_output(&output, yo.n_elem, xo.n_elem, data.n_slices);
+        plhs[0] = qd_mex_init_output(&output, y_new.n_elem, x_new.n_elem, input.n_slices);
 
-        CALL_QD(quadriga_lib::interp_2D(data, xi, yi, xo, yo, output));
+        CALL_QD(quadriga_lib::interp_2D(x, y, input, x_new, y_new, output));
     }
     else if (nlhs > 0)
     {
-        const arma::vec xi = qd_mex_get_Col<double>(prhs[0]);
-        const arma::vec yi = twoD ? qd_mex_get_Col<double>(prhs[1]) : arma::vec(1);
-        const arma::cube data = qd_mex_get_Cube<double>(prhs[2]);
-        const arma::vec xo = qd_mex_get_Col<double>(prhs[3]);
-        const arma::vec yo = (nrhs > 4 && twoD) ? qd_mex_get_Col<double>(prhs[4]) : arma::vec(1);
+        const arma::vec x = qd_mex_get_Col<double>(prhs[0]);
+        const arma::vec y = twoD ? qd_mex_get_Col<double>(prhs[1]) : arma::vec(1);
+        const arma::cube input = qd_mex_get_Cube<double>(prhs[2]);
+        const arma::vec x_new = qd_mex_get_Col<double>(prhs[3]);
+        const arma::vec y_new = (nrhs > 4 && twoD) ? qd_mex_get_Col<double>(prhs[4]) : arma::vec(1);
 
         arma::cube output;
-        plhs[0] = qd_mex_init_output(&output, yo.n_elem, xo.n_elem, data.n_slices);
+        plhs[0] = qd_mex_init_output(&output, y_new.n_elem, x_new.n_elem, input.n_slices);
 
-        CALL_QD(quadriga_lib::interp_2D(data, xi, yi, xo, yo, output));
+        CALL_QD(quadriga_lib::interp_2D(x, y, input, x_new, y_new, output));
     }
 }

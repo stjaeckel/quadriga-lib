@@ -19,16 +19,16 @@ TEST_CASE("Quadriga tools - 2D Interpolation")
 
     arma::vec x = {0.0, 1.5, 2.0}, xo;
     arma::vec y = {10.0, 20.0}, yo;
-    arma::cube T;
+    arma::cube T, O;
 
     // Interpolation at the same sample points should create identical output
-    auto O = quadriga_lib::interp_2D(I, x, y, x, y);
+    quadriga_lib::interp_2D(x, y, I, x, y, O);
     CHECK(arma::approx_equal(I, O, "absdiff", 1e-13));
 
     // Regular interpolation, y-values out of bound
     xo = {0.75, 1.875};
     yo = {0.0, 100.0};
-    quadriga_lib::interp_2D(I, x, y, xo, yo, O);
+    quadriga_lib::interp_2D(x, y, I, xo, yo, O);
     T.set_size(2, 2, 2);
     T.slice(0) = {{0.5, -1.5}, {0.5, -1.5}};
     T.slice(1) = {{2.0, 2.0}, {4.0, 4.0}};
@@ -38,14 +38,14 @@ TEST_CASE("Quadriga tools - 2D Interpolation")
     I.set_size(1, 4, 1);
     I.slice(0) = {{0.0, 1.0, 2.0, 3.0}};
     x = {0.0, 1.0, 1.0, 2.0}, y = {0.0}, xo = {0.9, 1.0, 1.1}, yo = {-1.0, 1.0};
-    O = quadriga_lib::interp_2D(I, x, y, xo, yo);
+    quadriga_lib::interp_2D(x, y, I, xo, yo, O);
     T.set_size(2, 3, 1);
     T.slice(0) = {{0.9, 2.0, 2.1}, {0.9, 2.0, 2.1}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-13));
 
     // Reverse order
     x = {3.0, 2.0, 1.0, 0.0}, y = {0.0}, xo = {2.5, 2.1, 2.0, 1.9}, yo = {0.0};
-    quadriga_lib::interp_2D(I, x, y, xo, yo, O);
+    quadriga_lib::interp_2D(x, y, I, xo, yo, O);
     T.set_size(1, 4, 1);
     T.slice(0) = {{0.5, 0.9, 1.0, 1.1}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-13));
@@ -60,23 +60,23 @@ TEST_CASE("Quadriga tools - 2D Interpolation example")
     arma::vec yo = arma::linspace(0, 4, 10);
 
     arma::cube output;
-    quadriga_lib::interp_2D(input, xi, yi, xo, yo, output);
+    quadriga_lib::interp_2D(xi, yi, input, xo, yo, output);
 }
 
 TEST_CASE("Quadriga tools - 1D Interpolation")
 {
     arma::fmat I = {{1.0f, 0.0f, -2.0f}, {2.0f, 3.0f, 4.0f}};
     arma::fvec x = {0.0f, 1.5f, 2.0f}, xo;
-    arma::fmat T;
+    arma::fmat T, O;
     I = I.t();
 
     // Interpolation at the same sample points should create identical output
-    auto O = quadriga_lib::interp_1D(I, x, x);
+    quadriga_lib::interp_1D(x, I, x, O);
     CHECK(arma::approx_equal(I, O, "absdiff", 1e-6));
 
     // Regular interpolation, y-values out of bound
     xo = {0.75f, 1.875f};
-    O = quadriga_lib::interp_1D(I, x, xo);
+    quadriga_lib::interp_1D(x, I, xo, O);
     T = {{0.5f, 2.5f}, {-1.5f, 3.75f}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-6));
 }
@@ -87,7 +87,8 @@ TEST_CASE("Quadriga tools - 1D Interpolation example")
     arma::vec xi = arma::linspace(0, 4, 5);
     arma::vec xo = arma::linspace(0, 4, 10);
 
-    auto output = quadriga_lib::interp_1D(input, xi, xo);
+    arma::mat output;
+    quadriga_lib::interp_1D(xi, input, xo, output);
 }
 
 TEST_CASE("Quadriga tools - Icosphere")
@@ -270,7 +271,8 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
     points.col(2) += 1.0f;
 
     // Calculate bounding box
-    auto aabb = quadriga_lib::point_cloud_aabb(&points);
+    arma::fmat aabb;
+    quadriga_lib::point_cloud_aabb(points, aabb);
 
     arma::fmat T;
     T = {{0.0f, 40.3f, -50.0f, 50.0f, 1.0f, 1.0f}};
@@ -321,7 +323,7 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
     CHECK(arma::all(reverse_ind == I));
 
     // Test AABB of sub-clouds
-    aabb = quadriga_lib::point_cloud_aabb(&pointsR, &sub_cloud_ind);
+    quadriga_lib::point_cloud_aabb(pointsR, aabb, &sub_cloud_ind);
 
     T = {{0.0f, 0.3f, -5.0f, -5.0f, 1.0f, 1.0f},
          {0.0f, 0.3f, 5.0f, 5.0f, 1.0f, 1.0f},
@@ -499,17 +501,30 @@ TEST_CASE("Quadriga tools - coord2path interaction count sum does not wrap at 32
 
 TEST_CASE("Quadriga tools - Rotation matrix")
 {
-    arma::mat ori(3, 1);
-    ori(0, 0) = 0.0;    // bank
-    ori(1, 0) = 0.0;    // tilt
-    ori(2, 0) = 1.5708; // head
-    auto R = quadriga_lib::calc_rotation_matrix(ori);
+    arma::mat ori(3, 2);
+    ori.col(0) = {0.0, 0.0, 1.5708}; // bank, tilt, head
+    ori.col(1) = {0.1, 0.2, 0.3};
+    arma::cube R;
+    quadriga_lib::calc_rotation_matrix(arma::cube(ori.memptr(), 3, 2, 1, false, true), R);
+    CHECK(R.n_rows == 9);
+    CHECK(R.n_cols == 2);
+    CHECK(R.n_slices == 1);
 
-    arma::fvec oriv(3);
-    oriv(0) = 0.0;    // bank
-    oriv(1) = 0.0;    // tilt
-    oriv(2) = 1.5708; // head
-    auto Rv = quadriga_lib::calc_rotation_matrix(oriv);
+    // The transpose swaps rows and columns of each 3x3 matrix
+    arma::cube Rt;
+    quadriga_lib::calc_rotation_matrix(arma::cube(ori.memptr(), 3, 2, 1, false, true), Rt, true);
+    CHECK(arma::approx_equal(arma::reshape(Rt.slice(0).col(1), 3, 3), arma::reshape(R.slice(0).col(1), 3, 3).t(), "absdiff", 1e-14));
+
+    // Single precision, the output is written in place when it has the right size
+    arma::fcube Rf(9, 1, 1, arma::fill::zeros);
+    const float *p_Rf = Rf.memptr();
+    quadriga_lib::calc_rotation_matrix(arma::fcube(arma::fvec{0.0f, 0.0f, 1.5708f}.memptr(), 3, 1, 1), Rf);
+    CHECK(Rf.memptr() == p_Rf);
+    CHECK(std::abs(Rf(1, 0, 0) - 1.0f) < 1e-4f); // x-axis turned onto y
+
+    // The output cannot be the input
+    arma::cube O(3, 1, 1, arma::fill::zeros);
+    CHECK_THROWS_AS(quadriga_lib::calc_rotation_matrix(O, O), std::invalid_argument);
 }
 
 TEST_CASE("Quadriga tools - coord2path example")
@@ -735,7 +750,12 @@ TEST_CASE("calc_rotation_matrix - heading, tilt and bank are right-handed (3GPP 
     // turns x down, bank turns y toward z
     const double a = 0.3, c = std::cos(a), s = std::sin(a);
     auto R = [](double b, double t, double h)
-    { return arma::mat(arma::reshape(quadriga_lib::calc_rotation_matrix(arma::vec{b, t, h}), 3, 3)); };
+    {
+        arma::vec o = {b, t, h};
+        arma::cube rot;
+        quadriga_lib::calc_rotation_matrix(arma::cube(o.memptr(), 3, 1, 1, false, true), rot);
+        return arma::mat(arma::reshape(rot.slice(0), 3, 3));
+    };
     CHECK(arma::approx_equal(R(0.0, 0.0, a).col(0), arma::vec{c, s, 0.0}, "absdiff", 1e-14));
     CHECK(arma::approx_equal(R(0.0, a, 0.0).col(0), arma::vec{c, 0.0, -s}, "absdiff", 1e-14));
     CHECK(arma::approx_equal(R(a, 0.0, 0.0).col(1), arma::vec{0.0, c, s}, "absdiff", 1e-14));

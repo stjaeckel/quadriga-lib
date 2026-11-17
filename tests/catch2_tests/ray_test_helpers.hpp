@@ -2894,8 +2894,10 @@ namespace
     // stands, before ray_progress touches it, using the same limits ray_progress will apply.
     std::vector<bool> subdiv_flags(const Cfg &C, const Scene &S, const Hits &H, const Opt &o)
     {
-        return quadriga_lib::ray_subdivide_flag(S.mesh, C.orig, C.dest, H.fbs_ind, C.trivec, C.tridir,
-                                                C.paths, C.cur, o.max_int, o.max_sub, o.sub_tol);
+        std::vector<bool> f;
+        quadriga_lib::ray_subdivide_flag(S.mesh, C.orig, C.dest, H.fbs_ind, C.trivec, C.tridir, C.paths, C.cur, f,
+                                         o.max_int, o.max_sub, o.sub_tol);
+        return f;
     }
 
     // Bind a delegated subdivision flag into an option block

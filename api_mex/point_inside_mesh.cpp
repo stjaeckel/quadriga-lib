@@ -61,7 +61,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uvec *p_obj_ind = obj_ind_arma.is_empty() ? nullptr : &obj_ind_arma;
 
     arma::uvec res;
-    CALL_QD(res = quadriga_lib::point_inside_mesh(&points_arma, &mesh_arma, p_obj_ind, distance));
+    CALL_QD(quadriga_lib::point_inside_mesh(points_arma, mesh_arma, res, p_obj_ind, distance));
 
     if (nlhs == 1)
         plhs[0] = qd_mex_copy2matlab(&res);

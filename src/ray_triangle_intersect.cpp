@@ -178,7 +178,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     arma::Mat<dtype> aabb_computed;
     if (aabb == nullptr)
     {
-        aabb_computed = quadriga_lib::triangle_mesh_aabb(mesh, sub_mesh_ind);
+        quadriga_lib::triangle_mesh_aabb(*mesh, aabb_computed, sub_mesh_ind);
         aabb = &aabb_computed;
     }
     else
