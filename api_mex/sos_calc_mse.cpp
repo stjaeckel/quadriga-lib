@@ -105,8 +105,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(mse_dB = quadriga_lib::sos_calc_mse<double>(spatial_freq, acf, dist, p_mse_core, p_mse_all, p_acf_tail, p_test_dir, n_dir));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&mse_dB);
+    plhs[0] = qd_mex_copy2matlab(&mse_dB);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&mse_core_dB);
     if (nlhs > 2)

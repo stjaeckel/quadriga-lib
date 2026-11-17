@@ -65,7 +65,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
     // Wrap optional output pointers based on nlhs
-    arma::uword *p_no_cir = (nlhs > 0) ? &n_cir : nullptr;
     arma::uword *p_no_orig = (nlhs > 1) ? &n_orig : nullptr;
     arma::uword *p_no_dest = (nlhs > 2) ? &n_dest : nullptr;
     arma::uword *p_no_freq = (nlhs > 3) ? &n_freq : nullptr;
@@ -80,14 +79,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::fmat *p_orig_orientation = (nlhs > 12) ? &orig_orientation : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::qrt_file_parse(fn, p_no_cir, p_no_orig, p_no_dest, p_no_freq,
+    CALL_QD(quadriga_lib::qrt_file_parse(fn, &n_cir, p_no_orig, p_no_dest, p_no_freq,
                                          p_cir_offset, p_orig_names, p_dest_names, p_version,
                                          p_center_freq, p_cir_pos, p_cir_orientation, p_orig_pos,
                                          p_orig_orientation));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&n_cir);
+    plhs[0] = qd_mex_copy2matlab(&n_cir);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&n_orig);
     if (nlhs > 2)

@@ -66,8 +66,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat cdf_per_set;
     arma::vec cdf_avg, bins_out, mu, sig;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&cdf_per_set, n_bins_out, n_sets);
+    plhs[0] = qd_mex_init_output(&cdf_per_set, n_bins_out, n_sets);
 
     if (nlhs > 2)
         plhs[2] = qd_mex_init_output(&cdf_avg, n_bins_out);

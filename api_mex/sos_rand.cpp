@@ -90,8 +90,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::mat val;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&val, pos.n_rows, dist_decorr.n_elem);
+    plhs[0] = qd_mex_init_output(&val, pos.n_rows, dist_decorr.n_elem);
 
     // Wrap optional pointers
     const arma::mat *p_pos_b = pos_b.empty() ? nullptr : &pos_b;

@@ -73,8 +73,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         reverse_ind += 1;
 
     // Copy outputs to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&pointsR);
+    plhs[0] = qd_mex_copy2matlab(&pointsR);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&sub_cloud_ind);
     if (nlhs > 2)

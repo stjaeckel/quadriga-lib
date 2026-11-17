@@ -49,9 +49,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    if (nlhs == 0)
-        return;
-
     // Read first input as cube, convert to single precision if needed
     arma::fcube Xs;
     arma::cube Xd;
@@ -81,8 +78,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Allocate memory for the outputs
     arma::fcube P, Q;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&P, n_rows, n_cols, n_slices);
+    plhs[0] = qd_mex_init_output(&P, n_rows, n_cols, n_slices);
 
     if (nlhs > 1 && !cos_only)
         plhs[1] = qd_mex_init_output(&Q, n_rows, n_cols, n_slices);

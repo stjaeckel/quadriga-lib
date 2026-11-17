@@ -54,7 +54,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // No output argument behaves as one (the struct goes to "ans")
     const int n_out = (nlhs == 0) ? 1 : nlhs;
 
     // Read inputs

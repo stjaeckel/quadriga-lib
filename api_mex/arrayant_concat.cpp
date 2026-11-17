@@ -90,6 +90,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         CALL_QD(ant_out = quadriga_lib::arrayant_concat(ant1, ant2));
 
     // Output as struct (or struct array for multi-frequency)
-    if (nlhs == 1)
-        plhs[0] = (n_freq1 > 1) ? qd_mex_arrayant2struct_multi(ant_out_multi) : qd_mex_arrayant2struct(ant_out);
+    plhs[0] = (n_freq1 > 1) ? qd_mex_arrayant2struct_multi(ant_out_multi) : qd_mex_arrayant2struct(ant_out);
 }

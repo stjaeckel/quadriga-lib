@@ -75,8 +75,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat loss_dB;
     arma::vec d2d_in;
     arma::uvec model_ind;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&loss_dB, rnd.n_rows, center_freq.n_elem);
+    plhs[0] = qd_mex_init_output(&loss_dB, rnd.n_rows, center_freq.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&d2d_in, rnd.n_rows);
     if (nlhs > 2)

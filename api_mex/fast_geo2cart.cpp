@@ -83,10 +83,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (split)
     {
-        if (nlhs > 0)
-            plhs[0] = qd_mex_init_output(&x, n, m);
-        else
-            x.set_size(n, m);
+        plhs[0] = qd_mex_init_output(&x, n, m);
 
         if (nlhs > 1)
             plhs[1] = qd_mex_init_output(&y, n, m);
@@ -112,8 +109,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         x.set_size(n, m);
         y.set_size(n, m);
         z.set_size(n, m);
-        if (nlhs > 0)
-            plhs[0] = qd_mex_init_output(&cart, 3, n, m);
+        plhs[0] = qd_mex_init_output(&cart, 3, n, m);
     }
 
     // Map to vectors
@@ -140,7 +136,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                 p_sin_az, p_cos_az, p_sin_el, p_cos_el, p_len, use_kernel));
 
     // Combine outputs
-    if (!split && nlhs > 0)
+    if (!split)
     {
         double *pd = cart.memptr();
         const double *px = x.memptr(), *py = y.memptr(), *pz = z.memptr();

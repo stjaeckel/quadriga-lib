@@ -118,8 +118,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::sos_remove_bias<double>(spatial_freq, phase, pos, p_pos_b, p_phase_b, p_acf, p_dist, p_offset, p_mean_before, spatial_freq_scale_b));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&phase);
+    plhs[0] = qd_mex_copy2matlab(&phase);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&phase_b);
     if (nlhs > 2)

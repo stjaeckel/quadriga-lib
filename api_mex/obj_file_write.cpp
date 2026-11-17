@@ -126,21 +126,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const std::vector<std::string> *p_csv_names = csv_names.empty() ? nullptr : &csv_names;
     const std::unordered_map<std::string, std::vector<double>> *p_csv_prop = csv_prop.empty() ? nullptr : &csv_prop;
 
-    // Outputs (size determined by the C++ call) - request only what the user asked for
+    // Outputs (size determined by the C++ call); face_ind_out only when requested
     arma::mat vert_list_out;
     arma::umat face_ind_out;
-    arma::mat *p_vert_list_out = (nlhs > 0) ? &vert_list_out : nullptr;
     arma::umat *p_face_ind_out = (nlhs > 1) ? &face_ind_out : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::obj_file_write<double>(fn, p_mesh, p_obj_ind, p_mtl_ind, p_obj_names, p_mtl_names,
-                                                 p_vert_list_out, p_face_ind_out, p_vert_list, p_face_ind,
+                                                 &vert_list_out, p_face_ind_out, p_vert_list, p_face_ind,
                                                  p_bsdf, threshold, p_csv_ind, p_csv_names, p_csv_prop,
                                                  csv_write_defaults, split_loose_parts));
 
     // Copy to MATLAB (convert face indices back to 1-based)
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&vert_list_out);
+    plhs[0] = qd_mex_copy2matlab(&vert_list_out);
 
     if (nlhs > 1)
     {

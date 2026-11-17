@@ -127,8 +127,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat xprmat;
     arma::cube coord;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&gain, n_pos);
+    plhs[0] = qd_mex_init_output(&gain, n_pos);
 
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&xprmat, (scalar_mode ? 2 : 8), n_pos);

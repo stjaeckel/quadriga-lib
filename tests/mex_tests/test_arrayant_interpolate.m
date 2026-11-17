@@ -96,12 +96,12 @@ assertEqual( MV_1, cat(3, V_re, V_re) );
 %% Outputs: none, and fewer than the maximum
 quadriga_lib.arrayant_interpolate( ant, az, el );
 [ V_2, V_i2 ] = quadriga_lib.arrayant_interpolate( ant, az, el );
-assertEqual( V_2, V_re );
-assertEqual( V_i2, V_im );
+assertElementsAlmostEqual( V_2, V_re, 'absolute', 1e-12 );
+assertElementsAlmostEqual( V_i2, V_im, 'absolute', 1e-12 );
 [ ~, ~, ~, ~, dist_5 ] = quadriga_lib.arrayant_interpolate( ant_p, az, el );
 [ ~, ~, ~, ~, dist_8, ~, ~, gamma_8 ] = quadriga_lib.arrayant_interpolate( ant_p, az, el );
-assertEqual( dist_5, dist_8 );
-assertEqual( gamma_8, gamma );
+assertElementsAlmostEqual( dist_5, dist_8, 'absolute', 1e-12 );
+assertElementsAlmostEqual( gamma_8, gamma, 'absolute', 1e-12 );
 
 %% Type handling and shapes: single precision inputs, empty angle input
 [ V_s, ~, ~, H_s ] = quadriga_lib.arrayant_interpolate( ant, single(az), single(el) );

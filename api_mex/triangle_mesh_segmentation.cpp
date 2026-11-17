@@ -79,8 +79,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     sub_mesh_ind += 1;
 
     // Copy outputs to MATLAB (sizes only known after the C++ call)
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&meshR);
+    plhs[0] = qd_mex_copy2matlab(&meshR);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&sub_mesh_ind);
     if (nlhs > 2)

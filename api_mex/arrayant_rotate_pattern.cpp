@@ -80,5 +80,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     auto ant = qd_mex_struct2arrayant(prhs[0], false, true); // Validated by the C++ function
     CALL_QD(quadriga_lib::arrayant_rotate_pattern(ant, orientation, usage, &i_element));
-    plhs[0] = qd_mex_arrayant2struct(ant); // Also without output argument: the struct goes to ans
+    plhs[0] = qd_mex_arrayant2struct(ant);
 }

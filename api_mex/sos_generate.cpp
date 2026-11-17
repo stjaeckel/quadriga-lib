@@ -123,8 +123,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::sos_generate<double>(acf, dist, n_coeff, spatial_freq, p_ase, p_test_dir, n_dim, uniform_smp, n_dir, random_init, spatial_freq_min, spatial_freq_max, seed));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&spatial_freq);
+    plhs[0] = qd_mex_copy2matlab(&spatial_freq);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&ase);
     if (nlhs > 2)

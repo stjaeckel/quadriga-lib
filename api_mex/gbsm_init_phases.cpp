@@ -89,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 'scenpar'; with an unknown preset or set type or an invalid 'scenpar' the call throws before any output
     arma::cube phase;
     const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
-    bool known = nlhs > 0 && n_coeff > 0 && (lsf || set_type == "cluster" || set_type == "ray");
+    bool known = n_coeff > 0 && (lsf || set_type == "cluster" || set_type == "ray");
     auto sp = scenpar;
     try
     {

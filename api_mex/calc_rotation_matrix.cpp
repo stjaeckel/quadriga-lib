@@ -44,6 +44,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube rotation;
     CALL_QD(quadriga_lib::calc_rotation_matrix<double>(orientation, rotation, transposed));
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&rotation);
+    plhs[0] = qd_mex_copy2matlab(&rotation);
 }

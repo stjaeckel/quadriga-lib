@@ -62,8 +62,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat center, vert, direction;
     arma::vec length;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&center, n_faces, 3);
+    plhs[0] = qd_mex_init_output(&center, n_faces, 3);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&length, n_faces);
     if (nlhs > 2)

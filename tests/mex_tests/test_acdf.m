@@ -25,6 +25,11 @@ assertEqual( numel(sig), 9 );
 % sig should be all zeros for single column
 assertElementsAlmostEqual( sig, zeros(9,1), 'absolute', 1e-10 );
 
+% Without output argument, the first output goes to ans
+Sh1 = quadriga_lib.acdf( data );
+quadriga_lib.acdf( data );
+assertEqual( ans, Sh1 );
+
 % --- Multiple identical columns ---
 data = [ (0:99).', (0:99).' ];
 [ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data );

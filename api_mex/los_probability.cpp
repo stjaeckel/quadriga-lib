@@ -91,8 +91,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool soft = nlhs > 1 && !rnd_g.empty() && !center_freq.empty();
     arma::vec p_los;
     arma::mat los_soft;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&p_los, d2d_out.n_elem);
+    plhs[0] = qd_mex_init_output(&p_los, d2d_out.n_elem);
     if (soft)
         plhs[1] = qd_mex_init_output(&los_soft, d2d_out.n_elem, center_freq.n_elem);
     else if (nlhs > 1) // [], or [0, n_freq] for no link: an empty 'rnd_g' is then a valid input

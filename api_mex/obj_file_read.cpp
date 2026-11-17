@@ -86,7 +86,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::unordered_map<std::string, std::vector<double>> csv_prop;
 
     // Wrap optional outputs (skip work the user did not request)
-    arma::mat *p_mesh = (nlhs > 0) ? &mesh : nullptr;
     arma::mat *p_vert_list = (nlhs > 1) ? &vert_list : nullptr;
     arma::umat *p_face_ind = (nlhs > 2) ? &face_ind : nullptr;
     arma::uvec *p_obj_ind = (nlhs > 3) ? &obj_ind : nullptr;
@@ -99,14 +98,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::unordered_map<std::string, std::vector<double>> *p_csv_prop = (nlhs > 10) ? &csv_prop : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::obj_file_read<double>(fn, p_mesh, p_vert_list, p_face_ind, p_obj_ind, p_obj_names,
+    CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, p_vert_list, p_face_ind, p_obj_ind, p_obj_names,
                                                 p_mtl_ind, p_mtl_names, p_bsdf,
                                                 fn_csv, p_csv_ind, p_csv_names, p_csv_prop, csv_strict));
 
     // Copy to MATLAB. face_ind and obj_ind are 0-based in C++ -> shift to 1-based.
     // mtl_ind and csv_ind are already 1-based (0 = no material) and pass through unchanged.
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&mesh);
+    plhs[0] = qd_mex_copy2matlab(&mesh);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&vert_list);
     if (nlhs > 2)

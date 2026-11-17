@@ -342,17 +342,19 @@ const auto n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "
 
 ## Output allocation
 - Declare an empty Armadillo variable for every output.
+- A wrapper with a result always sets its first output on success, also for `nlhs = 0`, so that a call without assignment shows it as `ans`; further outputs are set only when requested. A wrapper whose output form depends on `nlhs` treats `nlhs = 0` as one output.
 - **Known size**: allocate in MATLAB memory before the call with `qd_mex_init_output`; the C++ function then writes into the MATLAB array directly (zero-copy). The memory is zero-initialized and the size must match exactly what the C++ function produces: if it resizes the container, the result goes to new memory and the MATLAB output stays zero. For a 4D output use the `std::vector<arma::Cube>` overload and do not resize the vector or its cubes afterwards.
 ```
-if (nlhs > 0)
-    plhs[0] = qd_mex_init_output(&az, n_rows, n_cols);
+plhs[0] = qd_mex_init_output(&az, n_rows, n_cols);
+if (nlhs > 1)
+    plhs[1] = qd_mex_init_output(&el, n_rows, n_cols);
 ```
 - **Unknown size** (determined by the C++ call, or a return value): pass the empty object and copy after the call with `qd_mex_copy2matlab`, or `qd_mex_vector2matlab` for a `std::vector` of Armadillo objects (zero-padded to a regular ND array). Prefer `qd_mex_init_output` whenever the wrapper knows the size of an output that grows with the data (angles, paths, snapshots, pattern samples); small per-element or per-frequency results may be copied instead, which keeps the wrapper from repeating the size rules of the C++ function.
 
 ## Optional and mandatory C++ arguments
-- Optional C++ outputs (pointers) get `(nlhs > k) ? &obj : nullptr`, so that an output nobody requested is neither allocated nor computed.
+- Optional C++ outputs (pointers) get `(nlhs > k) ? &obj : nullptr`, so that an output nobody requested is neither allocated nor computed. The exception is an optional C++ output that feeds the first wrapper output: it is always passed.
 - Optional C++ inputs (pointers) get `nullptr` when the input is omitted or empty.
-- Mandatory C++ arguments (by reference) get the object itself. A mandatory output is pre-allocated with `qd_mex_init_output` only when it is requested; otherwise the local empty object is passed and discarded.
+- Mandatory C++ arguments (by reference) get the object itself. A mandatory output is pre-allocated with `qd_mex_init_output` only when it is requested (the first output always); otherwise the local empty object is passed and discarded.
 
 ## Call the C++ function
 - `CALL_QD(expr)` (defined in `mex_helper_functions.hpp`) wraps the call and turns any `std::exception` into `mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ex.what())`:
@@ -425,7 +427,7 @@ end
 The plan or spec may narrow or extend this list.
 - **Basic call**: all mandatory inputs, all outputs; check size, class and values of every output.
 - **Each optional input**: omitted, passed as `[]` (must give the same result as omitted), and passed with a non-default value that visibly changes the result. This also shows that the default in the wrapper matches the documentation.
-- **Outputs**: a call with 0 outputs must not fail; calls with fewer outputs than the maximum give the same values as the full call for the outputs that are requested (the wrapper passes `nullptr` for the others).
+- **Outputs**: a call with 0 outputs must not fail and, for a wrapper with a result, sets `ans` to the first output; calls with fewer outputs than the maximum give the same values as the full call for the outputs that are requested (the wrapper passes `nullptr` for the others).
 - **Argument counts**: one input too many, too few mandatory inputs, one output too many → `'Wrong number of input arguments.'` / `'Wrong number of output arguments.'`.
 - **Type handling**: at least one call with non-double inputs (`single(...)`, an integer class for an index or count) gives the same result; outputs have the documented class (double unless stated; integer class for index outputs).
 - **Orientation and shape**: a vector input given as row and as column is accepted; vector outputs have the documented orientation; empty optional arrays are accepted.

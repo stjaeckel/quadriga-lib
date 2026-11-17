@@ -153,7 +153,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries
         const size_t n_snap = fbs_pos.size();
         std::vector<arma::cube> out[7];
-        for (int k = 0; k < nlhs; ++k)
+        for (int k = 0; k < std::max(nlhs, 1); ++k)
         {
             plhs[k] = mxCreateCellMatrix((mwSize)n_snap, 1);
             out[k].resize(n_snap);
@@ -190,8 +190,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
     arma::cube *p_aod = nullptr, *p_eod = nullptr, *p_aoa = nullptr, *p_eoa = nullptr;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path);
+    plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&coeff_im, n_ports_rx, n_ports_tx, n_path);
     if (nlhs > 2)

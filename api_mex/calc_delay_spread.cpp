@@ -66,8 +66,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::calc_delay_spread<double>(delays, powers, ds, threshold_dB, granularity, p_mean_delay));
 
     // Write outputs
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&ds);
+    plhs[0] = qd_mex_copy2matlab(&ds);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&mean_delay);
 }

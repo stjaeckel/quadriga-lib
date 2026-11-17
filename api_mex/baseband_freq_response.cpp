@@ -179,22 +179,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (has_isnap)
     {
         arma::uword n_out = i_snap.is_empty() ? n_slab : i_snap.n_elem;
-        if (nlhs > 0)
-            plhs[0] = qd_mex_init_output(&hmat_re_v, n_rx, n_tx, n_carrier, n_out);
+        plhs[0] = qd_mex_init_output(&hmat_re_v, n_rx, n_tx, n_carrier, n_out);
         if (nlhs > 1)
             plhs[1] = qd_mex_init_output(&hmat_im_v, n_rx, n_tx, n_carrier, n_out);
     }
     else
     {
-        if (nlhs > 0)
-            plhs[0] = qd_mex_init_output(&hmat_re, n_rx, n_tx, n_carrier);
+        plhs[0] = qd_mex_init_output(&hmat_re, n_rx, n_tx, n_carrier);
         if (nlhs > 1)
             plhs[1] = qd_mex_init_output(&hmat_im, n_rx, n_tx, n_carrier);
     }
-
-    arma::cube *p_hmat_re = (nlhs > 0) ? &hmat_re : nullptr;
     arma::cube *p_hmat_im = (nlhs > 1) ? &hmat_im : nullptr;
-    std::vector<arma::cube> *p_hmat_re_v = (nlhs > 0) ? &hmat_re_v : nullptr;
     std::vector<arma::cube> *p_hmat_im_v = (nlhs > 1) ? &hmat_im_v : nullptr;
 
     // Dispatch
@@ -212,7 +207,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
 
         CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(&coeff_re, &coeff_im, &delay,
-                                                                 &pilot_grid, bw, p_hmat_re_v, p_hmat_im_v,
+                                                                 &pilot_grid, bw, &hmat_re_v, p_hmat_im_v,
                                                                  i_snap.is_empty() ? nullptr : &i_snap, use_kernel));
     }
     else if (n_slab == 1) // Single-frequency backend
@@ -229,7 +224,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
 
         CALL_QD(quadriga_lib::baseband_freq_response<double>(&coeff_re[0], &coeff_im[0], &delay[0],
-                                                             &pilot_grid, bw, p_hmat_re, p_hmat_im, nullptr, use_kernel));
+                                                             &pilot_grid, bw, &hmat_re, p_hmat_im, nullptr, use_kernel));
     }
     else // Multi-frequency backend
     {
@@ -241,6 +236,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             carrier_freq = center_freq.at(0) + pilot_grid_in * bandwidth;
 
         CALL_QD(quadriga_lib::baseband_freq_response_multi<double>(coeff_re, coeff_im, delay,
-                                                                   center_freq, carrier_freq, p_hmat_re, p_hmat_im, nullptr, true, use_kernel));
+                                                                   center_freq, carrier_freq, &hmat_re, p_hmat_im, nullptr, true, use_kernel));
     }
 }

@@ -112,8 +112,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation in MATLAB memory: [n_link, n_gen], n_gen = columns of 'phase' (checked by the library)
     arma::mat rnd;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&rnd, rx_pos.n_rows, phase.n_cols);
+    plhs[0] = qd_mex_init_output(&rnd, rx_pos.n_rows, phase.n_cols);
 
     // Call library function
     CALL_QD(quadriga_lib::gbsm_draw(scenpar, set_type, phase, tx_pos, rx_pos, rnd, set_id, preset, p_floor_id,

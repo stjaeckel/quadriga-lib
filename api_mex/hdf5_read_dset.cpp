@@ -69,6 +69,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::any dset;
     CALL_QD(dset = quadriga_lib::hdf5_read_dset(fn, name, ix, iy, iz, iw, prefix));
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_any2matlab(dset);
+    plhs[0] = qd_mex_any2matlab(dset);
 }

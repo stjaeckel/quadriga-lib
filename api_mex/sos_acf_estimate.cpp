@@ -98,8 +98,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::vec acf_est, dist_est, acf_est_dual;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&acf_est, bins.n_elem);
+    plhs[0] = qd_mex_init_output(&acf_est, bins.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&dist_est, bins.n_elem);
     if (nlhs > 2)

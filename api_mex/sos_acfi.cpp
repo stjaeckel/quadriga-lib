@@ -50,8 +50,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::vec val;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&val, d.n_elem);
+    plhs[0] = qd_mex_init_output(&val, d.n_elem);
 
     // Call library function
     CALL_QD(quadriga_lib::sos_acfi<double>(acf, dist, d, val));

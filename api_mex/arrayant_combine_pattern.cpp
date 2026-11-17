@@ -64,7 +64,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::vec el = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3]);
     const double propagation_speed = (nrhs < 5) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[4], "propagation_speed", 299792458.0);
 
-    // The output is also set without output argument (it goes to ans)
     if (freq_new.n_elem > 1 || mxGetNumberOfElements(prhs[0]) > 1) // Multi-frequency
     {
         const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]); // Validated by the C++ function

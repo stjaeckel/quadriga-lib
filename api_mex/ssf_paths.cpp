@@ -116,8 +116,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         using T = typename std::decay_t<decltype(x)>::elem_type;
         return x.empty() ? mxCreateNumericMatrix(0, 1, qd_mex_class_id<T>(), mxREAL) : qd_mex_copy2matlab(&x);
     };
-    if (nlhs > 0)
-        plhs[0] = mat(path_gain);
+    plhs[0] = mat(path_gain);
     if (nlhs > 1)
         plhs[1] = col(path_length);
     if (nlhs > 2)

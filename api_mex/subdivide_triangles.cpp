@@ -62,8 +62,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat triangles_out;
     arma::uvec mtl_ind_out;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&triangles_out, n_triangles_out, 9);
+    plhs[0] = qd_mex_init_output(&triangles_out, n_triangles_out, 9);
 
     if (nlhs > 1)
     {

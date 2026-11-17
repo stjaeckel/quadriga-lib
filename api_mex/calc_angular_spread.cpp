@@ -76,7 +76,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<arma::vec> phi, theta;
 
     // Set up optional output pointers based on nlhs
-    arma::vec *p_as = (nlhs > 0) ? &azimuth_spread : nullptr;
     arma::vec *p_es = (nlhs > 1) ? &elevation_spread : nullptr;
     arma::mat *p_orient = (nlhs > 2) ? &orientation : nullptr;
     std::vector<arma::vec> *p_phi = (nlhs > 3) ? &phi : nullptr;
@@ -84,12 +83,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call library function (double precision only)
     CALL_QD(quadriga_lib::calc_angular_spread<double>(
-        az, el, powers, p_as, p_es, p_orient, p_phi, p_theta,
+        az, el, powers, &azimuth_spread, p_es, p_orient, p_phi, p_theta,
         wrapping, calc_bank_angle, quantize_deg));
 
     // Write outputs to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&azimuth_spread);
+    plhs[0] = qd_mex_copy2matlab(&azimuth_spread);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&elevation_spread);
     if (nlhs > 2)

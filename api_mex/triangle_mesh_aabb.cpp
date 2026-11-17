@@ -69,6 +69,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::triangle_mesh_aabb<double>(mesh, aabb, p_sub_mesh_index, vec_size));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&aabb);
+    plhs[0] = qd_mex_copy2matlab(&aabb);
 }

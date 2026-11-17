@@ -157,8 +157,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // xprmat: 8 rows for EM (types 0-2), 2 rows for scalar (types 3-5); one column per output ray
     const arma::uword n_xpr = (interaction_type <= 2) ? 8 : 2;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&origN, n_rayN, 3);
+    plhs[0] = qd_mex_init_output(&origN, n_rayN, 3);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&destN, n_rayN, 3);
     if (nlhs > 2)
@@ -185,7 +184,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[13] = qd_mex_init_output(&path_dirN, n_rayN, 3);
 
     // Wrap optional output pointers based on requested outputs
-    arma::mat *p_origN = (nlhs > 0) ? &origN : nullptr;
+    arma::mat *p_origN = &origN;
     arma::mat *p_destN = (nlhs > 1) ? &destN : nullptr;
     arma::mat *p_fbsN = (nlhs > 2) ? &fbsN : nullptr;
     arma::mat *p_sbsN = (nlhs > 3) ? &sbsN : nullptr;

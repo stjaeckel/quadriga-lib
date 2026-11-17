@@ -89,5 +89,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         CALL_QD(id = quadriga_lib::qdant_write(fn, ant, id, &layout));
 
-    plhs[0] = qd_mex_copy2matlab(&id); // Also without output argument: the ID goes to ans
+    plhs[0] = qd_mex_copy2matlab(&id);
 }

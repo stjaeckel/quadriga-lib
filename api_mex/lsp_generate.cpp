@@ -106,14 +106,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool cholesky = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "cholesky", true);
     const bool clip_spreads = (nrhs < 8) ? true : qd_mex_get_scalar<bool>(prhs[7], "clip_spreads", true);
 
-    // Output allocation: the requested outputs only, the others are passed to C++ as nullptr
+    // Output allocation: the first output always, the others only when requested (else nullptr to C++)
     const arma::uword n_link = rx_pos.n_rows, n_freq = center_freq.n_elem;
     arma::cube lsp, lsp_mu, lsp_sigma;
     arma::vec abs_toa;
     arma::mat gr_eps_re, gr_eps_im, eod_offset_deg;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&lsp, n_link, n_freq, 8);
+    plhs[0] = qd_mex_init_output(&lsp, n_link, n_freq, 8);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&abs_toa, n_link);
     if (nlhs > 2)

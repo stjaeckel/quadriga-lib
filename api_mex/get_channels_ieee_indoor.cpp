@@ -154,6 +154,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                           n_walls,
                                                           wall_loss));
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_channel2struct(chan);
+    plhs[0] = qd_mex_channel2struct(chan);
 }

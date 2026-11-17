@@ -160,7 +160,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         const arma::uword n_slot = (arma::uword)sp.at("NumClusters") + (sp.at("GR_enabled") > 0.0 ? 1 : 0);
         const arma::uword n_fd = (method == "38.901_MF") ? n_freq : 1;
         arma::cube *out[6] = {&delay, &power, &aod, &eod, &aoa, &eoa};
-        for (int k = 0; k < 6 && k < nlhs; ++k)
+        for (int k = 0; k < 6 && k < std::max(nlhs, 1); ++k)
             plhs[k] = qd_mex_init_output(out[k], n_link, n_slot, k == 1 ? n_freq : n_fd);
         if (nlhs > 6)
             plhs[6] = qd_mex_init_output(&n_active, n_link);

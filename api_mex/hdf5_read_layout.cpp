@@ -55,8 +55,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn, p_channel_id));
 
     // Return storage space as 1x4 row vector
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&storage_space, true);
+    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 
     // Build binary occupancy mask as 4D uint32 array (no Col/Mat/Cube helper for 4D)
     if (nlhs > 1)

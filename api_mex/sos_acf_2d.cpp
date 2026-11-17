@@ -57,7 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword n_grid = (acf.n_elem < 2) ? 0 : 4 * acf.n_elem - 3;
     arma::mat acf_2d;
     arma::vec dist_2d;
-    if (nlhs > 0 && n_grid != 0)
+    if (n_grid != 0)
         plhs[0] = qd_mex_init_output(&acf_2d, n_grid, n_grid);
     if (nlhs > 1 && n_grid != 0)
         plhs[1] = qd_mex_init_output(&dist_2d, n_grid);

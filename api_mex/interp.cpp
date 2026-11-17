@@ -53,7 +53,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (twoD && nrhs < 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'y_new' is required when 'y' is given (2D case).");
 
-    if (mxIsSingle(prhs[0]) && nlhs > 0)
+    if (mxIsSingle(prhs[0]))
     {
         const arma::fvec x = qd_mex_get_Col<float>(prhs[0]);
         const arma::fvec y = twoD ? qd_mex_get_Col<float>(prhs[1]) : arma::fvec(1);
@@ -66,7 +66,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         CALL_QD(quadriga_lib::interp_2D(x, y, input, x_new, y_new, output));
     }
-    else if (nlhs > 0)
+    else
     {
         const arma::vec x = qd_mex_get_Col<double>(prhs[0]);
         const arma::vec y = twoD ? qd_mex_get_Col<double>(prhs[1]) : arma::vec(1);

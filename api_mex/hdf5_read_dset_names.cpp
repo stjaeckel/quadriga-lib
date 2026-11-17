@@ -67,6 +67,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::hdf5_read_dset_names(fn, &par_names, ix, iy, iz, iw, prefix));
 
     // Return cell array
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&par_names);
+    plhs[0] = qd_mex_copy2matlab(&par_names);
 }

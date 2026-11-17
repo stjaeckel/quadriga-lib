@@ -68,6 +68,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(mesh = quadriga_lib::plane<double>(scale, rotation, location, n_div));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&mesh);
+    plhs[0] = qd_mex_copy2matlab(&mesh);
 }

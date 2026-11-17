@@ -89,17 +89,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Declare outputs
     arma::mat xpr;
     arma::vec pg;
-
-    arma::mat *p_xpr = (nlhs > 0) ? &xpr : nullptr;
     arma::vec *p_pg = (nlhs > 1) ? &pg : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::calc_cross_polarization_ratio<double>(
-        powers, M, path_length, tx_pos, rx_pos, p_xpr, p_pg, include_los, window_size));
+        powers, M, path_length, tx_pos, rx_pos, &xpr, p_pg, include_los, window_size));
 
     // Write outputs
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&xpr);
+    plhs[0] = qd_mex_copy2matlab(&xpr);
 
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&pg);

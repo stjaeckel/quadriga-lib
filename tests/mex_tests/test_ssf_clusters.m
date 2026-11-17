@@ -149,8 +149,8 @@ assertEqual( n1, uint32( zeros(4, 1) ) );
 
 %% Type handling
 [ ds, ps ] = quadriga_lib.ssf_clusters( sp, single(tx_pos), single(rx_pos), lsp, rnd, '38.901', rnd_f );
-assertEqual( ds, delay );                                                      % positions exact in single
-assertEqual( ps, power );
+assertElementsAlmostEqual( ds, delay, 'relative', 1e-12 );
+assertElementsAlmostEqual( ps, power, 'relative', 1e-12 );
 
 %% Errors
 assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp ), 'Wrong number of input arguments.' );

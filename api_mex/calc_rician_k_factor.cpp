@@ -56,15 +56,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec kf, pg;
 
     // Set up optional output pointers based on nlhs
-    arma::vec *p_kf = (nlhs > 0) ? &kf : nullptr;
     arma::vec *p_pg = (nlhs > 1) ? &pg : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::calc_rician_k_factor<double>(powers, path_length, tx_pos, rx_pos, p_kf, p_pg, window_size));
+    CALL_QD(quadriga_lib::calc_rician_k_factor<double>(powers, path_length, tx_pos, rx_pos, &kf, p_pg, window_size));
 
     // Write outputs to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&kf);
+    plhs[0] = qd_mex_copy2matlab(&kf);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&pg);
 }

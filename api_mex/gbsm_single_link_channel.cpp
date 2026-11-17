@@ -131,8 +131,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                           kf_ratio.empty() ? nullptr : &kf_ratio, oxygen,
                                                           use_absolute_delays));
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_channel2struct({chan});
+    plhs[0] = qd_mex_channel2struct({chan});
     if (nlhs > 1)
     {
         plhs[1] = qd_mex_make_struct(chan.par_names, 1);

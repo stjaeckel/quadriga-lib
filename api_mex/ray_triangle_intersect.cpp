@@ -90,8 +90,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat fbs, sbs;
     arma::u32_vec n_interact, fbs_ind, sbs_ind;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&fbs, n_rays, 3);
+    plhs[0] = qd_mex_init_output(&fbs, n_rays, 3);
 
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&sbs, n_rays, 3);

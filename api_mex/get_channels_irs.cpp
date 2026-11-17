@@ -193,8 +193,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                    p_active_path_out, use_kernel));
 
     // Write to MATLAB
-    if (nlhs > 0)
-        plhs[0] = copy_cube(coeff_re);
+    plhs[0] = copy_cube(coeff_re);
     if (nlhs > 1)
         plhs[1] = copy_cube(coeff_im);
     if (nlhs > 2)

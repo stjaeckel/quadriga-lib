@@ -204,6 +204,10 @@ for fake_los = [false, true]
 end
 [~, ~, dl] = quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx(:, 1)', ori, rx', ori); % row vectors: shared
 assertEqual( numel(dl), n_snap );
+cr = quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx, ori, rx, ori); % without output argument, coeff_re goes to ans
+quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx, ori, rx, ori);
+assertTrue( iscell(ans) );
+assertEqual( ans, cr );
 assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx(:, 1:2), ori, rx, ori), 'quadriga_lib:CPPerror');
 assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs(1:3), pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');
 assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs{1}, pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');

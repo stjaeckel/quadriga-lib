@@ -76,8 +76,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::mat phase;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&phase, n_coeff, n_gen);
+    plhs[0] = qd_mex_init_output(&phase, n_coeff, n_gen);
 
     // Call library function
     CALL_QD(quadriga_lib::sos_init_phases<double>(n_coeff, n_gen, phase, seed));

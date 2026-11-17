@@ -93,6 +93,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::hdf5_write_dset(fn, name, &data, ix, iy, iz, iw, prefix));
 
     // Return storage space
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&storage_space, true);
+    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 }

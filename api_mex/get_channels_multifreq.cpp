@@ -126,8 +126,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Initialize 4D output memory
     std::vector<arma::cube> coeff_re, coeff_im, delay;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path, n_freq_new);
+    plhs[0] = qd_mex_init_output(&coeff_re, n_ports_rx, n_ports_tx, n_path, n_freq_new);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&coeff_im, n_ports_rx, n_ports_tx, n_path, n_freq_new);
     if (nlhs > 2)

@@ -69,7 +69,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation (a zero size is left to the library to reject)
     std::vector<arma::cube> map;
-    if (nlhs > 0 && nx != 0 && n_gen != 0)
+    if (nx != 0 && n_gen != 0)
         plhs[0] = qd_mex_init_output(&map, ny, nx, nz, n_gen);
 
     // Wrap optional pointers

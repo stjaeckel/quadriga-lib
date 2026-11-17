@@ -186,6 +186,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexWarnMsgIdAndTxt("quadriga_lib:CPPerror", "Modifying or overwriting existing dataset in file.");
 
     // Return storage space
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&storage_space, true);
+    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 }

@@ -113,8 +113,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::mat pl_dB, sf_sigma_dB;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&pl_dB, rx_pos.n_rows, center_freq.n_elem);
+    plhs[0] = qd_mex_init_output(&pl_dB, rx_pos.n_rows, center_freq.n_elem);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&sf_sigma_dB, rx_pos.n_rows, center_freq.n_elem);
 

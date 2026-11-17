@@ -63,8 +63,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     i_element -= 1;
     const double threshold_dB = (nrhs < 3) ? 3.0 : qd_mex_get_scalar<double>(prhs[2], "threshold_dB", 3.0);
 
-    // A single struct is a one-entry vector; the outputs are [n_out, n_freq] either way. The first output is also
-    // computed without output argument (it goes to ans).
+    // A single struct is a one-entry vector; the outputs are [n_out, n_freq] either way
     const int n_out = (nlhs == 0) ? 1 : nlhs;
     arma::mat out[4];
     const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]); // Validated by the C++ function

@@ -62,7 +62,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool valid = n_grid != 0 && n_dim >= 1 && n_dim <= 3;
     arma::cube acf_approx;
     arma::vec dist_2d;
-    if (nlhs > 0 && valid)
+    if (valid)
         plhs[0] = qd_mex_init_output(&acf_approx, n_grid, (n_dim == 1) ? 1 : n_grid, (n_dim == 3) ? 3 : 1);
     if (nlhs > 1 && valid)
         plhs[1] = qd_mex_init_output(&dist_2d, n_grid);

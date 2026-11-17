@@ -219,8 +219,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Output 1: chan struct array (qd_mex_channel2struct handles empty vector)
-    if (nlhs > 0)
-        plhs[0] = qd_mex_channel2struct(channels, false);
+    plhs[0] = qd_mex_channel2struct(channels, false);
 
     // Output 2: par struct array with the union of par_names across all channels
     if (nlhs > 1)

@@ -20,6 +20,11 @@ assertElementsAlmostEqual(as, 0.1, 'absolute', 1e-6);
 assertElementsAlmostEqual(es, 0.0, 'absolute', 1e-6);
 assertElementsAlmostEqual(orient(3,1), 0.0, 'absolute', 1e-6);
 
+% Without output argument, the first output goes to ans
+as1 = quadriga_lib.calc_angular_spread(az, el, powers, 1);
+quadriga_lib.calc_angular_spread(az, el, powers, 1);
+assertEqual( ans, as1 );
+
 % --- Two symmetric elevation paths ---
 az = [0.0; 0.0];
 el = [0.2; -0.2];

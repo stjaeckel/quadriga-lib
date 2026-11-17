@@ -80,10 +80,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Output allocation
     arma::mat az, el, len;
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&az, n, m);
-    else
-        az.set_size(n, m);
+    plhs[0] = qd_mex_init_output(&az, n, m);
 
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&el, n, m);

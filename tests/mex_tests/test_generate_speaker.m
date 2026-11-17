@@ -6,6 +6,11 @@ function test_generate_speaker
 
 % Default call returns a struct array with all expected fields
 data = quadriga_lib.generate_speaker();
+
+% Without output argument, the struct array goes to ans
+quadriga_lib.generate_speaker();
+assertEqual( ans, data );
+
 required_fields = {'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im', ...
                    'azimuth_grid', 'elevation_grid', 'element_pos', ...
                    'coupling_re', 'coupling_im', 'center_freq', 'name'};

@@ -63,9 +63,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::hdf5_reshape_layout(fn, nx, ny, nz, nw));
 
     // Return new storage space
-    if (nlhs > 0)
-    {
-        arma::u32_vec storage_space = {nx, ny, nz, nw};
-        plhs[0] = qd_mex_copy2matlab(&storage_space, true);
-    }
+    arma::u32_vec storage_space = {nx, ny, nz, nw};
+    plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 }

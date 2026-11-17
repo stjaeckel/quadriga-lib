@@ -79,10 +79,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Wrap optional input pointer
     const arma::u32_vec *p_sub_cloud_index = sub_cloud_ind.empty() ? nullptr : &sub_cloud_ind;
 
-    // hit_count output: size known (n_points), allocate MATLAB-owned memory if requested
+    // hit_count output: size known (n_points), MATLAB-owned memory
     arma::u32_vec hit_count;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&hit_count, points.n_rows);
+    plhs[0] = qd_mex_init_output(&hit_count, points.n_rows);
 
     arma::u32_vec *p_hit_count = hit_count.empty() ? nullptr : &hit_count;
 

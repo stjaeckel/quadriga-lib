@@ -94,8 +94,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         tap_spacing, max_taps, power_exponent, fix_taps));
 
     // Write outputs — convert std::vector<Cube> back to 4D MATLAB arrays
-    if (nlhs > 0)
-        plhs[0] = qd_mex_vector2matlab(&coeff_re_q);
+    plhs[0] = qd_mex_vector2matlab(&coeff_re_q);
     if (nlhs > 1)
         plhs[1] = qd_mex_vector2matlab(&coeff_im_q);
     if (nlhs > 2)

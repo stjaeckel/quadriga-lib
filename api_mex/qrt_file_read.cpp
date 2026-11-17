@@ -121,16 +121,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword no_out = i_cir.n_elem;
 
     // Return frequencies in Hz
-    if (nlhs > 0)
-    {
-        arma::vec center_freq;
-        plhs[0] = qd_mex_init_output(&center_freq, cache.no_freq);
-        for (unsigned i_freq = 0; i_freq < cache.no_freq; ++i_freq)
-            if (cache.version == 6) // Scalar mode, stored in Hz
-                center_freq[i_freq] = (double)cache.freq[i_freq];
-            else // EM Mode, stored in GHz
-                center_freq[i_freq] = 1.0e9 * (double)cache.freq[i_freq];
-    }
+    arma::vec center_freq;
+    plhs[0] = qd_mex_init_output(&center_freq, cache.no_freq);
+    for (unsigned i_freq = 0; i_freq < cache.no_freq; ++i_freq)
+        if (cache.version == 6) // Scalar mode, stored in Hz
+            center_freq[i_freq] = (double)cache.freq[i_freq];
+        else // EM Mode, stored in GHz
+            center_freq[i_freq] = 1.0e9 * (double)cache.freq[i_freq];
 
     // Initialize output data structures
     arma::mat tx_pos, tx_orientation, rx_pos, rx_orientation;

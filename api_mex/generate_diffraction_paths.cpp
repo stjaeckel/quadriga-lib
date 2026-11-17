@@ -72,18 +72,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                              ray_x, ray_y, ray_z, weight));
 
     // Rays output as a 4D MATLAB array [n_pos, n_path, n_seg-1, 3], x, y, z stacked along the 4th dimension
-    if (nlhs > 0)
+    mwSize dims[4] = {(mwSize)ray_x.n_rows, (mwSize)ray_x.n_cols, (mwSize)ray_x.n_slices, 3};
+    plhs[0] = mxCreateNumericArray(4, dims, mxDOUBLE_CLASS, mxREAL);
+    double *data = (double *)mxGetData(plhs[0]);
+    const arma::uword offset = ray_x.n_elem;
+    if (offset != 0)
     {
-        mwSize dims[4] = {(mwSize)ray_x.n_rows, (mwSize)ray_x.n_cols, (mwSize)ray_x.n_slices, 3};
-        plhs[0] = mxCreateNumericArray(4, dims, mxDOUBLE_CLASS, mxREAL);
-        double *data = (double *)mxGetData(plhs[0]);
-        const arma::uword offset = ray_x.n_elem;
-        if (offset != 0)
-        {
-            std::memcpy(data, ray_x.memptr(), offset * sizeof(double));
-            std::memcpy(&data[offset], ray_y.memptr(), offset * sizeof(double));
-            std::memcpy(&data[2 * offset], ray_z.memptr(), offset * sizeof(double));
-        }
+        std::memcpy(data, ray_x.memptr(), offset * sizeof(double));
+        std::memcpy(&data[offset], ray_y.memptr(), offset * sizeof(double));
+        std::memcpy(&data[2 * offset], ray_z.memptr(), offset * sizeof(double));
     }
 
     // Weights output [n_pos, n_path, n_seg]

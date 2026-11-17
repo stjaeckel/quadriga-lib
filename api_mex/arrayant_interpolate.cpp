@@ -107,8 +107,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         const arma::uword n_freq = freq_new.is_empty() ? (arma::uword)ant.size() : freq_new.n_elem;
         arma::cube V_re, V_im, H_re, H_im;
-        if (nlhs > 0)
-            plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang, n_freq);
+        plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang, n_freq);
         if (nlhs > 1)
             plhs[1] = qd_mex_init_output(&V_im, n_out, n_ang, n_freq);
         if (nlhs > 2)
@@ -123,8 +122,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
-    if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang);
+    plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&V_im, n_out, n_ang);
     if (nlhs > 2)

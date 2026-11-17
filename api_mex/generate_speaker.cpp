@@ -104,6 +104,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                          angular_resolution_deg));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_arrayant2struct_multi(ant);
+    plhs[0] = qd_mex_arrayant2struct_multi(ant);
 }

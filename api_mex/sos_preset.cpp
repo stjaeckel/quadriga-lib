@@ -78,6 +78,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::sos_preset<double>(name, spatial_freq, p_acf, p_dist, dist_decorr));
 
     // Copy to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&spatial_freq);
+    plhs[0] = qd_mex_copy2matlab(&spatial_freq);
 }
