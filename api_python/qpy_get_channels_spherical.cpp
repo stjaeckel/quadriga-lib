@@ -4,10 +4,6 @@
 
 #include "python_quadriga_adapter.hpp"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 /*!SECTION
 Channel generation functions
 SECTION!*/
@@ -47,14 +43,14 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ## Batch mode:
-- If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_out` snapshots
-  in one call, distributing the snapshots over all available cores (OpenMP).
-- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_out`,
+- If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
+  in one call, the snapshots in parallel (OpenMP in C++).
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_snap`,
   matching the output format of [[qrt_file_read]]; list entries that are Fortran-contiguous float64 arrays (as
   returned by [[qrt_file_read]]) are read in place, other entries are copied.
-- The position and orientation inputs are `(3, n_out)` arrays with one column per snapshot; a `(3,)` array
+- The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array
   or a single-column `(3, 1)` array is applied to all snapshots.
-- All outputs are returned as lists of length `n_out`, one entry per snapshot.
+- All outputs are returned as lists of length `n_snap`, one entry per snapshot.
 - Snapshots without any path produce an empty output entry with `n_path = 0`, or only the zero-power LOS path
   when `add_fake_los_path` is set (as for a single snapshot).
 - Batch mode releases the GIL while processing, so it can be combined with Python threads. The function keeps
@@ -77,17 +73,17 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
 ## Inputs:
 - **`ant_tx`** — Transmit arrayant dict; see [[generate]]
 - **`ant_rx`** — Receive arrayant dict; see [[generate]]
-- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
-- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
-- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_out` in batch mode
+- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
+- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
+- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
-  (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_out` in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_out`
+  (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
+- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
   in batch mode
-- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_out)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_out)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
+- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
@@ -111,7 +107,7 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
 - **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
 - **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`
 - **`eoa`** — Elevation of arrival in the GCS, in rad; same shape; only with `angles=True`
-- In batch mode, every output is a list of length `n_out` whose entries have the shapes given above.
+- In batch mode, every output is a list of length `n_snap` whose entries have the shapes given above.
 
 ## See also:
 - [[channel.multifreq]] (multi-frequency extension)
@@ -226,36 +222,22 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         const auto path_length_a = qd_alias_list_Col(path_length, keep_alive);
         const auto M_a = qd_alias_list_Cube(M, keep_alive);
 
-        const arma::uword n_out = (arma::uword)fbs_pos_a.size();
+        const arma::uword n_snap = (arma::uword)fbs_pos_a.size();
 
-        if (lbs_pos_a.size() != n_out || path_gain_a.size() != n_out ||
-            path_length_a.size() != n_out || M_a.size() != n_out)
+        // Needed before the frequency check below, which indexes all five lists
+        if (lbs_pos_a.size() != n_snap || path_gain_a.size() != n_snap ||
+            path_length_a.size() != n_snap || M_a.size() != n_snap)
             throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must have the same length.");
 
-        // Positions and orientations, one column per snapshot
-        const auto tx_pos_arr = tx_pos.cast<py::array_t<double>>();
-        const auto tx_orientation_arr = tx_orientation.cast<py::array_t<double>>();
-        const auto rx_pos_arr = rx_pos.cast<py::array_t<double>>();
-        const auto rx_orientation_arr = rx_orientation.cast<py::array_t<double>>();
-
-        const auto tx_pos_a = qd_python_numpy2arma_Mat(tx_pos_arr, true);
-        const auto tx_orientation_a = qd_python_numpy2arma_Mat(tx_orientation_arr, true);
-        const auto rx_pos_a = qd_python_numpy2arma_Mat(rx_pos_arr, true);
-        const auto rx_orientation_a = qd_python_numpy2arma_Mat(rx_orientation_arr, true);
-
-        if (tx_pos_a.n_rows != 3ULL || tx_orientation_a.n_rows != 3ULL ||
-            rx_pos_a.n_rows != 3ULL || rx_orientation_a.n_rows != 3ULL)
-            throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 3 rows.");
-
-        if ((tx_pos_a.n_cols != 1ULL && tx_pos_a.n_cols != n_out) ||
-            (tx_orientation_a.n_cols != 1ULL && tx_orientation_a.n_cols != n_out) ||
-            (rx_pos_a.n_cols != 1ULL && rx_pos_a.n_cols != n_out) ||
-            (rx_orientation_a.n_cols != 1ULL && rx_orientation_a.n_cols != n_out))
-            throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 1 or 'n_out' columns.");
+        // Positions and orientations, one column per snapshot or one for all; checked by the C++ core
+        const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
+        const auto tx_orientation_a = qd_python_numpy2arma_Mat<double>(tx_orientation, true);
+        const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
+        const auto rx_orientation_a = qd_python_numpy2arma_Mat<double>(rx_orientation, true);
 
         // Check the frequency dimension, path counts are validated by the C++ core
         arma::uword n_freq = 0ULL;
-        for (arma::uword i = 0ULL; i < n_out; ++i)
+        for (arma::uword i = 0ULL; i < n_snap; ++i)
         {
             arma::uword n_freq_i = path_gain_a[i].n_cols;
             if (i == 0ULL)
@@ -270,96 +252,60 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
         if (!center_freq_a.empty() && center_freq_a.n_elem != n_freq)
             throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
 
-        if (n_out != 0ULL && i_freq >= n_freq)
+        if (n_snap != 0ULL && i_freq >= n_freq)
             throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
 
         const double center_freq_sel = center_freq_a.empty() ? 0.0 : center_freq_a.at(i_freq);
 
-        // Number of output paths per snapshot
-        std::vector<arma::uword> n_path(n_out);
-        for (arma::uword i = 0ULL; i < n_out; ++i)
+        // Select the frequency slice of every snapshot, aliased without copying the data
+        std::vector<arma::vec> path_gain_f;
+        std::vector<arma::mat> M_f;
+        path_gain_f.reserve(n_snap), M_f.reserve(n_snap);
+        for (arma::uword i = 0ULL; i < n_snap; ++i)
         {
-            arma::uword n_path_in = fbs_pos_a[i].n_cols;
-            n_path[i] = add_fake_los_path ? n_path_in + 1ULL : n_path_in;
+            path_gain_f.emplace_back(const_cast<double *>(path_gain_a[i].colptr(i_freq)), path_gain_a[i].n_rows, false, true);
+            M_f.emplace_back(const_cast<double *>(M_a[i].slice_memptr(i_freq)), M_a[i].n_rows, M_a[i].n_cols, false, true);
         }
 
-        // Allocate all outputs before the parallel region, numpy memory is mapped to the Armadillo cubes
-        std::vector<arma::cube> coeff_re(n_out), coeff_im(n_out), delay(n_out);
-        std::vector<arma::cube> aod(n_out), eod(n_out), aoa(n_out), eoa(n_out);
+        // Allocate the outputs; numpy memory is mapped to the Armadillo cubes, which C++ writes in place
+        std::vector<arma::cube> coeff_re(n_snap), coeff_im(n_snap), delay(n_snap);
+        std::vector<arma::cube> aod(n_snap), eod(n_snap), aoa(n_snap), eoa(n_snap);
         py::list coeff_re_py, coeff_im_py, delay_py, aod_py, eod_py, aoa_py, eoa_py;
 
-        for (arma::uword i = 0ULL; i < n_out; ++i)
+        for (arma::uword i = 0ULL; i < n_snap; ++i)
         {
-            delay_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &delay[i]));
+            const arma::uword n_path = add_fake_los_path ? fbs_pos_a[i].n_cols + 1ULL : fbs_pos_a[i].n_cols;
+            delay_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &delay[i]));
             if (angles) // Without angles, the core skips their conversion to the ports
             {
-                aod_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &aod[i]));
-                eod_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &eod[i]));
-                aoa_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &aoa[i]));
-                eoa_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &eoa[i]));
+                aod_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &aod[i]));
+                eod_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &eod[i]));
+                aoa_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &aoa[i]));
+                eoa_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &eoa[i]));
             }
 
             if (!want_complex) // Complex coefficients are combined after the C++ call, no zero-copy mapping possible
             {
-                coeff_re_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &coeff_re[i]));
-                coeff_im_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path[i], &coeff_im[i]));
+                coeff_re_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_re[i]));
+                coeff_im_py.append(qd_python_init_output<double>(n_ports_rx, n_ports_tx, n_path, &coeff_im[i]));
             }
         }
 
-        // Process all snapshots in parallel, no Python object may be touched inside this region
-        std::string error_message;
         {
             py::gil_scoped_release release;
-
-#if defined(_OPENMP) && _OPENMP >= 200805
-            omp_set_max_active_levels(1); // Parallelize over snapshots, the path loop in the core stays serial
-#elif defined(_OPENMP)
-            omp_set_nested(0); // OpenMP 2.0 (MSVC /openmp) has no max_active_levels
-#endif
-
-#pragma omp parallel for schedule(dynamic)
-            for (long long i = 0LL; i < (long long)n_out; ++i)
-            {
-                try
-                {
-                    const arma::uword j = (arma::uword)i;
-
-                    // Select the frequency slice, aliased without copying the data
-                    const arma::Col<double> path_gain_f(const_cast<double *>(path_gain_a[j].colptr(i_freq)),
-                                                        path_gain_a[j].n_rows, false, true);
-                    const arma::Mat<double> M_f(const_cast<double *>(M_a[j].slice_memptr(i_freq)),
-                                                M_a[j].n_rows, M_a[j].n_cols, false, true);
-
-                    // Positions and orientations of the snapshot; a single column applies to all snapshots
-                    auto xyz = [j](const arma::mat &m) { return arma::mat(m.col(m.n_cols == 1ULL ? 0ULL : j)); };
-                    const arma::mat T = xyz(tx_pos_a), To = xyz(tx_orientation_a);
-                    const arma::mat R = xyz(rx_pos_a), Ro = xyz(rx_orientation_a);
-
-                    quadriga_lib::get_channels_spherical<double>(ant_tx_a, ant_rx_a, T, To, R, Ro,
-                                                                 fbs_pos_a[j], lbs_pos_a[j], path_gain_f, path_length_a[j], M_f,
-                                                                 coeff_re[j], coeff_im[j], delay[j],
-                                                                 center_freq_sel, use_absolute_delays, add_fake_los_path,
-                                                                 angles ? &aod[j] : nullptr, angles ? &eod[j] : nullptr,
-                                                                 angles ? &aoa[j] : nullptr, angles ? &eoa[j] : nullptr,
-                                                                 use_kernel);
-                }
-                catch (const std::exception &e)
-                {
-#pragma omp critical
-                    if (error_message.empty())
-                        error_message = "Snapshot " + std::to_string(i) + ": " + e.what();
-                }
-            }
+            quadriga_lib::get_channels_spherical_vec<double>(ant_tx_a, ant_rx_a, tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
+                                                             fbs_pos_a, lbs_pos_a, path_gain_f, path_length_a, M_f,
+                                                             coeff_re, coeff_im, delay,
+                                                             center_freq_sel, use_absolute_delays, add_fake_los_path,
+                                                             angles ? &aod : nullptr, angles ? &eod : nullptr,
+                                                             angles ? &aoa : nullptr, angles ? &eoa : nullptr, use_kernel);
         }
-
-        if (!error_message.empty())
-            throw std::invalid_argument(error_message.c_str());
 
         py::list out;
         if (want_complex)
         {
             py::list coeff_py;
-            for (arma::uword i = 0ULL; i < n_out; ++i)
+            for (arma::uword i = 0ULL; i < n_snap; ++i)
                 coeff_py.append(qd_python_copy2numpy<double, std::complex<double>>(&coeff_re[i], &coeff_im[i]));
             out.append(coeff_py);
         }

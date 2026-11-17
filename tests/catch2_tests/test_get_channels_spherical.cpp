@@ -2174,3 +2174,120 @@ TEST_CASE("Get Channels Spherical - Position and orientation shapes")
             CHECK(arma::approx_equal(d, dl, "absdiff", 0.0));
         }
 }
+
+TEST_CASE("Get Channels Spherical - vec form equals single calls")
+{
+    // 40 snapshots (enough for the parallel region), shared or per-snapshot positions, snapshots without paths
+    auto tx = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    quadriga_lib::arrayant_copy_element(tx, 0, {1});
+    tx.element_pos = {{0.3, -0.2}, {0.1, 0.4}, {0.0, 0.2}};
+    tx.e_phi_re.slice(1) += 0.5;
+    auto rx = tx;
+    rx.coupling_re = arma::vec({1.0, 0.5}); // 2 elements, 1 port
+    rx.coupling_im = arma::vec({0.0, 0.2});
+
+    const arma::uword n_snap = 40;
+    arma::arma_rng::set_seed(7);
+    std::vector<arma::mat> fbs(n_snap), lbs(n_snap), M(n_snap);
+    std::vector<arma::vec> gain(n_snap), len(n_snap);
+    for (arma::uword s = 0; s < n_snap; ++s)
+    {
+        const arma::uword n_path = (s % 7 == 3) ? 0 : 1 + s % 5;
+        fbs[s] = arma::randu<arma::mat>(3, n_path) * 50.0 - 25.0;
+        lbs[s] = arma::randu<arma::mat>(3, n_path) * 50.0 - 25.0;
+        M[s] = arma::randn<arma::mat>(8, n_path);
+        gain[s] = arma::randu<arma::vec>(n_path);
+        len[s] = arma::zeros<arma::vec>(n_path);
+    }
+    const arma::mat tx_pos = arma::randu<arma::mat>(3, n_snap) * 10.0, tx_ori = arma::randu<arma::mat>(3, n_snap);
+    const arma::mat rx_pos = arma::randu<arma::mat>(3, n_snap) * 10.0 + 30.0, rx_ori = arma::randu<arma::mat>(3, 1);
+
+    for (bool fake_los : {false, true})
+        for (bool shared : {false, true})
+        {
+            const arma::mat Tp = shared ? arma::mat(tx_pos.col(0)) : tx_pos;
+            std::vector<arma::cube> cr, ci, dl, ad, ed, aa, ea;
+            quadriga_lib::get_channels_spherical_vec<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, fbs, lbs, gain, len, M,
+                                                             cr, ci, dl, 3.5e9, false, fake_los, &ad, &ed, &aa, &ea);
+            REQUIRE(cr.size() == n_snap);
+            REQUIRE(ea.size() == n_snap);
+            for (arma::uword s = 0; s < n_snap; ++s)
+            {
+                arma::cube r_cr, r_ci, r_dl, r_ad, r_ed, r_aa, r_ea;
+                quadriga_lib::get_channels_spherical<double>(tx, rx, Tp.col(shared ? 0 : s), tx_ori.col(s), rx_pos.col(s), rx_ori,
+                                                             fbs[s], lbs[s], gain[s], len[s], M[s], r_cr, r_ci, r_dl,
+                                                             3.5e9, false, fake_los, &r_ad, &r_ed, &r_aa, &r_ea);
+                REQUIRE(arma::size(cr[s]) == arma::size(r_cr));
+                CHECK(arma::approx_equal(cr[s], r_cr, "absdiff", 1e-12));
+                CHECK(arma::approx_equal(ci[s], r_ci, "absdiff", 1e-12));
+                CHECK(arma::approx_equal(dl[s], r_dl, "absdiff", 1e-18));
+                CHECK(arma::approx_equal(ad[s], r_ad, "absdiff", 1e-12));
+                CHECK(arma::approx_equal(ed[s], r_ed, "absdiff", 1e-12));
+                CHECK(arma::approx_equal(aa[s], r_aa, "absdiff", 1e-12));
+                CHECK(arma::approx_equal(ea[s], r_ea, "absdiff", 1e-12));
+            }
+        }
+
+    // Float, without angles; output entries of the right size are written in place
+    auto txf = quadriga_lib::generate_arrayant_omni<float>(10.0);
+    std::vector<arma::fmat> fbs_f = {arma::fmat({1.0f, 2.0f, 3.0f}).t()}, M_f = {arma::fmat({1, 0, 0, 0, 0, 0, -1, 0}).t()};
+    std::vector<arma::fvec> gain_f = {arma::fvec({1.0f})}, len_f = {arma::fvec({0.0f})};
+    std::vector<arma::fcube> cr(1, arma::fcube(1, 1, 1)), ci, dl;
+    const float *p = cr[0].memptr();
+    quadriga_lib::get_channels_spherical_vec<float>(txf, txf, arma::fmat({0.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
+                                                    arma::fmat({10.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
+                                                    fbs_f, fbs_f, gain_f, len_f, M_f, cr, ci, dl, 1e9f);
+    CHECK(cr[0].memptr() == p);
+    CHECK(dl.size() == 1);
+    CHECK(std::abs(dl[0](0) * 299792458.0f - (std::sqrt(14.0f) + std::sqrt(94.0f) - 10.0f)) < 1e-4f); // relative to LOS
+
+    // No snapshots: empty outputs
+    std::vector<arma::fmat> e_m;
+    std::vector<arma::fvec> e_v;
+    quadriga_lib::get_channels_spherical_vec<float>(txf, txf, arma::fmat(3, 1, arma::fill::zeros), arma::fmat(3, 1, arma::fill::zeros),
+                                                    arma::fmat(3, 1, arma::fill::ones), arma::fmat(3, 1, arma::fill::zeros),
+                                                    e_m, e_m, e_v, e_v, e_m, cr, ci, dl);
+    CHECK(cr.empty());
+    CHECK(dl.empty());
+}
+
+TEST_CASE("Get Channels Spherical - vec form errors")
+{
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(10.0);
+    std::vector<arma::mat> fbs(3, arma::mat(3, 1, arma::fill::ones)), M(3, arma::mat(8, 1, arma::fill::ones));
+    std::vector<arma::vec> gain(3, arma::vec({1.0})), len(3, arma::vec({0.0}));
+    const arma::mat p1(3, 1, arma::fill::zeros), p3(3, 3, arma::fill::zeros), p2(3, 2, arma::fill::zeros), r1 = arma::mat({10.0, 0.0, 0.0}).t();
+    std::vector<arma::cube> cr, ci, dl;
+    using Catch::Matchers::ContainsSubstring;
+
+    auto bad_len = gain;
+    bad_len.pop_back();
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, bad_len, len, M, cr, ci, dl),
+                      ContainsSubstring("must have the same length"));
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p2, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+                      ContainsSubstring("1 or 'n_snap' columns"));
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, arma::mat(r1.t()), p1, fbs, fbs, gain, len, M, cr, ci, dl),
+                      ContainsSubstring("must have 3 rows"));
+    CHECK_NOTHROW(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p3, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl));
+
+    // Invalid antennas and kernels throw without a snapshot prefix, also without snapshots
+    std::vector<arma::mat> e_m;
+    std::vector<arma::vec> e_v;
+    auto bad = ant;
+    bad.e_theta_im.reset();
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(bad, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl),
+                      ContainsSubstring("Transmit antenna: ") && !ContainsSubstring("Snapshot"));
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, bad, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+                      ContainsSubstring("Receive antenna: ") && !ContainsSubstring("Snapshot"));
+    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl,
+                                                                     0.0, false, false, nullptr, nullptr, nullptr, nullptr, 7),
+                    std::invalid_argument);
+
+    // Errors of the single call name the lowest failing snapshot, also from the parallel region (40 snapshots)
+    fbs.resize(40, fbs[0]), M.resize(40, M[0]), gain.resize(40, gain[0]), len.resize(40, len[0]);
+    M[23] = arma::mat(7, 1, arma::fill::ones), M[5] = M[23];
+    CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+                      ContainsSubstring("Snapshot 5: ") && ContainsSubstring("'M' must have 8 rows"));
+    CHECK_THROWS_AS(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
+                    std::invalid_argument);
+}

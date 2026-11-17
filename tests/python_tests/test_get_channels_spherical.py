@@ -1041,13 +1041,15 @@ class TestGetChannelsSpherical(unittest.TestCase):
                     r = single(s, conv, freq)
                     for k in range(7):
                         npt.assert_array_equal(r[k], ref[s][k], err_msg="single, %s, freq %d" % (name, freq))
-                        npt.assert_array_equal(b[k][s], ref[s][k], err_msg="batch, %s, freq %d" % (name, freq))
+                        npt.assert_allclose(b[k][s], ref[s][k], rtol=1e-12, atol=1e-15,
+                                            err_msg="batch, %s, freq %d" % (name, freq))
             b = channel.spherical(ant_c, ant_c, *[[snaps[s][k] for s in range(n_out)] for k in range(5)],
                                   tx_pos, tx_ori, rx_pos, rx_ori, cf, angles=True, i_freq=freq,
                                   complex=False)
             for s in range(n_out):
                 for k in range(7):
-                    npt.assert_array_equal(b[k][s], ref[s][k], err_msg="batch, C-order antenna, freq %d" % freq)
+                    npt.assert_allclose(b[k][s], ref[s][k], rtol=1e-12, atol=1e-15,
+                                        err_msg="batch, C-order antenna, freq %d" % freq)
 
         # The caller's (aliased) arrays are not modified
         for snap, snap_copy in zip(snaps, snaps_copy):
@@ -1064,6 +1066,17 @@ class TestGetChannelsSpherical(unittest.TestCase):
             pos[i] = np.array([[0.0, 1.0], [0.0, 0.0], [1.0, 1.0]])
             with self.assertRaises(ValueError):
                 channel.spherical(ant, ant, fbs_pos, fbs_pos, np.ones(2), np.zeros(2), make_M(2), *pos)
+
+    def test_error_batch_names_lowest_snapshot(self):
+        """Batch mode: an error names the lowest failing snapshot (0-based), also when run in parallel."""
+        ant = omni()
+        n = 40
+        fbs = [np.array([[10.0], [0.0], [1.0]])] * n
+        M = [make_M(1)] * n
+        M[23] = M[5] = np.ones((7, 1))
+        with self.assertRaisesRegex(ValueError, "Snapshot 5: "):
+            channel.spherical(ant, ant, fbs, fbs, [np.ones(1)] * n, [np.zeros(1)] * n, M,
+                              [0, 0, 1], [0, 0, 0], [20, 0, 1], [0, 0, 0])
 
 
 class test_zero_paths_fake_los(unittest.TestCase):

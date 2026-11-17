@@ -1697,14 +1697,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [MATLAB](quadr
 - The flag `complex` takes a bool or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`
 
 ### Batch mode:
-- If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_out` snapshots
-  in one call, distributing the snapshots over all available cores (OpenMP).
-- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_out`,
+- If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
+  in one call, the snapshots in parallel (OpenMP in C++).
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_snap`,
   matching the output format of [qrt_file_read](#qrt_file_read); list entries that are Fortran-contiguous float64 arrays (as
   returned by [qrt_file_read](#qrt_file_read)) are read in place, other entries are copied.
-- The position and orientation inputs are `(3, n_out)` arrays with one column per snapshot; a `(3,)` array
+- The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array
   or a single-column `(3, 1)` array is applied to all snapshots.
-- All outputs are returned as lists of length `n_out`, one entry per snapshot.
+- All outputs are returned as lists of length `n_snap`, one entry per snapshot.
 - Snapshots without any path produce an empty output entry with `n_path = 0`, or only the zero-power LOS path
   when `add_fake_los_path` is set (as for a single snapshot).
 - Batch mode releases the GIL while processing, so it can be combined with Python threads. The function keeps
@@ -1727,17 +1727,17 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
 ### Inputs:
 - **`ant_tx`** — Transmit arrayant dict; see [generate](#generate)
 - **`ant_rx`** — Receive arrayant dict; see [generate](#generate)
-- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
-- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_out` in batch mode
-- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_out` in batch mode
+- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
+- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
+- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
-  (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_out` in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_out`
+  (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
+- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
   in batch mode
-- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_out)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_out)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_out)` in batch mode
+- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
@@ -1761,7 +1761,7 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
 - **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
 - **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`
 - **`eoa`** — Elevation of arrival in the GCS, in rad; same shape; only with `angles=True`
-- In batch mode, every output is a list of length `n_out` whose entries have the shapes given above.
+- In batch mode, every output is a list of length `n_snap` whose entries have the shapes given above.
 
 ### See also:
 - [channel.multifreq](#channel.multifreq) (multi-frequency extension)

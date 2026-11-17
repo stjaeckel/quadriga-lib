@@ -15,6 +15,7 @@ arrayant_rotate_pattern = ["arrayant_rotate_pattern", "arrayant_rotate_pattern_m
 qdant_read = ["qdant_read", "qdant_read_multi"]
 qdant_write = ["qdant_write", "qdant_write_multi"]
 channel_export_obj_file = [".write_paths_to_obj_file"]
+get_channels_spherical = ["get_channels_spherical", "get_channels_spherical_vec"]
 interp = ["interp_2D"]
 ssf_scatterers = [".solve_scatterers"]
 version = ["quadriga_lib_version", "quadriga_lib_has_AVX2", "quadriga_lib_has_CUDA"]

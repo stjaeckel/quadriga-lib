@@ -9,6 +9,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-channe
 | [get_channels_multifreq](#get_channels_multifreq) | Compute channel coefficients for spherical waves across multiple frequencies |
 | [get_channels_planar](#get_channels_planar) | Calculate MIMO channel coefficients for planar wave paths |
 | [get_channels_spherical](#get_channels_spherical) | Calculate MIMO channel coefficients and delays for spherical wave propagation |
+| [get_channels_spherical_vec](#get_channels_spherical_vec) | Calculate MIMO channel coefficients and delays for spherical wave propagation for several snapshots |
 
 ---
 <a id="get_channels_ieee_indoor"></a>
@@ -492,9 +493,75 @@ void quadriga_lib::get_channels_spherical(
 - **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path(+1)]`
 
 ### See also:
+- [get_channels_spherical_vec](#get_channels_spherical_vec) (several snapshots in one call)
 - [get_channels_planar](#get_channels_planar) (planar wave variant)
 - [get_channels_multifreq](#get_channels_multifreq) (multi-freq counterpart)
 - [get_channels_irs](#get_channels_irs) (for IRS-assisted communication)
 - [arrayant](array-antenna-class.md#arrayant) (antenna array class)
 - [baseband_freq_response](channel-functions.md#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](channel-functions.md#quantize_delays) (for mapping delays to a fixed grid)
+
+---
+<a id="get_channels_spherical_vec"></a>
+## get_channels_spherical_vec
+Calculate MIMO channel coefficients and delays for spherical wave propagation for several snapshots
+
+Also in: [MATLAB](../mex/channel-generation-functions.md#get_channels_spherical) · [Python](../python/channel-generation-functions.md#channel.spherical)
+
+- Batch form of [get_channels_spherical](#get_channels_spherical): computes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP);
+  each snapshot gives the same result as a single call with its inputs.
+- `n_snap` is the length of the path inputs; all five must have the same length. A snapshot's paths follow the rules
+  of [get_channels_spherical](#get_channels_spherical), including 0 paths.
+- Positions and orientations have one column per snapshot; a single column applies to all snapshots.
+- The output vectors get `n_snap` entries. Entries that already have the output size are written in place, without
+  reallocating their memory.
+- An error in a snapshot throws `std::invalid_argument` with the message of the single call, preceded by
+  `"Snapshot <i>: "` (0-based, the lowest failing index). Invalid antennas and `use_kernel` throw without the prefix,
+  also when `n_snap = 0`.
+
+### Declaration:
+```cpp
+void quadriga_lib::get_channels_spherical_vec(
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const std::vector<arma::Mat<dtype>> &fbs_pos,
+    const std::vector<arma::Mat<dtype>> &lbs_pos,
+    const std::vector<arma::Col<dtype>> &path_gain,
+    const std::vector<arma::Col<dtype>> &path_length,
+    const std::vector<arma::Mat<dtype>> &M,
+    std::vector<arma::Cube<dtype>> &coeff_re,
+    std::vector<arma::Cube<dtype>> &coeff_im,
+    std::vector<arma::Cube<dtype>> &delay,
+    dtype center_freq = dtype(0.0),
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    std::vector<arma::Cube<dtype>> *aod = nullptr,
+    std::vector<arma::Cube<dtype>> *eod = nullptr,
+    std::vector<arma::Cube<dtype>> *aoa = nullptr,
+    std::vector<arma::Cube<dtype>> *eoa = nullptr,
+    int use_kernel = 0);
+```
+
+### Inputs:
+- **`tx_array`**, **`rx_array`** — Transmit and receive antenna arrays, as in [get_channels_spherical](#get_channels_spherical)
+- **`tx_pos`** — Transmitter positions in [m], finite; `[3, n_snap]` or `[3, 1]`
+- **`tx_orientation`** — Transmitter orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
+- **`rx_pos`** — Receiver positions in [m], finite; `[3, n_snap]` or `[3, 1]`
+- **`rx_orientation`** — Receiver orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions; vectors of length `n_snap`, entries `[3, n_path]`
+- **`path_gain`**, **`path_length`** — Path gains (linear) and path lengths; vectors of length `n_snap`, entries `[n_path]`
+- **`M`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
+- **`center_freq`**, **`use_absolute_delays`**, **`add_fake_los_path`**, **`use_kernel`** *(optional)* — As in
+  [get_channels_spherical](#get_channels_spherical), for all snapshots
+
+### Outputs:
+- **`coeff_re`**, **`coeff_im`**, **`delay`** — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+
+### See also:
+- [get_channels_spherical](#get_channels_spherical) (single snapshot)
+- [qrt_file_read](channel-functions.md#qrt_file_read) (path data of many snapshots)

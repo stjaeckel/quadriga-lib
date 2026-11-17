@@ -538,6 +538,34 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *eoa = nullptr,    // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
                                 int use_kernel = 0);                 // Kernel of antenna interpolation and coefficients: 0 = auto, 1 = GENERIC, 2 = AVX2
 
+    // Calculate channel coefficients for spherical waves for several snapshots
+    // - Calls get_channels_spherical for each snapshot, snapshots in parallel (OpenMP)
+    // - Positions and orientations have one column per snapshot, or one column for all snapshots
+    // - Output vectors get n_snap entries; entries that already have the output size are written in place
+    template <typename dtype>
+    void get_channels_spherical_vec(const arrayant<dtype> &tx_array,                  // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
+                                    const arrayant<dtype> &rx_array,                  // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+                                    const arma::Mat<dtype> &tx_pos,                   // Transmitter positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]
+                                    const arma::Mat<dtype> &tx_orientation,           // Transmitter orientations (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]
+                                    const arma::Mat<dtype> &rx_pos,                   // Receiver positions in Cartesian coordinates [m], [3, n_snap] or [3, 1]
+                                    const arma::Mat<dtype> &rx_orientation,           // Receiver orientations (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]
+                                    const std::vector<arma::Mat<dtype>> &fbs_pos,     // First-bounce scatterer positions, vector (n_snap) of matrices [3, n_path]
+                                    const std::vector<arma::Mat<dtype>> &lbs_pos,     // Last-bounce scatterer positions, vector (n_snap) of matrices [3, n_path]
+                                    const std::vector<arma::Col<dtype>> &path_gain,   // Path gain (linear scale), vector (n_snap) of vectors [n_path]
+                                    const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, vector (n_snap) of vectors [n_path]
+                                    const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix, vector (n_snap) of matrices [8, n_path]
+                                    std::vector<arma::Cube<dtype>> &coeff_re,         // Output: Channel coefficients, real part, vector (n_snap) of tensors [n_rx, n_tx, n_path]
+                                    std::vector<arma::Cube<dtype>> &coeff_im,         // Output: Channel coefficients, imaginary part, vector (n_snap) of tensors [n_rx, n_tx, n_path]
+                                    std::vector<arma::Cube<dtype>> &delay,            // Output: Propagation delay in seconds, vector (n_snap) of tensors [n_rx, n_tx, n_path]
+                                    dtype center_freq = dtype(0.0),                   // Center frequency in [Hz]; 0: coefficients at f = 0 (delay phase 1)
+                                    bool use_absolute_delays = false,                 // Option: If true, the LOS delay is included for all paths
+                                    bool add_fake_los_path = false,                   // Option: Add one path, slot 0 = LOS path (zero power if none was present)
+                                    std::vector<arma::Cube<dtype>> *aod = nullptr,    // Optional output: Azimuth of Departure angles in [rad], vector (n_snap) of tensors [n_rx, n_tx, n_path]
+                                    std::vector<arma::Cube<dtype>> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], vector (n_snap) of tensors [n_rx, n_tx, n_path]
+                                    std::vector<arma::Cube<dtype>> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], vector (n_snap) of tensors [n_rx, n_tx, n_path]
+                                    std::vector<arma::Cube<dtype>> *eoa = nullptr,    // Optional output: Elevation of Arrival angles in [rad], vector (n_snap) of tensors [n_rx, n_tx, n_path]
+                                    int use_kernel = 0);                              // Kernel of antenna interpolation and coefficients: 0 = auto, 1 = GENERIC, 2 = AVX2
+
     // Calculate channel coefficients for spherical waves across multiple frequencies
     // - Extends get_channels_spherical to support frequency-dependent antenna patterns, path gains, and Jones matrices
     // - Geometry (angles, delays, LOS detection) is computed once and reused for all output frequencies

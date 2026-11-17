@@ -105,6 +105,7 @@ void quadriga_lib::get_channels_spherical(
 - **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path(+1)]`
 
 ## See also:
+- [[get_channels_spherical_vec]] (several snapshots in one call)
 - [[get_channels_planar]] (planar wave variant)
 - [[get_channels_multifreq]] (multi-freq counterpart)
 - [[get_channels_irs]] (for IRS-assisted communication)
@@ -688,3 +689,168 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
                                                    int use_kernel);
+/*!MD
+# get_channels_spherical_vec
+Calculate MIMO channel coefficients and delays for spherical wave propagation for several snapshots
+
+- Batch form of [[get_channels_spherical]]: computes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP);
+  each snapshot gives the same result as a single call with its inputs.
+- `n_snap` is the length of the path inputs; all five must have the same length. A snapshot's paths follow the rules
+  of [[get_channels_spherical]], including 0 paths.
+- Positions and orientations have one column per snapshot; a single column applies to all snapshots.
+- The output vectors get `n_snap` entries. Entries that already have the output size are written in place, without
+  reallocating their memory.
+- An error in a snapshot throws `std::invalid_argument` with the message of the single call, preceded by
+  `"Snapshot <i>: "` (0-based, the lowest failing index). Invalid antennas and `use_kernel` throw without the prefix,
+  also when `n_snap = 0`.
+
+## Declaration:
+```
+void quadriga_lib::get_channels_spherical_vec(
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const std::vector<arma::Mat<dtype>> &fbs_pos,
+    const std::vector<arma::Mat<dtype>> &lbs_pos,
+    const std::vector<arma::Col<dtype>> &path_gain,
+    const std::vector<arma::Col<dtype>> &path_length,
+    const std::vector<arma::Mat<dtype>> &M,
+    std::vector<arma::Cube<dtype>> &coeff_re,
+    std::vector<arma::Cube<dtype>> &coeff_im,
+    std::vector<arma::Cube<dtype>> &delay,
+    dtype center_freq = dtype(0.0),
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    std::vector<arma::Cube<dtype>> *aod = nullptr,
+    std::vector<arma::Cube<dtype>> *eod = nullptr,
+    std::vector<arma::Cube<dtype>> *aoa = nullptr,
+    std::vector<arma::Cube<dtype>> *eoa = nullptr,
+    int use_kernel = 0);
+```
+
+## Inputs:
+- **`tx_array`**, **`rx_array`** — Transmit and receive antenna arrays, as in [[get_channels_spherical]]
+- **`tx_pos`** — Transmitter positions in [m], finite; `[3, n_snap]` or `[3, 1]`
+- **`tx_orientation`** — Transmitter orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
+- **`rx_pos`** — Receiver positions in [m], finite; `[3, n_snap]` or `[3, 1]`
+- **`rx_orientation`** — Receiver orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
+- **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions; vectors of length `n_snap`, entries `[3, n_path]`
+- **`path_gain`**, **`path_length`** — Path gains (linear) and path lengths; vectors of length `n_snap`, entries `[n_path]`
+- **`M`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
+- **`center_freq`**, **`use_absolute_delays`**, **`add_fake_los_path`**, **`use_kernel`** *(optional)* — As in
+  [[get_channels_spherical]], for all snapshots
+
+## Outputs:
+- **`coeff_re`**, **`coeff_im`**, **`delay`** — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+
+## See also:
+- [[get_channels_spherical]] (single snapshot)
+- [[qrt_file_read]] (path data of many snapshots)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<dtype> &tx_array, const quadriga_lib::arrayant<dtype> &rx_array,
+                                              const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
+                                              const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
+                                              const std::vector<arma::Mat<dtype>> &fbs_pos, const std::vector<arma::Mat<dtype>> &lbs_pos,
+                                              const std::vector<arma::Col<dtype>> &path_gain, const std::vector<arma::Col<dtype>> &path_length,
+                                              const std::vector<arma::Mat<dtype>> &M,
+                                              std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
+                                              std::vector<arma::Cube<dtype>> &delay,
+                                              dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                              std::vector<arma::Cube<dtype>> *aod, std::vector<arma::Cube<dtype>> *eod,
+                                              std::vector<arma::Cube<dtype>> *aoa, std::vector<arma::Cube<dtype>> *eoa,
+                                              int use_kernel)
+{
+    const size_t n_snap = fbs_pos.size();
+    if (lbs_pos.size() != n_snap || path_gain.size() != n_snap || path_length.size() != n_snap || M.size() != n_snap)
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must have the same length.");
+
+    if (tx_pos.n_rows != 3ULL || tx_orientation.n_rows != 3ULL || rx_pos.n_rows != 3ULL || rx_orientation.n_rows != 3ULL)
+        throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 3 rows.");
+
+    for (const arma::Mat<dtype> *m : {&tx_pos, &tx_orientation, &rx_pos, &rx_orientation})
+        if (m->n_cols != 1ULL && m->n_cols != n_snap)
+            throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 1 or 'n_snap' columns.");
+
+    // Antennas and kernel are checked once, also without snapshots (the single call checks them again, from a cache)
+    qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
+    std::string antenna_error = qd_arrayant_is_valid_quick(tx_array);
+    if (!antenna_error.empty())
+        throw std::invalid_argument("Transmit antenna: " + antenna_error);
+    antenna_error = qd_arrayant_is_valid_quick(rx_array);
+    if (!antenna_error.empty())
+        throw std::invalid_argument("Receive antenna: " + antenna_error);
+
+    // Resizing keeps the existing entries, which the single call writes in place if they have the output size
+    for (std::vector<arma::Cube<dtype>> *out : {&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa})
+        if (out != nullptr && out->size() != n_snap)
+            out->resize(n_snap);
+
+    // Work of all snapshots in coefficients (element pairs times output paths), plus the fixed cost of a call, which
+    // equals about 8 coefficients (measured: 3.2 us per call and 0.35 us per coefficient on one thread)
+    const arma::uword n_links = tx_array.e_theta_re.n_slices * rx_array.e_theta_re.n_slices;
+    arma::uword n_work = 0ULL;
+    for (size_t s = 0; s < n_snap; ++s)
+        n_work += (fbs_pos[s].n_cols + 1ULL) * n_links + 8ULL;
+
+    // Limit: 2x faster than one thread from 8 SISO snapshots with one path each (n_work = 80; 4 snapshots: 1.3x).
+    // Inner parallel regions of the single call stay serial inside this region (one active level by default).
+    std::string error_message;
+    long long error_snap = (long long)n_snap;
+    const long long n_snap_i = (long long)n_snap;
+#pragma omp parallel for schedule(dynamic) if (n_snap > 1 && n_work >= 64)
+    for (long long i = 0; i < n_snap_i; ++i)
+    {
+        const size_t s = (size_t)i;
+        auto col = [s](const arma::Mat<dtype> &m) // Column of the snapshot, aliased without copying
+        { return arma::Mat<dtype>(const_cast<dtype *>(m.colptr(m.n_cols == 1ULL ? 0ULL : s)), 3, 1, false, true); };
+        try
+        {
+            quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, col(tx_pos), col(tx_orientation), col(rx_pos), col(rx_orientation),
+                                                        fbs_pos[s], lbs_pos[s], path_gain[s], path_length[s], M[s],
+                                                        coeff_re[s], coeff_im[s], delay[s], center_freq, use_absolute_delays, add_fake_los_path,
+                                                        aod ? &aod->at(s) : nullptr, eod ? &eod->at(s) : nullptr,
+                                                        aoa ? &aoa->at(s) : nullptr, eoa ? &eoa->at(s) : nullptr, use_kernel);
+        }
+        catch (const std::exception &e)
+        {
+#pragma omp critical
+            if (i < error_snap)
+                error_snap = i, error_message = e.what();
+        }
+    }
+
+    if (error_snap < n_snap_i)
+        throw std::invalid_argument("Snapshot " + std::to_string(error_snap) + ": " + error_message);
+}
+
+template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<float> &tx_array, const quadriga_lib::arrayant<float> &rx_array,
+                                                       const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
+                                                       const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
+                                                       const std::vector<arma::Mat<float>> &fbs_pos, const std::vector<arma::Mat<float>> &lbs_pos,
+                                                       const std::vector<arma::Col<float>> &path_gain, const std::vector<arma::Col<float>> &path_length,
+                                                       const std::vector<arma::Mat<float>> &M,
+                                                       std::vector<arma::Cube<float>> &coeff_re, std::vector<arma::Cube<float>> &coeff_im,
+                                                       std::vector<arma::Cube<float>> &delay,
+                                                       float center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                       std::vector<arma::Cube<float>> *aod, std::vector<arma::Cube<float>> *eod,
+                                                       std::vector<arma::Cube<float>> *aoa, std::vector<arma::Cube<float>> *eoa,
+                                                       int use_kernel);
+
+template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
+                                                       const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
+                                                       const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
+                                                       const std::vector<arma::Mat<double>> &fbs_pos, const std::vector<arma::Mat<double>> &lbs_pos,
+                                                       const std::vector<arma::Col<double>> &path_gain, const std::vector<arma::Col<double>> &path_length,
+                                                       const std::vector<arma::Mat<double>> &M,
+                                                       std::vector<arma::Cube<double>> &coeff_re, std::vector<arma::Cube<double>> &coeff_im,
+                                                       std::vector<arma::Cube<double>> &delay,
+                                                       double center_freq, bool use_absolute_delays, bool add_fake_los_path,
+                                                       std::vector<arma::Cube<double>> *aod, std::vector<arma::Cube<double>> *eod,
+                                                       std::vector<arma::Cube<double>> *aoa, std::vector<arma::Cube<double>> *eoa,
+                                                       int use_kernel);

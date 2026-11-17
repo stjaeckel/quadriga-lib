@@ -174,4 +174,38 @@ for k = 1:7
     assertEqual( [size(o0{k}, 1), size(o0{k}, 2), size(o0{k}, 3)], [2, 2, 0] );
 end
 
+
+% Batch mode: cell arrays of path data equal single calls per snapshot (shared and per-snapshot positions)
+n_snap = 4;
+fbs = cell(n_snap, 1); lbs = fbs; pg = fbs; pl = fbs; Mc = fbs;
+for s = 1:n_snap
+    n_path = mod(s, 3);  % snapshot 3 has no paths
+    f = [10 + s, 2; -s, 10; 1, 11 + s];
+    g = [1; 0.25];
+    fbs{s} = f(:, 1:n_path);
+    lbs{s} = fbs{s} + 1;
+    pg{s} = g(1:n_path);
+    pl{s} = zeros(n_path, 1);
+    Mc{s} = M(:, 1:n_path);
+end
+tx = [zeros(2, n_snap); 1:n_snap]; ori = [0; 0; 0.1]; rx = [20; 0; 1];
+for fake_los = [false, true]
+    ob = cell(1, 7);
+    [ob{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx, ori, rx, ori, 3e9, false, fake_los);
+    assertEqual( size(ob{1}), [n_snap, 1] );
+    for s = 1:n_snap
+        os = cell(1, 7);
+        [os{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, fbs{s}, lbs{s}, pg{s}, pl{s}, Mc{s}, tx(:, s), ori, rx, ori, 3e9, false, fake_los);
+        for k = 1:7
+            assertEqual( size(ob{k}{s}), size(os{k}) );
+            assertElementsAlmostEqual( ob{k}{s}, os{k}, 'absolute', 1e-12 );
+        end
+    end
+end
+[~, ~, dl] = quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx(:, 1)', ori, rx', ori); % row vectors: shared
+assertEqual( numel(dl), n_snap );
+assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx(:, 1:2), ori, rx, ori), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs(1:3), pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs{1}, pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');
+
 end

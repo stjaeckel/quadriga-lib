@@ -36,6 +36,18 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
   hold only this zero-power LOS path, with the LOS delays and angles per antenna pair.
 
+## Batch mode:
+- If `fbs_pos` is a cell array, the function processes `n_snap` snapshots in one call, the snapshots in parallel
+  (OpenMP).
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then cell arrays of length `n_snap`, as
+  [[qrt_file_read]] returns them for one frequency.
+- The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
+  snapshots.
+- An error names the snapshot 0-based (`Snapshot 0` is the first cell entry).
+- All outputs are cell arrays of length `n_snap`, `[n_snap, 1]`, whose entries have the shapes given below.
+- Snapshots without any path produce an empty entry, or only the zero-power LOS path with `add_fake_los_path` (as for
+  a single snapshot).
+
 ## Usage:
 ```
 [ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
@@ -46,16 +58,19 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [[arrayant_generate]]
 - **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [[arrayant_generate]]
-- **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_gain`** — Path gains in linear scale; `[n_path, 1]`
+- **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`, or a cell of length `n_snap` in batch mode
+- **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`, or a cell of length `n_snap` in batch mode
+- **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
-  (e.g. 0) use the polyline length; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
-- **`tx_pos`** — Transmitter position, finite; `[3, 1]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`rx_pos`** — Receiver position, finite; `[3, 1]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
+  (e.g. 0) use the polyline length; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
+- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
+  batch mode
+- **`tx_pos`** — Transmitter position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
+  `[3, n_snap]` in batch mode
+- **`rx_pos`** — Receiver position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
+  `[3, n_snap]` in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
@@ -81,6 +96,24 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/
 
+// Read the entries of a cell array of path data, numeric data of class double is not copied
+template <typename obj, typename F>
+static std::vector<obj> read_cell(const mxArray *input, const char *var_name, F &&get)
+{
+    if (!mxIsCell(input))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must all be cell arrays.");
+
+    const size_t n = mxGetNumberOfElements(input);
+    std::vector<obj> out(n);
+    for (size_t i = 0; i < n; ++i)
+    {
+        const mxArray *element = mxGetCell(input, (mwIndex)i); // NULL for unset elements: no paths
+        if (element != nullptr)
+            out[i] = get(element, var_name);
+    }
+    return out;
+}
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs < 11 || nrhs > 15)
@@ -93,7 +126,54 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     auto ant_tx = qd_mex_struct2arrayant(prhs[0]);
     auto ant_rx = qd_mex_struct2arrayant(prhs[1]);
 
-    // Parse other arguments
+    const double center_freq = (nrhs < 12) ? 0.0 : qd_mex_get_scalar<double>(prhs[11], "center_freq", 0.0);
+    const bool use_absolute_delays = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "use_absolute_delays", false);
+    const bool add_fake_los_path = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "add_fake_los_path", false);
+    const int use_kernel = (nrhs < 15) ? 0 : qd_mex_get_scalar<int>(prhs[14], "use_kernel", 0);
+
+    arma::uword n_ports_tx = ant_tx.n_ports();
+    arma::uword n_ports_rx = ant_rx.n_ports();
+
+    // Batch mode: path data as cell arrays, one entry per snapshot
+    if (mxIsCell(prhs[2]))
+    {
+        auto get_Mat = [](const mxArray *a, const char *name) { return qd_mex_get_Mat<double>(a, false, name); };
+        auto get_Col = [](const mxArray *a, const char *name) { return qd_mex_get_Col<double>(a, false, name); };
+        const auto fbs_pos = read_cell<arma::mat>(prhs[2], "fbs_pos", get_Mat);
+        const auto lbs_pos = read_cell<arma::mat>(prhs[3], "lbs_pos", get_Mat);
+        const auto path_gain = read_cell<arma::vec>(prhs[4], "path_gain", get_Col);
+        const auto path_length = read_cell<arma::vec>(prhs[5], "path_length", get_Col);
+        const auto M = read_cell<arma::mat>(prhs[6], "M", get_Mat);
+        auto get_xyz = [](const mxArray *a, const char *name) // A 3-element vector (row or column) applies to all snapshots
+        { return mxGetNumberOfElements(a) == 3 ? arma::mat(qd_mex_typecast_Col<double>(a, name, 3)) : qd_mex_get_Mat<double>(a, false, name); };
+        const auto tx_pos = get_xyz(prhs[7], "tx_pos");
+        const auto tx_orientation = get_xyz(prhs[8], "tx_orientation");
+        const auto rx_pos = get_xyz(prhs[9], "rx_pos");
+        const auto rx_orientation = get_xyz(prhs[10], "rx_orientation");
+
+        // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries
+        const size_t n_snap = fbs_pos.size();
+        std::vector<arma::cube> out[7];
+        for (int k = 0; k < nlhs; ++k)
+        {
+            plhs[k] = mxCreateCellMatrix((mwSize)n_snap, 1);
+            out[k].resize(n_snap);
+            for (size_t s = 0; s < n_snap; ++s)
+            {
+                const arma::uword n_path = add_fake_los_path ? fbs_pos[s].n_cols + 1 : fbs_pos[s].n_cols;
+                mxSetCell(plhs[k], (mwIndex)s, qd_mex_init_output(&out[k][s], n_ports_rx, n_ports_tx, n_path));
+            }
+        }
+
+        CALL_QD(quadriga_lib::get_channels_spherical_vec<double>(ant_tx, ant_rx, tx_pos, tx_orientation, rx_pos, rx_orientation,
+                                                                 fbs_pos, lbs_pos, path_gain, path_length, M,
+                                                                 out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
+                                                                 (nlhs > 3) ? &out[3] : nullptr, (nlhs > 4) ? &out[4] : nullptr,
+                                                                 (nlhs > 5) ? &out[5] : nullptr, (nlhs > 6) ? &out[6] : nullptr, use_kernel));
+        return;
+    }
+
+    // Single snapshot
     const auto fbs_pos = qd_mex_get_Mat<double>(prhs[2]);
     const auto lbs_pos = qd_mex_get_Mat<double>(prhs[3]);
     const auto path_gain = qd_mex_get_Col<double>(prhs[4]);
@@ -103,14 +183,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[8], "tx_orientation", 3);
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[9], "rx_pos", 3);
     const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[10], "rx_orientation", 3);
-    double center_freq = (nrhs < 12) ? 0.0 : qd_mex_get_scalar<double>(prhs[11], "center_freq", 0.0);
-    bool use_absolute_delays = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "use_absolute_delays", false);
-    bool add_fake_los_path = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "add_fake_los_path", false);
-    const int use_kernel = (nrhs < 15) ? 0 : qd_mex_get_scalar<int>(prhs[14], "use_kernel", 0);
 
     // Derived inputs
-    arma::uword n_ports_tx = ant_tx.n_ports();
-    arma::uword n_ports_rx = ant_rx.n_ports();
     arma::uword n_path = add_fake_los_path ? fbs_pos.n_cols + 1 : fbs_pos.n_cols;
 
     // Initialize output memory
