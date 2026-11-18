@@ -89,7 +89,7 @@ void channel_export_obj_file(const py::handle &fn,
         c.n_interact = qd_python_list2vector_Col<unsigned>(py::reinterpret_borrow<py::list>(n_interact));
     else
     {
-        const auto n_interact_a = qd_python_numpy2arma_Mat<unsigned>(n_interact, true);
+        const auto n_interact_a = qd_python_numpy2arma_Mat<unsigned>(n_interact, true, false, "n_interact");
         c.n_interact.reserve(n_interact_a.n_cols);
         for (arma::uword j = 0; j < n_interact_a.n_cols; ++j)
             c.n_interact.push_back(n_interact_a.col(j));
@@ -154,7 +154,7 @@ void channel_export_obj_file(const py::handle &fn,
     }
 
     // Optional snapshot selection (0-based, empty = all)
-    arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, true);
+    arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, true, false, "i_snap");
 
     // Call library function
     c.write_paths_to_obj_file(fn_s, max_paths, gain_max_dB, gain_min_dB, colormap, &i_snap_a, radius_max, radius_min, n_edges);

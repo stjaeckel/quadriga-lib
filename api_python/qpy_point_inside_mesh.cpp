@@ -50,7 +50,7 @@ py::array_t<py::ssize_t> point_inside_mesh(const py::array_t<double> &points,
 {
     const auto points_arma = qd_python_numpy2arma_Mat<double>(points, true);
     const auto mesh_arma = qd_python_numpy2arma_Mat<double>(mesh, true);
-    const auto obj_ind_arma = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true);
+    const auto obj_ind_arma = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true, false, "obj_ind");
 
     const arma::uvec *p_obj_ind = obj_ind_arma.is_empty() ? nullptr : &obj_ind_arma;
 

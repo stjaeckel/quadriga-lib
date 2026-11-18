@@ -47,9 +47,9 @@ MD!*/
 
 void mitsuba_xml_file_write(const py::handle &fn,
                             py::array_t<double> vert_list,
-                            py::array_t<arma::uword> face_ind,
-                            py::array_t<arma::uword> obj_ind,
-                            py::array_t<arma::uword> mtl_ind,
+                            const py::handle &face_ind,
+                            const py::handle &obj_ind,
+                            const py::handle &mtl_ind,
                             py::list obj_names,
                             py::list mtl_names,
                             const py::handle &bsdf,
@@ -60,9 +60,9 @@ void mitsuba_xml_file_write(const py::handle &fn,
     const bool map_to_itu_b = qd_python_flag(map_to_itu_materials, false, "map_to_itu_materials");
 
     const arma::mat vert_list_a = qd_python_numpy2arma_Mat(vert_list, true);
-    const arma::umat face_ind_a = qd_python_numpy2arma_Mat(face_ind, true);
-    const arma::uvec obj_ind_a = qd_python_numpy2arma_Col(obj_ind, true);
-    const arma::uvec mtl_ind_a = qd_python_numpy2arma_Col(mtl_ind, true);
+    const arma::umat face_ind_a = qd_python_numpy2arma_Mat<arma::uword>(face_ind, true, false, "face_ind");
+    const arma::uvec obj_ind_a = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true, false, "obj_ind");
+    const arma::uvec mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true, false, "mtl_ind");
     const std::vector<std::string> obj_names_a = qd_python_list2vector_Strings(obj_names);
     const std::vector<std::string> mtl_names_a = qd_python_list2vector_Strings(mtl_names);
     const arma::mat bsdf_a = qd_python_numpy2arma_Mat<double>(bsdf, true);

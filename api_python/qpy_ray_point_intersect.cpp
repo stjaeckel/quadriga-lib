@@ -69,7 +69,7 @@ py::tuple ray_point_intersect(const py::array_t<double> &points,
     const auto trivec_arma = qd_python_numpy2arma_Mat(trivec, true);
     const auto tridir_arma = qd_python_numpy2arma_Mat(tridir, true);
     const auto points_arma = qd_python_numpy2arma_Mat(points, true);
-    const auto sub_cloud_ind_arma = qd_python_numpy2arma_Col<unsigned>(sub_cloud_ind, true);
+    const auto sub_cloud_ind_arma = qd_python_numpy2arma_Col<unsigned>(sub_cloud_ind, true, false, "sub_cloud_ind");
 
     // Both sizes are known up front, so the library writes straight into the
     // numpy buffers. Sizing them exactly prevents a resize inside the library,

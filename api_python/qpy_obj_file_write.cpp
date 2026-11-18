@@ -90,14 +90,14 @@ py::tuple obj_file_write(const py::handle &fn,
 
     // Convert inputs (empty Armadillo object when the handle is None)
     const auto mesh_a = qd_python_numpy2arma_Mat<double>(mesh, true);
-    const auto obj_ind_a = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true);
-    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true);
+    const auto obj_ind_a = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true, false, "obj_ind");
+    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true, false, "mtl_ind");
     const auto vert_list_a = qd_python_numpy2arma_Mat<double>(vert_list, true);
-    const auto face_ind_a = qd_python_numpy2arma_Mat<arma::uword>(face_ind, true);
+    const auto face_ind_a = qd_python_numpy2arma_Mat<arma::uword>(face_ind, true, false, "face_ind");
     const auto bsdf_a = qd_python_numpy2arma_Mat<double>(bsdf, true);
     const auto obj_names_v = qd_python_list2vector_Strings(obj_names);
     const auto mtl_names_v = qd_python_list2vector_Strings(mtl_names);
-    const auto csv_ind_a = qd_python_numpy2arma_Col<arma::uword>(csv_ind, true);
+    const auto csv_ind_a = qd_python_numpy2arma_Col<arma::uword>(csv_ind, true, false, "csv_ind");
     const auto csv_names_v = qd_python_list2vector_Strings(csv_names);
 
     // csv_ind is 1-based on both sides (0 = no material); no index shift

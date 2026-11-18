@@ -13,6 +13,9 @@
 #include <memory>
 #include <type_traits>
 #include <cstdint>
+#include <cmath>
+#include <limits>
+#include <algorithm>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <unordered_map>
@@ -1154,9 +1157,39 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(py::array_t<dtype> &&input, b
     return qd_python_numpy2arma_Cube(array, false, false);
 }
 
-// py::handle overloads: None gives an empty object; only an ndarray of dtype (the caller's own array) can be aliased
+// Integer input given in another dtype (int64 or float array, list, scalar): read as double and checked, so that a
+// negative, fractional or non-finite entry cannot wrap or truncate silently. Every entry must be an integer from the
+// lowest value of dtype to min(largest value, 2^53), else std::invalid_argument naming the input.
+// - Returns the Fortran-ordered double array; qd_python_check_integers writes the converted values to 'out'
+static py::array_t<double> qd_python_integers_as_double(const py::handle &obj)
+{
+    auto src = py::array_t<double, py::array::f_style | py::array::forcecast>::ensure(obj);
+    if (!src)
+        throw py::error_already_set();
+    return py::array_t<double>(src);
+}
+
 template <typename dtype>
-static arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool view = false, bool strict = false)
+static void qd_python_check_integers(const double *in, arma::uword n, dtype *out, const std::string &var_name)
+{
+    const double lo = (double)std::numeric_limits<dtype>::lowest();
+    const double hi = std::min((double)std::numeric_limits<dtype>::max(), 9007199254740992.0);
+    for (arma::uword i = 0; i < n; ++i)
+    {
+        const double v = in[i];
+        if (!(v >= lo && v <= hi) || (double)(dtype)v != v) // NaN fails the range test; the cast is in range
+            throw std::invalid_argument((var_name.empty() ? std::string("Integer input") : "Input '" + var_name + "'") +
+                                        " must contain integers from " + std::to_string((long long)lo) + " to " +
+                                        std::to_string((unsigned long long)hi) + ".");
+        out[i] = (dtype)v;
+    }
+}
+
+// py::handle overloads: None gives an empty object; only an ndarray of dtype (the caller's own array) can be aliased
+// - Integer dtypes: other inputs are checked by qd_python_check_integers; var_name names the input in its error
+template <typename dtype>
+static arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool view = false, bool strict = false,
+                                                 const std::string &var_name = "")
 {
     if (obj.is_none())
         return arma::Col<dtype>();
@@ -1167,11 +1200,20 @@ static arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool vie
     }
     if (view && strict)
         throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
-    return qd_python_numpy2arma_Col(py::cast<py::array_t<dtype>>(obj));
+    if constexpr (std::is_integral_v<dtype>)
+    {
+        const auto src = qd_python_integers_as_double(obj);
+        arma::Col<dtype> out((arma::uword)src.size(), arma::fill::none);
+        qd_python_check_integers(src.data(), out.n_elem, out.memptr(), var_name);
+        return out;
+    }
+    else
+        return qd_python_numpy2arma_Col(py::cast<py::array_t<dtype>>(obj));
 }
 
 template <typename dtype>
-static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, bool view = false, bool strict = false)
+static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, bool view = false, bool strict = false,
+                                                 const std::string &var_name = "")
 {
     if (obj.is_none())
         return arma::Mat<dtype>();
@@ -1182,11 +1224,21 @@ static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, bool vie
     }
     if (view && strict)
         throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
-    return qd_python_numpy2arma_Mat(py::cast<py::array_t<dtype>>(obj));
+    if constexpr (std::is_integral_v<dtype>)
+    {
+        const auto src = qd_python_integers_as_double(obj);
+        const auto shape = qd_python_get_shape(src, true);
+        arma::Mat<dtype> out(shape[0], shape[1] * shape[2], arma::fill::none);
+        qd_python_check_integers(src.data(), out.n_elem, out.memptr(), var_name);
+        return out;
+    }
+    else
+        return qd_python_numpy2arma_Mat(py::cast<py::array_t<dtype>>(obj));
 }
 
 template <typename dtype>
-static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool view = false, bool strict = false)
+static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool view = false, bool strict = false,
+                                                   const std::string &var_name = "")
 {
     if (obj.is_none())
         return arma::Cube<dtype>();
@@ -1197,7 +1249,16 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool v
     }
     if (view && strict)
         throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
-    return qd_python_numpy2arma_Cube(py::cast<py::array_t<dtype>>(obj));
+    if constexpr (std::is_integral_v<dtype>)
+    {
+        const auto src = qd_python_integers_as_double(obj);
+        const auto shape = qd_python_get_shape(src, true);
+        arma::Cube<dtype> out(shape[0], shape[1], shape[2], arma::fill::none);
+        qd_python_check_integers(src.data(), out.n_elem, out.memptr(), var_name);
+        return out;
+    }
+    else
+        return qd_python_numpy2arma_Cube(py::cast<py::array_t<dtype>>(obj));
 }
 
 // Convert a 3D or 4D Numpy array to std::vector<arma::Cube<dtype>>

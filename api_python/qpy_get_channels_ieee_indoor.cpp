@@ -106,7 +106,7 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
                                   const double speed_station_kmh,
                                   const double speed_env_kmh,
                                   const py::array_t<double> &Dist_m,
-                                  const py::array_t<arma::uword> &n_floors,
+                                  const py::handle &n_floors,
                                   const bool uplink,
                                   const py::array_t<double> &offset_angles,
                                   const arma::uword n_subpath,
@@ -117,7 +117,7 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
                                   const double SF_std_dB_LOS,
                                   const double SF_std_dB_NLOS,
                                   const double dBP_m,
-                                  const py::array_t<arma::uword> &n_walls,
+                                  const py::handle &n_walls,
                                   const double wall_loss,
                                   const bool stack)
 {
@@ -125,9 +125,9 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
     const auto ant_tx_a = qd_python_dict2arrayant(ap_array, true);
     const auto ant_rx_a = qd_python_dict2arrayant(sta_array, true);
     const auto Dist_m_a = qd_python_numpy2arma_Col(Dist_m, true);
-    const auto n_floors_a = qd_python_numpy2arma_Col(n_floors, true);
+    const auto n_floors_a = qd_python_numpy2arma_Col<arma::uword>(n_floors, true, false, "n_floors");
     const auto offset_angles_a = qd_python_numpy2arma_Mat(offset_angles, true);
-    const auto n_walls_a = qd_python_numpy2arma_Col(n_walls, true);
+    const auto n_walls_a = qd_python_numpy2arma_Col<arma::uword>(n_walls, true, false, "n_walls");
 
     // Call CPP implementation
     std::vector<quadriga_lib::channel<double>> chan;

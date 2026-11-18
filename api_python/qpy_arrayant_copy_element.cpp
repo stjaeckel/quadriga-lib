@@ -50,8 +50,8 @@ py::dict arrayant_copy_element(const py::dict &arrayant,
                                const py::handle &i_target)
 {
     // Index vectors (0-based)
-    const auto source = qd_python_numpy2arma_Col<arma::uword>(i_source, true);
-    const auto dest = qd_python_numpy2arma_Col<arma::uword>(i_target, true);
+    const auto source = qd_python_numpy2arma_Col<arma::uword>(i_source, true, false, "i_source");
+    const auto dest = qd_python_numpy2arma_Col<arma::uword>(i_target, true, false, "i_target");
 
     if (source.n_elem == 0 || dest.n_elem == 0)
         throw std::invalid_argument("'i_source' and 'i_target' cannot be empty.");

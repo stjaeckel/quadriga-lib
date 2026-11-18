@@ -46,7 +46,7 @@ void arrayant_export_obj_file(const py::handle &fn,
     const std::string fn_s = qd_python_path(fn, "fn");
 
     // Element indices (0-based); empty uvec = export all elements
-    const arma::uvec i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
+    const arma::uvec i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true, false, "i_element");
 
     // Parse the (possibly frequency-dependent) input antenna
     const auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true, false);

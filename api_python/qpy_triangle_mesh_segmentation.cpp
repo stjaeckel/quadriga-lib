@@ -53,7 +53,7 @@ py::tuple triangle_mesh_segmentation(const py::array_t<double> &mesh,
                                      const py::handle &mtl_ind)
 {
     const auto triangles_a = qd_python_numpy2arma_Mat<double>(mesh, true);
-    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true);
+    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true, false, "mtl_ind");
 
     arma::mat mesh_out;
     arma::uvec mtl_ind_out;

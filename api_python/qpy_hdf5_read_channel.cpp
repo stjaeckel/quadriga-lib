@@ -76,7 +76,7 @@ MD!*/
 // index vector. None or empty selects the full dimension (0 ... n-1).
 static arma::u32_vec parse_idx(const py::handle &h, unsigned n, const char *name)
 {
-    arma::u32_vec idx = qd_python_numpy2arma_Col<unsigned>(h, false);
+    arma::u32_vec idx = qd_python_numpy2arma_Col<unsigned>(h, false, false, name);
 
     if (idx.is_empty()) // None / empty -> full dimension
     {
@@ -123,7 +123,7 @@ py::tuple hdf5_read_channel(const py::handle &fn,
     const arma::uword n_sel = sx.n_elem * sy.n_elem * sz.n_elem * sw.n_elem;
 
     // Snapshot selection is only meaningful for a single addressed slot
-    const arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, false);
+    const arma::uvec i_snap_a = qd_python_numpy2arma_Col<arma::uword>(i_snap, false, false, "i_snap");
     if (!i_snap_a.is_empty() && n_sel != 1)
         throw std::invalid_argument("'i_snap' is only allowed when a single slot is selected.");
 

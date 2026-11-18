@@ -39,7 +39,7 @@ py::tuple subdivide_triangles(arma::uword n_div,
                               py::handle mtl_ind)
 {
     const auto triangles_in_a = qd_python_numpy2arma_Mat(triangles_in, true);
-    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true);
+    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true, false, "mtl_ind");
 
     // triangles_out is written in numpy memory; for an n_div too large for 64 bits the size wraps and C++ throws
     arma::mat triangles_out;

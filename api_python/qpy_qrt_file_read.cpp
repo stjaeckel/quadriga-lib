@@ -133,7 +133,7 @@ py::tuple qrt_file_read(const py::handle &fn,
     auto cache = quadriga_lib::qrt_read_cache_init(fn_s, &stream);
 
     // Resolve snapshot indices (None or empty = read all snapshots)
-    arma::uvec i_cir_a = qd_python_numpy2arma_Col<arma::uword>(i_cir, true);
+    arma::uvec i_cir_a = qd_python_numpy2arma_Col<arma::uword>(i_cir, true, false, "i_cir");
     if (i_cir_a.empty()) // None for a file without CIRs: empty outputs
     {
         if (cache.no_cir != 0)

@@ -97,7 +97,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
     // 'ix' defaults to 0 ... n_chan-1; the others default to a scalar 0.
     auto parse_idx = [&](py::handle h, const char *name, bool is_x) -> arma::Col<unsigned>
     {
-        arma::Col<unsigned> v = qd_python_numpy2arma_Col<unsigned>(h, false);
+        arma::Col<unsigned> v = qd_python_numpy2arma_Col<unsigned>(h, false, false, name);
         if (v.is_empty())
         {
             if (is_x)

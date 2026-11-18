@@ -106,9 +106,9 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     const auto orig_a = qd_python_numpy2arma_Mat<double>(orig, true);
     const auto dest_a = qd_python_numpy2arma_Mat<double>(dest, true);
     const auto mesh_a = qd_python_numpy2arma_Mat<double>(mesh, true);
-    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true);
+    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true, false, "mtl_ind");
     const auto mtl_prop_map = qd_python_dict2map<double>(mtl_prop);
-    const auto sub_mesh_index_a = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true);
+    const auto sub_mesh_index_a = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true, false, "sub_mesh_ind");
 
     arma::uword n_pos = orig_a.n_rows;
 

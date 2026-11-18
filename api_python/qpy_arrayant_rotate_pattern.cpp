@@ -63,7 +63,7 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
         throw std::invalid_argument("Input 'orientation' must have 3 elements.");
 
     // Element indices (0-based); empty = rotate all elements
-    const arma::uvec i_el = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
+    const arma::uvec i_el = qd_python_numpy2arma_Col<arma::uword>(i_element, true, false, "i_element");
 
     // Parse the (possibly frequency-dependent) antenna (copy, the user's arrays are not changed)
     auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false, false, false, false);

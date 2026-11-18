@@ -70,7 +70,7 @@ py::tuple ray_triangle_intersect(const py::array_t<double> &orig,
     const auto orig_arma = qd_python_numpy2arma_Mat(orig, true);
     const auto dest_arma = qd_python_numpy2arma_Mat(dest, true);
     const auto triangles_arma = qd_python_numpy2arma_Mat(mesh, true);
-    const auto sub_mesh_index_arma = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true);
+    const auto sub_mesh_index_arma = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true, false, "sub_mesh_ind");
     const auto aabb_arma = qd_python_numpy2arma_Mat<double>(aabb, true);
 
     arma::uword n_ray = orig_arma.n_rows;

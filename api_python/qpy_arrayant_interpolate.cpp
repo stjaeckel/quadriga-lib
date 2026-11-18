@@ -98,7 +98,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
 
     const auto azimuth_a = qd_python_numpy2arma_Mat(azimuth, true);
     const auto elevation_a = qd_python_numpy2arma_Mat(elevation, true);
-    const auto i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
+    const auto i_element_a = qd_python_numpy2arma_Col<arma::uword>(i_element, true, false, "i_element");
     const auto orientation_a = qd_python_numpy2arma_Cube<double>(orientation, true);
     const auto element_pos_a = qd_python_numpy2arma_Mat<double>(element_pos, true);
     const auto freq_new_a = qd_python_numpy2arma_Col<double>(freq_new, true);

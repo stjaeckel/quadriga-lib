@@ -57,7 +57,7 @@ py::tuple arrayant_calc_beamwidth(const py::dict &arrayant,
 {
     // Pattern arrays as views; 3D single-frequency and 4D multi-frequency arrays; validated by the C++ function
     const auto ant_multi = qd_python_dict2arrayant_multi(arrayant, true, false, false, false);
-    const arma::uvec i_el = qd_python_numpy2arma_Col<arma::uword>(i_element, true);
+    const arma::uvec i_el = qd_python_numpy2arma_Col<arma::uword>(i_element, true, false, "i_element");
 
     if (ant_multi.size() == 1) // Single frequency: 1D outputs (n_out,)
     {

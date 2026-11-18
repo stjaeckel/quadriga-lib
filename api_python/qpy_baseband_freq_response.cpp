@@ -497,7 +497,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
     }
 
     // Process snapshot indices and allocate output
-    arma::uvec snap_arma = qd_python_numpy2arma_Col<arma::uword>(snap, true);
+    arma::uvec snap_arma = qd_python_numpy2arma_Col<arma::uword>(snap, true, false, "snap");
     if (snap_arma.is_empty())
         snap_arma = arma::regspace<arma::uvec>(0, (arma::uword)n_snap_total - 1);
     else
