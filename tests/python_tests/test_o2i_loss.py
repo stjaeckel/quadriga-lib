@@ -52,16 +52,17 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         ok = quadriga_lib.gbsm.o2i_loss(center_freq=self.fc, rnd=self.rnd, models=self.models, weights=self.weights,
                                         d2d_in_max=25.0)
-        op = quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, self.models, self.weights, 25.0)
+        op = quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, self.models, self.weights, d2d_in_max=25.0)
         for a, b, c in zip(ok, op, self.out):
             npt.assert_array_equal(a, c)
             npt.assert_array_equal(b, c)
 
     def test_d2d_in_max(self):
-        loss3, d3, _ = quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, self.models, self.weights, 10.0)
+        loss3, d3, _ = quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, self.models, self.weights, d2d_in_max=10.0)
         npt.assert_allclose(d3, [3.0, 0.0, 2.0], atol=1e-14, rtol=0)
         npt.assert_allclose(loss3[0] - self.out[0][0], np.full(3, 0.5 * (3 - 7.5)), atol=1e-12, rtol=0)
-        npt.assert_array_equal(quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, self.models, self.weights, 25)[1],
+        npt.assert_array_equal(quadriga_lib.gbsm.o2i_loss(self.fc, self.rnd, self.models, self.weights,
+                                                          d2d_in_max=25)[1],
                                self.out[1])  # int value
 
     def test_models(self):

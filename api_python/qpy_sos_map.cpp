@@ -23,7 +23,7 @@ Spatially correlated random values on a regular grid
 
 ## Usage:
 ```
-map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, uniform, use_kernel )
+map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, *, uniform, use_kernel )
 ```
 
 ## Inputs:

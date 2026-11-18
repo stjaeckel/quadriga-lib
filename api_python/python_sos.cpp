@@ -34,6 +34,7 @@ void quadriga_lib_sos(py::module_ &m)
     m.def("init_phases", &sos_init_phases,
           py::arg("n_coeff"),
           py::arg("n_gen"),
+          py::kw_only(),
           py::arg("seed") = -1);
 
     m.def("acfi", &sos_acfi,
@@ -46,6 +47,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("phase").none(false),
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
+          py::kw_only(),
           py::arg("phase_b") = py::none(),
           py::arg("acf") = py::none(),
           py::arg("dist") = py::none(),
@@ -59,6 +61,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("x").none(false),
           py::arg("y") = py::none(),
           py::arg("z") = py::none(),
+          py::kw_only(),
           py::arg("uniform") = false,
           py::arg("use_kernel") = 0);
 
@@ -66,6 +69,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("dist_decorr").none(false),
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
+          py::kw_only(),
           py::arg("dist_decorr_b") = py::none(),
           py::arg("preset") = "Comb256",
           py::arg("seed") = -1);
@@ -74,6 +78,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("dist_decorr").none(false),
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
+          py::kw_only(),
           py::arg("dist_decorr_b") = py::none(),
           py::arg("preset") = "Comb256",
           py::arg("seed") = -1);
@@ -83,6 +88,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("pos").none(false),
           py::arg("imax"),
           py::arg("pos_b") = py::none(),
+          py::kw_only(),
           py::arg("dist_decorr_b") = py::none(),
           py::arg("preset") = "Comb256",
           py::arg("seed") = -1);
@@ -92,6 +98,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("phase_in").none(false),
           py::arg("pos").none(false),
           py::arg("pos_b") = py::none(),
+          py::kw_only(),
           py::arg("phase_b_in") = py::none(),
           py::arg("acf") = py::none(),
           py::arg("dist") = py::none(),
@@ -109,6 +116,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("spatial_freq").none(false),
           py::arg("acf").none(false),
           py::arg("dist").none(false),
+          py::kw_only(),
           py::arg("n_dir") = 10);
 
     m.def("acf_estimate", &sos_acf_estimate,
@@ -116,6 +124,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("phase").none(false),
           py::arg("bins").none(false),
           py::arg("n_pos"),
+          py::kw_only(),
           py::arg("acf") = py::none(),
           py::arg("dist") = py::none(),
           py::arg("seed") = -1);
@@ -125,6 +134,7 @@ void quadriga_lib_sos(py::module_ &m)
           py::arg("dist").none(false),
           py::arg("n_coeff"),
           py::arg("n_dim") = 3,
+          py::kw_only(),
           py::arg("uniform_smp") = true,
           py::arg("n_dir") = 10,
           py::arg("random_init") = true,

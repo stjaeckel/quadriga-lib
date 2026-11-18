@@ -33,12 +33,12 @@ def make_rays():
     # "quadriga" rays of one link in UMi LOS with ground reflection at two frequencies, solved
     sp = gbsm.conf_file_read(os.path.join(CONF_DIR, "3GPP_38.901_v19_UMi_LOS.conf"))[0]
     sp["GR_enabled"] = 1.0
-    phase = gbsm.init_phases(sp, "lsf", 9)
+    phase = gbsm.init_phases(sp, "lsf", seed=9)
     lsp, _, gr_eps, _, mu, sig = gbsm.lsp_generate(sp, FC, TX, RX, gbsm.draw(sp, "lsf", phase, TX, RX))
-    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", 9), TX, RX)
-    cl = gbsm.ssf_clusters(sp, TX, RX, lsp, rnd, "quadriga", gr_eps=gr_eps)
-    rr = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", 9), TX, RX, center_freq=FC)
-    rays = gbsm.ssf_rays(sp, TX, RX, FC, lsp, mu, sig, *cl[:6], rr, "quadriga", gr_eps=gr_eps)
+    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed=9), TX, RX)
+    cl = gbsm.ssf_clusters(sp, TX, RX, lsp, rnd, method="quadriga", gr_eps=gr_eps)
+    rr = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", seed=9), TX, RX, center_freq=FC)
+    rays = gbsm.ssf_rays(sp, TX, RX, FC, lsp, mu, sig, *cl[:6], rr, method="quadriga", gr_eps=gr_eps)
     return gbsm.ssf_scatterers(rays[0])[0]
 
 
@@ -91,9 +91,9 @@ class test_case(unittest.TestCase):
 
     def test_optional_inputs(self):
         c0 = self.out[0]["coeff"][0]
-        chan, par = self.call("phase")
+        chan, par = self.call(mobility="phase")
         self.assertNotIn("fbs_pos", par)
-        chan, par = self.call("drift", "rays")
+        chan, par = self.call(mobility="drift", output="rays")
         self.assertEqual(chan["coeff"][0].shape, (2, 1, self.n_path))
         self.assertEqual(chan["path_gain"][0].shape, (self.n_path,))
         self.assertEqual(chan["fbs_pos"][0].shape, (3, self.n_path))
@@ -126,9 +126,8 @@ class test_case(unittest.TestCase):
         rx2 = np.vstack([RX, RX + [1.0, 0.0, 0.0]])
         c0 = self.call(rx_pos=rx2)[0]
         c1 = self.call(rx_pos=rx2, stack=True)[0]
-        with self.assertRaises(TypeError):  # stack is keyword-only
-            gbsm.single_link_channel(self.tx, self.rx, self.rays, [-90.0], "auto", "taps", 0, None, None, None, None,
-                                     None, False, False, True)
+        with self.assertRaises(TypeError):  # optional arguments are keyword-only
+            gbsm.single_link_channel(self.tx, self.rx, self.rays, [-90.0], "auto")
         self.assertIsInstance(c1["coeff"], np.ndarray)
         self.assertEqual(c1["coeff"].shape, (2, 1, self.taps.size, 2))
         npt.assert_array_equal(c1["coeff"][..., 1], c0["coeff"][1])

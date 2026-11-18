@@ -42,7 +42,7 @@ the same. Block 13, the XPR per cluster, is in column `13·N·M + n`; block 14, 
 
 ## Usage:
 ```
-rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, \
+rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, *, set_id, preset, floor_id, \
     center_freq, dual_mobility, horizontal )
 ```
 

@@ -24,7 +24,7 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 
 ## Usage:
 ```
-cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, n_bins )
+cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, *, n_bins )
 ```
 
 ## Inputs:

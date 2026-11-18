@@ -28,7 +28,7 @@ Also in: [C++](../cpp/channel-statistics.md#acdf) · [MATLAB](../mex/channel-sta
 
 ### Usage:
 ```python
-cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, n_bins )
+cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, *, n_bins )
 ```
 
 ### Inputs:
@@ -72,7 +72,7 @@ Also in: [C++](../cpp/channel-statistics.md#calc_angular_spread) · [MATLAB](../
 ### Usage:
 ```python
 azimuth_spread, elevation_spread, orientation, phi, theta = \
-    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize_deg )
+    quadriga_lib.tools.calc_angular_spread( az, el, powers, *, wrapping, calc_bank_angle, quantize_deg )
 ```
 
 ### Inputs:
@@ -128,7 +128,7 @@ Also in: [C++](../cpp/channel-statistics.md#calc_cross_polarization_ratio) · [M
 ### Usage:
 ```python
 xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, \
-    include_los, window_size )
+    *, include_los, window_size )
 ```
 
 ### Inputs:
@@ -173,7 +173,7 @@ Also in: [C++](../cpp/channel-statistics.md#calc_delay_spread) · [MATLAB](../me
 
 ### Usage:
 ```python
-ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, threshold_dB, granularity )
+ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, *, threshold_dB, granularity )
 ```
 
 ### Inputs:
@@ -206,7 +206,7 @@ Also in: [C++](../cpp/channel-statistics.md#calc_rician_k_factor) · [MATLAB](..
 
 ### Usage:
 ```python
-kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, window_size )
+kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, *, window_size )
 ```
 
 ### Inputs:

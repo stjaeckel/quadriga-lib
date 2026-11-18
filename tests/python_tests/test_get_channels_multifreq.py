@@ -36,7 +36,7 @@ def gen_xpol():
 
 def gen_custom(az_3dB=90.0, el_3dB=90.0, rear_gain=0.0):
     """Generate a custom antenna dictionary."""
-    return quadriga_lib.arrayant.generate('custom', 1, az_3dB, el_3dB, rear_gain)
+    return quadriga_lib.arrayant.generate('custom', 1, freq=az_3dB, az_3dB=el_3dB, el_3dB=rear_gain)
 
 
 def copy_element(ant, src):
@@ -271,7 +271,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
 
         # Single-frequency reference (returns 3D arrays)
         cr_ref, ci_ref, dl_ref = re_im(quadriga_lib.channel.spherical(
-            ant, ant, tx_pos, ori, rx_pos, ori, fbs, lbs, pg_vec, pl_vec, M_single, fc, True, False))
+            ant, ant, tx_pos, ori, rx_pos, ori, fbs, lbs, pg_vec, pl_vec, M_single, fc, use_absolute_delays=True,
+            add_fake_los_path=False))
 
         # Multi-frequency version (returns 4D arrays)
         cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
@@ -992,7 +993,8 @@ class test_zero_paths_fake_los(unittest.TestCase):
         ant['center_freq'] = fc
         cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], np.zeros((3, 0)), np.zeros((3, 0)),
-            np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], True, True))
+            np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], use_absolute_delays=True,
+            add_fake_los_path=True))
         self.assertEqual(np.shape(dl), (1, 1, 1, 2))
         npt.assert_array_equal(np.concatenate([np.ravel(cr), np.ravel(ci)]), np.zeros(4))
         npt.assert_allclose(np.ravel(dl), [10 / 299792458.0] * 2, rtol=1e-15)
@@ -1004,7 +1006,8 @@ class test_zero_paths_fake_los(unittest.TestCase):
         ant['center_freq'] = fc
         out = quadriga_lib.channel.multifreq(
             ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], np.zeros((3, 0)), np.zeros((3, 0)),
-            np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], True, False)
+            np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], use_absolute_delays=True,
+            add_fake_los_path=False)
         for x in out:
             self.assertEqual(np.shape(x), (2, 2, 0, 2))
 

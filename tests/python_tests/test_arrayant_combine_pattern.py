@@ -116,7 +116,7 @@ class test_case(unittest.TestCase):
 
         # Denser azimuth grid -> every 2nd sample reproduces the original grid.
         az_grid = np.linspace(-np.pi, np.pi, 73)
-        out = arrayant.combine_pattern(ant, 3.0e9, az_grid)
+        out = arrayant.combine_pattern(ant, freq_new=3.0e9, azimuth_grid=az_grid)
         npt.assert_allclose(out["e_theta_re"][:, ::2, 0], 3.0 * ant["e_theta_re"][:, :, 0],
                             atol=1e-14, rtol=0)
         self.assertEqual(float(out["center_freq"]), 3.0e9)
@@ -129,7 +129,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(out["name"], "buy_bitcoin")
 
         # Directivity is preserved when combining co-located elements ...
-        directivity_ant = arrayant.calc_directivity(ant, 0)
+        directivity_ant = arrayant.calc_directivity(ant, i_element=0)
         directivity_out = arrayant.calc_directivity(out)
         npt.assert_almost_equal(directivity_ant, directivity_out, decimal=1)
 
@@ -161,27 +161,27 @@ class test_case(unittest.TestCase):
         mf = _stack_mf(ants)
 
         # Scalar freq selects a single frequency -> single (3D) dict, scalar center_freq.
-        out = arrayant.combine_pattern(mf, 2e9)
+        out = arrayant.combine_pattern(mf, freq_new=2e9)
         self.assertEqual(out["e_theta_re"].ndim, 3)
         self.assertEqual(np.ndim(out["center_freq"]), 0)
         npt.assert_allclose(out["e_theta_re"][:, :, 0], np.full((3, 4), 2.0), atol=1e-12, rtol=0)
         self.assertEqual(float(out["center_freq"]), 2e9)
 
         # Vector freq interpolates -> 4D output (linear blend of the in-phase reals).
-        out = arrayant.combine_pattern(mf, [1.5e9, 2.5e9])
+        out = arrayant.combine_pattern(mf, freq_new=[1.5e9, 2.5e9])
         self.assertEqual(out["e_theta_re"].shape[3], 2)
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 0], np.full((3, 4), 1.5), atol=1e-10, rtol=0)
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 1], np.full((3, 4), 2.5), atol=1e-10, rtol=0)
         npt.assert_allclose(out["center_freq"], [1.5e9, 2.5e9], rtol=1e-12)
 
         # Out-of-range frequencies clamp to the nearest entry.
-        out = arrayant.combine_pattern(mf, [0.5e9, 10e9])
+        out = arrayant.combine_pattern(mf, freq_new=[0.5e9, 10e9])
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 0], np.full((3, 4), 1.0), atol=1e-12, rtol=0)
         npt.assert_allclose(out["e_theta_re"][:, :, 0, 1], np.full((3, 4), 3.0), atol=1e-12, rtol=0)
 
         # Single-freq input + vector freq -> 4D output, all clamped to that one entry.
         single = _ant_sf(n_elem=1, et_re=2.0, et_im=0.0, ep_re=0.0, ep_im=0.0, center_freq=2e9)
-        out = arrayant.combine_pattern(single, [1e9, 2e9, 3e9])
+        out = arrayant.combine_pattern(single, freq_new=[1e9, 2e9, 3e9])
         self.assertEqual(out["e_theta_re"].shape[3], 3)
         for k in range(3):
             npt.assert_allclose(out["e_theta_re"][:, :, 0, k], np.full((3, 4), 2.0),
@@ -219,7 +219,7 @@ class test_case(unittest.TestCase):
             "center_freq": np.array([1e9, 2e9]),
         }
         # Midpoint frequency -> coupling interpolated between 1 and 3 -> 2; pattern stays 1.
-        out = arrayant.combine_pattern(mf, 1.5e9)
+        out = arrayant.combine_pattern(mf, freq_new=1.5e9)
         npt.assert_allclose(out["e_theta_re"][:, :, 0], np.full((3, 4), 2.0), atol=1e-10, rtol=0)
 
         # Both polarisations carried through a multi-freq combine.
@@ -245,7 +245,7 @@ class test_case(unittest.TestCase):
         ant["coupling_im"] = np.zeros((2, 1))
         ant["element_pos"][1, :] = [-0.25, 0.25]
 
-        d_single = arrayant.calc_directivity(ant, 0)
+        d_single = arrayant.calc_directivity(ant, i_element=0)
 
         # Replicate the same (element-separated) antenna at two frequencies.
         mf = {key: np.stack([ant[key], ant[key]], axis=3)
@@ -260,7 +260,7 @@ class test_case(unittest.TestCase):
         out = arrayant.combine_pattern(mf)
         self.assertEqual(out["e_theta_re"].shape[3], 2)
         for k in range(2):
-            d_combined = arrayant.calc_directivity(_slice_freq(out, k), 0)
+            d_combined = arrayant.calc_directivity(_slice_freq(out, k), i_element=0)
             self.assertGreater(d_combined, d_single + 1.2)
 
     # ---- freq input-conversion tests ----
@@ -269,24 +269,24 @@ class test_case(unittest.TestCase):
         ant = _ant_sf(n_elem=1, et_re=1.0, et_im=0.0, ep_re=0.0, ep_im=0.0, center_freq=2e9)
 
         # Python int and float scalars both override the center frequency.
-        self.assertEqual(float(arrayant.combine_pattern(ant, int(3e9))["center_freq"]), 3e9)
-        self.assertEqual(float(arrayant.combine_pattern(ant, 3.0e9)["center_freq"]), 3e9)
+        self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=int(3e9))["center_freq"]), 3e9)
+        self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=3.0e9)["center_freq"]), 3e9)
 
         # 0-D numpy array and numpy scalar are promoted to a 1-element vector.
-        self.assertEqual(float(arrayant.combine_pattern(ant, np.array(2.5e9))["center_freq"]), 2.5e9)
-        self.assertEqual(float(arrayant.combine_pattern(ant, np.float64(2.5e9))["center_freq"]), 2.5e9)
+        self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=np.array(2.5e9))["center_freq"]), 2.5e9)
+        self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=np.float64(2.5e9))["center_freq"]), 2.5e9)
 
         # freq <= 0 and freq=None mean "not given" -> the input center_freq is kept.
         for noop in (0, 0.0, None):
-            self.assertEqual(float(arrayant.combine_pattern(ant, noop)["center_freq"]), 2e9)
+            self.assertEqual(float(arrayant.combine_pattern(ant, freq_new=noop)["center_freq"]), 2e9)
 
         # A Python list / numpy array of length > 1 triggers the multi-frequency path.
-        out = arrayant.combine_pattern(ant, [1.5e9, 2.5e9])
+        out = arrayant.combine_pattern(ant, freq_new=[1.5e9, 2.5e9])
         self.assertEqual(out["e_theta_re"].ndim, 4)
         self.assertEqual(out["e_theta_re"].shape[3], 2)
         npt.assert_allclose(out["center_freq"], [1.5e9, 2.5e9], rtol=1e-12)
 
-        out = arrayant.combine_pattern(ant, np.array([1e9, 2e9, 3e9]))
+        out = arrayant.combine_pattern(ant, freq_new=np.array([1e9, 2e9, 3e9]))
         self.assertEqual(out["e_theta_re"].shape[3], 3)
 
     def test_freq_input_invalid(self):
@@ -299,7 +299,7 @@ class test_case(unittest.TestCase):
                          {"freq": 1e9},
                          object()):
             with self.assertRaises(ANY_ERR):
-                arrayant.combine_pattern(ant, bad_freq)
+                arrayant.combine_pattern(ant, freq_new=bad_freq)
 
     # ---- Error tests ----
 
@@ -391,7 +391,8 @@ class test_case(unittest.TestCase):
         self.assertAlmostEqual(expected, 0.506, places=3)
 
         # Positional argument, and the multi-frequency branch (vector freq)
-        out = arrayant.combine_pattern(ant, None, None, None, 344.0)
+        out = arrayant.combine_pattern(ant, freq_new=None, azimuth_grid=None, elevation_grid=None,
+                                       propagation_speed=344.0)
         self.assertAlmostEqual(amp(out, ie, ia90), expected, places=6)
         out = arrayant.combine_pattern(ant, freq_new=np.array([500.0, 1000.0]), propagation_speed=344.0)
         self.assertEqual(out["e_theta_re"].shape[3], 2)

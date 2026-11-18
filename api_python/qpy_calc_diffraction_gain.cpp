@@ -25,12 +25,12 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ```
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 ```
 

@@ -25,8 +25,8 @@ class test_case(unittest.TestCase):
 
     def setUp(self):
         self.spatial_freq, self.acf, self.dist = quadriga_lib.sos.preset("Comb128")
-        self.phase = quadriga_lib.sos.init_phases(128, 3, 5)
-        self.phase_b = quadriga_lib.sos.init_phases(128, 3, 6)
+        self.phase = quadriga_lib.sos.init_phases(128, 3, seed=5)
+        self.phase_b = quadriga_lib.sos.init_phases(128, 3, seed=6)
 
         # 20 positions on a grid; the second device on another set of positions
         x, y = np.meshgrid(np.arange(0.0, 25.0, 5.0), np.arange(0.0, 20.0, 5.0))
@@ -67,8 +67,9 @@ class test_case(unittest.TestCase):
         self.assertGreater(np.max(np.abs(offset)), 1e-3)
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, self.pos_b, self.phase_b, self.acf,
-                                           self.dist, 2.5)
+        ref = quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b,
+                                           phase_b_in=self.phase_b, acf=self.acf,
+                                           dist=self.dist, spatial_freq_scale_b=2.5)
         out = quadriga_lib.sos.remove_bias(spatial_freq=self.spatial_freq, phase_in=self.phase, pos=self.pos, pos_b=self.pos_b,
                                            phase_b_in=self.phase_b, acf=self.acf, dist=self.dist, spatial_freq_scale_b=2.5)
         self.assertEqual(len(out), 4)
@@ -80,15 +81,18 @@ class test_case(unittest.TestCase):
         m0 = self.mean(self.spatial_freq, self.phase, self.pos)
 
         # None and empty arrays are the same as omitted
-        for out in (quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, None, None, None, None, 1.0),
-                    quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, np.zeros((0, 3)), [], [], [])):
+        for out in (quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, pos_b=None, phase_b_in=None,
+                                                 acf=None, dist=None, spatial_freq_scale_b=1.0),
+                    quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, pos_b=np.zeros((0, 3)),
+                                                 phase_b_in=[], acf=[], dist=[])):
             npt.assert_array_equal(out[0], ref[0])
             self.assertIsNone(out[1])
             npt.assert_array_equal(out[2], ref[2])
             npt.assert_array_equal(out[3], ref[3])
 
         # Two devices on the same map: one offset per generator, no phases for the second device
-        p3, pb3, o3, mb3 = quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, self.pos_b, acf=self.acf,
+        p3, pb3, o3, mb3 = quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b,
+                                                        acf=self.acf,
                                                         dist=self.dist)
         self.assertIsNone(pb3)
         self.assertEqual(o3.shape, (3, 1))
@@ -98,11 +102,13 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(mb3[:, 0], self.mean(self.spatial_freq, self.phase, self.pos, **same_map), atol=1e-13, rtol=0)
 
         # The returned None can be passed on as "same map"
-        val = quadriga_lib.sos.val(self.spatial_freq, p3, self.pos, self.pos_b, pb3, self.acf, self.dist, use_kernel=1)
+        val = quadriga_lib.sos.val(self.spatial_freq, p3, self.pos, pos_b=self.pos_b, phase_b=pb3, acf=self.acf,
+                                   dist=self.dist, use_kernel=1)
         npt.assert_allclose(np.mean(val, axis=0), np.zeros(3), atol=1e-13, rtol=0)
 
         # Two devices on different maps, with a frequency scale for the second device
-        p4, pb4, o4, mb4 = quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, self.pos_b, self.phase_b,
+        p4, pb4, o4, mb4 = quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b,
+                                                        phase_b_in=self.phase_b,
                                                         spatial_freq_scale_b=2.5)
         self.assertEqual(pb4.shape, (128, 3))
         self.assertEqual(pb4.dtype, np.float64)
@@ -119,7 +125,10 @@ class test_case(unittest.TestCase):
 
     def test_array_layout_and_dtype(self):
         args = [self.spatial_freq, self.phase, self.pos, self.pos_b, self.phase_b]
-        ref = quadriga_lib.sos.remove_bias(*args)
+
+        def remove_bias_b(spatial_freq, phase_in, pos, pos_b, phase_b_in):
+            return quadriga_lib.sos.remove_bias(spatial_freq, phase_in, pos, pos_b=pos_b, phase_b_in=phase_b_in)
+        ref = remove_bias_b(*args)
 
         variants = [
             lambda a: np.ascontiguousarray(a),            # C order
@@ -128,13 +137,13 @@ class test_case(unittest.TestCase):
             lambda a: a.tolist(),                         # plain lists
         ]
         for fn in variants:
-            out = quadriga_lib.sos.remove_bias(*[fn(a) for a in args])
+            out = remove_bias_b(*[fn(a) for a in args])
             for a, b in zip(out, ref):
                 self.assertEqual(a.dtype, np.float64)
                 npt.assert_array_equal(a, b)
 
         # float32 input: the phases are rounded, the offsets follow
-        out = quadriga_lib.sos.remove_bias(*[a.astype(np.float32) for a in args])
+        out = remove_bias_b(*[a.astype(np.float32) for a in args])
         for a, b in zip(out[:2], ref[:2]):
             self.assertEqual(a.dtype, np.float64)
             npt.assert_allclose(self.wrapped(a - b), np.zeros((128, 3)), atol=1e-4, rtol=0)
@@ -143,7 +152,7 @@ class test_case(unittest.TestCase):
         # Fortran-ordered float64 arrays are the case in which the helpers could hand out a view
         args = [np.asfortranarray(a) for a in (self.spatial_freq, self.phase, self.pos, self.pos_b, self.phase_b)]
         copies = [a.copy() for a in args]
-        phase_out, phase_b_out, _, _ = quadriga_lib.sos.remove_bias(*args)
+        phase_out, phase_b_out, _, _ = quadriga_lib.sos.remove_bias(*args[:3], pos_b=args[3], phase_b_in=args[4])
         for a, c in zip(args, copies):
             npt.assert_array_equal(a, c)
 
@@ -160,11 +169,12 @@ class test_case(unittest.TestCase):
         self.assertIn("phase", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, self.pos_b)
+            quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b)
         self.assertIn("acf", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, self.pos_b, None, self.acf, self.dist, 2.0)
+            quadriga_lib.sos.remove_bias(self.spatial_freq, self.phase, self.pos, pos_b=self.pos_b, phase_b_in=None,
+                                         acf=self.acf, dist=self.dist, spatial_freq_scale_b=2.0)
         self.assertIn("spatial_freq_scale_b", str(ctx.exception))
 
         # Rejected by pybind11

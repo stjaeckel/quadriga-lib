@@ -15,7 +15,8 @@ Generates predefined array antenna models
 - Dispatches to one of several C++ generator functions based on the `type` string
 - Supported types: `omni`, `dipole` (or `short-dipole`), `half-wave-dipole`, `xpol`, `custom`,
   `ula`, `3gpp` (or `3GPP`), `multibeam`
-- All arguments after `type` are keyword-only and type-specific; defaults are filled where omitted
+- `res` applies to all types; the arguments after it are keyword-only and type-specific; defaults are filled
+  where omitted
 - For `3gpp` and `ula`, a `pattern` dict can override the default per-element pattern
 - `multibeam` combines beams via MRT weighting; set `separate_beams=True` for one beam per direction
 

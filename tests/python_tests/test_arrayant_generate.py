@@ -48,7 +48,7 @@ class test_case(unittest.TestCase):
         assert data["name"] == 'xpol'
 
         # Custom antenna
-        data = arrayant.generate("custom", 10, 90, 90, 0)
+        data = arrayant.generate("custom", 10, freq=90, az_3dB=90, el_3dB=0)
         assert data["e_theta_re"].shape == (19, 37, 1)
         assert data["e_theta_re"].flags.f_contiguous
         assert data["name"] == 'custom'

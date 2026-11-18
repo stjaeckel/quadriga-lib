@@ -52,7 +52,7 @@ Calculate MIMO channel coefficients for planar wave paths
 ```
 coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
-    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
+    center_freq, *, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
 ```
 
 ## Inputs:

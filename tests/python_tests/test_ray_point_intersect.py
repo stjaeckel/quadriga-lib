@@ -95,7 +95,7 @@ class test_case(unittest.TestCase):
 
         Mirrors the MATLAB test: each point is hit by exactly one beam.
         """
-        orig, _, trivec, tridir = quadriga_lib.RTtools.icosphere(n_div, 1.0, True)
+        orig, _, trivec, tridir = quadriga_lib.RTtools.icosphere(n_div, 1.0, direction_xyz=True)
         orig = orig - np.array([10.0, 20.0, 30.0])
 
         pts = np.zeros((4, 3))
@@ -357,7 +357,7 @@ class test_case(unittest.TestCase):
         hit_ref, _, _ = quadriga_lib.RTtools.ray_point_intersect(
             points, orig, trivec, tridir)
         pointsR, sub_cloud_ind, _, reverse_ind = (
-            quadriga_lib.RTtools.point_cloud_segmentation(points, 4, 8)
+            quadriga_lib.RTtools.point_cloud_segmentation(points, target_size=4, vec_size=8)
         )
         hit_R, _, _ = quadriga_lib.RTtools.ray_point_intersect(
             pointsR, orig, trivec, tridir, sub_cloud_ind=sub_cloud_ind)

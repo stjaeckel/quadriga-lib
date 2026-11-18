@@ -38,14 +38,14 @@ class test_case(unittest.TestCase):
         # File name to write
         out_file = "test.png"
 
-        # quadriga_lib.tools.write_png(fn, data, colormap, min_val, max_val, log_transform)
+        # quadriga_lib.tools.write_png(fn, data, *, colormap, min_val, max_val, log_transform)
         quadriga_lib.tools.write_png(
             out_file,
             gradient,
-            "jet",          # any valid Matplotlib‑style colormap string works
-            0.0,                # min_val  (matches gradient.min())
-            max_val,            # max_val  (matches gradient.max())
-            False               # log_transform
+            colormap="jet",          # any valid Matplotlib‑style colormap string works
+            min_val=0.0,             # matches gradient.min()
+            max_val=max_val,         # matches gradient.max()
+            log_transform=False
         )
 
         # Check that the file was created
@@ -59,8 +59,8 @@ class test_case(unittest.TestCase):
         out_file = "test_png_range.png"
         first, last = (0, 0, 131), (128, 0, 0)  # first and last colour of "jet"
 
-        def pixels(data, *args):
-            quadriga_lib.tools.write_png(out_file, data, "jet", *args)
+        def pixels(data, **kwargs):
+            quadriga_lib.tools.write_png(out_file, data, colormap="jet", **kwargs)
             with Image.open(out_file) as im:
                 px = np.asarray(im.convert("RGB"))
             os.remove(out_file)
@@ -78,11 +78,11 @@ class test_case(unittest.TestCase):
 
         # Inverted user range and empty data raise
         with self.assertRaises(ValueError):
-            quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), "jet", 2.0, 1.0)
+            quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), colormap="jet", min_val=2.0, max_val=1.0)
         with self.assertRaises(ValueError):
             quadriga_lib.tools.write_png(out_file, np.zeros((0, 3)))
         with self.assertRaises(ValueError):  # infinite limits
-            quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), "jet", -np.inf)
+            quadriga_lib.tools.write_png(out_file, np.ones((2, 2)), colormap="jet", min_val=-np.inf)
         self.assertFalse(os.path.exists(out_file))
 
     def test_path_none_and_flag_types(self):

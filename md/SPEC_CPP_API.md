@@ -107,7 +107,7 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 # WRAPPER INTERFACE
 - The MATLAB / Octave and Python wrappers take the names, the argument order and the defaults of the C++ declaration, so that users learn one interface for all three APIs. Where a wrapper differs, its documentation block says how and why.
 - The file name is the first argument of every function that reads or writes a file; new arguments are appended, with a default.
-- In Python, the `stack` flag is keyword-only (`md/SPEC_PYTHON_API.md`, "Standard flags").
+- In Python, optional arguments are keyword-only, except a few that a call almost always passes, and the positional arguments may be ordered differently from C++ where that reads better (`md/SPEC_PYTHON_API.md`, "Keyword-only arguments").
 
 # IMPLEMENTATION GUIDELINES
 

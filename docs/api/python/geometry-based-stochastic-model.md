@@ -147,7 +147,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#conf_file_list) · [MAT
 
 ### Usage:
 ```python
-scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, parse_shortnames )
+scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, *, parse_shortnames )
 ```
 
 ### Inputs:
@@ -194,7 +194,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#conf_file_read) · [MAT
 ### Usage:
 ```python
 scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
-    quadriga_lib.gbsm.conf_file_read( fn, validate )
+    quadriga_lib.gbsm.conf_file_read( fn, *, validate )
 ```
 
 ### Inputs:
@@ -246,7 +246,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#conf_file_write) · [MA
 
 ### Usage:
 ```python
-quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, \
+quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, *, short_names, ref, ref_sec, valid_range, \
     write_defaults )
 ```
 
@@ -311,7 +311,7 @@ the same. Block 13, the XPR per cluster, is in column `13·N·M + n`; block 14, 
 
 ### Usage:
 ```python
-rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, \
+rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, *, set_id, preset, floor_id, \
     center_freq, dual_mobility, horizontal )
 ```
 
@@ -365,7 +365,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_init_phases) · [M
 
 ### Usage:
 ```python
-phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, \
+phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, *, seed, set_id, preset, tx_pos, rx_pos, \
     dual_mobility, remove_bias, horizontal )
 ```
 
@@ -413,7 +413,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_rays_from_paths) �
 ### Usage:
 ```python
 rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, \
-    path_length, M, method, path_type, tap, gr_eps )
+    path_length, M, *, method, path_type, tap, gr_eps )
 ```
 
 ### Inputs:
@@ -470,7 +470,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, \
+chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, *, mobility, \
     output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
     use_absolute_delays, stack=False )
 ```
@@ -493,7 +493,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays (`"phase"`: of the ray-data positions); default:
   `False`
-- **`stack`** — Keyword-only; snapshot layout of `chan` as in [hdf5_read_channel](channel-functions.md#hdf5_read_channel); default: `False`
+- **`stack`** — Snapshot layout of `chan` as in [hdf5_read_channel](channel-functions.md#hdf5_read_channel); default: `False`
 
 ### Outputs:
 - **`chan`** — Channel dict, layout as documented in [hdf5_read_channel](channel-functions.md#hdf5_read_channel): `center_freq` `(1,)`;
@@ -544,8 +544,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#los_probability) · [MA
 
 ### Usage:
 ```python
-p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, d_clutter, r_clutter, \
-    h_clutter, rnd_g, center_freq )
+p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, *, d_clutter, \
+    r_clutter, h_clutter, rnd_g, center_freq )
 ```
 
 ### Inputs:
@@ -611,7 +611,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [MATLA
 ### Usage:
 ```python
 lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
-    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads )
+    center_freq, tx_pos, rx_pos, rnd, *, sf_sigma_dB, cholesky, clip_spreads )
 ```
 
 ### Inputs:
@@ -669,7 +669,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#o2i_loss) · [MATLAB](.
 
 ### Usage:
 ```python
-loss_dB, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
+loss_dB, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, *, \
+    d2d_in_max )
 ```
 
 ### Inputs:
@@ -744,7 +745,8 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#path_loss) · [MATLAB](
 
 ### Usage:
 ```python
-pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he )
+pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, *, \
+    d2d_in, rnd_he )
 ```
 
 ### Inputs:
@@ -799,7 +801,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#scenpar_validate) · [M
 
 ### Usage:
 ```python
-scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scenpar_in, validate )
+scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scenpar_in, *, validate )
 ```
 
 ### Inputs:
@@ -866,7 +868,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_clusters) · [MATLA
 ### Usage:
 ```python
 delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( scenpar, tx_pos, rx_pos, \
-    lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
+    lsp, rnd, *, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
 ```
 
 ### Inputs:
@@ -950,7 +952,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#ssf_paths) · [MATLAB](
 ### Usage:
 ```python
 path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_ind = \
-    quadriga_lib.gbsm.ssf_paths( rays, link_gain_dB, mobility, tx_pos, rx_pos, kf_ratio, oxygen )
+    quadriga_lib.gbsm.ssf_paths( rays, link_gain_dB, *, mobility, tx_pos, rx_pos, kf_ratio, oxygen )
 ```
 
 ### Inputs:
@@ -1044,7 +1046,7 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 ### Usage:
 ```python
 rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, \
-    delay, power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, \
+    delay, power, aod, eod, aoa, eoa, rnd_ray, *, method, i_freq, angle_model, pol_model, gr_eps, \
     pol_variability, random_phase )
 ```
 
@@ -1109,7 +1111,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#.solve_scatterers) · [
 
 ### Usage:
 ```python
-rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, d_min )
+rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, *, d_min )
 ```
 
 ### Inputs:

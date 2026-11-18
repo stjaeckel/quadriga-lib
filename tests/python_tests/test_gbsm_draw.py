@@ -30,7 +30,7 @@ class test_lsf(unittest.TestCase):
         # Phases of a scenario with distinct decorrelation distances, 5 links
         self.scenpar = {"DS_lambda": 10.0, "AS_D_lambda": 18.0, "AS_A_lambda": 15.0,
                         "ES_D_lambda": 12.0, "ES_A_lambda": 8.0}
-        self.phase = quadriga_lib.gbsm.init_phases(self.scenpar, "lsf", 7)
+        self.phase = quadriga_lib.gbsm.init_phases(self.scenpar, "lsf", seed=7)
         self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0], [80.0, 30.0, 1.5],
                                 [3.0, 4.0, 10.0]])
         self.tx_pos = np.array([[10.0, 10.0, 25.0]])
@@ -124,7 +124,7 @@ class test_lsf(unittest.TestCase):
         r3 = f(self.scenpar, "lsf", self.phase, self.tx_pos, self.rx_pos, horizontal=False)
         r3z = f(self.scenpar, "lsf", self.phase, self.tx_pos, rx_z, horizontal=False)
         self.assertGreater(np.max(np.abs(r3z - r3)), 1e-3)  # 3D: z is used
-        phase_c = quadriga_lib.gbsm.init_phases(self.scenpar, "lsf", 7, preset="Comb1024")
+        phase_c = quadriga_lib.gbsm.init_phases(self.scenpar, "lsf", seed=7, preset="Comb1024")
         rc = f(self.scenpar, "lsf", phase_c, self.tx_pos, self.rx_pos, preset="Comb1024")
         self.assertEqual(rc.shape, (5, 11))
         self.assertGreater(np.max(np.abs(rc - self.rnd)), 1e-3)
@@ -210,8 +210,8 @@ class test_cluster(unittest.TestCase):
         # UMi LOS file (N = 12, SC_lambda = 12 m), shared and per-frequency phases, 5 links
         self.sp = quadriga_lib.gbsm.conf_file_read(os.path.join(CONF_DIR, "3GPP_38.901_v19_UMi_LOS.conf"))[0]
         self.N = int(self.sp["NumClusters"]) - 1
-        self.phase = quadriga_lib.gbsm.init_phases(self.sp, "cluster", 7)
-        self.phase_f = quadriga_lib.gbsm.init_phases(self.sp, "cluster", 7, 0)
+        self.phase = quadriga_lib.gbsm.init_phases(self.sp, "cluster", seed=7)
+        self.phase_f = quadriga_lib.gbsm.init_phases(self.sp, "cluster", seed=7, set_id=0)
         self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0], [80.0, 30.0, 1.5],
                                 [3.0, 4.0, 10.0]])
         self.tx_pos = np.array([[10.0, 10.0, 25.0]])
@@ -243,7 +243,8 @@ class test_cluster(unittest.TestCase):
         rk = quadriga_lib.gbsm.draw(scenpar=self.sp, set_type="cluster", phase=self.phase_f, tx_pos=self.tx_pos,
                                     rx_pos=self.rx_pos, set_id=0, preset="Comb256", floor_id=self.fl,
                                     dual_mobility=False, horizontal=True)
-        rp = quadriga_lib.gbsm.draw(self.sp, "cluster", self.phase_f, self.tx_pos, self.rx_pos, 0, "Comb256", self.fl,
+        rp = quadriga_lib.gbsm.draw(self.sp, "cluster", self.phase_f, self.tx_pos, self.rx_pos, set_id=0,
+                                    preset="Comb256", floor_id=self.fl,
                                     dual_mobility=False, horizontal=True)
         npt.assert_array_equal(rk, rp)
         self.assertEqual(rk.shape, (5, self.N))
@@ -255,11 +256,11 @@ class test_cluster(unittest.TestCase):
         self.assertEqual(rf.shape, (5, self.N))
         self.assertTrue(np.any(rf < 0))  # Normal shadowing values
         npt.assert_array_equal(f(*args, set_id=3), rf)  # same set type
-        npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos, -1), self.rnd)
+        npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos, set_id=-1), self.rnd)
 
     def test_floor_id(self):
         f = quadriga_lib.gbsm.draw
-        args = (self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos, -1)
+        args = (self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos)
         npt.assert_array_equal(f(*args, floor_id=None), self.rnd)
         npt.assert_array_equal(f(*args, floor_id=np.zeros(5)), self.rnd)
         rl = f(*args, floor_id=self.fl)
@@ -271,13 +272,13 @@ class test_cluster(unittest.TestCase):
     def test_flags(self):
         f = quadriga_lib.gbsm.draw
         tx_d = np.array([[5.0, 5.0, 1.5], [30.0, 0.0, 1.5], [40.0, -20.0, 1.5], [60.0, 10.0, 1.5], [0.0, 9.0, 1.5]])
-        rd = f(self.sp, "cluster", self.phase, tx_d, self.rx_pos, -1, floor_id=None, dual_mobility=True)
+        rd = f(self.sp, "cluster", self.phase, tx_d, self.rx_pos, set_id=-1, floor_id=None, dual_mobility=True)
         self.assertTrue(np.max(np.abs(rd - self.rnd)) > 1e-3)
         blk = np.array([0, 2, 1, 4, 3, 6, 5, 8, 7])
         swap = (blk[:, None] * self.N + np.arange(self.N)[None, :]).ravel()
-        npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.rx_pos, tx_d, -1, floor_id=None,
+        npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.rx_pos, tx_d, set_id=-1, floor_id=None,
                                  dual_mobility=True), rd[:, swap])
-        npt.assert_array_equal(f(self.sp, "cluster", self.phase, tx_d, self.rx_pos, -1, floor_id=None,
+        npt.assert_array_equal(f(self.sp, "cluster", self.phase, tx_d, self.rx_pos, set_id=-1, floor_id=None,
                                  dual_mobility=None), self.rnd)
         rx_z = self.rx_pos.copy()
         rx_z[:, 2] += np.array([0.0, 5.0, 10.0, 2.0, 7.0])
@@ -294,7 +295,7 @@ class test_cluster(unittest.TestCase):
 
     def test_preset_and_scenpar(self):
         f = quadriga_lib.gbsm.draw
-        pc = quadriga_lib.gbsm.init_phases(self.sp, "cluster", 7, -1, "Comb1024")
+        pc = quadriga_lib.gbsm.init_phases(self.sp, "cluster", seed=7, set_id=-1, preset="Comb1024")
         rc = f(self.sp, "cluster", pc, self.tx_pos, self.rx_pos, preset="Comb1024")
         self.assertEqual(rc.shape, (5, 9 * self.N))
         self.assertTrue(np.max(np.abs(rc - self.rnd)) > 1e-3)
@@ -315,7 +316,7 @@ class test_cluster(unittest.TestCase):
         npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.tx_pos.astype(np.float32),
                                  self.rx_pos.astype(np.float32)), self.rnd)  # positions exact in float32
         rx0, ph0 = self.rx_pos.copy(), self.phase.copy()
-        f(self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos, -1, floor_id=self.fl)
+        f(self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos, set_id=-1, floor_id=self.fl)
         npt.assert_array_equal(self.rx_pos, rx0)
         npt.assert_array_equal(self.phase, ph0)
 
@@ -352,11 +353,12 @@ class test_set_types(unittest.TestCase):
 
     def test_set_type_set_id_and_center_freq(self):
         f = quadriga_lib.gbsm.draw
-        ph = quadriga_lib.gbsm.init_phases(self.sp, "lsf", 7)
+        ph = quadriga_lib.gbsm.init_phases(self.sp, "lsf", seed=7)
         r = f(self.sp, "lsf", ph, self.tx_pos, self.rx_pos)
-        npt.assert_array_equal(f(self.sp, "lsf", ph, self.tx_pos, self.rx_pos, 5), r)  # set_id is ignored for "lsf"
+        npt.assert_array_equal(f(self.sp, "lsf", ph, self.tx_pos, self.rx_pos, set_id=5),
+                               r)  # set_id is ignored for "lsf"
         npt.assert_array_equal(f(self.sp, "lsf", ph, self.tx_pos, self.rx_pos, center_freq=[-1.0, np.nan]), r)
-        pc = quadriga_lib.gbsm.init_phases(self.sp, "cluster", 7)
+        pc = quadriga_lib.gbsm.init_phases(self.sp, "cluster", seed=7)
         rc = f(self.sp, "cluster", pc, self.tx_pos, self.rx_pos)
         npt.assert_array_equal(f(self.sp, "cluster", pc, self.tx_pos, self.rx_pos, center_freq=np.array([3.5e9])), rc)
         with self.assertRaises(ValueError) as ctx:
@@ -369,7 +371,7 @@ class test_set_types(unittest.TestCase):
         sr = {"NumClusters": 3, "NumClusters_min": 1, "NumSubPaths": 4, "SC_lambda": 15.0, "PerClusterDS": 11.0,
               "PerClusterDS_gamma": -2.0, "PerClusterAS_A": 22.0}  # N = 2, M = 4
         n_link = self.rx_pos.shape[0]
-        pr = quadriga_lib.gbsm.init_phases(sr, "ray", 7)
+        pr = quadriga_lib.gbsm.init_phases(sr, "ray", seed=7)
         rr = f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[3.5e9])
         self.assertEqual(rr.shape, (n_link, 114))
         self.assertTrue(np.all((rr[:, 106:] > 0) & (rr[:, 106:] < 1)))  # block 14, Uniform
@@ -380,10 +382,10 @@ class test_set_types(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[np.nan])
         self.assertIn("Input 'center_freq' must be finite and > 0.", str(ctx.exception))
-        pk = quadriga_lib.gbsm.init_phases(sr, "ray", 7, 1)
-        rk = f(sr, "ray", pk, self.tx_pos, self.rx_pos, 1)  # k >= 0
+        pk = quadriga_lib.gbsm.init_phases(sr, "ray", seed=7, set_id=1)
+        rk = f(sr, "ray", pk, self.tx_pos, self.rx_pos, set_id=1)  # k >= 0
         self.assertEqual(rk.shape, (n_link, 114))
-        npt.assert_array_equal(f(sr, "ray", pk, self.tx_pos, self.rx_pos, 1, center_freq=[-1.0, np.nan]), rk)
+        npt.assert_array_equal(f(sr, "ray", pk, self.tx_pos, self.rx_pos, set_id=1, center_freq=[-1.0, np.nan]), rk)
 
 
 if __name__ == "__main__":

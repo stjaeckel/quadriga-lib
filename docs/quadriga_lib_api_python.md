@@ -14,7 +14,7 @@ lang: en-US
 - Array inputs take numpy arrays in any memory order; lists, scalars and other numeric dtypes are converted (copied). Outputs are numpy arrays: float64 for real values, complex128 for complex values; integer outputs have the dtype stated at the output.
 - Complex data: many functions take or return complex arrays where C++ uses separate `_re` / `_im` arrays or interleaved rows; complex outputs are always complex arrays (`x.real` and `x.imag` give the parts without a copy). Each function states its form.
 - Data structures (array antennas, channels, scenario parameters, ray data) are dicts; the function that defines one lists its keys. Each call builds a new arrayant from an arrayant dict, so its data is checked in full on every call.
-- Arguments have the names, order and defaults of the C++ function unless the function states otherwise. The flag `stack` is keyword-only: pass it as `stack=True`.
+- Arguments have the names and defaults of the C++ function. Optional arguments follow a `*` in the Usage line and are passed by keyword, e.g. `stack=True`; a few optional inputs that a call almost always needs, such as the slot indices of the HDF5 functions, come before the `*` and can also be passed by position. The Usage line shows the order of the positional arguments.
 - Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Flags (bool options) take a `bool` or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`. File names take a `str`, `bytes` or path-like object (e.g. `pathlib.Path`). Several outputs are returned as a tuple in the order of the Usage line.
 - Errors: invalid inputs (shape/domain, an index outside the layout of a file) raise `ValueError`, a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) `RuntimeError`, an index out of range of an input array `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument.
 
@@ -136,7 +136,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_beamwidth) · [MATLAB](quad
 ### Usage:
 ```python
 beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg = \
-    quadriga_lib.arrayant.calc_beamwidth( arrayant, i_element, threshold_dB )
+    quadriga_lib.arrayant.calc_beamwidth( arrayant, *, i_element, threshold_dB )
 ```
 
 ### Inputs:
@@ -172,7 +172,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_calc_directivity) · [MATLAB](qu
 
 ### Usage:
 ```python
-directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, i_element )
+directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, *, i_element )
 ```
 
 ### Inputs:
@@ -210,10 +210,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_combine_pattern) · [MATLAB](qua
 ```python
 # Single frequency
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant )
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, *, freq_new, azimuth_grid, \
+    elevation_grid )
 
 # Multiple frequencies (freq_new as a 1D array, or a frequency-dependent input antenna)
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, *, freq_new, azimuth_grid, \
+    elevation_grid )
 
 # Acoustic array (speed of sound)
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_speed=343.0 )
@@ -327,7 +329,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_export_obj_file) · [MATLAB](qua
 
 ### Usage:
 ```python
-quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, \
+quadriga_lib.arrayant.export_obj_file( fn, arrayant, *, directivity_range_dB, colormap, object_radius, \
     icosphere_n_div, i_element, i_freq )
 ```
 
@@ -351,7 +353,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#generate_arrayant_3GPP) · [MATLAB](quadr
 - Dispatches to one of several C++ generator functions based on the `type` string
 - Supported types: `omni`, `dipole` (or `short-dipole`), `half-wave-dipole`, `xpol`, `custom`,
   `ula`, `3gpp` (or `3GPP`), `multibeam`
-- All arguments after `type` are keyword-only and type-specific; defaults are filled where omitted
+- `res` applies to all types; the arguments after it are keyword-only and type-specific; defaults are filled
+  where omitted
 - For `3gpp` and `ula`, a `pattern` dict can override the default per-element pattern
 - `multibeam` combines beams via MRT weighting; set `separate_beams=True` for one beam per direction
 
@@ -558,8 +561,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_interpolate) · [MATLAB](quadrig
 ### Usage:
 ```python
 # Single-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, i_element, orientation, element_pos, \
-    use_kernel=0 )
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, *, i_element, orientation, \
+    element_pos, use_kernel=0 )
 
 # Single-frequency mode with the projected distance and the local angles
 V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \
@@ -853,7 +856,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#.write_paths_to_obj_file) · [MATLAB](qua
 
 ### Usage:
 ```python
-quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, colormap, \
+quadriga_lib.channel.export_obj_file( fn, *, max_paths, gain_max_dB, gain_min_dB, colormap, \
     radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
     coeff_re, coeff_im, i_snap )
 ```
@@ -944,7 +947,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [MATLAB](quadriga_l
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, stack=False )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_snap, stack=False )
 ```
 
 ### Inputs:
@@ -954,7 +957,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
 - **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
-- **`stack`** — Keyword-only; if `True`, stack snapshots. Default: `False` (return as list)
+- **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
 
 ### Outputs:
 - **`chan`** — List of dicts with the following keys:
@@ -1005,7 +1008,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_dset) · [MATLAB](quadriga_lib_
 
 ### Usage:
 ```python
-dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, *, prefix )
 ```
 
 ### Inputs:
@@ -1041,7 +1044,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_dset_names) · [MATLAB](quadrig
 
 ### Usage:
 ```python
-names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
+names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, *, prefix )
 ```
 
 ### Inputs:
@@ -1190,7 +1193,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_dset) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix )
+quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, *, prefix )
 ```
 
 ### Input Arguments:
@@ -1265,7 +1268,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [MATLAB](quadriga_lib_a
 ```python
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
     path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
-    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_M )
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, *, uplink, normalize_M )
 ```
 
 ### Inputs:
@@ -1328,8 +1331,6 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [MATLAB](quadriga_lib
 - If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped
   (nearest-neighbor selection) but tap-selection logic still applies
 - Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
-- Coefficients are given either as one complex list `coeff`, or as split `coeff_re` + `coeff_im`;
-  supplying both forms is an error. The output coefficients are complex for both input forms
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -1347,18 +1348,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-# Complex input (keyword)
-coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay )
-
-# Split real / imaginary input
-coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff, delay, *, tap_spacing, max_taps, \
+    power_exponent, fix_taps, stack=False )
 ```
 
 ### Inputs:
-- **`coeff_re`** — Real part of channel coefficients; list of length `n_snap`; each item
-  `(n_rx, n_tx, n_path)`; must be paired with `coeff_im`; mutually exclusive with `coeff`;
-  default: `None`
-- **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
+- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
 - **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or
   shared `(1, 1, n_path)`; non-negative with a tolerance of `tap_spacing / 2`, finite, below
   `2^31 * tap_spacing`
@@ -1368,10 +1363,8 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, del
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
   2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
-- **`stack`** — Keyword-only; if `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
+- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
-- **`coeff`** — Keyword-only; complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
-  mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
 ### Outputs:
 - **`coeff_q`** — Complex output coefficients; list of `(n_rx, n_tx, n_taps)` when `stack` is `False`, else
@@ -1413,7 +1406,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_ieee_indoor) · [MATLAB](qua
 
 ### Usage:
 ```python
-chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
+chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, *, CarrierFreq_Hz, \
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack=False )
@@ -1445,7 +1438,7 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, Carri
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default; default: NAN
 - **`n_walls`** *(optional)* — Number of walls per user TGax models; `(n_users,)` or `(1,)`; default: 0
 - **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
-- **`stack`** *(optional)* — Keyword-only; if `True`, per-snapshot data is stacked into a single array along an appended 
+- **`stack`** *(optional)* — If `True`, per-snapshot data is stacked into a single array along an appended 
   snapshot axis instead of being returned as a list of per-snapshot arrays; default: False
 
 ### Output:
@@ -1504,8 +1497,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [MATLAB](quadriga_li
 coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
-    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, \
-    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, center_freq, \
+    *, i_irs, threshold_dB, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
 
 # Departure and arrival angles as well
 coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..., angles=True )
@@ -1534,9 +1527,9 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 - **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
   the polyline length; `(n_path_2,)`
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
+- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS coupling matrix); default: `0`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
-- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory; default: `False`
 - **`irs_array_2`** — Second IRS arrayant dict for the RX-facing side (asymmetric IRS), with the same number of
@@ -1605,7 +1598,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadr
 ```python
 coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
-    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
+    freq, freq_new, *, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
 ```
 
 ### Inputs:
@@ -1687,7 +1680,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [MATLAB](quadriga
 ```python
 coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
-    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
+    center_freq, *, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
 ```
 
 ### Inputs:
@@ -1779,7 +1772,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [MATLAB](quadr
 ```python
 coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
-    center_freq, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
+    center_freq, *, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
 
 # Departure and arrival angles as well
 coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
@@ -1849,7 +1842,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#acdf) · [MATLAB](quadriga_lib_api_mex.md
 
 ### Usage:
 ```python
-cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, n_bins )
+cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, *, n_bins )
 ```
 
 ### Inputs:
@@ -1893,7 +1886,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_angular_spread) · [MATLAB](quadriga
 ### Usage:
 ```python
 azimuth_spread, elevation_spread, orientation, phi, theta = \
-    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize_deg )
+    quadriga_lib.tools.calc_angular_spread( az, el, powers, *, wrapping, calc_bank_angle, quantize_deg )
 ```
 
 ### Inputs:
@@ -1949,7 +1942,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [MATLAB
 ### Usage:
 ```python
 xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, \
-    include_los, window_size )
+    *, include_los, window_size )
 ```
 
 ### Inputs:
@@ -1994,7 +1987,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_delay_spread) · [MATLAB](quadriga_l
 
 ### Usage:
 ```python
-ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, threshold_dB, granularity )
+ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, *, threshold_dB, granularity )
 ```
 
 ### Inputs:
@@ -2027,7 +2020,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_rician_k_factor) · [MATLAB](quadrig
 
 ### Usage:
 ```python
-kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, window_size )
+kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, *, window_size )
 ```
 
 ### Inputs:
@@ -2175,7 +2168,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_list) · [MATLAB](quadriga_lib_
 
 ### Usage:
 ```python
-scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, parse_shortnames )
+scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list( dirs, *, parse_shortnames )
 ```
 
 ### Inputs:
@@ -2222,7 +2215,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_read) · [MATLAB](quadriga_lib_
 ### Usage:
 ```python
 scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
-    quadriga_lib.gbsm.conf_file_read( fn, validate )
+    quadriga_lib.gbsm.conf_file_read( fn, *, validate )
 ```
 
 ### Inputs:
@@ -2274,7 +2267,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#conf_file_write) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, short_names, ref, ref_sec, valid_range, \
+quadriga_lib.gbsm.conf_file_write( fn, scenpar, plpar, *, short_names, ref, ref_sec, valid_range, \
     write_defaults )
 ```
 
@@ -2339,7 +2332,7 @@ the same. Block 13, the XPR per cluster, is in column `13·N·M + n`; block 14, 
 
 ### Usage:
 ```python
-rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, preset, floor_id, \
+rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, *, set_id, preset, floor_id, \
     center_freq, dual_mobility, horizontal )
 ```
 
@@ -2393,7 +2386,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_init_phases) · [MATLAB](quadriga_li
 
 ### Usage:
 ```python
-phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, seed, set_id, preset, tx_pos, rx_pos, \
+phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, *, seed, set_id, preset, tx_pos, rx_pos, \
     dual_mobility, remove_bias, horizontal )
 ```
 
@@ -2441,7 +2434,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [MATLAB](quadrig
 ### Usage:
 ```python
 rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, \
-    path_length, M, method, path_type, tap, gr_eps )
+    path_length, M, *, method, path_type, tap, gr_eps )
 ```
 
 ### Inputs:
@@ -2498,7 +2491,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [MATLAB](qua
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, \
+chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, *, mobility, \
     output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
     use_absolute_delays, stack=False )
 ```
@@ -2521,7 +2514,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays (`"phase"`: of the ray-data positions); default:
   `False`
-- **`stack`** — Keyword-only; snapshot layout of `chan` as in [hdf5_read_channel](#hdf5_read_channel); default: `False`
+- **`stack`** — Snapshot layout of `chan` as in [hdf5_read_channel](#hdf5_read_channel); default: `False`
 
 ### Outputs:
 - **`chan`** — Channel dict, layout as documented in [hdf5_read_channel](#hdf5_read_channel): `center_freq` `(1,)`;
@@ -2572,8 +2565,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#los_probability) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, d_clutter, r_clutter, \
-    h_clutter, rnd_g, center_freq )
+p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, *, d_clutter, \
+    r_clutter, h_clutter, rnd_g, center_freq )
 ```
 
 ### Inputs:
@@ -2639,7 +2632,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [MATLAB](quadriga_lib_ap
 ### Usage:
 ```python
 lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
-    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads )
+    center_freq, tx_pos, rx_pos, rnd, *, sf_sigma_dB, cholesky, clip_spreads )
 ```
 
 ### Inputs:
@@ -2697,7 +2690,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#o2i_loss) · [MATLAB](quadriga_lib_api_me
 
 ### Usage:
 ```python
-loss_dB, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, d2d_in_max )
+loss_dB, d2d_in, model_ind = quadriga_lib.gbsm.o2i_loss( center_freq, rnd, models, weights, *, \
+    d2d_in_max )
 ```
 
 ### Inputs:
@@ -2772,7 +2766,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#path_loss) · [MATLAB](quadriga_lib_api_m
 
 ### Usage:
 ```python
-pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he )
+pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, *, \
+    d2d_in, rnd_he )
 ```
 
 ### Inputs:
@@ -2827,7 +2822,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#scenpar_validate) · [MATLAB](quadriga_li
 
 ### Usage:
 ```python
-scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scenpar_in, validate )
+scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scenpar_in, *, validate )
 ```
 
 ### Inputs:
@@ -2894,7 +2889,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_clusters) · [MATLAB](quadriga_lib_ap
 ### Usage:
 ```python
 delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( scenpar, tx_pos, rx_pos, \
-    lsp, rnd, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
+    lsp, rnd, *, method, rnd_freq, lsp_anchor, eod_offset_deg, abs_toa, gr_eps, o2i, n_cluster )
 ```
 
 ### Inputs:
@@ -2978,7 +2973,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [MATLAB](quadriga_lib_api_m
 ### Usage:
 ```python
 path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_ind = \
-    quadriga_lib.gbsm.ssf_paths( rays, link_gain_dB, mobility, tx_pos, rx_pos, kf_ratio, oxygen )
+    quadriga_lib.gbsm.ssf_paths( rays, link_gain_dB, *, mobility, tx_pos, rx_pos, kf_ratio, oxygen )
 ```
 
 ### Inputs:
@@ -3072,7 +3067,7 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 ### Usage:
 ```python
 rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, \
-    delay, power, aod, eod, aoa, eoa, rnd_ray, method, i_freq, angle_model, pol_model, gr_eps, \
+    delay, power, aod, eod, aoa, eoa, rnd_ray, *, method, i_freq, angle_model, pol_model, gr_eps, \
     pol_variability, random_phase )
 ```
 
@@ -3137,7 +3132,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#.solve_scatterers) · [MATLAB](quadriga_l
 
 ### Usage:
 ```python
-rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, d_min )
+rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, *, d_min )
 ```
 
 ### Inputs:
@@ -3176,7 +3171,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_cart2geo) · [MATLAB](quadriga_lib_a
 
 ### Usage:
 ```python
-geo_coords     = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine, use_kernel )
+geo_coords     = quadriga_lib.tools.fast_cart2geo( cart, y, z, *, combine, use_kernel )
 az, el, length = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine=False )
 ```
 
@@ -3211,7 +3206,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#fast_geo2cart) · [MATLAB](quadriga_lib_a
 
 ### Usage:
 ```python
-cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, combine, use_kernel )
+cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, *, combine, use_kernel )
 x, y, z = quadriga_lib.tools.fast_geo2cart( az, el, len, combine=False )
 ```
 
@@ -3281,7 +3276,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#write_png) · [MATLAB](quadriga_lib_api_m
 
 ### Usage:
 ```python
-quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transform )
+quadriga_lib.tools.write_png( fn, data, *, colormap, min_val, max_val, log_transform )
 ```
 
 ### Arguments:
@@ -3330,12 +3325,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [MATLAB](quadri
 ```python
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 ```
 
@@ -3404,7 +3399,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#cube) · [MATLAB](quadriga_lib_api_mex.md
 
 ### Usage:
 ```python
-mesh = quadriga_lib.RTtools.cube( scale, rotation, location, n_div )
+mesh = quadriga_lib.RTtools.cube( scale, rotation, location, *, n_div )
 ```
 
 ### Inputs:
@@ -3432,10 +3427,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#icosphere) · [MATLAB](quadriga_lib_api_m
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.icosphere( n_div, radius, direction_xyz )
+data = quadriga_lib.RTtools.icosphere( n_div, radius, *, direction_xyz )
 
 # Unpacked outputs
-center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius, direction_xyz )
+center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius, *, direction_xyz )
 ```
 
 ### Inputs:
@@ -3475,7 +3470,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#mitsuba_xml_file_write) · Not in: MATLAB
 ### Usage:
 ```python
 quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
-    mtl_names, bsdf, map_to_itu_materials )
+    mtl_names, bsdf, *, map_to_itu_materials )
 ```
 
 ### Input Arguments:
@@ -3521,7 +3516,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_read) · [MATLAB](quadriga_lib_a
 ### Usage:
 ```python
 mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop = \
-    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, csv_strict )
+    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, *, csv_strict )
 ```
 
 ### Inputs:
@@ -3581,7 +3576,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#obj_file_write) · [MATLAB](quadriga_lib_
 ### Usage:
 ```python
 vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, \
-    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, \
+    obj_names, mtl_names, *, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, \
     csv_write_defaults, split_loose_parts )
 ```
 
@@ -3628,7 +3623,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#plane) · [MATLAB](quadriga_lib_api_mex.m
 
 ### Usage:
 ```python
-mesh = quadriga_lib.RTtools.plane( scale, rotation, location, n_div )
+mesh = quadriga_lib.RTtools.plane( scale, rotation, location, *, n_div )
 ```
 
 ### Inputs:
@@ -3657,7 +3652,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#point_cloud_aabb) · [MATLAB](quadriga_li
 
 ### Usage:
 ```python
-aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
+aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, *, vec_size )
 ```
 
 ### Input Arguments:
@@ -3687,11 +3682,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#point_cloud_segmentation) · [MATLAB](qua
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+data = quadriga_lib.RTtools.point_cloud_segmentation( points, *, target_size, vec_size )
 
 # Unpacked outputs
 points_out, sub_cloud_ind, forward_ind, reverse_ind = \
-    quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+    quadriga_lib.RTtools.point_cloud_segmentation( points, *, target_size, vec_size )
 ```
 
 ### Inputs:
@@ -3725,7 +3720,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#point_inside_mesh) · [MATLAB](quadriga_l
 
 ### Usage:
 ```python
-result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
+result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, *, distance )
 ```
 
 ### Input Arguments:
@@ -3762,7 +3757,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_point_intersect) · [MATLAB](quadriga
 ### Usage:
 ```python
 hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
-    tridir, sub_cloud_ind, use_kernel, gpu_id )
+    tridir, sub_cloud_ind, *, use_kernel, gpu_id )
 ```
 
 ### Inputs:
@@ -3811,11 +3806,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_triangle_intersect) · [MATLAB](quadr
 ### Usage:
 ```python
 # Output as tuple
-data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, use_kernel, gpu_id )
+data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 
 # Unpacked outputs
 fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, \
-    sub_mesh_ind, aabb, use_kernel, gpu_id )
+    sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 ```
 
 ### Inputs:
@@ -3858,7 +3853,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_aabb) · [MATLAB](quadriga_
 
 ### Usage:
 ```python
-aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size )
+aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, *, vec_size )
 ```
 
 ### Inputs:
@@ -3892,11 +3887,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_segmentation) · [MATLAB](q
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
+data = quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, *, target_size, vec_size, mtl_ind )
 
 # Unpacked outputs
 mesh_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
-    quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
+    quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, *, target_size, vec_size, mtl_ind )
 ```
 
 ### Inputs:
@@ -3972,7 +3967,7 @@ positions are shared: 20 generators take less than twice as long as one.
 spatial_freq, acf, dist = quadriga_lib.sos.preset("Comb256", 10)
 
 # Phases of 20 generators; each column is one independent random field
-phase = quadriga_lib.sos.init_phases(spatial_freq.shape[0], 20, 42)
+phase = quadriga_lib.sos.init_phases(spatial_freq.shape[0], 20, seed=42)
 
 # Values of all 20 generators at the positions, shape (1000, 20)
 val_all = quadriga_lib.sos.val(spatial_freq, phase, pos)
@@ -4157,7 +4152,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_acf_estimate) · [MATLAB](quadriga_li
 ### Usage:
 ```python
 acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, phase, bins, n_pos, \
-    acf, dist, seed )
+    *, acf, dist, seed )
 ```
 
 ### Inputs:
@@ -4242,7 +4237,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_calc_mse) · [MATLAB](quadriga_lib_ap
 
 ### Usage:
 ```python
-mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, dist, n_dir )
+mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, \
+    dist, *, n_dir )
 ```
 
 ### Inputs:
@@ -4301,8 +4297,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_generate) · [MATLAB](quadriga_lib_ap
 
 ### Usage:
 ```python
-spatial_freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, uniform_smp, n_dir, \
-    random_init, spatial_freq_min, spatial_freq_max, seed )
+spatial_freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, *, uniform_smp, \
+    n_dir, random_init, spatial_freq_min, spatial_freq_max, seed )
 ```
 
 ### Inputs:
@@ -4354,7 +4350,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_init_phases) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )
+phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, *, seed )
 ```
 
 ### Inputs:
@@ -4388,7 +4384,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_map) · [MATLAB](quadriga_lib_api_mex
 
 ### Usage:
 ```python
-map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, uniform, use_kernel )
+map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, *, uniform, use_kernel )
 ```
 
 ### Inputs:
@@ -4462,9 +4458,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_rand) · [MATLAB](quadriga_lib_api_me
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
   A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed_b )`, where `seed_b` is the seed with bit 62
+  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
   flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
   phases of a generator therefore depend neither on the number of generators nor on whether a
   second device is given
@@ -4488,7 +4484,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_rand) · [MATLAB](quadriga_lib_api_me
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, seed )
+val = quadriga_lib.sos.rand( dist_decorr, pos, pos_b, *, dist_decorr_b, preset, seed )
 ```
 
 ### Inputs:
@@ -4524,9 +4520,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_randi) · [MATLAB](quadriga_lib_api_m
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
   A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed_b )`, where `seed_b` is the seed with bit 62
+  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
   flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
   phases of a generator therefore depend neither on the number of generators nor on whether a
   second device is given
@@ -4551,7 +4547,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_randi) · [MATLAB](quadriga_lib_api_m
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, preset, seed )
+val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, *, dist_decorr_b, preset, seed )
 ```
 
 ### Inputs:
@@ -4588,9 +4584,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_randn) · [MATLAB](quadriga_lib_api_m
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
   A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed_b )`, where `seed_b` is the seed with bit 62
+  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
   flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
   phases of a generator therefore depend neither on the number of generators nor on whether a
   second device is given
@@ -4613,7 +4609,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_randn) · [MATLAB](quadriga_lib_api_m
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, seed )
+val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, *, dist_decorr_b, preset, seed )
 ```
 
 ### Inputs:
@@ -4684,8 +4680,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_remove_bias) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, pos, \
-    pos_b, phase_b_in, acf, dist, spatial_freq_scale_b )
+phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, \
+    pos, pos_b, *, phase_b_in, acf, dist, spatial_freq_scale_b )
 ```
 
 ### Inputs:
@@ -4768,8 +4764,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#sos_val) · [MATLAB](quadriga_lib_api_mex
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, phase_b, acf, dist, spatial_freq_scale_b, \
-    uniform, use_kernel )
+val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, *, phase_b, acf, dist, \
+    spatial_freq_scale_b, uniform, use_kernel )
 ```
 
 ### Inputs:

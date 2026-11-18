@@ -122,7 +122,7 @@ class test_case(unittest.TestCase):
             self.assertEqual(ignored_keys, [], fn)
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.gbsm.conf_file_read(self.fn, True)
+        ref = quadriga_lib.gbsm.conf_file_read(self.fn, validate=True)
         out = quadriga_lib.gbsm.conf_file_read(fn=self.fn, validate=True)
         self.assertEqual(out[0], ref[0])
         self.assertEqual(list(out[1]), list(ref[1]))
@@ -137,30 +137,30 @@ class test_case(unittest.TestCase):
             quadriga_lib.gbsm.conf_file_read(fn)
         self.assertIn("r_DS", str(ctx.exception))
         with self.assertRaises(RuntimeError):
-            quadriga_lib.gbsm.conf_file_read(fn, True)
+            quadriga_lib.gbsm.conf_file_read(fn, validate=True)
 
         # validate = False only checks the grammar
-        scenpar = quadriga_lib.gbsm.conf_file_read(fn, False)[0]
+        scenpar = quadriga_lib.gbsm.conf_file_read(fn, validate=False)[0]
         self.assertEqual(scenpar["r_DS"], -1.0)
 
     def test_validate_flag_types(self):
         # None selects the default (True); bool and numpy.bool_ are accepted; anything else is a TypeError
         fn = self.write("conf_file_read_invalid.conf", "r_DS = -1\n")
-        for args, kwargs in [((fn, None), {}), ((fn,), {"validate": None}), ((fn, np.bool_(True)), {})]:
+        for args, kwargs in [((fn,), {"validate": None}), ((fn,), {"validate": np.bool_(True)})]:
             with self.assertRaises(RuntimeError) as ctx:
                 quadriga_lib.gbsm.conf_file_read(*args, **kwargs)
             self.assertIn("r_DS", str(ctx.exception))
-        self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, np.bool_(False))[0]["r_DS"], -1.0)
+        self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, validate=np.bool_(False))[0]["r_DS"], -1.0)
 
         ref = quadriga_lib.gbsm.conf_file_read(self.fn)
-        out = quadriga_lib.gbsm.conf_file_read(self.fn, None)
+        out = quadriga_lib.gbsm.conf_file_read(self.fn, validate=None)
         self.assertEqual(out[0], ref[0])
         npt.assert_array_equal(out[2], ref[2])
         self.assertEqual(out[3:], ref[3:])
 
         for value in ["yes", 1, 0, 1.0]:
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.gbsm.conf_file_read(fn, value)
+                quadriga_lib.gbsm.conf_file_read(fn, validate=value)
             self.assertIn("'validate'", str(ctx.exception))
 
     def test_path_like(self):
@@ -231,7 +231,7 @@ class test_case(unittest.TestCase):
         # Thrown by C++: std::runtime_error -> RuntimeError, with file name and line number
         fn = self.write("conf_file_read_grammar.conf", "% comment\nDS_mu = abc\n")
         with self.assertRaises(RuntimeError) as ctx:
-            quadriga_lib.gbsm.conf_file_read(fn, False)
+            quadriga_lib.gbsm.conf_file_read(fn, validate=False)
         self.assertIn("line 2", str(ctx.exception))
         self.assertIn("DS_mu", str(ctx.exception))
 
@@ -241,13 +241,13 @@ class test_case(unittest.TestCase):
             quadriga_lib.gbsm.conf_file_read(fn)
         self.assertIn("line 2", str(ctx.exception))
         self.assertIn("Values of 'DS_VS_a' and 'DS_VS_b' must not both be 0 if 'DS_VS' is > 0.", str(ctx.exception))
-        self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, False)[0]["DS_VS"], 4.0)
+        self.assertEqual(quadriga_lib.gbsm.conf_file_read(fn, validate=False)[0]["DS_VS"], 4.0)
 
         # SubpathMethod: only 'legacy' is accepted, also without validation
         fn = self.write("conf_file_read_subpath.conf", "DS_mu = -7\nSubpathMethod = mmMAGIC\n")
         for validate in (True, False):
             with self.assertRaises(RuntimeError) as ctx:
-                quadriga_lib.gbsm.conf_file_read(fn, validate)
+                quadriga_lib.gbsm.conf_file_read(fn, validate=validate)
             self.assertIn("line 2: Value 'mmMAGIC' of 'SubpathMethod' is not supported; only 'legacy' is accepted.",
                           str(ctx.exception))
 

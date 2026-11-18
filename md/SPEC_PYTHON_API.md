@@ -308,7 +308,7 @@ SECTION!*/
 - The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
 - The heading is the name exposed to Python, without case conversion (names without their prefix: see "Submodules").
 - Omit dtype specifications (except for integer and complex arguments). Use Python types and syntax: tuples `(n, m)` for shapes, `list`, `dict`, `str`, `None`.
-- A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements; split long calls (line length: `docs_builder/README.md`, "Writing pitfalls") with continuation lines indented by 4 and ending in ` \`. If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
+- A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements; split long calls (line length: `docs_builder/README.md`, "Writing pitfalls") with continuation lines indented by 4 and ending in ` \`. The keyword-only arguments follow a `*` ("Keyword-only arguments"). If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
 ```
 ## Usage:
 ```
@@ -438,8 +438,14 @@ auto bins_out_py = qd_python_copy2numpy(&bins_out);
 ### List of Armadillo types (output)
 - A `std::vector<arma::Col/Mat/Cube>` with ragged sizes is returned as a `list` (`qd_python_copy2list`), or as one zero-padded array with the vector index on the last axis (`qd_python_stack2numpy`, see the `stack` flag). A regular 4D output with known dimensions uses the zero-copy `qd_python_init_output(..., &vector<Cube>)` overload.
 
+## Keyword-only arguments
+- Mandatory arguments are positional. Optional arguments are keyword-only: the registration puts `py::kw_only()` after the last argument that may be passed by position, and the Usage line shows the marker as `*`. A new optional argument can then go anywhere after the marker without breaking callers.
+- An optional argument stays before the marker only if a call almost always passes it and it reads clearly by position: the data the call works on or its address, e.g. the slot indices `ix, iy, iz, iw` of the HDF5 functions, the second file name of `obj_file_read`, the `sub_mesh_ind` / `aabb` outputs of an earlier call, the positions `pos_b` of a second device, `center_freq` of the channel functions. Flags, modes, tuning parameters, seeds, kernel and GPU selection and selectors of a subset (`i_element`, `i_freq`, `i_snap`) are keyword-only.
+- Names and defaults are those of C++. The positional arguments may come in another order than in C++ where that reads better (e.g. `center_freq` of `channel.irs` directly after the path data); the Usage line shows the Python order. The order of keyword-only arguments does not matter to callers.
+- `tests/python_tests/test_keyword_only.py` lists the optional arguments before the marker; a change of that list is an interface change and is decided, not a side effect.
+
 ## Standard flags
-- One keyword flag is standard and is added wherever it applies. It is keyword-only: the registration puts `py::kw_only()` before it, and it is the last argument of the wrapper. A new positional argument goes before the marker. The flag gets one line in the `## Inputs:` section, which says that it is keyword-only.
+- One keyword flag is standard and is added wherever it applies. It is keyword-only, as every flag. The flag gets one line in the `## Inputs:` section.
 - It is a flag in the sense of "Flags" (read with `qd_python_flag`).
 - **`stack`** (`bool`, default: `false`) — applies when the C++ function outputs a `std::vector` of Armadillo objects with possibly ragged sizes (typically one entry per snapshot).
   - `stack=False`: return a `list` of arrays (`qd_python_copy2list`).
@@ -472,7 +478,7 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
   2. Add the `m.def(...)` call inside the `quadriga_lib_<submodule>(py::module_ &m)` function.
 - The dispatcher entry is the only copy of the Python signature. When changing the arguments of an existing wrapper, update the function signature, the dispatcher entry and the Usage line together.
 - The kwarg names in `py::arg(...)` must match the C++ parameter names of the wrapper AND the names in the `## Usage:` line. These are what the user types as keyword arguments from Python.
-- One `py::arg(...)` line per parameter, in the order of the wrapper signature. Include defaults for all optional parameters; mandatory parameters have no default and come first.
+- One `py::arg(...)` line per parameter, in the order of the wrapper signature. Include defaults for all optional parameters; mandatory parameters have no default and come first. `py::kw_only()` follows the last positional parameter ("Keyword-only arguments").
 
 # DIFFERENCES FROM THE MEX WRAPPER
 - Both wrappers follow the C++ declaration (`md/SPEC_CPP_API.md`, "WRAPPER INTERFACE"). Where a MEX wrapper exists, the Python wrapper has the same in/out splits and computed outputs and differs from it only in:
@@ -564,7 +570,7 @@ self.assertIn("n_bins", str(ctx.exception))
 ## Default coverage
 The plan or spec may narrow or extend this list.
 - **Basic call**: all mandatory inputs; check the type of the returned object (tuple and its length for several outputs), and the type, shape, dtype and values of every output.
-- **Keyword arguments**: one call that passes every argument by keyword, using the names from the Usage line, gives the same result as the positional call. This is the check that the Usage line, the wrapper signature and the registration agree; a wrong name raises `TypeError`.
+- **Keyword arguments**: one call that passes every argument by keyword, using the names from the Usage line, gives the same result as the call that passes the positional arguments by position. This is the check that the Usage line, the wrapper signature and the registration agree; a wrong name raises `TypeError`.
 - **Each optional input**: omitted, passed as `None` where the default is `None` (must give the same result as omitted), and passed with a non-default value that visibly changes the result. This also shows that the default in the registration matches the documentation.
 - **Array memory layout**: the same data as C-ordered array, as Fortran-ordered array (`np.asfortranarray`), and as a non-contiguous view (e.g. a slice with a step) gives the same result. This exercises both the view and the copy path of the input helpers.
 - **Array dtype**: at least one call with `float32` or integer arrays (and a plain Python list for an optional input) gives the same result as the `float64` call.

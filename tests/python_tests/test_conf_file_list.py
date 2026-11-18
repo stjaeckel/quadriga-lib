@@ -58,15 +58,15 @@ class test_case(unittest.TestCase):
         self.assertEqual(file_dirs, [self.d1, self.d1, self.d1, self.d2, self.d2])
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], False)
+        ref = quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=False)
         out = quadriga_lib.gbsm.conf_file_list(dirs=[self.d1, self.d2], parse_shortnames=False)
         self.assertEqual(out, ref)
 
     def test_parse_shortnames(self):
         ref = quadriga_lib.gbsm.conf_file_list([self.d1, self.d2])
-        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], True), ref)
+        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=True), ref)
 
-        scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], False)
+        scenarios, file_names, file_dirs = quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=False)
         self.assertEqual(scenarios, ["B", "a", "C"])
         self.assertEqual(file_names, ["B.conf", "a.conf", "C.conf"])
         self.assertEqual(file_dirs, [self.d1, self.d1, self.d2])
@@ -74,14 +74,14 @@ class test_case(unittest.TestCase):
     def test_parse_shortnames_flag_types(self):
         # None selects the default (True); bool and numpy.bool_ are accepted; anything else is a TypeError
         ref = quadriga_lib.gbsm.conf_file_list([self.d1, self.d2])
-        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], None), ref)
         self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=None), ref)
-        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], np.bool_(True)), ref)
-        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], np.bool_(False)),
-                         quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], False))
+        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=None), ref)
+        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=np.bool_(True)), ref)
+        self.assertEqual(quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=np.bool_(False)),
+                         quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=False))
         for value in ["yes", 1, 0]:
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], value)
+                quadriga_lib.gbsm.conf_file_list([self.d1, self.d2], parse_shortnames=value)
             self.assertIn("'parse_shortnames'", str(ctx.exception))
 
     def test_dirs_path_like(self):

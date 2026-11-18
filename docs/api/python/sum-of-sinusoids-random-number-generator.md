@@ -73,7 +73,7 @@ positions are shared: 20 generators take less than twice as long as one.
 spatial_freq, acf, dist = quadriga_lib.sos.preset("Comb256", 10)
 
 # Phases of 20 generators; each column is one independent random field
-phase = quadriga_lib.sos.init_phases(spatial_freq.shape[0], 20, 42)
+phase = quadriga_lib.sos.init_phases(spatial_freq.shape[0], 20, seed=42)
 
 # Values of all 20 generators at the positions, shape (1000, 20)
 val_all = quadriga_lib.sos.val(spatial_freq, phase, pos)
@@ -258,7 +258,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_acf_estima
 ### Usage:
 ```python
 acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, phase, bins, n_pos, \
-    acf, dist, seed )
+    *, acf, dist, seed )
 ```
 
 ### Inputs:
@@ -343,7 +343,8 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_calc_mse) 
 
 ### Usage:
 ```python
-mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, dist, n_dir )
+mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, \
+    dist, *, n_dir )
 ```
 
 ### Inputs:
@@ -402,8 +403,8 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_generate) 
 
 ### Usage:
 ```python
-spatial_freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, uniform_smp, n_dir, \
-    random_init, spatial_freq_min, spatial_freq_max, seed )
+spatial_freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, *, uniform_smp, \
+    n_dir, random_init, spatial_freq_min, spatial_freq_max, seed )
 ```
 
 ### Inputs:
@@ -455,7 +456,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_init_phase
 
 ### Usage:
 ```python
-phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )
+phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, *, seed )
 ```
 
 ### Inputs:
@@ -489,7 +490,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_map) · [M
 
 ### Usage:
 ```python
-map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, uniform, use_kernel )
+map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, *, uniform, use_kernel )
 ```
 
 ### Inputs:
@@ -563,9 +564,9 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_rand) · [
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
   A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed_b )`, where `seed_b` is the seed with bit 62
+  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
   flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
   phases of a generator therefore depend neither on the number of generators nor on whether a
   second device is given
@@ -589,7 +590,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_rand) · [
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.rand( dist_decorr, pos, pos_b, dist_decorr_b, preset, seed )
+val = quadriga_lib.sos.rand( dist_decorr, pos, pos_b, *, dist_decorr_b, preset, seed )
 ```
 
 ### Inputs:
@@ -625,9 +626,9 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_randi) · 
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
   A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed_b )`, where `seed_b` is the seed with bit 62
+  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
   flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
   phases of a generator therefore depend neither on the number of generators nor on whether a
   second device is given
@@ -652,7 +653,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_randi) · 
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, preset, seed )
+val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, *, dist_decorr_b, preset, seed )
 ```
 
 ### Inputs:
@@ -689,9 +690,9 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_randn) · 
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [sos.val](#sos.val) for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
   A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed_b )`, where `seed_b` is the seed with bit 62
+  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
   flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
   phases of a generator therefore depend neither on the number of generators nor on whether a
   second device is given
@@ -714,7 +715,7 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_randn) · 
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, dist_decorr_b, preset, seed )
+val = quadriga_lib.sos.randn( dist_decorr, pos, pos_b, *, dist_decorr_b, preset, seed )
 ```
 
 ### Inputs:
@@ -785,8 +786,8 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_remove_bia
 
 ### Usage:
 ```python
-phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, pos, \
-    pos_b, phase_b_in, acf, dist, spatial_freq_scale_b )
+phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, \
+    pos, pos_b, *, phase_b_in, acf, dist, spatial_freq_scale_b )
 ```
 
 ### Inputs:
@@ -869,8 +870,8 @@ Also in: [C++](../cpp/sum-of-sinusoids-random-number-generator.md#sos_val) · [M
 
 ### Usage:
 ```python
-val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, phase_b, acf, dist, spatial_freq_scale_b, \
-    uniform, use_kernel )
+val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, *, phase_b, acf, dist, \
+    spatial_freq_scale_b, uniform, use_kernel )
 ```
 
 ### Inputs:

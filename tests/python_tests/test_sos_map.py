@@ -38,14 +38,14 @@ class test_case(unittest.TestCase):
         self.ref = a * np.stack((np.cos(np.pi / 2 * xx) + common, -np.sin(np.pi / 2 * xx) + common), axis=3)
 
     def test_basic_call(self):
-        out = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, self.y, self.z, False, 1)
+        out = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, self.y, self.z, uniform=False, use_kernel=1)
         self.assertIsInstance(out, np.ndarray)
         self.assertEqual(out.shape, (2, 3, 4, 2))  # (ny, nx, nz, n_gen)
         self.assertEqual(out.dtype, np.float64)
         npt.assert_allclose(out, self.ref, atol=1e-13, rtol=0)
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, self.y, self.z, True, 1)
+        ref = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, self.y, self.z, uniform=True, use_kernel=1)
         out = quadriga_lib.sos.map(spatial_freq=self.spatial_freq, phase=self.phase, x=self.x, y=self.y, z=self.z,
                                    uniform=True, use_kernel=1)
         npt.assert_array_equal(out, ref)
@@ -57,7 +57,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(m1, self.ref[:1, :, :1, :], atol=1e-13, rtol=0)
 
         # None and empty arrays are the same as omitted
-        m2 = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, None, None, False, 1)
+        m2 = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, None, None, uniform=False, use_kernel=1)
         npt.assert_array_equal(m2, m1)
         m2 = quadriga_lib.sos.map(self.spatial_freq, self.phase, self.x, [], np.zeros(0), use_kernel=1)
         npt.assert_array_equal(m2, m1)

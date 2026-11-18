@@ -29,7 +29,7 @@ Calculate azimuth and elevation angular spreads, optionally with spherical wrapp
 ## Usage:
 ```
 azimuth_spread, elevation_spread, orientation, phi, theta = \
-    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize_deg )
+    quadriga_lib.tools.calc_angular_spread( az, el, powers, *, wrapping, calc_bank_angle, quantize_deg )
 ```
 
 ## Inputs:

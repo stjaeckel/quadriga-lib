@@ -23,7 +23,7 @@ Construct a triangulated cube mesh
 
 ## Usage:
 ```
-mesh = quadriga_lib.RTtools.cube( scale, rotation, location, n_div )
+mesh = quadriga_lib.RTtools.cube( scale, rotation, location, *, n_div )
 ```
 
 ## Inputs:

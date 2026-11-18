@@ -51,8 +51,8 @@ Remove the sample mean of sum-of-sinusoids generators over a set of positions
 
 ## Usage:
 ```
-phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, pos, \
-    pos_b, phase_b_in, acf, dist, spatial_freq_scale_b )
+phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, \
+    pos, pos_b, *, phase_b_in, acf, dist, spatial_freq_scale_b )
 ```
 
 ## Inputs:

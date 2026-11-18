@@ -34,7 +34,7 @@ First- and last-bounce scatterers of the rays of one link (two-bounce solver)
 
 ## Usage:
 ```
-rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, d_min )
+rays_out, b_med, b_eff = quadriga_lib.gbsm.ssf_scatterers( rays, *, d_min )
 ```
 
 ## Inputs:

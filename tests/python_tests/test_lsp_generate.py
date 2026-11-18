@@ -80,26 +80,28 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         ok = self.call(scenpar=self.sp, center_freq=self.fc, tx_pos=self.tx_pos, rx_pos=self.rx_pos, rnd=self.rnd,
                        sf_sigma_dB=None, cholesky=True, clip_spreads=True)
-        op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True)
+        op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf_sigma_dB=None, cholesky=True,
+                       clip_spreads=True)
         for a, b, c in zip(ok, op, self.out):
             npt.assert_array_equal(a, c)
             npt.assert_array_equal(b, c)
 
     def test_sf_sigma(self):
         lsp_sigma = self.out[5]
-        o2 = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None)
+        o2 = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf_sigma_dB=None)
         npt.assert_array_equal(o2[0], self.out[0])
         npt.assert_array_equal(o2[5], lsp_sigma)
-        npt.assert_array_equal(self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, np.zeros((0, 2)))[5],
+        npt.assert_array_equal(self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf_sigma_dB=np.zeros((0,
+                                                                                                                     2)))[5],
                                lsp_sigma)  # empty = scenario value
         sf_in = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
         rnd_s = self.rnd.copy()
         rnd_s[:, 2] = 1.0  # SF value passed through
-        lsp3, _, _, _, _, sig3 = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_s, sf_in)
+        lsp3, _, _, _, _, sig3 = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_s, sf_sigma_dB=sf_in)
         npt.assert_array_equal(sig3[:, :, 2], sf_in)  # replaces slice 2
         npt.assert_array_equal(sig3[:, :, [0, 1, 3, 4, 5, 6, 7]], lsp_sigma[:, :, [0, 1, 3, 4, 5, 6, 7]])
         npt.assert_allclose(lsp3[:, :, 2], 10.0 ** (0.1 * sf_in), rtol=1e-12, atol=0)
-        sig4 = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_s, sf_in.astype(np.int32))[5]
+        sig4 = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_s, sf_sigma_dB=sf_in.astype(np.int32))[5]
         npt.assert_array_equal(sig4, sig3)
 
     def test_cholesky_and_clip_spreads(self):
@@ -123,7 +125,8 @@ class test_case(unittest.TestCase):
 
     def test_flags(self):
         args = (self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd)
-        out = self.call(*args, None, None, None)  # None selects the default of each flag
+        out = self.call(*args, sf_sigma_dB=None, cholesky=None,
+                        clip_spreads=None)  # None selects the default of each flag
         self.assertEqual(len(out), 6)
         for a, b in zip(out, self.out):
             npt.assert_array_equal(a, b)
@@ -148,7 +151,7 @@ class test_case(unittest.TestCase):
         # conf_file_read -> path_loss (sf_sigma_dB) -> lsp_generate
         sp, plpar = quadriga_lib.gbsm.conf_file_read(os.path.join(config_dir, "3GPP_38.901_v19_UMa_NLOS.conf"))[:2]
         pl, sf = quadriga_lib.gbsm.path_loss(plpar, sp, self.fc, self.tx_pos, self.rx_pos)
-        lsp, _, _, _, _, sig = self.call(sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf)
+        lsp, _, _, _, _, sig = self.call(sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf_sigma_dB=sf)
         npt.assert_array_equal(sig[:, :, 2], sf)
         self.assertEqual(lsp.shape, (3, 2, 8))
 
@@ -174,7 +177,7 @@ class test_case(unittest.TestCase):
     def test_inputs_not_modified(self):
         rnd, rx = self.rnd.copy(), self.rx_pos.copy()
         sf = np.ones((3, 2))
-        self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf)
+        self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf_sigma_dB=sf)
         npt.assert_array_equal(self.rnd, rnd)
         npt.assert_array_equal(self.rx_pos, rx)
         npt.assert_array_equal(sf, np.ones((3, 2)))
@@ -189,7 +192,7 @@ class test_case(unittest.TestCase):
             self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd[:, :10])
         self.assertIn("Input 'rnd' must have size [n_link, 11].", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, -np.ones((3, 2)))
+            self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, sf_sigma_dB=-np.ones((3, 2)))
         self.assertIn("Input 'sf_sigma_dB' must be finite and >= 0.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             self.call({"ds_kf": 0.9, "ds_sf": 0.9, "sf_kf": -0.9}, self.fc, self.tx_pos, self.rx_pos, self.rnd)

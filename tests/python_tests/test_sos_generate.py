@@ -33,7 +33,8 @@ class test_case(unittest.TestCase):
         self.expo = np.exp(-self.dist_e / 10.0)
 
     def test_basic_call(self):
-        out = quadriga_lib.sos.generate(self.acf, self.dist, 2, 1, True, 10, True, 0.0, 0.0, 3)
+        out = quadriga_lib.sos.generate(self.acf, self.dist, 2, 1, uniform_smp=True, n_dir=10, random_init=True,
+                                        spatial_freq_min=0.0, spatial_freq_max=0.0, seed=3)
         self.assertIsInstance(out, tuple)
         self.assertEqual(len(out), 3)
         spatial_freq, ase, test_dir = out
@@ -51,7 +52,8 @@ class test_case(unittest.TestCase):
         self.assertEqual(test_dir.shape, (0, 0))  # no test directions in 1-D
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, False, 7, False, 0.03, 0.2, 5)
+        ref = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, uniform_smp=False, n_dir=7, random_init=False,
+                                        spatial_freq_min=0.03, spatial_freq_max=0.2, seed=5)
         out = quadriga_lib.sos.generate(acf=self.expo, dist=self.dist_e, n_coeff=12, n_dim=2, uniform_smp=False,
                                         n_dir=7, random_init=False, spatial_freq_min=0.03, spatial_freq_max=0.2, seed=5)
         for a, b in zip(out, ref):
@@ -68,13 +70,15 @@ class test_case(unittest.TestCase):
         # NaN or a value <= 0 selects 15 / max(dist)
         ref = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, seed=5)
         for f_max in (np.nan, 0.0, -1.0, 15.0 / np.max(self.dist_e)):
-            out = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 3, True, 10, True, 0.0, f_max, 5)
+            out = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 3, uniform_smp=True, n_dir=10, random_init=True,
+                                            spatial_freq_min=0.0, spatial_freq_max=f_max, seed=5)
             for a, b in zip(out, ref):
                 npt.assert_array_equal(a, b)
 
     def test_optional_inputs(self):
         # n_dim and n_dir
-        f4, a4, d4 = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, True, 7, True, 0.0, 0.0, 5)
+        f4, a4, d4 = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, uniform_smp=True, n_dir=7,
+                                               random_init=True, spatial_freq_min=0.0, spatial_freq_max=0.0, seed=5)
         self.assertEqual(f4.shape, (12, 2))
         self.assertEqual(d4.shape, (7, 1))
         npt.assert_allclose(d4[:, 0], np.pi * np.arange(7) / 7.0, atol=1e-14, rtol=0)
@@ -115,8 +119,10 @@ class test_case(unittest.TestCase):
             lambda a: a.tolist(),               # plain list
         ]
         for fn in variants:
-            out = quadriga_lib.sos.generate(fn(self.acf), fn(self.dist), np.uint32(2), np.int32(1), np.bool_(True),
-                                            np.int64(10), True, 0, 0, np.int32(3))
+            out = quadriga_lib.sos.generate(fn(self.acf), fn(self.dist), np.uint32(2), np.int32(1),
+                                            uniform_smp=np.bool_(True),
+                                            n_dir=np.int64(10), random_init=True, spatial_freq_min=0,
+                                            spatial_freq_max=0, seed=np.int32(3))
             for a, b in zip(out, ref):
                 self.assertEqual(a.dtype, np.float64)
                 npt.assert_array_equal(a, b)
@@ -169,8 +175,10 @@ class test_case(unittest.TestCase):
 
     def test_none_and_flag_types(self):
         # uniform_smp and random_init: None selects the default (True), other types than bool raise TypeError
-        ref = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, True, 7, True, 0.0, 0.0, 5)
-        out = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, None, 7, None, 0.0, 0.0, 5)
+        ref = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, uniform_smp=True, n_dir=7, random_init=True,
+                                        spatial_freq_min=0.0, spatial_freq_max=0.0, seed=5)
+        out = quadriga_lib.sos.generate(self.expo, self.dist_e, 12, 2, uniform_smp=None, n_dir=7, random_init=None,
+                                        spatial_freq_min=0.0, spatial_freq_max=0.0, seed=5)
         for a, b in zip(out, ref):
             npt.assert_array_equal(a, b)
         for name in ("uniform_smp", "random_init"):

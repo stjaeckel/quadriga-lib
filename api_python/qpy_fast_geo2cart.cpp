@@ -24,7 +24,7 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
 ## Usage:
 ```
-cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, combine, use_kernel )
+cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, *, combine, use_kernel )
 x, y, z = quadriga_lib.tools.fast_geo2cart( az, el, len, combine=False )
 ```
 

@@ -20,11 +20,11 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 ## Usage:
 ```
 # Output as tuple
-data = quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+data = quadriga_lib.RTtools.point_cloud_segmentation( points, *, target_size, vec_size )
 
 # Unpacked outputs
 points_out, sub_cloud_ind, forward_ind, reverse_ind = \
-    quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+    quadriga_lib.RTtools.point_cloud_segmentation( points, *, target_size, vec_size )
 ```
 
 ## Inputs:

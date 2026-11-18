@@ -30,8 +30,8 @@ LOS probability of a set of links, TR 38.901 Table 7.4.2-1 and other named model
 
 ## Usage:
 ```
-p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, d_clutter, r_clutter, \
-    h_clutter, rnd_g, center_freq )
+p_los, los_soft = quadriga_lib.gbsm.los_probability( model, d2d_out, h_bs, h_ut, *, d_clutter, \
+    r_clutter, h_clutter, rnd_g, center_freq )
 ```
 
 ## Inputs:

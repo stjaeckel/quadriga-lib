@@ -38,7 +38,7 @@ Monte-Carlo estimate of the ACF of one generator
 ## Usage:
 ```
 acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate( spatial_freq, phase, bins, n_pos, \
-    acf, dist, seed )
+    *, acf, dist, seed )
 ```
 
 ## Inputs:

@@ -19,10 +19,10 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 ## Usage:
 ```
 # Output as tuple
-data = quadriga_lib.RTtools.icosphere( n_div, radius, direction_xyz )
+data = quadriga_lib.RTtools.icosphere( n_div, radius, *, direction_xyz )
 
 # Unpacked outputs
-center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius, direction_xyz )
+center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius, *, direction_xyz )
 ```
 
 ## Inputs:

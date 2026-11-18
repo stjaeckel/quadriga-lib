@@ -22,7 +22,7 @@ Calculate the Rician K-Factor from channel impulse response data
 
 ## Usage:
 ```
-kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, window_size )
+kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, *, window_size )
 ```
 
 ## Inputs:

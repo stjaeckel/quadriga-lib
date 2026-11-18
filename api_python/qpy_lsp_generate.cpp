@@ -42,7 +42,7 @@ Large-scale parameters of a set of links from normalized random values
 ## Usage:
 ```
 lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
-    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads )
+    center_freq, tx_pos, rx_pos, rnd, *, sf_sigma_dB, cholesky, clip_spreads )
 ```
 
 ## Inputs:

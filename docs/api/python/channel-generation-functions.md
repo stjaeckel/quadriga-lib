@@ -38,7 +38,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_ieee_indoor) 
 
 ### Usage:
 ```python
-chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
+chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, *, CarrierFreq_Hz, \
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack=False )
@@ -70,7 +70,7 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, Carri
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default; default: NAN
 - **`n_walls`** *(optional)* — Number of walls per user TGax models; `(n_users,)` or `(1,)`; default: 0
 - **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
-- **`stack`** *(optional)* — Keyword-only; if `True`, per-snapshot data is stacked into a single array along an appended 
+- **`stack`** *(optional)* — If `True`, per-snapshot data is stacked into a single array along an appended 
   snapshot axis instead of being returned as a list of per-snapshot arrays; default: False
 
 ### Output:
@@ -129,8 +129,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [MATL
 coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
-    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, \
-    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, center_freq, \
+    *, i_irs, threshold_dB, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
 
 # Departure and arrival angles as well
 coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..., angles=True )
@@ -159,9 +159,9 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 - **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
   the polyline length; `(n_path_2,)`
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
+- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS coupling matrix); default: `0`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
-- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory; default: `False`
 - **`irs_array_2`** — Second IRS arrayant dict for the RX-facing side (asymmetric IRS), with the same number of
@@ -230,7 +230,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 ```python
 coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
-    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
+    freq, freq_new, *, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
 ```
 
 ### Inputs:
@@ -312,7 +312,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
 ```python
 coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
-    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
+    center_freq, *, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
 ```
 
 ### Inputs:
@@ -404,7 +404,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 ```python
 coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
-    center_freq, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
+    center_freq, *, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
 
 # Departure and arrival angles as well
 coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )

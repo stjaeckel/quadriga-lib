@@ -47,8 +47,8 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
-    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, \
-    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, center_freq, \
+    *, i_irs, threshold_dB, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
 
 # Departure and arrival angles as well
 coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..., angles=True )
@@ -77,9 +77,9 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 - **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
   the polyline length; `(n_path_2,)`
 - **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
+- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS coupling matrix); default: `0`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
-- **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory; default: `False`
 - **`irs_array_2`** — Second IRS arrayant dict for the RX-facing side (asymmetric IRS), with the same number of
@@ -124,9 +124,9 @@ py::tuple get_channels_irs(const py::dict &tx_array,
                            const py::array_t<double> &path_gain_2,
                            const py::array_t<double> &path_length_2,
                            const py::array_t<double> &M_2,
+                           const double center_freq,
                            const arma::uword i_irs,
                            const double threshold_dB,
-                           const double center_freq,
                            py::handle use_absolute_delays,
                            py::handle angles,
                            py::handle irs_array_2,

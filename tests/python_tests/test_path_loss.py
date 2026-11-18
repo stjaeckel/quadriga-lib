@@ -90,25 +90,25 @@ class test_case(unittest.TestCase):
     def test_d2d_in(self):
         f = quadriga_lib.gbsm.path_loss
         args = (self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
-        npt.assert_array_equal(f(*args, None)[0], self.pl_dB)
-        npt.assert_array_equal(f(*args, np.zeros(0))[0], self.pl_dB)  # empty = geometric distance
-        npt.assert_array_equal(f(*args, np.zeros(3))[0], self.pl_dB)  # 0 = outdoor link
-        pl_in = f(*args, [0.0, 20.0, 0.0])[0]  # legacy outdoor distance
+        npt.assert_array_equal(f(*args, d2d_in=None)[0], self.pl_dB)
+        npt.assert_array_equal(f(*args, d2d_in=np.zeros(0))[0], self.pl_dB)  # empty = geometric distance
+        npt.assert_array_equal(f(*args, d2d_in=np.zeros(3))[0], self.pl_dB)  # 0 = outdoor link
+        pl_in = f(*args, d2d_in=[0.0, 20.0, 0.0])[0]  # legacy outdoor distance
         npt.assert_array_equal(pl_in[[0, 2]], self.pl_dB[[0, 2]])
         npt.assert_allclose(pl_in[1], 20 * np.log10(980.0) + 30 + 20 * np.log10(self.fc / 1e9), atol=1e-12, rtol=0)
-        npt.assert_array_equal(f(*args, np.array([0, 20, 0], dtype=np.int32))[0], pl_in)
-        npt.assert_array_equal(f(*args, np.array([0, 20, 0], dtype=np.float32))[0], pl_in)
+        npt.assert_array_equal(f(*args, d2d_in=np.array([0, 20, 0], dtype=np.int32))[0], pl_in)
+        npt.assert_array_equal(f(*args, d2d_in=np.array([0, 20, 0], dtype=np.float32))[0], pl_in)
 
     def test_rnd_he(self):
         # UMa LOS: hE = 1 m for u < p1, hE = 18 m for u near 1 at hUT = 20 m
         f = quadriga_lib.gbsm.path_loss
         args = (self.pl_los, self.sp_los, 1e9, self.tx_u, self.rx_u)
         pa = f(*args)[0]
-        npt.assert_array_equal(f(*args, None, None)[0], pa)
+        npt.assert_array_equal(f(*args, d2d_in=None, rnd_he=None)[0], pa)
         npt.assert_allclose(f(*args, rnd_he=[0.0])[0], pa, atol=1e-12, rtol=0)
         pr = f(*args, rnd_he=[0.999])[0]
         self.assertGreater(pr[0, 0] - pa[0, 0], 1.0)  # beyond the breakpoint
-        npt.assert_array_equal(f(*args, [0.0], [0.999])[0], pr)
+        npt.assert_array_equal(f(*args, d2d_in=[0.0], rnd_he=[0.999])[0], pr)
         npt.assert_array_equal(f(*args, rnd_he=0.999)[0], pr)  # scalar for one link
 
     def test_array_layout_and_dtype(self):
@@ -134,7 +134,7 @@ class test_case(unittest.TestCase):
     def test_inputs_not_modified(self):
         rx, fc, pp = self.rx_pos.copy(), self.fc.copy(), dict(self.plpar)
         d2d = np.array([0.0, 20.0, 0.0])
-        quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos, d2d)
+        quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos, d2d_in=d2d)
         npt.assert_array_equal(self.rx_pos, rx)
         npt.assert_array_equal(self.fc, fc)
         npt.assert_array_equal(d2d, [0.0, 20.0, 0.0])
@@ -150,10 +150,10 @@ class test_case(unittest.TestCase):
             f({"model": "logdist", "A": 20.0}, *args)
         self.assertIn("Path-loss model 'logdist' requires the parameter 'B'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f(self.pl_los, self.sp_los, 1e9, self.tx_u, self.rx_u, None, [1.5])
+            f(self.pl_los, self.sp_los, 1e9, self.tx_u, self.rx_u, d2d_in=None, rnd_he=[1.5])
         self.assertIn("Input 'rnd_he' must be in the range from 0 to 1.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f(self.plpar, *args, [0.0, 1.0])
+            f(self.plpar, *args, d2d_in=[0.0, 1.0])
         self.assertIn("Number of elements in 'd2d_in' does not match number of rows in 'rx_pos'.",
                       str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++

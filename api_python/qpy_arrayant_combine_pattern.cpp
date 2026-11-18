@@ -26,10 +26,12 @@ Combine element patterns, positions, and coupling weights into effective radiati
 ```
 # Single frequency
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant )
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, *, freq_new, azimuth_grid, \
+    elevation_grid )
 
 # Multiple frequencies (freq_new as a 1D array, or a frequency-dependent input antenna)
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, *, freq_new, azimuth_grid, \
+    elevation_grid )
 
 # Acoustic array (speed of sound)
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_speed=343.0 )

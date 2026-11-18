@@ -24,7 +24,7 @@ Read a single unstructured dataset from an HDF5 file
 
 ## Usage:
 ```
-dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, *, prefix )
 ```
 
 ## Inputs:

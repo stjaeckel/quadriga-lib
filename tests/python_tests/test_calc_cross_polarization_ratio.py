@@ -59,10 +59,10 @@ class test_case(unittest.TestCase):
         pl = [np.array([10.0, 15.0])]
 
         # Without LOS
-        xpr_no, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, False)
+        xpr_no, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=False)
 
         # With LOS
-        xpr_yes, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, True)
+        xpr_yes, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=True)
 
         # V-XPR without LOS: 0.5*0.64 / (0.5*0.04) = 16
         npt.assert_allclose(xpr_no[0, 1], 16.0, atol=1e-10, rtol=0)
@@ -156,7 +156,7 @@ class test_case(unittest.TestCase):
 
         # Large window: excludes paths 0 and 1
         xpr_large, _ = quadriga_lib.tools.calc_cross_polarization_ratio(
-            pw, M, pl, tx, rx, False, 0.01)
+            pw, M, pl, tx, rx, include_los=False, window_size=0.01)
 
         # Only path 2: V-XPR = 0.49/0.09
         npt.assert_allclose(xpr_large[0, 1], 0.49 / 0.09, atol=1e-10, rtol=0)
@@ -193,10 +193,10 @@ class test_case(unittest.TestCase):
         M_nlos = np.array([0.8, 0.0, 0.2, 0.0, 0.2, 0.0, 0.7, 0.0]).reshape(8, 1)
         M = [np.hstack([M_los, M_nlos])]
         pl = [np.array([10.0, 15.0])]
-        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, None)
+        xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=None)
         npt.assert_allclose(xpr[0, 1], 16.0, atol=1e-10, rtol=0)  # LOS excluded
         with self.assertRaises(TypeError) as ctx:
-            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, 2.5)
+            quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx, include_los=2.5)
         self.assertIn("'include_los'", str(ctx.exception))
         with self.assertRaises(TypeError):
             quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, None, rx)

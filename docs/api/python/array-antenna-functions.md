@@ -41,7 +41,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_calc_beamwidth) · [MA
 ### Usage:
 ```python
 beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg = \
-    quadriga_lib.arrayant.calc_beamwidth( arrayant, i_element, threshold_dB )
+    quadriga_lib.arrayant.calc_beamwidth( arrayant, *, i_element, threshold_dB )
 ```
 
 ### Inputs:
@@ -77,7 +77,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_calc_directivity) · [
 
 ### Usage:
 ```python
-directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, i_element )
+directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, *, i_element )
 ```
 
 ### Inputs:
@@ -115,10 +115,12 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_combine_pattern) · [M
 ```python
 # Single frequency
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant )
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, *, freq_new, azimuth_grid, \
+    elevation_grid )
 
 # Multiple frequencies (freq_new as a 1D array, or a frequency-dependent input antenna)
-arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq_new, azimuth_grid, elevation_grid )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, *, freq_new, azimuth_grid, \
+    elevation_grid )
 
 # Acoustic array (speed of sound)
 arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, propagation_speed=343.0 )
@@ -232,7 +234,7 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_export_obj_file) · [M
 
 ### Usage:
 ```python
-quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range_dB, colormap, object_radius, \
+quadriga_lib.arrayant.export_obj_file( fn, arrayant, *, directivity_range_dB, colormap, object_radius, \
     icosphere_n_div, i_element, i_freq )
 ```
 
@@ -256,7 +258,8 @@ Also in: [C++](../cpp/array-antenna-functions.md#generate_arrayant_3GPP) · [MAT
 - Dispatches to one of several C++ generator functions based on the `type` string
 - Supported types: `omni`, `dipole` (or `short-dipole`), `half-wave-dipole`, `xpol`, `custom`,
   `ula`, `3gpp` (or `3GPP`), `multibeam`
-- All arguments after `type` are keyword-only and type-specific; defaults are filled where omitted
+- `res` applies to all types; the arguments after it are keyword-only and type-specific; defaults are filled
+  where omitted
 - For `3gpp` and `ula`, a `pattern` dict can override the default per-element pattern
 - `multibeam` combines beams via MRT weighting; set `separate_beams=True` for one beam per direction
 
@@ -463,8 +466,8 @@ Also in: [C++](../cpp/array-antenna-functions.md#arrayant_interpolate) · [MATLA
 ### Usage:
 ```python
 # Single-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, i_element, orientation, element_pos, \
-    use_kernel=0 )
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, *, i_element, orientation, \
+    element_pos, use_kernel=0 )
 
 # Single-frequency mode with the projected distance and the local angles
 V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \

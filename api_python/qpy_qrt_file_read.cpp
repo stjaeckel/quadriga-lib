@@ -32,7 +32,7 @@ Read ray-tracing CIR data from a QRT file
 ```
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
     path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
-    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_M )
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, *, uplink, normalize_M )
 ```
 
 ## Inputs:

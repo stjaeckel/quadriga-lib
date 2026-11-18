@@ -25,7 +25,7 @@ Also in: [C++](../cpp/math-functions.md#fast_cart2geo) · [MATLAB](../mex/math-f
 
 ### Usage:
 ```python
-geo_coords     = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine, use_kernel )
+geo_coords     = quadriga_lib.tools.fast_cart2geo( cart, y, z, *, combine, use_kernel )
 az, el, length = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine=False )
 ```
 
@@ -60,7 +60,7 @@ Also in: [C++](../cpp/math-functions.md#fast_geo2cart) · [MATLAB](../mex/math-f
 
 ### Usage:
 ```python
-cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, combine, use_kernel )
+cart    = quadriga_lib.tools.fast_geo2cart( az, el, len, *, combine, use_kernel )
 x, y, z = quadriga_lib.tools.fast_geo2cart( az, el, len, combine=False )
 ```
 

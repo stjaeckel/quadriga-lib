@@ -63,7 +63,7 @@ positions are shared: 20 generators take less than twice as long as one.
 spatial_freq, acf, dist = quadriga_lib.sos.preset("Comb256", 10)
 
 # Phases of 20 generators; each column is one independent random field
-phase = quadriga_lib.sos.init_phases(spatial_freq.shape[0], 20, 42)
+phase = quadriga_lib.sos.init_phases(spatial_freq.shape[0], 20, seed=42)
 
 # Values of all 20 generators at the positions, shape (1000, 20)
 val_all = quadriga_lib.sos.val(spatial_freq, phase, pos)
@@ -190,8 +190,8 @@ Spatially correlated random values at given positions
 
 ## Usage:
 ```
-val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, phase_b, acf, dist, spatial_freq_scale_b, \
-    uniform, use_kernel )
+val = quadriga_lib.sos.val( spatial_freq, phase, pos, pos_b, *, phase_b, acf, dist, \
+    spatial_freq_scale_b, uniform, use_kernel )
 ```
 
 ## Inputs:

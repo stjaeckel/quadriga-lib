@@ -22,7 +22,7 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 ## Usage:
 ```
-quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, colormap, \
+quadriga_lib.channel.export_obj_file( fn, *, max_paths, gain_max_dB, gain_min_dB, colormap, \
     radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
     coeff_re, coeff_im, i_snap )
 ```

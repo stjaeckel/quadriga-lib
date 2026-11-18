@@ -32,6 +32,7 @@ void quadriga_lib_channel(py::module_ &m)
     m.def("baseband_freq_response", &baseband_freq_response,
           py::arg("coeff") = py::none(),
           py::arg("delay") = py::none(),
+          py::kw_only(),
           py::arg("bandwidth") = 0.0,
           py::arg("carriers") = 128,
           py::arg("pilot_grid") = py::none(),
@@ -45,6 +46,7 @@ void quadriga_lib_channel(py::module_ &m)
 
     m.def("export_obj_file", &channel_export_obj_file,
           py::arg("fn"),
+          py::kw_only(),
           py::arg("max_paths") = 0,
           py::arg("gain_max_dB") = -60.0,
           py::arg("gain_min_dB") = -140.0,
@@ -71,12 +73,13 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("iy") = py::none(),
           py::arg("iz") = py::none(),
           py::arg("iw") = py::none(),
-          py::arg("i_snap") = py::none(),
           py::kw_only(),
+          py::arg("i_snap") = py::none(),
           py::arg("stack") = false);
 
     m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+          py::kw_only(),
           py::arg("prefix") = "par_");
 
     m.def("hdf5_read_dset", &hdf5_read_dset,
@@ -86,6 +89,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("iy") = 0,
           py::arg("iz") = 0,
           py::arg("iw") = 0,
+          py::kw_only(),
           py::arg("prefix") = "par_");
 
     m.def("hdf5_read_layout", &hdf5_read_layout, py::arg("fn"));
@@ -106,12 +110,14 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("name"),
           py::arg("data").none(false),
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+          py::kw_only(),
           py::arg("prefix") = "par_");
 
     m.def("ieee_indoor", &get_channels_ieee_indoor,
           py::arg("ap_array") = py::dict(),
           py::arg("sta_array") = py::dict(),
           py::arg("ChannelType"),
+          py::kw_only(),
           py::arg("CarrierFreq_Hz") = 5.25e9,
           py::arg("tap_spacing_s") = 10.0e-9,
           py::arg("n_users") = 1,
@@ -133,7 +139,6 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("dBP_m") = NAN,
           py::arg("n_walls") = py::array_t<arma::uword>(),
           py::arg("wall_loss") = 5.0,
-          py::kw_only(),
           py::arg("stack") = false);
 
     m.def("irs", &get_channels_irs,
@@ -156,9 +161,10 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("path_gain_2").none(false),
           py::arg("path_length_2").none(false),
           py::arg("M_2").none(false),
+          py::arg("center_freq") = 0.0,
+          py::kw_only(),
           py::arg("i_irs") = 0,
           py::arg("threshold_dB") = -140.0,
-          py::arg("center_freq") = 0.0,
           py::arg("use_absolute_delays") = false,
           py::arg("angles") = false,
           py::arg("irs_array_2") = py::none(),
@@ -180,6 +186,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("path_length").none(false),
           py::arg("M").none(false),
           py::arg("center_freq") = py::none(),
+          py::kw_only(),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("use_kernel") = 0,
@@ -198,6 +205,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("path_length").none(false),
           py::arg("M").none(false),
           py::arg("center_freq") = py::none(),
+          py::kw_only(),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false,
@@ -218,22 +226,21 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("M").none(false),
           py::arg("freq").none(false),
           py::arg("freq_new").none(false),
+          py::kw_only(),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("propagation_speed") = 299792458.0,
           py::arg("use_kernel") = 0);
 
     m.def("quantize_delays", &quantize_delays,
-          py::arg("coeff_re") = py::none(),
-          py::arg("coeff_im") = py::none(),
-          py::arg("delay") = py::none(),
+          py::arg("coeff").none(false),
+          py::arg("delay").none(false),
+          py::kw_only(),
           py::arg("tap_spacing") = 5e-9,
           py::arg("max_taps") = 48,
           py::arg("power_exponent") = 1.0,
           py::arg("fix_taps") = 0,
-          py::kw_only(),
-          py::arg("stack") = false,
-          py::arg("coeff") = py::none());
+          py::arg("stack") = false);
 
     m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));
 
@@ -241,6 +248,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("fn"),
           py::arg("i_cir") = py::none(),
           py::arg("i_orig") = 0,
+          py::kw_only(),
           py::arg("uplink") = false,
           py::arg("normalize_M") = 1);
 }

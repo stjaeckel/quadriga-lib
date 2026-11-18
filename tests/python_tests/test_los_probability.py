@@ -52,8 +52,9 @@ class test_case(unittest.TestCase):
         pk, sk = quadriga_lib.gbsm.los_probability(model="38.901_UMi", d2d_out=self.d, h_bs=10.0, h_ut=1.5,
                                                    d_clutter=math.nan, r_clutter=math.nan, h_clutter=math.nan,
                                                    rnd_g=self.rnd_g, center_freq=self.fc)
-        pp, sp = quadriga_lib.gbsm.los_probability("38.901_UMi", self.d, 10.0, 1.5, math.nan, math.nan, math.nan,
-                                                   self.rnd_g, self.fc)
+        pp, sp = quadriga_lib.gbsm.los_probability("38.901_UMi", self.d, 10.0, 1.5, d_clutter=math.nan,
+                                                   r_clutter=math.nan, h_clutter=math.nan,
+                                                   rnd_g=self.rnd_g, center_freq=self.fc)
         npt.assert_array_equal(pk, self.p)
         npt.assert_array_equal(pk, pp)
         npt.assert_array_equal(sk, sp)
@@ -79,10 +80,13 @@ class test_case(unittest.TestCase):
         f = quadriga_lib.gbsm.los_probability
         p_sl = f("38.901_InF_SL", self.d, 8.0, 1.5)[0]
         npt.assert_allclose(p_sl, np.exp(-self.d * (-np.log(1 - 0.2) / 10)), atol=1e-14, rtol=0)
-        npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, math.nan, math.nan, math.nan)[0], p_sl)
-        npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, None, None, None)[0], p_sl)  # None = default
+        npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, d_clutter=math.nan, r_clutter=math.nan,
+                                 h_clutter=math.nan)[0], p_sl)
+        npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, d_clutter=None, r_clutter=None, h_clutter=None)[0],
+                               p_sl)  # None = default
         npt.assert_array_equal(f("38.901_InF_SL", self.d, 8.0, 1.5, d_clutter=np.array([10.0]))[0], p_sl)
-        npt.assert_allclose(f("38.901_InF_SL", self.d, 8.0, 1.5, 10.0, 0.2)[0], p_sl, atol=1e-15, rtol=0)
+        npt.assert_allclose(f("38.901_InF_SL", self.d, 8.0, 1.5, d_clutter=10.0, r_clutter=0.2)[0], p_sl, atol=1e-15,
+                            rtol=0)
         p_d = f("38.901_InF_SL", self.d, 8.0, 1.5, d_clutter=20.0)[0]
         npt.assert_allclose(p_d, np.exp(-self.d * (-np.log(1 - 0.2) / 20)), atol=1e-14, rtol=0)
         p_r = f("38.901_InF_SL", self.d, 8.0, 1.5, r_clutter=0.4)[0]

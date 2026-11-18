@@ -60,7 +60,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(mse2, -10.0 * np.log10(np.mean(np.square(self.other - self.acf))), atol=1e-9, rtol=0)
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, 7)
+        ref = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, n_dir=7)
         out = quadriga_lib.sos.calc_mse(spatial_freq=self.f3, acf=self.other, dist=self.dist, n_dir=7)
         npt.assert_allclose(out[:3], ref[:3], rtol=1e-12, atol=0)  # parallel sum: last digits
         npt.assert_array_equal(out[3], ref[3])
@@ -74,16 +74,16 @@ class test_case(unittest.TestCase):
         self.assertTrue(c3 > 0.0 and a3 > 0.0 and c3 != m3 and a3 != c3)
         self.assertEqual(t3.shape, (4,))
 
-        m4, _, _, _, dir4 = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, 10)
+        m4, _, _, _, dir4 = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, n_dir=10)
         npt.assert_allclose(m4, m3, rtol=1e-12, atol=0)
         npt.assert_array_equal(dir4, dir3)
 
-        m5, _, _, _, dir5 = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, 7)
+        m5, _, _, _, dir5 = quadriga_lib.sos.calc_mse(self.f3, self.other, self.dist, n_dir=7)
         self.assertEqual(dir5.shape, (7, 2))
         self.assertGreater(abs(m5 - m3), 1e-6)
 
         # 2-D: one column of azimuth angles
-        dir6 = quadriga_lib.sos.calc_mse(self.f3[:, :2], self.other, self.dist, np.int32(4))[4]
+        dir6 = quadriga_lib.sos.calc_mse(self.f3[:, :2], self.other, self.dist, n_dir=np.int32(4))[4]
         self.assertEqual(dir6.shape, (4, 1))
         npt.assert_allclose(dir6[:, 0], np.pi * np.arange(4) / 4.0, atol=1e-14, rtol=0)
 
@@ -122,7 +122,7 @@ class test_case(unittest.TestCase):
         self.assertIn("dist", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf, self.dist, 0)
+            quadriga_lib.sos.calc_mse(self.spatial_freq, self.acf, self.dist, n_dir=0)
         self.assertIn("n_dir", str(ctx.exception))
 
         # Rejected by pybind11

@@ -20,7 +20,7 @@ Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
 ## Usage:
 ```
-aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
+aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, *, vec_size )
 ```
 
 ## Input Arguments:

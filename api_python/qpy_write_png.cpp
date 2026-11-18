@@ -36,7 +36,7 @@ Write data to a PNG file
 
 ## Usage:
 ```
-quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transform )
+quadriga_lib.tools.write_png( fn, data, *, colormap, min_val, max_val, log_transform )
 ```
 
 ## Arguments:

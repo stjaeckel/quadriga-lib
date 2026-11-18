@@ -24,7 +24,7 @@ Construct a triangulated plane mesh
 
 ## Usage:
 ```
-mesh = quadriga_lib.RTtools.plane( scale, rotation, location, n_div )
+mesh = quadriga_lib.RTtools.plane( scale, rotation, location, *, n_div )
 ```
 
 ## Inputs:

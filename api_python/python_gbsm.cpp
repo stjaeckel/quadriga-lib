@@ -31,12 +31,14 @@ void quadriga_lib_gbsm(py::module_ &m)
 {
     m.def("conf_file_read", &conf_file_read,
           py::arg("fn"),
+          py::kw_only(),
           py::arg("validate") = true);
 
     m.def("conf_file_write", &conf_file_write,
           py::arg("fn"),
           py::arg("scenpar"),
           py::arg("plpar") = py::none(),
+          py::kw_only(),
           py::arg("short_names") = py::none(),
           py::arg("ref") = py::none(),
           py::arg("ref_sec") = py::none(),
@@ -45,15 +47,18 @@ void quadriga_lib_gbsm(py::module_ &m)
 
     m.def("scenpar_validate", &scenpar_validate,
           py::arg("scenpar_in") = py::none(),
+          py::kw_only(),
           py::arg("validate") = true);
 
     m.def("conf_file_list", &conf_file_list,
           py::arg("dirs"),
+          py::kw_only(),
           py::arg("parse_shortnames") = true);
 
     m.def("init_phases", &gbsm_init_phases,
           py::arg("scenpar"),
           py::arg("set_type"),
+          py::kw_only(),
           py::arg("seed") = -1,
           py::arg("set_id") = -1,
           py::arg("preset") = "Comb256",
@@ -69,6 +74,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("phase").none(false),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
+          py::kw_only(),
           py::arg("set_id") = -1,
           py::arg("preset") = "Comb256",
           py::arg("floor_id") = py::none(),
@@ -82,6 +88,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("center_freq").none(false),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
+          py::kw_only(),
           py::arg("d2d_in") = py::none(),
           py::arg("rnd_he") = py::none());
 
@@ -91,6 +98,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
           py::arg("rnd").none(false),
+          py::kw_only(),
           py::arg("sf_sigma_dB") = py::none(),
           py::arg("cholesky") = true,
           py::arg("clip_spreads") = true);
@@ -100,6 +108,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("d2d_out").none(false),
           py::arg("h_bs").none(false),
           py::arg("h_ut").none(false),
+          py::kw_only(),
           py::arg("d_clutter") = py::none(),
           py::arg("r_clutter") = py::none(),
           py::arg("h_clutter") = py::none(),
@@ -111,6 +120,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("rnd").none(false),
           py::arg("models"),
           py::arg("weights").none(false),
+          py::kw_only(),
           py::arg("d2d_in_max") = 25.0);
 
     m.def("ssf_clusters", &ssf_clusters,
@@ -119,6 +129,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("rx_pos").none(false),
           py::arg("lsp").none(false),
           py::arg("rnd").none(false),
+          py::kw_only(),
           py::arg("method") = "38.901",
           py::arg("rnd_freq") = py::none(),
           py::arg("lsp_anchor") = py::none(),
@@ -127,6 +138,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("gr_eps") = py::none(),
           py::arg("o2i") = py::none(),
           py::arg("n_cluster") = py::none());
+
     m.def("ssf_rays", &ssf_rays,
           py::arg("scenpar"),
           py::arg("tx_pos").none(false),
@@ -142,6 +154,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("aoa").none(false),
           py::arg("eoa").none(false),
           py::arg("rnd_ray").none(false),
+          py::kw_only(),
           py::arg("method") = "38.901",
           py::arg("i_freq") = 0,
           py::arg("angle_model") = "additive",
@@ -149,17 +162,22 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("gr_eps") = py::none(),
           py::arg("pol_variability") = false,
           py::arg("random_phase") = true);
+
     m.def("ssf_scatterers", &ssf_scatterers,
           py::arg("rays"),
+          py::kw_only(),
           py::arg("d_min") = 2.0);
+
     m.def("ssf_paths", &ssf_paths,
           py::arg("rays"),
           py::arg("link_gain_dB").none(false),
+          py::kw_only(),
           py::arg("mobility") = "auto",
           py::arg("tx_pos") = py::none(),
           py::arg("rx_pos") = py::none(),
           py::arg("kf_ratio") = py::none(),
           py::arg("oxygen") = false);
+
     m.def("rays_from_paths", &gbsm_rays_from_paths,
           py::arg("center_freq").none(false),
           py::arg("tx_pos").none(false),
@@ -169,15 +187,18 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("path_gain").none(false),
           py::arg("path_length").none(false),
           py::arg("M").none(false),
+          py::kw_only(),
           py::arg("method") = "quadriga",
           py::arg("path_type") = py::none(),
           py::arg("tap") = py::none(),
           py::arg("gr_eps") = py::none());
+
     m.def("single_link_channel", &gbsm_single_link_channel,
           py::arg("tx_array"),
           py::arg("rx_array"),
           py::arg("rays"),
           py::arg("link_gain_dB").none(false),
+          py::kw_only(),
           py::arg("mobility") = "auto",
           py::arg("output") = "taps",
           py::arg("i_freq") = 0,
@@ -188,6 +209,5 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("kf_ratio") = py::none(),
           py::arg("oxygen") = false,
           py::arg("use_absolute_delays") = false,
-          py::kw_only(),
           py::arg("stack") = false);
 }

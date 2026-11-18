@@ -49,7 +49,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 ```
 coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
-    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
+    freq, freq_new, *, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
 ```
 
 ## Inputs:

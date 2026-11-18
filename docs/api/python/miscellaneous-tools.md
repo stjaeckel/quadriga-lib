@@ -54,7 +54,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#write_png) · [MATLAB](.
 
 ### Usage:
 ```python
-quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transform )
+quadriga_lib.tools.write_png( fn, data, *, colormap, min_val, max_val, log_transform )
 ```
 
 ### Arguments:

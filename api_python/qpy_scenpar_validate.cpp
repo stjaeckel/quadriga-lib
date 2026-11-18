@@ -36,7 +36,7 @@ Validate scenario parameters and complete them with default values
 
 ## Usage:
 ```
-scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scenpar_in, validate )
+scenpar_out, lsp_xcorr, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate( scenpar_in, *, validate )
 ```
 
 ## Inputs:

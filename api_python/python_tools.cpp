@@ -22,18 +22,21 @@ void quadriga_lib_tools(py::module_ &m)
     m.def("acdf", &acdf,
           py::arg("data").none(false),
           py::arg("bins") = py::none(),
+          py::kw_only(),
           py::arg("n_bins") = 201);
 
     m.def("fast_cart2geo", &fast_cart2geo,
           py::arg("cart").none(false),
           py::arg("y") = py::none(),
           py::arg("z") = py::none(),
+          py::kw_only(),
           py::arg("combine") = true,
           py::arg("use_kernel") = 0);
 
     m.def("write_png", &write_png,
           py::arg("fn"),
           py::arg("data").none(false),
+          py::kw_only(),
           py::arg("colormap") = "jet",
           py::arg("min_val") = NAN,
           py::arg("max_val") = NAN,
@@ -43,6 +46,7 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("az"),
           py::arg("el"),
           py::arg("powers"),
+          py::kw_only(),
           py::arg("wrapping") = false,
           py::arg("calc_bank_angle") = false,
           py::arg("quantize_deg") = 0.0);
@@ -50,6 +54,7 @@ void quadriga_lib_tools(py::module_ &m)
     m.def("calc_delay_spread", &calc_delay_spread,
           py::arg("delays"),
           py::arg("powers"),
+          py::kw_only(),
           py::arg("threshold_dB") = 100.0,
           py::arg("granularity") = 0.0);
 
@@ -58,6 +63,7 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("path_length"),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
+          py::kw_only(),
           py::arg("window_size") = 0.01);
 
     m.def("calc_cross_polarization_ratio", &calc_cross_polarization_ratio,
@@ -66,6 +72,7 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("path_length"),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),
+          py::kw_only(),
           py::arg("include_los") = false,
           py::arg("window_size") = 0.01);
 
@@ -73,6 +80,7 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("az").none(false),
           py::arg("el") = py::none(),
           py::arg("len") = py::none(),
+          py::kw_only(),
           py::arg("combine") = true,
           py::arg("use_kernel") = 0);
 }

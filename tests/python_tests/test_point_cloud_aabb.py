@@ -50,7 +50,7 @@ class test_case(unittest.TestCase):
         # ---------- 3) vec_size padding for output rows ----------
         with self.subTest("vec_size padding on output rows"):
             vec_size = 4
-            got = RTtools.point_cloud_aabb(points, sub_cloud_ind, vec_size)
+            got = RTtools.point_cloud_aabb(points, sub_cloud_ind, vec_size=vec_size)
             # Expect rows padded to a multiple of vec_size (2 -> 4)
             self.assertEqual(got.shape[0], vec_size)
             # First two rows match expected; padded rows are zeros
@@ -84,9 +84,9 @@ class test_case(unittest.TestCase):
             vec_size = 8
 
             points_out, sub_ind, fwd_ind, _ = RTtools.point_cloud_segmentation(
-                pts, target_size, vec_size
+                pts, target_size=target_size, vec_size=vec_size
             )
-            aabb_lib = RTtools.point_cloud_aabb(points_out, sub_ind, vec_size)
+            aabb_lib = RTtools.point_cloud_aabb(points_out, sub_ind, vec_size=vec_size)
 
             # Manually compute expected per sub-cloud using only "real" elements (fwd_ind > 0)
             n_sub = len(sub_ind)

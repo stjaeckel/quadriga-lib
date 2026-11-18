@@ -65,27 +65,27 @@ class test_case(unittest.TestCase):
         tri = np.array([[0, 0, 0, 2, 0, 0, 1, 3, -1]], dtype=np.float64)
         expected = aabb_numpy(tri)
         # An empty index array works as None does
-        got = RTtools.triangle_mesh_aabb(tri, np.array([], dtype=int), 1)
+        got = RTtools.triangle_mesh_aabb(tri, np.array([], dtype=int), vec_size=1)
         self.assertEqual(got.dtype, np.float64)
         npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
 
     def test_entire_mesh_multiple_triangles(self):
         expected = aabb_numpy(self.triangles)
-        got = RTtools.triangle_mesh_aabb(self.triangles, np.array([], dtype=int), 1)
+        got = RTtools.triangle_mesh_aabb(self.triangles, np.array([], dtype=int), vec_size=1)
         self.assertEqual(got.dtype, np.float64)
         npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
         self.assertEqual(got.shape, (1, 6))
 
     def test_submesh_indices(self):
         expected = aabb_numpy(self.triangles, self.sub_mesh_ind)
-        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_ind, 1)
+        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_ind, vec_size=1)
         self.assertEqual(got.dtype, np.float64)
         npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
         self.assertEqual(got.shape, (2, 6))
 
     def test_vec_size_padding(self):
         vec_size = 8
-        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_ind, vec_size)
+        got = RTtools.triangle_mesh_aabb(self.triangles, self.sub_mesh_ind, vec_size=vec_size)
         self.assertEqual(got.dtype, np.float64)
         self.assertEqual(got.shape[0] % vec_size, 0)
         self.assertEqual(got.shape, (vec_size, 6))
@@ -104,7 +104,7 @@ class test_case(unittest.TestCase):
 
     def test_output_always_float64(self):
         # Inputs as float32 should still yield float64 output
-        got = RTtools.triangle_mesh_aabb(self.triangles.astype(np.float32), self.sub_mesh_ind, 1)
+        got = RTtools.triangle_mesh_aabb(self.triangles.astype(np.float32), self.sub_mesh_ind, vec_size=1)
         self.assertEqual(got.dtype, np.float64)
 
     def test_submesh_index_dtype_flexibility(self):
@@ -121,7 +121,7 @@ class test_case(unittest.TestCase):
         expected = aabb_numpy(self.triangles, [0, 2])
         for v in variants:
             with self.subTest(dtype=str(np.asarray(v).dtype) if not isinstance(v, list) else "list"):
-                got = RTtools.triangle_mesh_aabb(self.triangles, v, 1)
+                got = RTtools.triangle_mesh_aabb(self.triangles, v, vec_size=1)
                 self.assertEqual(got.dtype, np.float64)
                 npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
 
@@ -134,25 +134,25 @@ class test_case(unittest.TestCase):
             starts = np.r_[0, starts]
         starts.sort()
         expected = aabb_numpy(tris, starts)
-        got = RTtools.triangle_mesh_aabb(tris, starts, 1)
+        got = RTtools.triangle_mesh_aabb(tris, starts, vec_size=1)
         self.assertEqual(got.dtype, np.float64)
         npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
 
     def test_integration_with_segmentation(self):
         triangles_out, sub_idx, mesh_idx, mtl_prop_out = RTtools.triangle_mesh_segmentation(
             self.triangles.copy(),
-            2,   # target_size
-            1    # vec_size
+            target_size=2,   # target_size
+            vec_size=1
         )
         expected = aabb_numpy(triangles_out, sub_idx)
         # Pass sub_idx as-is (dtype may vary); API should accept and cast internally
-        got = RTtools.triangle_mesh_aabb(triangles_out.astype(np.float32), sub_idx, 1)
+        got = RTtools.triangle_mesh_aabb(triangles_out.astype(np.float32), sub_idx, vec_size=1)
         self.assertEqual(got.dtype, np.float64)
         npt.assert_allclose(got, expected, rtol=0, atol=1e-12)
 
     def test_no_submesh_vec_size_padding(self):
         vec_size = 4
-        got = RTtools.triangle_mesh_aabb(self.triangles, np.array([], dtype=int), vec_size)
+        got = RTtools.triangle_mesh_aabb(self.triangles, np.array([], dtype=int), vec_size=vec_size)
         self.assertEqual(got.dtype, np.float64)
         self.assertEqual(got.shape, (vec_size, 6))
         expected = aabb_numpy(self.triangles)

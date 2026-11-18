@@ -20,7 +20,7 @@ Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-me
 
 ## Usage:
 ```
-aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size )
+aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, *, vec_size )
 ```
 
 ## Inputs:

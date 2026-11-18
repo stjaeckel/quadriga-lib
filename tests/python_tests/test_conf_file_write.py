@@ -58,8 +58,8 @@ class test_case(unittest.TestCase):
             return f.read()
 
     def test_basic_call(self):
-        out = quadriga_lib.gbsm.conf_file_write(self.fn, self.scenpar, self.plpar, self.short_names,
-                                                 self.ref, self.ref_sec, self.valid_range)
+        out = quadriga_lib.gbsm.conf_file_write(self.fn, self.scenpar, self.plpar, short_names=self.short_names,
+                                                 ref=self.ref, ref_sec=self.ref_sec, valid_range=self.valid_range)
         self.assertIsNone(out)
 
         scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
@@ -94,7 +94,7 @@ class test_case(unittest.TestCase):
             scenpar, plpar, _, _, short_names, _ = ref
 
             fn_out = os.path.join(self.tmp.name, "round_trip_" + os.path.basename(fn))
-            quadriga_lib.gbsm.conf_file_write(fn_out, scenpar, plpar, short_names)
+            quadriga_lib.gbsm.conf_file_write(fn_out, scenpar, plpar, short_names=short_names)
             out = quadriga_lib.gbsm.conf_file_read(fn_out)
             os.remove(fn_out)
 
@@ -118,8 +118,8 @@ class test_case(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(self.tmp.name)), [])
 
     def test_keyword_arguments(self):
-        ref = self.write_text(self.scenpar, self.plpar, self.short_names, self.ref, self.ref_sec,
-                              self.valid_range, True)
+        ref = self.write_text(self.scenpar, self.plpar, short_names=self.short_names, ref=self.ref,
+                              ref_sec=self.ref_sec, valid_range=self.valid_range, write_defaults=True)
         quadriga_lib.gbsm.conf_file_write(fn=self.fn, scenpar=self.scenpar, plpar=self.plpar,
                                            short_names=self.short_names, ref=self.ref, ref_sec=self.ref_sec,
                                            valid_range=self.valid_range, write_defaults=True)
@@ -131,8 +131,9 @@ class test_case(unittest.TestCase):
         ref = self.write_text({})
         self.assertEqual(ref, '% Config file for scenario "conf_file_write_test"\n')
         self.assertEqual(self.write_text(None), ref)
-        self.assertEqual(self.write_text({}, None, None, None, None, None, False), ref)
-        self.assertEqual(self.write_text({}, {}, [], "", []), ref)
+        self.assertEqual(self.write_text({}, None, short_names=None, ref=None, ref_sec=None, valid_range=None,
+                                         write_defaults=False), ref)
+        self.assertEqual(self.write_text({}, {}, short_names=[], ref="", ref_sec=[]), ref)
 
         # Each optional input changes the file
         texts = [self.write_text({}, plpar=self.plpar),
@@ -224,8 +225,9 @@ class test_case(unittest.TestCase):
         scenpar = copy.deepcopy(self.scenpar)
         plpar = copy.deepcopy(self.plpar)
         valid_range = self.valid_range.copy()
-        quadriga_lib.gbsm.conf_file_write(self.fn, scenpar, plpar, self.short_names, self.ref, self.ref_sec,
-                                           valid_range)
+        quadriga_lib.gbsm.conf_file_write(self.fn, scenpar, plpar, short_names=self.short_names, ref=self.ref,
+                                          ref_sec=self.ref_sec,
+                                           valid_range=valid_range)
         self.assertEqual(list(scenpar), list(self.scenpar))
         npt.assert_array_equal(scenpar_bits(scenpar), scenpar_bits(self.scenpar))
         self.assertEqual(list(plpar), list(self.plpar))

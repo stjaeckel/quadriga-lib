@@ -75,19 +75,19 @@ class test_case(unittest.TestCase):
     def test_basic_gain_lod0(self):
         # Per-body att -> 3 dB per path.
         gain, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0, 0)
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0, verbose=0)
         npt.assert_allclose(gain, [10 ** -0.3, 10 ** -0.3], atol=1e-10, rtol=0)
 
     def test_output_shapes(self):
         # gain (n_pos,), xprmat EM (8, n_pos).
         gain, xprmat, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2)
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2)
         self.assertEqual(gain.shape, (2,))
         self.assertEqual(xprmat.shape, (8, 2))
 
         # lod = 5 -> n_seg = 1 (path midpoints).
         gain5, xpr5, coord5 = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 5)
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=5)
         npt.assert_allclose(gain5, [10 ** -0.3, 10 ** -0.3], atol=1e-6, rtol=0)
         self.assertEqual(xpr5.shape, (8, 2))
 
@@ -103,7 +103,7 @@ class test_case(unittest.TestCase):
         n_segs = [2, 2, 3, 4, 1, 1]
         for lod, n_seg in zip(lods, n_segs):
             _, _, coord = quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod)
+                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=lod)
             self.assertEqual(coord.shape, (3, n_seg, 2),
                              f'coord dimension mismatch at lod {lod}')
 
@@ -112,24 +112,24 @@ class test_case(unittest.TestCase):
     def test_input_casting_single(self):
         # Single-precision inputs are cast to double internally.
         gain_ref, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2)
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2)
         gain_single, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig.astype(np.float32), self.dest.astype(np.float32),
-            self.cube.astype(np.float32), self.mtl_ind, self.mtl_prop, 1e9, 2)
+            self.cube.astype(np.float32), self.mtl_ind, self.mtl_prop, 1e9, lod=2)
         npt.assert_allclose(gain_ref, gain_single, atol=1e-5, rtol=0)
 
     def test_sub_mesh_passthrough(self):
         gain_ref, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0)
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0)
 
         # None (no sub-mesh) runs without error.
         quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0,
             sub_mesh_ind=None)
 
         # A single whole-mesh sub-mesh at offset 0 matches the no-sub-mesh result.
         gain_smi, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0,
             sub_mesh_ind=np.array([0], dtype=np.uint32))
         npt.assert_allclose(gain_ref, gain_smi, atol=1e-10, rtol=0)
 
@@ -137,26 +137,26 @@ class test_case(unittest.TestCase):
         # Non-uint32 sub_mesh_ind (e.g. numpy's default int64) is cast and
         # gives an identical result.
         gain_u32, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0,
             sub_mesh_ind=np.array([0], dtype=np.uint32))
         gain_i64, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0,
             sub_mesh_ind=np.array([0], dtype=np.int64))
         npt.assert_allclose(gain_u32, gain_i64, atol=1e-10, rtol=0)
 
     def test_kernel_selection(self):
         gain_ref, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2)
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2)
 
         # use_kernel = 1 (GENERIC) matches the default (auto) kernel.
         gain_generic, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2,
             use_kernel=1)
         npt.assert_allclose(gain_ref, gain_generic, atol=1e-10, rtol=0)
 
         # Full acceleration args (use_kernel + gpu_id) match the default.
         gain_full, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2,
             use_kernel=1, gpu_id=0)
         npt.assert_allclose(gain_ref, gain_full, atol=1e-10, rtol=0)
 
@@ -166,7 +166,7 @@ class test_case(unittest.TestCase):
         # Clear path (entirely outside) -> gain 1 and identity Jones matrix. Row
         # layout is col-major 2x2: [ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH].
         g_clr, xpr_clr, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 10e9, 0)
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 10e9, lod=0)
         npt.assert_allclose(g_clr, 1.0, atol=1e-12, rtol=0)
         self.assertEqual(xpr_clr.shape, (8, 1))
         npt.assert_allclose(xpr_clr[:, 0], [1, 0, 0, 0, 0, 0, 1, 0], atol=1e-12, rtol=0)
@@ -178,7 +178,7 @@ class test_case(unittest.TestCase):
         eps2 = np.tile([2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
         eps2_ind, eps2_prop = m2p(eps2)
         g_e2, xpr_e2, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_in, self.dest_in, self.cube, eps2_ind, eps2_prop, 10e9, 0)
+            self.orig_in, self.dest_in, self.cube, eps2_ind, eps2_prop, 10e9, lod=0)
 
         xpr = xpr_e2[:, 0]
         R0 = (1 - np.sqrt(2)) / (1 + np.sqrt(2))
@@ -196,18 +196,18 @@ class test_case(unittest.TestCase):
 
         # EM reference at normal incidence (TE == TM).
         g_e2, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_in, self.dest_in, self.cube, eps2_ind, eps2_prop, 10e9, 0)
+            self.orig_in, self.dest_in, self.cube, eps2_ind, eps2_prop, 10e9, lod=0)
 
         # Scalar transmission collapses xprmat to (2, n_pos) and equals EM here.
         g_sc, xpr_sc, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_in, self.dest_in, self.cube, eps2_ind, eps2_prop, 10e9, 0,
+            self.orig_in, self.dest_in, self.cube, eps2_ind, eps2_prop, 10e9, lod=0,
             scalar_mode=True)
         npt.assert_allclose(g_sc, g_e2, atol=1e-9, rtol=0)
         self.assertEqual(xpr_sc.shape, (2, 1))
 
         # Scalar clear path -> gain 1, coefficient (1, 0).
         g_sc_c, xpr_sc_c, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, eps2_ind, eps2_prop, 10e9, 0,
+            self.orig_clear, self.dest_clear, self.cube, eps2_ind, eps2_prop, 10e9, lod=0,
             scalar_mode=True)
         npt.assert_allclose(g_sc_c, 1.0, atol=1e-12, rtol=0)
         self.assertEqual(xpr_sc_c.shape, (2, 1))
@@ -221,14 +221,14 @@ class test_case(unittest.TestCase):
         # the wrapper passing mtl_ind through 1-based with no decrement.
         mtl_ind_zero = np.zeros(12, dtype=np.uint64)
         gain_zero, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, mtl_ind_zero, self.mtl_prop, 10e9, 0)
+            self.orig, self.dest, self.cube, mtl_ind_zero, self.mtl_prop, 10e9, lod=0)
         npt.assert_allclose(gain_zero, [1.0, 1.0], atol=1e-12, rtol=0)
 
         # Same geometry, real lossy material (att = 6 dB) clearly attenuates.
         lossy = np.tile([1.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
         lossy_ind, lossy_prop = m2p(lossy)
         gain_lossy, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, lossy_ind, lossy_prop, 10e9, 0)
+            self.orig, self.dest, self.cube, lossy_ind, lossy_prop, 10e9, lod=0)
         self.assertTrue(np.all(gain_lossy < 0.5))
 
     # --- Physics sanity ---
@@ -237,7 +237,7 @@ class test_case(unittest.TestCase):
         # LOS (unobstructed) path above the cube -> gain ~ 1.
         gain_los, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
             np.array([[0.0, 0.0, 5.0]]), np.array([[0.0, 0.0, 10.0]]),
-            self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2)
+            self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2)
         npt.assert_allclose(gain_los, 1.0, atol=1e-6, rtol=0)
 
     def test_physics_alpha(self):
@@ -246,7 +246,7 @@ class test_case(unittest.TestCase):
         alpha = np.tile([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 1.0], (12, 1))
         alpha_ind, alpha_prop = m2p(alpha)
         gain_alpha, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_in, self.dest_in, self.cube, alpha_ind, alpha_prop, 10e9, 0)
+            self.orig_in, self.dest_in, self.cube, alpha_ind, alpha_prop, 10e9, lod=0)
         npt.assert_allclose(gain_alpha, 10 ** -0.6, atol=1e-7, rtol=0)
 
     def test_physics_freq_scaling(self):
@@ -255,7 +255,7 @@ class test_case(unittest.TestCase):
         attB = np.tile([1.0, 0.0, 0.0, 0.0, 3.0, 1.0, 0.0, 0.0, 2.0], (12, 1))
         attB_ind, attB_prop = m2p(attB)
         gain_attB, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_in, self.dest_in, self.cube, attB_ind, attB_prop, 10e9, 0)
+            self.orig_in, self.dest_in, self.cube, attB_ind, attB_prop, 10e9, lod=0)
         npt.assert_allclose(gain_attB, 10 ** -1.5, atol=1e-10, rtol=0)
 
     def test_physics_fref_equivalence(self):
@@ -267,9 +267,9 @@ class test_case(unittest.TestCase):
         matA_ind, matA_prop = m2p(mat_A)
         matB_ind, matB_prop = m2p(mat_B)
         gain_A, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_in, self.dest_in, self.cube, matA_ind, matA_prop, 10e9, 3)
+            self.orig_in, self.dest_in, self.cube, matA_ind, matA_prop, 10e9, lod=3)
         gain_B, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_in, self.dest_in, self.cube, matB_ind, matB_prop, 10e9, 3)
+            self.orig_in, self.dest_in, self.cube, matB_ind, matB_prop, 10e9, lod=3)
         npt.assert_allclose(gain_A, gain_B, atol=1e-12, rtol=0)
 
     # --- thin_slab_threshold (Fabry-Perot plumbing) ---
@@ -291,9 +291,9 @@ class test_case(unittest.TestCase):
         orig_fp = np.array([[-10.0, 0.0, 0.0]])
         dest_fp = np.array([[10.0, 0.0, 0.0]])  # normal incidence through both faces
         g_on, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            orig_fp, dest_fp, slab, slab_ind, slab_prop, f, 0, thin_slab_threshold=0.0)
+            orig_fp, dest_fp, slab, slab_ind, slab_prop, f, lod=0, thin_slab_threshold=0.0)
         g_off, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            orig_fp, dest_fp, slab, slab_ind, slab_prop, f, 0, thin_slab_threshold=1.0)
+            orig_fp, dest_fp, slab, slab_ind, slab_prop, f, lod=0, thin_slab_threshold=1.0)
 
         self.assertTrue(0.0 < g_on[0] <= 1.0 + 1e-9)
         self.assertTrue(0.0 < g_off[0] <= 1.0 + 1e-9)
@@ -305,9 +305,9 @@ class test_case(unittest.TestCase):
         # Both flags default to False: omitting them must reproduce the legacy
         # result exactly (gain relative to FSPL, xprmat without propagation phase).
         g_def, x_def, c_def = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2)
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2)
         g_exp, x_exp, c_exp = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2,
             apply_fspl=False, apply_phase=False)
         npt.assert_allclose(g_def, g_exp, atol=1e-14, rtol=0)
         npt.assert_allclose(x_def, x_exp, atol=1e-14, rtol=0)
@@ -318,9 +318,9 @@ class test_case(unittest.TestCase):
         # pure FSPL = 32.45 + 20*log10(f_GHz) + 20*log10(d).
         d, f = 5.0, 1e9
         g_rel, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0)
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, lod=0)
         g_abs, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, lod=0,
             apply_fspl=True)
         npt.assert_allclose(g_rel, 1.0, atol=1e-12, rtol=0)
 
@@ -333,20 +333,20 @@ class test_case(unittest.TestCase):
         # sit just below it.
         d = 5.0
         g_ac, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 125.0, 0,
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 125.0, lod=0,
             scalar_mode=True, apply_fspl=True)
         npt.assert_allclose(g_ac, 1.0 / d ** 2, atol=0, rtol=1e-3)
         self.assertTrue(g_ac[0] < 1.0 / d ** 2)
 
         # Absorption grows with frequency: 16 kHz loses clearly more than 125 Hz.
         g_hi, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 16000.0, 0,
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 16000.0, lod=0,
             scalar_mode=True, apply_fspl=True)
         self.assertTrue(g_hi[0] < g_ac[0])
 
         # EM at the same frequency differs (it carries the 20*log10(f_GHz) term).
         g_em, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 16000.0, 0,
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, 16000.0, lod=0,
             apply_fspl=True)
         self.assertTrue(abs(g_em[0] - g_hi[0]) > 1e-12)
 
@@ -356,7 +356,7 @@ class test_case(unittest.TestCase):
         orig = np.array([[-20.0, 0.0, 0.5], [-20.0, 0.0, 0.5]])
         dest = np.array([[-15.0, 0.0, 0.5], [-10.0, 0.0, 0.5]])
         gain, _, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0, apply_fspl=True)
+            orig, dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0, apply_fspl=True)
         self.assertEqual(gain.shape, (2,))
         npt.assert_allclose(gain[0] / gain[1], 4.0, atol=0, rtol=1e-9)
 
@@ -366,7 +366,7 @@ class test_case(unittest.TestCase):
         # magnitude stays 1 (xprmat remains normalized).
         d, f = 5.0, 1e9
         _, xpr, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, lod=0,
             apply_phase=True)
         self.assertEqual(xpr.shape, (8, 1))
 
@@ -384,7 +384,7 @@ class test_case(unittest.TestCase):
         d, f = 5.0, 1000.0
         c_ac = 343.0
         _, xpr_ac, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, lod=0,
             scalar_mode=True, apply_phase=True)
         self.assertEqual(xpr_ac.shape, (2, 1))
 
@@ -393,14 +393,14 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(ac, np.exp(-2j * np.pi * f * d / c_ac), atol=1e-9, rtol=0)
 
         _, xpr_em, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
+            self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, lod=0,
             apply_phase=True)
         self.assertTrue(abs((xpr_em[0, 0] + 1j * xpr_em[1, 0]) - ac) > 1e-3)
 
     def test_flags_are_independent(self):
         # apply_fspl touches only gain, apply_phase touches only xprmat, and
         # enabling both reproduces each single-flag result.
-        args = (self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 10e9, 2)
+        args = (self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 10e9)  # lod 2 is the default
         g00, x00, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args)
         g10, x10, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args, apply_fspl=True)
         g01, x01, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args, apply_phase=True)
@@ -421,9 +421,10 @@ class test_case(unittest.TestCase):
         # thin_slab_threshold. Positional and keyword forms must agree.
         g_pos, x_pos, _ = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9,
-            2, 0, None, 0, 0, False, 0.0, True, True)
+            lod=2, verbose=0, sub_mesh_ind=None, use_kernel=0, gpu_id=0, scalar_mode=False, thin_slab_threshold=0.0,
+            apply_fspl=True, apply_phase=True)
         g_kw, x_kw, _ = quadriga_lib.RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 2,
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=2,
             apply_fspl=True, apply_phase=True)
         npt.assert_allclose(g_pos, g_kw, atol=1e-14, rtol=0)
         npt.assert_allclose(x_pos, x_kw, atol=1e-14, rtol=0)
@@ -434,7 +435,7 @@ class test_case(unittest.TestCase):
         orig = np.array([[-10.0, 0.0, 0.5], [-10.0, 0.0, 0.5]])
         dest = np.array([[10.0, 0.0, 0.5], [-10.0, 0.0, 0.5]])  # row 1 co-located
         gain, xpr, coord = quadriga_lib.RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, self.mtl_ind, self.mtl_prop, 3.5e9, 2,
+            orig, dest, self.cube, self.mtl_ind, self.mtl_prop, 3.5e9, lod=2,
             apply_fspl=True, apply_phase=True)
         self.assertTrue(np.all(np.isfinite(gain)))
         self.assertTrue(np.all(np.isfinite(xpr)))
@@ -442,7 +443,7 @@ class test_case(unittest.TestCase):
 
     def test_none_and_flag_types(self):
         # Flags: None selects the default (False), a non-bool raises TypeError.
-        args = (self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 10e9, 2)
+        args = (self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 10e9)  # lod 2 is the default
         g_def, x_def, _ = quadriga_lib.RTtools.calc_diffraction_gain(*args)
         for flag in ('scalar_mode', 'apply_fspl', 'apply_phase'):
             with self.subTest(flag=flag):
@@ -473,35 +474,35 @@ class test_case(unittest.TestCase):
     def test_error_orig_dest_row_mismatch(self):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest[0:1, :], self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0)
+                self.orig, self.dest[0:1, :], self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0)
 
     def test_error_mtl_ind_length(self):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_ind[0:1], self.mtl_prop, 1e9, 0)
+                self.orig, self.dest, self.cube, self.mtl_ind[0:1], self.mtl_prop, 1e9, lod=0)
 
     def test_error_sub_mesh_first_nonzero(self):
         # First sub-mesh must start at index 0 (0-based in Python).
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
+                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0,
                 sub_mesh_ind=np.array([1], dtype=np.uint32))
 
     def test_error_sub_mesh_exceeds_faces(self):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0,
+                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0,
                 sub_mesh_ind=np.array([0, 32], dtype=np.uint32))
 
     def test_error_orig_not_three_cols(self):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig[:, 0:2], self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, 0)
+                self.orig[:, 0:2], self.dest, self.cube, self.mtl_ind, self.mtl_prop, 1e9, lod=0)
 
     def test_error_mesh_not_nine_cols(self):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube[:, 0:8], self.mtl_ind, self.mtl_prop, 1e9, 0)
+                self.orig, self.dest, self.cube[:, 0:8], self.mtl_ind, self.mtl_prop, 1e9, lod=0)
 
     # Best-effort guards (mirroring the MEX "(guess)" cases) — remove or adjust
     # if the refactored library does not enforce them.
@@ -509,14 +510,14 @@ class test_case(unittest.TestCase):
     def test_error_nonpositive_frequency(self):
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 0.0, 0)
+                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_prop, 0.0, lod=0)
 
     def test_error_material_index_too_large(self):
         mtl_ind_big = self.mtl_ind.copy()
         mtl_ind_big[0] = 40000  # exceeds the 14-bit material-index cap (16383)
         with self.assertRaises(Exception):
             quadriga_lib.RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, mtl_ind_big, self.mtl_prop, 1e9, 0)
+                self.orig, self.dest, self.cube, mtl_ind_big, self.mtl_prop, 1e9, lod=0)
 
 
 class test_lod_range(unittest.TestCase):
@@ -527,12 +528,12 @@ class test_lod_range(unittest.TestCase):
         cube = R.cube(); o = np.array([[-3.0, 0, 0.5], [-3.0, 0, 0.2]]); d = np.array([[3.0, 0, 0.5], [3.0, 0, 0.3]])
         mtl = np.ones(12, dtype=np.uint64); prop = {'a': [1.0], 'b': [0.0], 'c': [0.0], 'd': [0.0]}
         for lod, n in [(0, 0), (1, 2), (2, 2), (3, 3), (4, 4), (5, 1), (6, 1), (7, 9)]:
-            g, x, c = R.calc_diffraction_gain(o, d, cube, mtl, prop, 3.5e9, lod)
+            g, x, c = R.calc_diffraction_gain(o, d, cube, mtl, prop, 3.5e9, lod=lod)
             self.assertEqual(c.shape, (3, n, 2))
             self.assertEqual(g.shape, (2,))
         for lod in (-1, 8):
             with self.assertRaisesRegex(ValueError, "Input 'lod' must be 0-7."):
-                R.calc_diffraction_gain(o, d, cube, mtl, prop, 3.5e9, lod)
+                R.calc_diffraction_gain(o, d, cube, mtl, prop, 3.5e9, lod=lod)
         with self.assertRaisesRegex(ValueError, "Inputs 'orig' and 'dest' cannot be empty."):
             R.calc_diffraction_gain(np.zeros((0, 3)), np.zeros((0, 3)), cube, mtl, prop, 3.5e9)
 

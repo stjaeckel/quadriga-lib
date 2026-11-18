@@ -142,7 +142,7 @@ Read and validate a QuaDRiGa scenario configuration file
 ## Usage:
 ```
 scenpar, plpar, lsp_xcorr, lsp_xcorr_chk, short_names, ignored_keys = \
-    quadriga_lib.gbsm.conf_file_read( fn, validate )
+    quadriga_lib.gbsm.conf_file_read( fn, *, validate )
 ```
 
 ## Inputs:

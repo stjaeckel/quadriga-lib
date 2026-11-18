@@ -43,7 +43,7 @@ class test_arrayant_calc_directivity(unittest.TestCase):
     def test_dipole_element_repeat(self):
         # Selecting the same element twice should return the same value twice
         ant = quadriga_lib.arrayant.generate('dipole')
-        directivity = quadriga_lib.arrayant.calc_directivity(ant, np.array([0, 0]))
+        directivity = quadriga_lib.arrayant.calc_directivity(ant, i_element=np.array([0, 0]))
 
         self.assertEqual(directivity.shape, (2,))
         npt.assert_allclose(directivity, [1.760964, 1.760964], atol=1e-6, rtol=0)
@@ -59,7 +59,7 @@ class test_arrayant_calc_directivity(unittest.TestCase):
     def test_xpol_subset(self):
         # Subset selection: 0-based index 1 picks the second element
         ant = quadriga_lib.arrayant.generate('xpol')
-        directivity = quadriga_lib.arrayant.calc_directivity(ant, np.array([1]))
+        directivity = quadriga_lib.arrayant.calc_directivity(ant, i_element=np.array([1]))
 
         self.assertEqual(directivity.shape, (1,))
         npt.assert_allclose(directivity, [0.0], atol=1e-6, rtol=0)
@@ -70,8 +70,8 @@ class test_arrayant_calc_directivity(unittest.TestCase):
         expected = np.array([0.0, 0.0])
 
         d_omit  = quadriga_lib.arrayant.calc_directivity(ant)
-        d_none  = quadriga_lib.arrayant.calc_directivity(ant, None)
-        d_empty = quadriga_lib.arrayant.calc_directivity(ant, np.array([], dtype=np.uint64))
+        d_none  = quadriga_lib.arrayant.calc_directivity(ant, i_element=None)
+        d_empty = quadriga_lib.arrayant.calc_directivity(ant, i_element=np.array([], dtype=np.uint64))
 
         for d in (d_omit, d_none, d_empty):
             self.assertEqual(d.shape, (2,))
@@ -101,7 +101,7 @@ class test_arrayant_calc_directivity(unittest.TestCase):
         # Multi-frequency with element selection
         ant = quadriga_lib.arrayant.generate('dipole')
         ant_mf = _stack_multi_freq(ant, 2)
-        directivity = quadriga_lib.arrayant.calc_directivity(ant_mf, np.array([0, 0]))
+        directivity = quadriga_lib.arrayant.calc_directivity(ant_mf, i_element=np.array([0, 0]))
 
         self.assertEqual(directivity.shape, (2, 2))
         npt.assert_allclose(directivity,
@@ -122,7 +122,7 @@ class test_arrayant_calc_directivity(unittest.TestCase):
         # dipole has 1 element; index 1 is out of bounds
         ant = quadriga_lib.arrayant.generate('dipole')
         with self.assertRaises(Exception):
-            quadriga_lib.arrayant.calc_directivity(ant, np.array([1]))
+            quadriga_lib.arrayant.calc_directivity(ant, i_element=np.array([1]))
 
     def test_error_missing_field(self):
         # arrayant dict missing a required pattern field

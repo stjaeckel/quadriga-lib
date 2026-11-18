@@ -76,7 +76,7 @@ class test_case(unittest.TestCase):
         self.assertTrue(ref[2])
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.gbsm.scenpar_validate(self.scenpar, True)
+        ref = quadriga_lib.gbsm.scenpar_validate(self.scenpar, validate=True)
         out = quadriga_lib.gbsm.scenpar_validate(scenpar_in=self.scenpar, validate=True)
         self.assertEqual(out[0], ref[0])
         npt.assert_array_equal(out[1], ref[1])
@@ -85,21 +85,21 @@ class test_case(unittest.TestCase):
     def test_validate_flag_types(self):
         # None selects the default (True); bool and numpy.bool_ are accepted; anything else is a TypeError
         bad = {"r_DS": -1.0}
-        for args, kwargs in [((bad, None), {}), ((bad,), {"validate": None}), ((bad, np.bool_(True)), {})]:
+        for args, kwargs in [((bad,), {"validate": None}), ((bad,), {"validate": np.bool_(True)})]:
             with self.assertRaises(ValueError) as ctx:
                 quadriga_lib.gbsm.scenpar_validate(*args, **kwargs)
             self.assertIn("r_DS", str(ctx.exception))
-        self.assertEqual(quadriga_lib.gbsm.scenpar_validate(bad, np.bool_(False))[0]["r_DS"], -1.0)
+        self.assertEqual(quadriga_lib.gbsm.scenpar_validate(bad, validate=np.bool_(False))[0]["r_DS"], -1.0)
 
         ref = quadriga_lib.gbsm.scenpar_validate(self.scenpar)
-        out = quadriga_lib.gbsm.scenpar_validate(self.scenpar, None)
+        out = quadriga_lib.gbsm.scenpar_validate(self.scenpar, validate=None)
         self.assertEqual(out[0], ref[0])
         npt.assert_array_equal(out[1], ref[1])
         self.assertEqual(out[2], ref[2])
 
         for value in ["yes", 1, 0.0]:
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.gbsm.scenpar_validate(bad, value)
+                quadriga_lib.gbsm.scenpar_validate(bad, validate=value)
             self.assertIn("'validate'", str(ctx.exception))
 
     def test_validate(self):
@@ -108,14 +108,14 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError):
             quadriga_lib.gbsm.scenpar_validate(bad)
         with self.assertRaises(ValueError):
-            quadriga_lib.gbsm.scenpar_validate(bad, True)
+            quadriga_lib.gbsm.scenpar_validate(bad, validate=True)
 
         # validate = False accepts NaN; NaN in a correlation gives lsp_xcorr_chk = False
-        scenpar_out, _, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate(bad, False)
+        scenpar_out, _, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate(bad, validate=False)
         self.assertTrue(np.isnan(scenpar_out["DS_mu"]))
         self.assertNotIn("SubpathMethod", scenpar_out)
         self.assertTrue(lsp_xcorr_chk)
-        _, _, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate({"asD_ds": np.nan}, False)
+        _, _, lsp_xcorr_chk = quadriga_lib.gbsm.scenpar_validate({"asD_ds": np.nan}, validate=False)
         self.assertFalse(lsp_xcorr_chk)
 
     def test_not_positive_definite(self):
@@ -153,7 +153,7 @@ class test_case(unittest.TestCase):
         self.assertIn("SNS_mu", str(ctx.exception))
         for validate in [True, False]:  # SubpathMethod: only 'legacy' is accepted
             with self.assertRaises(ValueError) as ctx:
-                quadriga_lib.gbsm.scenpar_validate({"SubpathMethod": "foo"}, validate)
+                quadriga_lib.gbsm.scenpar_validate({"SubpathMethod": "foo"}, validate=validate)
             self.assertIn("Value 'foo' of 'SubpathMethod' is not supported; only 'legacy' is accepted.",
                           str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
@@ -164,7 +164,7 @@ class test_case(unittest.TestCase):
         # Unknown keys are an error also with validate = False, GR_epsilon included
         for validate in [True, False]:
             with self.assertRaises(ValueError) as ctx:
-                quadriga_lib.gbsm.scenpar_validate({"GR_epsilon": 1.0}, validate)
+                quadriga_lib.gbsm.scenpar_validate({"GR_epsilon": 1.0}, validate=validate)
             self.assertIn("Unknown key 'GR_epsilon'", str(ctx.exception))
 
         # Thrown by the wrapper (dict conversion)

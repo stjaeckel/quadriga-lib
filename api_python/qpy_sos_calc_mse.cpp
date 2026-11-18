@@ -38,7 +38,8 @@ Approximation error of the ACF of a set of sinusoids
 
 ## Usage:
 ```
-mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, dist, n_dir )
+mse_dB, mse_core_dB, mse_all_dB, acf_tail, test_dir = quadriga_lib.sos.calc_mse( spatial_freq, acf, \
+    dist, *, n_dir )
 ```
 
 ## Inputs:

@@ -21,7 +21,7 @@ Read the names of unstructured datasets from an HDF5 file
 
 ## Usage:
 ```
-names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
+names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, *, prefix )
 ```
 
 ## Inputs:

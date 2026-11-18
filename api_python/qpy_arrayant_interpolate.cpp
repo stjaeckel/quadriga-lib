@@ -31,8 +31,8 @@ Interpolate the polarimetric field pattern of an array antenna at given azimuth 
 ## Usage:
 ```
 # Single-frequency mode
-V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, i_element, orientation, element_pos, \
-    use_kernel=0 )
+V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, *, i_element, orientation, \
+    element_pos, use_kernel=0 )
 
 # Single-frequency mode with the projected distance and the local angles
 V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \

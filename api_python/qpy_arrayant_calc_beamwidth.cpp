@@ -29,7 +29,7 @@ Calculate the beamwidth and pointing angles of array antenna elements in degrees
 ## Usage:
 ```
 beamwidth_az_deg, beamwidth_el_deg, az_point_ang_deg, el_point_ang_deg = \
-    quadriga_lib.arrayant.calc_beamwidth( arrayant, i_element, threshold_dB )
+    quadriga_lib.arrayant.calc_beamwidth( arrayant, *, i_element, threshold_dB )
 ```
 
 ## Inputs:

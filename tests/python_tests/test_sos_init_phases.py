@@ -24,7 +24,7 @@ import quadriga_lib
 class test_case(unittest.TestCase):
 
     def test_basic_call(self):
-        phase = quadriga_lib.sos.init_phases(7, 3, 42)
+        phase = quadriga_lib.sos.init_phases(7, 3, seed=42)
         self.assertIsInstance(phase, np.ndarray)
         self.assertEqual(phase.shape, (7, 3))  # (n_coeff, n_gen)
         self.assertEqual(phase.dtype, np.float64)
@@ -33,33 +33,33 @@ class test_case(unittest.TestCase):
         self.assertEqual(np.unique(phase).size, 21)  # every element is written
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.sos.init_phases(7, 3, 42)
+        ref = quadriga_lib.sos.init_phases(7, 3, seed=42)
         phase = quadriga_lib.sos.init_phases(n_coeff=7, n_gen=3, seed=42)
         npt.assert_array_equal(phase, ref)
 
     def test_seed_and_fill_order(self):
-        ref = quadriga_lib.sos.init_phases(7, 3, 42)
+        ref = quadriga_lib.sos.init_phases(7, 3, seed=42)
 
         # A seed is reproducible; the array is filled column by column from one stream
-        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 3, 42), ref)
-        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 5, 42)[:, :3], ref)
+        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 3, seed=42), ref)
+        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 5, seed=42)[:, :3], ref)
 
         # n_coeff and n_gen are not swapped
-        phase = quadriga_lib.sos.init_phases(3, 7, 42)
+        phase = quadriga_lib.sos.init_phases(3, 7, seed=42)
         self.assertEqual(phase.shape, (3, 7))
         npt.assert_array_equal(phase.flatten(order="F"), ref.flatten(order="F"))
 
-        phase = quadriga_lib.sos.init_phases(7, 3, 43)
+        phase = quadriga_lib.sos.init_phases(7, 3, seed=43)
         self.assertGreater(np.max(np.abs(phase - ref)), 0.1)
 
         # The random state of numpy has no effect
         np.random.seed(1)
-        a = quadriga_lib.sos.init_phases(7, 3, 42)
+        a = quadriga_lib.sos.init_phases(7, 3, seed=42)
         np.random.seed(2)
-        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 3, 42), a)
+        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 3, seed=42), a)
 
     def test_optional_inputs(self):
-        ref = quadriga_lib.sos.init_phases(7, 3, 42)
+        ref = quadriga_lib.sos.init_phases(7, 3, seed=42)
 
         # seed = -1 (system random device: new values on each call)
         p1 = quadriga_lib.sos.init_phases(9, 1)
@@ -69,11 +69,11 @@ class test_case(unittest.TestCase):
 
         npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 1, seed=42), ref[:, :1])
 
-        p3 = quadriga_lib.sos.init_phases(7, 3, -1)
+        p3 = quadriga_lib.sos.init_phases(7, 3, seed=-1)
         self.assertGreater(np.max(np.abs(p3 - ref)), 1e-6)
 
         # numpy integers
-        npt.assert_array_equal(quadriga_lib.sos.init_phases(np.uint32(7), np.int64(3), np.int32(42)), ref)
+        npt.assert_array_equal(quadriga_lib.sos.init_phases(np.uint32(7), np.int64(3), seed=np.int32(42)), ref)
 
     def test_errors(self):
         # Thrown by C++: std::invalid_argument -> ValueError
@@ -86,7 +86,7 @@ class test_case(unittest.TestCase):
         self.assertIn("n_gen", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.init_phases(7, 3, -2)
+            quadriga_lib.sos.init_phases(7, 3, seed=-2)
         self.assertIn("seed", str(ctx.exception))
 
         # Rejected by pybind11

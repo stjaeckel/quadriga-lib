@@ -72,11 +72,11 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         ori = np.array([[0.1], [0.2], [0.3]])
         pos = np.array([[1.0, 0.0], [0.0, 2.0], [0.0, 0.5]])
-        pos_res = re_im(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0], ori, pos, None, True, True,
-                                                    False, 1))
-        with self.assertRaises(TypeError):  # one positional argument too many
-            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0], ori, pos, None, True, True, False, 1,
-                                              False)
+        pos_res = re_im(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, i_element=[1, 0], orientation=ori,
+                                                          element_pos=pos, freq_new=None, dist=True, local_angles=True,
+                                                          fast_access=False, use_kernel=1))
+        with self.assertRaises(TypeError):  # optional arguments are keyword-only
+            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0])
         kw_res = re_im(quadriga_lib.arrayant.interpolate(arrayant=self.ant, azimuth=self.az, elevation=self.el, i_element=[1, 0],
                                                    orientation=ori, element_pos=pos, freq_new=None, dist=True,
                                                    local_angles=True, fast_access=False, use_kernel=1))
@@ -218,7 +218,9 @@ class test_case(unittest.TestCase):
         pos = np.array([[1.0, 0.0, 1.0], [0.0, 2.0, 0.0], [0.0, 0.0, 0.0]])
         inputs = (np.asfortranarray(self.az), np.asfortranarray(self.el), element, ori, pos)
         copies = [np.copy(x) for x in inputs]
-        quadriga_lib.arrayant.interpolate(self.ant, *inputs, dist=True, local_angles=True)
+        quadriga_lib.arrayant.interpolate(self.ant, *inputs[:2], i_element=element, orientation=ori, element_pos=pos,
+                                          dist=True,
+                                          local_angles=True)
         for x, y in zip(inputs, copies):
             npt.assert_array_equal(x, y)
         for k in self.ant:

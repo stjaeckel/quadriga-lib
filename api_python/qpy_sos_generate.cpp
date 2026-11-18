@@ -43,8 +43,8 @@ Find the spatial frequencies of a sum-of-sinusoids generator for a given ACF
 
 ## Usage:
 ```
-spatial_freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, uniform_smp, n_dir, \
-    random_init, spatial_freq_min, spatial_freq_max, seed )
+spatial_freq, ase, test_dir = quadriga_lib.sos.generate( acf, dist, n_coeff, n_dim, *, uniform_smp, \
+    n_dir, random_init, spatial_freq_min, spatial_freq_max, seed )
 ```
 
 ## Inputs:

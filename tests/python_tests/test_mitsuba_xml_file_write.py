@@ -45,7 +45,7 @@ class test_case(unittest.TestCase):
             obj_names,
             mtl_names,
             bsdf,
-            True        # map_to_itu_materials
+            map_to_itu_materials=True        # map_to_itu_materials
         )
 
         xml_stem = os.path.splitext(os.path.basename(xml_file))[0]

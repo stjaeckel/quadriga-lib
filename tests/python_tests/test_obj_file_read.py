@@ -476,13 +476,13 @@ class test_case(unittest.TestCase):
         try:
             # non-strict (default): unmatched -> no material (index 0); request csv_ind so resolution runs
             (_, _, _, _, _, _, mtl_names, _, csv_ind, _, _) = \
-                quadriga_lib.RTtools.obj_file_read(fn, "", False)
+                quadriga_lib.RTtools.obj_file_read(fn, "", csv_strict=False)
             npt.assert_equal(mtl_names[0], "not_a_real_material")  # raw name kept
             npt.assert_(np.all(csv_ind == 0))                      # resolved to no material
 
             # strict: raises because the material is absent from the table
             with self.assertRaises(RuntimeError):
-                quadriga_lib.RTtools.obj_file_read(fn, "", True)
+                quadriga_lib.RTtools.obj_file_read(fn, "", csv_strict=True)
         finally:
             if os.path.isfile(fn):
                 os.remove(fn)
@@ -499,12 +499,12 @@ class test_case(unittest.TestCase):
         create_cube_with_materials(fn, "custom_material_1", "not_a_real_material")
         try:
             ref = quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
-            out = quadriga_lib.RTtools.obj_file_read(pathlib.Path(fn), pathlib.Path(csv_fn), None)
+            out = quadriga_lib.RTtools.obj_file_read(pathlib.Path(fn), pathlib.Path(csv_fn), csv_strict=None)
             npt.assert_array_equal(out[0], ref[0])
             npt.assert_array_equal(out[8], ref[8])
             self.assertEqual(list(out[9]), list(ref[9]))
             with self.assertRaises(TypeError) as ctx:
-                quadriga_lib.RTtools.obj_file_read(fn, csv_fn, 2.5)
+                quadriga_lib.RTtools.obj_file_read(fn, csv_fn, csv_strict=2.5)
             self.assertIn("'csv_strict'", str(ctx.exception))
         finally:
             cleanup(fn, csv_fn)

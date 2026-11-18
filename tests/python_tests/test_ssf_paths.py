@@ -31,12 +31,12 @@ def make_rays():
     # "38.901" rays of one link in UMi LOS with ground reflection at 60 GHz, solved
     sp = gbsm.conf_file_read(os.path.join(CONF_DIR, "3GPP_38.901_v19_UMi_LOS.conf"))[0]
     sp["GR_enabled"] = 1.0
-    phase = gbsm.init_phases(sp, "lsf", 5)
+    phase = gbsm.init_phases(sp, "lsf", seed=5)
     lsp, _, gr_eps, _, mu, sig = gbsm.lsp_generate(sp, FC, TX, RX, gbsm.draw(sp, "lsf", phase, TX, RX))
-    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", 5), TX, RX)
-    rf = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", 5, 0), TX, RX, 0)
-    rr = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", 5, 0), TX, RX, 0)
-    cl = gbsm.ssf_clusters(sp, TX, RX, lsp, rnd, "38.901", rf, gr_eps=gr_eps)
+    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed=5), TX, RX)
+    rf = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed=5, set_id=0), TX, RX, set_id=0)
+    rr = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", seed=5, set_id=0), TX, RX, set_id=0)
+    cl = gbsm.ssf_clusters(sp, TX, RX, lsp, rnd, method="38.901", rnd_freq=rf, gr_eps=gr_eps)
     rays = gbsm.ssf_rays(sp, TX, RX, FC, lsp, mu, sig, *cl[:6], rr[:, :, None], gr_eps=gr_eps)
     return gbsm.ssf_scatterers(rays[0])[0]
 
@@ -81,15 +81,15 @@ class test_case(unittest.TestCase):
 
     def test_optional_inputs(self):
         r, pg, pl, M = self.rays, *self.out[:3]
-        out = gbsm.ssf_paths(r, [-90.0], "drift")
+        out = gbsm.ssf_paths(r, [-90.0], mobility="drift")
         npt.assert_array_equal(out[7], r["fbs_pos"][:, out[10]])
         npt.assert_array_equal(out[8], r["lbs_pos"][:, out[10]])
         self.assertGreater(np.max(np.abs(out[1] - pl)), 1e-6)  # fallback rays: longer polyline
         rx = RX[0] + [0.01, 0.0, 0.0]
-        out = gbsm.ssf_paths(r, [-90.0], "phase", TX[0], rx)
+        out = gbsm.ssf_paths(r, [-90.0], mobility="phase", tx_pos=TX[0], rx_pos=rx)
         npt.assert_array_equal(out[0], pg)
         self.assertGreater(np.max(np.abs(out[2] - M)), 1e-3)  # displacement phase
-        out2 = gbsm.ssf_paths(r, [-90.0], "phase", rx_pos=list(rx))
+        out2 = gbsm.ssf_paths(r, [-90.0], mobility="phase", rx_pos=list(rx))
         npt.assert_array_equal(out2[2], out[2])
         g = gbsm.ssf_paths(r, [-90.0], kf_ratio=np.zeros(1))[0]
         npt.assert_array_equal(g[:2, 0], 0.0)  # kf_ratio 0: no LOS and GR
@@ -107,19 +107,19 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(out[0], self.out[0])
         npt.assert_array_equal(out[9], self.out[9])
         m0 = self.rays["M"].copy()
-        gbsm.ssf_paths(self.rays, [-90.0], "phase", rx_pos=RX[0] + 1.0)
+        gbsm.ssf_paths(self.rays, [-90.0], mobility="phase", rx_pos=RX[0] + 1.0)
         npt.assert_array_equal(self.rays["M"], m0)  # input not modified
 
     def test_errors(self):
         r = self.rays
         with self.assertRaises(ValueError) as ctx:
-            gbsm.ssf_paths(r, [0.0], "foo")
+            gbsm.ssf_paths(r, [0.0], mobility="foo")
         self.assertIn("Input 'mobility' must be 'phase', 'drift' or 'auto'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.ssf_paths(r, [0.0, 0.0])
         self.assertIn("Input 'link_gain_dB' must have n_freq elements.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            gbsm.ssf_paths(dict(r, fbs_pos=None, lbs_pos=None), [0.0], "drift")
+            gbsm.ssf_paths(dict(r, fbs_pos=None, lbs_pos=None), [0.0], mobility="drift")
         self.assertIn("Mobility 'drift' needs 'rays.fbs_pos'", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
             gbsm.ssf_paths({k: v for k, v in r.items() if k != "tap"}, [0.0])

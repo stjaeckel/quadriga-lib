@@ -20,7 +20,7 @@ Calculates the directivity in dBi of array antenna elements
 
 ## Usage:
 ```
-directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, i_element )
+directivity_dBi = quadriga_lib.arrayant.calc_directivity( arrayant, *, i_element )
 ```
 
 ## Inputs:

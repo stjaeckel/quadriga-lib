@@ -25,15 +25,18 @@ void quadriga_lib_arrayant(py::module_ &m)
 {
     m.def("calc_beamwidth", &arrayant_calc_beamwidth,
           py::arg("arrayant"),
+          py::kw_only(),
           py::arg("i_element") = py::none(),
           py::arg("threshold_dB") = 3.0);
 
     m.def("calc_directivity", &arrayant_calc_directivity,
           py::arg("arrayant"),
+          py::kw_only(),
           py::arg("i_element") = py::none());
 
     m.def("combine_pattern", &arrayant_combine_pattern,
           py::arg("arrayant"),
+          py::kw_only(),
           py::arg("freq_new") = py::none(),
           py::arg("azimuth_grid") = py::none(),
           py::arg("elevation_grid") = py::none(),
@@ -51,6 +54,7 @@ void quadriga_lib_arrayant(py::module_ &m)
     m.def("export_obj_file", &arrayant_export_obj_file,
           py::arg("fn"),
           py::arg("arrayant"),
+          py::kw_only(),
           py::arg("directivity_range_dB") = 30.0,
           py::arg("colormap") = "jet",
           py::arg("object_radius") = 1.0,
@@ -61,6 +65,7 @@ void quadriga_lib_arrayant(py::module_ &m)
     m.def("generate", &arrayant_generate,
           py::arg("type"),
           py::arg("res") = 0.0,
+          py::kw_only(),
           py::arg("freq") = 299792458.0,
           py::arg("az_3dB") = 0.0,
           py::arg("el_3dB") = 0.0,
@@ -83,6 +88,7 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("generate_speaker", &generate_speaker,
           py::arg("driver_type") = "piston",
+          py::kw_only(),
           py::arg("radius") = 0.05,
           py::arg("lower_cutoff") = 80.0,
           py::arg("upper_cutoff") = 12000.0,
@@ -102,6 +108,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("arrayant"),
           py::arg("azimuth").none(false),
           py::arg("elevation").none(false),
+          py::kw_only(),
           py::arg("i_element") = py::none(),
           py::arg("orientation") = py::none(),
           py::arg("element_pos") = py::none(),
@@ -117,11 +124,13 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("fn"),
           py::arg("arrayant"),
           py::arg("id") = 0,
+          py::kw_only(),
           py::arg("layout") = py::none());
 
     m.def("rotate_pattern", &arrayant_rotate_pattern,
           py::arg("arrayant"),
           py::arg("orientation").none(false),
+          py::kw_only(),
           py::arg("usage") = 0,
           py::arg("i_element") = py::none());
 }

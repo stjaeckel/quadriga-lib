@@ -437,8 +437,8 @@ class test_case(unittest.TestCase):
 
         # Stack model: one array per key with the snapshot on the last axis, zero-padded to the largest n_path
         chan, _ = channel.hdf5_read_channel(fn, stack=True)
-        with self.assertRaises(TypeError):  # stack is keyword-only
-            channel.hdf5_read_channel(fn, None, None, None, None, None, True)
+        with self.assertRaises(TypeError):  # i_snap and stack are keyword-only
+            channel.hdf5_read_channel(fn, None, None, None, None, None)
         c = chan[0]
         shapes = {'coeff': (2, 3, 3, 2), 'delay': (2, 3, 3, 2), 'path_gain': (3, 2), 'path_length': (3, 2),
                   'path_polarization': (8, 3, 2), 'path_angles': (3, 4, 2), 'fbs_pos': (3, 3, 2),
@@ -516,7 +516,7 @@ class test_case(unittest.TestCase):
         ref = full_channel()
         channel.hdf5_write_channel(fn, ref)
 
-        chan, _ = channel.hdf5_read_channel(fn, 0, 0, 0, 0, [1, 0])  # 0-based, reversed order
+        chan, _ = channel.hdf5_read_channel(fn, 0, 0, 0, 0, i_snap=[1, 0])  # 0-based, reversed order
         c = chan[0]
         for key in ['coeff', 'delay', 'path_gain', 'path_polarization', 'n_interact', 'interact_coord']:
             self.assert_same(c[key], [ref[key][1], ref[key][0]], key)
@@ -619,17 +619,17 @@ class test_case(unittest.TestCase):
         fn = self.fn('dset_prefix.hdf5')
         channel.hdf5_create_file(fn, 2)
         channel.hdf5_write_dset(fn, 'a', 1.0, 0, 0, 0, 0)
-        channel.hdf5_write_dset(fn, 'b', np.arange(2.0), 0, 0, 0, 0, 'x_')        # positional
+        channel.hdf5_write_dset(fn, 'b', np.arange(2.0), 0, 0, 0, 0, prefix='x_')        # positional
         channel.hdf5_write_dset(fn, name='c', data='text')
         channel.hdf5_write_dset(fn, name='d', data=np.int32(4), prefix='x_')      # keyword
 
         self.assertEqual(channel.hdf5_read_dset_names(fn), ['a', 'c'])
-        self.assertEqual(channel.hdf5_read_dset_names(fn, 0, 0, 0, 0, 'x_'), ['b', 'd'])
+        self.assertEqual(channel.hdf5_read_dset_names(fn, 0, 0, 0, 0, prefix='x_'), ['b', 'd'])
         self.assertEqual(channel.hdf5_read_dset_names(fn, prefix=''), ['par_a', 'x_b', 'par_c', 'x_d'])
         self.assertEqual(channel.hdf5_read_dset_names(fn, 1, prefix='x_'), [])
 
         self.assert_same(channel.hdf5_read_dset(fn, name='b', prefix='x_'), np.arange(2.0))
-        self.assertEqual(channel.hdf5_read_dset(fn, 'd', 0, 0, 0, 0, 'x_'), 4)
+        self.assertEqual(channel.hdf5_read_dset(fn, 'd', 0, 0, 0, 0, prefix='x_'), 4)
         self.assertEqual(channel.hdf5_read_dset(fn, name='x_d', prefix=''), 4)
         self.assertIsNone(channel.hdf5_read_dset(fn, name='b'))                    # looked up as 'par_b'
         self.assertEqual(channel.hdf5_read_dset(fn, name='a', prefix='par_'), 1.0)

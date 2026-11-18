@@ -25,7 +25,7 @@ Calculate intersections of ray beams with points in 3D space
 ## Usage:
 ```
 hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
-    tridir, sub_cloud_ind, use_kernel, gpu_id )
+    tridir, sub_cloud_ind, *, use_kernel, gpu_id )
 ```
 
 ## Inputs:

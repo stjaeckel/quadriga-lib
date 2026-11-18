@@ -46,7 +46,7 @@ Antenna-free paths of one link at one position
 ## Usage:
 ```
 path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_ind = \
-    quadriga_lib.gbsm.ssf_paths( rays, link_gain_dB, mobility, tx_pos, rx_pos, kf_ratio, oxygen )
+    quadriga_lib.gbsm.ssf_paths( rays, link_gain_dB, *, mobility, tx_pos, rx_pos, kf_ratio, oxygen )
 ```
 
 ## Inputs:

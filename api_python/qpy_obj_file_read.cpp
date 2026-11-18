@@ -34,7 +34,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 ## Usage:
 ```
 mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop = \
-    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, csv_strict )
+    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, *, csv_strict )
 ```
 
 ## Inputs:

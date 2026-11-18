@@ -33,10 +33,10 @@ def read(name):
 
 def draw(sp, fc, seed):
     # LSPs, ground permittivity, EoD offset, absolute TOA and the random values of one scenario at the links
-    phase = gbsm.init_phases(sp, "lsf", seed, remove_bias=False)
+    phase = gbsm.init_phases(sp, "lsf", seed=seed, remove_bias=False)
     lsp, abs_toa, gr_eps, eod, _, _ = gbsm.lsp_generate(sp, np.array(fc), TX, RX, gbsm.draw(sp, "lsf", phase, TX, RX))
-    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed), TX, RX)
-    rnd_f = np.stack([gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed, k), TX, RX, k)
+    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed=seed), TX, RX)
+    rnd_f = np.stack([gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed=seed, set_id=k), TX, RX, set_id=k)
                       for k in range(len(fc))], 2)
     return lsp, rnd, rnd_f, abs_toa, gr_eps, eod
 
@@ -48,7 +48,7 @@ class test_case(unittest.TestCase):
         self.N = int(self.sp["NumClusters"]) - 1  # 12
         self.lsp, self.rnd, self.rnd_f, _, self.gr_eps, _ = draw(self.sp, [6e9], 11)
         self.lsp_n, self.rnd_n, self.rnd_fn, self.abs_toa_n, _, self.eod_n = draw(self.sn, [6e9], 12)
-        self.out = gbsm.ssf_clusters(self.sp, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f)
+        self.out = gbsm.ssf_clusters(self.sp, TX, RX, self.lsp, self.rnd, method="38.901", rnd_freq=self.rnd_f)
         v = RX - TX
         self.aod_l = np.arctan2(v[:, 1], v[:, 0])
         self.eod_l = np.arctan2(v[:, 2], np.hypot(v[:, 0], v[:, 1]))
@@ -75,7 +75,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(n_active, np.sum(power[:, 1:, 0] > 0, axis=1))
 
         # NLOS scenario: zero LOS power
-        pn = gbsm.ssf_clusters(self.sn, TX, RX, self.lsp_n, self.rnd_n, "38.901", self.rnd_fn)[1]
+        pn = gbsm.ssf_clusters(self.sn, TX, RX, self.lsp_n, self.rnd_n, method="38.901", rnd_freq=self.rnd_fn)[1]
         self.assertEqual(pn.shape, (4, 20, 1))
         npt.assert_array_equal(pn[:, 0, 0], np.zeros(4))
 
@@ -84,15 +84,19 @@ class test_case(unittest.TestCase):
                                method="38.901", rnd_freq=self.rnd_fn, lsp_anchor=None, eod_offset_deg=self.eod_n,
                                abs_toa=self.abs_toa_n, gr_eps=None, o2i=np.array([0, 1, 0, 0]),
                                n_cluster=np.array([19, 6, 9, 19]))
-        op = gbsm.ssf_clusters(self.sn, TX, RX, self.lsp_n, self.rnd_n, "38.901", self.rnd_fn, None, self.eod_n,
-                               self.abs_toa_n, None, np.array([0, 1, 0, 0]), np.array([19, 6, 9, 19]))
+        op = gbsm.ssf_clusters(self.sn, TX, RX, self.lsp_n, self.rnd_n, method="38.901", rnd_freq=self.rnd_fn,
+                               lsp_anchor=None, eod_offset_deg=self.eod_n,
+                               abs_toa=self.abs_toa_n, gr_eps=None, o2i=np.array([0, 1, 0, 0]), n_cluster=np.array([19,
+                                                                                                                    6,
+                                                                                                                    9,
+                                                                                                                    19]))
         for a, b in zip(ok, op):
             npt.assert_array_equal(a, b)
         self.assertTrue(np.all(ok[6] <= [19, 6, 9, 19]))
 
     def test_method(self):
         f = gbsm.ssf_clusters
-        dq, pq, _, _, _, _, nq = f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga")
+        dq, pq, _, _, _, _, nq = f(self.sp, TX, RX, self.lsp, self.rnd, method="quadriga")
         self.assertEqual(dq.shape, (4, self.N + 1, 1))
         npt.assert_allclose(pq.sum(axis=1)[:, 0], np.ones(4), atol=1e-12, rtol=0)
         npt.assert_array_equal(nq, np.full(4, self.N))
@@ -101,30 +105,31 @@ class test_case(unittest.TestCase):
         # 38.901_MF with two frequencies and anchor LSPs: delays and angles per frequency
         lsp2, _, rnd_f2, _, _, _ = draw(self.sp, [6e9, 30e9], 11)
         lsp_a = draw(self.sp, [2e9], 11)[0]
-        out = f(self.sp, TX, RX, lsp2, self.rnd, "38.901_MF", rnd_f2, lsp_a)
+        out = f(self.sp, TX, RX, lsp2, self.rnd, method="38.901_MF", rnd_freq=rnd_f2, lsp_anchor=lsp_a)
         for x in out[:6]:
             self.assertEqual(x.shape, (4, self.N + 1, 2))
         npt.assert_array_equal(rnd_f2[:, :, :1], self.rnd_f)
 
     def test_eod_offset_and_abs_toa(self):
         f = gbsm.ssf_clusters
-        args = (self.sn, TX, RX, self.lsp_n, self.rnd_n, "38.901", self.rnd_fn)
-        d0, p0, _, e0 = f(*args)[:4]
-        e1 = f(*args, eod_offset_deg=self.eod_n)[3]
+        args = (self.sn, TX, RX, self.lsp_n, self.rnd_n)
+        kw = dict(method="38.901", rnd_freq=self.rnd_fn)
+        d0, p0, _, e0 = f(*args, **kw)[:4]
+        e1 = f(*args, **kw, eod_offset_deg=self.eod_n)[3]
         self.assertTrue(np.max(np.abs(e1[:, 1:] - e0[:, 1:])) > 1e-3)
         npt.assert_array_equal(e1[:, 0], e0[:, 0])
-        npt.assert_array_equal(f(*args, eod_offset_deg=None)[3], e0)
-        dt, pt = f(*args, abs_toa=self.abs_toa_n)[:2]
+        npt.assert_array_equal(f(*args, **kw, eod_offset_deg=None)[3], e0)
+        dt, pt = f(*args, **kw, abs_toa=self.abs_toa_n)[:2]
         self.assertTrue(np.all(self.abs_toa_n > 0))
         npt.assert_allclose(dt[:, 1:, 0] - d0[:, 1:, 0], np.tile(self.abs_toa_n[:, None], (1, 19)), atol=1e-15,
                             rtol=0)
         npt.assert_array_equal(pt, p0)
-        npt.assert_array_equal(f(*args, abs_toa=list(self.abs_toa_n))[0], dt)
+        npt.assert_array_equal(f(*args, **kw, abs_toa=list(self.abs_toa_n))[0], dt)
         # "quadriga" in an NLOS scenario with absolute TOA: abs_toa required, the first NLOS cluster at abs_toa
         with self.assertRaises(ValueError) as ctx:
-            f(self.sn, TX, RX, self.lsp_n, self.rnd_n, "quadriga")
+            f(self.sn, TX, RX, self.lsp_n, self.rnd_n, method="quadriga")
         self.assertIn("Method 'quadriga' requires 'abs_toa'", str(ctx.exception))
-        dq = f(self.sn, TX, RX, self.lsp_n, self.rnd_n, "quadriga", abs_toa=self.abs_toa_n)[0]
+        dq = f(self.sn, TX, RX, self.lsp_n, self.rnd_n, method="quadriga", abs_toa=self.abs_toa_n)[0]
         npt.assert_array_equal(dq[:, 1:, 0].min(axis=1), self.abs_toa_n)
 
     def test_ground_reflection(self):
@@ -132,7 +137,8 @@ class test_case(unittest.TestCase):
         sg = dict(self.sp)
         sg["GR_enabled"] = 1.0
         self.assertEqual(self.gr_eps.dtype, np.complex128)
-        dg, pg, ag, eg, _, eag, _ = f(sg, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f, gr_eps=self.gr_eps)
+        dg, pg, ag, eg, _, eag, _ = f(sg, TX, RX, self.lsp, self.rnd, method="38.901", rnd_freq=self.rnd_f,
+                                      gr_eps=self.gr_eps)
         self.assertEqual(dg.shape, (4, self.N + 2, 1))
         npt.assert_array_equal(pg[:, [0] + list(range(2, self.N + 2))], self.out[1])  # other slots unchanged
         self.assertTrue(np.all(pg[:, 1, 0] > 0))
@@ -142,49 +148,53 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(eag[:, 1, 0], e_gr, atol=1e-14, rtol=0)
 
         # A real array is accepted (imaginary part 0); the outputs differ
-        pr = f(sg, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f, gr_eps=self.gr_eps.real.copy())[1]
+        pr = f(sg, TX, RX, self.lsp, self.rnd, method="38.901", rnd_freq=self.rnd_f, gr_eps=self.gr_eps.real.copy())[1]
         self.assertTrue(np.max(np.abs(pr[:, 1] - pg[:, 1])) > 1e-6)
         npt.assert_array_equal(pr[:, 2:], pg[:, 2:])
-        p32 = f(sg, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f, gr_eps=self.gr_eps.astype(np.complex64))[1]
+        p32 = f(sg, TX, RX, self.lsp, self.rnd, method="38.901", rnd_freq=self.rnd_f,
+                gr_eps=self.gr_eps.astype(np.complex64))[1]
         npt.assert_allclose(p32, pg, atol=1e-6, rtol=0)  # permittivity rounded to single precision
         with self.assertRaises(ValueError) as ctx:
-            f(sg, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f, gr_eps=np.conj(self.gr_eps))
+            f(sg, TX, RX, self.lsp, self.rnd, method="38.901", rnd_freq=self.rnd_f, gr_eps=np.conj(self.gr_eps))
         self.assertIn("'gr_eps_im' >= 0", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # a 3-D array is not flattened
-            f(sg, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f, gr_eps=self.gr_eps[:, :, np.newaxis])
+            f(sg, TX, RX, self.lsp, self.rnd, method="38.901", rnd_freq=self.rnd_f, gr_eps=self.gr_eps[:, :,
+                                                                                                       np.newaxis])
         self.assertIn("Input 'gr_eps' must have size (n_link, n_freq).", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            f(sg, TX, RX, self.lsp, self.rnd, "quadriga")
+            f(sg, TX, RX, self.lsp, self.rnd, method="quadriga")
         self.assertIn("are required when 'GR_enabled' is set", str(ctx.exception))
 
     def test_o2i_and_n_cluster(self):
         f = gbsm.ssf_clusters
-        args = (self.sn, TX, RX, self.lsp_n, self.rnd_n, "38.901", self.rnd_fn)
-        ea = f(*args)[5]
-        eo = f(*args, o2i=np.array([False, True, False, False]))[5]
+        args = (self.sn, TX, RX, self.lsp_n, self.rnd_n)
+        kw = dict(method="38.901", rnd_freq=self.rnd_fn)
+        ea = f(*args, **kw)[5]
+        eo = f(*args, **kw, o2i=np.array([False, True, False, False]))[5]
         npt.assert_array_equal(eo[[0, 2, 3]], ea[[0, 2, 3]])
         self.assertTrue(np.max(np.abs(eo[1, 1:] - ea[1, 1:])) > 1e-3)
-        npt.assert_array_equal(f(*args, o2i=[0, 2.5, 0, 0])[5], eo)  # numeric, nonzero = True
+        npt.assert_array_equal(f(*args, **kw, o2i=[0, 2.5, 0, 0])[5], eo)  # numeric, nonzero = True
 
         nc = np.array([12, 6, 9, 12])
-        dc, pc, ac, _, _, _, nac = f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=nc)
+        dc, pc, ac, _, _, _, nac = f(self.sp, TX, RX, self.lsp, self.rnd, method="quadriga", n_cluster=nc)
         npt.assert_array_equal(pc[1, 7:, 0], np.zeros(6))  # slots 7 ... 12 inactive
         npt.assert_array_equal(dc[1, 7:, 0], np.zeros(6))
         npt.assert_allclose(ac[1, 7:, 0], np.full(6, self.aod_l[1]), atol=1e-14, rtol=0)
         npt.assert_array_equal(nac, nc)
-        npt.assert_array_equal(f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=nc.astype(float))[0], dc)
+        npt.assert_array_equal(f(self.sp, TX, RX, self.lsp, self.rnd, method="quadriga", n_cluster=nc.astype(float))[0],
+                               dc)
         with self.assertRaises(ValueError) as ctx:
-            f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 6.5, 9, 12])
+            f(self.sp, TX, RX, self.lsp, self.rnd, method="quadriga", n_cluster=[12, 6.5, 9, 12])
         self.assertIn("Entries in 'n_cluster' must be integers from 0 to 4294967295.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            f(self.sp, TX, RX, self.lsp, self.rnd, "quadriga", n_cluster=[12, 3, 9, 12])
+            f(self.sp, TX, RX, self.lsp, self.rnd, method="quadriga", n_cluster=[12, 3, 9, 12])
         self.assertIn("Entries of 'n_cluster' must be in [6, 12].", str(ctx.exception))
 
     def test_special_sizes(self):
         f = gbsm.ssf_clusters
         # Zero links
-        out = f(self.sp, TX, np.zeros((0, 3)), np.zeros((0, 1, 8)), np.zeros((0, 9 * self.N)), "38.901",
-                np.zeros((0, self.N, 1)))
+        out = f(self.sp, TX, np.zeros((0, 3)), np.zeros((0, 1, 8)), np.zeros((0, 9 * self.N)), method="38.901",
+                rnd_freq=np.zeros((0, self.N, 1)))
         self.assertEqual(out[0].shape, (0, self.N + 1, 1))
         self.assertEqual(out[6].shape, (0,))
         # NumClusters = 1: LOS path only
@@ -197,19 +207,20 @@ class test_case(unittest.TestCase):
 
     def test_memory_layout_and_dtype(self):
         f = gbsm.ssf_clusters
-        args = (self.sp, TX, RX, self.lsp, self.rnd, "38.901", self.rnd_f)
+        args = (self.sp, TX, RX, self.lsp, self.rnd)
+        kw = dict(method="38.901", rnd_freq=self.rnd_f)
         of = f(self.sp, np.asfortranarray(TX), np.asfortranarray(RX), np.asfortranarray(self.lsp),
-               np.asfortranarray(self.rnd), "38.901", np.asfortranarray(self.rnd_f))
+               np.asfortranarray(self.rnd), method="38.901", rnd_freq=np.asfortranarray(self.rnd_f))
         big = np.zeros((8, 2 * 9 * self.N))
         big[::2, ::2] = self.rnd
-        os_ = f(self.sp, TX, RX, self.lsp, big[::2, ::2], "38.901", self.rnd_f)  # strided view
-        o32 = f(self.sp, TX.astype(np.float32), RX.astype(np.float32), *args[3:])  # positions exact in float32
+        os_ = f(self.sp, TX, RX, self.lsp, big[::2, ::2], method="38.901", rnd_freq=self.rnd_f)  # strided view
+        o32 = f(self.sp, TX.astype(np.float32), RX.astype(np.float32), *args[3:], **kw)  # positions exact in float32
         for a, b, c, d in zip(self.out, of, os_, o32):
             npt.assert_array_equal(b, a)
             npt.assert_array_equal(c, a)
             npt.assert_array_equal(d, a)
         lsp0, rnd0 = self.lsp.copy(), self.rnd.copy()
-        f(*args)
+        f(*args, **kw)
         npt.assert_array_equal(self.lsp, lsp0)
         npt.assert_array_equal(self.rnd, rnd0)
 
@@ -219,10 +230,10 @@ class test_case(unittest.TestCase):
             f(self.sp, TX, RX, self.lsp, self.rnd)
         self.assertIn("Input 'rnd_freq' is required for method '38.901'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            f(self.sp, TX, RX, self.lsp, self.rnd, "other")
+            f(self.sp, TX, RX, self.lsp, self.rnd, method="other")
         self.assertIn("Input 'method' must be '38.901', '38.901_MF' or 'quadriga'.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            f(self.sp, TX, RX, self.lsp, self.rnd[:, 1:], "quadriga")
+            f(self.sp, TX, RX, self.lsp, self.rnd[:, 1:], method="quadriga")
         self.assertIn("Input 'rnd' must have size [n_link, 108].", str(ctx.exception))
         with self.assertRaises(TypeError):
             f(self.sp, TX, RX, self.lsp)

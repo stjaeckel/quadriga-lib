@@ -114,7 +114,7 @@ Also in: [C++](../cpp/channel-class.md#.write_paths_to_obj_file) · [MATLAB](../
 
 ### Usage:
 ```python
-quadriga_lib.channel.export_obj_file( fn, max_paths, gain_max_dB, gain_min_dB, colormap, \
+quadriga_lib.channel.export_obj_file( fn, *, max_paths, gain_max_dB, gain_min_dB, colormap, \
     radius_max, radius_min, n_edges, rx_pos, tx_pos, n_interact, interact_coord, center_freq, coeff, \
     coeff_re, coeff_im, i_snap )
 ```
@@ -205,7 +205,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [MATLAB](../mex
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, stack=False )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_snap, stack=False )
 ```
 
 ### Inputs:
@@ -215,7 +215,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
 - **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
-- **`stack`** — Keyword-only; if `True`, stack snapshots. Default: `False` (return as list)
+- **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
 
 ### Outputs:
 - **`chan`** — List of dicts with the following keys:
@@ -266,7 +266,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_dset) · [MATLAB](../mex/ch
 
 ### Usage:
 ```python
-dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, *, prefix )
 ```
 
 ### Inputs:
@@ -302,7 +302,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_dset_names) · [MATLAB](../
 
 ### Usage:
 ```python
-names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix )
+names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw, *, prefix )
 ```
 
 ### Inputs:
@@ -451,7 +451,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_write_dset) · [MATLAB](../mex/c
 
 ### Usage:
 ```python
-quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix )
+quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, *, prefix )
 ```
 
 ### Input Arguments:
@@ -526,7 +526,7 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [MATLAB](../mex/cha
 ```python
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
     path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
-    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_M )
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, *, uplink, normalize_M )
 ```
 
 ### Inputs:
@@ -589,8 +589,6 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [MATLAB](../mex/c
 - If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped
   (nearest-neighbor selection) but tap-selection logic still applies
 - Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
-- Coefficients are given either as one complex list `coeff`, or as split `coeff_re` + `coeff_im`;
-  supplying both forms is an error. The output coefficients are complex for both input forms
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -608,18 +606,12 @@ Also in: [C++](../cpp/channel-functions.md#quantize_delays) · [MATLAB](../mex/c
 
 ### Usage:
 ```python
-# Complex input (keyword)
-coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay )
-
-# Split real / imaginary input
-coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff, delay, *, tap_spacing, max_taps, \
+    power_exponent, fix_taps, stack=False )
 ```
 
 ### Inputs:
-- **`coeff_re`** — Real part of channel coefficients; list of length `n_snap`; each item
-  `(n_rx, n_tx, n_path)`; must be paired with `coeff_im`; mutually exclusive with `coeff`;
-  default: `None`
-- **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
+- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
 - **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or
   shared `(1, 1, n_path)`; non-negative with a tolerance of `tap_spacing / 2`, finite, below
   `2^31 * tap_spacing`
@@ -629,10 +621,8 @@ coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, del
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
   2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
-- **`stack`** — Keyword-only; if `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
+- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
-- **`coeff`** — Keyword-only; complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
-  mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
 ### Outputs:
 - **`coeff_q`** — Complex output coefficients; list of `(n_rx, n_tx, n_taps)` when `stack` is `False`, else

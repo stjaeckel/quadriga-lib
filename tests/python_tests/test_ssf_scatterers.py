@@ -32,12 +32,12 @@ KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "e
 def make_rays():
     # "quadriga" rays of two links in UMi LOS
     sp = gbsm.conf_file_read(os.path.join(CONF_DIR, "3GPP_38.901_v19_UMi_LOS.conf"))[0]
-    phase = gbsm.init_phases(sp, "lsf", 3)
+    phase = gbsm.init_phases(sp, "lsf", seed=3)
     lsp, _, _, _, mu, sig = gbsm.lsp_generate(sp, FC, TX, RX, gbsm.draw(sp, "lsf", phase, TX, RX))
-    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", 3), TX, RX)
-    cl = gbsm.ssf_clusters(sp, TX, RX, lsp, rnd, "quadriga")
-    rr = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", 3), TX, RX, center_freq=FC)
-    return gbsm.ssf_rays(sp, TX, RX, FC, lsp, mu, sig, *cl[:6], rr, "quadriga")
+    rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed=3), TX, RX)
+    cl = gbsm.ssf_clusters(sp, TX, RX, lsp, rnd, method="quadriga")
+    rr = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", seed=3), TX, RX, center_freq=FC)
+    return gbsm.ssf_rays(sp, TX, RX, FC, lsp, mu, sig, *cl[:6], rr, method="quadriga")
 
 
 class test_case(unittest.TestCase):
@@ -73,19 +73,19 @@ class test_case(unittest.TestCase):
         r, b_med, b_eff = self.out
         ant = quadriga_lib.arrayant.generate("omni")
         for k in range(2):
-            par = gbsm.single_link_channel(ant, ant, r, np.array([0.0]), "drift", "taps", k)[1]
+            par = gbsm.single_link_channel(ant, ant, r, np.array([0.0]), mobility="drift", output="taps", i_freq=k)[1]
             npt.assert_array_equal(b_med[:, k], par["b_med"])
             npt.assert_array_equal(b_eff[:, k], par["b_eff"])
 
     def test_d_min_and_solved_input(self):
         r, b_med, _ = self.out
-        r2, m2, _ = gbsm.ssf_scatterers(self.rays[0], 2.0)
+        r2, m2, _ = gbsm.ssf_scatterers(self.rays[0], d_min=2.0)
         npt.assert_array_equal(r2["fbs_pos"], r["fbs_pos"])
         npt.assert_array_equal(m2, b_med)
         r2 = gbsm.ssf_scatterers(rays=self.rays[0], d_min=2)[0]
         npt.assert_array_equal(r2["lbs_pos"], r["lbs_pos"])
         fbs0, lbs0, fb0 = r["fbs_pos"].copy(), r["lbs_pos"].copy(), r["fallback"].copy()
-        r5 = gbsm.ssf_scatterers(r, 5.0)[0]  # 2 rays fall back at 5 m, none at 2 m
+        r5 = gbsm.ssf_scatterers(r, d_min=5.0)[0]  # 2 rays fall back at 5 m, none at 2 m
         npt.assert_array_equal(r["fbs_pos"], fbs0)
         npt.assert_array_equal(r["lbs_pos"], lbs0)
         npt.assert_array_equal(r["fallback"], fb0)
@@ -137,7 +137,7 @@ class test_case(unittest.TestCase):
             gbsm.ssf_scatterers(dict(r, gr_eps=np.ones(3)))
         self.assertIn("'rays.gr_eps_re' and 'rays.gr_eps_im'", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            gbsm.ssf_scatterers(r, 0.0)
+            gbsm.ssf_scatterers(r, d_min=0.0)
         self.assertIn("Input 'd_min' must be finite and > 0.", str(ctx.exception))
         with self.assertRaises(TypeError):
             gbsm.ssf_scatterers(self.rays)

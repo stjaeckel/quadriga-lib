@@ -60,7 +60,7 @@ import quadriga_lib
 
 ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)
 print(quadriga_lib.version())
-print(quadriga_lib.arrayant.calc_directivity(ant, 0))
+print(quadriga_lib.arrayant.calc_directivity(ant, i_element=0))
 ```
 
 **MATLAB / Octave**

@@ -25,7 +25,7 @@ class test_case(unittest.TestCase):
 
     def setUp(self):
         self.spatial_freq, self.acf, self.dist = quadriga_lib.sos.preset("Gauss256")
-        self.phase = quadriga_lib.sos.init_phases(256, 1, 3)[:, 0]
+        self.phase = quadriga_lib.sos.init_phases(256, 1, seed=3)[:, 0]
         self.bins = np.array([2.0, 5.0, 10.0, 15.0, 22.0, 30.0])
 
     def test_basic_call(self):
@@ -55,7 +55,7 @@ class test_case(unittest.TestCase):
 
         # With the ACF table all three outputs are arrays; the first two do not change
         acf_est, dist_est, acf_est_dual = quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150,
-                                                                        self.acf, self.dist, 1)
+                                                                        acf=self.acf, dist=self.dist, seed=1)
         npt.assert_array_equal(acf_est, ref[0])
         npt.assert_array_equal(dist_est, ref[1])
         self.assertIsInstance(acf_est_dual, np.ndarray)
@@ -69,7 +69,8 @@ class test_case(unittest.TestCase):
         self.assertGreater(np.max(np.abs(acf_est_dual[valid] - acf_est[valid])), 1e-4)
 
     def test_keyword_arguments(self):
-        ref = quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, self.acf, self.dist, 1)
+        ref = quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, acf=self.acf, dist=self.dist,
+                                            seed=1)
         out = quadriga_lib.sos.acf_estimate(spatial_freq=self.spatial_freq, phase=self.phase, bins=self.bins, n_pos=150,
                                             acf=self.acf, dist=self.dist, seed=1)
         self.assertEqual(len(out), 3)
@@ -80,8 +81,10 @@ class test_case(unittest.TestCase):
         ref = quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, seed=1)
 
         # None and empty arrays are the same as omitted
-        for out in (quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, None, None, 1),
-                    quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, [], np.zeros(0), 1)):
+        for out in (quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, acf=None, dist=None,
+                                                  seed=1),
+                    quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, acf=[],
+                                                  dist=np.zeros(0), seed=1)):
             npt.assert_array_equal(out[0], ref[0])
             npt.assert_array_equal(out[1], ref[1])
             self.assertIsNone(out[2])
@@ -99,7 +102,8 @@ class test_case(unittest.TestCase):
         self.assertTrue(np.max(np.abs(a5 - ref[0])) > 1e-4 or np.any(np.isnan(a5)))
 
     def test_array_layout_and_dtype(self):
-        ref = quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, self.acf, self.dist, 1)
+        ref = quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, acf=self.acf, dist=self.dist,
+                                            seed=1)
         mats = [
             lambda a: np.ascontiguousarray(a),            # C order
             lambda a: np.asfortranarray(a),               # Fortran order
@@ -114,7 +118,7 @@ class test_case(unittest.TestCase):
         ]
         for fm, fv in zip(mats, vecs):
             out = quadriga_lib.sos.acf_estimate(fm(self.spatial_freq), fv(self.phase), fv(self.bins), np.uint32(150),
-                                                fv(self.acf), fv(self.dist), np.int32(1))
+                                                acf=fv(self.acf), dist=fv(self.dist), seed=np.int32(1))
             for a, b in zip(out, ref):
                 self.assertEqual(a.dtype, np.float64)
                 npt.assert_array_equal(a, b)
@@ -128,7 +132,8 @@ class test_case(unittest.TestCase):
     def test_inputs_not_modified(self):
         args = [self.spatial_freq, self.phase, self.bins, self.acf, self.dist]
         copies = [a.copy() for a in args]
-        quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, self.acf, self.dist, 1)
+        quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, acf=self.acf, dist=self.dist,
+                                      seed=1)
         for a, c in zip(args, copies):
             npt.assert_array_equal(a, c)
 
@@ -144,7 +149,7 @@ class test_case(unittest.TestCase):
 
         # Only one of acf and dist: the two-device estimate is requested and C++ rejects the call
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, self.acf)
+            quadriga_lib.sos.acf_estimate(self.spatial_freq, self.phase, self.bins, 150, acf=self.acf)
         self.assertIn("acf_est_dual", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:

@@ -32,6 +32,7 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("mtl_ind").none(false),
           py::arg("mtl_prop").none(false),
           py::arg("center_freq"),
+          py::kw_only(),
           py::arg("lod") = 2,
           py::arg("verbose") = 0,
           py::arg("sub_mesh_ind") = py::none(),
@@ -46,10 +47,11 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("scale") = py::none(),
           py::arg("rotation") = py::none(),
           py::arg("location") = py::none(),
+          py::kw_only(),
           py::arg("n_div") = 1);
 
     m.def("icosphere", &icosphere, py::arg("n_div"),
-          py::arg("radius"), py::arg("direction_xyz") = false);
+          py::arg("radius"), py::kw_only(), py::arg("direction_xyz") = false);
 
     m.def("mitsuba_xml_file_write", &mitsuba_xml_file_write,
           py::arg("fn"),
@@ -60,11 +62,13 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("obj_names").none(false),
           py::arg("mtl_names").none(false),
           py::arg("bsdf") = py::none(),
+          py::kw_only(),
           py::arg("map_to_itu_materials") = false);
 
     m.def("obj_file_read", &obj_file_read,
           py::arg("fn") = "",
           py::arg("fn_csv") = "",
+          py::kw_only(),
           py::arg("csv_strict") = false);
 
     m.def("obj_file_write", &obj_file_write,
@@ -74,6 +78,7 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("mtl_ind") = py::none(),
           py::arg("obj_names") = py::none(),
           py::arg("mtl_names") = py::none(),
+          py::kw_only(),
           py::arg("vert_list") = py::none(),
           py::arg("face_ind") = py::none(),
           py::arg("bsdf") = py::none(),
@@ -88,15 +93,18 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("scale") = py::none(),
           py::arg("rotation") = py::none(),
           py::arg("location") = py::none(),
+          py::kw_only(),
           py::arg("n_div") = 1);
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
           py::arg("points").none(false),
           py::arg("sub_cloud_ind") = py::none(),
+          py::kw_only(),
           py::arg("vec_size") = 1);
 
     m.def("point_cloud_segmentation", &point_cloud_segmentation,
           py::arg("points").none(false),
+          py::kw_only(),
           py::arg("target_size") = 1024,
           py::arg("vec_size") = 1);
 
@@ -104,6 +112,7 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("points").none(false),
           py::arg("mesh").none(false),
           py::arg("obj_ind") = py::none(),
+          py::kw_only(),
           py::arg("distance") = 0.0);
 
     m.def("ray_point_intersect", &ray_point_intersect,
@@ -112,6 +121,7 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("trivec").none(false),
           py::arg("tridir").none(false),
           py::arg("sub_cloud_ind") = py::none(),
+          py::kw_only(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0);
 
@@ -121,16 +131,19 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("mesh").none(false),
           py::arg("sub_mesh_ind") = py::none(),
           py::arg("aabb") = py::none(),
+          py::kw_only(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0);
 
     m.def("triangle_mesh_aabb", &triangle_mesh_aabb,
           py::arg("mesh").none(false),
           py::arg("sub_mesh_ind") = py::none(),
+          py::kw_only(),
           py::arg("vec_size") = 1);
 
     m.def("triangle_mesh_segmentation", &triangle_mesh_segmentation,
           py::arg("mesh").none(false),
+          py::kw_only(),
           py::arg("target_size") = 1024,
           py::arg("vec_size") = 1,
           py::arg("mtl_ind") = py::none());

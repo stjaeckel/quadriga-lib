@@ -39,12 +39,12 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) �
 ```python
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
 gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 ```
 
@@ -113,7 +113,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#cube) · [MATLAB](../mex
 
 ### Usage:
 ```python
-mesh = quadriga_lib.RTtools.cube( scale, rotation, location, n_div )
+mesh = quadriga_lib.RTtools.cube( scale, rotation, location, *, n_div )
 ```
 
 ### Inputs:
@@ -141,10 +141,10 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#icosphere) · [MATLAB](.
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.icosphere( n_div, radius, direction_xyz )
+data = quadriga_lib.RTtools.icosphere( n_div, radius, *, direction_xyz )
 
 # Unpacked outputs
-center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius, direction_xyz )
+center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius, *, direction_xyz )
 ```
 
 ### Inputs:
@@ -184,7 +184,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#mitsuba_xml_file_write) 
 ### Usage:
 ```python
 quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
-    mtl_names, bsdf, map_to_itu_materials )
+    mtl_names, bsdf, *, map_to_itu_materials )
 ```
 
 ### Input Arguments:
@@ -230,7 +230,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_read) · [MATLA
 ### Usage:
 ```python
 mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop = \
-    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, csv_strict )
+    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, *, csv_strict )
 ```
 
 ### Inputs:
@@ -290,7 +290,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#obj_file_write) · [MATL
 ### Usage:
 ```python
 vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, \
-    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, \
+    obj_names, mtl_names, *, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, \
     csv_write_defaults, split_loose_parts )
 ```
 
@@ -337,7 +337,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#plane) · [MATLAB](../me
 
 ### Usage:
 ```python
-mesh = quadriga_lib.RTtools.plane( scale, rotation, location, n_div )
+mesh = quadriga_lib.RTtools.plane( scale, rotation, location, *, n_div )
 ```
 
 ### Inputs:
@@ -366,7 +366,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_cloud_aabb) · [MA
 
 ### Usage:
 ```python
-aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
+aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, *, vec_size )
 ```
 
 ### Input Arguments:
@@ -396,11 +396,11 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_cloud_segmentation
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+data = quadriga_lib.RTtools.point_cloud_segmentation( points, *, target_size, vec_size )
 
 # Unpacked outputs
 points_out, sub_cloud_ind, forward_ind, reverse_ind = \
-    quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+    quadriga_lib.RTtools.point_cloud_segmentation( points, *, target_size, vec_size )
 ```
 
 ### Inputs:
@@ -434,7 +434,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_inside_mesh) · [M
 
 ### Usage:
 ```python
-result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
+result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, *, distance )
 ```
 
 ### Input Arguments:
@@ -471,7 +471,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_point_intersect) · 
 ### Usage:
 ```python
 hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
-    tridir, sub_cloud_ind, use_kernel, gpu_id )
+    tridir, sub_cloud_ind, *, use_kernel, gpu_id )
 ```
 
 ### Inputs:
@@ -520,11 +520,11 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_triangle_intersect) 
 ### Usage:
 ```python
 # Output as tuple
-data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, use_kernel, gpu_id )
+data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 
 # Unpacked outputs
 fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, \
-    sub_mesh_ind, aabb, use_kernel, gpu_id )
+    sub_mesh_ind, aabb, *, use_kernel, gpu_id )
 ```
 
 ### Inputs:
@@ -567,7 +567,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#triangle_mesh_aabb) · [
 
 ### Usage:
 ```python
-aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size )
+aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, *, vec_size )
 ```
 
 ### Inputs:
@@ -601,11 +601,11 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#triangle_mesh_segmentati
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
+data = quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, *, target_size, vec_size, mtl_ind )
 
 # Unpacked outputs
 mesh_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
-    quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
+    quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, *, target_size, vec_size, mtl_ind )
 ```
 
 ### Inputs:

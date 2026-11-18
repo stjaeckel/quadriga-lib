@@ -100,8 +100,10 @@ class test_case(unittest.TestCase):
         tp, to, rp, ro, ip, io = args[3:9]
         seg1, seg2 = args[9:14], args[14:19]
         irs_1 = dict(irs, coupling_re=irs["coupling_re"][:, :1], coupling_im=irs["coupling_im"][:, :1])
-        c1, d1, aod, eod, _, _ = quadriga_lib.channel.spherical(tx, irs_1, tp, to, ip, io, *seg1, 3.5e9, True, angles=True)
-        c2, d2, _, _, aoa, eoa = quadriga_lib.channel.spherical(irs_1, rx, ip, io, rp, ro, *seg2, 3.5e9, True, angles=True)
+        c1, d1, aod, eod, _, _ = quadriga_lib.channel.spherical(tx, irs_1, tp, to, ip, io, *seg1, 3.5e9,
+                                                                use_absolute_delays=True, angles=True)
+        c2, d2, _, _, aoa, eoa = quadriga_lib.channel.spherical(irs_1, rx, ip, io, rp, ro, *seg2, 3.5e9,
+                                                                use_absolute_delays=True, angles=True)
         shape = (2, 1, 4)
         pair_1 = lambda x: np.broadcast_to(x[:, :, :, None], (2, 1, 2, 2)).reshape(shape)
         pair_2 = lambda x: np.broadcast_to(x[:, :, None, :], (2, 1, 2, 2)).reshape(shape)
@@ -116,7 +118,7 @@ class test_case(unittest.TestCase):
         args = distinct_args()
         opts = dict(i_irs=1, threshold_dB=-100.0, center_freq=1.0e9, use_absolute_delays=True, angles=True,
                     irs_array_2=irs_two_ports(), active_path=[1, 1, 0, 1], use_kernel=1)
-        ref = quadriga_lib.channel.irs(*args, *opts.values())
+        ref = quadriga_lib.channel.irs(*args, **opts)
         out = quadriga_lib.channel.irs(**dict(zip(self.names, args)), **opts)
         self.assertEqual(len(out), 7)
         for a, b in zip(ref, out):
@@ -124,7 +126,8 @@ class test_case(unittest.TestCase):
 
     def test_optional_inputs(self):
         ref = self.call()
-        explicit = self.call(0, -140.0, 0.0, False, False, None, None, 0)
+        explicit = self.call(i_irs=0, threshold_dB=-140.0, center_freq=0.0, use_absolute_delays=False, angles=False,
+                             irs_array_2=None, active_path=None, use_kernel=0)
         nones = self.call(use_absolute_delays=None, angles=None, irs_array_2=None, active_path=None)
         empty_mask = self.call(active_path=[])
         for out in (explicit, nones, empty_mask):
@@ -192,7 +195,8 @@ class test_case(unittest.TestCase):
         args = self.args()
         copies = [{k: v.copy() for k, v in a.items() if isinstance(v, np.ndarray)} if isinstance(a, dict) else a.copy()
                   for a in args]
-        self.call(1, -100.0, 3.5e9, True, True, irs_two_ports(), [1, 1, 0, 1])
+        self.call(i_irs=1, threshold_dB=-100.0, center_freq=3.5e9, use_absolute_delays=True, angles=True,
+                  irs_array_2=irs_two_ports(), active_path=[1, 1, 0, 1])
         for a, c in zip(args, copies):
             if isinstance(a, dict):
                 for k in c:

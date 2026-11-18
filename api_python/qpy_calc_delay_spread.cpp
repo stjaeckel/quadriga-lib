@@ -22,7 +22,7 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
 ## Usage:
 ```
-ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, threshold_dB, granularity )
+ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, *, threshold_dB, granularity )
 ```
 
 ## Inputs:

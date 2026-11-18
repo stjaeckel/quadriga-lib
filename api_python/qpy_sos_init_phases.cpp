@@ -27,7 +27,7 @@ Draw random phases for a set of sum-of-sinusoids generators
 
 ## Usage:
 ```
-phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )
+phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, *, seed )
 ```
 
 ## Inputs:

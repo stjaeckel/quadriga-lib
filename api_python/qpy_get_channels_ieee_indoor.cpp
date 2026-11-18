@@ -33,7 +33,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
 ## Usage:
 ```
-chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
+chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, *, CarrierFreq_Hz, \
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack=False )
@@ -65,7 +65,7 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, Carri
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default; default: NAN
 - **`n_walls`** *(optional)* — Number of walls per user TGax models; `(n_users,)` or `(1,)`; default: 0
 - **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
-- **`stack`** *(optional)* — Keyword-only; if `True`, per-snapshot data is stacked into a single array along an appended 
+- **`stack`** *(optional)* — If `True`, per-snapshot data is stacked into a single array along an appended 
   snapshot axis instead of being returned as a list of per-snapshot arrays; default: False
 
 

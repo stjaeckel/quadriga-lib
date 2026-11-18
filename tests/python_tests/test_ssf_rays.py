@@ -31,14 +31,14 @@ KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "e
 
 def lsps(sp, fc):
     # LSPs, ground permittivity, means and std at the links
-    phase = gbsm.init_phases(sp, "lsf", 7)
+    phase = gbsm.init_phases(sp, "lsf", seed=7)
     lsp, _, gr_eps, _, mu, sig = gbsm.lsp_generate(sp, fc, TX, RX, gbsm.draw(sp, "lsf", phase, TX, RX))
     return lsp, gr_eps, mu, sig
 
 
 def cset(sp, set_type, k):
     # Per-frequency random set k (0-based set id)
-    return gbsm.draw(sp, set_type, gbsm.init_phases(sp, set_type, 7, k), TX, RX, k)
+    return gbsm.draw(sp, set_type, gbsm.init_phases(sp, set_type, seed=7, set_id=k), TX, RX, set_id=k)
 
 
 class test_case(unittest.TestCase):
@@ -48,21 +48,23 @@ class test_case(unittest.TestCase):
         sp["GR_enabled"] = 1.0
         self.sp = sp
         self.lsp, self.gr_eps, self.mu, self.sig = lsps(sp, FC)
-        rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", 7), TX, RX)
+        rnd = gbsm.draw(sp, "cluster", gbsm.init_phases(sp, "cluster", seed=7), TX, RX)
         self.n_ray = 2 + (int(sp["NumClusters"]) - 1) * int(sp["NumSubPaths"])
         # "quadriga": clusters of all frequencies, the shared "ray" set
-        self.cl = gbsm.ssf_clusters(sp, TX, RX, self.lsp, rnd, "quadriga", gr_eps=self.gr_eps)
-        self.rq = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", 7), TX, RX, center_freq=FC)
+        self.cl = gbsm.ssf_clusters(sp, TX, RX, self.lsp, rnd, method="quadriga", gr_eps=self.gr_eps)
+        self.rq = gbsm.draw(sp, "ray", gbsm.init_phases(sp, "ray", seed=7), TX, RX, center_freq=FC)
         self.args = (sp, TX, RX, FC, self.lsp, self.mu, self.sig, *self.cl[:6], self.rq)
         # "38.901_MF": per-frequency cluster and "ray" sets, anchor LSPs at 2 GHz
         rf = np.stack([cset(sp, "cluster", k) for k in range(2)], 2)
         self.rr = np.stack([cset(sp, "ray", k) for k in range(2)], 2)
         la = lsps(sp, np.array([2e9]))[0]
-        self.cm = gbsm.ssf_clusters(sp, TX, RX, self.lsp, rnd, "38.901_MF", rf, la, gr_eps=self.gr_eps)
-        self.rays = gbsm.ssf_rays(*self.args, "quadriga", gr_eps=self.gr_eps)
+        self.cm = gbsm.ssf_clusters(sp, TX, RX, self.lsp, rnd, method="38.901_MF", rnd_freq=rf, lsp_anchor=la,
+                                    gr_eps=self.gr_eps)
+        self.rays = gbsm.ssf_rays(*self.args, method="quadriga", gr_eps=self.gr_eps)
 
     def mf(self, **kw):
-        return gbsm.ssf_rays(self.sp, TX, RX, FC, self.lsp, self.mu, self.sig, *self.cm[:6], self.rr, "38.901_MF",
+        return gbsm.ssf_rays(self.sp, TX, RX, FC, self.lsp, self.mu, self.sig, *self.cm[:6], self.rr,
+                             method="38.901_MF",
                              gr_eps=self.gr_eps, **kw)
 
     def test_basic_call(self):
@@ -93,9 +95,9 @@ class test_case(unittest.TestCase):
 
     def test_no_ground_reflection(self):
         sn = dict(self.sp, GR_enabled=0.0)
-        rnd = gbsm.draw(sn, "cluster", gbsm.init_phases(sn, "cluster", 7), TX, RX)
-        cl = gbsm.ssf_clusters(sn, TX, RX, self.lsp, rnd, "quadriga")
-        r = gbsm.ssf_rays(sn, TX, RX, FC, self.lsp, self.mu, self.sig, *cl[:6], self.rq, "quadriga")[0]
+        rnd = gbsm.draw(sn, "cluster", gbsm.init_phases(sn, "cluster", seed=7), TX, RX)
+        cl = gbsm.ssf_clusters(sn, TX, RX, self.lsp, rnd, method="quadriga")
+        r = gbsm.ssf_rays(sn, TX, RX, FC, self.lsp, self.mu, self.sig, *cl[:6], self.rq, method="quadriga")[0]
         self.assertEqual(list(r.keys()), KEYS)
         self.assertEqual(r["delay"].shape, (self.n_ray - 1,))
         self.assertEqual(r["gr_eps"].size, 0)
@@ -141,14 +143,14 @@ class test_case(unittest.TestCase):
         args = list(self.args)
         args[1], args[3] = tx, list(FC)
         args[4] = np.ascontiguousarray(self.lsp)
-        r = gbsm.ssf_rays(*args, "quadriga", gr_eps=self.gr_eps)
+        r = gbsm.ssf_rays(*args, method="quadriga", gr_eps=self.gr_eps)
         npt.assert_array_equal(r[1]["delay"], self.rays[1]["delay"])
         npt.assert_array_equal(r[1]["M"], self.rays[1]["M"])
-        r = gbsm.ssf_rays(*self.args, "quadriga", gr_eps=self.gr_eps.real)  # real array: imaginary part 0
+        r = gbsm.ssf_rays(*self.args, method="quadriga", gr_eps=self.gr_eps.real)  # real array: imaginary part 0
         self.assertEqual(r[0]["gr_eps"].dtype, np.complex128)
         npt.assert_array_equal(r[0]["gr_eps"].imag, 0.0)
         lsp0 = self.lsp.copy()
-        gbsm.ssf_rays(*self.args, "quadriga", gr_eps=self.gr_eps)
+        gbsm.ssf_rays(*self.args, method="quadriga", gr_eps=self.gr_eps)
         npt.assert_array_equal(self.lsp, lsp0)
 
     def test_errors(self):
@@ -156,16 +158,16 @@ class test_case(unittest.TestCase):
             self.mf(i_freq=2)
         self.assertIn("Input 'i_freq' is out of range for 2 frequencies.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            gbsm.ssf_rays(*self.args, "quadriga")
+            gbsm.ssf_rays(*self.args, method="quadriga")
         self.assertIn("Inputs 'gr_eps_re' and 'gr_eps_im' are required", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            gbsm.ssf_rays(*self.args, "foo")
+            gbsm.ssf_rays(*self.args, method="foo")
         self.assertIn("Input 'method' must be", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            gbsm.ssf_rays(*self.args, "quadriga", gr_eps=self.gr_eps[:, :, None, None])
+            gbsm.ssf_rays(*self.args, method="quadriga", gr_eps=self.gr_eps[:, :, None, None])
         self.assertIn("Input 'gr_eps' must have size (n_link, n_freq).", str(ctx.exception))
         with self.assertRaises(TypeError):
-            gbsm.ssf_rays(*self.args, "quadriga", gr_eps=self.gr_eps, random_phase=2.5)
+            gbsm.ssf_rays(*self.args, method="quadriga", gr_eps=self.gr_eps, random_phase=2.5)
         with self.assertRaises(TypeError):
             gbsm.ssf_rays(*self.args[:13])
         with self.assertRaises(TypeError):

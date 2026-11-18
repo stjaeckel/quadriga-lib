@@ -16,9 +16,9 @@ Spatially correlated integer random numbers
 - Convenience function: sets up one sum-of-sinusoids generator per entry of `dist_decorr` from a
   preset, draws its phases and evaluates it at the given positions; see [[sos.val]] for the model
 - The generators are independent of each other and may have different decorrelation distances
-- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )`.
+- Phases: generator `g` uses column `g` of `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed )`.
   A second device on its own map uses column `g` of a second stream,
-  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed_b )`, where `seed_b` is the seed with bit 62
+  `quadriga_lib.sos.init_phases( n_coeff, n_gen, seed=seed_b )`, where `seed_b` is the seed with bit 62
   flipped, i.e. `seed + 2^62` for seeds below 2^62; for `seed = -1` both streams are random. The
   phases of a generator therefore depend neither on the number of generators nor on whether a
   second device is given
@@ -43,7 +43,7 @@ Spatially correlated integer random numbers
 
 ## Usage:
 ```
-val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, dist_decorr_b, preset, seed )
+val = quadriga_lib.sos.randi( dist_decorr, pos, imax, pos_b, *, dist_decorr_b, preset, seed )
 ```
 
 ## Inputs:

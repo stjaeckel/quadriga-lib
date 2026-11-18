@@ -74,7 +74,7 @@ class test_case(unittest.TestCase):
 
         # ──────────── Case 4: (points, mesh, obj_ind, distance = 0.09) ────────────
         # C++ expected:  res.n_elem == 2; res[0] == 2; res[1] == 0
-        res = RTtools.point_inside_mesh(points, mesh, obj_ind, 0.09)
+        res = RTtools.point_inside_mesh(points, mesh, obj_ind, distance=0.09)
         self.assertEqual(res.shape[0], 2)
         # Tolerance too small → same as Case 1
         self.assertEqual(int(res[0]), 2)
@@ -82,7 +82,7 @@ class test_case(unittest.TestCase):
 
         # ──────────── Case 5: (points, mesh, obj_ind, distance = 2.0) ────────────
         # C++ expected:  res.n_elem == 2; res[0] == 2; res[1] == 2
-        res = RTtools.point_inside_mesh(points, mesh, obj_ind, 2.0)
+        res = RTtools.point_inside_mesh(points, mesh, obj_ind, distance=2.0)
         self.assertEqual(res.shape[0], 2)
         # With a huge tolerance, both points fall within the distance of some face whose obj_ind=2
         self.assertEqual(int(res[0]), 2)

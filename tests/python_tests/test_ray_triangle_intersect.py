@@ -245,7 +245,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
     #  Segmented mesh with sub-mesh index                                 #
     # ------------------------------------------------------------------ #
     def test_segmented_mesh(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
 
         fbs_ref, sbs_ref, no_hit_ref, _, _ = RTtools.ray_triangle_intersect(
@@ -264,7 +264,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
     #  Pre-computed AABB                                                  #
     # ------------------------------------------------------------------ #
     def test_precomputed_aabb(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
         aabb = RTtools.triangle_mesh_aabb(cube_seg, smi)
 
@@ -284,7 +284,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
     #  AABB validation errors                                             #
     # ------------------------------------------------------------------ #
     def test_error_aabb_row_mismatch(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
         aabb = RTtools.triangle_mesh_aabb(cube_seg, smi)
 
@@ -293,7 +293,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         self.assertIn("aabb", str(ctx.exception).lower())
 
     def test_error_aabb_col_mismatch(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
         aabb = RTtools.triangle_mesh_aabb(cube_seg, smi)
 
@@ -351,7 +351,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
     #  AVX2 kernel with segmented mesh + pre-computed AABB                #
     # ------------------------------------------------------------------ #
     def test_kernel_avx2_with_submesh_and_aabb(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
         aabb = RTtools.triangle_mesh_aabb(cube_seg, smi)
 
@@ -417,7 +417,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
     #  Sub-mesh index dtype variants (int64, int32)                       #
     # ------------------------------------------------------------------ #
     def test_submesh_index_int64(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
 
         fbs_ref, _, _, _, _ = RTtools.ray_triangle_intersect(
             self.orig, self.dest, cube_seg, smi.astype(np.uint32))
@@ -428,7 +428,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
         npt.assert_allclose(fbs, fbs_ref, atol=1e-6)
 
     def test_submesh_index_int32(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
 
         fbs_ref, _, _, _, _ = RTtools.ray_triangle_intersect(
             self.orig, self.dest, cube_seg, smi.astype(np.uint32))
@@ -490,7 +490,7 @@ class TestRayTriangleIntersect(unittest.TestCase):
     #  F-contiguous with segmented mesh + AABB                            #
     # ------------------------------------------------------------------ #
     def test_f_contiguous_with_submesh_and_aabb(self):
-        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, 4)
+        cube_seg, smi, _, _ = RTtools.triangle_mesh_segmentation(self.cube, target_size=4)
         smi = smi.astype(np.uint32)
         aabb = RTtools.triangle_mesh_aabb(cube_seg, smi)
 

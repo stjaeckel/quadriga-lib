@@ -67,7 +67,7 @@ class test_case(unittest.TestCase):
         delay_list = [delay, delay, delay]
         pilots = np.arange(0, 2.1, 0.1)
 
-        hmat = channel.baseband_freq_response(coeff_list, delay_list, fc, carriers=11)
+        hmat = channel.baseband_freq_response(coeff_list, delay_list, bandwidth=fc, carriers=11)
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 
@@ -82,7 +82,8 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(hmat_re[:, :, :, 0] * 2.0, hmat_re[:, :, :, 1], decimal=6)
         npt.assert_almost_equal(hmat_re[:, :, :, 0] * 3.0, hmat_re[:, :, :, 2], decimal=5)
 
-        hmat = channel.baseband_freq_response(coeff_list, delay_list, fc, pilot_grid=pilots, snap=[1, 2, 1, 0])
+        hmat = channel.baseband_freq_response(coeff_list, delay_list, bandwidth=fc, pilot_grid=pilots, snap=[1, 2, 1,
+                                                                                                             0])
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 
@@ -551,11 +552,12 @@ class test_use_kernel(unittest.TestCase):
         coeff, delay = [np.ones((2, 3, 4), dtype=complex)], [np.zeros((1, 1, 4))]
         coeff_mf, delay_mf = [np.ones((2, 3, 4, 2), dtype=complex)], [np.zeros((1, 1, 4, 2))]
         f, f_new = np.array([3e9, 3.2e9]), np.array([3e9, 3.1e9])
-        channel.baseband_freq_response(coeff, delay, 1e8, carriers=5, use_kernel=1)
+        channel.baseband_freq_response(coeff, delay, bandwidth=1e8, carriers=5, use_kernel=1)
         channel.baseband_freq_response(coeff_mf, delay_mf, freq=f, freq_new=f_new, use_kernel=1)
-        calls = (lambda: channel.baseband_freq_response(coeff, delay, 1e8, carriers=5, use_kernel=3),
+        calls = (lambda: channel.baseband_freq_response(coeff, delay, bandwidth=1e8, carriers=5, use_kernel=3),
                  lambda: channel.baseband_freq_response(coeff_mf, delay_mf, freq=f, freq_new=f_new, use_kernel=3),
-                 lambda: channel.baseband_freq_response([np.ones((2, 3, 0), dtype=complex)], [np.zeros((1, 1, 0))], 1e8,
+                 lambda: channel.baseband_freq_response([np.ones((2, 3, 0), dtype=complex)], [np.zeros((1, 1, 0))],
+                                                        bandwidth=1e8,
                                                         carriers=5, use_kernel=3))
         for call in calls:
             with self.assertRaises(ValueError) as ctx:

@@ -58,7 +58,8 @@ Path loss and shadow-fading standard deviation of a set of links
 
 ## Usage:
 ```
-pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, d2d_in, rnd_he )
+pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, tx_pos, rx_pos, *, \
+    d2d_in, rnd_he )
 ```
 
 ## Inputs:

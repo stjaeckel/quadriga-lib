@@ -44,7 +44,7 @@ class test_case(unittest.TestCase):
         self.fc, self.tx, self.rx = np.array([3.5e9, 28e9]), tx, rx
         self.args = (self.fc, tx, rx, self.fb, self.lb, self.pg, self.pl, self.M)
         self.pt = np.array([0, 1, 2])
-        self.rays = gbsm.rays_from_paths(*self.args, "quadriga", self.pt)
+        self.rays = gbsm.rays_from_paths(*self.args, method="quadriga", path_type=self.pt)
 
     def test_basic_call(self):
         r = self.rays
@@ -69,7 +69,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose([r["aod"][2], r["eod"][2]], [np.arctan2(v[1], v[0]), np.arctan2(v[2], np.hypot(v[0], v[1]))],
                             atol=1e-14, rtol=0)
         # Round trip: the paths of "drift" at the same positions are the input paths
-        out = gbsm.ssf_paths(r, np.zeros(2), "drift")
+        out = gbsm.ssf_paths(r, np.zeros(2), mobility="drift")
         npt.assert_allclose(out[0], self.pg, atol=1e-20, rtol=0)
         npt.assert_allclose(out[1], self.pl, atol=1e-9, rtol=0)
         npt.assert_allclose(out[2], self.M, atol=1e-14, rtol=0)
@@ -85,8 +85,8 @@ class test_case(unittest.TestCase):
                                   self.M[:, i])
         npt.assert_array_equal(r2["path_type"], [0, 2])  # LOS by geometry
         npt.assert_array_equal(r2["tap"], [0, 6])
-        r3 = gbsm.rays_from_paths(*self.args, "38.901", [0.0, 1.0, 2.0], np.array([5, 3, 0], dtype=np.int32),
-                                  np.array([5 + 0.1j, 7 + 0.2j]))
+        r3 = gbsm.rays_from_paths(*self.args, method="38.901", path_type=[0.0, 1.0, 2.0],
+                                  tap=np.array([5, 3, 0], dtype=np.int32), gr_eps=np.array([5 + 0.1j, 7 + 0.2j]))
         self.assertEqual(r3["method"], "38.901")
         npt.assert_array_equal(r3["tap"], [5, 3, 0])  # codes
         npt.assert_array_equal(r3["gr_eps"], [5 + 0.1j, 7 + 0.2j])
@@ -100,11 +100,11 @@ class test_case(unittest.TestCase):
     def test_array_handling(self):
         args = (list(self.fc), self.tx.astype(np.float32), self.rx, np.asfortranarray(self.fb),
                 np.ascontiguousarray(self.lb), self.pg[::1], self.pl, np.ascontiguousarray(self.M))
-        r = gbsm.rays_from_paths(*args, "quadriga", self.pt)
+        r = gbsm.rays_from_paths(*args, method="quadriga", path_type=self.pt)
         npt.assert_array_equal(r["delay"], self.rays["delay"])
         npt.assert_array_equal(r["M"], self.M)
         fb0 = self.fb.copy()
-        gbsm.rays_from_paths(*self.args, "quadriga", self.pt)
+        gbsm.rays_from_paths(*self.args, method="quadriga", path_type=self.pt)
         npt.assert_array_equal(self.fb, fb0)
         r0 = gbsm.rays_from_paths(self.fc, self.tx, self.rx, np.zeros((3, 0)), np.zeros((3, 0)), np.zeros((0, 2)),
                                   np.zeros(0), np.zeros((8, 0, 2)))

@@ -37,7 +37,7 @@ class test_case(unittest.TestCase):
         points_in = rng.normal(size=(n_points, 3))
 
         # Run once
-        data = RTtools.point_cloud_segmentation(points_in, target_size, vec_size)
+        data = RTtools.point_cloud_segmentation(points_in, target_size=target_size, vec_size=vec_size)
         self.assertIsInstance(data, tuple)
         self.assertEqual(len(data), 4)
 
@@ -121,7 +121,7 @@ class test_case(unittest.TestCase):
                 )
 
         # --- Determinism: running twice gives identical outputs ---
-        data2 = RTtools.point_cloud_segmentation(points_in, target_size, vec_size)
+        data2 = RTtools.point_cloud_segmentation(points_in, target_size=target_size, vec_size=vec_size)
         for a, b, name in zip(data, data2, ["points_out", "sub_cloud_ind", "forward_ind", "reverse_ind"]):
             self.assertEqual(a.shape, b.shape, msg=f"{name} shape changed between runs")
             if a.dtype.kind in ('f',):

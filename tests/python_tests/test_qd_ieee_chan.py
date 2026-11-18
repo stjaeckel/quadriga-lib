@@ -96,14 +96,14 @@ def _ieee_call(ant_ap, ant_sta, model, *,
 
     return channel.ieee_indoor(
         ant_ap, ant_sta, model,
-        CarrierFreq_Hz, tap_spacing_s, n_users,
-        observation_time, update_rate,
-        speed_station_kmh, speed_env_kmh,
-        Dist_m, n_floors, uplink,
-        offset_angles, n_subpath, Doppler_effect, seed,
-        KF_linear, XPR_NLOS_linear,
-        SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m,
-        n_walls, wall_loss, stack=stack)
+        CarrierFreq_Hz=CarrierFreq_Hz, tap_spacing_s=tap_spacing_s, n_users=n_users,
+        observation_time=observation_time, update_rate=update_rate,
+        speed_station_kmh=speed_station_kmh, speed_env_kmh=speed_env_kmh,
+        Dist_m=Dist_m, n_floors=n_floors, uplink=uplink,
+        offset_angles=offset_angles, n_subpath=n_subpath, Doppler_effect=Doppler_effect, seed=seed,
+        KF_linear=KF_linear, XPR_NLOS_linear=XPR_NLOS_linear,
+        SF_std_dB_LOS=SF_std_dB_LOS, SF_std_dB_NLOS=SF_std_dB_NLOS, dBP_m=dBP_m,
+        n_walls=n_walls, wall_loss=wall_loss, stack=stack)
 
 
 # ============================================================================
@@ -538,7 +538,6 @@ class test_case(unittest.TestCase):
                       speed_station_kmh=30.0, seed=2024)
 
         chan_list = _ieee_call(ant, ant, "B", stack=False, **common)
-        self.assertIn("*, stack", channel.ieee_indoor.__doc__)  # stack is keyword-only
         chan_stk = _ieee_call(ant, ant, "B", stack=True, **common)
 
         self.assertEqual(len(chan_list), 1)

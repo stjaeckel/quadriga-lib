@@ -80,7 +80,7 @@ class test_arrayant_calc_beamwidth(unittest.TestCase):
     def test_subset_selection(self):
         # 0-based index 1 picks only the second element
         ant_xp = quadriga_lib.arrayant.generate('xpol')
-        bw_az, _, _, _ = quadriga_lib.arrayant.calc_beamwidth(ant_xp, np.array([1]))
+        bw_az, _, _, _ = quadriga_lib.arrayant.calc_beamwidth(ant_xp, i_element=np.array([1]))
 
         self.assertEqual(bw_az.shape, (1,))
         npt.assert_allclose(bw_az, [360.0], atol=0.05, rtol=0)
@@ -91,8 +91,8 @@ class test_arrayant_calc_beamwidth(unittest.TestCase):
         expected_az = np.array([360.0, 360.0])
 
         bw_omit, _, _, _  = quadriga_lib.arrayant.calc_beamwidth(ant_xp)
-        bw_none, _, _, _  = quadriga_lib.arrayant.calc_beamwidth(ant_xp, None)
-        bw_empty, _, _, _ = quadriga_lib.arrayant.calc_beamwidth(ant_xp, np.array([], dtype=np.uint64))
+        bw_none, _, _, _  = quadriga_lib.arrayant.calc_beamwidth(ant_xp, i_element=None)
+        bw_empty, _, _, _ = quadriga_lib.arrayant.calc_beamwidth(ant_xp, i_element=np.array([], dtype=np.uint64))
 
         for bw in (bw_omit, bw_none, bw_empty):
             self.assertEqual(bw.shape, (2,))
@@ -102,7 +102,8 @@ class test_arrayant_calc_beamwidth(unittest.TestCase):
         # Keyword-argument form; element 1 is rotated by 90 deg heading, which shows the order
         ant = quadriga_lib.arrayant.generate('custom', az_3dB=30.0, el_3dB=20.0, res=2.0)
         ant = quadriga_lib.arrayant.concat(ant, ant)
-        ant = quadriga_lib.arrayant.rotate_pattern(ant, np.array([0.0, 0.0, np.pi / 2]), 3, i_element=np.array([1]))
+        ant = quadriga_lib.arrayant.rotate_pattern(ant, np.array([0.0, 0.0, np.pi / 2]), usage=3,
+                                                   i_element=np.array([1]))
         _, _, az_pt, _ = quadriga_lib.arrayant.calc_beamwidth(ant, i_element=np.array([1, 0]))
 
         self.assertEqual(az_pt.shape, (2,))
@@ -124,7 +125,7 @@ class test_arrayant_calc_beamwidth(unittest.TestCase):
         # Multi-frequency with element selection → shape (2, 2)
         ant_c = quadriga_lib.arrayant.generate('custom', az_3dB=30.0, el_3dB=20.0)
         ant_mf = _stack_multi_freq(ant_c, 2)
-        bw_az, _, _, _ = quadriga_lib.arrayant.calc_beamwidth(ant_mf, np.array([0, 0]))
+        bw_az, _, _, _ = quadriga_lib.arrayant.calc_beamwidth(ant_mf, i_element=np.array([0, 0]))
 
         self.assertEqual(bw_az.shape, (2, 2))
         npt.assert_allclose(bw_az,
@@ -155,13 +156,13 @@ class test_arrayant_calc_beamwidth(unittest.TestCase):
         # Custom antenna has 1 element; index 1 is out of bounds
         ant_c = quadriga_lib.arrayant.generate('custom', az_3dB=30.0, el_3dB=20.0)
         with self.assertRaises(Exception):
-            quadriga_lib.arrayant.calc_beamwidth(ant_c, np.array([1]))
+            quadriga_lib.arrayant.calc_beamwidth(ant_c, i_element=np.array([1]))
 
     def test_error_threshold_not_positive_finite(self):
         ant_c = quadriga_lib.arrayant.generate('custom', az_3dB=30.0, el_3dB=20.0)
         for v in (np.nan, np.inf, -np.inf, 0.0, -3.0):
             with self.assertRaises(ValueError):
-                quadriga_lib.arrayant.calc_beamwidth(ant_c, None, v)
+                quadriga_lib.arrayant.calc_beamwidth(ant_c, i_element=None, threshold_dB=v)
 
     def test_error_missing_field(self):
         # arrayant dict missing a required pattern field
