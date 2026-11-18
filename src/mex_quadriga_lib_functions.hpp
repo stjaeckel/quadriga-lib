@@ -58,6 +58,54 @@ inline mxArray *qd_mex_arrayant2struct_multi(const std::vector<quadriga_lib::arr
     return output;
 }
 
+// Reads element n of an arrayant struct (array); errors name the fields 'var_name.field', or 'var_name(n).field' for a
+// struct array (n 1-based)
+inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant_element(const mxArray *input, size_t n, bool copy,
+                                                                     const std::string &var_name)
+{
+    std::string prefix = var_name; // Names in errors
+    if (!prefix.empty())
+        prefix += (mxGetNumberOfElements(input) > 1 ? "(" + std::to_string(n + 1) + ")." : std::string("."));
+    auto fld = [&](const char *f) { return prefix + f; };
+    auto get = [&](const char *f) { return qd_mex_get_field(input, f, n, var_name); }; // Mandatory field
+    auto opt = [&](const char *f) -> const mxArray *                                   // Optional field, nullptr if missing or empty
+    {
+        const mxArray *a = mxGetField(input, (mwIndex)n, f);
+        return (a == nullptr || mxIsEmpty(a)) ? nullptr : a;
+    };
+
+    quadriga_lib::arrayant<double> ant;
+    ant.e_theta_re = qd_mex_get_Cube<double>(get("e_theta_re"), copy, fld("e_theta_re"));
+    ant.e_theta_im = qd_mex_get_Cube<double>(get("e_theta_im"), copy, fld("e_theta_im"));
+    ant.e_phi_re = qd_mex_get_Cube<double>(get("e_phi_re"), copy, fld("e_phi_re"));
+    ant.e_phi_im = qd_mex_get_Cube<double>(get("e_phi_im"), copy, fld("e_phi_im"));
+    ant.azimuth_grid = qd_mex_get_Col<double>(get("azimuth_grid"), copy, fld("azimuth_grid"));
+    ant.elevation_grid = qd_mex_get_Col<double>(get("elevation_grid"), copy, fld("elevation_grid"));
+    const arma::uword n_elements = ant.e_theta_re.n_slices;
+
+    if (const mxArray *a = opt("element_pos"))
+        ant.element_pos = qd_mex_get_Mat<double>(a, copy, fld("element_pos"));
+    else
+        ant.element_pos.zeros(3, n_elements);
+
+    const mxArray *c_re = opt("coupling_re"), *c_im = opt("coupling_im");
+    if (c_re)
+        ant.coupling_re = qd_mex_get_Mat<double>(c_re, copy, fld("coupling_re"));
+    else if (!c_im)
+        ant.coupling_re.eye(n_elements, n_elements);
+    if (c_im)
+        ant.coupling_im = qd_mex_get_Mat<double>(c_im, copy, fld("coupling_im"));
+    else
+        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
+
+    if (const mxArray *a = opt("center_freq"))
+        ant.center_freq = qd_mex_get_scalar<double>(a, fld("center_freq"), 299792458.0);
+    if (const mxArray *a = opt("name"))
+        ant.name = qd_mex_get_string(a, "", fld("name"));
+    return ant;
+}
+
+// Arrayant struct -> arrayant; reads the first element of a struct array
 inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *input, bool validate = false, bool copy = false,
                                                              const std::string &var_name = "")
 {
@@ -66,52 +114,17 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
         const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
-    auto fld = [&](const char *f) { return var_name.empty() ? std::string(f) : var_name + "." + f; }; // Names in errors
-
-    quadriga_lib::arrayant<double> ant;
-
-    // Mandatory fields
-    ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_re", 0, var_name), copy, fld("e_theta_re"));
-    ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_im", 0, var_name), copy, fld("e_theta_im"));
-    ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_re", 0, var_name), copy, fld("e_phi_re"));
-    ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_im", 0, var_name), copy, fld("e_phi_im"));
-    ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "azimuth_grid", 0, var_name), copy, fld("azimuth_grid"));
-    ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "elevation_grid", 0, var_name), copy, fld("elevation_grid"));
-
-    arma::uword n_elements = ant.e_theta_re.n_slices;
-
-    // Optional fields
-    if (qd_mex_has_field(input, "element_pos") && !mxIsEmpty(qd_mex_get_field(input, "element_pos", 0, var_name)))
-        ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos", 0, var_name), copy, fld("element_pos"));
-    else
-        ant.element_pos.zeros(3, n_elements);
-
-    if (qd_mex_has_field(input, "coupling_re") && !mxIsEmpty(qd_mex_get_field(input, "coupling_re", 0, var_name)))
-        ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re", 0, var_name), copy, fld("coupling_re"));
-    else if (!(qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", 0, var_name))))
-        ant.coupling_re.eye(n_elements, n_elements);
-
-    if (qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", 0, var_name)))
-        ant.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im", 0, var_name), copy, fld("coupling_im"));
-    else
-        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
-
-    if (qd_mex_has_field(input, "center_freq") && !mxIsEmpty(qd_mex_get_field(input, "center_freq", 0, var_name)))
-        ant.center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", 0, var_name), fld("center_freq"), 299792458.0);
-
-    if (qd_mex_has_field(input, "name") && !mxIsEmpty(qd_mex_get_field(input, "name", 0, var_name)))
-        ant.name = qd_mex_get_string(qd_mex_get_field(input, "name", 0, var_name), "", fld("name"));
-
+    auto ant = qd_mex_struct2arrayant_element(input, 0, copy, var_name);
     if (validate)
     {
         auto error_msg = ant.is_valid();
         if (!error_msg.empty())
             qd_mex_cpp_error(error_msg);
     }
-
     return ant;
 }
 
+// Arrayant struct array -> one arrayant per element (frequency)
 inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(const mxArray *input, bool validate = false, bool copy = false,
                                                                                 const std::string &var_name = "")
 {
@@ -120,57 +133,15 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
         const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
-    auto fld = [&](const char *f) { return var_name.empty() ? std::string(f) : var_name + "." + f; }; // Names in errors
-
-    // Check for optional fields
-    bool has_element_pos = qd_mex_has_field(input, "element_pos");
-    bool has_coupling_re = qd_mex_has_field(input, "coupling_re");
-    bool has_coupling_im = qd_mex_has_field(input, "coupling_im");
-    bool has_name = qd_mex_has_field(input, "name");
-    bool has_center_freq = qd_mex_has_field(input, "center_freq");
-
-    size_t n_elem = (size_t)mxGetNumberOfElements(input);
-    std::vector<quadriga_lib::arrayant<double>> ant(n_elem);
-    for (size_t n = 0; n < n_elem; ++n)
-    {
-        ant[n].e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_re", n, var_name), copy, fld("e_theta_re"));
-        ant[n].e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_im", n, var_name), copy, fld("e_theta_im"));
-        ant[n].e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_re", n, var_name), copy, fld("e_phi_re"));
-        ant[n].e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_im", n, var_name), copy, fld("e_phi_im"));
-        ant[n].azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "azimuth_grid", n, var_name), copy, fld("azimuth_grid"));
-        ant[n].elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "elevation_grid", n, var_name), copy, fld("elevation_grid"));
-
-        arma::uword n_elements = ant[n].e_theta_re.n_slices;
-
-        if (has_center_freq && !mxIsEmpty(qd_mex_get_field(input, "center_freq", n, var_name)))
-            ant[n].center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", n, var_name), fld("center_freq"), 299792458.0);
-
-        if (has_element_pos && !mxIsEmpty(qd_mex_get_field(input, "element_pos", n, var_name)))
-            ant[n].element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos", n, var_name), copy, fld("element_pos"));
-        else
-            ant[n].element_pos.zeros(3, n_elements);
-
-        if (has_coupling_re && !mxIsEmpty(qd_mex_get_field(input, "coupling_re", n, var_name)))
-            ant[n].coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re", n, var_name), copy, fld("coupling_re"));
-        else if (!(has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n, var_name))))
-            ant[n].coupling_re.eye(n_elements, n_elements);
-
-        if (has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n, var_name)))
-            ant[n].coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im", n, var_name), copy, fld("coupling_im"));
-        else
-            ant[n].coupling_im.zeros(ant[n].coupling_re.n_rows, ant[n].coupling_re.n_cols);
-
-        if (has_name && !mxIsEmpty(qd_mex_get_field(input, "name", n, var_name)))
-            ant[n].name = qd_mex_get_string(qd_mex_get_field(input, "name", n, var_name), "", fld("name"));
-    }
-
+    std::vector<quadriga_lib::arrayant<double>> ant;
+    for (size_t n = 0; n < (size_t)mxGetNumberOfElements(input); ++n)
+        ant.push_back(qd_mex_struct2arrayant_element(input, n, copy, var_name));
     if (validate)
     {
         auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant);
         if (!error_msg.empty())
             qd_mex_cpp_error(error_msg);
     }
-
     return ant;
 }
 

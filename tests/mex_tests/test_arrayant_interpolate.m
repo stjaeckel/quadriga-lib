@@ -125,6 +125,8 @@ assert_throws( @() out5( ant_m, az, el ), 'Multi-frequency mode supports at most
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [0, 1] ), 'cannot be 0 (1-based index)' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant_m([]), az, el ), 'Input ''arrayant'' cannot be empty.' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( 1, az, el ), 'Input ''arrayant'' must be a struct.' );
+ant_bad = ant_m; ant_bad(2).azimuth_grid = 'abc';                          % names the struct array element
+assert_throws( @() quadriga_lib.arrayant_interpolate( ant_bad, az, el ), 'Input ''arrayant(2).azimuth_grid'' has an unsupported data type.' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, [], [] ), 'Input ''azimuth'' must have 1 or n_out rows.' ); % C++
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el(1:2) ), ...
     'Input ''elevation'' must have the same size as ''azimuth''.' );                   % C++
