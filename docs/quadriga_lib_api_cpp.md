@@ -1764,13 +1764,13 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#baseband_freq_response) · [Python](qu
 ### Declaration:
 ```cpp
 void quadriga_lib::baseband_freq_response(
-    const arma::Cube<dtype> *coeff_re,
-    const arma::Cube<dtype> *coeff_im,
-    const arma::Cube<dtype> *delay,
-    const arma::Col<dtype> *pilot_grid,
+    const arma::Cube<dtype> &coeff_re,
+    const arma::Cube<dtype> &coeff_im,
+    const arma::Cube<dtype> &delay,
+    const arma::Col<dtype> &pilot_grid,
     const double bandwidth,
-    arma::Cube<dtype> *hmat_re,
-    arma::Cube<dtype> *hmat_im,
+    arma::Cube<dtype> *hmat_re = nullptr,
+    arma::Cube<dtype> *hmat_im = nullptr,
     arma::Cube<std::complex<dtype>> *hmat = nullptr,
     int use_kernel = 0);
 ```
@@ -1866,10 +1866,10 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 void quadriga_lib::baseband_freq_response_vec(
-    const std::vector<arma::Cube<dtype>> *coeff_re,
-    const std::vector<arma::Cube<dtype>> *coeff_im,
-    const std::vector<arma::Cube<dtype>> *delay,
-    const arma::Col<dtype> *pilot_grid,
+    const std::vector<arma::Cube<dtype>> &coeff_re,
+    const std::vector<arma::Cube<dtype>> &coeff_im,
+    const std::vector<arma::Cube<dtype>> &delay,
+    const arma::Col<dtype> &pilot_grid,
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
@@ -2075,9 +2075,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset_names) · [Python](quad
 
 ### Declaration:
 ```cpp
-arma::uword quadriga_lib::hdf5_read_dset_names(
+std::vector<std::string> quadriga_lib::hdf5_read_dset_names(
     const std::string &fn,
-    std::vector<std::string> *names,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2087,7 +2086,6 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`names`** — Pointer to vector receiving dataset names (without prefix)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -2095,7 +2093,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 - **`prefix`** *(optional)* — Prefix used to identify unstructured datasets
 
 ### Returns:
-- Number of datasets found at the specified slot
+- Dataset names without the prefix, in creation order; empty if the slot has none
 
 ### See also:
 - [hdf5_read_dset](#hdf5_read_dset) (read a dataset by name)
@@ -2122,7 +2120,9 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`channel_id`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
+
+### Outputs:
+- **`channel_id`** *(optional)* — Serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ### Returns:
 - Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
@@ -2190,7 +2190,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel) · [Python](quadri
 ```cpp
 int quadriga_lib::hdf5_write_channel(
     const std::string &fn,
-    const quadriga_lib::channel<dtype> *chan,
+    const quadriga_lib::channel<dtype> &chan,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2199,7 +2199,7 @@ int quadriga_lib::hdf5_write_channel(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`chan`** — Pointer to the channel object to write
+- **`chan`** — Channel object to write
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -2273,7 +2273,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset) · [Python](quadriga_
 void quadriga_lib::hdf5_write_dset(
     const std::string &fn,
     const std::string &name,
-    const std::any *data,
+    const std::any &data,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2284,7 +2284,7 @@ void quadriga_lib::hdf5_write_dset(
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`name`** — Dataset name without prefix; alphanumeric and underscores only
-- **`data`** — Pointer to the data to write; type must be supported (see above)
+- **`data`** — Data to write; type must be supported (see above)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -2834,12 +2834,12 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#quantize_delays) · [Python](quadriga_
 ### Declaration:
 ```cpp
 void quadriga_lib::quantize_delays(
-    const std::vector<arma::Cube<dtype>> *coeff_re,
-    const std::vector<arma::Cube<dtype>> *coeff_im,
-    const std::vector<arma::Cube<dtype>> *delay,
-    std::vector<arma::Cube<dtype>> *coeff_re_quant,
-    std::vector<arma::Cube<dtype>> *coeff_im_quant,
-    std::vector<arma::Cube<dtype>> *delay_quant,
+    const std::vector<arma::Cube<dtype>> &coeff_re,
+    const std::vector<arma::Cube<dtype>> &coeff_im,
+    const std::vector<arma::Cube<dtype>> &delay,
+    std::vector<arma::Cube<dtype>> &coeff_re_quant,
+    std::vector<arma::Cube<dtype>> &coeff_im_quant,
+    std::vector<arma::Cube<dtype>> &delay_quant,
     dtype tap_spacing = (dtype)5.0e-9,
     arma::uword max_taps = 48,
     dtype power_exponent = (dtype)1.0,
@@ -2875,7 +2875,7 @@ cre[0].set_size(1,1,3); cim[0].set_size(1,1,3); dl[0].set_size(1,1,3);
 cre[1].set_size(1,1,2); cim[1].set_size(1,1,2); dl[1].set_size(1,1,2);
 dl[0](0,0,1) = 12.5e-9; dl[0](0,0,2) = 33.4e-9; dl[1](0,0,1) = 10.0e-9;
 std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 ```
 
 ---

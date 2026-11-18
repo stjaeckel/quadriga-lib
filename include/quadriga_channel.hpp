@@ -231,7 +231,7 @@ namespace quadriga_lib
     // - Throws an error if the requested index in the file has not been reserved during hdf5_create_file
     template <typename dtype>                                      // Float or double
     int hdf5_write_channel(const std::string &fn,                    // Filename of the HDF5 file
-                           const quadriga_lib::channel<dtype> *chan, // Channel object to write
+                           const quadriga_lib::channel<dtype> &chan, // Channel object to write
                            unsigned ix = 0,                          // x-Index in the HDF file
                            unsigned iy = 0,                          // y-Index in the HDF file
                            unsigned iz = 0,                          // z-Index in the HDF file
@@ -304,16 +304,14 @@ namespace quadriga_lib
                             const std::string &prefix = "par_"); // Option to set a different prefix
 
     // Read names of the unstructured datasets from the HDF file
-    // - Returns number of the unstructured datasets at the given location
-    // - names will contain all dataset names without the prefix
+    // - Returns the dataset names at the given location without the prefix, in creation order (empty if none)
     // - Throws if the file does not exist or is not a version-3 channel file
-    arma::uword hdf5_read_dset_names(const std::string &fn,               // Filename of the HDF5 file
-                                     std::vector<std::string> *names,     // Output data
-                                     unsigned ix = 0,                     // x-Index in the HDF file
-                                     unsigned iy = 0,                     // y-Index in the HDF file
-                                     unsigned iz = 0,                     // z-Index in the HDF file
-                                     unsigned iw = 0,                     // w-Index in the HDF file
-                                     const std::string &prefix = "par_"); // Option to set a different prefix
+    std::vector<std::string> hdf5_read_dset_names(const std::string &fn,               // Filename of the HDF5 file
+                                                  unsigned ix = 0,                     // x-Index in the HDF file
+                                                  unsigned iy = 0,                     // y-Index in the HDF file
+                                                  unsigned iz = 0,                     // z-Index in the HDF file
+                                                  unsigned iw = 0,                     // w-Index in the HDF file
+                                                  const std::string &prefix = "par_"); // Option to set a different prefix
 
     // Write single unstructured data field to HDF5 file
     // - Scalar types: string, unsigned, int, long long, unsigned long long, float, double
@@ -330,7 +328,7 @@ namespace quadriga_lib
     // - One writer per file at a time (no file locking)
     void hdf5_write_dset(const std::string &fn,               // Filename of the HDF5 file
                          const std::string &name,             // Dataset name without the prefix (typically "par_")
-                         const std::any *data,                // Data to be written
+                         const std::any &data,                // Data to be written
                          unsigned ix = 0,                     // x-Index in the HDF file
                          unsigned iy = 0,                     // y-Index in the HDF file
                          unsigned iz = 0,                     // z-Index in the HDF file
@@ -346,10 +344,10 @@ namespace quadriga_lib
     // - The phase bandwidth * pilot * delay is computed in double precision and reduced to one period; sin / cos,
     //   coefficients and sums are single precision
     template <typename dtype>
-    void baseband_freq_response(const arma::Cube<dtype> *coeff_re,                // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
-                                const arma::Cube<dtype> *coeff_im,                // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
-                                const arma::Cube<dtype> *delay,                   // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                const arma::Col<dtype> *pilot_grid,               // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
+    void baseband_freq_response(const arma::Cube<dtype> &coeff_re,                // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
+                                const arma::Cube<dtype> &coeff_im,                // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
+                                const arma::Cube<dtype> &delay,                   // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                const arma::Col<dtype> &pilot_grid,               // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
                                 const double bandwidth,                           // The baseband bandwidth in [Hz]
                                 arma::Cube<dtype> *hmat_re = nullptr,             // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
                                 arma::Cube<dtype> *hmat_im = nullptr,             // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
@@ -383,10 +381,10 @@ namespace quadriga_lib
     // - Output vectors have length n_out: either n_snap (all snapshots) or length(i_snap) (subset)
     // - Internal arithmetic is single-precision
     template <typename dtype>
-    void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> *coeff_re,    // Real part of time-domain channel coefficients, vector of n_snap cubes [n_rx, n_tx, n_path]
-                                    const std::vector<arma::Cube<dtype>> *coeff_im,    // Imaginary part of time-domain channel coefficients, same structure as coeff_re
-                                    const std::vector<arma::Cube<dtype>> *delay,       // Path delays in seconds, same structure as coeff_re; each cube broadcastable to [1, 1, n_path]
-                                    const arma::Col<dtype> *pilot_grid,                // Normalized sub-carrier positions in range [0.0, 1.0]; [n_carriers]
+    void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> &coeff_re,    // Real part of time-domain channel coefficients, vector of n_snap cubes [n_rx, n_tx, n_path]
+                                    const std::vector<arma::Cube<dtype>> &coeff_im,    // Imaginary part of time-domain channel coefficients, same structure as coeff_re
+                                    const std::vector<arma::Cube<dtype>> &delay,       // Path delays in seconds, same structure as coeff_re; each cube broadcastable to [1, 1, n_path]
+                                    const arma::Col<dtype> &pilot_grid,                // Normalized sub-carrier positions in range [0.0, 1.0]; [n_carriers]
                                     const double bandwidth,                            // Total baseband bandwidth
                                     std::vector<arma::Cube<dtype>> *hmat_re = nullptr, // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carriers]
                                     std::vector<arma::Cube<dtype>> *hmat_im = nullptr, // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
@@ -395,13 +393,13 @@ namespace quadriga_lib
 
     // Fixes the path delays to a grid of delay bins
     template <typename dtype>
-    void quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
-                         const std::vector<arma::Cube<dtype>> *coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
-                         const std::vector<arma::Cube<dtype>> *delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path];
+    void quantize_delays(const std::vector<arma::Cube<dtype>> &coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+                         const std::vector<arma::Cube<dtype>> &coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+                         const std::vector<arma::Cube<dtype>> &delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path];
                                                                          //   finite, > -tap_spacing/2 (values below 0 count as 0) and < 2^31 * tap_spacing
-                         std::vector<arma::Cube<dtype>> *coeff_re_quant, // Output coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
-                         std::vector<arma::Cube<dtype>> *coeff_im_quant, // Output coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
-                         std::vector<arma::Cube<dtype>> *delay_quant,    // Output delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps], or [1, 1, n_taps]
+                         std::vector<arma::Cube<dtype>> &coeff_re_quant, // Output coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
+                         std::vector<arma::Cube<dtype>> &coeff_im_quant, // Output coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
+                         std::vector<arma::Cube<dtype>> &delay_quant,    // Output delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps], or [1, 1, n_taps]
                                                                          //   for delay input [1, 1, n_path] with fix_taps 1 or 2
                          dtype tap_spacing = 5.0e-9,                     // Tap spacing in seconds
                          arma::uword max_taps = 48,                      // 0 = unlimited

@@ -71,5 +71,5 @@ void hdf5_write_dset(const py::handle &fn,
         throw std::invalid_argument("Location exceeds storage space in HDF file.");
 
     // Write to file
-    quadriga_lib::hdf5_write_dset(fn_s, name, &any_data, ix, iy, iz, iw, prefix);
+    quadriga_lib::hdf5_write_dset(fn_s, name, any_data, ix, iy, iz, iw, prefix);
 }

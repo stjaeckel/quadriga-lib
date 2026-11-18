@@ -889,7 +889,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uw
         else // Combine the coefficients into a single beam
         {
             arma::Cube<std::complex<dtype>> hmat;
-            quadriga_lib::baseband_freq_response<dtype>(&coeff_re, &coeff_im, &delay, &pilot_grid, 1.0, nullptr, nullptr, &hmat);
+            quadriga_lib::baseband_freq_response<dtype>(coeff_re, coeff_im, delay, pilot_grid, 1.0, nullptr, nullptr, &hmat);
 
             ant.coupling_re.set_size(n_elements, 1);
             ant.coupling_im.set_size(n_elements, 1);

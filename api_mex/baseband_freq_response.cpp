@@ -200,8 +200,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         else // has_xf: pilot_grid = 0 at the carrier (center_freq), else at the lowest output carrier
             carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
 
-        CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(&coeff_re, &coeff_im, &delay,
-                                                                 &pilot_grid, bw, &hmat_re_v, p_hmat_im_v,
+        CALL_QD(quadriga_lib::baseband_freq_response_vec<double>(coeff_re, coeff_im, delay,
+                                                                 pilot_grid, bw, &hmat_re_v, p_hmat_im_v,
                                                                  i_snap.is_empty() ? nullptr : &i_snap, use_kernel));
     }
     else if (n_slab == 1) // Single-frequency backend
@@ -217,8 +217,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         else // has_xf: pilot_grid = 0 at the carrier (center_freq), else at the lowest output carrier
             carriers_to_pilot_grid(carrier_freq_in, has_cf ? center_freq[0] : carrier_freq_in.min(), pilot_grid, bw);
 
-        CALL_QD(quadriga_lib::baseband_freq_response<double>(&coeff_re[0], &coeff_im[0], &delay[0],
-                                                             &pilot_grid, bw, &hmat_re, p_hmat_im, nullptr, use_kernel));
+        CALL_QD(quadriga_lib::baseband_freq_response<double>(coeff_re[0], coeff_im[0], delay[0],
+                                                             pilot_grid, bw, &hmat_re, p_hmat_im, nullptr, use_kernel));
     }
     else // Multi-frequency backend
     {

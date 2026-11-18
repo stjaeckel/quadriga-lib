@@ -169,7 +169,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         unsigned iw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
 
         int return_code = 0;
-        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(fn, &c, ix, iy, iz, iw));
+        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(fn, c, ix, iy, iz, iw));
         if (return_code == 1)
             any_overwrite = true;
     }

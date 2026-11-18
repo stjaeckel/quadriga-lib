@@ -833,7 +833,7 @@ TEST_CASE("baseband_freq_response_multi - Consistency with baseband_freq_respons
 
     // --- Run narrowband DFT ---
     arma::Cube<double> Hr_nb, Hi_nb;
-    quadriga_lib::baseband_freq_response(&coeff_re_nb, &coeff_im_nb, &delay_nb, &pilot_grid,
+    quadriga_lib::baseband_freq_response(coeff_re_nb, coeff_im_nb, delay_nb, pilot_grid,
                                          bandwidth, &Hr_nb, &Hi_nb);
 
     // --- Run multi with same baked coefficients, remove_delay_phase=true ---

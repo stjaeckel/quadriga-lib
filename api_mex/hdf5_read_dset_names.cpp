@@ -58,7 +58,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read dataset names
     std::vector<std::string> names;
-    CALL_QD(quadriga_lib::hdf5_read_dset_names(fn, &names, ix, iy, iz, iw, prefix));
+    CALL_QD(names = quadriga_lib::hdf5_read_dset_names(fn, ix, iy, iz, iw, prefix));
 
     // Return cell array
     plhs[0] = qd_mex_copy2matlab(&names);

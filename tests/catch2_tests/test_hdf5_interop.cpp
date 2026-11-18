@@ -467,35 +467,35 @@ TEST_CASE("hdf5_write_channel - the HDF5 C library reads the documented object t
     c0.par_data = {std::string("abc"), std::string(), 3.14f, 12341100000ULL, arma::Col<int>{-1, 2, -3},
                    arma::rowvec{0.5, 1.5}, arma::umat{{1, 2}, {3, 4}, {5, 6}}, arma::fmat(0, 3),
                    arma::icube(2, 3, 2, arma::fill::value(-7)), filled(arma::cube(3, 1, 2), 5.0)};
-    quadriga_lib::hdf5_write_channel(fn, &c0, 0);
+    quadriga_lib::hdf5_write_channel(fn, c0, 0);
 
     // Slot 1: one snapshot written as float, an empty name, positions for all snapshots, no orientations
     auto c1 = full_channel<float>("", {4}, false);
-    quadriga_lib::hdf5_write_channel(fn, &c1, 1);
+    quadriga_lib::hdf5_write_channel(fn, c1, 1);
 
     // Slot 2: an empty slot that gets unstructured data with hdf5_write_dset
     quadriga_lib::channel<double> c2;
     c2.par_names = {"note", "values"};
     c2.par_data = {std::string("note"), arma::Mat<unsigned>(2, 2, arma::fill::value(3u))};
     for (size_t i = 0; i < c2.par_names.size(); ++i)
-        quadriga_lib::hdf5_write_dset(fn, c2.par_names[i], &c2.par_data[i], 2);
+        quadriga_lib::hdf5_write_dset(fn, c2.par_names[i], c2.par_data[i], 2);
 
     // Slot 3: written, then overwritten; the old group is removed
     auto old = full_channel<double>("old", {2, 2}, false);
     old.par_names = {"old"};
     old.par_data = {1.0};
-    quadriga_lib::hdf5_write_channel(fn, &old, 0, 1);
+    quadriga_lib::hdf5_write_channel(fn, old, 0, 1);
     auto c3 = full_channel<double>("new", {1, 2}, false);
     c3.par_names = {"new"};
     c3.par_data = {2};
-    quadriga_lib::hdf5_write_channel(fn, &c3, 0, 1);
+    quadriga_lib::hdf5_write_channel(fn, c3, 0, 1);
 
     // Slot 4: a channel without unstructured data, extended with hdf5_write_dset; then the layout is reshaped
     auto c4 = full_channel<double>(std::string(20, 'M'), {2}, true);
-    quadriga_lib::hdf5_write_channel(fn, &c4, 1, 1);
+    quadriga_lib::hdf5_write_channel(fn, c4, 1, 1);
     c4.par_names = {"added"};
     c4.par_data = {arma::vec{1.0, 2.0}};
-    quadriga_lib::hdf5_write_dset(fn, "added", &c4.par_data[0], 1, 1);
+    quadriga_lib::hdf5_write_dset(fn, "added", c4.par_data[0], 1, 1);
     quadriga_lib::hdf5_reshape_layout(fn, 2, 3);
 
     // Channel IDs: one above the largest ID in the file
@@ -560,31 +560,31 @@ namespace
         c0.par_data = {std::string("abc"), std::string(), 3.14f, 12341100000ULL, arma::Col<int>{-1, 2, -3},
                        arma::rowvec{0.5, 1.5}, arma::umat{{1, 2}, {3, 4}, {5, 6}}, arma::fmat(0, 3),
                        arma::icube(2, 3, 2, arma::fill::value(-7)), filled(arma::cube(3, 1, 2), 5.0)};
-        quadriga_lib::hdf5_write_channel(fn, &c0, 0);
+        quadriga_lib::hdf5_write_channel(fn, c0, 0);
         step();
         auto c1 = full_channel<float>("", {4}, false);
-        quadriga_lib::hdf5_write_channel(fn, &c1, 1);
+        quadriga_lib::hdf5_write_channel(fn, c1, 1);
         step();
         std::any note = std::string("note"), values = arma::Mat<unsigned>(2, 2, arma::fill::value(3u));
-        quadriga_lib::hdf5_write_dset(fn, "note", &note, 2);
+        quadriga_lib::hdf5_write_dset(fn, "note", note, 2);
         step();
-        quadriga_lib::hdf5_write_dset(fn, "values", &values, 2);
+        quadriga_lib::hdf5_write_dset(fn, "values", values, 2);
         step();
         auto old = full_channel<double>("old", {2, 2}, false);
         old.par_names = {"old"};
         old.par_data = {1.0};
-        quadriga_lib::hdf5_write_channel(fn, &old, 0, 1);
+        quadriga_lib::hdf5_write_channel(fn, old, 0, 1);
         step();
         auto c3 = full_channel<double>("new", {1, 2}, false);
         c3.par_names = {"new"};
         c3.par_data = {2};
-        quadriga_lib::hdf5_write_channel(fn, &c3, 0, 1);
+        quadriga_lib::hdf5_write_channel(fn, c3, 0, 1);
         step();
         auto c4 = full_channel<double>(std::string(20, 'M'), {2}, true);
-        quadriga_lib::hdf5_write_channel(fn, &c4, 1, 1);
+        quadriga_lib::hdf5_write_channel(fn, c4, 1, 1);
         step();
         std::any added = arma::vec{1.0, 2.0};
-        quadriga_lib::hdf5_write_dset(fn, "added", &added, 1, 1);
+        quadriga_lib::hdf5_write_dset(fn, "added", added, 1, 1);
         step();
         quadriga_lib::hdf5_reshape_layout(fn, 2, 3);
         step();
@@ -706,12 +706,12 @@ TEST_CASE("hdf5_write_channel - the HDF5 C library reads every intermediate stat
     for (unsigned s = 0; s < 50; ++s)
     {
         auto c = minimal_channel(s + 1.0);
-        quadriga_lib::hdf5_write_channel(fn_a, &c, s);
+        quadriga_lib::hdf5_write_channel(fn_a, c, s);
     }
     const std::vector<unsigned char> A = load(fn_a);
     save(fn_b, A);
     auto c = minimal_channel(100.0);
-    quadriga_lib::hdf5_write_channel(fn_b, &c, 0);
+    quadriga_lib::hdf5_write_channel(fn_b, c, 0);
     const std::vector<unsigned char> B = load(fn_b);
     const size_t eof_a = eof_address(A), eof_b = eof_address(B);
     REQUIRE(eof_a == A.size());
@@ -799,14 +799,14 @@ TEST_CASE("hdf5_write_channel - the HDF5 C library finds 8000 root links through
     for (unsigned s = 0; s < n; ++s)
     {
         auto c = minimal_channel(s + 1.0);
-        quadriga_lib::hdf5_write_channel(fn, &c, s);
+        quadriga_lib::hdf5_write_channel(fn, c, s);
         order[s] = s + 1;
     }
     unsigned next_id = n + 1;
     for (unsigned s : {0u, 3999u, 7999u, 7999u, 7999u})
     {
         auto c = minimal_channel(100000.0 + next_id);
-        quadriga_lib::hdf5_write_channel(fn, &c, s);
+        quadriga_lib::hdf5_write_channel(fn, c, s);
         order[s] = next_id++;
     }
 
@@ -844,7 +844,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
     auto names_of = [&](unsigned ix, unsigned iy)
     {
         names.clear();
-        quadriga_lib::hdf5_read_dset_names(fn, &names, ix, iy);
+        names = quadriga_lib::hdf5_read_dset_names(fn, ix, iy);
         return names;
     };
     // Calls that throw the "Unsupported" message and leave the file unchanged
@@ -866,7 +866,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
         for (unsigned s = 0; s < 3; ++s)
         {
             auto c = minimal_channel(s + 1.0);
-            quadriga_lib::hdf5_write_channel(fn, &c, s);
+            quadriga_lib::hdf5_write_channel(fn, c, s);
         }
         modify(fn, [](hid_t file)
                { id_guard g{H5Gcreate2(file, "/extra", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT), H5Gclose}; REQUIRE(g >= 0); });
@@ -877,18 +877,18 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
             CHECK(quadriga_lib::hdf5_read_channel<double>(fn, s).coeff_re[0](0) == s + 1.0);
         auto c = minimal_channel(9.0);
         check_rejected({{"hdf5_write_channel", [&]()
-                                 { quadriga_lib::hdf5_write_channel(fn, &c, 3); }},
+                                 { quadriga_lib::hdf5_write_channel(fn, c, 3); }},
                                 {"hdf5_write_channel overwrite", [&]()
-                                 { quadriga_lib::hdf5_write_channel(fn, &c, 0); }},
+                                 { quadriga_lib::hdf5_write_channel(fn, c, 0); }},
                                 {"hdf5_write_dset, empty slot", [&]()
-                                 { quadriga_lib::hdf5_write_dset(fn, "x", &x, 3); }},
+                                 { quadriga_lib::hdf5_write_dset(fn, "x", x, 3); }},
                                 {"hdf5_write_dset, filled slot", [&]()
-                                 { quadriga_lib::hdf5_write_dset(fn, "x", &x, 0); }},
+                                 { quadriga_lib::hdf5_write_dset(fn, "x", x, 0); }},
                                 {"hdf5_reshape_layout", [&]()
                                  { quadriga_lib::hdf5_reshape_layout(fn, 2, 2); }}});
         std::remove(fn.c_str());
         quadriga_lib::hdf5_create_file(fn, 2);
-        CHECK(quadriga_lib::hdf5_write_channel(fn, &c, 1) == 0);
+        CHECK(quadriga_lib::hdf5_write_channel(fn, c, 1) == 0);
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1).coeff_re[0](0) == 9.0);
     }
     SECTION("a group added to the root of the reference file (dense root): every function is rejected")
@@ -906,9 +906,9 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
                                 {"hdf5_read_dset_names", [&]()
                                  { names_of(0, 1); }},
                                 {"hdf5_write_channel", [&]()
-                                 { quadriga_lib::hdf5_write_channel(fn, &c, 1, 2); }},
+                                 { quadriga_lib::hdf5_write_channel(fn, c, 1, 2); }},
                                 {"hdf5_write_dset", [&]()
-                                 { quadriga_lib::hdf5_write_dset(fn, "x", &x, 0); }},
+                                 { quadriga_lib::hdf5_write_dset(fn, "x", x, 0); }},
                                 {"hdf5_reshape_layout", [&]()
                                  { quadriga_lib::hdf5_reshape_layout(fn, 6); }}});
     }
@@ -935,7 +935,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
                                 {"hdf5_read_dset_names", [&]()
                                  { names_of(0, 0); }},
                                 {"hdf5_write_dset", [&]()
-                                 { quadriga_lib::hdf5_write_dset(fn, "x", &x, 0, 0); }}});
+                                 { quadriga_lib::hdf5_write_dset(fn, "x", x, 0, 0); }}});
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0).n_snap() == 1);
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1, 1).name == "new");
         CHECK(names_of(0, 1) == std::vector<std::string>({"note", "values"}));
@@ -943,7 +943,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
 
         // An overwrite does not read the old group: it replaces the slot, and both libraries read the result
         auto c = minimal_channel(9.0);
-        CHECK(quadriga_lib::hdf5_write_channel(fn, &c, 0, 0) == 1);
+        CHECK(quadriga_lib::hdf5_write_channel(fn, c, 0, 0) == 1);
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 0, 0).coeff_re[0](0) == 9.0);
         CHECK(tree_walk(fn) > 0);
         CHECK(!link_exists(fn, "channel_1"));
@@ -957,7 +957,7 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 0, 1).par_names == std::vector<std::string>({"values"}));
         CHECK(!quadriga_lib::hdf5_read_dset(fn, "note", 0, 1).has_value());
         CHECK(names_of(0, 1) == std::vector<std::string>({"values"}));
-        quadriga_lib::hdf5_write_dset(fn, "x", &x, 0, 1);
+        quadriga_lib::hdf5_write_dset(fn, "x", x, 0, 1);
         CHECK(names_of(0, 1) == std::vector<std::string>({"values", "x"}));
         CHECK(std::any_cast<double>(quadriga_lib::hdf5_read_dset(fn, "x", 0, 1)) == 1.0);
         CHECK(tree_walk(fn) > 0);
@@ -979,9 +979,9 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
                                 {"hdf5_read_dset_names", [&]()
                                  { names_of(0, 0); }},
                                 {"hdf5_write_channel", [&]()
-                                 { quadriga_lib::hdf5_write_channel(fn, &c); }},
+                                 { quadriga_lib::hdf5_write_channel(fn, c); }},
                                 {"hdf5_write_dset", [&]()
-                                 { quadriga_lib::hdf5_write_dset(fn, "x", &x); }},
+                                 { quadriga_lib::hdf5_write_dset(fn, "x", x); }},
                                 {"hdf5_reshape_layout", [&]()
                                  { quadriga_lib::hdf5_reshape_layout(fn, 1); }}});
     }

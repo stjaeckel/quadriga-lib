@@ -7,10 +7,23 @@
 #include "quadriga_lib.hpp"
 
 #include <chrono>
+#include <complex>
 #include <cmath>
 #include <limits>
 #include <string>
 #include <vector>
+
+// Sum of the output coefficients of rx 0, tx 0 of snapshot s at the output delay 'delay' (taps within tol)
+template <typename dtype>
+static std::complex<double> qd_tap_value(const std::vector<arma::Cube<dtype>> &re, const std::vector<arma::Cube<dtype>> &im,
+                                         const std::vector<arma::Cube<dtype>> &dl, size_t s, double delay, double tol)
+{
+    std::complex<double> v = 0.0;
+    for (arma::uword k = 0; k < re[s].n_slices; ++k)
+        if (std::abs((double)dl[s](0, 0, k) - delay) < tol)
+            v += std::complex<double>((double)re[s](0, 0, k), (double)im[s](0, 0, k));
+    return v;
+}
 
 TEST_CASE("quantize_delays - Input validation")
 {
@@ -24,49 +37,34 @@ TEST_CASE("quantize_delays - Input validation")
     dl[0] *= 100e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-
-    // Null input pointers
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(nullptr, &cim, &dl, &cre_q, &cim_q, &dl_q),
-                    std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, nullptr, &dl, &cre_q, &cim_q, &dl_q),
-                    std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, nullptr, &cre_q, &cim_q, &dl_q),
-                    std::invalid_argument);
-
-    // Null output pointers
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, nullptr, &cim_q, &dl_q),
-                    std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, nullptr, &dl_q),
-                    std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, nullptr),
-                    std::invalid_argument);
+    CHECK_NOTHROW(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q));
 
     // Empty input
     std::vector<arma::Cube<double>> empty_vec;
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&empty_vec, &cim, &dl, &cre_q, &cim_q, &dl_q),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(empty_vec, cim, dl, cre_q, cim_q, dl_q),
                     std::invalid_argument);
 
     // Mismatched vector sizes
     std::vector<arma::Cube<double>> cim_short;
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim_short, &dl, &cre_q, &cim_q, &dl_q),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim_short, dl, cre_q, cim_q, dl_q),
                     std::invalid_argument);
 
     // Invalid tap_spacing
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 0.0),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, 0.0),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, -1.0e-9),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, -1.0e-9),
                     std::invalid_argument);
 
     // Invalid power_exponent (NaN passed the "<= 0" check and gave NaN coefficients)
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 0.0),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 0.0),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, NAN),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, NAN),
                     std::invalid_argument);
 
     // Invalid fix_taps
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, -1),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, -1),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 4),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 4),
                     std::invalid_argument);
 
     // Mismatched n_rx/n_tx across snapshots
@@ -77,7 +75,7 @@ TEST_CASE("quantize_delays - Input validation")
     cre2[1].set_size(3, 2, 3); cre2[1].randn(); // Different n_rx
     cim2[1].set_size(3, 2, 3); cim2[1].randn();
     dl2[1].set_size(3, 2, 3); dl2[1].randu(); dl2[1] *= 100e-9;
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(&cre2, &cim2, &dl2, &cre_q, &cim_q, &dl_q),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays<double>(cre2, cim2, dl2, cre_q, cim_q, dl_q),
                     std::invalid_argument);
 }
 
@@ -94,7 +92,7 @@ TEST_CASE("quantize_delays - Single path at exact tap boundary")
     dl[0](0, 0, 0) = 15.0e-9; // Exactly 3 * 5ns
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 1);
     REQUIRE(cre_q[0].n_rows == 1);
@@ -128,7 +126,7 @@ TEST_CASE("quantize_delays - Single path at half-tap offset with linear exponent
     dl[0](0, 0, 0) = 12.5e-9; // Half way between 10ns and 15ns
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 1);
 
@@ -160,7 +158,7 @@ TEST_CASE("quantize_delays - Single path at half-tap offset with sqrt exponent")
     dl[0](0, 0, 0) = 12.5e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 0.5, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 0.5, 0);
 
     REQUIRE(cre_q.size() == 1);
 
@@ -193,7 +191,7 @@ TEST_CASE("quantize_delays - Multiple paths, basic correctness")
     cre[0](0, 0, 2) = 1.0; cim[0](0, 0, 2) = 0.0; dl[0](0, 0, 2) = 33.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 1);
 
@@ -227,7 +225,7 @@ TEST_CASE("quantize_delays - Already quantized input passes through")
     cre[0](0, 0, 3) = 0.1; cim[0](0, 0, 3) = 0.0; dl[0](0, 0, 3) = 50.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 1);
     REQUIRE(cre_q[0].n_slices >= 4);
@@ -268,7 +266,7 @@ TEST_CASE("quantize_delays - max_taps limits output")
     cre[0](0, 0, 4) = 4.0; cim[0](0, 0, 4) = 0.0; dl[0](0, 0, 4) = 20.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 3, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 3, 1.0, 0);
 
     REQUIRE(cre_q[0].n_slices <= 3);
 
@@ -296,7 +294,7 @@ TEST_CASE("quantize_delays - Shared delays [1,1,n_path] with fix_taps=2")
     }
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 2);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 2);
 
     REQUIRE(dl_q.size() == 2);
     CHECK(dl_q[0].n_rows == 1);
@@ -319,7 +317,7 @@ TEST_CASE("quantize_delays - Shared delays with fix_taps=0 produces per-antenna 
     dl[0](0, 0, 1) = 17.5e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(dl_q.size() == 1);
     CHECK(dl_q[0].n_rows == 2);
@@ -339,7 +337,7 @@ TEST_CASE("quantize_delays - Per-antenna delays")
     cre[0](1, 0, 1) = 1.0; cim[0](1, 0, 1) = 0.0; dl[0](1, 0, 1) = 27.5e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(dl_q.size() == 1);
     CHECK(dl_q[0].n_rows == 2);
@@ -364,11 +362,25 @@ TEST_CASE("quantize_delays - Multiple snapshots with same n_path")
     }
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == n_snap);
+
+    // Linear interpolation (power_exponent 1): 7.5 ns splits 0.5 / 0.5 onto 5 and 10 ns, 15 ns is on the grid,
+    // 22.5 ns splits onto 20 and 25 ns; the path at 0 ns stays at tap 0
+    const double tol = 1e-12, ts = 5.0e-9;
+    const std::vector<std::vector<std::pair<double, double>>> expected = {
+        {{0.0, 1.0}, {5.0e-9, 0.5}, {10.0e-9, 0.5}}, {{0.0, 1.0}, {15.0e-9, 1.0}}, {{0.0, 1.0}, {20.0e-9, 0.5}, {25.0e-9, 0.5}}};
     for (arma::uword s = 0; s < n_snap; ++s)
-        CHECK(cre_q[s].n_slices >= 1);
+    {
+        double total = 0.0;
+        for (const auto &[d, v] : expected[s])
+        {
+            CHECK(std::abs(qd_tap_value(cre_q, cim_q, dl_q, s, d, 0.01 * ts) - v) < tol);
+            total += v;
+        }
+        CHECK(std::abs(arma::accu(cre_q[s]) - total) < tol); // No coefficient anywhere else
+    }
 }
 
 TEST_CASE("quantize_delays - Variable n_path across snapshots")
@@ -391,7 +403,7 @@ TEST_CASE("quantize_delays - Variable n_path across snapshots")
     cre[2](0, 0, 1) = 0.8; cim[2](0, 0, 1) = 0.0; dl[2](0, 0, 1) = 17.5e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 3);
     // All output cubes must have same n_rx, n_tx and n_taps (n_taps = max across all grids)
@@ -433,7 +445,7 @@ TEST_CASE("quantize_delays - Zero-path snapshot")
     cre[2](0, 0, 0) = 3.0; cim[2](0, 0, 0) = 0.0; dl[2](0, 0, 0) = 5.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 3);
     arma::uword n_taps = cre_q[0].n_slices;
@@ -465,7 +477,7 @@ TEST_CASE("quantize_delays - All snapshots zero paths")
     cre[1].set_size(2, 1, 0); cim[1].set_size(2, 1, 0); dl[1].set_size(2, 1, 0);
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 2);
     CHECK(cre_q[0].n_rows == 2);
@@ -492,7 +504,7 @@ TEST_CASE("quantize_delays - Variable n_path with fix_taps=1")
     cre[1](0, 0, 0) = 2.0; cim[1](0, 0, 0) = 0.0; dl[1](0, 0, 0) = 15.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 1);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 1);
 
     REQUIRE(cre_q.size() == 2);
     // Both snapshots should have identical delay grids
@@ -518,7 +530,7 @@ TEST_CASE("quantize_delays - Variable n_path with shared delays and fix_taps=2")
     dl[1](0, 0, 0) = 5.0e-9; dl[1](0, 0, 1) = 20.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 2);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 2);
 
     REQUIRE(dl_q.size() == 2);
     // Output delays should be shared [1,1,n_taps]
@@ -548,7 +560,7 @@ TEST_CASE("quantize_delays - fix_taps=1 produces uniform grid")
     }
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 1);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 1);
 
     REQUIRE(dl_q.size() == 2);
     arma::uword n_taps = dl_q[0].n_slices;
@@ -572,7 +584,7 @@ TEST_CASE("quantize_delays - fix_taps=3 same delays across snapshots")
     }
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 3);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 3);
 
     REQUIRE(dl_q.size() == 3);
     arma::uword n_taps = dl_q[0].n_slices;
@@ -594,10 +606,17 @@ TEST_CASE("quantize_delays - Float precision")
     cre[0](0, 0, 1) = 2.0f; cim[0](0, 0, 1) = 1.0f; dl[0](0, 0, 1) = 12.5e-9f;
 
     std::vector<arma::Cube<float>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9f, 48, 1.0f, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9f, 48, 1.0f, 0);
 
     REQUIRE(cre_q.size() == 1);
-    CHECK(cre_q[0].n_slices >= 2);
+
+    // 12.5 ns splits 2 + 1j onto 10 and 15 ns (0.5 each); the path at 0 ns stays at tap 0; float tolerance
+    const std::complex<double> half(1.0, 0.5);
+    const double tol = 1e-6, dtol = 5.0e-11;
+    CHECK(std::abs(qd_tap_value(cre_q, cim_q, dl_q, 0, 0.0, dtol) - half) < tol);
+    CHECK(std::abs(qd_tap_value(cre_q, cim_q, dl_q, 0, 10.0e-9, dtol) - half) < tol);
+    CHECK(std::abs(qd_tap_value(cre_q, cim_q, dl_q, 0, 15.0e-9, dtol) - half) < tol);
+    CHECK(std::abs((double)arma::accu(cre_q[0]) - 3.0) < tol); // No coefficient anywhere else
 }
 
 TEST_CASE("quantize_delays - Paths combining at same tap")
@@ -611,7 +630,7 @@ TEST_CASE("quantize_delays - Paths combining at same tap")
     cre[0](0, 0, 1) = 2.0; cim[0](0, 0, 1) = 0.0; dl[0](0, 0, 1) = 10.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     bool found = false;
     for (arma::uword k = 0; k < cre_q[0].n_slices; ++k) {
@@ -635,7 +654,7 @@ TEST_CASE("quantize_delays - Zero delay (tap 0)")
     dl[0](0, 0, 0) = 0.0;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 
     REQUIRE(cre_q.size() == 1);
     CHECK(std::abs(cre_q[0](0, 0, 0) - 1.0) < 1e-12);
@@ -655,7 +674,7 @@ TEST_CASE("quantize_delays - Unlimited taps (max_taps=0)")
     cre[0](0, 0, 2) = 1.0; cim[0](0, 0, 2) = 0.0; dl[0](0, 0, 2) = 100.0e-9;
 
     std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-    quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 0, 1.0, 0);
+    quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 0, 1.0, 0);
 
     REQUIRE(cre_q.size() == 1);
     int n_nonzero = 0;
@@ -700,7 +719,7 @@ TEST_CASE("quantize_delays - Relative delays of get_channels_spherical")
 
     for (int fix_taps = 0; fix_taps < 4; ++fix_taps)
     {
-        REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, fix_taps));
+        REQUIRE_NOTHROW(quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, fix_taps));
         REQUIRE(cre_q.size() == 1);
         REQUIRE(cre_q[0].n_rows == 4);
         REQUIRE(cre_q[0].n_cols == 8);
@@ -735,8 +754,8 @@ TEST_CASE("quantize_delays - Small negative delays are clamped to tap 0")
         {
             dl = dl0;
             dl[0](0, 0, 0) = d0;
-            quadriga_lib::quantize_delays(&cre, &cim, &dl0, &cre_r, &cim_r, &dl_r, ts, 48, 1.0, fix_taps);
-            REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, ts, 48, 1.0, fix_taps));
+            quadriga_lib::quantize_delays(cre, cim, dl0, cre_r, cim_r, dl_r, ts, 48, 1.0, fix_taps);
+            REQUIRE_NOTHROW(quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, ts, 48, 1.0, fix_taps));
             CHECK(qd_same(cre_q, cre_r));
             CHECK(qd_same(cim_q, cim_r));
             CHECK(qd_same(dl_q, dl_r));
@@ -752,7 +771,7 @@ TEST_CASE("quantize_delays - Small negative delays are clamped to tap 0")
     dl2[0].slice(0).fill(0.0);
     dl2[0].slice(1).fill(20.0e-9);
     dl2[0](1, 0, 0) = -1.0e-9;
-    REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&cre2, &cim2, &dl2, &cre_q, &cim_q, &dl_q, ts, 48, 1.0, 0));
+    REQUIRE_NOTHROW(quadriga_lib::quantize_delays(cre2, cim2, dl2, cre_q, cim_q, dl_q, ts, 48, 1.0, 0));
     CHECK(dl_q[0](1, 0, 0) == 0.0);
     CHECK(cre_q[0](1, 0, 0) == 1.0);
 
@@ -761,7 +780,7 @@ TEST_CASE("quantize_delays - Small negative delays are clamped to tap 0")
     {
         dl = dl0;
         dl[0](0, 0, 0) = d0;
-        CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, ts, 48, 1.0, 0),
+        CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, ts, 48, 1.0, 0),
                         std::invalid_argument);
     }
 
@@ -771,11 +790,11 @@ TEST_CASE("quantize_delays - Small negative delays are clamped to tap 0")
     fim[0] = arma::fcube(1, 1, 2, arma::fill::zeros);
     fdl[0] = arma::fcube(1, 1, 2);
     fdl[0](0, 0, 0) = -1.0e-10f, fdl[0](0, 0, 1) = 12.5e-9f;
-    REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&fre, &fim, &fdl, &fre_q, &fim_q, &fdl_q, 5.0e-9f, 48, 1.0f, 0));
+    REQUIRE_NOTHROW(quadriga_lib::quantize_delays(fre, fim, fdl, fre_q, fim_q, fdl_q, 5.0e-9f, 48, 1.0f, 0));
     CHECK(fdl_q[0](0, 0, 0) == 0.0f);
     CHECK(fre_q[0](0, 0, 0) == 1.0f);
     fdl[0](0, 0, 0) = -0.5f * 5.0e-9f;
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&fre, &fim, &fdl, &fre_q, &fim_q, &fdl_q, 5.0e-9f, 48, 1.0f, 0),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(fre, fim, fdl, fre_q, fim_q, fdl_q, 5.0e-9f, 48, 1.0f, 0),
                     std::invalid_argument);
 }
 
@@ -796,7 +815,7 @@ TEST_CASE("quantize_delays - Non-finite and too large delays throw")
         {
             dl = dl0;
             dl[0](1, 0, 1) = bad;
-            CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, ts, 48, 1.0, fix_taps),
+            CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, ts, 48, 1.0, fix_taps),
                             std::invalid_argument);
         }
 
@@ -804,13 +823,13 @@ TEST_CASE("quantize_delays - Non-finite and too large delays throw")
     std::vector<arma::Cube<double>> dls(1);
     dls[0] = arma::cube(1, 1, 3);
     dls[0](0, 0, 0) = 0.0, dls[0](0, 0, 1) = nan, dls[0](0, 0, 2) = 20.0e-9;
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dls, &cre_q, &cim_q, &dl_q, ts, 48, 1.0, 1),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dls, cre_q, cim_q, dl_q, ts, 48, 1.0, 1),
                     std::invalid_argument);
 
     // Non-finite tap spacing
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl0, &cre_q, &cim_q, &dl_q, nan),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl0, cre_q, cim_q, dl_q, nan),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl0, &cre_q, &cim_q, &dl_q, inf),
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl0, cre_q, cim_q, dl_q, inf),
                     std::invalid_argument);
 
     // Just below the bound: a single tap far out, no dense allocation over the delay range
@@ -822,7 +841,7 @@ TEST_CASE("quantize_delays - Non-finite and too large delays throw")
     d1[0](0, 0, 1) = 2147483000.0 * ts; // integer tap index below 2^31
     for (arma::uword max_taps : {0, 48})
     {
-        REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&c1, &i1, &d1, &cre_q, &cim_q, &dl_q, ts, max_taps, 1.0, 0));
+        REQUIRE_NOTHROW(quadriga_lib::quantize_delays(c1, i1, d1, cre_q, cim_q, dl_q, ts, max_taps, 1.0, 0));
         REQUIRE(dl_q[0].n_elem == 2);
         CHECK(dl_q[0](0, 0, 0) == 0.0);
         CHECK(std::abs(dl_q[0](0, 0, 1) - 2147483000.0 * ts) < 1e-6 * ts);
@@ -832,7 +851,7 @@ TEST_CASE("quantize_delays - Non-finite and too large delays throw")
 
     // Acoustic tap spacing: the bound is in taps, not in seconds (48 kHz, delays of several seconds)
     d1[0](0, 0, 0) = 0.5, d1[0](0, 0, 1) = 30.0;
-    REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&c1, &i1, &d1, &cre_q, &cim_q, &dl_q, 1.0 / 48000.0, 48, 1.0, 0));
+    REQUIRE_NOTHROW(quadriga_lib::quantize_delays(c1, i1, d1, cre_q, cim_q, dl_q, 1.0 / 48000.0, 48, 1.0, 0));
     CHECK(std::abs(dl_q[0](0, 0, 1) - 30.0) < 1e-9);
 }
 
@@ -859,8 +878,8 @@ TEST_CASE("quantize_delays - Delay offset gives the same taps")
                 for (double pe : {1.0, 0.5})
                 {
                     std::vector<arma::Cube<double>> re0, im0, d0, re1, im1, d1;
-                    quadriga_lib::quantize_delays(&cre, &cim, shared ? &dls : &dl, &re0, &im0, &d0, ts, max_taps, pe, fix_taps);
-                    quadriga_lib::quantize_delays(&cre, &cim, shared ? &dls_off : &dl_off, &re1, &im1, &d1, ts, max_taps, pe, fix_taps);
+                    quadriga_lib::quantize_delays(cre, cim, shared ? dls : dl, re0, im0, d0, ts, max_taps, pe, fix_taps);
+                    quadriga_lib::quantize_delays(cre, cim, shared ? dls_off : dl_off, re1, im1, d1, ts, max_taps, pe, fix_taps);
                     CHECK(qd_same(re0, re1));
                     CHECK(qd_same(im0, im1));
                     REQUIRE(d0.size() == d1.size());
@@ -883,7 +902,7 @@ TEST_CASE("quantize_delays - Delay offset gives the same taps")
     i2[0] = arma::cube(16, 16, 20, arma::fill::randn);
     d2[0] = arma::cube(16, 16, 20, arma::fill::randu) * 2.0e-6 + 20.0e-3;
     auto t0 = std::chrono::steady_clock::now();
-    quadriga_lib::quantize_delays(&c2, &i2, &d2, &re_q, &im_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+    quadriga_lib::quantize_delays(c2, i2, d2, re_q, im_q, dl_q, 5.0e-9, 48, 1.0, 0);
     double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     CHECK(sec < 1.0);
 }
@@ -894,20 +913,20 @@ TEST_CASE("quantize_delays - Outputs that alias inputs")
     cre[0] = arma::cube(2, 3, 5, arma::fill::randn);
     cim[0] = arma::cube(2, 3, 5, arma::fill::randn);
     dl[0] = arma::cube(2, 3, 5, arma::fill::randu) * 100.0e-9;
-    CHECK_NOTHROW(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o2, &o3));
+    CHECK_NOTHROW(quadriga_lib::quantize_delays(cre, cim, dl, o1, o2, o3));
 
     // Each output is its own input
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre, &cim, &dl), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, cre, cim, dl), std::invalid_argument);
 
     // An output is another input
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o2, &cre), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &dl, &o2, &o3), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &dl, &o3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, o1, o2, cre), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, dl, o2, o3), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, o1, dl, o3), std::invalid_argument);
 
     // Two outputs are the same object
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o1, &o2), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o1, &o2, &o1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::quantize_delays(&cre, &cim, &dl, &o2, &o1, &o1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, o1, o1, o2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, o1, o2, o1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::quantize_delays(cre, cim, dl, o2, o1, o1), std::invalid_argument);
 }
 
 TEST_CASE("quantize_delays - Output delay shapes")
@@ -923,12 +942,12 @@ TEST_CASE("quantize_delays - Output delay shapes")
 
     for (int fix_taps = 0; fix_taps < 4; ++fix_taps)
     {
-        quadriga_lib::quantize_delays(&cre, &cim, &dl_ant, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, fix_taps);
+        quadriga_lib::quantize_delays(cre, cim, dl_ant, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, fix_taps);
         CHECK(dl_q[0].n_rows == 2);
         CHECK(dl_q[0].n_cols == 2);
         CHECK(dl_q[0].n_slices == cre_q[0].n_slices);
 
-        quadriga_lib::quantize_delays(&cre, &cim, &dl_shr, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, fix_taps);
+        quadriga_lib::quantize_delays(cre, cim, dl_shr, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, fix_taps);
         arma::uword n = (fix_taps == 1 || fix_taps == 2) ? 1 : 2;
         CHECK(dl_q[0].n_rows == n);
         CHECK(dl_q[0].n_cols == n);
@@ -968,7 +987,7 @@ TEST_CASE("quantize_delays - Relative delays of an acoustic array")
             std::string msg;
             try
             {
-                quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, ts);
+                quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, ts);
             }
             catch (const std::invalid_argument &e)
             {
@@ -980,7 +999,7 @@ TEST_CASE("quantize_delays - Relative delays of an acoustic array")
         else
         {
             REQUIRE(dl[0].min() > 0.0);
-            REQUIRE_NOTHROW(quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, ts));
+            REQUIRE_NOTHROW(quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, ts));
             REQUIRE(cre_q.size() == 1);
             CHECK(cre_q[0].n_rows == 2);
             CHECK(arma::accu(arma::square(cre_q[0]) + arma::square(cim_q[0])) > 0.0);

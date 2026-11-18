@@ -181,14 +181,14 @@ static void run(fz::input &in)
         fz::clean([&] { quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw); });
     }
     unsigned ix = (unsigned)in.index(2), iy = (unsigned)in.index(2), iz = (unsigned)in.size(1), iw = (unsigned)in.size(1);
-    fz::clean([&] { quadriga_lib::hdf5_write_channel(fn, &c, ix, iy, iz, iw); });
+    fz::clean([&] { quadriga_lib::hdf5_write_channel(fn, c, ix, iy, iz, iw); });
     if (in.ConsumeBool()) // overwrite the slot
-        fz::clean([&] { quadriga_lib::hdf5_write_channel(fn, &c, ix, iy, iz, iw); });
+        fz::clean([&] { quadriga_lib::hdf5_write_channel(fn, c, ix, iy, iz, iw); });
     {
         std::string name = fuzzed_name(in);
         std::any par = fuzzed_any<T>(in);
         std::string prefix = in.ConsumeBool() ? "par_" : in.ConsumeRandomLengthString(6);
-        fz::clean([&] { quadriga_lib::hdf5_write_dset(fn, name, &par, ix, iy, iz, iw, prefix); });
+        fz::clean([&] { quadriga_lib::hdf5_write_dset(fn, name, par, ix, iy, iz, iw, prefix); });
     }
     if (in.ConsumeBool())
     {
@@ -213,7 +213,7 @@ static void run(fz::input &in)
         fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<T>(fn, slots, &i_snap); });
     }
     std::vector<std::string> names;
-    fz::clean([&] { quadriga_lib::hdf5_read_dset_names(fn, &names, ix, iy, iz, iw); });
+    fz::clean([&] { names = quadriga_lib::hdf5_read_dset_names(fn, ix, iy, iz, iw); });
     for (const auto &n : names)
         fz::clean([&] { quadriga_lib::hdf5_read_dset(fn, n, ix, iy, iz, iw); });
     fz::clean([&] { quadriga_lib::hdf5_read_dset(fn, fuzzed_name(in), ix, iy, iz, iw); });

@@ -52,7 +52,7 @@ static bool qHDF_par_type(int datatype_id, h5::dtype &t)
 }
 
 // Check the name (including the prefix) and the type of an unstructured dataset before anything is written
-static void qHDF_check_par(const std::string &name, const std::any *par_data)
+static void qHDF_check_par(const std::string &name, const std::any &par_data)
 {
     auto is_alnum = [&]()
     {
@@ -65,13 +65,11 @@ static void qHDF_check_par(const std::string &name, const std::any *par_data)
         throw std::invalid_argument("Parameter name must only contain letters, numbers and the underscore '_'.");
     if (name.length() > h5::max_name_length)
         throw std::invalid_argument("Parameter name is too long.");
-    if (par_data == nullptr)
-        throw std::invalid_argument("NULL pointer was passed as data object.");
     h5::dtype t = h5::float32;
-    const int datatype_id = quadriga_lib::any_type_id(par_data);
+    const int datatype_id = quadriga_lib::any_type_id(&par_data);
     if (datatype_id != 9 && !qHDF_par_type(datatype_id, t))
         throw std::invalid_argument("Unsupported data type for '" + name + "'");
-    if (datatype_id == 9 && std::any_cast<std::string>(par_data)->size() > (size_t)UINT32_MAX) // 32-bit type size
+    if (datatype_id == 9 && std::any_cast<std::string>(&par_data)->size() > (size_t)UINT32_MAX) // 32-bit type size
         throw std::invalid_argument("String '" + name + "' is too long: at most 4294967295 bytes can be stored.");
 }
 
@@ -595,7 +593,9 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 
 ## Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`channel_id`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
+
+## Outputs:
+- **`channel_id`** *(optional)* — Serialized slot occupancy list; `[nx·ny·nz·nw]`
 
 ## Returns:
 - Four-element vector `{nx, ny, nz, nw}` describing the layout dimensions
@@ -766,7 +766,7 @@ Write a channel object to an HDF5 file at a specified 4D index
 ```
 int quadriga_lib::hdf5_write_channel(
     const std::string &fn,
-    const quadriga_lib::channel<dtype> *chan,
+    const quadriga_lib::channel<dtype> &chan,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -775,7 +775,7 @@ int quadriga_lib::hdf5_write_channel(
 
 ## Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`chan`** — Pointer to the channel object to write
+- **`chan`** — Channel object to write
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -806,7 +806,7 @@ static std::vector<std::string> qHDF_check_channel(const quadriga_lib::channel<d
     for (size_t i = 0; i < chan.par_names.size(); ++i)
     {
         names.push_back("par_" + chan.par_names[i]);
-        qHDF_check_par(names[i], &chan.par_data[i]);
+        qHDF_check_par(names[i], chan.par_data[i]);
         if (!unique.insert(names[i]).second)
             throw std::invalid_argument("Input 'par_names' contains '" + chan.par_names[i] + "' twice.");
     }
@@ -866,16 +866,16 @@ static int qHDF_write_slot(const std::string &fn, const quadriga_lib::channel<dt
 }
 
 template <typename dtype>
-int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadriga_lib::channel<dtype> *chan,
+int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadriga_lib::channel<dtype> &chan,
                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
-    return qHDF_write_slot(fn, *chan, qHDF_check_channel(*chan), ix, iy, iz, iw);
+    return qHDF_write_slot(fn, chan, qHDF_check_channel(chan), ix, iy, iz, iw);
 }
 
-template int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadriga_lib::channel<float> *chan,
+template int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadriga_lib::channel<float> &chan,
                                               unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
-template int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadriga_lib::channel<double> *chan,
+template int quadriga_lib::hdf5_write_channel(const std::string &fn, const quadriga_lib::channel<double> &chan,
                                               unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
 /*!MD
@@ -1516,9 +1516,8 @@ Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 
 ## Declaration:
 ```
-arma::uword quadriga_lib::hdf5_read_dset_names(
+std::vector<std::string> quadriga_lib::hdf5_read_dset_names(
     const std::string &fn,
-    std::vector<std::string> *names,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -1528,7 +1527,6 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 
 ## Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`names`** — Pointer to vector receiving dataset names (without prefix)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -1536,7 +1534,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 - **`prefix`** *(optional)* — Prefix used to identify unstructured datasets
 
 ## Returns:
-- Number of datasets found at the specified slot
+- Dataset names without the prefix, in creation order; empty if the slot has none
 
 ## See also:
 - [[hdf5_read_dset]] (read a dataset by name)
@@ -1544,26 +1542,21 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 MD!*/
 
 // Read names of the unstructured data fields from the HDF file
-arma::uword quadriga_lib::hdf5_read_dset_names(const std::string &fn, std::vector<std::string> *names,
-                                               unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                               const std::string &prefix)
+std::vector<std::string> quadriga_lib::hdf5_read_dset_names(const std::string &fn, unsigned ix, unsigned iy, unsigned iz,
+                                                            unsigned iw, const std::string &prefix)
 {
     qHDF_file h;
     if (!qHDF_open(h, fn, false))
         throw std::runtime_error("File does not exist.");
+    std::vector<std::string> names;
     qHDF_group data;
     if (!qHDF_read_data_group(h, ix, iy, iz, iw, data))
-        return 0ULL;
+        return names;
 
-    arma::uword n_found = 0;
     for (const h5::link *l : qHDF_creation_order(data.g))
         if (l->name.compare(0, prefix.length(), prefix) == 0)
-        {
-            if (names != nullptr)
-                names->push_back(std::string(l->name.substr(prefix.length())));
-            ++n_found;
-        }
-    return n_found;
+            names.emplace_back(l->name.substr(prefix.length()));
+    return names;
 }
 
 /*!MD
@@ -1588,7 +1581,7 @@ Write a single unstructured dataset to an HDF5 file at a specified 4D index
 void quadriga_lib::hdf5_write_dset(
     const std::string &fn,
     const std::string &name,
-    const std::any *data,
+    const std::any &data,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -1599,7 +1592,7 @@ void quadriga_lib::hdf5_write_dset(
 ## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`name`** — Dataset name without prefix; alphanumeric and underscores only
-- **`data`** — Pointer to the data to write; type must be supported (see above)
+- **`data`** — Data to write; type must be supported (see above)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -1613,7 +1606,7 @@ void quadriga_lib::hdf5_write_dset(
 MD!*/
 
 // Writes unstructured data to a hdf5 file
-void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &name, const std::any *data,
+void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &name, const std::any &data,
                                    unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                                    const std::string &prefix)
 {
@@ -1643,7 +1636,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
         qHDF_check_chunks(h, root.ranges());
         const uint32_t id = qHDF_new_channel_id(root);
         h5::output out(h.f, h.eof);
-        const uint64_t data_addr = qHDF_emit_data_group(out, hdr, {{dset_name, qHDF_emit_par(out, data)}});
+        const uint64_t data_addr = qHDF_emit_data_group(out, hdr, {{dset_name, qHDF_emit_par(out, &data)}});
         qHDF_commit_channel(h, root, out, hdr, slot, id, 0, qHDF_channel_attributes(), {}, data_addr);
         h.f.close();
         return;
@@ -1667,7 +1660,7 @@ void quadriga_lib::hdf5_write_dset(const std::string &fn, const std::string &nam
         channel.check_insert(4, false);
 
     h5::output out(h.f, h.eof);
-    const uint64_t dset_addr = qHDF_emit_par(out, data);
+    const uint64_t dset_addr = qHDF_emit_par(out, &data);
     std::vector<h5::patch> patches;
     if (data_link != nullptr)
         patches = data_group.prepare_insert(dset_name, dset_addr, true, out.buf, out.base);

@@ -461,7 +461,7 @@ TEST_CASE("IEEE indoor publication - Sec. 4.2, Table 4-2: 4x4 MIMO NLOS capacity
                 auto c = quadriga_lib::get_channels_ieee_indoor(ula, ula, models[m], 2.4e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {50.0}, {0},
                                                                 false, {}, 20, 50.0, n);
                 arma::cx_cube hm;
-                quadriga_lib::baseband_freq_response<double>(&c[0].coeff_re[0], &c[0].coeff_im[0], &c[0].delay[0], &pilot,
+                quadriga_lib::baseband_freq_response<double>(c[0].coeff_re[0], c[0].coeff_im[0], c[0].delay[0], pilot,
                                                              100e6, nullptr, nullptr, &hm);
                 H = hm.slice(0);
             }

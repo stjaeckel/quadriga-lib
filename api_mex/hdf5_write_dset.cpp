@@ -84,7 +84,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File does not exist (use quadriga_lib.hdf5_create_file).");
 
     // Write dataset
-    CALL_QD(quadriga_lib::hdf5_write_dset(fn, name, &data, ix, iy, iz, iw, prefix));
+    CALL_QD(quadriga_lib::hdf5_write_dset(fn, name, data, ix, iy, iz, iw, prefix));
 
     // Return storage space
     plhs[0] = qd_mex_copy2matlab(&storage_space, true);

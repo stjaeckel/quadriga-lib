@@ -181,7 +181,7 @@ namespace
     template <typename W>
     void check_round_trip(const std::string &fn, const quadriga_lib::channel<W> &c, unsigned ix = 0)
     {
-        quadriga_lib::hdf5_write_channel(fn, &c, ix);
+        quadriga_lib::hdf5_write_channel(fn, c, ix);
         check_structured(quadriga_lib::hdf5_read_channel<float>(fn, ix), c);
         check_structured(quadriga_lib::hdf5_read_channel<double>(fn, ix), c);
     }
@@ -273,7 +273,7 @@ TEST_CASE("hdf5_create_file - creates a file with the given layout and all slots
 
     // An existing file is refused and kept; after removing it, a new file has all slots empty
     auto c = small_channel("old");
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 1);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 1);
     CHECK_THROWS_AS(quadriga_lib::hdf5_create_file(f.fn, 3), std::runtime_error);
     CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 1).name == "old");
     std::remove(f.fn.c_str());
@@ -323,10 +323,10 @@ TEST_CASE("hdf5_read_layout - channel IDs mark the occupied slots in write order
 
     quadriga_lib::hdf5_create_file(f.fn, 5);
     auto c = small_channel("c");
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 3);
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 0);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 3);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 0);
     std::any a = 1.0;
-    quadriga_lib::hdf5_write_dset(f.fn, "a", &a, 4);
+    quadriga_lib::hdf5_write_dset(f.fn, "a", a, 4);
 
     // New IDs count up from the largest ID in the file
     arma::u32_vec id(9, arma::fill::value(7)); // Stale content of another size is replaced
@@ -359,8 +359,8 @@ TEST_CASE("hdf5_reshape_layout - changes the layout and keeps the slots in linea
 
     quadriga_lib::hdf5_create_file(f.fn, 6);
     auto a = small_channel("slot 1"), b = small_channel("slot 4");
-    quadriga_lib::hdf5_write_channel(f.fn, &a, 1);
-    quadriga_lib::hdf5_write_channel(f.fn, &b, 4);
+    quadriga_lib::hdf5_write_channel(f.fn, a, 1);
+    quadriga_lib::hdf5_write_channel(f.fn, b, 4);
     const arma::u32_vec id_before = channel_ids(f.fn);
 
     quadriga_lib::hdf5_reshape_layout(f.fn, 2, 3);
@@ -384,8 +384,8 @@ TEST_CASE("hdf5_reshape_layout - changes the layout and keeps the slots in linea
     layout = quadriga_lib::hdf5_read_layout(f.fn);
     CHECK(layout(0) == 256);
     CHECK(layout(1) == 256);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &a, 0, 256), std::invalid_argument);
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &a, 255, 255) == 0);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, a, 0, 256), std::invalid_argument);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, a, 255, 255) == 0);
     CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 255, 255).coeff_re.size() == 1);
 }
 
@@ -428,9 +428,9 @@ TEST_CASE("hdf5_write_channel - slot (ix, iy, iz, iw) is the linear index ix + n
     for (auto &s : slots)
     {
         auto c = small_channel("slot " + std::to_string(s[0] + 2 * (s[1] + 3 * (s[2] + 2 * s[3]))));
-        CHECK(quadriga_lib::hdf5_write_channel(f.fn, &c, s[0], s[1], s[2], s[3]) == 0);
+        CHECK(quadriga_lib::hdf5_write_channel(f.fn, c, s[0], s[1], s[2], s[3]) == 0);
         std::any v = (unsigned)s[3];
-        quadriga_lib::hdf5_write_dset(f.fn, "w", &v, s[0], s[1], s[2], s[3]);
+        quadriga_lib::hdf5_write_dset(f.fn, "w", v, s[0], s[1], s[2], s[3]);
     }
 
     const arma::u32_vec id = channel_ids(f.fn);
@@ -447,7 +447,8 @@ TEST_CASE("hdf5_write_channel - slot (ix, iy, iz, iw) is the linear index ix + n
         std::any v = quadriga_lib::hdf5_read_dset(f.fn, "w", s[0], s[1], s[2], s[3]);
         CHECK(std::any_cast<unsigned>(v) == s[3]);
         std::vector<std::string> names;
-        CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names, s[0], s[1], s[2], s[3]) == 1);
+        names = quadriga_lib::hdf5_read_dset_names(f.fn, s[0], s[1], s[2], s[3]);
+        CHECK(names.size() == 1);
     }
 }
 
@@ -473,7 +474,7 @@ TEST_CASE("hdf5_write_channel - structured data round trips in single precision,
     SECTION("float and double reads agree within float accuracy")
     {
         auto c = full_channel<double>({3, 2});
-        quadriga_lib::hdf5_write_channel(f.fn, &c);
+        quadriga_lib::hdf5_write_channel(f.fn, c);
         auto rf = quadriga_lib::hdf5_read_channel<float>(f.fn);
         auto rd = quadriga_lib::hdf5_read_channel<double>(f.fn);
         REQUIRE(rf.coeff_re.size() == 2);
@@ -538,7 +539,7 @@ TEST_CASE("hdf5_write_channel - channels with a subset of the fields")
     {
         quadriga_lib::channel<double> c;
         c.initial_position = 5;
-        CHECK(quadriga_lib::hdf5_write_channel(f.fn, &c) == 0);
+        CHECK(quadriga_lib::hdf5_write_channel(f.fn, c) == 0);
         auto r = quadriga_lib::hdf5_read_channel<double>(f.fn);
         CHECK(r.initial_position == 5);
         CHECK(r.n_snap() == 0);
@@ -602,7 +603,7 @@ TEST_CASE("hdf5_write_channel - a channel generated by the library round trips")
     }
 
     quadriga_lib::hdf5_create_file(f.fn, 10);
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 7);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 7);
     auto d = quadriga_lib::hdf5_read_channel<double>(f.fn, 7);
     CHECK(!d.empty());
     check_structured(d, c);
@@ -616,18 +617,18 @@ TEST_CASE("hdf5_write_channel - channel names are stored with at most 255 charac
     {
         INFO("length " << len);
         auto c = small_channel(std::string(len, 'N'));
-        quadriga_lib::hdf5_write_channel(f.fn, &c);
+        quadriga_lib::hdf5_write_channel(f.fn, c);
         CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn).name == c.name);
     }
 
     auto c = small_channel("\xc3\xa4\xc3\xb6 UTF-8 bytes"); // Bytes are kept as they are
-    quadriga_lib::hdf5_write_channel(f.fn, &c);
+    quadriga_lib::hdf5_write_channel(f.fn, c);
     CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn).name == c.name);
 
     // A name of 300 characters is rejected by the validation
     std::remove(f.fn.c_str());
     c.name = std::string(300, 'L');
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, c), std::invalid_argument);
     CHECK(!file_exists(f.fn));
 }
 
@@ -638,13 +639,13 @@ TEST_CASE("hdf5_write_channel - unstructured data of every supported type round 
     // Slot 1: structured data only; slot 7: a channel with all types; slot 0: the same datasets one by one
     quadriga_lib::hdf5_create_file(f.fn, 10);
     auto c = small_channel("structured");
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 1);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 1);
     c.name = "with unstructured data";
     all_par_types(c.par_names, c.par_data);
     REQUIRE(c.par_names.size() == 31);
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 7);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 7);
     for (size_t i = 0; i < c.par_names.size(); ++i)
-        quadriga_lib::hdf5_write_dset(f.fn, c.par_names[i], &c.par_data[i]);
+        quadriga_lib::hdf5_write_dset(f.fn, c.par_names[i], c.par_data[i]);
 
     const arma::u32_vec id = channel_ids(f.fn);
     CHECK(id(0) == 3);
@@ -656,7 +657,8 @@ TEST_CASE("hdf5_write_channel - unstructured data of every supported type round 
     {
         INFO("slot " << slot);
         std::vector<std::string> names;
-        CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names, slot) == c.par_names.size());
+        names = quadriga_lib::hdf5_read_dset_names(f.fn, slot);
+        CHECK(names.size() == c.par_names.size());
         CHECK(names == c.par_names); // In write order
         for (size_t i = 0; i < c.par_names.size(); ++i)
         {
@@ -698,10 +700,11 @@ TEST_CASE("hdf5_write_dset - scalars, single elements, empty arrays and strings 
         {"str_inner_nul", std::string("ab\0cd", 5)}, {"mat0x3", arma::mat(0, 3)}, {"mat3x0", arma::Mat<int>(3, 0)},
         {"cube230", arma::cube(2, 3, 0)}, {"vec0", arma::vec()}, {"row0", arma::urowvec()}, {std::string(260, 'L'), 1.0}};
     for (auto &p : par)
-        quadriga_lib::hdf5_write_dset(f.fn, p.first, &p.second);
+        quadriga_lib::hdf5_write_dset(f.fn, p.first, p.second);
 
     std::vector<std::string> names;
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names) == par.size());
+    names = quadriga_lib::hdf5_read_dset_names(f.fn);
+    CHECK(names.size() == par.size());
     REQUIRE(names.size() == par.size());
     for (size_t i = 0; i < par.size(); ++i)
     {
@@ -714,7 +717,7 @@ TEST_CASE("hdf5_write_dset - scalars, single elements, empty arrays and strings 
 
     // Trailing NUL bytes of a string are not kept
     std::any trailing = std::string("ab\0\0", 4);
-    quadriga_lib::hdf5_write_dset(f.fn, "str_trailing_nul", &trailing);
+    quadriga_lib::hdf5_write_dset(f.fn, "str_trailing_nul", trailing);
     CHECK(std::any_cast<std::string>(quadriga_lib::hdf5_read_dset(f.fn, "str_trailing_nul")) == "ab");
 
     auto r = quadriga_lib::hdf5_read_channel<double>(f.fn);
@@ -727,11 +730,11 @@ TEST_CASE("hdf5_write_channel - overwriting a slot replaces it completely")
 
     // A dataset written with hdf5_write_dset, then a channel with dataset "b" into the same slot
     std::any a = 1.0;
-    quadriga_lib::hdf5_write_dset(f.fn, "a", &a);
+    quadriga_lib::hdf5_write_dset(f.fn, "a", a);
     auto c = small_channel("c", 3);
     c.par_names = {"b"};
     c.par_data = {std::any(2.0)};
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &c) == 1);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, c) == 1);
     {
         auto r = quadriga_lib::hdf5_read_channel<double>(f.fn);
         REQUIRE(r.par_names.size() == 1);
@@ -740,24 +743,25 @@ TEST_CASE("hdf5_write_channel - overwriting a slot replaces it completely")
         CHECK(r.coeff_re.size() == 1);
         CHECK(!quadriga_lib::hdf5_read_dset(f.fn, "a").has_value());
         std::vector<std::string> names;
-        CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names) == 1);
+        names = quadriga_lib::hdf5_read_dset_names(f.fn);
+        CHECK(names.size() == 1);
         REQUIRE(names.size() == 1);
         CHECK(names[0] == "b");
     }
 
     // A channel with unstructured data replaced by one without: no unstructured data is left
     auto plain = small_channel("plain");
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &plain) == 1);
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr) == 0);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, plain) == 1);
+    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn).empty());
     CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn).par_names.empty());
 
     // A channel with structured data replaced by a parameter-only channel, written twice
     quadriga_lib::channel<double> p;
     p.par_names = {"x"};
     p.par_data = {std::any(1.0)};
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &p) == 1);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, p) == 1);
     p.par_data = {std::any(99.0)};
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &p) == 1);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, p) == 1);
     {
         auto r = quadriga_lib::hdf5_read_channel<double>(f.fn);
         CHECK(r.n_snap() == 0);
@@ -770,11 +774,11 @@ TEST_CASE("hdf5_write_channel - overwriting a slot replaces it completely")
     std::remove(f.fn.c_str());
     quadriga_lib::hdf5_create_file(f.fn, 4);
     auto other = small_channel("other");
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &other, 1) == 0);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, other, 1) == 0);
     for (int i = 0; i < 5; ++i)
     {
         c.name = "rewrite " + std::to_string(i);
-        CHECK(quadriga_lib::hdf5_write_channel(f.fn, &c, 0) == (i == 0 ? 0 : 1));
+        CHECK(quadriga_lib::hdf5_write_channel(f.fn, c, 0) == (i == 0 ? 0 : 1));
     }
     arma::u32_vec id = channel_ids(f.fn);
     CHECK(id(0) == 6);
@@ -790,7 +794,7 @@ TEST_CASE("hdf5_write_channel - a channel without structured data")
     // Nothing to write: returns 0 and does not create the file
     quadriga_lib::channel<double> e;
     REQUIRE(e.empty());
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &e) == 0);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, e) == 0);
     CHECK(!file_exists(f.fn));
 
     // Unstructured data only: the slot holds the datasets; the channel name is not stored
@@ -798,7 +802,7 @@ TEST_CASE("hdf5_write_channel - a channel without structured data")
     p.name = "parameters";
     p.par_names = {"x"};
     p.par_data = {std::any(1.0)};
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &p, 2) == 0);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, p, 2) == 0);
     CHECK(quadriga_lib::hdf5_read_layout(f.fn)(0) == 65536); // A missing file is created with the default layout
     auto r = quadriga_lib::hdf5_read_channel<double>(f.fn, 2);
     CHECK(r.empty());
@@ -809,7 +813,7 @@ TEST_CASE("hdf5_write_channel - a channel without structured data")
     CHECK(channel_ids(f.fn)(2) == 1);
 
     // The empty channel leaves the existing file and its slots unchanged
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &e, 3) == 0);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, e, 3) == 0);
     CHECK(channel_ids(f.fn)(3) == 0);
 }
 
@@ -818,29 +822,29 @@ TEST_CASE("hdf5_write_channel - an invalid channel leaves the file unchanged")
     test_file f("test_hdf5_write_invalid_channel.hdf5");
     quadriga_lib::hdf5_create_file(f.fn, 4);
     auto good = small_channel("good");
-    quadriga_lib::hdf5_write_channel(f.fn, &good, 0);
+    quadriga_lib::hdf5_write_channel(f.fn, good, 0);
 
     // Invalid channels are rejected before the file is changed: no slot is written, no channel ID is used up
     auto coeff = small_channel("coeff");
     coeff.coeff_im[0].set_size(2, 3, 3);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &coeff, 1), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &coeff, 0), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, coeff, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, coeff, 0), std::invalid_argument);
 
     auto pos = small_channel("pos");
     pos.tx_pos.set_size(2, 1);
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &pos, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, pos, 1), std::invalid_argument);
 
     auto par = small_channel("par");
     par.par_names = {"a"}; // Without data
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &par, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, par, 1), std::invalid_argument);
     par.par_data = {std::any(arma::cx_mat(2, 2))}; // Unsupported type
-    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &par, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, par, 1), std::invalid_argument);
 
     arma::u32_vec id = channel_ids(f.fn);
     CHECK(id(0) == 1);
     CHECK(id(1) == 0);
     CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 0).name == "good");
-    CHECK(quadriga_lib::hdf5_write_channel(f.fn, &good, 1) == 0);
+    CHECK(quadriga_lib::hdf5_write_channel(f.fn, good, 1) == 0);
     CHECK(channel_ids(f.fn)(1) == 2);
 }
 
@@ -851,7 +855,7 @@ TEST_CASE("hdf5_write_channel - input validation")
     auto c = small_channel("valid");
     c.par_names = {"a"};
     c.par_data = {std::any(1.0)};
-    CHECK_NOTHROW(quadriga_lib::hdf5_write_channel(f.fn, &c, 1, 1, 1, 1));
+    CHECK_NOTHROW(quadriga_lib::hdf5_write_channel(f.fn, c, 1, 1, 1, 1));
     const arma::u32_vec id_before = channel_ids(f.fn);
 
     SECTION("invalid channel, the file is not created")
@@ -859,14 +863,14 @@ TEST_CASE("hdf5_write_channel - input validation")
         test_file g("test_hdf5_write_validation_new.hdf5");
         auto bad = c;
         bad.delay[0].set_size(1, 3, 2);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(g.fn, &bad), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(g.fn, bad), std::invalid_argument);
         CHECK(!file_exists(g.fn));
     }
     SECTION("par_names and par_data differ in length")
     {
         auto bad = c;
         bad.par_names.push_back("b");
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &bad), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, bad), std::invalid_argument);
     }
     SECTION("invalid dataset name")
     {
@@ -875,7 +879,7 @@ TEST_CASE("hdf5_write_channel - input validation")
             INFO("name '" << name << "'");
             auto bad = c;
             bad.par_names = {name};
-            CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &bad), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, bad), std::invalid_argument);
         }
     }
     SECTION("duplicate dataset names, the slot is unchanged")
@@ -883,22 +887,22 @@ TEST_CASE("hdf5_write_channel - input validation")
         auto bad = small_channel("duplicate");
         bad.par_names = {"a", "a"};
         bad.par_data = {std::any(1.0), std::any(2.0)};
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &bad, 1, 1, 1, 1), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &bad, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, bad, 1, 1, 1, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, bad, 0), std::invalid_argument);
         CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 1, 1, 1, 1).name == "valid");
     }
     SECTION("index out of range in each dimension")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &c, 2, 0, 0, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &c, 0, 2, 0, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &c, 0, 0, 2, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &c, 0, 0, 0, 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, c, 2, 0, 0, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, c, 0, 2, 0, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, c, 0, 0, 2, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, c, 0, 0, 0, 2), std::invalid_argument);
     }
     SECTION("not an HDF5 file")
     {
         test_file g("test_hdf5_write_validation.txt");
         std::ofstream(g.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(g.fn, &c), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(g.fn, c), std::runtime_error);
     }
     CHECK(arma::all(channel_ids(f.fn) == id_before));
 }
@@ -908,7 +912,7 @@ TEST_CASE("hdf5_read_channel - empty slots and indices outside the layout give a
     test_file f("test_hdf5_read_channel_empty.hdf5");
     quadriga_lib::hdf5_create_file(f.fn, 2, 2);
     auto c = small_channel("c");
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 1, 1);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 1, 1);
 
     for (auto i : {std::vector<unsigned>{0, 0, 0, 0}, {2, 0, 0, 0}, {0, 2, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}})
     {
@@ -946,7 +950,7 @@ TEST_CASE("hdf5_write_dset - adds a dataset to an empty or a filled slot")
 
     // A missing file is created with the default layout
     std::any a = arma::vec{1.0, 2.0};
-    quadriga_lib::hdf5_write_dset(f.fn, "a", &a, 3);
+    quadriga_lib::hdf5_write_dset(f.fn, "a", a, 3);
     CHECK(quadriga_lib::hdf5_read_layout(f.fn)(0) == 65536);
     CHECK(channel_ids(f.fn)(3) == 1);
 
@@ -958,8 +962,8 @@ TEST_CASE("hdf5_write_dset - adds a dataset to an empty or a filled slot")
 
     // Filled slot without unstructured data: structured data is kept, the channel ID does not change
     auto c = full_channel<double>({2, 3});
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 1);
-    quadriga_lib::hdf5_write_dset(f.fn, "x", &a, 1);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 1);
+    quadriga_lib::hdf5_write_dset(f.fn, "x", a, 1);
     CHECK(channel_ids(f.fn)(1) == 2);
     r = quadriga_lib::hdf5_read_channel<double>(f.fn, 1);
     REQUIRE(r.par_names.size() == 1);
@@ -970,8 +974,8 @@ TEST_CASE("hdf5_write_dset - adds a dataset to an empty or a filled slot")
     // Filled slot with unstructured data: appended after the existing datasets
     c.par_names = {"p", "q"};
     c.par_data = {std::any(1), std::any(2)};
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 2);
-    quadriga_lib::hdf5_write_dset(f.fn, "extra", &a, 2);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 2);
+    quadriga_lib::hdf5_write_dset(f.fn, "extra", a, 2);
     CHECK(channel_ids(f.fn)(2) == 3);
     r = quadriga_lib::hdf5_read_channel<double>(f.fn, 2);
     CHECK(r.par_names == std::vector<std::string>({"p", "q", "extra"}));
@@ -979,13 +983,14 @@ TEST_CASE("hdf5_write_dset - adds a dataset to an empty or a filled slot")
 
     // A custom prefix: listed and read with that prefix only; hdf5_read_channel reads only "par_" datasets
     std::any b = 7;
-    quadriga_lib::hdf5_write_dset(f.fn, "y", &b, 2, 0, 0, 0, "xyz_");
+    quadriga_lib::hdf5_write_dset(f.fn, "y", b, 2, 0, 0, 0, "xyz_");
     std::vector<std::string> names;
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names, 2, 0, 0, 0, "xyz_") == 1);
+    names = quadriga_lib::hdf5_read_dset_names(f.fn, 2, 0, 0, 0, "xyz_");
+    CHECK(names.size() == 1);
     CHECK(names == std::vector<std::string>({"y"}));
     CHECK(std::any_cast<int>(quadriga_lib::hdf5_read_dset(f.fn, "y", 2, 0, 0, 0, "xyz_")) == 7);
     CHECK(!quadriga_lib::hdf5_read_dset(f.fn, "y", 2).has_value());
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr, 2) == 3);
+    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, 2).size() == 3);
     CHECK(quadriga_lib::hdf5_read_channel<double>(f.fn, 2).par_names.size() == 3);
 }
 
@@ -994,21 +999,20 @@ TEST_CASE("hdf5_write_dset - input validation")
     test_file f("test_hdf5_write_dset_validation.hdf5");
     quadriga_lib::hdf5_create_file(f.fn, 4);
     std::any v = arma::vec{1.0, 2.0};
-    CHECK_NOTHROW(quadriga_lib::hdf5_write_dset(f.fn, "valid", &v, 1));
+    CHECK_NOTHROW(quadriga_lib::hdf5_write_dset(f.fn, "valid", v, 1));
     const arma::u32_vec id_before = channel_ids(f.fn);
 
     SECTION("invalid name or prefix, the empty slot is not reserved")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "bad name", &v, 2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "bad-name", &v, 2), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v, 2, 0, 0, 0, "bad prefix"), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "", &v, 2, 0, 0, 0, ""), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "bad name", v, 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "bad-name", v, 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", v, 2, 0, 0, 0, "bad prefix"), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "", v, 2, 0, 0, 0, ""), std::invalid_argument);
     }
     SECTION("no data")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", nullptr, 2), std::invalid_argument);
         std::any none;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &none, 2), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", none, 2), std::invalid_argument);
     }
     SECTION("unsupported types")
     {
@@ -1016,30 +1020,30 @@ TEST_CASE("hdf5_write_dset - input validation")
                            std::any((const char *)"abc"), std::any((unsigned short)3)})
         {
             INFO("type " << u.type().name());
-            CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "u", &u, 2), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "u", u, 2), std::invalid_argument);
         }
     }
     SECTION("existing name, no overwrite")
     {
         std::any w = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "valid", &w, 1), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "valid", w, 1), std::runtime_error);
         CHECK(std::any_cast<arma::vec>(quadriga_lib::hdf5_read_dset(f.fn, "valid", 1)).n_elem == 2);
     }
     SECTION("index out of range in each dimension")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v, 4, 0, 0, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v, 0, 1, 0, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v, 0, 0, 1, 0), std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v, 0, 0, 0, 1), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", v, 4, 0, 0, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", v, 0, 1, 0, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", v, 0, 0, 1, 0), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", v, 0, 0, 0, 1), std::invalid_argument);
     }
     SECTION("not an HDF5 file")
     {
         test_file g("test_hdf5_write_dset_validation.txt");
         std::ofstream(g.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(g.fn, "a", &v), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(g.fn, "a", v), std::runtime_error);
     }
     CHECK(arma::all(channel_ids(f.fn) == id_before));
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr, 1) == 1);
+    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, 1).size() == 1);
 }
 
 TEST_CASE("hdf5_read_dset - missing slots, groups and names give an empty std::any")
@@ -1047,9 +1051,9 @@ TEST_CASE("hdf5_read_dset - missing slots, groups and names give an empty std::a
     test_file f("test_hdf5_read_dset_missing.hdf5");
     quadriga_lib::hdf5_create_file(f.fn, 3);
     auto c = small_channel("no unstructured data");
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 1);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 1);
     std::any v = 1.0;
-    quadriga_lib::hdf5_write_dset(f.fn, "a", &v, 2);
+    quadriga_lib::hdf5_write_dset(f.fn, "a", v, 2);
 
     CHECK(!quadriga_lib::hdf5_read_dset(f.fn, "a", 0).has_value()); // empty slot
     CHECK(!quadriga_lib::hdf5_read_dset(f.fn, "a", 1).has_value()); // slot without unstructured data
@@ -1063,7 +1067,7 @@ TEST_CASE("hdf5_read_dset - input validation")
 {
     test_file f("test_hdf5_read_dset_validation.hdf5");
     std::any v = 1.0;
-    quadriga_lib::hdf5_write_dset(f.fn, "a", &v);
+    quadriga_lib::hdf5_write_dset(f.fn, "a", v);
     CHECK_NOTHROW(quadriga_lib::hdf5_read_dset(f.fn, "a"));
 
     SECTION("missing file")
@@ -1084,46 +1088,41 @@ TEST_CASE("hdf5_read_dset_names - lists the names after the prefix in write orde
     for (const char *name : {"zeta", "alpha", "s_one", "mid", "s_two"})
     {
         std::any v = 1;
-        quadriga_lib::hdf5_write_dset(f.fn, name, &v, 1);
+        quadriga_lib::hdf5_write_dset(f.fn, name, v, 1);
     }
     auto c = small_channel("no unstructured data");
-    quadriga_lib::hdf5_write_channel(f.fn, &c, 2);
+    quadriga_lib::hdf5_write_channel(f.fn, c, 2);
 
-    std::vector<std::string> names;
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names, 1) == 5);
+    auto names = quadriga_lib::hdf5_read_dset_names(f.fn, 1);
     CHECK(names == std::vector<std::string>({"zeta", "alpha", "s_one", "mid", "s_two"}));
 
     // A longer prefix selects a subset; an empty prefix lists the full dataset names
-    names.clear();
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names, 1, 0, 0, 0, "par_s_") == 2);
+    names = quadriga_lib::hdf5_read_dset_names(f.fn, 1, 0, 0, 0, "par_s_");
     CHECK(names == std::vector<std::string>({"one", "two"}));
-    names.clear();
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, &names, 1, 0, 0, 0, "") == 5);
+    names = quadriga_lib::hdf5_read_dset_names(f.fn, 1, 0, 0, 0, "");
+    CHECK(names.size() == 5);
     CHECK(names.front() == "par_zeta");
 
-    // Without an output vector, only the number is returned
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr, 1) == 5);
-
-    // Empty slot, slot without unstructured data, index outside the layout
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr, 0) == 0);
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr, 2) == 0);
-    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr, 4) == 0);
+    // Empty slot (default slot 0), slot without unstructured data, index outside the layout
+    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn).empty());
+    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, 2).empty());
+    CHECK(quadriga_lib::hdf5_read_dset_names(f.fn, 4).empty());
 }
 
 TEST_CASE("hdf5_read_dset_names - input validation")
 {
     test_file f("test_hdf5_read_dset_names_validation.hdf5");
     quadriga_lib::hdf5_create_file(f.fn, 2);
-    CHECK_NOTHROW(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr));
+    CHECK_NOTHROW(quadriga_lib::hdf5_read_dset_names(f.fn));
 
     SECTION("missing file")
     {
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names("test_hdf5_read_dset_names_missing.hdf5", nullptr), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names("test_hdf5_read_dset_names_missing.hdf5"), std::runtime_error);
     }
     SECTION("not an HDF5 file")
     {
         std::ofstream(f.fn) << "This is not HDF5 data";
-        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(f.fn, nullptr), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_dset_names(f.fn), std::runtime_error);
     }
 }
 
@@ -1141,8 +1140,8 @@ TEST_CASE("hdf5_write_channel - files that cannot be opened for writing throw st
     {
         auto c = small_channel("c");
         std::any v = 1.0;
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, &c), std::runtime_error);
-        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", &v), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_channel(f.fn, c), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_write_dset(f.fn, "a", v), std::runtime_error);
         CHECK_THROWS_AS(quadriga_lib::hdf5_reshape_layout(f.fn, 1, 2), std::runtime_error);
         CHECK_THROWS_AS(quadriga_lib::hdf5_create_file(f.fn, 2), std::runtime_error);
         CHECK(arma::all(quadriga_lib::hdf5_read_layout(f.fn) == arma::u32_vec({2, 1, 1, 1})));
@@ -1198,10 +1197,10 @@ TEST_CASE("hdf5_read_channel - i_snap reads the selected snapshots")
     auto single = full_channel<double>({5});
     quadriga_lib::channel<double> par_only;
     par_only.par_names = {"y"}, par_only.par_data = {2.5};
-    quadriga_lib::hdf5_write_channel(f.fn, &per_snap, 0);
-    quadriga_lib::hdf5_write_channel(f.fn, &shared, 1);
-    quadriga_lib::hdf5_write_channel(f.fn, &single, 2);
-    quadriga_lib::hdf5_write_channel(f.fn, &par_only, 3);
+    quadriga_lib::hdf5_write_channel(f.fn, per_snap, 0);
+    quadriga_lib::hdf5_write_channel(f.fn, shared, 1);
+    quadriga_lib::hdf5_write_channel(f.fn, single, 2);
+    quadriga_lib::hdf5_write_channel(f.fn, par_only, 3);
 
     for (arma::uvec i_snap : {arma::uvec{2}, arma::uvec{3, 0}, arma::uvec{1, 1, 2}, arma::uvec{0, 1, 2, 3}})
     {
@@ -1265,7 +1264,7 @@ TEST_CASE("hdf5_write_channel_vec / hdf5_read_channel_vec - equal loops of singl
     // The same slot twice in a file that holds only this channel (each read is limited by the file size)
     std::remove(f.fn.c_str());
     quadriga_lib::hdf5_create_file(f.fn, 1);
-    quadriga_lib::hdf5_write_channel(f.fn, &chan[0]);
+    quadriga_lib::hdf5_write_channel(f.fn, chan[0]);
     auto twice = quadriga_lib::hdf5_read_channel_vec<double>(f.fn, arma::Mat<unsigned>(4, 2, arma::fill::zeros));
     REQUIRE(twice.size() == 2);
     check_structured(twice[0], chan[0]);

@@ -89,8 +89,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call library function
     CALL_QD(quadriga_lib::quantize_delays<double>(
-        &coeff_re, &coeff_im, &delay,
-        &coeff_re_q, &coeff_im_q, &delay_q,
+        coeff_re, coeff_im, delay,
+        coeff_re_q, coeff_im_q, delay_q,
         tap_spacing, max_taps, power_exponent, fix_taps));
 
     // Write outputs — convert std::vector<Cube> back to 4D MATLAB arrays

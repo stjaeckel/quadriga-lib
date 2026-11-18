@@ -557,10 +557,9 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                 qd_python_copy2arma(delay_ptrs[j], delay_shapes[j], dl_snap);
 
                 // Call single-freq DFT
-                quadriga_lib::baseband_freq_response<double>(&cre_snap, &cim_snap, &dl_snap,
-                                                             &pilot_grid_arma, bandwidth,
-                                                             (arma::Cube<double> *)nullptr,
-                                                             (arma::Cube<double> *)nullptr,
+                quadriga_lib::baseband_freq_response<double>(cre_snap, cim_snap, dl_snap,
+                                                             pilot_grid_arma, bandwidth,
+                                                             nullptr, nullptr,
                                                              &hmat_vec[ii], use_kernel);
             }
             catch (...)

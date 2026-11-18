@@ -187,12 +187,12 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 ## Declaration:
 ```
 void quadriga_lib::quantize_delays(
-    const std::vector<arma::Cube<dtype>> *coeff_re,
-    const std::vector<arma::Cube<dtype>> *coeff_im,
-    const std::vector<arma::Cube<dtype>> *delay,
-    std::vector<arma::Cube<dtype>> *coeff_re_quant,
-    std::vector<arma::Cube<dtype>> *coeff_im_quant,
-    std::vector<arma::Cube<dtype>> *delay_quant,
+    const std::vector<arma::Cube<dtype>> &coeff_re,
+    const std::vector<arma::Cube<dtype>> &coeff_im,
+    const std::vector<arma::Cube<dtype>> &delay,
+    std::vector<arma::Cube<dtype>> &coeff_re_quant,
+    std::vector<arma::Cube<dtype>> &coeff_im_quant,
+    std::vector<arma::Cube<dtype>> &delay_quant,
     dtype tap_spacing = (dtype)5.0e-9,
     arma::uword max_taps = 48,
     dtype power_exponent = (dtype)1.0,
@@ -228,44 +228,32 @@ cre[0].set_size(1,1,3); cim[0].set_size(1,1,3); dl[0].set_size(1,1,3);
 cre[1].set_size(1,1,2); cim[1].set_size(1,1,2); dl[1].set_size(1,1,2);
 dl[0](0,0,1) = 12.5e-9; dl[0](0,0,2) = 33.4e-9; dl[1](0,0,1) = 10.0e-9;
 std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+quadriga_lib::quantize_delays(cre, cim, dl, cre_q, cim_q, dl_q, 5.0e-9, 48, 1.0, 0);
 ```
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_re,
-                                   const std::vector<arma::Cube<dtype>> *coeff_im,
-                                   const std::vector<arma::Cube<dtype>> *delay,
-                                   std::vector<arma::Cube<dtype>> *coeff_re_quant,
-                                   std::vector<arma::Cube<dtype>> *coeff_im_quant,
-                                   std::vector<arma::Cube<dtype>> *delay_quant,
+void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> &coeff_re,
+                                   const std::vector<arma::Cube<dtype>> &coeff_im,
+                                   const std::vector<arma::Cube<dtype>> &delay,
+                                   std::vector<arma::Cube<dtype>> &coeff_re_quant,
+                                   std::vector<arma::Cube<dtype>> &coeff_im_quant,
+                                   std::vector<arma::Cube<dtype>> &delay_quant,
                                    dtype tap_spacing,
                                    arma::uword max_taps,
                                    dtype power_exponent,
                                    int fix_taps)
 {
     // --- Input validation ---
-    if (coeff_re == nullptr)
-        throw std::invalid_argument("Input 'coeff_re' must not be NULL.");
-    if (coeff_im == nullptr)
-        throw std::invalid_argument("Input 'coeff_im' must not be NULL.");
-    if (delay == nullptr)
-        throw std::invalid_argument("Input 'delay' must not be NULL.");
-    if (coeff_re_quant == nullptr)
-        throw std::invalid_argument("Output 'coeff_re_quant' must not be NULL.");
-    if (coeff_im_quant == nullptr)
-        throw std::invalid_argument("Output 'coeff_im_quant' must not be NULL.");
-    if (delay_quant == nullptr)
-        throw std::invalid_argument("Output 'delay_quant' must not be NULL.");
-    qd_check_alias_list({coeff_re_quant, coeff_im_quant, delay_quant},
-                        {"coeff_re_quant", "coeff_im_quant", "delay_quant"}, coeff_re, coeff_im, delay);
+    qd_check_alias_list({&coeff_re_quant, &coeff_im_quant, &delay_quant},
+                        {"coeff_re_quant", "coeff_im_quant", "delay_quant"}, &coeff_re, &coeff_im, &delay);
 
-    arma::uword n_snap = (arma::uword)coeff_re->size();
+    arma::uword n_snap = (arma::uword)coeff_re.size();
     if (n_snap == 0)
         throw std::invalid_argument("Input 'coeff_re' must not be empty.");
-    if ((arma::uword)coeff_im->size() != n_snap)
+    if ((arma::uword)coeff_im.size() != n_snap)
         throw std::invalid_argument("Inputs 'coeff_re' and 'coeff_im' must have the same length.");
-    if ((arma::uword)delay->size() != n_snap)
+    if ((arma::uword)delay.size() != n_snap)
         throw std::invalid_argument("Inputs 'coeff_re' and 'delay' must have the same length.");
     if (!(tap_spacing > (dtype)0) || !std::isfinite(tap_spacing) || !std::isfinite((dtype)1.0 / tap_spacing))
         throw std::invalid_argument("Input 'tap_spacing' must be positive and finite.");
@@ -274,8 +262,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
     if (fix_taps < 0 || fix_taps > 3)
         throw std::invalid_argument("Input 'fix_taps' must be 0, 1, 2, or 3.");
 
-    arma::uword n_rx = coeff_re->at(0).n_rows;
-    arma::uword n_tx = coeff_re->at(0).n_cols;
+    arma::uword n_rx = coeff_re.at(0).n_rows;
+    arma::uword n_tx = coeff_re.at(0).n_cols;
     arma::uword n_ant = n_rx * n_tx;
 
     if (n_rx == 0 || n_tx == 0)
@@ -291,17 +279,17 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
 
     for (arma::uword s = 0; s < n_snap; ++s)
     {
-        arma::uword n_p = coeff_re->at(s).n_slices;
+        arma::uword n_p = coeff_re.at(s).n_slices;
         n_path_vec[s] = n_p;
 
         if (n_p > 0)
         {
-            if (coeff_re->at(s).n_rows != n_rx || coeff_re->at(s).n_cols != n_tx)
+            if (coeff_re.at(s).n_rows != n_rx || coeff_re.at(s).n_cols != n_tx)
                 throw std::invalid_argument("All cubes in 'coeff_re' must have the same number of rows and columns.");
-            if (coeff_im->at(s).n_rows != n_rx || coeff_im->at(s).n_cols != n_tx || coeff_im->at(s).n_slices != n_p)
+            if (coeff_im.at(s).n_rows != n_rx || coeff_im.at(s).n_cols != n_tx || coeff_im.at(s).n_slices != n_p)
                 throw std::invalid_argument("All cubes in 'coeff_im' must have the same size as 'coeff_re'.");
 
-            bool snap_shared = (delay->at(s).n_rows == 1 && delay->at(s).n_cols == 1);
+            bool snap_shared = (delay.at(s).n_rows == 1 && delay.at(s).n_cols == 1);
             if (!shared_delays_set)
             {
                 shared_delays = snap_shared;
@@ -312,12 +300,12 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
 
             if (snap_shared)
             {
-                if (delay->at(s).n_rows != 1 || delay->at(s).n_cols != 1 || delay->at(s).n_slices != n_p)
+                if (delay.at(s).n_rows != 1 || delay.at(s).n_cols != 1 || delay.at(s).n_slices != n_p)
                     throw std::invalid_argument("All cubes in 'delay' must have consistent size.");
             }
             else
             {
-                if (delay->at(s).n_rows != n_rx || delay->at(s).n_cols != n_tx || delay->at(s).n_slices != n_p)
+                if (delay.at(s).n_rows != n_rx || delay.at(s).n_cols != n_tx || delay.at(s).n_slices != n_p)
                     throw std::invalid_argument("All cubes in 'delay' must have the same size as 'coeff_re'.");
             }
         }
@@ -344,7 +332,7 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
 
     for (arma::uword s = 0; s < n_snap; ++s)
     {
-        const dtype *dl_ptr = delay->at(s).memptr();
+        const dtype *dl_ptr = delay.at(s).memptr();
         arma::uword n_p = n_path_vec[s];
         arma::uword base = offset[s];
 
@@ -390,8 +378,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
 
     for (arma::uword s = 0; s < n_snap; ++s)
     {
-        const dtype *re = coeff_re->at(s).memptr();
-        const dtype *im = coeff_im->at(s).memptr();
+        const dtype *re = coeff_re.at(s).memptr();
+        const dtype *im = coeff_im.at(s).memptr();
         arma::uword n_coeff_s = n_ant * n_path_vec[s];
         arma::uword base = offset[s];
         for (arma::uword i = 0; i < n_coeff_s; ++i)
@@ -409,8 +397,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
 
         for (arma::uword s = 0; s < n_snap; ++s)
         {
-            const dtype *re = coeff_re->at(s).memptr();
-            const dtype *im = coeff_im->at(s).memptr();
+            const dtype *re = coeff_re.at(s).memptr();
+            const dtype *im = coeff_im.at(s).memptr();
             arma::uword n_coeff_s = n_ant * n_path_vec[s];
             arma::uword base = offset[s];
 
@@ -572,8 +560,8 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
         dtype *ore = out_re[s].memptr();
         dtype *oim = out_im[s].memptr();
         dtype *odl = out_dl[s].memptr();
-        const dtype *ire = coeff_re->at(s).memptr();
-        const dtype *iim = coeff_im->at(s).memptr();
+        const dtype *ire = coeff_re.at(s).memptr();
+        const dtype *iim = coeff_im.at(s).memptr();
         arma::uword gbase = offset[s];
 
         // Write shared delay values (use antenna 0's grid, which is the same for all)
@@ -721,31 +709,31 @@ void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_r
     }
 
     // All inputs have been read: assign the outputs
-    *coeff_re_quant = std::move(out_re);
-    *coeff_im_quant = std::move(out_im);
-    *delay_quant = std::move(out_dl);
+    coeff_re_quant = std::move(out_re);
+    coeff_im_quant = std::move(out_im);
+    delay_quant = std::move(out_dl);
 }
 
 // --- Explicit template instantiation ---
 template void quadriga_lib::quantize_delays(
-    const std::vector<arma::Cube<float>> *coeff_re,
-    const std::vector<arma::Cube<float>> *coeff_im,
-    const std::vector<arma::Cube<float>> *delay,
-    std::vector<arma::Cube<float>> *coeff_re_quant,
-    std::vector<arma::Cube<float>> *coeff_im_quant,
-    std::vector<arma::Cube<float>> *delay_quant,
+    const std::vector<arma::Cube<float>> &coeff_re,
+    const std::vector<arma::Cube<float>> &coeff_im,
+    const std::vector<arma::Cube<float>> &delay,
+    std::vector<arma::Cube<float>> &coeff_re_quant,
+    std::vector<arma::Cube<float>> &coeff_im_quant,
+    std::vector<arma::Cube<float>> &delay_quant,
     float tap_spacing,
     arma::uword max_taps,
     float power_exponent,
     int fix_taps);
 
 template void quadriga_lib::quantize_delays(
-    const std::vector<arma::Cube<double>> *coeff_re,
-    const std::vector<arma::Cube<double>> *coeff_im,
-    const std::vector<arma::Cube<double>> *delay,
-    std::vector<arma::Cube<double>> *coeff_re_quant,
-    std::vector<arma::Cube<double>> *coeff_im_quant,
-    std::vector<arma::Cube<double>> *delay_quant,
+    const std::vector<arma::Cube<double>> &coeff_re,
+    const std::vector<arma::Cube<double>> &coeff_im,
+    const std::vector<arma::Cube<double>> &delay,
+    std::vector<arma::Cube<double>> &coeff_re_quant,
+    std::vector<arma::Cube<double>> &coeff_im_quant,
+    std::vector<arma::Cube<double>> &delay_quant,
     double tap_spacing,
     arma::uword max_taps,
     double power_exponent,

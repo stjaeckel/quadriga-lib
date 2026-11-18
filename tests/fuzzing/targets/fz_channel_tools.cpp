@@ -39,7 +39,7 @@ static void run(fz::input &in)
         arma::uword max_taps = in.ConsumeIntegralInRange<int>(0, 7) == 0 ? std::numeric_limits<arma::uword>::max() : in.size(64);
         T exponent = in.ConsumeBool() ? T(1) : in.value<T>();
         int fix_taps = in.ConsumeIntegralInRange<int>(-1, 4);
-        fz::clean([&] { quadriga_lib::quantize_delays(&ire, &iim, &idl, q_re, q_im, q_dl, tap, max_taps, exponent, fix_taps); });
+        fz::clean([&] { quadriga_lib::quantize_delays(ire, iim, idl, *q_re, *q_im, *q_dl, tap, max_taps, exponent, fix_taps); });
     }
 
     // Outputs: nullptr or an object, sometimes with a stale size
@@ -57,7 +57,7 @@ static void run(fz::input &in)
         arma::Cube<std::complex<T>> h;
         if (out_mask & 8)
             h_re.set_size(in.size(3), in.size(3), in.size(3)), h.set_size(in.size(3), in.size(3), in.size(3));
-        fz::clean([&] { quadriga_lib::baseband_freq_response(&a, &b, &d, (out_mask & 16) ? nullptr : &pilot, bandwidth,
+        fz::clean([&] { quadriga_lib::baseband_freq_response(a, b, d, pilot, bandwidth,
                                                              (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
                                                              (out_mask & 4) ? &h : nullptr, use_kernel); });
     }
@@ -70,7 +70,7 @@ static void run(fz::input &in)
         std::vector<arma::Cube<T>> h_re, h_im;
         if (out_mask & 8)
             h_re.resize(in.size(3));
-        fz::clean([&] { quadriga_lib::baseband_freq_response_vec(&cre, &cim, &dl, &pilot, bandwidth,
+        fz::clean([&] { quadriga_lib::baseband_freq_response_vec(cre, cim, dl, pilot, bandwidth,
                                                                  (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
                                                                  (out_mask & 32) ? &i_snap : nullptr, use_kernel); });
     }
