@@ -20,6 +20,7 @@ if package_path not in sys.path:
 
 import quadriga_lib
 
+
 C0 = 299792458.0
 MANDATORY_KEYS = ("e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im", "azimuth_grid", "elevation_grid")
 
@@ -114,17 +115,17 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         args = distinct_args()
         opts = dict(i_irs=1, threshold_dB=-100.0, center_freq=1.0e9, use_absolute_delays=True, angles=True,
-                    irs_array_2=irs_two_ports(), active_path=[1, 1, 0, 1], use_kernel=1, complex=False)
-        ref = quadriga_lib.channel.irs(*args, *list(opts.values())[:-1], complex=False)
+                    irs_array_2=irs_two_ports(), active_path=[1, 1, 0, 1], use_kernel=1)
+        ref = quadriga_lib.channel.irs(*args, *opts.values())
         out = quadriga_lib.channel.irs(**dict(zip(self.names, args)), **opts)
-        self.assertEqual(len(out), 8)
+        self.assertEqual(len(out), 7)
         for a, b in zip(ref, out):
             npt.assert_array_equal(a, b)
 
     def test_optional_inputs(self):
         ref = self.call()
-        explicit = self.call(0, -140.0, 0.0, False, False, None, None, 0, complex=True)
-        nones = self.call(use_absolute_delays=None, angles=None, irs_array_2=None, active_path=None, complex=None)
+        explicit = self.call(0, -140.0, 0.0, False, False, None, None, 0)
+        nones = self.call(use_absolute_delays=None, angles=None, irs_array_2=None, active_path=None)
         empty_mask = self.call(active_path=[])
         for out in (explicit, nones, empty_mask):
             for a, b in zip(ref, out):
@@ -170,18 +171,6 @@ class test_case(unittest.TestCase):
         for a in out[3:]:
             self.assertEqual(a.shape, (1, 1, 4))
             self.assertEqual(a.dtype, np.float64)
-        self.assertEqual(len(self.call(angles=True, complex=False)), 8)
-
-    def test_complex_flag(self):
-        coeff, delay, act = self.call(center_freq=3.5e9)
-        out = self.call(center_freq=3.5e9, complex=False)
-        self.assertEqual(len(out), 4)
-        coeff_re, coeff_im, delay_s, act_s = out
-        self.assertEqual(coeff_re.dtype, np.float64)
-        npt.assert_array_equal(coeff_re, coeff.real)
-        npt.assert_array_equal(coeff_im, coeff.imag)
-        npt.assert_array_equal(delay_s, delay)
-        npt.assert_array_equal(act_s, act)
 
     def test_memory_layout_and_dtype(self):
         ref = self.call(center_freq=3.5e9)
@@ -245,7 +234,7 @@ class test_case(unittest.TestCase):
             quadriga_lib.channel.irs(*args)
         self.assertIn("irs_pos", str(ctx.exception))
         # Flags
-        for flag in ("use_absolute_delays", "angles", "complex"):
+        for flag in ("use_absolute_delays", "angles"):
             with self.assertRaises(TypeError) as ctx:
                 self.call(**{flag: 2.5})
             self.assertIn(flag, str(ctx.exception))
@@ -254,8 +243,6 @@ class test_case(unittest.TestCase):
             quadriga_lib.channel.irs(*self.args()[:-1])
         with self.assertRaises(TypeError):
             self.call(bad_name=1)
-        with self.assertRaises(TypeError):  # complex is keyword-only
-            self.call(0, -140.0, 0.0, False, False, None, None, 0, True)
         args = self.args()
         args[9] = None
         with self.assertRaises(TypeError):

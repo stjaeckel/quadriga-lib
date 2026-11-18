@@ -28,10 +28,10 @@ The interface is derived from the C++ declaration and documentation block, exist
 - the Python name and the submodule
 - the usage line: order and kwarg names of the inputs, order of the returned tuple, in/out splits
 - which inputs are optional and their defaults
-- whether the `complex` and `stack` flags apply
+- whether the `stack` flag applies
 - the type of every output (array dtype, list, dict, scalar), its size, and whether the wrapper can know it before the call
 - the helper for every argument, and the section name
-- anything that does not fit this document: an unclear submodule, a C++ type without helper, an output order that is not obvious, a flag beyond `complex` / `stack`, logic that would have to live in the wrapper
+- anything that does not fit this document: an unclear submodule, a C++ type without helper, an output order that is not obvious, a flag beyond `stack`, logic that would have to live in the wrapper
 
 Existing wrappers that show the patterns:
 - `qpy_o2i_loss.cpp` — a complete recent example: array and string-list inputs, a default, outputs of known size, an integer index output; registered in `python_gbsm.cpp`, test in `tests/python_tests/test_o2i_loss.py` (its documentation block predates the lean rules)
@@ -40,8 +40,8 @@ Existing wrappers that show the patterns:
 - `qpy_obj_file_write.cpp` — many optional inputs passed to C++ as `nullptr` when absent
 - `qpy_calc_delay_spread.cpp` — ragged inputs as lists of arrays
 - `qpy_arrayant_rotate_pattern.cpp` — arrayant dict in / dict out, in-place modification
-- `qpy_get_channels_multifreq.cpp` — arrayant dicts, 3-element position vectors, 4D outputs, `complex` flag
-- `qpy_quantize_delays.cpp` — `complex` and `stack` flags for lists of arrays
+- `qpy_get_channels_multifreq.cpp` — arrayant dicts, 3-element position vectors, 4D outputs, zero-copy complex output
+- `qpy_quantize_delays.cpp` — `stack` flag for lists of arrays
 - `qpy_hdf5_write_channel.cpp`, `qpy_hdf5_read_channel.cpp` — channel dicts, unstructured data
 
 # IMPLEMENTATION ORDER
@@ -326,7 +326,7 @@ out1, out2 = quadriga_lib.tools.function_name( in1, in2, optional_in3 )
   - **No output**: `void`.
   - **Single output**: return the object directly (e.g. `py::array_t<double>`, `arma::uword`, `std::string`, `py::list`, `py::dict`).
   - **Multiple outputs**: return `py::tuple` and build it via `py::make_tuple(out1_py, out2_py, ...)`.
-- All outputs are always computed and returned: there is no `nargout` equivalent in pybind11, and the C++ function always gets a valid pointer for every output. The only standard exceptions are the `complex` and `stack` flags (see "Standard flags"). Three other documented exceptions: `arrayant.interpolate` returns `dist` and the local angles (`azimuth_loc`, `elevation_loc`, `gamma`) only with the flags `dist` / `local_angles`, since computing them costs noticeable extra time and memory; `channel.spherical` returns the departure and arrival angles only with `angles`, since they are rarely needed, more than double the output memory and, with element coupling, cost time to convert to the ports; `channel.irs` does the same with `angles` (angles last in the tuple) to save their output memory. Do not add other skip or mode flags unless requested; if the C++ side has prohibitively expensive optional computation, ask.
+- All outputs are always computed and returned: there is no `nargout` equivalent in pybind11, and the C++ function always gets a valid pointer for every output. The only standard exception is the `stack` flag (see "Standard flags"). Three other documented exceptions: `arrayant.interpolate` returns `dist` and the local angles (`azimuth_loc`, `elevation_loc`, `gamma`) only with the flags `dist` / `local_angles`, since computing them costs noticeable extra time and memory; `channel.spherical` returns the departure and arrival angles only with `angles`, since they are rarely needed, more than double the output memory and, with element coupling, cost time to convert to the ports; `channel.irs` does the same with `angles` (angles last in the tuple) to save their output memory. Do not add other skip or mode flags unless requested; if the C++ side has prohibitively expensive optional computation, ask.
 - In/out arguments (e.g. `bins` / `bins_out`): read the input (empty for `None`); declare a separate output object and copy a non-empty input into it; pass the output's address to C++, which keeps or regenerates the content; copy it to numpy after the call.
 - Naming convention inside the wrapper:
   - Input numpy arg → Armadillo view with suffix `_a` (e.g. `data` → `data_a`).
@@ -399,7 +399,7 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
   - `auto X_py = qd_python_copy2numpy<double, std::complex<double>>(&X_re, &X_im);`
   - `auto X_py = qd_python_stack2numpy<double, std::complex<double>>(&vec_re, &vec_im);`
   - `auto X_py = qd_python_copy2list<arma::Cube<double>, std::complex<double>>(&vec_re, &vec_im);`
-- A complex output needs one merge copy, unless the C++ function offers an optional `std::complex` output: then `qd_python_init_output<std::complex<double>>` provides it zero-copy. The split form can always be written zero-copy via `qd_python_init_output`. Where this matters, offer both through the `complex` flag (see "Standard flags").
+- Complex outputs are returned as complex arrays only, without a split `X_re` / `X_im` form (`x.real` and `x.imag` are views). A complex output needs one merge copy, unless the C++ function offers an optional `std::complex` output: then `qd_python_init_output<std::complex<double>>` provides it zero-copy.
 - Whether a wrapper should additionally accept split `X_re` / `X_im` inputs next to the complex `X` (as some existing wrappers do) is decided case by case; ask.
 - Exception: the arrayant dict keeps its split `_re` / `_im` keys.
 
@@ -439,15 +439,12 @@ auto bins_out_py = qd_python_copy2numpy(&bins_out);
 - A `std::vector<arma::Col/Mat/Cube>` with ragged sizes is returned as a `list` (`qd_python_copy2list`), or as one zero-padded array with the vector index on the last axis (`qd_python_stack2numpy`, see the `stack` flag). A regular 4D output with known dimensions uses the zero-copy `qd_python_init_output(..., &vector<Cube>)` overload.
 
 ## Standard flags
-- Two keyword flags are standard and are added wherever they apply. They are keyword-only: the registration puts `py::kw_only()` before them, and they are the last arguments of the wrapper, in this order. A new positional argument goes before the marker. Each flag gets one line in the `## Inputs:` section, which says that it is keyword-only.
-- Both are flags in the sense of "Flags" (read with `qd_python_flag`).
-- **`complex`** (`bool`, default: `true`) — applies when the C++ function outputs `X_re` / `X_im` pairs.
-  - `complex=True`: each pair is returned as one complex array `X`.
-  - `complex=False`: the pair is returned as two real arrays `X_re`, `X_im`, in place of `X` in the tuple; use `qd_python_init_output` for zero-copy where the size is known.
+- One keyword flag is standard and is added wherever it applies. It is keyword-only: the registration puts `py::kw_only()` before it, and it is the last argument of the wrapper. A new positional argument goes before the marker. The flag gets one line in the `## Inputs:` section, which says that it is keyword-only.
+- It is a flag in the sense of "Flags" (read with `qd_python_flag`).
 - **`stack`** (`bool`, default: `false`) — applies when the C++ function outputs a `std::vector` of Armadillo objects with possibly ragged sizes (typically one entry per snapshot).
   - `stack=False`: return a `list` of arrays (`qd_python_copy2list`).
   - `stack=True`: return one zero-padded array with the vector index on the last axis (`qd_python_stack2numpy`).
-- Outputs whose Python type depends on a flag are held in a `py::object` (or the wrapper returns from separate branches).
+- Outputs whose Python type depends on the flag are held in a `py::object`.
 - Any other flag that changes the returned tuple (as `angles`, `dist`, `local_angles`, `combine` in existing wrappers) is not standard: ask before adding one.
 
 ## Call the C++ function
@@ -483,7 +480,7 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
   - **Outputs**: always computed and returned; no `nlhs` gates or `nullptr` patterns for outputs.
   - **Heading**: no case conversion.
   - **Lists**: MATLAB cell arrays and zero-padded arrays that stand for a ragged `std::vector` become a `list` (plus the `stack` flag).
-  - **Complex**: MATLAB split Re/Im becomes one complex array by default (plus the `complex` flag).
+  - **Complex**: MATLAB split Re/Im becomes one complex array.
   - **Structs**: MATLAB struct → `dict`; arrayant struct array → one arrayant dict with 4D patterns; channel struct array → list of channel dicts.
   - **Optional inputs**: MATLAB `[]` → `None`.
   - **Exceptions**: no `CALL_QD`; pybind11 translates them (see "Exception handling").
@@ -497,7 +494,7 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
   - **Data lands where it should**: every input reaches the C++ argument it belongs to, positionally and by keyword; every output comes back in the documented position of the tuple, with the documented type, shape and dtype.
   - **Optional arguments and defaults work**: omitted, passed as `None`, and passed explicitly.
   - **Array handling works**: the result does not depend on the memory layout or dtype of the input arrays, and inputs are not modified.
-  - **Flags work**: `complex` and `stack` change the form of the output, not its values.
+  - **Flags work**: `stack` changes the form of the output, not its values.
   - **Errors are passed correctly**: exceptions thrown by the C++ function and by the wrapper arrive as the right Python exception type with the right message.
 - For this, a few small cases with known results are enough: values that can be written down by hand, or that follow from the input by construction. Use distinctive inputs (different values per element, non-square shapes, non-symmetric index lists) so that a swapped argument, a transposed array or a wrong axis order changes the result visibly.
 - Keep it lean: no duplicated cases, no helper layers. The test is as long as it needs to be to cover the checklist below. It must also run fast: the complete suite runs in every future session (see "TESTS" in `md/SPEC_CPP_API.md`).
@@ -574,7 +571,6 @@ The plan or spec may narrow or extend this list.
 - **Inputs are not modified**: keep a copy of the inputs before the call and compare afterwards — mandatory for wrappers that work in place on a copy (arrayant dicts, index arrays), cheap everywhere else.
 - **Output dtypes**: `float64` for real outputs, `complex128` for complex outputs; integer outputs as documented (the C++ integer type for pre-allocated outputs, `int64` for copied ones).
 - **Indices** (if the function has index arguments): they are 0-based in and out (the smallest valid value is 0), except those documented as 1-based, which pass through unchanged. Use an input in which the index matters and is not symmetric.
-- **`complex` flag** (if present): `complex=True` returns one complex array per pair; `complex=False` returns the two real arrays in its place; real and imaginary part of the complex result equal the split result. Check the length of the tuple in both cases.
 - **`stack` flag** (if present): `stack=False` returns a list with one array per entry; `stack=True` returns one array with the entry index on the last axis; the entries agree (up to zero padding for ragged data).
 - **Dicts** (arrayant, channel, material properties): a dict with only the mandatory keys is accepted; an output dict has the documented keys and shapes; a round trip (output of one call as input of the next) works; for arrayants, the single-frequency (3D) and the frequency-dependent (4D) layout are both exercised where supported.
 - **Errors from C++**: at least one case in which the C++ function throws (e.g. a wrong number of columns, an out-of-range scalar), to show that the exception type and message come through.

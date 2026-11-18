@@ -109,9 +109,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("dist") = false,
           py::arg("local_angles") = false,
           py::arg("fast_access") = false,
-          py::arg("use_kernel") = 0,
-          py::kw_only(),
-          py::arg("complex") = true);
+          py::arg("use_kernel") = 0);
 
     m.def("qdant_read", &qdant_read, py::arg("fn"), py::arg("id") = py::none());
 

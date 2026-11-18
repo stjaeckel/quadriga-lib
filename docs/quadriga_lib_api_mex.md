@@ -1586,6 +1586,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
   delays at or below `-tap_spacing / 2` (at 5 ns taps: half sizes adding up to more than about 0.75 m), use
   `use_absolute_delays = true` in that case.
 
+### Batch mode:
+- If `aod` is a cell array, the function processes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP).
+- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `M` are then cell arrays of length
+  `n_snap`.
+- The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
+  snapshots.
+- All outputs are cell arrays of length `n_snap`, `[n_snap, 1]`, whose entries have the shapes given below.
+- Snapshots without any path produce an empty entry, or only the zero-power LOS path with `add_fake_los_path` (as for
+  a single snapshot).
+
 ### Usage:
 ```matlab
 [ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
@@ -1596,17 +1606,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 ### Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
 - **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [arrayant_generate](#arrayant_generate)
-- **`tx_pos`** — Transmitter position; `[3, 1]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`rx_pos`** — Receiver position; `[3, 1]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`aod`** — Departure azimuth angles; rad; `[n_path, 1]`
-- **`eod`** — Departure elevation angles; rad; `[n_path, 1]`
-- **`aoa`** — Arrival azimuth angles; rad; `[n_path, 1]`
-- **`eoa`** — Arrival elevation angles; rad; `[n_path, 1]`
-- **`path_gain`** — Path gains in linear scale; `[n_path, 1]`
-- **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
+- **`tx_pos`** — Transmitter position; `[3, 1]`, or `[3, n_snap]` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`, or `[3, n_snap]` in
+  batch mode
+- **`rx_pos`** — Receiver position; `[3, 1]`, or `[3, n_snap]` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`, or `[3, n_snap]` in
+  batch mode
+- **`aod`** — Departure azimuth angles; rad; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
+- **`eod`** — Departure elevation angles; rad; `[n_path, 1]`, or a cell in batch mode
+- **`aoa`** — Arrival azimuth angles; rad; `[n_path, 1]`, or a cell in batch mode
+- **`eoa`** — Arrival elevation angles; rad; `[n_path, 1]`, or a cell in batch mode
+- **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell in batch mode
+- **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`, or a cell in batch mode
+- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was

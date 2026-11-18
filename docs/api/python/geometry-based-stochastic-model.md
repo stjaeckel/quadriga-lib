@@ -607,18 +607,11 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#lsp_generate) · [MATLA
   f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) + EoD_offset_c +
   EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if `EoD_offset_b > 0`, plus `(atan((EoD_offset_hcl - h)/d) -
   atan((hUT - h)/d))·180/pi` if `hUT < EoD_offset_hcl`
-- `complex = True` returns the permittivity as one complex array `gr_eps = gr_eps_re + 1j·gr_eps_im`; `complex = False`
-  returns the two real arrays `gr_eps_re`, `gr_eps_im` in its place (one more output)
 
 ### Usage:
 ```python
-# complex=True (default)
 lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
-    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads, complex=True )
-
-# complex=False
-lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
-    lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., complex=False )
+    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads )
 ```
 
 ### Inputs:
@@ -634,15 +627,13 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
 - **`clip_spreads`** — `True`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause 7.5 step 4);
   `lsp_mu` and `lsp_sigma` are not affected; default: True
-- **`complex`** — Keyword-only; see the description; default: True
 
 ### Outputs:
 - **`lsp`** — Large-scale parameters; slices: 0 DS in s; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA in
   deg; `(n_link, n_freq, 8)`
 - **`abs_toa`** — Absolute TOA offset in s, 0 if not active; `(n_link,)`
-- **`gr_eps`** — Relative permittivity of the ground (`complex=True`), imaginary part >= 0; the complex value of TR
-  38.901 eq. (7.6-40) is `gr_eps.conj()`; complex128; `(n_link, n_freq)`
-- **`gr_eps_re`**, **`gr_eps_im`** — Real and imaginary part instead of `gr_eps` (`complex=False`); `(n_link, n_freq)`
+- **`gr_eps`** — Relative permittivity of the ground, imaginary part >= 0; the complex value of TR 38.901 eq.
+  (7.6-40) is `gr_eps.conj()`; complex128; `(n_link, n_freq)`
 - **`eod_offset_deg`** — EoD offset in deg, positive = up; `(n_link, n_freq)`
 - **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of s for DS, lg of deg for the angular spreads, dB
   for KF, SF and XPR; required by [ssf_rays](#ssf_rays); `(n_link, n_freq, 8)`

@@ -11,6 +11,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 #include "qd_arrayant_functions.hpp"
+#include "qd_channels_vec.hpp"
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
@@ -220,13 +221,13 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     }
 
     // 64-bit integers used by Armadillo
-    const arma::uword n_path = fbs_pos.n_cols;                        // Number of paths
+    const arma::uword n_path = fbs_pos.n_cols;                         // Number of paths
     const arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
-    const arma::uword n_tx = tx_array.e_theta_re.n_slices;            // Number of TX antenna elements before coupling
-    const arma::uword n_rx = rx_array.e_theta_re.n_slices;            // Number of RX antenna elements before coupling
+    const arma::uword n_tx = tx_array.e_theta_re.n_slices;             // Number of TX antenna elements before coupling
+    const arma::uword n_rx = rx_array.e_theta_re.n_slices;             // Number of RX antenna elements before coupling
     const arma::uword n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    const arma::uword n_tx_ports = tx_array.n_ports();                // Number of TX antenna elements after coupling
-    const arma::uword n_rx_ports = rx_array.n_ports();                // Number of RX antenna elements after coupling
+    const arma::uword n_tx_ports = tx_array.n_ports();                 // Number of TX antenna elements after coupling
+    const arma::uword n_rx_ports = rx_array.n_ports();                 // Number of RX antenna elements after coupling
     const arma::uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
 
     if (lbs_pos.n_cols != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || M.n_cols != n_path)
@@ -689,6 +690,7 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
                                                    int use_kernel);
+
 /*!MD
 # get_channels_spherical_vec
 Calculate MIMO channel coefficients and delays for spherical wave propagation for several snapshots
@@ -703,6 +705,9 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation fo
 - An error in a snapshot throws `std::invalid_argument` with the message of the single call, preceded by
   `"Snapshot <i>: "` (0-based, the lowest failing index). Invalid antennas and `use_kernel` throw without the prefix,
   also when `n_snap = 0`.
+- With `coeff`, the coefficients are returned as complex values in place of `coeff_re` / `coeff_im`, which are left
+  empty. Each thread computes one snapshot at a time into its own split buffers, so the split data of all snapshots is
+  never held at once.
 
 ## Declaration:
 ```
@@ -728,6 +733,7 @@ void quadriga_lib::get_channels_spherical_vec(
     std::vector<arma::Cube<dtype>> *eod = nullptr,
     std::vector<arma::Cube<dtype>> *aoa = nullptr,
     std::vector<arma::Cube<dtype>> *eoa = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
     int use_kernel = 0);
 ```
 
@@ -746,6 +752,8 @@ void quadriga_lib::get_channels_spherical_vec(
 ## Outputs:
 - **`coeff_re`**, **`coeff_im`**, **`delay`** — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+- **`coeff`** *(optional)* — Complex coefficients, replacing `coeff_re` and `coeff_im` (then left empty); vector of
+  length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
 
 ## See also:
 - [[get_channels_spherical]] (single snapshot)
@@ -764,69 +772,31 @@ void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<dtype
                                               dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                               std::vector<arma::Cube<dtype>> *aod, std::vector<arma::Cube<dtype>> *eod,
                                               std::vector<arma::Cube<dtype>> *aoa, std::vector<arma::Cube<dtype>> *eoa,
-                                              int use_kernel)
+                                              std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
 {
     const size_t n_snap = fbs_pos.size();
     if (lbs_pos.size() != n_snap || path_gain.size() != n_snap || path_length.size() != n_snap || M.size() != n_snap)
         throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must have the same length.");
 
-    if (tx_pos.n_rows != 3ULL || tx_orientation.n_rows != 3ULL || rx_pos.n_rows != 3ULL || rx_orientation.n_rows != 3ULL)
-        throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 3 rows.");
-
-    for (const arma::Mat<dtype> *m : {&tx_pos, &tx_orientation, &rx_pos, &rx_orientation})
-        if (m->n_cols != 1ULL && m->n_cols != n_snap)
-            throw std::invalid_argument("Inputs 'tx_pos', 'tx_orientation', 'rx_pos' and 'rx_orientation' must have 1 or 'n_snap' columns.");
-
-    // Antennas and kernel are checked once, also without snapshots (the single call checks them again, from a cache)
-    qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
-    std::string antenna_error = qd_arrayant_is_valid_quick(tx_array);
-    if (!antenna_error.empty())
-        throw std::invalid_argument("Transmit antenna: " + antenna_error);
-    antenna_error = qd_arrayant_is_valid_quick(rx_array);
-    if (!antenna_error.empty())
-        throw std::invalid_argument("Receive antenna: " + antenna_error);
+    const bool parallel = qd_channels_vec_check(tx_array, rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, n_snap, [&](size_t s)
+                                                { return fbs_pos[s].n_cols; }, use_kernel);
 
     // Resizing keeps the existing entries, which the single call writes in place if they have the output size
-    for (std::vector<arma::Cube<dtype>> *out : {&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa})
+    for (std::vector<arma::Cube<dtype>> *out : {&delay, aod, eod, aoa, eoa})
         if (out != nullptr && out->size() != n_snap)
             out->resize(n_snap);
 
-    // Work of all snapshots in coefficients (element pairs times output paths), plus the fixed cost of a call, which
-    // equals about 8 coefficients (measured: 3.2 us per call and 0.35 us per coefficient on one thread)
-    const arma::uword n_links = tx_array.e_theta_re.n_slices * rx_array.e_theta_re.n_slices;
-    arma::uword n_work = 0ULL;
-    for (size_t s = 0; s < n_snap; ++s)
-        n_work += (fbs_pos[s].n_cols + 1ULL) * n_links + 8ULL;
-
-    // Limit: 2x faster than one thread from 8 SISO snapshots with one path each (n_work = 80; 4 snapshots: 1.3x).
-    // Inner parallel regions of the single call stay serial inside this region (one active level by default).
-    std::string error_message;
-    long long error_snap = (long long)n_snap;
-    const long long n_snap_i = (long long)n_snap;
-#pragma omp parallel for schedule(dynamic) if (n_snap > 1 && n_work >= 64)
-    for (long long i = 0; i < n_snap_i; ++i)
-    {
-        const size_t s = (size_t)i;
-        auto col = [s](const arma::Mat<dtype> &m) // Column of the snapshot, aliased without copying
-        { return arma::Mat<dtype>(const_cast<dtype *>(m.colptr(m.n_cols == 1ULL ? 0ULL : s)), 3, 1, false, true); };
-        try
-        {
-            quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, col(tx_pos), col(tx_orientation), col(rx_pos), col(rx_orientation),
-                                                        fbs_pos[s], lbs_pos[s], path_gain[s], path_length[s], M[s],
-                                                        coeff_re[s], coeff_im[s], delay[s], center_freq, use_absolute_delays, add_fake_los_path,
-                                                        aod ? &aod->at(s) : nullptr, eod ? &eod->at(s) : nullptr,
-                                                        aoa ? &aoa->at(s) : nullptr, eoa ? &eoa->at(s) : nullptr, use_kernel);
-        }
-        catch (const std::exception &e)
-        {
-#pragma omp critical
-            if (i < error_snap)
-                error_snap = i, error_message = e.what();
-        }
-    }
-
-    if (error_snap < n_snap_i)
-        throw std::invalid_argument("Snapshot " + std::to_string(error_snap) + ": " + error_message);
+    qd_channels_snapshot_loop<dtype>(n_snap, parallel, coeff_re, coeff_im, coeff,
+                                     [&](size_t s, arma::Cube<dtype> &cr, arma::Cube<dtype> &ci)
+                                     {
+                                         auto col = [s](const arma::Mat<dtype> &m)
+                                         { return qd_channels_vec_col(m, s); };
+                                         quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, col(tx_pos), col(tx_orientation), col(rx_pos), col(rx_orientation),
+                                                                                     fbs_pos[s], lbs_pos[s], path_gain[s], path_length[s], M[s],
+                                                                                     cr, ci, delay[s], center_freq, use_absolute_delays, add_fake_los_path,
+                                                                                     aod ? &aod->at(s) : nullptr, eod ? &eod->at(s) : nullptr,
+                                                                                     aoa ? &aoa->at(s) : nullptr, eoa ? &eoa->at(s) : nullptr, use_kernel);
+                                     });
 }
 
 template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<float> &tx_array, const quadriga_lib::arrayant<float> &rx_array,
@@ -840,7 +810,7 @@ template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::array
                                                        float center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                        std::vector<arma::Cube<float>> *aod, std::vector<arma::Cube<float>> *eod,
                                                        std::vector<arma::Cube<float>> *aoa, std::vector<arma::Cube<float>> *eoa,
-                                                       int use_kernel);
+                                                       std::vector<arma::Cube<std::complex<float>>> *coeff, int use_kernel);
 
 template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<double> &tx_array, const quadriga_lib::arrayant<double> &rx_array,
                                                        const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
@@ -853,4 +823,4 @@ template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::array
                                                        double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                        std::vector<arma::Cube<double>> *aod, std::vector<arma::Cube<double>> *eod,
                                                        std::vector<arma::Cube<double>> *aoa, std::vector<arma::Cube<double>> *eoa,
-                                                       int use_kernel);
+                                                       std::vector<arma::Cube<std::complex<double>>> *coeff, int use_kernel);

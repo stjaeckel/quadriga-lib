@@ -1302,4 +1302,30 @@ inline std::unordered_map<std::string, std::vector<dtype>> qd_mex_struct2map(con
     return map;
 }
 
+// Batch inputs: reads the entries of a cell array with 'get(entry, var_name)'; unset entries stay empty (no data).
+// 'error' is the message when 'input' is not a cell array.
+template <typename obj, typename F>
+inline std::vector<obj> qd_mex_read_cell(const mxArray *input, const char *var_name, const char *error, F &&get)
+{
+    if (!mxIsCell(input))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", error);
+
+    const size_t n = mxGetNumberOfElements(input);
+    std::vector<obj> out(n);
+    for (size_t i = 0; i < n; ++i)
+    {
+        const mxArray *element = mxGetCell(input, (mwIndex)i); // NULL for unset elements
+        if (element != nullptr)
+            out[i] = get(element, var_name);
+    }
+    return out;
+}
+
+// Batch positions and orientations: a 3-element vector (row or column) applies to all snapshots, else [3, n_snap]
+inline arma::mat qd_mex_get_xyz_batch(const mxArray *input, const char *var_name)
+{
+    return mxGetNumberOfElements(input) == 3 ? arma::mat(qd_mex_typecast_Col<double>(input, var_name, 3))
+                                             : qd_mex_get_Mat<double>(input, false, var_name);
+}
+
 #endif

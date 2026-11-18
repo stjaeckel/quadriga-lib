@@ -9,6 +9,7 @@
 #include "python_arma_adapter.hpp"
 
 #include <iterator>
+#include <type_traits>
 
 namespace py = pybind11;
 
@@ -925,6 +926,91 @@ static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, 
         out.append(d);
     }
     return out;
+}
+
+// Path inputs of the channel functions: true if 'h' is a list of numpy arrays (batch mode) or an empty list
+static bool qd_python_is_array_list(const py::handle &h)
+{
+    if (!py::isinstance<py::list>(h))
+        return false;
+    py::list lst = py::reinterpret_borrow<py::list>(h);
+    return lst.size() == 0 || py::isinstance<py::array>(lst[0]);
+}
+
+// Aliases the arrays of a list (batch mode), or a single input as a one-entry vector, without copying the data (arrays
+// that are not Fortran-contiguous float64 are copied, as are lists and scalars of a single input). T is
+// arma::Col<double>, arma::Mat<double> or arma::Cube<double>.
+// Every entry is added to 'keep_alive': the aliased memory must stay valid while the GIL is released, even if another
+// thread removes the entry from the list.
+template <typename T>
+static std::vector<T> qd_python_alias_list(const py::handle &h, bool batch, std::vector<py::object> &keep_alive)
+{
+    std::vector<T> out;
+    auto add = [&](const py::handle &item)
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        if constexpr (std::is_same_v<T, arma::Col<double>>)
+            out.push_back(qd_python_numpy2arma_Col<double>(keep_alive.back(), true));
+        else if constexpr (std::is_same_v<T, arma::Mat<double>>)
+            out.push_back(qd_python_numpy2arma_Mat<double>(keep_alive.back(), true));
+        else
+            out.push_back(qd_python_numpy2arma_Cube<double>(keep_alive.back(), true));
+    };
+    if (batch)
+    {
+        py::list lst = py::reinterpret_borrow<py::list>(h);
+        out.reserve(lst.size());
+        for (auto item : lst)
+            add(item);
+    }
+    else
+        out.reserve(1), add(h);
+    return out;
+}
+
+// Adds all values of a dict (e.g. an arrayant whose patterns are aliased) to 'keep_alive'
+static void qd_python_keep_dict_values(const py::dict &dict, std::vector<py::object> &keep_alive)
+{
+    for (auto item : dict)
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
+}
+
+// Frequency selection of the channel wrappers: all snapshots must have the same number of frequencies 'n_freq' in
+// 'path_gain' [n_path, n_freq] and 'M' [8, n_path, n_freq], 'center_freq' is empty or has 'n_freq' entries, and
+// 'i_freq' < n_freq (unless there are no snapshots). The slice 'i_freq' of every snapshot is aliased into 'path_gain_f'
+// and 'M_f'; returns the selected center frequency (0 for an empty 'center_freq').
+static double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_gain, const std::vector<arma::Cube<double>> &M,
+                                    const arma::Col<double> &center_freq, arma::uword i_freq,
+                                    std::vector<arma::vec> &path_gain_f, std::vector<arma::mat> &M_f)
+{
+    const size_t n_snap = path_gain.size();
+    arma::uword n_freq = 0ULL;
+    for (size_t i = 0; i < n_snap; ++i)
+    {
+        const arma::uword n_freq_i = path_gain[i].n_cols;
+        if (i == 0)
+            n_freq = n_freq_i;
+        else if (n_freq_i != n_freq)
+            throw std::invalid_argument("All entries of 'path_gain' must have the same number of frequencies.");
+
+        if (M[i].n_slices != n_freq_i)
+            throw std::invalid_argument("Inputs 'path_gain' and 'M' must have the same number of frequencies.");
+    }
+
+    if (!center_freq.empty() && center_freq.n_elem != n_freq)
+        throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
+
+    if (n_snap != 0 && i_freq >= n_freq)
+        throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
+
+    path_gain_f.clear(), M_f.clear();
+    path_gain_f.reserve(n_snap), M_f.reserve(n_snap);
+    for (size_t i = 0; i < n_snap; ++i)
+    {
+        path_gain_f.emplace_back(const_cast<double *>(path_gain[i].colptr(i_freq)), path_gain[i].n_rows, false, true);
+        M_f.emplace_back(const_cast<double *>(M[i].slice_memptr(i_freq)), M[i].n_rows, M[i].n_cols, false, true);
+    }
+    return center_freq.empty() ? 0.0 : center_freq.at(i_freq);
 }
 
 #endif

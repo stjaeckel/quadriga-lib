@@ -473,8 +473,6 @@ V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolat
 # Multi-frequency mode
 V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
 
-# Real and imaginary parts as separate arrays
-V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=False )
 ```
 
 ### Inputs:
@@ -497,14 +495,10 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
   a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
   default: `False`
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
-- **`complex`** — Keyword-only; return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
-  default: `True`
 
 ### Outputs:
 - **`V`** — e-theta (vertical) field, complex; `(n_out, n_ang)`; multi-frequency mode: `(n_out, n_ang, n_freq)`
 - **`H`** — e-phi (horizontal) field, complex; same shape as `V`
-- **`V_re`** / **`V_im`** / **`H_re`** / **`H_im`** — Real and imaginary parts of `V` and `H`; returned in their place
-  when `complex` is `False`
 - **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
   elements closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`;

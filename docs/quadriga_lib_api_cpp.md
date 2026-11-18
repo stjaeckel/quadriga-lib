@@ -129,6 +129,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [get_channels_irs](#get_channels_irs) | Channel generation functions | Calculate MIMO channel coefficients for IRS-assisted communication |
 | [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | Compute channel coefficients for spherical waves across multiple frequencies |
 | [get_channels_planar](#get_channels_planar) | Channel generation functions | Calculate MIMO channel coefficients for planar wave paths |
+| [get_channels_planar_vec](#get_channels_planar_vec) | Channel generation functions | Calculate MIMO channel coefficients for planar wave paths for several snapshots |
 | [get_channels_spherical](#get_channels_spherical) | Channel generation functions | Calculate MIMO channel coefficients and delays for spherical wave propagation |
 | [get_channels_spherical_vec](#get_channels_spherical_vec) | Channel generation functions | Calculate MIMO channel coefficients and delays for spherical wave propagation for several snapshots |
 | [acdf](#acdf) | Channel statistics | Calculate the empirical averaged cumulative distribution function (CDF) |
@@ -3195,11 +3196,83 @@ void quadriga_lib::get_channels_planar(
 - **`rx_Doppler`** *(optional)* — Doppler weights for moving RX; positive = moving toward path, negative = away; `[n_path(+1)]`
 
 ### See also:
+- [get_channels_planar_vec](#get_channels_planar_vec) (several snapshots in one call)
 - [get_channels_spherical](#get_channels_spherical) (spherical wave variant accounting for per-element angle differences)
 - [get_channels_ieee_indoor](#get_channels_ieee_indoor) (for generating IEEE compliant channels using `get_channels_planar` internally)
 - [baseband_freq_response](#baseband_freq_response) (for calculating the frequency response)
 - [quantize_delays](#quantize_delays) (for mapping delays to a fixed grid)
 - [arrayant](#arrayant) (antenna array class)
+
+---
+<a id="get_channels_planar_vec"></a>
+## get_channels_planar_vec
+Calculate MIMO channel coefficients for planar wave paths for several snapshots
+
+Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_planar) · [Python](quadriga_lib_api_python.md#channel.planar)
+
+- Batch form of [get_channels_planar](#get_channels_planar): computes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP);
+  each snapshot gives the same result as a single call with its inputs.
+- `n_snap` is the length of the path inputs; all seven must have the same length. A snapshot's paths follow the rules
+  of [get_channels_planar](#get_channels_planar), including 0 paths.
+- Positions and orientations have one column per snapshot; a single column applies to all snapshots.
+- The output vectors get `n_snap` entries. Entries that already have the output size are written in place, without
+  reallocating their memory.
+- An error in a snapshot throws `std::invalid_argument` with the message of the single call, preceded by
+  `"Snapshot <i>: "` (0-based, the lowest failing index). Invalid antennas and `use_kernel` throw without the prefix,
+  also when `n_snap = 0`.
+- With `coeff`, the coefficients are returned as complex values in place of `coeff_re` / `coeff_im`, which are left
+  empty. Each thread computes one snapshot at a time into its own split buffers, so the split data of all snapshots is
+  never held at once.
+
+### Declaration:
+```cpp
+void quadriga_lib::get_channels_planar_vec(
+    const quadriga_lib::arrayant<dtype> &tx_array,
+    const quadriga_lib::arrayant<dtype> &rx_array,
+    const arma::Mat<dtype> &tx_pos,
+    const arma::Mat<dtype> &tx_orientation,
+    const arma::Mat<dtype> &rx_pos,
+    const arma::Mat<dtype> &rx_orientation,
+    const std::vector<arma::Col<dtype>> &aod,
+    const std::vector<arma::Col<dtype>> &eod,
+    const std::vector<arma::Col<dtype>> &aoa,
+    const std::vector<arma::Col<dtype>> &eoa,
+    const std::vector<arma::Col<dtype>> &path_gain,
+    const std::vector<arma::Col<dtype>> &path_length,
+    const std::vector<arma::Mat<dtype>> &M,
+    std::vector<arma::Cube<dtype>> &coeff_re,
+    std::vector<arma::Cube<dtype>> &coeff_im,
+    std::vector<arma::Cube<dtype>> &delay,
+    dtype center_freq = dtype(0.0),
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    std::vector<arma::Col<dtype>> *rx_Doppler = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
+    int use_kernel = 0);
+```
+
+### Inputs:
+- **`tx_array`**, **`rx_array`** — Transmit and receive antenna arrays, as in [get_channels_planar](#get_channels_planar)
+- **`tx_pos`** — Transmitter positions in [m], finite; `[3, n_snap]` or `[3, 1]`
+- **`tx_orientation`** — Transmitter orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
+- **`rx_pos`** — Receiver positions in [m], finite; `[3, n_snap]` or `[3, 1]`
+- **`rx_orientation`** — Receiver orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
+- **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in [rad]; vectors of length `n_snap`,
+  entries `[n_path]`
+- **`path_gain`**, **`path_length`** — Path gains (linear) and path lengths; vectors of length `n_snap`, entries `[n_path]`
+- **`M`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
+- **`center_freq`**, **`use_absolute_delays`**, **`add_fake_los_path`**, **`use_kernel`** *(optional)* — As in
+  [get_channels_planar](#get_channels_planar), for all snapshots
+
+### Outputs:
+- **`coeff_re`**, **`coeff_im`**, **`delay`** — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+- **`rx_Doppler`** *(optional)* — Doppler weights for moving RX; vector of length `n_snap`, entries `[n_path(+1)]`
+- **`coeff`** *(optional)* — Complex coefficients, replacing `coeff_re` and `coeff_im` (then left empty); vector of
+  length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+
+### See also:
+- [get_channels_planar](#get_channels_planar) (single snapshot)
+- [get_channels_spherical_vec](#get_channels_spherical_vec) (spherical wave variant)
 
 ---
 <a id="get_channels_spherical"></a>
@@ -3314,6 +3387,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_spherical) · [Python](qu
 - An error in a snapshot throws `std::invalid_argument` with the message of the single call, preceded by
   `"Snapshot <i>: "` (0-based, the lowest failing index). Invalid antennas and `use_kernel` throw without the prefix,
   also when `n_snap = 0`.
+- With `coeff`, the coefficients are returned as complex values in place of `coeff_re` / `coeff_im`, which are left
+  empty. Each thread computes one snapshot at a time into its own split buffers, so the split data of all snapshots is
+  never held at once.
 
 ### Declaration:
 ```cpp
@@ -3339,6 +3415,7 @@ void quadriga_lib::get_channels_spherical_vec(
     std::vector<arma::Cube<dtype>> *eod = nullptr,
     std::vector<arma::Cube<dtype>> *aoa = nullptr,
     std::vector<arma::Cube<dtype>> *eoa = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *coeff = nullptr,
     int use_kernel = 0);
 ```
 
@@ -3357,6 +3434,8 @@ void quadriga_lib::get_channels_spherical_vec(
 ### Outputs:
 - **`coeff_re`**, **`coeff_im`**, **`delay`** — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Vectors of length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
+- **`coeff`** *(optional)* — Complex coefficients, replacing `coeff_re` and `coeff_im` (then left empty); vector of
+  length `n_snap`, entries `[n_rx, n_tx, n_path(+1)]`
 
 ### See also:
 - [get_channels_spherical](#get_channels_spherical) (single snapshot)

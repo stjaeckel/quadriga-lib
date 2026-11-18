@@ -17,6 +17,13 @@ if package_path not in sys.path:
 from quadriga_lib import arrayant
 
 
+def re_im(out, at=0, n=2):
+    """Output tuple with the complex outputs (array or list of arrays) from index 'at' replaced by real and imaginary parts"""
+    def split(c):
+        return ([x.real for x in c], [x.imag for x in c]) if isinstance(c, list) else (c.real, c.imag)
+    return tuple(out[:at]) + sum((split(c) for c in out[at:at + n]), ()) + tuple(out[at + n:])
+
+
 def make_single_freq_ant(n_el=19, n_az=37, n_elem=1, freq=1e9, res=10.0):
     """Helper: create a single-frequency arrayant via generate('omni')."""
     ant = arrayant.generate('omni', res, freq=freq)
@@ -406,8 +413,8 @@ class TestRotatePatternConvention(unittest.TestCase):
         o = np.array([0.2, 0.3, -0.4])
         out = arrayant.rotate_pattern(ant, o, usage=3)
         el, az = np.meshgrid(ant['elevation_grid'], ant['azimuth_grid'], indexing='ij')
-        V_re, V_im, H_re, H_im = arrayant.interpolate(ant, az.reshape(1, -1, order='F'), el.reshape(1, -1, order='F'),
-                                                       orientation=o.reshape(3, 1), complex=False)
+        V_re, V_im, H_re, H_im = re_im(arrayant.interpolate(ant, az.reshape(1, -1, order='F'), el.reshape(1, -1, order='F'),
+                                                       orientation=o.reshape(3, 1)))
         npt.assert_allclose(out['e_theta_re'][:, :, 0].reshape(-1, order='F'), V_re[0], atol=1e-12)
         npt.assert_allclose(out['e_phi_re'][:, :, 0].reshape(-1, order='F'), H_re[0], atol=1e-12)
 

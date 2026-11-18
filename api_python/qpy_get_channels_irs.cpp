@@ -44,16 +44,11 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 
 ## Usage:
 ```
-# Complex coefficients (default)
 coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, \
-    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel, \
-    complex=True )
-
-# Real and imaginary parts as separate arrays
-coeff_re, coeff_im, delay, active_path_out = quadriga_lib.channel.irs( ..., complex=False )
+    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
 
 # Departure and arrival angles as well
 coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..., angles=True )
@@ -93,13 +88,9 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
   when not empty; `(n_path_1 · n_path_2,)`; default: `None`
 - **`use_kernel`** — Kernel of both segments, as in [[channel.spherical]]: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; raises if unavailable); auto selects GENERIC in this version; `int`; default: 0
-- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
-  return separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
 
 ## Outputs:
-- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_rx, n_tx, n_path_irs)`
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
+- **`coeff`** — Complex channel coefficients; `(n_rx, n_tx, n_path_irs)`
 - **`delay`** — Propagation delays in seconds; `(n_rx, n_tx, n_path_irs)`
 - **`active_path_out`** — Mask of the path combinations in the output (can be passed as `active_path` to a later
   call); `bool`; `(n_path_1 · n_path_2,)`
@@ -140,12 +131,10 @@ py::tuple get_channels_irs(const py::dict &tx_array,
                            py::handle angles,
                            py::handle irs_array_2,
                            py::handle active_path,
-                           const int use_kernel,
-                           py::handle complex)
+                           const int use_kernel)
 {
     const bool want_absolute = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
     const bool want_angles = qd_python_flag(angles, false, "angles");
-    const bool want_complex = qd_python_flag(complex, true, "complex");
 
     // Antenna arrays
     const auto tx_array_a = qd_python_dict2arrayant(tx_array, true);
@@ -210,10 +199,7 @@ py::tuple get_channels_irs(const py::dict &tx_array,
         p_out[i] = active_path_out[i];
 
     py::list out;
-    if (want_complex)
-        out.append(qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im));
-    else
-        out.append(qd_python_copy2numpy(&coeff_re)), out.append(qd_python_copy2numpy(&coeff_im));
+    out.append(qd_python_copy2numpy<double, std::complex<double>>(&coeff_re, &coeff_im));
     out.append(qd_python_copy2numpy(&delay));
     out.append(active_path_out_py);
     if (want_angles)

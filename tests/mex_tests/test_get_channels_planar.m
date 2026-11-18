@@ -147,4 +147,49 @@ catch ME
         error('moxunit:exceptionNotRaised', ['EXPECTED: "use_kernel", GOT: "', ME.message, '"']);
     end
 end
+% Batch mode: cell arrays of path data equal single calls per snapshot (shared and per-snapshot positions)
+ant = quadriga_lib.arrayant_generate('xpol');
+n_snap = 4;
+aod = cell(n_snap, 1); eod = aod; aoa = aod; eoa = aod; pg = aod; pl = aod; Mc = aod;
+for s = 1:n_snap
+    n_path = mod(s, 3);  % snapshot 3 has no paths
+    aod{s} = 0.3 * (1:n_path)'; eod{s} = -0.1 * (1:n_path)'; aoa{s} = 3 - aod{s}; eoa{s} = -eod{s};
+    pg{s} = 1 ./ (1:n_path)'; pl{s} = 20 + s + (1:n_path)';
+    Mc{s} = repmat([1; 0; 0; 0; 0; 0; -1; 0.2], 1, n_path);
+end
+tx = [zeros(2, n_snap); 1:n_snap]; ori = [0; 0; 0.1]; rx = [20; 0; 1];
+for fake_los = [false, true]
+    ob = cell(1, 4);
+    [ob{:}] = quadriga_lib.get_channels_planar(ant, ant, tx, ori, rx, ori, aod, eod, aoa, eoa, pg, pl, Mc, 3e9, false, fake_los);
+    assertEqual( size(ob{1}), [n_snap, 1] );
+    assertEqual( size(ob{4}), [n_snap, 1] );
+    for s = 1:n_snap
+        os = cell(1, 4);
+        [os{:}] = quadriga_lib.get_channels_planar(ant, ant, tx(:, s), ori, rx, ori, aod{s}, eod{s}, aoa{s}, eoa{s}, pg{s}, pl{s}, Mc{s}, 3e9, false, fake_los);
+        for k = 1:4
+            assertEqual( size(ob{k}{s}), size(os{k}) );
+            assertEqual( ob{k}{s}, os{k} );
+        end
+    end
+end
+cr = quadriga_lib.get_channels_planar(ant, ant, tx(:, 1)', ori, rx', ori, aod, eod, aoa, eoa, pg, pl, Mc); % row vectors: shared
+assertEqual( numel(cr), n_snap );
+sgl = @(c) cellfun(@single, c, 'UniformOutput', false); % single-precision cell entries are converted
+cs = quadriga_lib.get_channels_planar(ant, ant, tx(:, 1)', ori, rx', ori, sgl(aod), sgl(eod), sgl(aoa), sgl(eoa), sgl(pg), sgl(pl), sgl(Mc));
+for s = 1:n_snap
+    assertElementsAlmostEqual( cs{s}, cr{s}, 'absolute', 1e-6 );
+end
+assertExceptionThrown(@() quadriga_lib.get_channels_planar(ant, ant, tx(:, 1:2), ori, rx, ori, aod, eod, aoa, eoa, pg, pl, Mc), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() quadriga_lib.get_channels_planar(ant, ant, tx, ori, rx, ori, aod, eod, aoa(1:3), eoa, pg, pl, Mc), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() quadriga_lib.get_channels_planar(ant, ant, tx, ori, rx, ori, aod, eod, aoa, eoa, pg{1}, pl, Mc), 'quadriga_lib:CPPerror');
+Mc_bad = Mc; Mc_bad{2} = Mc{2}(1:7, :); % the error names the snapshot 1-based
+try
+    quadriga_lib.get_channels_planar(ant, ant, tx, ori, rx, ori, aod, eod, aoa, eoa, pg, pl, Mc_bad);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, 'Snapshot 2: ')) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "Snapshot 2: ", GOT: "', ME.message, '"']);
+    end
+end
+
 end

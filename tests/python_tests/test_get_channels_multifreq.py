@@ -17,6 +17,13 @@ if package_path not in sys.path:
 import quadriga_lib
 
 
+def re_im(out, at=0, n=1):
+    """Output tuple with the complex output (array or list of arrays) from index 'at' replaced by real and imaginary parts"""
+    def split(c):
+        return ([x.real for x in c], [x.imag for x in c]) if isinstance(c, list) else (c.real, c.imag)
+    return tuple(out[:at]) + sum((split(c) for c in out[at:at + n]), ()) + tuple(out[at + n:])
+
+
 def gen_omni():
     """Generate an omnidirectional antenna dictionary (single-frequency, 3D patterns)."""
     return quadriga_lib.arrayant.generate('omni')
@@ -82,9 +89,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
 
         # Compute channel at 3 output frequencies using speed of sound
         freq_new = np.array([200.0, 1000.0, 5000.0])
-        coeff_re, coeff_im, delays = quadriga_lib.channel.multifreq(
+        coeff_re, coeff_im, delays = re_im(quadriga_lib.channel.multifreq(
             tx_woofer, rx, np.zeros(3), np.zeros(3), np.array([1.0, 0.0, 0.0]), np.zeros(3), fbs_pos, lbs_pos,
-            path_gain, path_length, M, freq, freq_new, propagation_speed=343.0, complex=False)
+            path_gain, path_length, M, freq, freq_new, propagation_speed=343.0))
 
         # Shape: (n_rx_ports, n_tx_ports, n_path, n_freq_new)
         self.assertEqual(coeff_re.ndim, 4)
@@ -204,9 +211,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M[0, 0, 1] = 1.0; M[0, 1, 1] = 1.0; M[0, 2, 1] = 1.0
         fi = np.array([1e9, 2e9]); fo = np.array([1e9, 1.5e9, 2e9, 3e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
-            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            complex=False)
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
+            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo))
 
         self.assertEqual(cr.ndim, 4)
         self.assertEqual(cr.shape, (1, 1, 3, 4))  # (n_rx, n_tx, n_path, n_freq_new)
@@ -223,9 +229,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((8, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.array([1e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            add_fake_los_path=True, complex=False)
+            add_fake_los_path=True))
 
         self.assertEqual(cr.shape[2], 2)  # 1 path + 1 fake LOS
 
@@ -264,13 +270,12 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         ori = np.zeros(3)
 
         # Single-frequency reference (returns 3D arrays)
-        cr_ref, ci_ref, dl_ref = quadriga_lib.channel.spherical(
-            ant, ant, tx_pos, ori, rx_pos, ori, fbs, lbs, pg_vec, pl_vec, M_single, fc, True, False, complex=False)
+        cr_ref, ci_ref, dl_ref = re_im(quadriga_lib.channel.spherical(
+            ant, ant, tx_pos, ori, rx_pos, ori, fbs, lbs, pg_vec, pl_vec, M_single, fc, True, False))
 
         # Multi-frequency version (returns 4D arrays)
-        cr, ci, dl = quadriga_lib.channel.multifreq(
-            ant, ant, tx_pos, ori, rx_pos, ori, fbs, lbs, pg_mat, pl_vec, M_multi, fi, fo, use_absolute_delays=True,
-            complex=False)
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
+            ant, ant, tx_pos, ori, rx_pos, ori, fbs, lbs, pg_mat, pl_vec, M_multi, fi, fo, use_absolute_delays=True))
 
         self.assertEqual(cr.shape[3], 1)  # single freq_new
         npt.assert_allclose(cr[:, :, :, 0], cr_ref, atol=1e-10, rtol=0)
@@ -292,16 +297,16 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         fi = np.array([1000.0]); fo = np.array([1000.0])
 
         # Absolute delays
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([5.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, propagation_speed=c_sound, complex=False)
+            use_absolute_delays=True, propagation_speed=c_sound))
 
         npt.assert_allclose(dl[0, 0, 0, 0], 5.0 / c_sound, atol=1e-12, rtol=0)
 
         # Relative delays
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([5.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=False, propagation_speed=c_sound, complex=False)
+            use_absolute_delays=False, propagation_speed=c_sound))
 
         self.assertAlmostEqual(dl[0, 0, 0, 0], 0.0, places=14)
 
@@ -315,13 +320,13 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.array([1e9])
 
-        _, _, dl_r = quadriga_lib.channel.multifreq(
+        _, _, dl_r = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([dist, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, propagation_speed=c_radio, complex=False)
+            use_absolute_delays=True, propagation_speed=c_radio))
 
-        _, _, dl_a = quadriga_lib.channel.multifreq(
+        _, _, dl_a = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([dist, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, propagation_speed=c_sound, complex=False)
+            use_absolute_delays=True, propagation_speed=c_sound))
 
         ratio = dl_a[0, 0, 0, 0] / dl_r[0, 0, 0, 0]
         self.assertAlmostEqual(ratio, c_radio / c_sound, delta=1e-6)
@@ -344,13 +349,13 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M_scalar = np.zeros((2, 1, 1), order='F')
         M_scalar[0, 0, 0] = 0.8; M_scalar[1, 0, 0] = 0.3
 
-        cr_f, ci_f, dl_f = quadriga_lib.channel.multifreq(
+        cr_f, ci_f, dl_f = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M_full, fi,
-            fo, complex=False)
+            fo))
 
-        cr_s, ci_s, dl_s = quadriga_lib.channel.multifreq(
+        cr_s, ci_s, dl_s = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M_scalar,
-            fi, fo, complex=False)
+            fi, fo))
 
         npt.assert_allclose(cr_f, cr_s, atol=1e-12, rtol=0)
         npt.assert_allclose(ci_f, ci_s, atol=1e-12, rtol=0)
@@ -370,9 +375,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 2), order='F'); M[0, 0, 0] = 1.0; M[0, 0, 1] = 1.0
         fi = np.array([1e9, 2e9]); fo = np.array([1.5e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
         a = amp(cr, ci, 0, 0, 0, 0)
         expected = math.sqrt(2.5)
@@ -390,9 +395,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M[1, 0, 1] = 1.0  # ImVV = 1 at freq[1] (90 deg phase)
         fi = np.array([1e9, 2e9]); fo = np.array([1.5e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
         a = amp(cr, ci, 0, 0, 0, 0)
         self.assertGreater(a, 0.5)
@@ -412,13 +417,13 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 2), order='F'); M[0, 0, 0] = 1.0; M[0, 0, 1] = 1.0
         fi = np.array([1e9, 2e9])
 
-        cr_lo, ci_lo, _ = quadriga_lib.channel.multifreq(
+        cr_lo, ci_lo, _ = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi,
-            np.array([100.0]), complex=False)
+            np.array([100.0])))
 
-        cr_ex, ci_ex, _ = quadriga_lib.channel.multifreq(
+        cr_ex, ci_ex, _ = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi,
-            np.array([1e9]), complex=False)
+            np.array([1e9])))
 
         amp_lo = amp(cr_lo, ci_lo, 0, 0, 0, 0)
         amp_ex = amp(cr_ex, ci_ex, 0, 0, 0, 0)
@@ -437,35 +442,13 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.linspace(500e6, 3e9, 20)
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
-            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            complex=False)
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
+            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo))
 
         self.assertEqual(cr.shape[3], 20)
         self.assertTrue(np.all(np.isfinite(cr)))
         self.assertTrue(np.all(np.isfinite(ci)))
         self.assertTrue(np.all(np.isfinite(dl)))
-
-    def test_complex_equals_split(self):
-        """complex=True (default) returns coeff_re + 1j * coeff_im and the same delays, also with a fake LOS path."""
-        tx = gen_xpol(); rx = gen_xpol()
-        fbs = np.array([[5.0, 20.0, 8.0], [0.0, 10.0, -6.0], [0.0, 2.0, 1.0]], order='F')
-        pg = np.array([[1.0, 0.8], [0.5, 0.4], [0.25, 0.3]], order='F'); pl = np.zeros(3)
-        M = np.zeros((8, 3, 2), order='F'); M[0] = 1.0; M[6] = -1.0; M[3] = 0.1
-        args = (tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, fbs, pg, pl, M,
-                np.array([1e9, 2e9]), np.linspace(0.8e9, 2.2e9, 11), True, True)
-        cr, ci, dl = quadriga_lib.channel.multifreq(*args, complex=False)
-        c, dl2 = quadriga_lib.channel.multifreq(*args)
-        self.assertEqual(c.dtype, np.complex128)
-        np.testing.assert_array_equal(c, cr + 1j * ci)
-        np.testing.assert_array_equal(dl2, dl)
-        # 'complex' is a flag: None selects the default, other types raise TypeError
-        np.testing.assert_array_equal(quadriga_lib.channel.multifreq(*args, complex=None)[0], c)
-        with self.assertRaises(TypeError) as ctx:
-            quadriga_lib.channel.multifreq(*args, complex=2.5)
-        self.assertIn("'complex'", str(ctx.exception))
-        with self.assertRaises(TypeError):  # complex is keyword-only
-            quadriga_lib.channel.multifreq(*args, 299792458.0, 0, False)
 
     def test_none_and_flag_types(self):
         ant = gen_omni()
@@ -518,9 +501,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((8, 1, 1), order='F'); M[0, 0, 0] = 1.0; M[6, 0, 0] = -1.0
         fi = np.array([1e9]); fo = np.array([1e9, 2e9, 3e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
-            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            complex=False)
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
+            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo))
 
         self.assertEqual(cr.shape[3], 3)
         a0 = amp(cr, ci, 0, 0, 0, 0)
@@ -553,9 +535,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 2), order='F'); M[0, 0, 0] = 1.0; M[0, 0, 1] = 1.0
         fo = np.array([200.0, 1000.0, 5000.0])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx_woofer, rx, np.zeros(3), np.zeros(3), np.array([1.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M,
-            fi, fo, propagation_speed=343.0, complex=False)
+            fi, fo, propagation_speed=343.0))
 
         self.assertEqual(cr.shape[3], 3)  # 3 output frequencies
         self.assertTrue(np.all(np.isfinite(cr)))
@@ -578,9 +560,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M[6, 0, 0] = -1.0  # ReHH
         fi = np.array([1e9]); fo = np.array([1e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
-            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            complex=False)
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
+            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo))
 
         self.assertEqual(cr.shape[0], 2)  # xpol has 2 elements
         self.assertEqual(cr.shape[1], 1)
@@ -609,9 +590,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         fi = np.array([2997924580.0]); fo = np.array([2997924580.0])
         pi = math.pi
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             ant, probe, np.array([0.0, 0.0, 1.0]), np.array([-pi / 2.0, 0.0, 0.0]), np.array([20.0, 0.0, 1.0]),
-            np.zeros(3), fbs, lbs, pg, pl, M, fi, fo, complex=False)
+            np.zeros(3), fbs, lbs, pg, pl, M, fi, fo))
 
         self.assertEqual(cr.shape[0], 2)  # xpol probe has 2 elements
         self.assertEqual(cr.shape[1], 2)  # TX has 2 elements
@@ -631,9 +612,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.array([1.0e9, 1.5e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
         a0 = amp(cr, ci, 0, 0, 0, 0)
         a1 = amp(cr, ci, 0, 0, 0, 1)
@@ -667,9 +648,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M[6, 0, 0] = -1.0; M[6, 1, 0] = -1.0
         fi = np.array([1e9]); fo = np.array([1e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
         self.assertLess(dl[0, 0, 0, 0], dl[0, 0, 1, 0])
         npt.assert_allclose(dl[0, 0, 0, 0], 10.0 / C, atol=1e-12, rtol=0)
@@ -696,9 +677,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((8, 1, 1), order='F'); M[0, 0, 0] = 1.0; M[6, 0, 0] = -1.0
         fi = np.array([1e9]); fo = np.array([1e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx_ant, rx_ant, np.zeros(3), np.zeros(3), np.array([20.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M,
-            fi, fo, complex=False)
+            fi, fo))
 
         self.assertEqual(cr.shape[0], 2)  # 2 RX elements
         self.assertEqual(cr.shape[1], 2)  # 2 TX elements
@@ -722,9 +703,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.array([0.0])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
         self.assertAlmostEqual(abs(ci[0, 0, 0, 0]), 0.0, places=14)
         self.assertAlmostEqual(cr[0, 0, 0, 0], 1.0, delta=1e-10)
@@ -745,9 +726,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M[0, 0, 0] = 1.0; M[0, 0, 1] = 1.0; M[0, 0, 2] = 1.0
         fo = np.array([1e9, 2e9, 3e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
         # At exact freq entries: amplitude = sqrt(gain)
         a0 = amp(cr, ci, 0, 0, 0, 0)
@@ -771,13 +752,13 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.array([1e9])
 
-        _, _, dl_a = quadriga_lib.channel.multifreq(
+        _, _, dl_a = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([dist, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
-        _, _, dl_r = quadriga_lib.channel.multifreq(
+        _, _, dl_r = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([dist, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=False, complex=False)
+            use_absolute_delays=False))
 
         npt.assert_allclose(dl_a[0, 0, 0, 0], dist / C, atol=1e-12, rtol=0)
         self.assertAlmostEqual(abs(dl_r[0, 0, 0, 0]), 0.0, places=14)
@@ -795,9 +776,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.linspace(1e9, 3e9, 10)
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, complex=False)
+            use_absolute_delays=True))
 
         amp_ref = amp(cr, ci, 0, 0, 0, 0)
         for f in range(1, 10):
@@ -825,9 +806,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M[0, 0, 0] = 1.0; M[0, 1, 0] = 1.0
         fi = np.array([500.0]); fo = np.array([500.0])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([3.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, propagation_speed=c_sound, complex=False)
+            use_absolute_delays=True, propagation_speed=c_sound))
 
         self.assertLess(dl[0, 0, 0, 0], dl[0, 0, 1, 0])
         npt.assert_allclose(dl[0, 0, 0, 0], d_los / c_sound, atol=1e-10, rtol=0)
@@ -851,9 +832,9 @@ class TestGetChannelsMultifreq(unittest.TestCase):
             M[0, 0, s] = 1.0
 
         fo = np.array([200.0, 5000.0, 10000.0])
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([5.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            use_absolute_delays=True, propagation_speed=c_sound, complex=False)
+            use_absolute_delays=True, propagation_speed=c_sound))
 
         a_lo = amp(cr, ci, 0, 0, 0, 0)
         a_mid = amp(cr, ci, 0, 0, 0, 1)
@@ -902,9 +883,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M[0, 0, 0] = 1.0; M[6, 0, 0] = -1.0
         fi = np.array([1e9]); fo = np.array([1e9, 2e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
-            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            complex=False)
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
+            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo))
 
         self.assertEqual(cr.shape[3], 2)
         # The two frequency slices should differ (different coupling)
@@ -925,13 +905,13 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         fo_fwd = np.array([1.2e9, 1.8e9])
         fo_rev = np.array([1.8e9, 1.2e9])
 
-        cr_f, ci_f, dl_f = quadriga_lib.channel.multifreq(
+        cr_f, ci_f, dl_f = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi,
-            fo_fwd, use_absolute_delays=True, complex=False)
+            fo_fwd, use_absolute_delays=True))
 
-        cr_r, ci_r, dl_r = quadriga_lib.channel.multifreq(
+        cr_r, ci_r, dl_r = re_im(quadriga_lib.channel.multifreq(
             tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi,
-            fo_rev, use_absolute_delays=True, complex=False)
+            fo_rev, use_absolute_delays=True))
 
         # Forward[:,:,:,0] == Reverse[:,:,:,1] and vice versa
         npt.assert_allclose(cr_f[:, :, :, 0], cr_r[:, :, :, 1], atol=1e-12, rtol=0)
@@ -956,9 +936,8 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((2, 1, 1), order='F'); M[0, 0, 0] = 1.0
         fi = np.array([1e9]); fo = np.array([1e9, 2e9])
 
-        cr, ci, dl = quadriga_lib.channel.multifreq(
-            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo,
-            complex=False)
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
+            tx, rx, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M, fi, fo))
 
         self.assertEqual(cr.shape, (1, 1, 1, 2))
         self.assertTrue(np.all(np.isfinite(cr)))
@@ -991,13 +970,13 @@ class TestGetChannelsMultifreq(unittest.TestCase):
         M = np.zeros((8, 1, 1), order='F'); M[0, 0, 0] = 1.0; M[6, 0, 0] = -1.0
         fi = np.array([1e9]); fo = np.array([1e9])
 
-        cr_3d, ci_3d, dl_3d = quadriga_lib.channel.multifreq(
+        cr_3d, ci_3d, dl_3d = re_im(quadriga_lib.channel.multifreq(
             tx_3d, rx_3d, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M,
-            fi, fo, use_absolute_delays=True, complex=False)
+            fi, fo, use_absolute_delays=True))
 
-        cr_4d, ci_4d, dl_4d = quadriga_lib.channel.multifreq(
+        cr_4d, ci_4d, dl_4d = re_im(quadriga_lib.channel.multifreq(
             tx_4d, rx_4d, np.zeros(3), np.zeros(3), np.array([10.0, 0.0, 0.0]), np.zeros(3), fbs, lbs, pg, pl, M,
-            fi, fo, use_absolute_delays=True, complex=False)
+            fi, fo, use_absolute_delays=True))
 
         npt.assert_allclose(cr_3d, cr_4d, atol=1e-12, rtol=0)
         npt.assert_allclose(ci_3d, ci_4d, atol=1e-12, rtol=0)
@@ -1011,9 +990,9 @@ class test_zero_paths_fake_los(unittest.TestCase):
         ant = quadriga_lib.arrayant.generate('omni')
         fc = 3e9
         ant['center_freq'] = fc
-        cr, ci, dl = quadriga_lib.channel.multifreq(
+        cr, ci, dl = re_im(quadriga_lib.channel.multifreq(
             ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], np.zeros((3, 0)), np.zeros((3, 0)),
-            np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], True, True, complex=False)
+            np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], True, True))
         self.assertEqual(np.shape(dl), (1, 1, 1, 2))
         npt.assert_array_equal(np.concatenate([np.ravel(cr), np.ravel(ci)]), np.zeros(4))
         npt.assert_allclose(np.ravel(dl), [10 / 299792458.0] * 2, rtol=1e-15)
@@ -1023,26 +1002,25 @@ class test_zero_paths_fake_los(unittest.TestCase):
         ant = quadriga_lib.arrayant.generate('xpol')
         fc = 3e9
         ant['center_freq'] = fc
-        for cplx in (False, True):
-            out = quadriga_lib.channel.multifreq(
-                ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], np.zeros((3, 0)), np.zeros((3, 0)),
-                np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], True, False, complex=cplx)
-            for x in out:
-                self.assertEqual(np.shape(x), (2, 2, 0, 2))
+        out = quadriga_lib.channel.multifreq(
+            ant, ant, [0, 0, 0], [0, 0, 0], [10, 0, 0], [0, 0, 0], np.zeros((3, 0)), np.zeros((3, 0)),
+            np.zeros((0, 1)), np.zeros(0), np.zeros((8, 0, 1)), [fc], [fc, 2 * fc], True, False)
+        for x in out:
+            self.assertEqual(np.shape(x), (2, 2, 0, 2))
 
 
 class test_use_kernel(unittest.TestCase):
-    # use_kernel (before complex) reaches C++: 0 gives the default result, 1 agrees within single precision, 3 raises from C++
+    # use_kernel (last argument) reaches C++: 0 gives the default result, 1 agrees within single precision, 3 raises from C++
     def test(self):
         fbs = np.array([[20.0], [5.0], [3.0]])
         M = np.zeros((8, 1, 2))
         M[0], M[6] = 1.0, -1.0
         args = (gen_xpol(), gen_xpol(), [0, 0, 10], [0, 0, 0], [50, 0, 1.5], [0, 0, 0], fbs, fbs, np.ones((1, 2)),
                 np.zeros(1), M, np.array([3e9, 3.6e9]), np.array([3e9, 3.3e9]))
-        ref = quadriga_lib.channel.multifreq(*args, complex=False)
-        for a, b in zip(quadriga_lib.channel.multifreq(*args, complex=False, use_kernel=0), ref):
+        ref = re_im(quadriga_lib.channel.multifreq(*args))
+        for a, b in zip(re_im(quadriga_lib.channel.multifreq(*args, use_kernel=0)), ref):
             npt.assert_array_equal(a, b)  # 0 is the default
-        for a, b in zip(quadriga_lib.channel.multifreq(*args, complex=False, use_kernel=1), ref):
+        for a, b in zip(re_im(quadriga_lib.channel.multifreq(*args, use_kernel=1)), ref):
             npt.assert_allclose(a, b, rtol=0, atol=1e-5 * np.abs(b).max())  # GENERIC: within single precision
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.channel.multifreq(*args, use_kernel=3)

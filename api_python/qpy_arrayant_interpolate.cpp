@@ -41,8 +41,6 @@ V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolat
 # Multi-frequency mode
 V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
 
-# Real and imaginary parts as separate arrays
-V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=False )
 ```
 
 ## Inputs:
@@ -65,14 +63,10 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
   a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
   default: `False`
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
-- **`complex`** — Keyword-only; return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
-  default: `True`
 
 ## Outputs:
 - **`V`** — e-theta (vertical) field, complex; `(n_out, n_ang)`; multi-frequency mode: `(n_out, n_ang, n_freq)`
 - **`H`** — e-phi (horizontal) field, complex; same shape as `V`
-- **`V_re`** / **`V_im`** / **`H_re`** / **`H_im`** — Real and imaginary parts of `V` and `H`; returned in their place
-  when `complex` is `False`
 - **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
   elements closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`;
@@ -96,13 +90,11 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
                                py::handle dist,
                                py::handle local_angles,
                                py::handle fast_access,
-                               int use_kernel,
-                               py::handle complex)
+                               int use_kernel)
 {
     const bool want_dist = qd_python_flag(dist, false, "dist");
     const bool want_local_angles = qd_python_flag(local_angles, false, "local_angles");
     const bool strict = qd_python_flag(fast_access, false, "fast_access");
-    const bool want_complex = qd_python_flag(complex, true, "complex");
 
     const auto azimuth_a = qd_python_numpy2arma_Mat(azimuth, true);
     const auto elevation_a = qd_python_numpy2arma_Mat(elevation, true);
@@ -125,49 +117,23 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
             throw std::invalid_argument("Outputs 'dist' and 'local_angles' are not available in the multi-frequency mode.");
 
         const arma::uword n_freq = freq_new_a.is_empty() ? (arma::uword)ant.size() : freq_new_a.n_elem;
-        arma::cube V_re, V_im, H_re, H_im;
+        arma::cube V_re, V_im, H_re, H_im; // Left empty, the complex outputs replace them
         arma::cx_cube V, H;
-        py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py;
-        py::array_t<std::complex<double>> V_py, H_py;
-        if (want_complex)
-        {
-            V_py = qd_python_init_output(n_out, n_ang, n_freq, &V);
-            H_py = qd_python_init_output(n_out, n_ang, n_freq, &H);
-        }
-        else
-        {
-            V_re_py = qd_python_init_output(n_out, n_ang, n_freq, &V_re);
-            V_im_py = qd_python_init_output(n_out, n_ang, n_freq, &V_im);
-            H_re_py = qd_python_init_output(n_out, n_ang, n_freq, &H_re);
-            H_im_py = qd_python_init_output(n_out, n_ang, n_freq, &H_im);
-        }
+        auto V_py = qd_python_init_output(n_out, n_ang, n_freq, &V);
+        auto H_py = qd_python_init_output(n_out, n_ang, n_freq, &H);
 
         quadriga_lib::arrayant_interpolate_multi<double>(ant, azimuth_a, elevation_a, V_re, V_im, H_re, H_im,
                                                          freq_new_a.is_empty() ? nullptr : &freq_new_a,
                                                          p_element, p_orientation, p_element_pos,
-                                                         want_complex ? &V : nullptr, want_complex ? &H : nullptr, use_kernel);
-
-        if (want_complex)
-            return py::make_tuple(V_py, H_py);
-        return py::make_tuple(V_re_py, V_im_py, H_re_py, H_im_py);
+                                                         &V, &H, use_kernel);
+        return py::make_tuple(V_py, H_py);
     }
 
-    arma::mat V_re, V_im, H_re, H_im, dist_a, azimuth_loc, elevation_loc, gamma;
+    arma::mat V_re, V_im, H_re, H_im, dist_a, azimuth_loc, elevation_loc, gamma; // V_re ... H_im left empty
     arma::cx_mat V, H;
-    py::array_t<double> V_re_py, V_im_py, H_re_py, H_im_py, dist_py, azimuth_loc_py, elevation_loc_py, gamma_py;
-    py::array_t<std::complex<double>> V_py, H_py;
-    if (want_complex)
-    {
-        V_py = qd_python_init_output(n_out, n_ang, &V);
-        H_py = qd_python_init_output(n_out, n_ang, &H);
-    }
-    else
-    {
-        V_re_py = qd_python_init_output(n_out, n_ang, &V_re);
-        V_im_py = qd_python_init_output(n_out, n_ang, &V_im);
-        H_re_py = qd_python_init_output(n_out, n_ang, &H_re);
-        H_im_py = qd_python_init_output(n_out, n_ang, &H_im);
-    }
+    py::array_t<double> dist_py, azimuth_loc_py, elevation_loc_py, gamma_py;
+    auto V_py = qd_python_init_output(n_out, n_ang, &V);
+    auto H_py = qd_python_init_output(n_out, n_ang, &H);
     if (want_dist)
         dist_py = qd_python_init_output(n_out, n_ang, &dist_a);
     if (want_local_angles)
@@ -183,22 +149,12 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
                                                want_local_angles ? &azimuth_loc : nullptr,
                                                want_local_angles ? &elevation_loc : nullptr,
                                                want_local_angles ? &gamma : nullptr,
-                                               want_complex ? &V : nullptr, want_complex ? &H : nullptr, use_kernel);
+                                               &V, &H, use_kernel);
 
     // Output tuple in the documented order
     py::list out;
-    if (want_complex)
-    {
-        out.append(V_py);
-        out.append(H_py);
-    }
-    else
-    {
-        out.append(V_re_py);
-        out.append(V_im_py);
-        out.append(H_re_py);
-        out.append(H_im_py);
-    }
+    out.append(V_py);
+    out.append(H_py);
     if (want_dist)
         out.append(dist_py);
     if (want_local_angles)

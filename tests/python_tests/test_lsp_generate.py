@@ -3,7 +3,7 @@
 # Part of quadriga-lib — see LICENSE for terms.
 
 # Python interface test for quadriga_lib.gbsm.lsp_generate.
-# Scope: argument and output handling, complex flag, defaults, error paths.
+# Scope: argument and output handling, defaults, error paths.
 # Physics validation lives in the Catch2 suite (test_lsp_generate.cpp).
 
 import sys
@@ -19,6 +19,7 @@ if package_path not in sys.path:
     sys.path.append(package_path)
 
 import quadriga_lib
+
 
 config_dir = os.path.join(current_dir, "../../data/config")
 
@@ -78,25 +79,11 @@ class test_case(unittest.TestCase):
 
     def test_keyword_arguments(self):
         ok = self.call(scenpar=self.sp, center_freq=self.fc, tx_pos=self.tx_pos, rx_pos=self.rx_pos, rnd=self.rnd,
-                       sf_sigma_dB=None, cholesky=True, clip_spreads=True, complex=True)
-        op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True, complex=True)
-        with self.assertRaises(TypeError):  # complex is keyword-only
-            self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True, True)
+                       sf_sigma_dB=None, cholesky=True, clip_spreads=True)
+        op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True)
         for a, b, c in zip(ok, op, self.out):
             npt.assert_array_equal(a, c)
             npt.assert_array_equal(b, c)
-
-    def test_complex_flag(self):
-        os_ = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, complex=False)
-        self.assertEqual(len(os_), 7)
-        lsp, abs_toa, gr_eps_re, gr_eps_im, eod, mu, sigma = os_
-        for x in (gr_eps_re, gr_eps_im):
-            self.assertEqual(x.shape, (3, 2))
-            self.assertEqual(x.dtype, np.float64)
-        npt.assert_array_equal(self.out[2].real, gr_eps_re)
-        npt.assert_array_equal(self.out[2].imag, gr_eps_im)
-        for a, b in zip((lsp, abs_toa, eod, mu, sigma), (self.out[0], self.out[1]) + self.out[3:]):
-            npt.assert_array_equal(a, b)
 
     def test_sf_sigma(self):
         lsp_sigma = self.out[5]
@@ -136,12 +123,11 @@ class test_case(unittest.TestCase):
 
     def test_flags(self):
         args = (self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd)
-        out = self.call(*args, None, None, None, complex=None)  # None selects the default of each flag
+        out = self.call(*args, None, None, None)  # None selects the default of each flag
         self.assertEqual(len(out), 6)
         for a, b in zip(out, self.out):
             npt.assert_array_equal(a, b)
-        self.assertEqual(len(self.call(*args, complex=np.bool_(False))), 7)
-        for name in ("cholesky", "clip_spreads", "complex"):
+        for name in ("cholesky", "clip_spreads"):
             for bad in (2.5, 1, "yes"):
                 with self.assertRaises(TypeError) as ctx:
                     self.call(*args, **{name: bad})
@@ -196,10 +182,9 @@ class test_case(unittest.TestCase):
     def test_errors(self):
         rnd_b = self.rnd.copy()
         rnd_b[:, 9] = 1.5
-        for cplx in (True, False):  # the permittivity is always computed, so column 9 is always checked
-            with self.assertRaises(ValueError) as ctx:  # C++
-                self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_b, complex=cplx)
-            self.assertIn("Ground-permittivity column of 'rnd' must be in the range from 0 to 1.", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:  # C++; the permittivity is always computed, so column 9 is checked
+            self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, rnd_b)
+        self.assertIn("Ground-permittivity column of 'rnd' must be in the range from 0 to 1.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd[:, :10])
         self.assertIn("Input 'rnd' must have size [n_link, 11].", str(ctx.exception))

@@ -95,24 +95,6 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/
 
-// Read the entries of a cell array of path data, numeric data of class double is not copied
-template <typename obj, typename F>
-static std::vector<obj> read_cell(const mxArray *input, const char *var_name, F &&get)
-{
-    if (!mxIsCell(input))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must all be cell arrays.");
-
-    const size_t n = mxGetNumberOfElements(input);
-    std::vector<obj> out(n);
-    for (size_t i = 0; i < n; ++i)
-    {
-        const mxArray *element = mxGetCell(input, (mwIndex)i); // NULL for unset elements: no paths
-        if (element != nullptr)
-            out[i] = get(element, var_name);
-    }
-    return out;
-}
-
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs < 11 || nrhs > 15)
@@ -136,19 +118,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Batch mode: path data as cell arrays, one entry per snapshot
     if (mxIsCell(prhs[6]))
     {
+        // Numeric data of class double is not copied
         auto get_Mat = [](const mxArray *a, const char *name) { return qd_mex_get_Mat<double>(a, false, name); };
         auto get_Col = [](const mxArray *a, const char *name) { return qd_mex_get_Col<double>(a, false, name); };
-        const auto fbs_pos = read_cell<arma::mat>(prhs[6], "fbs_pos", get_Mat);
-        const auto lbs_pos = read_cell<arma::mat>(prhs[7], "lbs_pos", get_Mat);
-        const auto path_gain = read_cell<arma::vec>(prhs[8], "path_gain", get_Col);
-        const auto path_length = read_cell<arma::vec>(prhs[9], "path_length", get_Col);
-        const auto M = read_cell<arma::mat>(prhs[10], "M", get_Mat);
-        auto get_xyz = [](const mxArray *a, const char *name) // A 3-element vector (row or column) applies to all snapshots
-        { return mxGetNumberOfElements(a) == 3 ? arma::mat(qd_mex_typecast_Col<double>(a, name, 3)) : qd_mex_get_Mat<double>(a, false, name); };
-        const auto tx_pos = get_xyz(prhs[2], "tx_pos");
-        const auto tx_orientation = get_xyz(prhs[3], "tx_orientation");
-        const auto rx_pos = get_xyz(prhs[4], "rx_pos");
-        const auto rx_orientation = get_xyz(prhs[5], "rx_orientation");
+        const char *error = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must all be cell arrays.";
+        const auto fbs_pos = qd_mex_read_cell<arma::mat>(prhs[6], "fbs_pos", error, get_Mat);
+        const auto lbs_pos = qd_mex_read_cell<arma::mat>(prhs[7], "lbs_pos", error, get_Mat);
+        const auto path_gain = qd_mex_read_cell<arma::vec>(prhs[8], "path_gain", error, get_Col);
+        const auto path_length = qd_mex_read_cell<arma::vec>(prhs[9], "path_length", error, get_Col);
+        const auto M = qd_mex_read_cell<arma::mat>(prhs[10], "M", error, get_Mat);
+        const auto tx_pos = qd_mex_get_xyz_batch(prhs[2], "tx_pos");
+        const auto tx_orientation = qd_mex_get_xyz_batch(prhs[3], "tx_orientation");
+        const auto rx_pos = qd_mex_get_xyz_batch(prhs[4], "rx_pos");
+        const auto rx_orientation = qd_mex_get_xyz_batch(prhs[5], "rx_orientation");
 
         // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries
         const size_t n_snap = fbs_pos.size();
@@ -168,7 +150,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                                  fbs_pos, lbs_pos, path_gain, path_length, M,
                                                                  out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
                                                                  (nlhs > 3) ? &out[3] : nullptr, (nlhs > 4) ? &out[4] : nullptr,
-                                                                 (nlhs > 5) ? &out[5] : nullptr, (nlhs > 6) ? &out[6] : nullptr, use_kernel));
+                                                                 (nlhs > 5) ? &out[5] : nullptr, (nlhs > 6) ? &out[6] : nullptr, nullptr, use_kernel));
         return;
     }
 

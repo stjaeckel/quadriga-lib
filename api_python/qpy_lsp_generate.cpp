@@ -38,18 +38,11 @@ Large-scale parameters of a set of links from normalized random values
   f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) + EoD_offset_c +
   EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if `EoD_offset_b > 0`, plus `(atan((EoD_offset_hcl - h)/d) -
   atan((hUT - h)/d))·180/pi` if `hUT < EoD_offset_hcl`
-- `complex = True` returns the permittivity as one complex array `gr_eps = gr_eps_re + 1j·gr_eps_im`; `complex = False`
-  returns the two real arrays `gr_eps_re`, `gr_eps_im` in its place (one more output)
 
 ## Usage:
 ```
-# complex=True (default)
 lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
-    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads, complex=True )
-
-# complex=False
-lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
-    lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., complex=False )
+    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads )
 ```
 
 ## Inputs:
@@ -65,15 +58,13 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
 - **`clip_spreads`** — `True`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause 7.5 step 4);
   `lsp_mu` and `lsp_sigma` are not affected; default: True
-- **`complex`** — Keyword-only; see the description; default: True
 
 ## Outputs:
 - **`lsp`** — Large-scale parameters; slices: 0 DS in s; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA in
   deg; `(n_link, n_freq, 8)`
 - **`abs_toa`** — Absolute TOA offset in s, 0 if not active; `(n_link,)`
-- **`gr_eps`** — Relative permittivity of the ground (`complex=True`), imaginary part >= 0; the complex value of TR
-  38.901 eq. (7.6-40) is `gr_eps.conj()`; complex128; `(n_link, n_freq)`
-- **`gr_eps_re`**, **`gr_eps_im`** — Real and imaginary part instead of `gr_eps` (`complex=False`); `(n_link, n_freq)`
+- **`gr_eps`** — Relative permittivity of the ground, imaginary part >= 0; the complex value of TR 38.901 eq.
+  (7.6-40) is `gr_eps.conj()`; complex128; `(n_link, n_freq)`
 - **`eod_offset_deg`** — EoD offset in deg, positive = up; `(n_link, n_freq)`
 - **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of s for DS, lg of deg for the angular spreads, dB
   for KF, SF and XPR; required by [[ssf_rays]]; `(n_link, n_freq, 8)`
@@ -94,14 +85,12 @@ py::tuple lsp_generate(py::handle scenpar,
                        const py::array_t<double> &rnd,
                        py::handle sf_sigma_dB,
                        py::handle cholesky,
-                       py::handle clip_spreads,
-                       py::handle complex)
+                       py::handle clip_spreads)
 {
     // Read inputs
     const auto scenpar_a = qd_python_dict2scenpar(scenpar, "scenpar");
     const bool cholesky_b = qd_python_flag(cholesky, true, "cholesky");
     const bool clip_spreads_b = qd_python_flag(clip_spreads, true, "clip_spreads");
-    const bool complex_b = qd_python_flag(complex, true, "complex");
     const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
     const auto tx_pos_a = qd_python_numpy2arma_Mat<double>(tx_pos, true);
     const auto rx_pos_a = qd_python_numpy2arma_Mat<double>(rx_pos, true);
@@ -120,14 +109,6 @@ py::tuple lsp_generate(py::handle scenpar,
     auto lsp_mu_py = qd_python_init_output(n_link, n_freq, (arma::uword)8, &lsp_mu);
     auto lsp_sigma_py = qd_python_init_output(n_link, n_freq, (arma::uword)8, &lsp_sigma);
 
-    // The split permittivity is written zero-copy; the complex one is merged after the call
-    py::array_t<double> gr_eps_re_py, gr_eps_im_py;
-    if (!complex_b)
-    {
-        gr_eps_re_py = qd_python_init_output(n_link, n_freq, &gr_eps_re);
-        gr_eps_im_py = qd_python_init_output(n_link, n_freq, &gr_eps_im);
-    }
-
     // Wrap optional pointers
     const arma::mat *p_sf_sigma = sf_sigma_a.is_empty() ? nullptr : &sf_sigma_a;
 
@@ -135,11 +116,7 @@ py::tuple lsp_generate(py::handle scenpar,
     quadriga_lib::lsp_generate(scenpar_a, center_freq_a, tx_pos_a, rx_pos_a, rnd_a, lsp, p_sf_sigma, &abs_toa, &gr_eps_re,
                                &gr_eps_im, &eod_offset_deg, &lsp_mu, &lsp_sigma, cholesky_b, clip_spreads_b);
 
-    if (complex_b)
-    {
-        auto gr_eps_py = qd_python_copy2numpy<double, std::complex<double>>(&gr_eps_re, &gr_eps_im);
-        return py::make_tuple(lsp_py, abs_toa_py, gr_eps_py, eod_offset_deg_py, lsp_mu_py, lsp_sigma_py);
-    }
-    return py::make_tuple(lsp_py, abs_toa_py, gr_eps_re_py, gr_eps_im_py, eod_offset_deg_py, lsp_mu_py,
-                          lsp_sigma_py);
+    // The permittivity is merged into one complex array (small: one value per link and frequency)
+    auto gr_eps_py = qd_python_copy2numpy<double, std::complex<double>>(&gr_eps_re, &gr_eps_im);
+    return py::make_tuple(lsp_py, abs_toa_py, gr_eps_py, eod_offset_deg_py, lsp_mu_py, lsp_sigma_py);
 }

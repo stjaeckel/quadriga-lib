@@ -163,9 +163,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("angles") = false,
           py::arg("irs_array_2") = py::none(),
           py::arg("active_path") = py::none(),
-          py::arg("use_kernel") = 0,
-          py::kw_only(),
-          py::arg("complex") = true);
+          py::arg("use_kernel") = 0);
 
     m.def("planar", &get_channels_planar,
           py::arg("tx_array"),
@@ -185,9 +183,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("use_kernel") = 0,
-          py::arg("i_freq") = 0,
-          py::kw_only(),
-          py::arg("complex") = true);
+          py::arg("i_freq") = 0);
 
     m.def("spherical", &get_channels_spherical,
           py::arg("tx_array"),
@@ -206,9 +202,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false,
           py::arg("use_kernel") = 0,
-          py::arg("i_freq") = 0,
-          py::kw_only(),
-          py::arg("complex") = true);
+          py::arg("i_freq") = 0);
 
     m.def("multifreq", &get_channels_multifreq,
           py::arg("tx_array"),
@@ -227,9 +221,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("propagation_speed") = 299792458.0,
-          py::arg("use_kernel") = 0,
-          py::kw_only(),
-          py::arg("complex") = true);
+          py::arg("use_kernel") = 0);
 
     m.def("quantize_delays", &quantize_delays,
           py::arg("coeff_re") = py::none(),
@@ -241,7 +233,6 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("fix_taps") = 0,
           py::kw_only(),
           py::arg("stack") = false,
-          py::arg("complex") = true,
           py::arg("coeff") = py::none());
 
     m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));

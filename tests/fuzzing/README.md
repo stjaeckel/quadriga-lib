@@ -116,7 +116,7 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 | `fz_arrayant_generate` | Parameters | The `generate_arrayant_*` functions and `generate_speaker` |
 | `fz_arrayant_interpolate` | Array antenna, angles | `arrayant_interpolate`, `arrayant_interpolate_multi` |
 | `fz_arrayant_edit` | Array antenna | The `arrayant` functions and members in a fuzzed order, the `arrayant_*_multi` functions, `qdant_write` and `qdant_read` |
-| `fz_get_channels` | Array antennas, paths | `get_channels_spherical`, `get_channels_planar`, `get_channels_irs`, `get_channels_multifreq` |
+| `fz_get_channels` | Array antennas, paths | `get_channels_spherical`, `get_channels_planar` (also `_vec`), `get_channels_irs`, `get_channels_multifreq` |
 | `fz_channel_tools` | Coefficients, delays | `quantize_delays`, the `baseband_freq_response` functions |
 | `fz_hdf5_write` | Channel object | `channel` member functions, the HDF5 writers, then the HDF5 readers on the written file |
 | `fz_sos` | Frequencies, phases, ACF tables | The `sos_*` functions |

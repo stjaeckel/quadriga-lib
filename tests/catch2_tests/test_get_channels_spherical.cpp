@@ -2211,6 +2211,24 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
                                                              cr, ci, dl, 3.5e9, false, fake_los, &ad, &ed, &aa, &ea);
             REQUIRE(cr.size() == n_snap);
             REQUIRE(ea.size() == n_snap);
+
+            // Complex output: same values as the split output (same computation), split outputs left empty
+            std::vector<arma::cube> cr2(2), ci2(2), dl2;
+            std::vector<arma::cx_cube> cx;
+            quadriga_lib::get_channels_spherical_vec<double>(tx, rx, Tp, tx_ori, rx_pos, rx_ori, fbs, lbs, gain, len, M,
+                                                             cr2, ci2, dl2, 3.5e9, false, fake_los,
+                                                             nullptr, nullptr, nullptr, nullptr, &cx);
+            CHECK(cr2.empty());
+            CHECK(ci2.empty());
+            REQUIRE(cx.size() == n_snap);
+            for (arma::uword s = 0; s < n_snap; ++s)
+            {
+                REQUIRE(arma::size(cx[s]) == arma::size(cr[s]));
+                CHECK(arma::all(arma::vectorise(arma::real(cx[s]) == cr[s])));
+                CHECK(arma::all(arma::vectorise(arma::imag(cx[s]) == ci[s])));
+                CHECK(arma::all(arma::vectorise(dl2[s] == dl[s])));
+            }
+
             for (arma::uword s = 0; s < n_snap; ++s)
             {
                 arma::cube r_cr, r_ci, r_dl, r_ad, r_ed, r_aa, r_ea;
@@ -2240,6 +2258,17 @@ TEST_CASE("Get Channels Spherical - vec form equals single calls")
     CHECK(cr[0].memptr() == p);
     CHECK(dl.size() == 1);
     CHECK(std::abs(dl[0](0) * 299792458.0f - (std::sqrt(14.0f) + std::sqrt(94.0f) - 10.0f)) < 1e-4f); // relative to LOS
+
+    // Complex output entries of the right size are written in place too
+    std::vector<arma::cx_fcube> cx(1, arma::cx_fcube(1, 1, 1));
+    const std::complex<float> *pc = cx[0].memptr();
+    quadriga_lib::get_channels_spherical_vec<float>(txf, txf, arma::fmat({0.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
+                                                    arma::fmat({10.0f, 0.0f, 0.0f}).t(), arma::fmat(3, 1, arma::fill::zeros),
+                                                    fbs_f, fbs_f, gain_f, len_f, M_f, cr, ci, dl, 1e9f, false, false,
+                                                    nullptr, nullptr, nullptr, nullptr, &cx);
+    CHECK(cx[0].memptr() == pc);
+    CHECK(cr.empty());
+    CHECK(std::abs(cx[0](0)) > 0.0f);
 
     // No snapshots: empty outputs
     std::vector<arma::fmat> e_m;
@@ -2280,7 +2309,7 @@ TEST_CASE("Get Channels Spherical - vec form errors")
     CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, bad, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
                       ContainsSubstring("Receive antenna: ") && !ContainsSubstring("Snapshot"));
     CHECK_THROWS_AS(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, e_m, e_m, e_v, e_v, e_m, cr, ci, dl,
-                                                                     0.0, false, false, nullptr, nullptr, nullptr, nullptr, 7),
+                                                                     0.0, false, false, nullptr, nullptr, nullptr, nullptr, nullptr, 7),
                     std::invalid_argument);
 
     // Errors of the single call name the lowest failing snapshot, also from the parallel region (40 snapshots)

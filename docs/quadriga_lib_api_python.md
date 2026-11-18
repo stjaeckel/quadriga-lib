@@ -12,9 +12,9 @@ lang: en-US
 - `import quadriga_lib`; all functions live in its submodules `arrayant`, `channel`, `tools`, `RTtools`, `sos` and `gbsm`, except `version` and `components`, which are at the top level. A name drops the prefix that would repeat its submodule (`arrayant_`, `channel_` and `get_channels_`, `sos_`, `gbsm_`): C++ `get_channels_spherical` is `quadriga_lib.channel.spherical`. The Usage line shows the full call, e.g. `quadriga_lib.tools.acdf(...)` or `quadriga_lib.version()`.
 - Array shapes follow in backticks as numpy shapes, e.g. `(n_rx, n_tx, n_path)`; `(n,)` is a 1D array.
 - Array inputs take numpy arrays in any memory order; lists, scalars and other numeric dtypes are converted (copied). Outputs are numpy arrays: float64 for real values, complex128 for complex values; integer outputs have the dtype stated at the output.
-- Complex data: many functions take or return complex arrays where C++ uses separate `_re` / `_im` arrays or interleaved rows; some select the form with a `complex` flag. Each function states its form.
+- Complex data: many functions take or return complex arrays where C++ uses separate `_re` / `_im` arrays or interleaved rows; complex outputs are always complex arrays (`x.real` and `x.imag` give the parts without a copy). Each function states its form.
 - Data structures (array antennas, channels, scenario parameters, ray data) are dicts; the function that defines one lists its keys. Each call builds a new arrayant from an arrayant dict, so its data is checked in full on every call.
-- Arguments have the names, order and defaults of the C++ function unless the function states otherwise. The flags `complex` and `stack` are keyword-only: pass them as `complex=False`, `stack=True`.
+- Arguments have the names, order and defaults of the C++ function unless the function states otherwise. The flag `stack` is keyword-only: pass it as `stack=True`.
 - Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Flags (bool options) take a `bool` or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`. File names take a `str`, `bytes` or path-like object (e.g. `pathlib.Path`). Several outputs are returned as a tuple in the order of the Usage line.
 - Errors: invalid inputs (shape/domain, an index outside the layout of a file) raise `ValueError`, a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) `RuntimeError`, an index out of range of an input array `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument.
 
@@ -568,8 +568,6 @@ V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolat
 # Multi-frequency mode
 V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
 
-# Real and imaginary parts as separate arrays
-V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., complex=False )
 ```
 
 ### Inputs:
@@ -592,14 +590,10 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
   a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
   default: `False`
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
-- **`complex`** — Keyword-only; return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
-  default: `True`
 
 ### Outputs:
 - **`V`** — e-theta (vertical) field, complex; `(n_out, n_ang)`; multi-frequency mode: `(n_out, n_ang, n_freq)`
 - **`H`** — e-phi (horizontal) field, complex; same shape as `V`
-- **`V_re`** / **`V_im`** / **`H_re`** / **`H_im`** — Real and imaginary parts of `V` and `H`; returned in their place
-  when `complex` is `False`
 - **`dist`** — Distance of each element from the wavefront plane through the origin of the antenna; negative for
   elements closer to the source; `(n_out, n_ang)`; returned when `dist` is `True`
 - **`azimuth_loc`** / **`elevation_loc`** — Azimuth and elevation in the local antenna frame; `(n_out, n_ang)`;
@@ -1335,9 +1329,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [MATLAB](quadriga_lib
   (nearest-neighbor selection) but tap-selection logic still applies
 - Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
 - Coefficients are given either as one complex list `coeff`, or as split `coeff_re` + `coeff_im`;
-  supplying both forms is an error. The input and output forms are independent
-- `complex=True` (default) returns one combined complex coefficient output; `complex=False` returns
-  separate real `coeff_re_q` and `coeff_im_q`
+  supplying both forms is an error. The output coefficients are complex for both input forms
 - Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
   shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
@@ -1355,12 +1347,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#quantize_delays) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-# Complex input and output (keyword)
+# Complex input (keyword)
 coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay )
 
-# Split real / imaginary input and output
-coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay, \
-    complex=False )
+# Split real / imaginary input
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
 ```
 
 ### Inputs:
@@ -1379,18 +1370,12 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re
   2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
 - **`stack`** — Keyword-only; if `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
-- **`complex`** — Keyword-only; if `True`, return combined complex coefficients `coeff_q`; if `False`, return
-  separate `coeff_re_q` and `coeff_im_q`; default: `True`
 - **`coeff`** — Keyword-only; complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
   mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
 ### Outputs:
-- **`coeff_q`** — Combined complex output coefficients; returned when `complex` is `True`; list of
-  `(n_rx, n_tx, n_taps)` when `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)`
-- **`coeff_re_q`** — Output coefficients, real part; returned when `complex` is `False`; list of
-  `(n_rx, n_tx, n_taps)` when `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)`
-- **`coeff_im_q`** — Output coefficients, imaginary part; returned when `complex` is `False`; same
-  shape as `coeff_re_q`
+- **`coeff_q`** — Complex output coefficients; list of `(n_rx, n_tx, n_taps)` when `stack` is `False`, else
+  `(n_rx, n_tx, n_taps, n_snap)`
 - **`delay_q`** — Output delays in seconds; list of `(n_rx, n_tx, n_taps)` or `(1, 1, n_taps)` when
   `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)` or `(1, 1, n_taps, n_snap)`; the `(1, 1, ...)`
   shape only for shared delay input with `fix_taps` 1 or 2
@@ -1516,16 +1501,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [MATLAB](quadriga_li
 
 ### Usage:
 ```python
-# Complex coefficients (default)
 coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, \
-    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel, \
-    complex=True )
-
-# Real and imaginary parts as separate arrays
-coeff_re, coeff_im, delay, active_path_out = quadriga_lib.channel.irs( ..., complex=False )
+    i_irs, threshold_dB, center_freq, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
 
 # Departure and arrival angles as well
 coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..., angles=True )
@@ -1565,13 +1545,9 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
   when not empty; `(n_path_1 · n_path_2,)`; default: `None`
 - **`use_kernel`** — Kernel of both segments, as in [channel.spherical](#channel.spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; raises if unavailable); auto selects GENERIC in this version; `int`; default: 0
-- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
-  return separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_rx, n_tx, n_path_irs)`
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
+- **`coeff`** — Complex channel coefficients; `(n_rx, n_tx, n_path_irs)`
 - **`delay`** — Propagation delays in seconds; `(n_rx, n_tx, n_path_irs)`
 - **`active_path_out`** — Mask of the path combinations in the output (can be passed as `active_path` to a later
   call); `bool`; `(n_path_1 · n_path_2,)`
@@ -1624,16 +1600,12 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadr
   before it interpolates across `freq`, so it needs channels generated with `use_absolute_delays = True`; with
   relative delays, the phase of the TX-RX distance stays in the coefficients, is interpolated across the frequency
   grid and gives wrong phases
-- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
-  separate real `coeff_re` and `coeff_im`
 
 ### Usage:
 ```python
 coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
-    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel, complex=True )
-
-coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
 ```
 
 ### Inputs:
@@ -1659,13 +1631,9 @@ coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [interpolate](#interpolate); `int`; default: 0
-- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
-  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
+- **`coeff`** — Complex channel coefficients; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
 - **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
 
 ### See also:
@@ -1701,35 +1669,42 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [MATLAB](quadriga
   paths keep their order, shifted by one slot.
 - With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
-  separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
+- Errors in the path data of a snapshot start with `Snapshot <i>: ` (0-based), also for a single snapshot
+  (`Snapshot 0: `); antenna and `use_kernel` errors have no prefix.
+
+### Batch mode:
+- If `aod` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots in one call,
+  the snapshots in parallel (OpenMP in C++).
+- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `M` are then lists of length `n_snap`;
+  list entries that are Fortran-contiguous float64 arrays are read in place, other entries are copied.
+- The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array or a
+  single-column `(3, 1)` array is applied to all snapshots.
+- All outputs are returned as lists of length `n_snap`, one entry per snapshot.
+- The GIL is released while processing, so the function can be combined with Python threads. The function keeps
+  references to all input arrays until it returns, but other threads must not write into them meanwhile.
 
 ### Usage:
 ```python
 coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
-    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq, complex=True )
-
-coeff_re, coeff_im, delay, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
-
-coeff, delay, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
+    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
 ```
 
 ### Inputs:
 - **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](#generate); a 4D dict raises
   `ValueError` (use [channel.multifreq](#channel.multifreq))
 - **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`aod`** — Departure azimuth angles in rad; `(n_path,)`
-- **`eod`** — Departure elevation angles in rad; `(n_path,)`
-- **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
-- **`eoa`** — Arrival elevation angles in rad; `(n_path,)`
-- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
-- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
-- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`, or `(3, n_snap)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`, or `(3, n_snap)` in batch mode
+- **`aod`** — Departure azimuth angles in rad; `(n_path,)`, or a list of length `n_snap` in batch mode
+- **`eod`** — Departure elevation angles in rad; `(n_path,)`, or a list in batch mode
+- **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`, or a list in batch mode
+- **`eoa`** — Arrival elevation angles in rad; `(n_path,)`, or a list in batch mode
+- **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list in batch mode
+- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`, or a list in batch mode
+- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
   coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
@@ -1739,13 +1714,9 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
   unavailable); auto selects GENERIC in this version, see [interpolate](#interpolate); `int`; default: 0
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
-- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
-  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
+- **`coeff`** — Complex channel coefficients; `(n_ports_rx, n_ports_tx, n_path)`
 - **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
@@ -1787,8 +1758,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [MATLAB](quadr
 - With 0 paths (all path inputs empty), the outputs are empty, `(n_rx, n_tx, 0)`; with `add_fake_los_path = True` they
   hold only this zero-power LOS path, with the LOS delays and angles per antenna pair (also per snapshot in batch
   mode).
-- `complex=True` (default) returns one combined complex coefficient array `coeff`; `complex=False` returns
-  separate real `coeff_re` and `coeff_im` via a zero-copy fast path
+- Errors in the path data of a snapshot start with `Snapshot <i>: ` (0-based), also for a single snapshot
+  (`Snapshot 0: `); antenna and `use_kernel` errors have no prefix.
 
 ### Batch mode:
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
@@ -1801,18 +1772,14 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [MATLAB](quadr
 - All outputs are returned as lists of length `n_snap`, one entry per snapshot.
 - Snapshots without any path produce an empty output entry with `n_path = 0`, or only the zero-power LOS path
   when `add_fake_los_path` is set (as for a single snapshot).
-- Batch mode releases the GIL while processing, so it can be combined with Python threads. The function keeps
+- The GIL is released while processing, so the function can be combined with Python threads. The function keeps
   references to all input arrays until it returns, but other threads must not write into them meanwhile.
 
 ### Usage:
 ```python
-# Complex coefficients (default)
 coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
-    center_freq, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq, complex=True )
-
-# Real and imaginary parts as separate arrays
-coeff_re, coeff_im, delay = quadriga_lib.channel.spherical( ..., complex=False )
+    center_freq, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
 
 # Departure and arrival angles as well
 coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
@@ -1844,13 +1811,9 @@ coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=T
   `int`; default: 0
 - **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
-- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
-  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
-- **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
-- **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
-- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
+- **`coeff`** — Complex channel coefficients; `(n_ports_rx, n_ports_tx, n_path)`
 - **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`aod`** — Azimuth of departure in the GCS, in rad; `(n_ports_rx, n_ports_tx, n_path)`; only with `angles=True`
 - **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
@@ -2672,18 +2635,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#lsp_generate) · [MATLAB](quadriga_lib_ap
   f'`, plus `10^((EoD_offset_a + EoD_offset_a_gamma·lg f')·lg(max(EoD_offset_b, d)) + EoD_offset_c +
   EoD_offset_c_gamma·lg f' + EoD_offset_c_hUT·hUT)` if `EoD_offset_b > 0`, plus `(atan((EoD_offset_hcl - h)/d) -
   atan((hUT - h)/d))·180/pi` if `hUT < EoD_offset_hcl`
-- `complex = True` returns the permittivity as one complex array `gr_eps = gr_eps_re + 1j·gr_eps_im`; `complex = False`
-  returns the two real arrays `gr_eps_re`, `gr_eps_im` in its place (one more output)
 
 ### Usage:
 ```python
-# complex=True (default)
 lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_generate( scenpar, \
-    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads, complex=True )
-
-# complex=False
-lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
-    lsp_sigma = quadriga_lib.gbsm.lsp_generate( ..., complex=False )
+    center_freq, tx_pos, rx_pos, rnd, sf_sigma_dB, cholesky, clip_spreads )
 ```
 
 ### Inputs:
@@ -2699,15 +2655,13 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
 - **`clip_spreads`** — `True`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause 7.5 step 4);
   `lsp_mu` and `lsp_sigma` are not affected; default: True
-- **`complex`** — Keyword-only; see the description; default: True
 
 ### Outputs:
 - **`lsp`** — Large-scale parameters; slices: 0 DS in s; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA in
   deg; `(n_link, n_freq, 8)`
 - **`abs_toa`** — Absolute TOA offset in s, 0 if not active; `(n_link,)`
-- **`gr_eps`** — Relative permittivity of the ground (`complex=True`), imaginary part >= 0; the complex value of TR
-  38.901 eq. (7.6-40) is `gr_eps.conj()`; complex128; `(n_link, n_freq)`
-- **`gr_eps_re`**, **`gr_eps_im`** — Real and imaginary part instead of `gr_eps` (`complex=False`); `(n_link, n_freq)`
+- **`gr_eps`** — Relative permittivity of the ground, imaginary part >= 0; the complex value of TR 38.901 eq.
+  (7.6-40) is `gr_eps.conj()`; complex128; `(n_link, n_freq)`
 - **`eod_offset_deg`** — EoD offset in deg, positive = up; `(n_link, n_freq)`
 - **`lsp_mu`** — Mean `mu` in the log domain, slices as `lsp`: lg of s for DS, lg of deg for the angular spreads, dB
   for KF, SF and XPR; required by [ssf_rays](#ssf_rays); `(n_link, n_freq, 8)`

@@ -2,8 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-// Channel coefficients from paths and array antennas: get_channels_spherical, get_channels_planar, get_channels_irs
-// and get_channels_multifreq with generated or fuzzed arrayants, fuzzed positions, orientations and path data
+// Channel coefficients from paths and array antennas: get_channels_spherical, get_channels_planar, their "_vec" batch
+// forms, get_channels_irs and get_channels_multifreq with generated or fuzzed arrayants, fuzzed positions, orientations and path data
 // (consistent or mismatched sizes), optional outputs, options and the available kernels
 
 #include "fuzz_target.hpp"
@@ -76,7 +76,7 @@ static void run(fz::input &in)
         return (outs & 128) ? m : arma::Mat<T>(m.t());
     };
 
-    switch (in.ConsumeIntegralInRange<int>(0, 3))
+    switch (in.ConsumeIntegralInRange<int>(0, 4))
     {
     case 0:
     {
@@ -123,6 +123,48 @@ static void run(fz::input &in)
                                                        opt(aod, 3), opt(eod, 4), opt(aoa, 5), opt(eoa, 6),
                                                        use_irs2 ? &irs2 : nullptr, use_active ? &active : nullptr,
                                                        use_active_out ? &active_out : nullptr, use_kernel); });
+        break;
+    }
+    case 3:
+    {
+        // Batch forms: up to 4 snapshots with their own path counts, positions [3, 1] or [3, n_cols] (n_cols fuzzed),
+        // split or complex coefficients
+        const arma::uword n_snap = in.size(4);
+        std::vector<arma::Mat<T>> fbs, lbs, M;
+        std::vector<arma::Col<T>> gain, length, a1, a2, a3, a4;
+        for (arma::uword s = 0; s < n_snap; ++s)
+        {
+            const arma::uword n_path = in.size(6);
+            paths<T> q(in, n_path);
+            fbs.push_back(q.fbs), lbs.push_back(q.lbs), M.push_back(q.M), gain.push_back(q.gain), length.push_back(q.length);
+            a1.push_back(in.col<T>(n_path)), a2.push_back(in.col<T>(n_path)), a3.push_back(in.col<T>(n_path)), a4.push_back(in.col<T>(n_path));
+        }
+        if (in.ConsumeBool() && n_snap != 0) // one list shorter than the others
+            (in.ConsumeBool() ? gain : a3).pop_back();
+        auto cols = [&](int i)
+        {
+            const arma::uword n = in.ConsumeBool() ? 1 : (in.ConsumeBool() ? n_snap : in.size(5));
+            arma::Mat<T> m(3, n);
+            for (arma::uword c = 0; c < n; ++c)
+                m(0, c) = p[i] + T(c), m(1, c) = p[i + 1], m(2, c) = p[i + 2];
+            return m;
+        };
+        const arma::Mat<T> tp = cols(0), to = cols(3), rp = cols(6), ro = cols(9);
+        std::vector<arma::Cube<T>> v_re, v_im, v_dl, v_aod, v_eod, v_aoa, v_eoa;
+        std::vector<arma::Col<T>> v_dop;
+        std::vector<arma::Cube<std::complex<T>>> v_cx;
+        auto vopt = [&](std::vector<arma::Cube<T>> &x, int bit) { return (outs >> bit) & 1 ? &x : nullptr; };
+        const bool cx = in.ConsumeBool();
+        const int use_kernel = in.ConsumeIntegralInRange<int>(0, quadriga_lib::quadriga_lib_has_AVX2() ? 2 : 1);
+        if (in.ConsumeBool())
+            fz::clean([&] { quadriga_lib::get_channels_spherical_vec<T>(tx, rx, tp, to, rp, ro, fbs, lbs, gain, length, M,
+                                                                        v_re, v_im, v_dl, fc, absolute, fake_los,
+                                                                        vopt(v_aod, 3), vopt(v_eod, 4), vopt(v_aoa, 5), vopt(v_eoa, 6),
+                                                                        cx ? &v_cx : nullptr, use_kernel); });
+        else
+            fz::clean([&] { quadriga_lib::get_channels_planar_vec<T>(tx, rx, tp, to, rp, ro, a1, a2, a3, a4, gain, length, M,
+                                                                     v_re, v_im, v_dl, fc, absolute, fake_los,
+                                                                     (outs & 8) ? &v_dop : nullptr, cx ? &v_cx : nullptr, use_kernel); });
         break;
     }
     default:

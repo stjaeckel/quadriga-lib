@@ -93,9 +93,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("rnd").none(false),
           py::arg("sf_sigma_dB") = py::none(),
           py::arg("cholesky") = true,
-          py::arg("clip_spreads") = true,
-          py::kw_only(),
-          py::arg("complex") = true);
+          py::arg("clip_spreads") = true);
 
     m.def("los_probability", &los_probability,
           py::arg("model"),
