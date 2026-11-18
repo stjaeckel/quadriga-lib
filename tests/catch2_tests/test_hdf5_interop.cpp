@@ -886,7 +886,8 @@ TEST_CASE("hdf5 - files modified with the HDF5 C library are rejected or read co
                                  { quadriga_lib::hdf5_write_dset(fn, "x", &x, 0); }},
                                 {"hdf5_reshape_layout", [&]()
                                  { quadriga_lib::hdf5_reshape_layout(fn, 2, 2); }}});
-        quadriga_lib::hdf5_create_file(fn, 2); // Replaces the file
+        std::remove(fn.c_str());
+        quadriga_lib::hdf5_create_file(fn, 2);
         CHECK(quadriga_lib::hdf5_write_channel(fn, &c, 1) == 0);
         CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1).coeff_re[0](0) == 9.0);
     }

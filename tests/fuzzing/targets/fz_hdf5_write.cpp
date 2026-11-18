@@ -4,8 +4,8 @@
 
 // Channel objects with fuzzed members (consistent or mismatched sizes, unstructured par_names / par_data of all
 // types): channel::is_valid, calc_effective_path_gain, add_paths, write_paths_to_obj_file, then hdf5_create_file,
-// hdf5_write_channel, hdf5_write_dset, hdf5_reshape_layout and the readers hdf5_read_layout, hdf5_read_channel,
-// hdf5_read_dset_names, hdf5_read_dset
+// hdf5_write_channel (also hdf5_write_channel_vec), hdf5_write_dset, hdf5_reshape_layout and the readers
+// hdf5_read_layout, hdf5_read_channel (also with i_snap and hdf5_read_channel_vec), hdf5_read_dset_names, hdf5_read_dset
 
 #include "fuzz_target.hpp"
 
@@ -198,6 +198,20 @@ static void run(fz::input &in)
     fz::clean([&] { arma::u32_vec id; quadriga_lib::hdf5_read_layout(fn, &id); });
     fz::clean([&] { quadriga_lib::hdf5_read_channel<T>(fn, ix, iy, iz, iw); });
     fz::clean([&] { quadriga_lib::hdf5_read_channel<double>(fn, 0); });
+
+    // Snapshot selection: fuzzed indices (valid, just past the end, or the largest value), then both batch functions
+    {
+        arma::uvec i_snap(in.size(3));
+        for (auto &i : i_snap)
+            i = in.index(c.n_snap());
+        fz::clean([&] { quadriga_lib::hdf5_read_channel<T>(fn, ix, iy, iz, iw, &i_snap); });
+        arma::Mat<unsigned> slots = {{ix, (unsigned)in.index(2)}, {iy, (unsigned)in.index(2)}, {iz, 0}, {iw, 0}};
+        if (in.ConsumeBool()) // Other shapes, also without rows
+            slots.resize(in.size(5), in.size(3));
+        std::vector<quadriga_lib::channel<T>> chan_vec = {c, c};
+        fz::clean([&] { quadriga_lib::hdf5_write_channel_vec(fn, chan_vec, slots); });
+        fz::clean([&] { quadriga_lib::hdf5_read_channel_vec<T>(fn, slots, &i_snap); });
+    }
     std::vector<std::string> names;
     fz::clean([&] { quadriga_lib::hdf5_read_dset_names(fn, &names, ix, iy, iz, iw); });
     for (const auto &n : names)

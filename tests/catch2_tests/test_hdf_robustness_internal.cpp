@@ -1030,6 +1030,14 @@ TEST_CASE("hdf5 - channel data that contradicts the channel attributes is reject
         remove_link("channel_2", "Snap_1");
         check_rejected(1);
     }
+    SECTION("malformed snapshot group that is not selected: only the selected groups are read and checked")
+    {
+        set_dataspace("channel_2/Snap_2/delay", {400});
+        const arma::uvec i_ok = {1, 0}, i_bad = {2};
+        CHECK(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, &i_ok).n_snap() == 2);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 1, 0, 0, 0, &i_bad), std::runtime_error);
+        CHECK_THROWS_AS(quadriga_lib::hdf5_read_channel<double>(fn, 1), std::runtime_error);
+    }
     SECTION("snapshot group names with a leading zero, beyond 2^32 - 1, with 25 digits")
     {
         for (const std::string &name : {std::string("Snap_01"), std::string("Snap_4294967296"), "Snap_" + std::string(25, '1')})
@@ -1211,6 +1219,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         // byte, the extent fits the file, but the slice pointers of the cube (8 bytes each) do not.
         for (bool huge : {false, true})
         {
+            std::remove(fn.c_str());
             quadriga_lib::hdf5_create_file(fn, 4);
             quadriga_lib::channel<double> c;
             c.tx_pos = arma::vec({0.0, 0.0, 1.0});
@@ -1237,6 +1246,7 @@ TEST_CASE("hdf5 - empty datasets with huge extents and huge interaction counts a
         c.interact_coord = {arma::mat(3, 1, arma::fill::ones)};
         for (std::pair<uint32_t, uint32_t> counts : {std::pair<uint32_t, uint32_t>{0xFFFFFFFFu, 0xFFFFFFFFu}, {1u << 29, 0u}})
         {
+            std::remove(fn.c_str());
             quadriga_lib::hdf5_create_file(fn, 4);
             quadriga_lib::hdf5_write_channel(fn, &c, 0);
             edit_messages(fn, "channel_1/no_interact", 0, [&](std::vector<message> &m)
@@ -1268,6 +1278,7 @@ TEST_CASE("hdf5 - index data that overlaps object headers is rejected before a w
                                                      {"Order", 724}, {"ChannelRef", 712}})
         {
             INFO("data of " << p.first << " at " << p.second);
+            std::remove(fn.c_str());
             quadriga_lib::hdf5_create_file(fn, 4);
             set_data_address(p.first, p.second);
             check_all_throw(fn, all_functions(fn));
@@ -1882,6 +1893,7 @@ TEST_CASE("hdf5 - every intermediate state of an interrupted write is a valid fi
     }
     SECTION("hdf5_write_channel overwrite with the old and the new link in the same link chunk")
     {
+        std::remove(fn_a.c_str());
         quadriga_lib::hdf5_create_file(fn_a, 3);
         for (unsigned s = 0; s < 2; ++s)
         {
