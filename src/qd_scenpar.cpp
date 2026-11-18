@@ -506,7 +506,8 @@ static qd_conf_num qd_conf_parse_number(const std::string &s, double &v)
         return QD_NUM_INVALID;
 
     // The text is a plain decimal number; convert it independent of the global locale. The stream fails on
-    // overflow (LWG 23); on underflow to 0, some libraries return 0 (libstdc++) and others fail (MSVC).
+    // overflow (LWG 23); on underflow to 0, some libraries return 0 (libstdc++) and others fail (MSVC). libc++ also
+    // fails on a subnormal result, but stores its correct value.
     std::istringstream is(s);
     is.imbue(std::locale::classic());
     double w = 0.0;
@@ -518,7 +519,7 @@ static qd_conf_num qd_conf_parse_number(const std::string &s, double &v)
     }
     if (nonzero && order > 0)
         return QD_NUM_RANGE;
-    v = negative ? -0.0 : 0.0;
+    v = (w != 0.0 && std::isfinite(w)) ? w : (negative ? -0.0 : 0.0);
     return QD_NUM_OK;
 }
 
