@@ -31,7 +31,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 
 ## Usage:
 ```
-[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
+[ origN, destN, fbsN, sbsN, gainN, polmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
     edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( interaction_type, center_freq, orig, dest, mesh, ...
     mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
@@ -62,8 +62,8 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2,
   single TE coefficient for types 3–5; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; includes interaction gain, TE/TM coefficients,
+- **`polmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
+  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`); includes interaction gain, TE/TM coefficients,
   incidence plane orientation; excludes in-medium attenuation and FSPL; `[8, n_rayN]`. For types
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if
@@ -149,12 +149,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto *p_mtl_prop = mtl_prop.empty() ? nullptr : &mtl_prop;
 
     // Output containers with known size (aliased to MATLAB memory via qd_mex_init_output)
-    arma::mat origN, destN, fbsN, sbsN, xprmatN, trivecN, tridirN, normal_vecN, path_dirN;
+    arma::mat origN, destN, fbsN, sbsN, polmatN, trivecN, tridirN, normal_vecN, path_dirN;
     arma::vec gainN, fbs_angleN, thicknessN, edge_lengthN;
     std::vector<uint8_t> out_typeN;
     arma::u32_vec ray_indN;
 
-    // xprmat: 8 rows for EM (types 0-2), 2 rows for scalar (types 3-5); one column per output ray
+    // polmat: 8 rows for EM (types 0-2), 2 rows for scalar (types 3-5); one column per output ray
     const arma::uword n_xpr = (interaction_type <= 2) ? 8 : 2;
 
     plhs[0] = qd_mex_init_output(&origN, n_rayN, 3);
@@ -167,7 +167,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 4)
         plhs[4] = qd_mex_init_output(&gainN, n_rayN);
     if (nlhs > 5)
-        plhs[5] = qd_mex_init_output(&xprmatN, n_xpr, n_rayN);
+        plhs[5] = qd_mex_init_output(&polmatN, n_xpr, n_rayN);
     if (nlhs > 6)
         plhs[6] = p_trivec ? qd_mex_init_output(&trivecN, n_rayN, 9) : mxCreateDoubleMatrix(0, 0, mxREAL);
     if (nlhs > 7)
@@ -189,7 +189,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_fbsN = (nlhs > 2) ? &fbsN : nullptr;
     arma::mat *p_sbsN = (nlhs > 3) ? &sbsN : nullptr;
     arma::vec *p_gainN = (nlhs > 4) ? &gainN : nullptr;
-    arma::mat *p_xprmatN = (nlhs > 5) ? &xprmatN : nullptr;
+    arma::mat *p_polmatN = (nlhs > 5) ? &polmatN : nullptr;
     arma::mat *p_trivecN = (nlhs > 6) ? &trivecN : nullptr;
     arma::mat *p_tridirN = (nlhs > 7) ? &tridirN : nullptr;
     arma::vec *p_fbs_angleN = (nlhs > 8) ? &fbs_angleN : nullptr;
@@ -205,7 +205,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         interaction_type, center_freq,
         &orig, &dest, &mesh, p_mtl_ind, p_mtl_prop, &fbs_ind, &sbs_ind,
         p_trivec, p_tridir,
-        p_origN, p_destN, p_fbsN, p_sbsN, p_gainN, p_xprmatN,
+        p_origN, p_destN, p_fbsN, p_sbsN, p_gainN, p_polmatN,
         p_trivecN, p_tridirN,
         p_fbs_angleN, p_thicknessN, p_edge_lengthN, p_normal_vecN, p_out_typeN,
         p_path_dirN, compact, p_ray_indN));

@@ -909,7 +909,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [Python](quadriga_l
   | `delay`            | Propagation delays in seconds                                            | `[n_rx, n_tx, n_path, n_snap]`      |
   | `path_gain`        | Path gain before antenna, linear scale                                   | `[n_path, n_snap]`                  |
   | `path_length`      | Path length in m                                                         | `[n_path, n_snap]`                  |
-  | `path_polarization`| Polarization transfer function, interleaved complex                      | `[8, n_path, n_snap]`               |
+  | `polmat`           | Polarization transfer matrix, interleaved complex                        | `[8, n_path, n_snap]`               |
   | `path_angles`      | Departure and arrival angles [AOD, EOD, AOA, EOA] in rad                 | `[n_path, 4, n_snap]`               |
   | `fbs_pos`          | First-bounce scatterer positions                                         | `[3, n_path, n_snap]`               |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
@@ -1194,16 +1194,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
-- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
+  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 
 ### Usage:
 ```matlab
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
-    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_M );
+    path_length, polmat, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
+    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_polmat );
 ```
 
 ### Inputs:
@@ -1212,10 +1212,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
   without CIRs, all outputs are empty with `n_out = 0`)
 - **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
 - **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX); logical scalar; default: `false`
-- **`normalize_M`** — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
     | :-----------: | :---------------------------------------------: | :------------------------------: |
     | 0             | As stored in QRT file                           | -PL                              |
     | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
@@ -1232,7 +1232,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#qrt_file_read) · [Python](quadriga_lib_a
 - **`lbs_pos`** — Last-bounce scatterer positions;  Cell of length `n_out`; elements `[3, n_path]`
 - **`path_gain`** — Path gain in linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
 - **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path]`
-- **`M`** — Polarization transfer matrix; Cell of length `n_out`;
+- **`polmat`** — Polarization transfer matrix; Cell of length `n_out`;
   elements `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
 - **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path]`
 - **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path]`
@@ -1409,7 +1409,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
 - The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` struct without
   `coupling_re` / `coupling_im` throws, unlike in the other functions, where it stands for identity
-- Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
+- Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx),
   rows 7-8 = (H rx, H tx)
@@ -1430,8 +1430,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 [ coeff_re, coeff_im, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
     tx_array, rx_array, irs_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
-    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
-    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
+    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1, ...
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2, ...
     i_irs, threshold_dB, center_freq, use_absolute_delays, irs_array_2, active_path, use_kernel );
 ```
 
@@ -1450,13 +1450,13 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_irs) · [Python](quadriga_li
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1, 1]`
 - **`path_length_1`** — Total path lengths from TX to IRS phase center for TX → IRS paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_1, 1]`
-- **`M_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `[8, n_path_1]`
+- **`polmat_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `[8, n_path_1]`
 - **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
 - **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
 - **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `[n_path_2, 1]`
 - **`path_length_2`** — Total path lengths from IRS to RX phase center for IRS → RX paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_2, 1]`
-- **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
+- **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
 - **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
@@ -1493,10 +1493,10 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
 - Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
-- `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
+- `path_gain` is interpolated linearly; `polmat` is interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to the nearest frequency entry on all four grids
 - `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
-- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+- `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx),
   rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -1523,7 +1523,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 ### Usage:
 ```matlab
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, ...
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, ...
     freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
 
@@ -1539,9 +1539,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [Python](quadr
 - **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq]`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
+- **`polmat`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
   `[2, n_path, n_freq]` (scalar pressure)
-- **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq, 1]`
+- **`freq`** — Input sample frequencies for `path_gain` and `polmat`; `[n_freq, 1]`
 - **`freq_new`** — Target output frequencies; `[n_freq_new, 1]`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
@@ -1569,7 +1569,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based (angles ignored).
-- Polarization transfer matrix `M` must be normalized; it is the 2x2 Jones matrix (rows = RX polarisation V/H,
+- Polarization transfer matrix `polmat` must be normalized; it is the 2x2 Jones matrix (rows = RX polarisation V/H,
   columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx),
   rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
@@ -1588,7 +1588,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 
 ### Batch mode:
 - If `aod` is a cell array, the function processes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP).
-- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `M` are then cell arrays of length
+- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `polmat` are then cell arrays of length
   `n_snap`.
 - The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
   snapshots.
@@ -1599,7 +1599,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 ### Usage:
 ```matlab
 [ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
-    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, ...
+    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, ...
     center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
@@ -1618,7 +1618,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [Python](quadriga
 - **`eoa`** — Arrival elevation angles; rad; `[n_path, 1]`, or a cell in batch mode
 - **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`, or a cell in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
@@ -1650,7 +1650,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
   using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
   V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx),
   rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -1673,7 +1673,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 ### Batch mode:
 - If `fbs_pos` is a cell array, the function processes `n_snap` snapshots in one call, the snapshots in parallel
   (OpenMP).
-- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then cell arrays of length `n_snap`, as
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `polmat` are then cell arrays of length `n_snap`, as
   [qrt_file_read](#qrt_file_read) returns them for one frequency.
 - The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
   snapshots.
@@ -1685,7 +1685,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 ```matlab
 [ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
     rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
+    path_length, polmat, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ### Inputs:
@@ -1702,7 +1702,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [Python](quadr
 - **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
   (e.g. 0) use the polyline length; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
   batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
@@ -1828,13 +1828,13 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [Python
 - XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis
 - LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
   `path_length <= dTR + window_size` are excluded by default
-- Polarization transfer matrix `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+- Polarization transfer matrix `polmat` is the 2x2 Jones matrix `M` (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 1-2 = (V rx, V tx),
   rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its
   receive and transmit polarisation: `M_vv` = rows 1-2, `M_hv` = rows 3-4, `M_vh` = rows 5-6, `M_hh` = rows 7-8
 - V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
   the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries couple circular patterns through `M` as get_channels_spherical couples antenna patterns,
+- The circular entries couple circular patterns through `polmat` as get_channels_spherical couples antenna patterns,
   `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
   (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP); names after the IEEE
   definition for the time convention exp(+j 2 pi f t) of the library's coefficients exp(-j 2 pi f tau).
@@ -1843,19 +1843,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_cross_polarization_ratio) · [Python
   Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` is co-polar (handedness
   kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
-- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `M` above about 1e18 overflow and give NaN
+- Normalization of `polmat` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `polmat` above about 1e18 overflow and give NaN
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`
 
 ### Usage:
 ```matlab
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, ...
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, polmat, path_length, tx_pos, rx_pos, ...
     include_los, window_size );
 ```
 
 ### Inputs:
 - **`powers`** — Path powers in [W]; `[n_path, n_cir]`
-- **`M`** — Polarization transfer matrices with interleaved real/imag parts; `[8, n_path, n_cir]`
+- **`polmat`** — Polarization transfer matrices with interleaved real/imag parts; `[8, n_path, n_cir]`
 - **`path_length`** — Absolute TX-to-RX path lengths; `[n_path, n_cir]`
 - **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
 - **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
@@ -2324,7 +2324,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [Python](quadriga_lib_api_python.md#gbsm.rays_from_paths)
 
 - Returns the ray struct of [ssf_rays](#ssf_rays) (`fallback` empty) from path data in the names and order of [qrt_file_read](#qrt_file_read),
-  read with `normalize_M = 1` (`uplink = true` gives the reverse link; `normalize_M = 0` leaves only the
+  read with `normalize_polmat = 1` (`uplink = true` gives the reverse link; `normalize_polmat = 0` leaves only the
   free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
@@ -2337,7 +2337,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_rays_from_paths) · [Python](quadrig
 ### Usage:
 ```matlab
 rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, method, path_type, tap, gr_eps_re, gr_eps_im );
+    path_length, polmat, method, path_type, tap, gr_eps_re, gr_eps_im );
 ```
 
 ### Inputs:
@@ -2346,7 +2346,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`M`** — Polarization transfer matrices, rows as in [get_channels_planar](#get_channels_planar); `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](#get_channels_planar); `[8, n_path, n_freq]`
 - **`method`** — Value of `rays.method`; sets the GR power law and the default mobility; default: `'quadriga'`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** — Tap index; `[n_path]`; default: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also
@@ -2422,7 +2422,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [Python](qua
 - **`chan`** — Channel struct, layout as documented in [hdf5_read_channel](#hdf5_read_channel): `center_freq` scalar;
   `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`, `rx_orientation` `[3, n_snap]`;
   `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap, n_snap]` (`'taps'`) or `[n_rx, n_tx, n_path, n_snap]`
-  (`'rays'`); `'rays'` also `path_gain`, `path_length`, `path_polarization`, `path_angles` and in `'drift'`
+  (`'rays'`); `'rays'` also `path_gain`, `path_length`, `polmat`, `path_angles` and in `'drift'`
   `fbs_pos`, `lbs_pos`
 - **`par`** — Struct with the fields below
 
@@ -2868,7 +2868,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [Python](quadriga_lib_api_p
   `rays` (see Terms) at new Tx and Rx positions (default: the ray-data positions), LOS and GR also at zero power; paths
   in ray order, `ray_ind` maps them to the rays (e.g. `rays.tap(ray_ind)`)
 - `'phase'`: use the outputs with [get_channels_planar](#get_channels_planar) and the arrays at the positions of `rays`; the displacement
-  phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer identified
+  phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer identified
   and the displacement phase counts twice, without an error
 - `'drift'`: use the outputs at the new positions with [get_channels_spherical](#get_channels_spherical) or [get_channels_multifreq](#get_channels_multifreq); needs
   the scatterers of [ssf_scatterers](#ssf_scatterers)
@@ -2877,11 +2877,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [Python](quadriga_lib_api_p
 | --- | --- | --- |
 | Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
-| `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
+| `polmat` | Ray `polmat` times the displacement phase | Ray `polmat`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `[3, 0]` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
 
 - `'drift'` with an end moved (any coordinate differs from `rays`): GR power by the power law of `rays.method`
-  (`(d3D / d_GR)²` for the TR methods, 1 for `'quadriga'`), GR `M` the scalar multiple of `diag(R_par, -R_perp)` (TR
+  (`(d3D / d_GR)²` for the TR methods, 1 for `'quadriga'`), GR `polmat` the scalar multiple of `diag(R_par, -R_perp)` (TR
   38.901 eqs. (7.6-38), (7.6-39)) that best fits the stored matrix, which replaces a matrix of another form (e.g. a
   conjugated one). Fallback rays have their longer polyline, also at the positions of `rays`
 - Path gain per frequency: the coefficient power; with `kf_ratio` LOS and GR are rescaled against NLOS so that the
@@ -2897,7 +2897,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [Python](quadriga_lib_api_p
 
 ### Usage:
 ```matlab
-[ path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_ind ] = ...
+[ path_gain, path_length, polmat, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_ind ] = ...
     quadriga_lib.ssf_paths( rays, link_gain_dB, mobility, tx_pos, rx_pos, kf_ratio, oxygen );
 ```
 
@@ -2913,7 +2913,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ssf_paths) · [Python](quadriga_lib_api_p
 ### Outputs:
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path, 1]`
-- **`M`** — Polarization transfer matrices, rows as in [get_channels_planar](#get_channels_planar); `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](#get_channels_planar); `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in [rad], GCS; `[n_path, 1]`
 - **`fbs_pos`**, **`lbs_pos`** — Scatterer positions in [m]; `[3, n_path]`, `[3, 0]` in `'phase'`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; uint32; `[n_path, 1]`
@@ -2983,7 +2983,7 @@ overwrites given scatterers, so solve rays without scatterers separately and con
 | `delay` | `[n_ray, 1]` | double | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | yes |
 | `power` | `[n_ray, n_freq]` | double | Coefficient powers (linear) without link gain; data from paths: path gain | yes |
 | `aod`, `eod`, `aoa`, `eoa` | `[n_ray, 1]` | double | Departure and arrival azimuth and elevation in [rad], GCS | yes |
-| `M` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | yes |
+| `polmat` | `[8, n_ray, n_freq]` | double | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](#get_channels_planar) | yes |
 | `path_type` | `[n_ray, 1]` | uint32 | 0 = LOS, 1 = GR, 2 = NLOS (a code, not shifted) | yes |
 | `tap` | `[n_ray, 1]` | uint32 | Tap index (a code, not shifted); rays with equal index form one tap | yes |
 | `gr_eps_re`, `gr_eps_im` | `[n_freq, 1]` or empty | double | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | no |
@@ -3317,7 +3317,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [Python](quadri
 
 ### Usage:
 ```matlab
-[ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
+[ gain, polmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
     center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
     apply_fspl, apply_phase );
 ```
@@ -3346,20 +3346,20 @@ Also in: [C++](quadriga_lib_api_cpp.md#calc_diffraction_gain) · [Python](quadri
   distance, matching the `path_length` used by [qrt_file_read](#qrt_file_read) for a
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
   `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm; default: `false`
-- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+- **`apply_phase`** — If `true`, multiplies `polmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium wave
   speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude, so
-  `xprmat` stays normalized. This is the phase [get_channels_spherical](#get_channels_spherical) would otherwise add from
+  `polmat` stays normalized. This is the phase [get_channels_spherical](#get_channels_spherical) would otherwise add from
   `path_length`; default: `false`
 
 ### Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos, 1]`. Relative to FSPL by
   default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = true`
-- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
   interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx), the row order
-  of `M` in [get_channels_spherical](#get_channels_spherical); `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
+  of `polmat` in [get_channels_spherical](#get_channels_spherical); `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
   (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
@@ -3755,7 +3755,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_mesh_interact) · Not in: Python
 
 ### Usage:
 ```matlab
-[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
+[ origN, destN, fbsN, sbsN, gainN, polmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
     edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( interaction_type, center_freq, orig, dest, mesh, ...
     mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
@@ -3786,8 +3786,8 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_mesh_interact) · Not in: Python
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2,
   single TE coefficient for types 3–5; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; includes interaction gain, TE/TM coefficients,
+- **`polmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
+  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`); includes interaction gain, TE/TM coefficients,
   incidence plane orientation; excludes in-medium attenuation and FSPL; `[8, n_rayN]`. For types
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if

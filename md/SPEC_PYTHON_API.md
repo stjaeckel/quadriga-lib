@@ -277,7 +277,7 @@ py::object qd_python_any2numpy(const std::any &dset);
 | `delay` | `(n_rx, n_tx, n_path)` | float |
 | `path_gain` | `(n_path,)` | float |
 | `path_length` | `(n_path,)` | float |
-| `path_polarization` | `(8, n_path)`; rows re, im of each entry, as in C++ and as the input `M` | float |
+| `polmat` | `(8, n_path)`; real, rows re, im of each entry, as in C++ | float |
 | `path_angles` | `(n_path, 4)` | float |
 | `fbs_pos` | `(3, n_path)` | float |
 | `lbs_pos` | `(3, n_path)` | float |

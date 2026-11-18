@@ -511,9 +511,9 @@ TEST_CASE("QRT Reader - index of 2^32 or more")
     }
 }
 
-TEST_CASE("QRT Reader - normalize_M must be 0 or 1")
+TEST_CASE("QRT Reader - normalize_polmat must be 0 or 1")
 {
-    // Other values of normalize_M throw, with and without the cache
+    // Other values of normalize_polmat throw, with and without the cache
     std::string fn = "tests/data/test_v5.qrt";
     std::ifstream f(fn, std::ios::binary);
     auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);

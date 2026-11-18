@@ -27,7 +27,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
 - The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` dict without
   `coupling_re` / `coupling_im` raises, unlike in the other functions, where it stands for identity
-- Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
+- Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx)
@@ -46,8 +46,8 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 ```
 coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
-    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
-    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, center_freq, \
+    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1, \
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2, center_freq, \
     *, i_irs, threshold_dB, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
 
 # Departure and arrival angles as well
@@ -70,13 +70,13 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `(n_path_1,)`
 - **`path_length_1`** — Total path lengths from TX to IRS phase center; values shorter than the polyline (e.g. 0) use
   the polyline length; `(n_path_1,)`
-- **`M_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `(8, n_path_1)`
+- **`polmat_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `(8, n_path_1)`
 - **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
 - **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
 - **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `(n_path_2,)`
 - **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
   the polyline length; `(n_path_2,)`
-- **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
+- **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
 - **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS coupling matrix); default: `0`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
@@ -118,12 +118,12 @@ py::tuple get_channels_irs(const py::dict &tx_array,
                            const py::array_t<double> &lbs_pos_1,
                            const py::array_t<double> &path_gain_1,
                            const py::array_t<double> &path_length_1,
-                           const py::array_t<double> &M_1,
+                           const py::array_t<double> &polmat_1,
                            const py::array_t<double> &fbs_pos_2,
                            const py::array_t<double> &lbs_pos_2,
                            const py::array_t<double> &path_gain_2,
                            const py::array_t<double> &path_length_2,
-                           const py::array_t<double> &M_2,
+                           const py::array_t<double> &polmat_2,
                            const double center_freq,
                            const arma::uword i_irs,
                            const double threshold_dB,
@@ -162,12 +162,12 @@ py::tuple get_channels_irs(const py::dict &tx_array,
     const auto lbs_pos_1_a = qd_python_numpy2arma_Mat(lbs_pos_1, true);
     const auto path_gain_1_a = qd_python_numpy2arma_Col(path_gain_1, true);
     const auto path_length_1_a = qd_python_numpy2arma_Col(path_length_1, true);
-    const auto M_1_a = qd_python_numpy2arma_Mat(M_1, true);
+    const auto polmat_1_a = qd_python_numpy2arma_Mat(polmat_1, true);
     const auto fbs_pos_2_a = qd_python_numpy2arma_Mat(fbs_pos_2, true);
     const auto lbs_pos_2_a = qd_python_numpy2arma_Mat(lbs_pos_2, true);
     const auto path_gain_2_a = qd_python_numpy2arma_Col(path_gain_2, true);
     const auto path_length_2_a = qd_python_numpy2arma_Col(path_length_2, true);
-    const auto M_2_a = qd_python_numpy2arma_Mat(M_2, true);
+    const auto polmat_2_a = qd_python_numpy2arma_Mat(polmat_2, true);
 
     // Active path mask: nonzero = active
     const auto active_path_in = qd_python_numpy2arma_Col<double>(active_path, true);
@@ -185,8 +185,8 @@ py::tuple get_channels_irs(const py::dict &tx_array,
     quadriga_lib::get_channels_irs<double>(tx_array_a, rx_array_a, irs_array_a,
                                            tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
                                            irs_pos_a, irs_orientation_a,
-                                           fbs_pos_1_a, lbs_pos_1_a, path_gain_1_a, path_length_1_a, M_1_a,
-                                           fbs_pos_2_a, lbs_pos_2_a, path_gain_2_a, path_length_2_a, M_2_a,
+                                           fbs_pos_1_a, lbs_pos_1_a, path_gain_1_a, path_length_1_a, polmat_1_a,
+                                           fbs_pos_2_a, lbs_pos_2_a, path_gain_2_a, path_length_2_a, polmat_2_a,
                                            coeff_re, coeff_im, delay,
                                            i_irs, threshold_dB, center_freq, want_absolute,
                                            want_angles ? &aod : nullptr, want_angles ? &eod : nullptr,

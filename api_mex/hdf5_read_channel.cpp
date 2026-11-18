@@ -53,7 +53,7 @@ Read one or more channel objects from an HDF5 file
   | `delay`            | Propagation delays in seconds                                            | `[n_rx, n_tx, n_path, n_snap]`      |
   | `path_gain`        | Path gain before antenna, linear scale                                   | `[n_path, n_snap]`                  |
   | `path_length`      | Path length in m                                                         | `[n_path, n_snap]`                  |
-  | `path_polarization`| Polarization transfer function, interleaved complex                      | `[8, n_path, n_snap]`               |
+  | `polmat`           | Polarization transfer matrix, interleaved complex                        | `[8, n_path, n_snap]`               |
   | `path_angles`      | Departure and arrival angles [AOD, EOD, AOA, EOA] in rad                 | `[n_path, 4, n_snap]`               |
   | `fbs_pos`          | First-bounce scatterer positions                                         | `[3, n_path, n_snap]`               |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | `[3, n_path, n_snap]`               |
@@ -197,7 +197,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         sub_vec(channel.delay, sub.delay);
         sub_vec(channel.path_gain, sub.path_gain);
         sub_vec(channel.path_length, sub.path_length);
-        sub_vec(channel.path_polarization, sub.path_polarization);
+        sub_vec(channel.polmat, sub.polmat);
         sub_vec(channel.path_angles, sub.path_angles);
         sub_vec(channel.fbs_pos, sub.fbs_pos);
         sub_vec(channel.lbs_pos, sub.lbs_pos);

@@ -987,8 +987,8 @@ Read ray-tracing CIR data from a QRT file
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
+  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [[qrt_read_cache_init]]-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
@@ -1014,13 +1014,13 @@ void quadriga_lib::qrt_file_read(
     arma::Mat<dtype> *lbs_pos = nullptr,
     arma::Mat<dtype> *path_gain = nullptr,
     arma::Col<dtype> *path_length = nullptr,
-    arma::Cube<dtype> *M = nullptr,
+    arma::Cube<dtype> *polmat = nullptr,
     arma::Col<dtype> *aod = nullptr,
     arma::Col<dtype> *eod = nullptr,
     arma::Col<dtype> *aoa = nullptr,
     arma::Col<dtype> *eoa = nullptr,
     std::vector<arma::Mat<dtype>> *path_coord = nullptr,
-    int normalize_M = 1,
+    int normalize_polmat = 1,
     arma::u32_vec *n_interact = nullptr,
     arma::fmat *coord = nullptr,
     std::vector<uint8_t> *interact_type = nullptr,
@@ -1033,11 +1033,11 @@ void quadriga_lib::qrt_file_read(
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
 - **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
-- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+- **`normalize_polmat`** *(optional)* — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
 
-    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
     | ------------- | ----------------------------------------------- | -------------------------------- |
     | 0             | As stored in QRT file                           | -PL                              |
     | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |<br><br>
@@ -1056,7 +1056,7 @@ void quadriga_lib::qrt_file_read(
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gain on linear scale; `[n_path, n_freq]`
 - **`path_length`** — Absolute path length TX to RX phase center; `[n_path]`
-- **`M`** — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
+- **`polmat`** — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
 - **`aod`** — Departure azimuth angles; `[n_path]`
 - **`eod`** — Departure elevation angles; `[n_path]`
 - **`aoa`** — Arrival azimuth angles; `[n_path]`
@@ -1073,12 +1073,12 @@ void quadriga_lib::qrt_file_read(
 std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
 auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
 arma::vec center_freq, tx_pos, rx_pos, path_length;
-arma::mat path_gain; arma::cube M;
+arma::mat path_gain; arma::cube polmat;
 for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
     for (arma::uword io = 0; io < cache.no_orig; ++io)
         quadriga_lib::qrt_file_read<double>("", ic, io, false,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-            nullptr, nullptr, &path_gain, &path_length, &M,
+            nullptr, nullptr, &path_gain, &path_length, &polmat,
             nullptr, nullptr, nullptr, nullptr, nullptr, 1,
             nullptr, nullptr, &stream, &cache);
 ```
@@ -1093,13 +1093,13 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
                                  arma::Col<dtype> *center_freq, arma::Mat<dtype> *tx_pos, arma::Mat<dtype> *tx_orientation,
                                  arma::Mat<dtype> *rx_pos, arma::Mat<dtype> *rx_orientation,
                                  arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos,
-                                 arma::Mat<dtype> *path_gain, arma::Col<dtype> *path_length, arma::Cube<dtype> *M,
+                                 arma::Mat<dtype> *path_gain, arma::Col<dtype> *path_length, arma::Cube<dtype> *polmat,
                                  arma::Col<dtype> *aod, arma::Col<dtype> *eod, arma::Col<dtype> *aoa, arma::Col<dtype> *eoa,
-                                 std::vector<arma::Mat<dtype>> *path_coord, int normalize_M, arma::u32_vec *n_interact, arma::fmat *coord, std::vector<uint8_t> *interact_type,
+                                 std::vector<arma::Mat<dtype>> *path_coord, int normalize_polmat, arma::u32_vec *n_interact, arma::fmat *coord, std::vector<uint8_t> *interact_type,
                                  std::ifstream *file, const qrt_read_cache *cache)
 {
-    if (normalize_M != 0 && normalize_M != 1)
-        throw std::invalid_argument("'normalize_M' must be 0 or 1.");
+    if (normalize_polmat != 0 && normalize_polmat != 1)
+        throw std::invalid_argument("'normalize_polmat' must be 0 or 1.");
 
     // Outputs must be distinct and must not be part of the cache; 'coord' is a float matrix, like the outputs for
     // dtype = float
@@ -1385,8 +1385,8 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
             coord->reset();
         if (interact_type)
             interact_type->clear();
-        if (M)
-            M->reset();
+        if (polmat)
+            polmat->reset();
         if (path_gain)
             path_gain->reset();
         if (path_length)
@@ -1542,19 +1542,19 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     if (interact_type)
         *interact_type = interact_typeR;
 
-    // Calculate path gain and polarization matrix M
+    // Calculate path gain and polarization matrix polmat
     // - xprmatR includes all interaction losses, but not the path loss
-    // - here we calculate the normalized polarization matrix M and the PG without path loss
-    if (M || path_gain)
+    // - here we calculate the normalized polarization matrix polmat and the PG without path loss
+    if (polmat || path_gain)
     {
         dtype *dst = nullptr;
-        if (M)
+        if (polmat)
         {
             if (v6)
-                M->set_size(2, n_path, n_freq);
+                polmat->set_size(2, n_path, n_freq);
             else
-                M->set_size(8, n_path, n_freq);
-            dst = M->memptr();
+                polmat->set_size(8, n_path, n_freq);
+            dst = polmat->memptr();
         }
 
         dtype *pg = nullptr;
@@ -1581,7 +1581,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
                 // column powers (V and H) - path gain = max column power
                 dtype gain = 1.0;
-                if (normalize_M == 1)
+                if (normalize_polmat == 1)
                 {
                     const dtype p1 = r11 * r11 + i11 * i11 + r21 * r21 + i21 * i21;
                     const dtype p2 = r12 * r12 + i12 * i12 + r22 * r22 + i22 * i22;
@@ -1731,18 +1731,18 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_c
                                           arma::Col<float> *center_freq, arma::Mat<float> *tx_pos, arma::Mat<float> *tx_orientation,
                                           arma::Mat<float> *rx_pos, arma::Mat<float> *rx_orientation,
                                           arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos,
-                                          arma::Mat<float> *path_gain, arma::Col<float> *path_length, arma::Cube<float> *M,
+                                          arma::Mat<float> *path_gain, arma::Col<float> *path_length, arma::Cube<float> *polmat,
                                           arma::Col<float> *aod, arma::Col<float> *eod, arma::Col<float> *aoa, arma::Col<float> *eoa,
-                                          std::vector<arma::Mat<float>> *path_coord, int normalize_M, arma::u32_vec *n_interact, arma::fmat *coord,
+                                          std::vector<arma::Mat<float>> *path_coord, int normalize_polmat, arma::u32_vec *n_interact, arma::fmat *coord,
                                           std::vector<uint8_t> *interact_type, std::ifstream *file, const qrt_read_cache *cache);
 
 template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool uplink,
                                           arma::Col<double> *center_freq, arma::Mat<double> *tx_pos, arma::Mat<double> *tx_orientation,
                                           arma::Mat<double> *rx_pos, arma::Mat<double> *rx_orientation,
                                           arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos,
-                                          arma::Mat<double> *path_gain, arma::Col<double> *path_length, arma::Cube<double> *M,
+                                          arma::Mat<double> *path_gain, arma::Col<double> *path_length, arma::Cube<double> *polmat,
                                           arma::Col<double> *aod, arma::Col<double> *eod, arma::Col<double> *aoa, arma::Col<double> *eoa,
-                                          std::vector<arma::Mat<double>> *path_coord, int normalize_M, arma::u32_vec *n_interact, arma::fmat *coord,
+                                          std::vector<arma::Mat<double>> *path_coord, int normalize_polmat, arma::u32_vec *n_interact, arma::fmat *coord,
                                           std::vector<uint8_t> *interact_type, std::ifstream *file, const qrt_read_cache *cache);
 
 /*!MD
@@ -1939,7 +1939,7 @@ Path objects of one CIR from spherical path data, for qrt_file_append
   `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only ([[qrt_file_read_raw]] returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
-  [[qrt_file_read]] (`uplink = false`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
+  [[qrt_file_read]] (`uplink = false`, `normalize_polmat` 0 or 1) returns sqrt(`path_gain`)·`polmat` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [[qrt_file_append]] and `rx_pos` the CIR position of [[qrt_file_init]]:
   `qrt_file_read` recomputes the lengths from the stored positions; not checked
@@ -1957,7 +1957,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
     const arma::mat &fbs_pos,
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
-    const arma::cube &M,
+    const arma::cube &polmat,
     const arma::u32_vec &path_type,
     arma::uword i_cir = 0);
 ```
@@ -1968,7 +1968,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`rx_pos`** — Rx position of the CIR in [m]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
-- **`M`** — Polarization transfer matrices, row order of [[get_channels_spherical]]; `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, row order of [[get_channels_spherical]]; `[8, n_path, n_freq]`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
 
@@ -1986,7 +1986,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
                                                                         const arma::mat &fbs_pos,
                                                                         const arma::mat &lbs_pos,
                                                                         const arma::mat &path_gain,
-                                                                        const arma::cube &M,
+                                                                        const arma::cube &polmat,
                                                                         const arma::u32_vec &path_type,
                                                                         arma::uword i_cir)
 {
@@ -2004,10 +2004,10 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
         throw std::invalid_argument("Input 'path_gain' must have size [n_path, n_freq].");
     if (!path_gain.is_finite() || arma::any(arma::vectorise(path_gain) < 0.0))
         throw std::invalid_argument("Input 'path_gain' must be finite and >= 0.");
-    if (M.n_rows != 8 || M.n_cols != n_path || M.n_slices != n_freq)
-        throw std::invalid_argument("Input 'M' must have size [8, n_path, n_freq].");
-    if (!M.is_finite())
-        throw std::invalid_argument("Input 'M' must be finite.");
+    if (polmat.n_rows != 8 || polmat.n_cols != n_path || polmat.n_slices != n_freq)
+        throw std::invalid_argument("Input 'polmat' must have size [8, n_path, n_freq].");
+    if (!polmat.is_finite())
+        throw std::invalid_argument("Input 'polmat' must be finite.");
     if (path_type.n_elem != n_path)
         throw std::invalid_argument("Input 'path_type' must have n_path elements.");
     if (arma::any(path_type > 2))
@@ -2064,17 +2064,17 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
             throw std::invalid_argument("Inputs 'tx_pos', 'rx_pos', 'fbs_pos' and 'lbs_pos' must be within the float32 "
                                         "range of QRT files.");
 
-        // Stored Jones matrix: M·sqrt(path_gain)·L·a_1m, so that qrt_file_read returns sqrt(path_gain)·M
+        // Stored Jones matrix: polmat·sqrt(path_gain)·L·a_1m, so that qrt_file_read returns sqrt(path_gain)·polmat
         for (arma::uword f = 0; f < n_freq; ++f)
         {
             const double s = std::sqrt(path_gain(p, f)) * L(p) * a_1m(f);
-            const double *m = M.slice_colptr(f, p);
+            const double *m = polmat.slice_colptr(f, p);
             float *J = q.xpr_coeff(f);
             for (int e = 0; e < 8; ++e)
             {
                 J[e] = (float)(m[e] * s);
                 if (!std::isfinite(J[e]))
-                    throw std::invalid_argument("Inputs 'path_gain' and 'M' give stored Jones matrices beyond the "
+                    throw std::invalid_argument("Inputs 'path_gain' and 'polmat' give stored Jones matrices beyond the "
                                                 "float32 range of QRT files.");
             }
         }

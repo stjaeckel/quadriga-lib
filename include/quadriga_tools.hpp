@@ -84,18 +84,18 @@ namespace quadriga_lib
     // - Circular basis obtained via Jones matrix transformation: M_circ = T * M_lin * T^-1
     // - Only applies for NLOS paths by default; LOS identified by path_length ≈ dTR
     // - All paths with path_length < dTR + window_size are excluded unless include_los is true
-    // - M is column-major with interleaved Re/Im: rows = [Re(Mvv),Im(Mvv),Re(Mhv),Im(Mhv),Re(Mvh),Im(Mvh),Re(Mhh),Im(Mhh)]
-    // - M may or may not be normalized (normalization cancels in the XPR ratio)
+    // - polmat is column-major with interleaved Re/Im: rows = [Re(Mvv),Im(Mvv),Re(Mhv),Im(Mhv),Re(Mvh),Im(Mvh),Re(Mhh),Im(Mhh)], labels <rx><tx>
+    // - polmat may or may not be normalized (normalization cancels in the XPR ratio)
     // - pg is always computed over all paths (including LOS), regardless of include_los
     // - If cross-polarized power is zero, XPR is set to 0 (undefined)
     template <typename dtype>
     void calc_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
-                                       const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix (Jones rows as in get_channels_spherical), Vector (n_cir) of matrices of size [8, n_path]
+                                       const std::vector<arma::Mat<dtype>> &polmat,      // Polarization transfer matrix (Jones rows as in get_channels_spherical), Vector (n_cir) of matrices of size [8, n_path]
                                        const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center in [m], Vector (n_cir) of vectors of length [n_path]
                                        const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates, Size [3, 1] (fixed TX) or [3, n_cir] (mobile TX)
                                        const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates, Size [3, 1] (fixed RX) or [3, n_cir] (mobile RX)
                                        arma::Mat<dtype> *xpr = nullptr,                  // Cross-polarization ratio, linear scale, Size [n_cir, 6], Cols: 0=agg. linear, 1=V-XPR (receive V), 2=H-XPR (receive H), 3=agg. circular, 4=LHCP, 5=RHCP
-                                       arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers × polarimetric powers in M), Length [n_cir]
+                                       arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers × polarimetric powers in polmat), Length [n_cir]
                                        bool include_los = false,                         // Include the LOS path(s) in the XPR calculation
                                        dtype window_size = 0.01);                        // LOS window size in meters, paths with path_length <= dTR + window_size are excluded
 
@@ -116,7 +116,7 @@ namespace quadriga_lib
                                dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz in scalar mode
                                int lod = 2,                                                         // Level of detail, 0-7 (0 = direct ray only)
                                arma::Col<dtype> *gain = nullptr,                                    // Diffraction gain, linear scale; Size: [ n_pos ]
-                               arma::Mat<dtype> *xprmat = nullptr,                                  // Polarization transfer matrix; Size [n_pos, 8] for EM or [n_pos, 8] for scalar
+                               arma::Mat<dtype> *polmat = nullptr,                                  // Polarization transfer matrix; Size [8, n_pos] for EM or [2, n_pos] for scalar
                                arma::Cube<dtype> *coord = nullptr,                                  // Diffracted path coords (excl. endpoints); Size: [ 3, n_seg-1, n_pos ]
                                int verbose = 0,                                                     // Verbosity level
                                const arma::u32_vec *sub_mesh_ind = nullptr,                       // Sub-mesh index, 0-based; Length: [ n_mesh ]
@@ -125,7 +125,7 @@ namespace quadriga_lib
                                bool scalar_mode = false,                                            // Scalar (acoustic) mode
                                double thin_slab_threshold = 0.0,                                    // Resolve threshold on the round-trip in-slab amplitude rho: summed where rho >= eps; 0 = always; >= 1 re-emits every series with rho < 1
                                bool apply_fspl = false,                                             // If true, fold the geometric spreading loss into gain
-                               bool apply_phase = false);                                           // If true, multiply xprmat by the propagation phase term exp(-j·2π·d/λ)
+                               bool apply_phase = false);                                           // If true, multiply polmat by the propagation phase term exp(-j·2π·d/λ)
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX
@@ -340,7 +340,7 @@ namespace quadriga_lib
                            arma::Mat<dtype> *fbsN = nullptr,                                    // First interaction points in GCS, [n_rayN, 3]
                            arma::Mat<dtype> *sbsN = nullptr,                                    // Second interaction points in GCS, [n_rayN, 3]
                            arma::Col<dtype> *gainN = nullptr,                                   // Interaction gain (linear, excl. FSPL), [n_rayN]
-                           arma::Mat<dtype> *xprmatN = nullptr,                                 // Polarization transfer matrix [ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH], [n_rayN, 8]
+                           arma::Mat<dtype> *polmatN = nullptr,                                 // Polarization transfer matrix (glossary row order), [8, n_rayN] for EM or [2, n_rayN] for scalar
                            arma::Mat<dtype> *trivecN = nullptr,                                 // Updated beam wavefront vertices, [n_rayN, 9]
                            arma::Mat<dtype> *tridirN = nullptr,                                 // Updated vertex-ray directions, format matches input
                            arma::Col<dtype> *fbs_angleN = nullptr,                              // Incidence angle at FBS in [rad], [n_rayN]
@@ -352,7 +352,7 @@ namespace quadriga_lib
                            bool compact = false,                                                // Remove non-hits from output, key on fbs_ind != 0
                            arma::u32_vec *ray_indN = nullptr);                                  // 0-based input ray index for each output ray, [n_rayN]
 
-    // Update inside/outside ray state and correct gainN / xprmatN
+    // Update inside/outside ray state and correct gainN / polmatN
     template <typename dtype>
     void ray_state_update(int interaction_type,                                                // 0 = EM reflect, 1 = EM transmit 2 = EM refract 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
                           dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz for types 3-5
@@ -377,7 +377,7 @@ namespace quadriga_lib
                           arma::Col<short> *mtl_ind_current_outN = nullptr,                    // Out: current medium (0 = outside), written at i; [n_rayN]
                           arma::Col<short> *mtl_ind_buffer_outN = nullptr,                     // Out: next-transition buffer (0 = empty), written at i; [n_rayN]
                           arma::Col<dtype> *gainN = nullptr,                                   // In/Out: interaction gain, updated in place; [n_rayN]
-                          arma::Mat<dtype> *xprmatN = nullptr,                                 // In/Out: polarization transfer matrix, updated in place; [n_rayN, 8]
+                          arma::Mat<dtype> *polmatN = nullptr,                                 // In/Out: polarization transfer matrix, updated in place; [8, n_rayN] or [2, n_rayN]
                           arma::Mat<dtype> *path_dirN = nullptr,                               // In/Out: Continuation direction, updated in place; [n_rayN]
                           arma::Col<dtype> *acc_dist_geometricN = nullptr,                     // Out: Accumulated geometric distance leaving this call, [n_rayN]
                           arma::Col<dtype> *acc_dist_refractedN = nullptr,                     // Out: Accumulated refracted distance leaving this call, [n_rayN]
@@ -512,13 +512,13 @@ namespace quadriga_lib
 
     // Polarization transfer (Jones) matrix threading along a ray path
     template <typename dtype>
-    void xpr_update(arma::Mat<dtype> &xprmat,                 // Existing XPR matrix; Updated in-place; EM mode [8, n_ray]; Scalar mode [2, n_ray]; Initialized if empty
-                    const arma::Mat<dtype> *update = nullptr, // XPR Update; [8 or 2, 1] broadcasts; empty = unitary; otherwise [8 or 2, n_rayU]
-                    arma::Col<dtype> *gain = nullptr,         // The per-ray gain; Length [n_rayU]
-                    bool initialize = false,                  // Initialize xprmat to unity before applying the update
-                    bool normalize = false,                   // Normalize result after updating (only n_rayU updated columns, ignores rest)
-                    bool apply_gain = false,                  // If true, read gain from *gain and apply it to xprmat after normalization
-                    const arma::uvec *ray_ind = nullptr);     // Optional rayU to ray mapping; default: 1:1 (n_ray == n_rayU)
+    void polmat_update(arma::Mat<dtype> &polmat,              // Polarization transfer matrix; Updated in-place; EM mode [8, n_ray]; Scalar mode [2, n_ray]; Initialized if empty
+                       const arma::Mat<dtype> *update = nullptr, // Update matrix; [8 or 2, 1] broadcasts; empty = unitary; otherwise [8 or 2, n_rayU]
+                       arma::Col<dtype> *gain = nullptr,         // The per-ray gain; Length [n_rayU]
+                       bool initialize = false,                  // Initialize polmat to unity before applying the update
+                       bool normalize = false,                   // Normalize result after updating (only n_rayU updated columns, ignores rest)
+                       bool apply_gain = false,                  // If true, read gain from *gain and apply it to polmat after normalization
+                       const arma::uvec *ray_ind = nullptr);     // Optional rayU to ray mapping; default: 1:1 (n_ray == n_rayU)
 
 }
 

@@ -134,7 +134,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(c1["delay"][..., 0], c0["delay"][0])
 
     def test_array_handling(self):
-        d = dict(self.rays, M=np.ascontiguousarray(self.rays["M"]), tap=self.rays["tap"].astype(np.int32))
+        d = dict(self.rays, polmat=np.ascontiguousarray(self.rays["polmat"]), tap=self.rays["tap"].astype(np.int32))
         chan = gbsm.single_link_channel(self.tx, self.rx, d, np.array([-90], dtype=np.float32),
                                         tx_pos=np.asfortranarray(TX), rx_pos=RX.astype(np.float32))[0]
         npt.assert_array_equal(chan["coeff"][0], self.out[0]["coeff"][0])

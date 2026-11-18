@@ -16,7 +16,7 @@ Calculate MIMO channel coefficients for planar wave paths
   paths under the planar wave assumption.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based; the input angles are not used for LOS detection.
-- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
   V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
@@ -40,7 +40,7 @@ Calculate MIMO channel coefficients for planar wave paths
 ## Batch mode:
 - If `aod` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots in one call,
   the snapshots in parallel (OpenMP in C++).
-- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `M` are then lists of length `n_snap`;
+- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `polmat` are then lists of length `n_snap`;
   list entries that are Fortran-contiguous float64 arrays are read in place, other entries are copied.
 - The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array or a
   single-column `(3, 1)` array is applied to all snapshots.
@@ -51,7 +51,7 @@ Calculate MIMO channel coefficients for planar wave paths
 ## Usage:
 ```
 coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, \
     center_freq, *, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
 ```
 
@@ -69,7 +69,7 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
 - **`eoa`** — Arrival elevation angles in rad; `(n_path,)`, or a list in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`, or a list in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list in batch mode
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
   coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
@@ -77,7 +77,7 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [[interpolate]]; `int`; default: 0
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
 
 ## Outputs:
@@ -103,7 +103,7 @@ py::tuple get_channels_planar(const py::dict &tx_array,
                               py::handle eoa,
                               py::handle path_gain,
                               py::handle path_length,
-                              py::handle M,
+                              py::handle polmat,
                               py::handle center_freq,
                               py::handle use_absolute_delays,
                               py::handle add_fake_los_path,
@@ -126,8 +126,8 @@ py::tuple get_channels_planar(const py::dict &tx_array,
     // Batch mode for lists of path arrays; a single snapshot is processed as a batch of one
     const bool batch = qd_python_is_array_list(aod);
     if (batch && (!qd_python_is_array_list(eod) || !qd_python_is_array_list(aoa) || !qd_python_is_array_list(eoa) ||
-                  !qd_python_is_array_list(path_gain) || !qd_python_is_array_list(path_length) || !qd_python_is_array_list(M)))
-        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'M' must all be lists.");
+                  !qd_python_is_array_list(path_gain) || !qd_python_is_array_list(path_length) || !qd_python_is_array_list(polmat)))
+        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'polmat' must all be lists.");
 
     // Alias the path data, no data is copied
     const auto aod_a = qd_python_alias_list<arma::Col<double>>(aod, batch, keep_alive);
@@ -136,13 +136,13 @@ py::tuple get_channels_planar(const py::dict &tx_array,
     const auto eoa_a = qd_python_alias_list<arma::Col<double>>(eoa, batch, keep_alive);
     const auto path_gain_a = qd_python_alias_list<arma::Mat<double>>(path_gain, batch, keep_alive);
     const auto path_length_a = qd_python_alias_list<arma::Col<double>>(path_length, batch, keep_alive);
-    const auto M_a = qd_python_alias_list<arma::Cube<double>>(M, batch, keep_alive);
+    const auto polmat_a = qd_python_alias_list<arma::Cube<double>>(polmat, batch, keep_alive);
     const arma::uword n_snap = (arma::uword)aod_a.size();
 
     // Needed before the frequency check below, which indexes the lists
     if (eod_a.size() != n_snap || aoa_a.size() != n_snap || eoa_a.size() != n_snap ||
-        path_gain_a.size() != n_snap || path_length_a.size() != n_snap || M_a.size() != n_snap)
-        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'M' must have the same length.");
+        path_gain_a.size() != n_snap || path_length_a.size() != n_snap || polmat_a.size() != n_snap)
+        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'polmat' must have the same length.");
 
     // Positions and orientations: one column per snapshot or one for all (checked by the C++ core); a single snapshot
     // takes any 3-element array
@@ -153,8 +153,8 @@ py::tuple get_channels_planar(const py::dict &tx_array,
 
     // Frequency slice of every snapshot, aliased without copying; path counts are validated by the C++ core
     std::vector<arma::vec> path_gain_f;
-    std::vector<arma::mat> M_f;
-    const double center_freq_sel = qd_python_select_freq(path_gain_a, M_a, center_freq_a, i_freq, path_gain_f, M_f);
+    std::vector<arma::mat> polmat_f;
+    const double center_freq_sel = qd_python_select_freq(path_gain_a, polmat_a, center_freq_a, i_freq, path_gain_f, polmat_f);
 
     // Outputs: numpy memory is mapped to the Armadillo objects, which C++ writes in place
     std::vector<arma::cube> coeff_re, coeff_im, delay(n_snap);
@@ -172,7 +172,7 @@ py::tuple get_channels_planar(const py::dict &tx_array,
     {
         py::gil_scoped_release release;
         quadriga_lib::get_channels_planar_vec<double>(ant_tx_a, ant_rx_a, tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
-                                                      aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, M_f,
+                                                      aod_a, eod_a, aoa_a, eoa_a, path_gain_f, path_length_a, polmat_f,
                                                       coeff_re, coeff_im, delay,
                                                       center_freq_sel, use_absolute_delays_b, add_fake_los_path_b,
                                                       &rx_Doppler, &coeff, use_kernel);

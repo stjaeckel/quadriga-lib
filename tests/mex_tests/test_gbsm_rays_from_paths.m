@@ -17,7 +17,7 @@ pg = [ 1e-6, 2e-6; 3e-7, 4e-7; 5e-8, 6e-8 ];
 M = reshape( 1 : 48, 8, 3, 2 ) / 48;
 pt = [ 0; 1; 2 ];
 fields = { 'method', 'tx_pos', 'rx_pos', 'center_freq', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', ...
-    'M', 'path_type', 'tap', 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
+    'polmat', 'path_type', 'tap', 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
 
 %% Basic call and values
 rays = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, fb, lb, pg, pl, M, 'quadriga', pt );
@@ -29,7 +29,7 @@ assertEqual( rays.rx_pos, rx );
 assertEqual( rays.center_freq, fc );
 assertElementsAlmostEqual( rays.delay, ( pl - d ) / c0, 'absolute', 1e-18 );
 assertEqual( rays.power, pg );
-assertEqual( rays.M, M );
+assertEqual( rays.polmat, M );
 assertEqual( rays.fbs_pos, fb );
 assertEqual( rays.lbs_pos, lb );
 assertTrue( isa(rays.path_type, 'uint32') && isa(rays.tap, 'uint32') && isa(rays.fallback, 'uint32') );
@@ -74,7 +74,7 @@ assertEqual( r6, r4 );                                                        % 
 r7 = quadriga_lib.gbsm_rays_from_paths( fc, tx, rx, zeros( 3, 0 ), zeros( 3, 0 ), zeros( 0, 2 ), zeros( 0, 1 ), ...
     zeros( 8, 0, 2 ) );
 assertTrue( isempty(r7.delay) && isempty(r7.path_type) );
-assertEqual( { size(r7.power), size(r7.fbs_pos), size(r7.M, 1), size(r7.M, 2) }, { [0, 2], [3, 0], 8, 0 } );
+assertEqual( { size(r7.power), size(r7.fbs_pos), size(r7.polmat, 1), size(r7.polmat, 2) }, { [0, 2], [3, 0], 8, 0 } );
 assertEqual( r7.center_freq, fc );
 assertTrue( isempty( quadriga_lib.ssf_paths( r7, [0; 0], 'drift' ) ) );
 

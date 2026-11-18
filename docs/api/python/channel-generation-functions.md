@@ -109,7 +109,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [MATL
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
 - The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` dict without
   `coupling_re` / `coupling_im` raises, unlike in the other functions, where it stands for identity
-- Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
+- Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx)
@@ -128,8 +128,8 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_irs) · [MATL
 ```python
 coeff, delay, active_path_out = quadriga_lib.channel.irs( tx_array, rx_array, irs_array, \
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, \
-    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, \
-    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, center_freq, \
+    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1, \
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2, center_freq, \
     *, i_irs, threshold_dB, use_absolute_delays, angles, irs_array_2, active_path, use_kernel )
 
 # Departure and arrival angles as well
@@ -152,13 +152,13 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `(n_path_1,)`
 - **`path_length_1`** — Total path lengths from TX to IRS phase center; values shorter than the polyline (e.g. 0) use
   the polyline length; `(n_path_1,)`
-- **`M_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `(8, n_path_1)`
+- **`polmat_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `(8, n_path_1)`
 - **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
 - **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `(3, n_path_2)`
 - **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `(n_path_2,)`
 - **`path_length_2`** — Total path lengths from IRS to RX phase center; values shorter than the polyline (e.g. 0) use
   the polyline length; `(n_path_2,)`
-- **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
+- **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `(8, n_path_2)`
 - **`center_freq`** — Center frequency in Hz; 0 gives the coefficients at f = 0 (see above); default: `0.0`
 - **`i_irs`** — IRS codebook port index, 0-based (one port per column of the IRS coupling matrix); default: `0`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; default: `-140.0`
@@ -198,10 +198,10 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 - Aligns four frequency grids: TX array (`tx_array['center_freq']`), RX array (`rx_array['center_freq']`), input samples (`freq`), and output (`freq_new`)
 - Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
-- `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
+- `path_gain` is interpolated linearly; `polmat` is interpolated via SLERP per complex entry pair to preserve phase
 - Coupling matrices are interpolated across frequencies (SLERP for complex pairs); pass 3D coupling `(n_elem, n_ports, n_freq)` for per-frequency coupling
 - Extrapolation clamps to the nearest frequency entry on all four grids
-- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+- `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
   rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -229,7 +229,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 ### Usage:
 ```python
 coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, \
     freq, freq_new, *, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
 ```
 
@@ -246,9 +246,9 @@ coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
 - **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq)`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
-- **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
+- **`polmat`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
   `(2, n_path, n_freq)` scalar pressure
-- **`freq`** — Input sample frequencies for `path_gain` and `M`; `(n_freq,)`
+- **`freq`** — Input sample frequencies for `path_gain` and `polmat`; `(n_freq,)`
 - **`freq_new`** — Target output frequencies; `(n_freq_new,)`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
@@ -276,7 +276,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
   paths under the planar wave assumption.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based; the input angles are not used for LOS detection.
-- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
   V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
@@ -300,7 +300,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
 ### Batch mode:
 - If `aod` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots in one call,
   the snapshots in parallel (OpenMP in C++).
-- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `M` are then lists of length `n_snap`;
+- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `polmat` are then lists of length `n_snap`;
   list entries that are Fortran-contiguous float64 arrays are read in place, other entries are copied.
 - The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array or a
   single-column `(3, 1)` array is applied to all snapshots.
@@ -311,7 +311,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
 ### Usage:
 ```python
 coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, \
     center_freq, *, use_absolute_delays, add_fake_los_path, use_kernel, i_freq )
 ```
 
@@ -329,7 +329,7 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
 - **`eoa`** — Arrival elevation angles in rad; `(n_path,)`, or a list in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`, or a list in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list in batch mode
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
   coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
@@ -337,7 +337,7 @@ coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate); `int`; default: 0
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
 
 ### Outputs:
@@ -361,7 +361,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
   using the spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
   V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -389,7 +389,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 ### Batch mode:
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
   in one call, the snapshots in parallel (OpenMP in C++).
-- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_snap`,
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `polmat` are then lists of length `n_snap`,
   matching the output format of [qrt_file_read](channel-functions.md#qrt_file_read); list entries that are Fortran-contiguous float64 arrays (as
   returned by [qrt_file_read](channel-functions.md#qrt_file_read)) are read in place, other entries are copied.
 - The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array
@@ -403,7 +403,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 ### Usage:
 ```python
 coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, \
     center_freq, *, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
 
 # Departure and arrival angles as well
@@ -423,7 +423,7 @@ coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=T
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
   (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
   in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
@@ -434,7 +434,7 @@ coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=T
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate);
   `int`; default: 0
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
 
 ### Outputs:

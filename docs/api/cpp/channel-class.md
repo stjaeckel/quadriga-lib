@@ -34,7 +34,7 @@ Not in: MATLAB, Python
 | `std::vector<arma::Cube<dtype>> delay`            | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds                                      |
 | `std::vector<arma::Col<dtype>> path_gain`         | per snap `[n_path]`                                             | Path gains before antenna pattern                           |
 | `std::vector<arma::Col<dtype>> path_length`       | per snap `[n_path]`                                             | Path lengths TX to RX                                       |
-| `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
+| `std::vector<arma::Mat<dtype>> polmat`            | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
 | `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
 | `std::vector<arma::Mat<dtype>> fbs_pos`           | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
 | `std::vector<arma::Mat<dtype>> lbs_pos`           | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
@@ -81,7 +81,7 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Mat<dtype> *interact_coord_add = nullptr,
     const arma::Col<dtype> *path_gain_add = nullptr,
     const arma::Col<dtype> *path_length_add = nullptr,
-    const arma::Mat<dtype> *path_polarization_add = nullptr,
+    const arma::Mat<dtype> *polmat_add = nullptr,
     const arma::Mat<dtype> *path_angles_add = nullptr,
     const arma::Mat<dtype> *fbs_pos_add = nullptr,
     const arma::Mat<dtype> *lbs_pos_add = nullptr);
@@ -96,7 +96,7 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(n_interact)]`
 - **`path_gain_add`** *(optional)* — Path gains before antenna effects; `[n_path_add]`
 - **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
-- **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
+- **`polmat_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
 - **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
 - **`fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
 - **`lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
@@ -109,7 +109,7 @@ Calculate the effective path gain per snapshot in linear scale
 Not in: MATLAB, Python
 
 - Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
-- Uses `coeff_re`/`coeff_im` if available; falls back to `path_polarization` assuming ideal XPOL antennas
+- Uses `coeff_re`/`coeff_im` if available; falls back to `polmat` assuming ideal XPOL antennas
 - Throws if neither coefficients nor polarization data are present
 
 ### Declaration:

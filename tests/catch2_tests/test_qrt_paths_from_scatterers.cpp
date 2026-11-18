@@ -55,7 +55,7 @@ namespace
     std::vector<quadriga_lib::path> paths_of(const quadriga_lib::gbsm_rays &r, arma::uword i_cir = 0)
     {
         return quadriga_lib::qrt_paths_from_scatterers(r.center_freq, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
-                                                       r.power, r.M, r.path_type, i_cir);
+                                                       r.power, r.polmat, r.path_type, i_cir);
     }
 
     // Largest difference between the stored Jones entries of frequency f and J = M·s; ref = largest entry of J
@@ -117,7 +117,7 @@ TEST_CASE("qrt_paths_from_scatterers - path objects carry the geometry, the code
         for (arma::uword f = 0; f < n_freq; ++f)
         {
             double d, ref;
-            jones_diff(q, r.M, p, f, std::sqrt(r.power(p, f)) * L * inv_fspl_1m(r.center_freq(f)), d, ref);
+            jones_diff(q, r.polmat, p, f, std::sqrt(r.power(p, f)) * L * inv_fspl_1m(r.center_freq(f)), d, ref);
             CHECK(d <= 1e-6 * ref);
             d_max = std::max(d_max, (ref > 0.0) ? d / ref : d);
         }
@@ -136,10 +136,10 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
     quadriga_lib::qrt_file_append<double>(fn, paths_of(r), r.tx_pos);
 
     QD_DIAG("\n# diag: qrt_paths_from_scatterers, file round trip (largest relative difference per path)\n");
-    QD_DIAG("normalize_M,path,type,d_len_m,tol_len_m,d_jones_rel\n");
+    QD_DIAG("normalize_polmat,path,type,d_len_m,tol_len_m,d_jones_rel\n");
     for (int norm : {0, 1})
     {
-        INFO("normalize_M " << norm);
+        INFO("normalize_polmat " << norm);
         arma::vec cf, tx, rx, pl;
         arma::mat fbs, lbs, pg;
         arma::cube M;
@@ -175,15 +175,15 @@ TEST_CASE("qrt_paths_from_scatterers - qrt_file_read returns path gain times M a
                 const double s_w = std::sqrt(r.power(p, f)), s_r = std::sqrt(pg(p, f));
                 double ref = 0.0, d = 0.0, ref2 = 0.0, d2 = 0.0;
                 for (arma::uword e = 0; e < 8; ++e)
-                    ref = std::max(ref, std::abs(s_w * r.M(e, p, f))),
-                    d = std::max(d, std::abs(s_r * M(e, p, f) - s_w * r.M(e, p, f)));
+                    ref = std::max(ref, std::abs(s_w * r.polmat(e, p, f))),
+                    d = std::max(d, std::abs(s_r * M(e, p, f) - s_w * r.polmat(e, p, f)));
                 CHECK(d <= 1e-6 * ref);
                 d_rel = std::max(d_rel, (ref > 0.0) ? d / ref : d);
 
                 // Documented property: path_gain·abs(M)² per complex entry
                 for (arma::uword e = 0; e < 8; e += 2)
                 {
-                    const double w = r.power(p, f) * (r.M(e, p, f) * r.M(e, p, f) + r.M(e + 1, p, f) * r.M(e + 1, p, f));
+                    const double w = r.power(p, f) * (r.polmat(e, p, f) * r.polmat(e, p, f) + r.polmat(e + 1, p, f) * r.polmat(e + 1, p, f));
                     const double g = pg(p, f) * (M(e, p, f) * M(e, p, f) + M(e + 1, p, f) * M(e + 1, p, f));
                     ref2 = std::max(ref2, w), d2 = std::max(d2, std::abs(g - w));
                 }
@@ -206,7 +206,7 @@ TEST_CASE("qrt_paths_from_scatterers - n_path = 0 and 127 frequencies")
     const arma::vec cf = arma::linspace(1.0e9, 100.0e9, 127);
     const arma::mat pg = arma::repmat(r.power, 1, 127);
     arma::cube M(8, 2, 127);
-    M.each_slice() = r.M.slice(0);
+    M.each_slice() = r.polmat.slice(0);
     const std::vector<quadriga_lib::path> P =
         quadriga_lib::qrt_paths_from_scatterers(cf, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos, pg, M, r.path_type);
     REQUIRE(P.size() == 2);
@@ -265,9 +265,9 @@ TEST_CASE("qrt_paths_from_scatterers - input validation")
     }
     SECTION("M")
     {
-        fails([](R &r, U &) { r.M.shed_slice(1); }, "Input 'M' must have size [8, n_path, n_freq].");
-        fails([](R &r, U &) { r.M.shed_row(7); }, "Input 'M' must have size [8, n_path, n_freq].");
-        fails([&](R &r, U &) { r.M(3, 2, 1) = nan; }, "Input 'M' must be finite.");
+        fails([](R &r, U &) { r.polmat.shed_slice(1); }, "Input 'polmat' must have size [8, n_path, n_freq].");
+        fails([](R &r, U &) { r.polmat.shed_row(7); }, "Input 'polmat' must have size [8, n_path, n_freq].");
+        fails([&](R &r, U &) { r.polmat(3, 2, 1) = nan; }, "Input 'polmat' must be finite.");
     }
     SECTION("path_type")
     {
@@ -297,6 +297,6 @@ TEST_CASE("qrt_paths_from_scatterers - input validation")
         fails([](R &r, U &) { r.fbs_pos(0, 3) = 1e39; },
               "Inputs 'tx_pos', 'rx_pos', 'fbs_pos' and 'lbs_pos' must be within the float32 range of QRT files.");
         fails([](R &r, U &) { r.power(2, 0) = 1e80; },
-              "Inputs 'path_gain' and 'M' give stored Jones matrices beyond the float32 range of QRT files.");
+              "Inputs 'path_gain' and 'polmat' give stored Jones matrices beyond the float32 range of QRT files.");
     }
 }

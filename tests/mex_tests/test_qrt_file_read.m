@@ -154,7 +154,7 @@ assertEqual(size(cir_orientation5), [double(n_cir5), 3]);
 assertEqual(size(orig_pos5), [double(n_orig5), 3]);
 assertEqual(size(orig_orientation5), [double(n_orig5), 3]);
 
-% ---------- qrt_file_read: v5, normalize_M=0 ----------
+% ---------- qrt_file_read: v5, normalize_polmat=0 ----------
 [center_freq5, ~, ~, ~, ~, ~, ~, path_gain5, ~, M5] = ...
     quadriga_lib.qrt_file_read(fn5, 2, 1, false, 0);
 
@@ -175,7 +175,7 @@ assertElementsAlmostEqual(M5(:, 1, 1), T, 'absolute', 1.5e-4);
 T = [0.0866; 0; 0; 0; 0; 0; -0.0866; 0];
 assertElementsAlmostEqual(M5(:, 1, 2), T, 'absolute', 1.5e-4);
 
-% ---------- qrt_file_read: v5, normalize_M=1 (default) ----------
+% ---------- qrt_file_read: v5, normalize_polmat=1 (default) ----------
 [~, ~, ~, ~, ~, ~, ~, ~, ~, M5n] = ...
     quadriga_lib.qrt_file_read(fn5, 2, 1, false, 1);
 
@@ -293,12 +293,12 @@ out = cell(1, 18);
 [out{:}] = quadriga_lib.qrt_file_read(fn5, 1);
 assertTrue(isa(out{18}{1}, 'uint8'));
 
-% ---------- qrt_file_read: normalize_M other than 0 or 1 ----------
+% ---------- qrt_file_read: normalize_polmat other than 0 or 1 ----------
 try
     c = quadriga_lib.qrt_file_read(fn5, 1, 1, false, 5);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = '''normalize_M'' must be 0 or 1';
+    expectedErrorMessage = '''normalize_polmat'' must be 0 or 1';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end

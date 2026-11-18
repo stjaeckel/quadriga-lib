@@ -23,6 +23,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-site-s
 | [point_cloud_segmentation](#point_cloud_segmentation) | Reorganize a point cloud into spatial sub-clouds for efficient processing |
 | [point_cloud_split](#point_cloud_split) | Split a point cloud into two sub-clouds along a spatial axis |
 | [point_inside_mesh](#point_inside_mesh) | Test whether 3D points are inside a triangle mesh using raycasting |
+| [polmat_update](#polmat_update) | Thread a polarization transfer (Jones) matrix along a ray path |
 | [ray_commit](#ray_commit) | Commit the paths of a launch configuration that reach a receiver |
 | [ray_init](#ray_init) | Seed a sphere of rays from a point source |
 | [ray_mesh_interact](#ray_mesh_interact) | Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
@@ -38,7 +39,6 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-site-s
 | [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing |
 | [triangle_mesh_split](#triangle_mesh_split) | Split a 3D triangular mesh into two sub-meshes along a given axis |
 | [write_png](#write_png) | Write a data matrix to a color-coded PNG file |
-| [xpr_update](#xpr_update) | Thread a polarization transfer (Jones) matrix along a ray path |
 
 ---
 <a id="calc_diffraction_gain"></a>
@@ -62,7 +62,7 @@ void calc_diffraction_gain(
     dtype center_freq,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
-    arma::Mat<dtype> *xprmat = nullptr,
+    arma::Mat<dtype> *polmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
     const arma::u32_vec *sub_mesh_ind = nullptr,
@@ -97,21 +97,21 @@ void calc_diffraction_gain(
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
   `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at
   `center_freq`.
-- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
+- **`apply_phase`** — If `true`, multiplies `polmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
   same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c / center_freq` with the speed
   of light (EM) or the speed of sound, 343 m/s (scalar mode). Since the term has unit
-  magnitude, `xprmat` stays normalized. This is the phase contribution that
+  magnitude, `polmat` stays normalized. This is the phase contribution that
   [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from `path_length`; enabling it here gives the complete
   omni-radiator coefficient without running the channel generator.
 
 ### Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
   i.e. bounded by 0 and 1; absolute propagation gain when `apply_fspl = true`.
-- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase. The `gain` output holds the power.
   For EM mode: interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row order
-  of `M` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_pos]`;
+  of `polmat` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_pos]`;
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
   With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
   is unaffected because that term has unit magnitude.
@@ -913,6 +913,112 @@ void quadriga_lib::point_inside_mesh(
 - [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
 
 ---
+<a id="polmat_update"></a>
+## polmat_update
+Thread a polarization transfer (Jones) matrix along a ray path
+
+Not in: MATLAB, Python
+
+- Left-multiplies each per-ray state matrix by a new interaction matrix, vectorized across up to
+  hundreds of millions of rays, then optionally normalizes the touched columns and re-imposes a
+  separately tracked scalar gain — all in a single pass
+- One entry point covers every operation needed while threading a chain: initialization, updating,
+  gain extraction, normalization, and gain application. They are selected independently through
+  `initialize`, `update`, `normalize`, `gain`, and `apply_gain`, so a call can do any combination
+  (see Usage)
+- An optional `ray_ind` lets the update set be a subset of the global state, scattered into
+  `polmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
+- Storage is interleaved complex, column-major, matching the `polmat` output of
+  [calc_diffraction_gain](#calc_diffraction_gain). EM mode carries the full 2x2 Jones matrix; scalar mode carries a
+  single complex pressure coefficient
+
+### Declaration:
+```cpp
+void polmat_update(
+    arma::Mat<dtype> &polmat,
+    const arma::Mat<dtype> *update = nullptr,
+    arma::Col<dtype> *gain = nullptr,
+    bool initialize = false,
+    bool normalize = false,
+    bool apply_gain = false,
+    const arma::uvec *ray_ind = nullptr);
+```
+
+### Arguments:
+- **`polmat`** — Polarization transfer matrix, updated in place. EM mode `[8, n_ray]`, scalar mode
+  `[2, n_ray]`. If empty on entry it is sized from `update` and seeded to unity (see Usage). A
+  pre-sized (non-empty) buffer is treated as accumulated state unless `initialize` is set. When
+  `ray_ind` is given, `polmat` must already exist, because the extent of the global set cannot be
+  inferred from a subset.
+- **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
+  match `polmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
+  broadcasts one matrix to every update; `nullptr` or empty applies the identity (no multiply).
+- **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
+  - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
+    normalization. With `normalize == false` this measures the gain without modifying the matrix
+    part of `polmat` (gain extraction); with `normalize == true` it reports the gain that was
+    removed. A value of 0 flags a degenerate (zero / non-finite) matrix the caller should prune.
+  - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the
+    corresponding `gain` value *after* normalization. Must be non-null and length `n_rayU`.
+- **`initialize`** — If `true`, each touched column is set to unity (identity for EM, `[1,0]` for
+  scalar) before the update. With an `update` this is a copy-through (the column becomes the
+  update, prior contents discarded); without an `update` it is a pure reset. Use this to
+  (re)initialize a pre-sized or reused buffer without reallocating.
+- **`normalize`** — If `true`, each touched column is scaled to unit gain after the update.
+  Untouched columns of `polmat` are left alone.
+- **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
+- **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `polmat`.
+  Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
+  `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
+  in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
+  so the result is the same as a single-threaded run for any thread count. With duplicates the call
+  runs single-threaded; unique indices keep the parallel loop.
+
+### Usage:
+The flags are composable in one call; the per-column order is always
+initialize -> update -> normalize -> apply_gain. Argument order is
+`(polmat, update, gain, initialize, normalize, apply_gain, ray_ind)`.
+```cpp
+arma::Mat<dtype> polmat;                            // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
+
+// (1) Initialization
+polmat_update(polmat, &U0);                         // empty polmat: sized from U0, seeded, polmat := U0
+polmat_update(polmat, nullptr, nullptr, true);      // pre-sized polmat: reset every column to unity
+polmat_update(polmat, &U0, nullptr, true);          // pre-sized polmat: copy-through, polmat := U0 (ignores old)
+
+// (2) Updating (accumulate onto existing state)
+polmat_update(polmat, &U);                          // polmat := U * polmat
+polmat_update(polmat, &Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
+
+// (3) Gain extraction (measure, leave the matrix part untouched)
+arma::Col<dtype> g;
+polmat_update(polmat, nullptr, &g);                 // g[k] = gain( polmat[:,k] )
+polmat_update(polmat, &U, &g);                      // apply U, then measure into g (no normalize)
+
+// (4) Normalizing (scale each column to unit gain; optionally update first)
+polmat_update(polmat, nullptr, nullptr, false, true); // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
+polmat_update(polmat, &U, nullptr, false, true);    // update, then normalize, one pass
+
+// (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
+//     'g' is read here (apply_gain = true):
+polmat_update(polmat, nullptr, &g, false, true, true); // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
+polmat_update(polmat, &U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
+```
+
+### Storage layout (column-major, interleaved complex):
+- **EM mode**, 8 values per ray: `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, so column 0 of the
+  2x2 is `[VV; HV]` (response to a V input) and column 1 is `[VH; HH]` (response to an H input).
+  The labels are `<out><in>`: the first letter is the output (receive) polarisation, the second the input
+  (transmit) polarisation, so rows 0-1 = (V out, V in), rows 2-3 = (H out, V in), rows 4-5 = (V out, H in),
+  rows 6-7 = (H out, H in). This is the row order of `polmat` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (rows = RX, columns = TX).
+- **Scalar mode**, 2 values per ray: `[Re Im]`.
+- The update is `M_out = M_update * M_state` (new interaction left-multiplies), consistent with
+  `E_out = polmat * E_in` for column vectors and Armadillo/MATLAB column-major storage.
+
+### See also:
+- [calc_diffraction_gain](#calc_diffraction_gain) (produces `polmat` in this exact layout)
+
+---
 <a id="ray_commit"></a>
 ## ray_commit
 Commit the paths of a launch configuration that reach a receiver
@@ -1165,7 +1271,7 @@ void quadriga_lib::ray_mesh_interact(
     arma::Mat<dtype> *fbsN = nullptr,
     arma::Mat<dtype> *sbsN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
-    arma::Mat<dtype> *xprmatN = nullptr,
+    arma::Mat<dtype> *polmatN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Col<dtype> *fbs_angleN = nullptr,
@@ -1192,17 +1298,17 @@ void quadriga_lib::ray_mesh_interact(
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
 - **`compact`** *(optional)* — If `true`, no-hit rays are dropped and `n_rayN ≤ n_ray`. If
   `false` (default), all rays are kept (`n_rayN = n_ray`) and no-hit rays are written as a transparent pass-through
-  (gain 1, identity `xprmat`, `out_type = 0`).
+  (gain 1, identity `polmat`, `out_type = 0`).
 
 ### Outputs:
 - **`origN`** — New origins, nudged off the face along the travel direction by 8 float ULP of the hit point's
   coordinate magnitude (past the SBS of a co-located pair, except for reflection); `[n_rayN, 3]`
 - **`destN`** — New destinations along the outgoing direction; `[n_rayN, 3]`
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
-- **`gainN`** — Linear power gain of the interaction, derived from `xprmatN`; `[n_rayN]`
-- **`xprmatN`** — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
-  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, the Jones matrix `M = [VV VH; HV HH]`
-  acting as `e_out = M · e_in`, the incoming V/H basis from the incident direction and the outgoing one from
+- **`gainN`** — Linear power gain of the interaction, derived from `polmatN`; `[n_rayN]`
+- **`polmatN`** — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
+  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`), the Jones matrix `J = [VV VH; HV HH]`
+  acting as `e_out = J · e_in`, the incoming V/H basis from the incident direction and the outgoing one from
   `path_dirN` (`eH = ẑ × k̂` normalized, `eV = eH × k̂`); `[8, n_rayN]`. Types 3–5: `[Re Im]` of the scalar pressure
   coefficient; `[2, n_rayN]`. A transmitted coefficient includes the entered material's `interface_gain`.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
@@ -1474,7 +1580,7 @@ Per-ray medium state machine with closed-form thin-slab (Fabry-Pérot) resolutio
 
 Not in: MATLAB, Python
 
-- Corrects the per-event `gainN` / `xprmatN` of [ray_mesh_interact](#ray_mesh_interact) with the medium each ray is known to be in,
+- Corrects the per-event `gainN` / `polmatN` of [ray_mesh_interact](#ray_mesh_interact) with the medium each ray is known to be in,
   and carries that state from event to event in three state words per ray (table below) and the in-medium path
   lengths (`acc_dist_*`):
   - the face is re-evaluated at the incidence of the direction the wave has (`path_dir_prev`) instead of the
@@ -1517,7 +1623,7 @@ void quadriga_lib::ray_state_update(
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
-    arma::Mat<dtype> *xprmatN = nullptr,
+    arma::Mat<dtype> *polmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
     arma::Col<dtype> *acc_dist_geometricN = nullptr,
     arma::Col<dtype> *acc_dist_refractedN = nullptr,
@@ -1584,8 +1690,8 @@ void quadriga_lib::ray_state_update(
   above), compact set; `[n_rayN]`. The previous-medium word may hold a sheet: the boundary behind the ray, never a
   medium it travels in. NULL skips the write.
 - **`gainN`** *(in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
-  with `xprmatN`. A killed ray (`resolved_typeN == 0`) has `gainN = 0` and an all-zero `xprmatN`.
-- **`xprmatN`** *(in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
+  with `polmatN`. A killed ray (`resolved_typeN == 0`) has `gainN = 0` and an all-zero `polmatN`.
+- **`polmatN`** *(in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
   `[2, n_rayN]` for scalar mode, layout and basis as in [ray_mesh_interact](#ray_mesh_interact). On return it also carries the
   in-medium attenuation and excess phase of the leg the ray leaves and, where the series was summed, the factor
   `S`. Spreading loss stays excluded, so the matrix is the complete per-event Jones factor. Where the series is
@@ -1614,7 +1720,7 @@ void quadriga_lib::ray_state_update(
    | Bit  | Flag        | Meaning                                                                        |
    | :--: | :---------: | ------------------------------------------------------------------------------ |
    |   0  | ok          | OK flag (0 = a deferred medium is pending in the buffer word)                  |
-   |   1  | vbs         | VBS correction (gain/xprmat corrected at the VBS instead of FBS/SBS)           |
+   |   1  | vbs         | VBS correction (gain/polmat corrected at the VBS instead of FBS/SBS)           |
    |   2  | resolve     | Internal multi-bounce series accounted for (expect no further internal bounces) |
    |   3  | inside      | Inside-object flag (1 = ray continues inside, 0 = continues outside)           |
    |   4  | fix         | Fix flag (the exit face names another medium than the state, or a sheet event met a deferred medium) |
@@ -2080,109 +2186,3 @@ void quadriga_lib::write_png(
 - **`min_val`** *(optional)* — Lower clipping bound; NaN (the default): data minimum
 - **`max_val`** *(optional)* — Upper clipping bound; NaN (the default): data maximum
 - **`log_transform`** *(optional)* — Apply 10*log10(data) before mapping; non-positive values map to the minimum color
-
----
-<a id="xpr_update"></a>
-## xpr_update
-Thread a polarization transfer (Jones) matrix along a ray path
-
-Not in: MATLAB, Python
-
-- Left-multiplies each per-ray state matrix by a new interaction matrix, vectorized across up to
-  hundreds of millions of rays, then optionally normalizes the touched columns and re-imposes a
-  separately tracked scalar gain — all in a single pass
-- One entry point covers every operation needed while threading a chain: initialization, updating,
-  gain extraction, normalization, and gain application. They are selected independently through
-  `initialize`, `update`, `normalize`, `gain`, and `apply_gain`, so a call can do any combination
-  (see Usage)
-- An optional `ray_ind` lets the update set be a subset of the global state, scattered into
-  `xprmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
-- Storage is interleaved complex, column-major, matching the `xprmat` output of
-  [calc_diffraction_gain](#calc_diffraction_gain). EM mode carries the full 2x2 Jones matrix; scalar mode carries a
-  single complex pressure coefficient
-
-### Declaration:
-```cpp
-void xpr_update(
-    arma::Mat<dtype> &xprmat,
-    const arma::Mat<dtype> *update = nullptr,
-    arma::Col<dtype> *gain = nullptr,
-    bool initialize = false,
-    bool normalize = false,
-    bool apply_gain = false,
-    const arma::uvec *ray_ind = nullptr);
-```
-
-### Arguments:
-- **`xprmat`** — Global XPR state, updated in place. EM mode `[8, n_ray]`, scalar mode
-  `[2, n_ray]`. If empty on entry it is sized from `update` and seeded to unity (see Usage). A
-  pre-sized (non-empty) buffer is treated as accumulated state unless `initialize` is set. When
-  `ray_ind` is given, `xprmat` must already exist, because the extent of the global set cannot be
-  inferred from a subset.
-- **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
-  match `xprmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
-  broadcasts one matrix to every update; `nullptr` or empty applies the identity (no multiply).
-- **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
-  - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
-    normalization. With `normalize == false` this measures the gain without modifying the matrix
-    part of `xprmat` (gain extraction); with `normalize == true` it reports the gain that was
-    removed. A value of 0 flags a degenerate (zero / non-finite) matrix the caller should prune.
-  - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the
-    corresponding `gain` value *after* normalization. Must be non-null and length `n_rayU`.
-- **`initialize`** — If `true`, each touched column is set to unity (identity for EM, `[1,0]` for
-  scalar) before the update. With an `update` this is a copy-through (the column becomes the
-  update, prior contents discarded); without an `update` it is a pure reset. Use this to
-  (re)initialize a pre-sized or reused buffer without reallocating.
-- **`normalize`** — If `true`, each touched column is scaled to unit gain after the update.
-  Untouched columns of `xprmat` are left alone.
-- **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
-- **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
-  Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
-  `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
-  in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
-  so the result is the same as a single-threaded run for any thread count. With duplicates the call
-  runs single-threaded; unique indices keep the parallel loop.
-
-### Usage:
-The flags are composable in one call; the per-column order is always
-initialize -> update -> normalize -> apply_gain. Argument order is
-`(xprmat, update, gain, initialize, normalize, apply_gain, ray_ind)`.
-```cpp
-arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
-
-// (1) Initialization
-xpr_update(M, &U0);                                 // empty M: sized from U0, seeded, M := U0
-xpr_update(M, nullptr, nullptr, true);              // pre-sized M: reset every column to unity
-xpr_update(M, &U0, nullptr, true);                  // pre-sized M: copy-through, M := U0 (ignores old)
-
-// (2) Updating (accumulate onto existing state)
-xpr_update(M, &U);                                  // M := U * M
-xpr_update(M, &Usub, nullptr, false, false, false, &idx);   // scatter: M[:,idx[k]] := Usub[:,k] * M[:,idx[k]]
-
-// (3) Gain extraction (measure, leave the matrix part untouched)
-arma::Col<dtype> g;
-xpr_update(M, nullptr, &g);                         // g[k] = gain( M[:,k] )
-xpr_update(M, &U, &g);                              // apply U, then measure into g (no normalize)
-
-// (4) Normalizing (scale each column to unit gain; optionally update first)
-xpr_update(M, nullptr, nullptr, false, true);       // M[:,k] := M[:,k] / gain( M[:,k] )
-xpr_update(M, &U, nullptr, false, true);            // update, then normalize, one pass
-
-// (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
-//     'g' is read here (apply_gain = true):
-xpr_update(M, nullptr, &g, false, true, true);      // M[:,k] := g[k] * ( M[:,k] / gain( M[:,k] ) )
-xpr_update(M, &U, &g, false, true, true, &idx);     // full chain step: scatter+update+normalize+apply
-```
-
-### Storage layout (column-major, interleaved complex):
-- **EM mode**, 8 values per ray: `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, so column 0 of the
-  2x2 is `[VV; HV]` (response to a V input) and column 1 is `[VH; HH]` (response to an H input).
-  The labels are `<out><in>`: the first letter is the output (receive) polarisation, the second the input
-  (transmit) polarisation, so rows 0-1 = (V out, V in), rows 2-3 = (H out, V in), rows 4-5 = (V out, H in),
-  rows 6-7 = (H out, H in). This is the row order of `M` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) (rows = RX, columns = TX).
-- **Scalar mode**, 2 values per ray: `[Re Im]`.
-- The update is `M_out = M_update * M_state` (new interaction left-multiplies), consistent with
-  `E_out = M * E_in` for column vectors and Armadillo/MATLAB column-major storage.
-
-### See also:
-- [calc_diffraction_gain](#calc_diffraction_gain) (produces `xprmat` in this exact layout)

@@ -640,14 +640,14 @@ TEST_CASE("QRT Write - uplink read returns the transposed M")
         std::vector<path> paths = {mk(0, {}), mk(2, {1, 2})};
         REQUIRE(quadriga_lib::qrt_file_append<double>(fn, paths, arma::vec{100.0, 200.0, 30.0}, nullptr, "TX") == 2);
 
-        for (int normalize_M : {0, 1})
+        for (int normalize_polmat : {0, 1})
         {
             arma::mat pg_dl, pg_ul;
             arma::cube M_dl, M_ul;
             quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                &pg_dl, nullptr, &M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_M);
+                                                &pg_dl, nullptr, &M_dl, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
             quadriga_lib::qrt_file_read<double>(fn, 0, 0, true, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                &pg_ul, nullptr, &M_ul, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_M);
+                                                &pg_ul, nullptr, &M_ul, nullptr, nullptr, nullptr, nullptr, nullptr, normalize_polmat);
             REQUIRE(M_dl.n_rows == (scalar ? 2u : 8u));
             REQUIRE(M_dl.n_cols == 2);
             REQUIRE(M_dl.n_slices == 2);

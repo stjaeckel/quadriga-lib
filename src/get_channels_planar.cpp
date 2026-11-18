@@ -24,14 +24,14 @@ Calculate MIMO channel coefficients for planar wave paths
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based (angles ignored).
-- Polarization transfer matrix `M` must be normalized; rows are interleaved real/imag components.
+- Polarization transfer matrix `polmat` must be normalized; rows are interleaved real/imag components.
 - If `add_fake_los_path` is true, one output path is always added (output size `n_path+1`): slot 0 holds the LOS path,
   with zero power if no LOS path was found. LOS = the strongest path whose `path_length` is within 0.1 mm of the TX-RX
   distance; it is moved to slot 0 and its original slot (input index + 1) holds a zero-power path. All other paths
   keep their order, shifted by one slot.
 - With 0 paths (all path inputs empty), the outputs are empty, `[n_rx, n_tx, 0]`; with `add_fake_los_path = true` they
   hold only this zero-power LOS path, with the LOS delays per antenna pair.
-- Polarization coupling: `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H),
+- Polarization coupling: `polmat` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation V/H),
   column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
@@ -57,7 +57,7 @@ void quadriga_lib::get_channels_planar(
     const arma::Col<dtype> &eoa,
     const arma::Col<dtype> &path_gain,
     const arma::Col<dtype> &path_length,
-    const arma::Mat<dtype> &M,
+    const arma::Mat<dtype> &polmat,
     arma::Cube<dtype> &coeff_re,
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
@@ -81,7 +81,7 @@ void quadriga_lib::get_channels_planar(
 - **`eoa`** — Arrival elevation angles; `[n_path]`
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
-- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
@@ -111,7 +111,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
                                        const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
                                        const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
                                        const arma::Col<dtype> &aod, const arma::Col<dtype> &eod, const arma::Col<dtype> &aoa, const arma::Col<dtype> &eoa,
-                                       const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &M,
+                                       const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &polmat,
                                        arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
                                        dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                        arma::Col<dtype> *rx_Doppler, int use_kernel)
@@ -134,9 +134,9 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     // Kernel of the antenna interpolation, checked before any early return
     const int kernel = qd_arrayant_interpolate_kernel(use_kernel, std::max(tx_array.e_theta_re.n_elem, rx_array.e_theta_re.n_elem));
 
-    qd_check_alias(rx_Doppler, "rx_Doppler", &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M);
+    qd_check_alias(rx_Doppler, "rx_Doppler", &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &polmat);
     qd_check_alias_list({&coeff_re, &coeff_im, &delay}, {"coeff_re", "coeff_im", "delay"},
-                        &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &M);
+                        &aod, &eod, &aoa, &eoa, &path_gain, &path_length, &polmat);
     qd_check_alias_outputs(&coeff_re, "coeff_re", rx_Doppler, "rx_Doppler");
     qd_check_alias_outputs(&coeff_im, "coeff_im", rx_Doppler, "rx_Doppler");
     qd_check_alias_outputs(&delay, "delay", rx_Doppler, "rx_Doppler");
@@ -145,7 +145,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     // path data, except that its delays use the antenna response in the direction of path 0: a dummy NLOS path in the
     // LOS direction (1 m longer, never detected as LOS) gives the delays of a LOS path; its own slot is dropped.
     if (add_fake_los_path && aod.n_elem == 0 && eod.n_elem == 0 && aoa.n_elem == 0 && eoa.n_elem == 0 &&
-        path_gain.n_elem == 0 && path_length.n_elem == 0 && M.n_cols == 0)
+        path_gain.n_elem == 0 && path_length.n_elem == 0 && polmat.n_cols == 0)
     {
         const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
         const dtype d_xy = std::sqrt(x * x + y * y);
@@ -205,14 +205,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     arma::uword n_ports = n_tx_ports * n_rx_ports;                  // Total number of ports
 
     // Check if the number of paths is consistent in all inputs
-    if (eod.n_elem != n_path || aoa.n_elem != n_path || eoa.n_elem != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || M.n_cols != n_path)
+    if (eod.n_elem != n_path || aoa.n_elem != n_path || eoa.n_elem != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || polmat.n_cols != n_path)
     {
-        error_message = "Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'M' must have the same number of columns (n_paths).";
+        error_message = "Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).";
         throw std::invalid_argument(error_message.c_str());
     }
-    if (M.n_rows != 8ULL && n_path != 0ULL)
+    if (polmat.n_rows != 8ULL && n_path != 0ULL)
     {
-        error_message = "Polarization transfer matrix 'M' must have 8 rows.";
+        error_message = "Polarization transfer matrix 'polmat' must have 8 rows.";
         throw std::invalid_argument(error_message.c_str());
     }
 
@@ -323,7 +323,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> &tx_a
     {
         arma::uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
-        const dtype *pM = M.colptr(i);
+        const dtype *pM = polmat.colptr(i);
         dtype *pVrr = Vr_re.colptr(i), *pVri = Vr_im.colptr(i),
               *pHrr = Hr_re.colptr(i), *pHri = Hr_im.colptr(i),
               *pVtr = Vt_re.colptr(i), *pVti = Vt_im.colptr(i),
@@ -453,7 +453,7 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<flo
                                                 const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
                                                 const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
                                                 const arma::Col<float> &aod, const arma::Col<float> &eod, const arma::Col<float> &aoa, const arma::Col<float> &eoa,
-                                                const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &M,
+                                                const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &polmat,
                                                 arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
                                                 float center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<float> *rx_Doppler, int use_kernel);
@@ -462,7 +462,7 @@ template void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dou
                                                 const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
                                                 const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
                                                 const arma::Col<double> &aod, const arma::Col<double> &eod, const arma::Col<double> &aoa, const arma::Col<double> &eoa,
-                                                const arma::Col<double> &path_gain, const arma::Col<double> &path_length, const arma::Mat<double> &M,
+                                                const arma::Col<double> &path_gain, const arma::Col<double> &path_length, const arma::Mat<double> &polmat,
                                                 arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
                                                 double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                 arma::Col<double> *rx_Doppler, int use_kernel);
@@ -500,7 +500,7 @@ void quadriga_lib::get_channels_planar_vec(
     const std::vector<arma::Col<dtype>> &eoa,
     const std::vector<arma::Col<dtype>> &path_gain,
     const std::vector<arma::Col<dtype>> &path_length,
-    const std::vector<arma::Mat<dtype>> &M,
+    const std::vector<arma::Mat<dtype>> &polmat,
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
@@ -521,7 +521,7 @@ void quadriga_lib::get_channels_planar_vec(
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in [rad]; vectors of length `n_snap`,
   entries `[n_path]`
 - **`path_gain`**, **`path_length`** — Path gains (linear) and path lengths; vectors of length `n_snap`, entries `[n_path]`
-- **`M`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
+- **`polmat`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
 - **`center_freq`**, **`use_absolute_delays`**, **`add_fake_los_path`**, **`use_kernel`** *(optional)* — As in
   [[get_channels_planar]], for all snapshots
 
@@ -543,7 +543,7 @@ void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<dtype> &
                                            const std::vector<arma::Col<dtype>> &aod, const std::vector<arma::Col<dtype>> &eod,
                                            const std::vector<arma::Col<dtype>> &aoa, const std::vector<arma::Col<dtype>> &eoa,
                                            const std::vector<arma::Col<dtype>> &path_gain, const std::vector<arma::Col<dtype>> &path_length,
-                                           const std::vector<arma::Mat<dtype>> &M,
+                                           const std::vector<arma::Mat<dtype>> &polmat,
                                            std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                            std::vector<arma::Cube<dtype>> &delay,
                                            dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
@@ -552,8 +552,8 @@ void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<dtype> &
 {
     const size_t n_snap = aod.size();
     if (eod.size() != n_snap || aoa.size() != n_snap || eoa.size() != n_snap ||
-        path_gain.size() != n_snap || path_length.size() != n_snap || M.size() != n_snap)
-        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'M' must have the same length.");
+        path_gain.size() != n_snap || path_length.size() != n_snap || polmat.size() != n_snap)
+        throw std::invalid_argument("Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'polmat' must have the same length.");
 
     const bool parallel = qd_channels_vec_check(tx_array, rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, n_snap, [&](size_t s)
                                                 { return aod[s].n_elem; }, use_kernel);
@@ -570,7 +570,7 @@ void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant<dtype> &
                                          auto col = [s](const arma::Mat<dtype> &m)
                                          { return qd_channels_vec_col(m, s); };
                                          quadriga_lib::get_channels_planar<dtype>(tx_array, rx_array, col(tx_pos), col(tx_orientation), col(rx_pos), col(rx_orientation),
-                                                                                  aod[s], eod[s], aoa[s], eoa[s], path_gain[s], path_length[s], M[s],
+                                                                                  aod[s], eod[s], aoa[s], eoa[s], path_gain[s], path_length[s], polmat[s],
                                                                                   cr, ci, delay[s], center_freq, use_absolute_delays, add_fake_los_path,
                                                                                   rx_Doppler ? &rx_Doppler->at(s) : nullptr, use_kernel);
                                      });
@@ -582,7 +582,7 @@ template void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant
                                                     const std::vector<arma::Col<float>> &aod, const std::vector<arma::Col<float>> &eod,
                                                     const std::vector<arma::Col<float>> &aoa, const std::vector<arma::Col<float>> &eoa,
                                                     const std::vector<arma::Col<float>> &path_gain, const std::vector<arma::Col<float>> &path_length,
-                                                    const std::vector<arma::Mat<float>> &M,
+                                                    const std::vector<arma::Mat<float>> &polmat,
                                                     std::vector<arma::Cube<float>> &coeff_re, std::vector<arma::Cube<float>> &coeff_im,
                                                     std::vector<arma::Cube<float>> &delay,
                                                     float center_freq, bool use_absolute_delays, bool add_fake_los_path,
@@ -595,7 +595,7 @@ template void quadriga_lib::get_channels_planar_vec(const quadriga_lib::arrayant
                                                     const std::vector<arma::Col<double>> &aod, const std::vector<arma::Col<double>> &eod,
                                                     const std::vector<arma::Col<double>> &aoa, const std::vector<arma::Col<double>> &eoa,
                                                     const std::vector<arma::Col<double>> &path_gain, const std::vector<arma::Col<double>> &path_length,
-                                                    const std::vector<arma::Mat<double>> &M,
+                                                    const std::vector<arma::Mat<double>> &polmat,
                                                     std::vector<arma::Cube<double>> &coeff_re, std::vector<arma::Cube<double>> &coeff_im,
                                                     std::vector<arma::Cube<double>> &delay,
                                                     double center_freq, bool use_absolute_delays, bool add_fake_los_path,

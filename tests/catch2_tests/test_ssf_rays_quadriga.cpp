@@ -42,7 +42,7 @@ namespace
     // Entry e of the 8-row layout (0 tt, 1 pt, 2 tp, 3 pp) of ray i at frequency k
     cx jones(const quadriga_lib::gbsm_rays &r, arma::uword e, arma::uword i, arma::uword k)
     {
-        return cx(r.M(2 * e, i, k), r.M(2 * e + 1, i, k));
+        return cx(r.polmat(2 * e, i, k), r.polmat(2 * e + 1, i, k));
     }
 
     // Link l of a "quadriga" call against ref_rays_qd at all frequencies
@@ -181,7 +181,7 @@ TEST_CASE("ssf_rays - quadriga ray delays are zero-mean per cluster and clamped 
     for (arma::uword l = 0; l < 2; ++l)
     {
         CHECK(r0[l].is_valid() == "");
-        CHECK(arma::size(r0[l].M) == arma::size(8, 2, 2));
+        CHECK(arma::size(r0[l].polmat) == arma::size(8, 2, 2));
         CHECK(arma::all(arma::vectorise(r0[l].power) == rv(in0.cl.power, l)));
     }
 }
@@ -221,16 +221,16 @@ TEST_CASE("ssf_rays - quadriga shares the geometry and the phases across frequen
             for (arma::uword l = 0; l < 4; ++l)
             {
                 INFO("link " << l);
-                CHECK(arma::all(arma::vectorise(r_eq[l].M.slice(1) == r_eq[l].M.slice(0))));
+                CHECK(arma::all(arma::vectorise(r_eq[l].polmat.slice(1) == r_eq[l].polmat.slice(0))));
                 CHECK(arma::all(r_eq[l].power.col(1) == r_eq[l].power.col(0)));
                 const quadriga_lib::gbsm_rays &a = rays[l], &b = r_ot[l];
                 CHECK(arma::all(a.delay == b.delay));
                 CHECK((arma::all(a.aod == b.aod) && arma::all(a.eod == b.eod)));
                 CHECK((arma::all(a.aoa == b.aoa) && arma::all(a.eoa == b.eoa)));
                 CHECK(arma::all(a.tap == b.tap));
-                CHECK(arma::all(arma::vectorise(a.M.slice(0) == b.M.slice(0))));
+                CHECK(arma::all(arma::vectorise(a.polmat.slice(0) == b.polmat.slice(0))));
                 CHECK(arma::all(a.power.col(0) == b.power.col(0)));
-                CHECK(arma::any(arma::vectorise(a.M.slice(1) != b.M.slice(1))));
+                CHECK(arma::any(arma::vectorise(a.polmat.slice(1) != b.polmat.slice(1))));
                 if (std::string(pol) == "38.901" && !var) // tt carries only the shared initial phase
                     for (arma::uword i = 2; i < a.n_ray(); ++i)
                         CHECK(jones(a, 0, i, 0) == jones(a, 0, i, 1));
@@ -364,7 +364,7 @@ TEST_CASE("ssf_rays - polarisation variability follows TR 7.6.16")
         {
             INFO("method " << method << ", link " << l);
             for (arma::uword i = 0; i < 1 + G; ++i)
-                CHECK(arma::all(r1[l].M.slice(0).col(i) == r0[l].M.slice(0).col(i)));
+                CHECK(arma::all(r1[l].polmat.slice(0).col(i) == r0[l].polmat.slice(0).col(i)));
             double d_J = 0.0, d_fro = 0.0, d_pow = 0.0;
             for (arma::uword n = 0; n < N; ++n)
                 for (arma::uword m = 0; m < M; ++m)
@@ -399,7 +399,7 @@ TEST_CASE("ssf_rays - polarisation variability follows TR 7.6.16")
         in.sp["PolVar_sigma"] = 0.0;
         const auto r2 = call(in);
         for (arma::uword l = 0; l < 3; ++l)
-            CHECK(arma::approx_equal(r2[l].M, r0[l].M, "absdiff", 1e-12));
+            CHECK(arma::approx_equal(r2[l].polmat, r0[l].polmat, "absdiff", 1e-12));
     }
 }
 

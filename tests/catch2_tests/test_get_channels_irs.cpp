@@ -412,8 +412,8 @@ TEST_CASE("Channel - Add Paths")
 
     // Channel has no path_polarization
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_length, &path_polarization), std::invalid_argument);
-    c.path_polarization.push_back(arma::mat(8, 15, arma::fill::randn));
-    c.path_polarization.push_back(arma::mat(8, 13, arma::fill::randn));
+    c.polmat.push_back(arma::mat(8, 15, arma::fill::randn));
+    c.polmat.push_back(arma::mat(8, 13, arma::fill::randn));
 
     // Mismatch
     REQUIRE_THROWS_AS(c.add_paths(1, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &path_gain, &path_polarization), std::invalid_argument);
@@ -449,7 +449,7 @@ TEST_CASE("Channel - Add Paths")
     CHECK(n_paths[1] == 14ULL);
 
     // Add fbs_pos
-    c.path_polarization.clear();
+    c.polmat.clear();
     auto path_pos = arma::mat(3, 2, arma::fill::randn);
 
     // Channel has no path_polarization

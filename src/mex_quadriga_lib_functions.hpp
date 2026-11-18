@@ -171,7 +171,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         h_del = h_del || !c.delay.empty();
         h_pg = h_pg || !c.path_gain.empty();
         h_pl = h_pl || !c.path_length.empty();
-        h_pp = h_pp || !c.path_polarization.empty();
+        h_pp = h_pp || !c.polmat.empty();
         h_pa = h_pa || !c.path_angles.empty();
         h_fbs = h_fbs || !c.fbs_pos.empty();
         h_lbs = h_lbs || !c.lbs_pos.empty();
@@ -203,7 +203,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     if (h_pl)
         fields.push_back("path_length");
     if (h_pp)
-        fields.push_back("path_polarization");
+        fields.push_back("polmat");
     if (h_pa)
         fields.push_back("path_angles");
     if (h_fbs)
@@ -252,7 +252,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         if (h_pl)
             qd_mex_set_field(output, "path_length", qd_mex_vector2matlab(&c.path_length), n);
         if (h_pp)
-            qd_mex_set_field(output, "path_polarization", qd_mex_vector2matlab(&c.path_polarization), n);
+            qd_mex_set_field(output, "polmat", qd_mex_vector2matlab(&c.polmat), n);
         if (h_pa)
             qd_mex_set_field(output, "path_angles", qd_mex_vector2matlab(&c.path_angles), n);
         if (h_fbs)
@@ -319,8 +319,8 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_length"))
             c.path_length = qd_mex_matlab2vector_Col<double>(fp, 1, fld("path_length"));
 
-        if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_polarization"))
-            c.path_polarization = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("path_polarization"));
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "polmat"))
+            c.polmat = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("polmat"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_angles"))
             c.path_angles = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("path_angles"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "fbs_pos"))
@@ -582,7 +582,7 @@ inline mxArray *qd_mex_any2matlab(const std::any &dset)
 // the others optional (missing = empty), also any field appended later
 inline const std::vector<std::string> qd_mex_gbsm_rays_fields = {
     "method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa",
-    "eoa", "M", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
+    "eoa", "polmat", "path_type", "tap", "gr_eps_re", "gr_eps_im", "fbs_pos", "lbs_pos", "fallback"};
 inline constexpr size_t qd_mex_gbsm_rays_n_required = 13; // "method" to "tap"
 
 // Element i of a gbsm_rays struct array -> gbsm_rays
@@ -638,13 +638,13 @@ inline quadriga_lib::gbsm_rays qd_mex_struct2gbsm_rays(const mxArray *s, arma::u
     col("path_type", r.path_type), col("tap", r.tap), col("gr_eps_re", r.gr_eps_re), col("gr_eps_im", r.gr_eps_im);
     col("fallback", r.fallback);
     mat("power", r.power), mat("fbs_pos", r.fbs_pos), mat("lbs_pos", r.lbs_pos);
-    if ((a = get("M")) != nullptr)
-        r.M = qd_mex_get_Cube<double>(a, copy, var_name + ".M");
+    if ((a = get("polmat")) != nullptr)
+        r.polmat = qd_mex_get_Cube<double>(a, copy, var_name + ".polmat");
     return r;
 }
 
 // Creates the 1 x n_link gbsm_rays struct array with all fields and aliases the attributes of 'rays' (resized to
-// n_link) whose size is known: positions [3, 1], 'center_freq', 'delay', 'power', angles, 'M', 'path_type',
+// n_link) whose size is known: positions [3, 1], 'center_freq', 'delay', 'power', angles, 'polmat', 'path_type',
 // 'tap', 'gr_eps_re' and 'gr_eps_im' if 'has_gr', 'fbs_pos' and 'lbs_pos' [3, n_ray] if 'has_scatterers'
 // - The other fields are empty ('fallback' uint32); 'method' is left unset for the caller to fill after the call
 inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
@@ -669,7 +669,7 @@ inline mxArray *qd_mex_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arm
         set("eod", qd_mex_init_output(&r.eod, n_ray));
         set("aoa", qd_mex_init_output(&r.aoa, n_ray));
         set("eoa", qd_mex_init_output(&r.eoa, n_ray));
-        set("M", qd_mex_init_output(&r.M, 8, n_ray, n_freq));
+        set("polmat", qd_mex_init_output(&r.polmat, 8, n_ray, n_freq));
         set("path_type", qd_mex_init_output(&r.path_type, n_ray));
         set("tap", qd_mex_init_output(&r.tap, n_ray));
         set("gr_eps_re", has_gr ? qd_mex_init_output(&r.gr_eps_re, n_freq) : empty());

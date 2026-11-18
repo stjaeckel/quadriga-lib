@@ -16,10 +16,10 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
 - Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
-- `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
+- `path_gain` is interpolated linearly; `polmat` is interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to the nearest frequency entry on all four grids
 - `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
-- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+- `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx),
   rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -46,7 +46,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 ## Usage:
 ```
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, ...
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, ...
     freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
 
@@ -62,9 +62,9 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq]`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
-- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
+- **`polmat`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
   `[2, n_path, n_freq]` (scalar pressure)
-- **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq, 1]`
+- **`freq`** — Input sample frequencies for `path_gain` and `polmat`; `[n_freq, 1]`
 - **`freq_new`** — Target output frequencies; `[n_freq_new, 1]`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
@@ -105,7 +105,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7], false, "lbs_pos");
     const auto path_gain = qd_mex_get_Mat<double>(prhs[8], false, "path_gain");
     const auto path_length = qd_mex_get_Col<double>(prhs[9], false, "path_length");
-    const auto M = qd_mex_get_Cube<double>(prhs[10], false, "M");
+    const auto polmat = qd_mex_get_Cube<double>(prhs[10], false, "polmat");
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[2], "tx_pos", 3);
     const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[3], "tx_orientation", 3);
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
@@ -136,7 +136,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_multifreq<double>(ant_tx, ant_rx,
                                                          tx_pos, tx_orientation, rx_pos, rx_orientation,
-                                                         fbs_pos, lbs_pos, path_gain, path_length, M,
+                                                         fbs_pos, lbs_pos, path_gain, path_length, polmat,
                                                          freq, freq_new,
                                                          coeff_re, coeff_im, delay,
                                                          use_absolute_delays, add_fake_los_path,

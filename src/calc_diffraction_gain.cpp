@@ -50,7 +50,7 @@ void calc_diffraction_gain(
     dtype center_freq,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
-    arma::Mat<dtype> *xprmat = nullptr,
+    arma::Mat<dtype> *polmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
     const arma::u32_vec *sub_mesh_ind = nullptr,
@@ -85,21 +85,21 @@ void calc_diffraction_gain(
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
   `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at
   `center_freq`.
-- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
+- **`apply_phase`** — If `true`, multiplies `polmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
   same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c / center_freq` with the speed
   of light (EM) or the speed of sound, 343 m/s (scalar mode). Since the term has unit
-  magnitude, `xprmat` stays normalized. This is the phase contribution that
+  magnitude, `polmat` stays normalized. This is the phase contribution that
   [[get_channels_spherical]] would otherwise add from `path_length`; enabling it here gives the complete
   omni-radiator coefficient without running the channel generator.
 
 ## Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos]`. Relative to FSPL by default,
   i.e. bounded by 0 and 1; absolute propagation gain when `apply_fspl = true`.
-- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase. The `gain` output holds the power.
   For EM mode: interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row order
-  of `M` in [[get_channels_spherical]]; `[8, n_pos]`;
+  of `polmat` in [[get_channels_spherical]]; `[8, n_pos]`;
   For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
   With `apply_phase = true`, the propagation phase `exp(-j·2π·d/λ)` is applied on top; the normalization
   is unaffected because that term has unit magnitude.
@@ -124,7 +124,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                          dtype center_freq,
                                          int lod,
                                          arma::Col<dtype> *gain,
-                                         arma::Mat<dtype> *xprmat,
+                                         arma::Mat<dtype> *polmat,
                                          arma::Cube<dtype> *coord,
                                          int verbose,
                                          const arma::u32_vec *sub_mesh_ind,
@@ -151,7 +151,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     const arma::uword n_pos = orig.n_rows;            // Number of positions
     const arma::uword n_mesh = mesh.n_rows;           // Number of mesh elements
     const int interaction_type = scalar_mode ? 4 : 1; // Transmission only
-    const arma::uword nXPR = scalar_mode ? 2 : 8;     // Number of columns in xprmat (8 for EM, 2 for scalar)
+    const arma::uword nXPR = scalar_mode ? 2 : 8;     // Number of rows in polmat (8 for EM, 2 for scalar)
 
     // Check for correct number of rows
     if (dest.n_rows != n_pos)
@@ -169,14 +169,14 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
         throw std::invalid_argument("Material indices must not exceed 16383.");
 
     qd_check_alias(gain, "gain", &orig, &dest, &mesh);
-    qd_check_alias(xprmat, "xprmat", &orig, &dest, &mesh);
-    qd_check_alias_outputs(gain, "gain", xprmat, "xprmat");
+    qd_check_alias(polmat, "polmat", &orig, &dest, &mesh);
+    qd_check_alias_outputs(gain, "gain", polmat, "polmat");
 
     // Initialize XPRMAT output
-    if (xprmat && (xprmat->n_rows != nXPR || xprmat->n_cols != n_pos))
-        xprmat->set_size(nXPR, n_pos);
-    if (xprmat) // Initialize to unit matrix
-        quadriga_lib::xpr_update<dtype>(*xprmat, nullptr, nullptr, true);
+    if (polmat && (polmat->n_rows != nXPR || polmat->n_cols != n_pos))
+        polmat->set_size(nXPR, n_pos);
+    if (polmat) // Initialize to unit matrix
+        quadriga_lib::polmat_update<dtype>(*polmat, nullptr, nullptr, true);
 
     // Generate diffraction paths
     arma::Cube<dtype> ray_x, ray_y, ray_z, weight;
@@ -362,7 +362,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
             arma::Mat<dtype> origN;        // New origin after transmission, [R,3]
             arma::Mat<dtype> dirN;         // Refracted path direction after mesh interaction, [R,3]
             arma::Col<dtype> gainN;        // Path gain, [R]
-            arma::Mat<dtype> xprmatN;      // Path gain, [8,R]
+            arma::Mat<dtype> polmatN;      // Polarization transfer matrix, [nXPR, R]
             arma::Col<dtype> fbs_angle;    // Incidence angle at FBS, [R]
             arma::Mat<dtype> normal_vec;   // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [R,6]
             std::vector<uint8_t> hit_type; // Interaction type code from ray_mesh_interact, [R]
@@ -370,7 +370,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
             // Calculate the interface interactions; no compaction
             quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_freq, &s_orig, &s_dest, &mesh, &mtl_ind, &mtl_prop,
                                                    &fbs_ind, &sbs_ind, nullptr, nullptr, &origN, nullptr, &fbsN, &sbsN,
-                                                   &gainN, &xprmatN, nullptr, nullptr, &fbs_angle, nullptr,
+                                                   &gainN, &polmatN, nullptr, nullptr, &fbs_angle, nullptr,
                                                    nullptr, &normal_vec, &hit_type, &dirN, false);
 
             // Declare outputs of ray_state_update
@@ -427,7 +427,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                                                       &prev_in, &cur_in, &buf_in,                   // Previous state, reduced-set
                                                       &dir_in, &acc_geo_in, &acc_ref_in,            // path_dir_prev, acc_dist in
                                                       &prev_out, &cur_out, &buf_out,                // Next state words
-                                                      &gainN, &xprmatN,                             // gain, xprmat of transition
+                                                      &gainN, &polmatN,                             // gain, polmat of transition
                                                       &dirN, &acc_geo_out, &acc_ref_out,            // path_dirN, acc_dist out
                                                       ptr_res_type,                                 // resolved_typeN
                                                       nullptr,                                      // No compaction n_rayN == n_ray
@@ -436,7 +436,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
             // Pointers
             dtype *p_gainN = gainN.memptr();             // Pointer to 'gainN'
-            dtype *p_xprmatN = xprmatN.memptr();         // Pointer to 'xprmatN'
+            dtype *p_xprmatN = polmatN.memptr();         // Pointer to 'polmatN'
             const uint8_t *p_hit_type = hit_type.data(); // pointer to 'hit_type'
 
             // Update path weights, taking material effects into account
@@ -474,8 +474,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                     g_normal(iG, 2) = normal_vec(iR, o + 2);
                 }
 
-                // xprmatN is [nXPR, R], indexed by the R-set. iG < n_pos selects the spine arc (iP == 0) and equals
-                // the target position. Compact those columns to the front of xprmatN and record their positions;
+                // polmatN is [nXPR, R], indexed by the R-set. iG < n_pos selects the spine arc (iP == 0) and equals
+                // the target position. Compact those columns to the front of polmatN and record their positions;
                 // off-spine arcs carry no polarization state and are dropped.
                 if (iG < n_pos) // spine ray: iG is the position index
                 {
@@ -503,7 +503,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                               << ", S" << sbs_ind[iR] << "-(" << sbsN.at(iR, 0) << "," << sbsN.at(iR, 1) << "," << sbsN.at(iR, 2) << ")"
                               << ", theta = " << fbs_angle[iR] * 57.29577951308232
                               << std::endl;
-                    xprmatN.t().print("XPR = ");
+                    polmatN.t().print("polmatN = ");
                 }
 
                 // Update R-set state words based on outputs of ray_state_update
@@ -529,12 +529,12 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 }
             }
 
-            // Left-multiply the compacted spine transitions into xprmat
-            if (xprmat && n_spine != 0)
+            // Left-multiply the compacted spine transitions into polmat
+            if (polmat && n_spine != 0)
             {
                 arma::uvec ray_ind(p_iSPINE, n_spine, false, true);             // Ray index view
                 arma::Mat<dtype> update(p_xprmatN, nXPR, n_spine, false, true); // Xprmat update view
-                quadriga_lib::xpr_update<dtype>(*xprmat, &update, nullptr, false, false, false, &ray_ind);
+                quadriga_lib::polmat_update<dtype>(*polmat, &update, nullptr, false, false, false, &ray_ind);
             }
 
             // Add multi-hits to a new launch config
@@ -622,19 +622,19 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     }
 
     // Finalize XPRMAT: normalize (remove gain)
-    if (xprmat)
+    if (polmat)
     {
         // Normalize XPRMAT to remove the gain
-        quadriga_lib::xpr_update<dtype>(*xprmat, nullptr, nullptr, false, true);
+        quadriga_lib::polmat_update<dtype>(*polmat, nullptr, nullptr, false, true);
 
         if (verbose == 2 && n_pos == 1) // Debug output
-            (*xprmat).t().print("Total xprmat = ");
+            (*polmat).t().print("Total polmat = ");
     }
 
-    // Optionally fold the geometric spreading loss into 'gain' and the propagation phase into 'xprmat'.
+    // Optionally fold the geometric spreading loss into 'gain' and the propagation phase into 'polmat'.
     // Both use the direct TX-RX distance, which is the 'path_length' that qrt_file_read and
     // get_channels_spherical see for a transmission-only path (the spine ray is a straight line).
-    if ((apply_fspl && p_gain) || (apply_phase && xprmat))
+    if ((apply_fspl && p_gain) || (apply_phase && polmat))
     {
         const double freq = (double)center_freq;
 
@@ -649,7 +649,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
         const double wave_number = 6.283185307179586 * freq / wave_speed;
         const double wavelength = wave_speed / freq;
 
-        dtype *p_xprmat = xprmat ? xprmat->memptr() : nullptr;
+        dtype *p_xprmat = polmat ? polmat->memptr() : nullptr;
 
         for (arma::uword iR = 0; iR < n_pos; ++iR)
         {
@@ -683,8 +683,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
             }
         }
 
-        if (verbose == 2 && n_pos == 1 && xprmat) // Debug output
-            (*xprmat).t().print("Total xprmat incl. phase = ");
+        if (verbose == 2 && n_pos == 1 && polmat) // Debug output
+            (*polmat).t().print("Total polmat incl. phase = ");
     }
 }
 
@@ -692,7 +692,7 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> &orig, 
                                                   const arma::Mat<float> &mesh, const arma::uvec &mtl_ind,
                                                   const std::unordered_map<std::string, std::vector<float>> &mtl_prop,
                                                   float center_freq, int lod,
-                                                  arma::Col<float> *gain, arma::Mat<float> *xprmat, arma::Cube<float> *coord,
+                                                  arma::Col<float> *gain, arma::Mat<float> *polmat, arma::Cube<float> *coord,
                                                   int verbose, const arma::u32_vec *sub_mesh_ind,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
                                                   bool apply_fspl, bool apply_phase);
@@ -701,7 +701,7 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> &orig,
                                                   const arma::Mat<double> &mesh, const arma::uvec &mtl_ind,
                                                   const std::unordered_map<std::string, std::vector<double>> &mtl_prop,
                                                   double center_freq, int lod,
-                                                  arma::Col<double> *gain, arma::Mat<double> *xprmat, arma::Cube<double> *coord,
+                                                  arma::Col<double> *gain, arma::Mat<double> *polmat, arma::Cube<double> *coord,
                                                   int verbose, const arma::u32_vec *sub_mesh_ind,
                                                   int use_kernel, int gpu_id, bool scalar_mode, double thin_slab_threshold,
                                                   bool apply_fspl, bool apply_phase);

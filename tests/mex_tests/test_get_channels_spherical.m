@@ -111,7 +111,7 @@ try
     [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos(:,[1,2,2]), fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''M'' must have the same number of columns (n_paths)';
+    expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''polmat'' must have the same number of columns (n_paths)';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

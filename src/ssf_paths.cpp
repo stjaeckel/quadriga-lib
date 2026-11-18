@@ -25,7 +25,7 @@ Antenna-free paths of one link at one position
   (also at zero power) and NLOS rays with power > 0 at some frequency; paths in ray order, `ray_ind` maps them to
   the rays (e.g. `rays.tap(ray_ind)`)
 - `"phase"`: use the outputs with [[get_channels_planar]] and the arrays at the positions of `rays`; the displacement
-  phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer
+  phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer
   identified and the displacement phase counts twice, without an error
 - `"drift"`: use the outputs at the new positions with [[get_channels_spherical]] or [[get_channels_multifreq]], or
   pass them to [[qrt_paths_from_scatterers]]; needs the scatterers of .[[solve_scatterers]]
@@ -34,11 +34,11 @@ Antenna-free paths of one link at one position
 | --- | --- | --- |
 | Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
-| `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
+| `polmat` | Ray `polmat` times the displacement phase | Ray `polmat`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `[3, 0]` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
 
 - `"drift"` with an end moved (any coordinate differs from `rays`): GR power by the power law of `rays.method`
-  (`(d3D / d_GR)²` for the TR methods, 1 for `"quadriga"`), GR `M` the scalar multiple of `diag(R_par, -R_perp)` (TR
+  (`(d3D / d_GR)²` for the TR methods, 1 for `"quadriga"`), GR `polmat` the scalar multiple of `diag(R_par, -R_perp)` (TR
   38.901 eqs. (7.6-38), (7.6-39)) that best fits the stored matrix, which replaces a matrix of another form (e.g. a
   conjugated one). Fallback rays have their longer polyline, also at the positions of `rays`
 - Path gain per frequency: the coefficient power; with `kf_ratio` LOS and GR are rescaled against NLOS so that the
@@ -59,7 +59,7 @@ void quadriga_lib::ssf_paths(
     const arma::vec &link_gain_dB,
     arma::mat &path_gain,
     arma::vec &path_length,
-    arma::cube &M,
+    arma::cube &polmat,
     const std::string &mobility = "auto",
     const arma::mat *tx_pos = nullptr,
     const arma::mat *rx_pos = nullptr,
@@ -86,7 +86,7 @@ void quadriga_lib::ssf_paths(
 ## Outputs:
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`M`** — Polarization transfer matrices, rows as in [[get_channels_planar]]; `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [[get_channels_planar]]; `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Departure and arrival angles in [rad], GCS; `[n_path]`
 - **`fbs_pos`**, **`lbs_pos`** *(optional)* — Scatterer positions in [m]; `[3, n_path]`, `[3, 0]` in `"phase"`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`
@@ -103,7 +103,7 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
                              const arma::vec &link_gain_dB,
                              arma::mat &path_gain,
                              arma::vec &path_length,
-                             arma::cube &M,
+                             arma::cube &polmat,
                              const std::string &mobility,
                              const arma::mat *tx_pos,
                              const arma::mat *rx_pos,
@@ -140,10 +140,10 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
     auto check = [&](const auto *out, const char *name)
     {
         qd_check_alias(out, name, &rays.tx_pos, &rays.rx_pos, &rays.center_freq, &rays.delay, &rays.power, &rays.aod,
-                       &rays.eod, &rays.aoa, &rays.eoa, &rays.M, &rays.path_type, &rays.tap, &rays.gr_eps_re,
+                       &rays.eod, &rays.aoa, &rays.eoa, &rays.polmat, &rays.path_type, &rays.tap, &rays.gr_eps_re,
                        &rays.gr_eps_im, &rays.fbs_pos, &rays.lbs_pos, &rays.fallback, &link_gain_dB, tx_pos, rx_pos, kf_ratio);
     };
-    check(&M, "M"), check(path_type, "path_type"), check(ray_ind, "ray_ind");
+    check(&polmat, "polmat"), check(path_type, "path_type"), check(ray_ind, "ray_ind");
     const arma::mat *outputs[8] = {&path_gain, &path_length, aod, eod, aoa, eoa, fbs_pos, lbs_pos};
     const char *names[8] = {"path_gain", "path_length", "aod", "eod", "aoa", "eoa", "fbs_pos", "lbs_pos"};
     for (int i = 0; i < 8; ++i)
@@ -177,8 +177,8 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
         path_gain.set_size(n_path, n_freq);
     if (path_length.n_elem != n_path)
         path_length.set_size(n_path);
-    if (M.n_rows != 8 || M.n_cols != n_path || M.n_slices != n_freq)
-        M.set_size(8, n_path, n_freq);
+    if (polmat.n_rows != 8 || polmat.n_cols != n_path || polmat.n_slices != n_freq)
+        polmat.set_size(8, n_path, n_freq);
     for (arma::vec *v : {aod, eod, aoa, eoa})
         if (v != nullptr && v->n_elem != n_path)
             v->set_size(n_path);
@@ -267,8 +267,8 @@ void quadriga_lib::ssf_paths(const gbsm_rays &rays,
 
         for (arma::uword k = 0; k < n_freq; ++k)
         {
-            const double *m0 = rays.M.slice_memptr(k) + 8 * i;
-            double *m = M.slice_memptr(k) + 8 * p, P = rays.power(i, k);
+            const double *m0 = rays.polmat.slice_memptr(k) + 8 * i;
+            double *m = polmat.slice_memptr(k) + 8 * p, P = rays.power(i, k);
             for (int e = 0; e < 8; ++e)
                 m[e] = m0[e];
             if (!drift) // displacement phase exp(j·2·pi·f/c·(r_rx·dR + r_tx·dT)), TR eq. (7.5-22)

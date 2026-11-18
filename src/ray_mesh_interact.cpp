@@ -30,7 +30,7 @@
 // - Face angle: theta = acos(u . n) - pi/2 is the angle to the face, >= 0 for a front-side hit (the vertices
 //   counter-clockwise seen from the ray); |cos(theta + pi/2)| is the cosine to the normal.
 // - Coefficients: TE / TM; a transmitted coefficient is a normal-flux amplitude (flux_amp), so
-//   0.5 (|cTE|^2 + |cTM|^2) is the power that crosses. xprmat per ray: [ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]
+//   0.5 (|cTE|^2 + |cTM|^2) is the power that crosses. polmat per ray: [ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH], labels <rx><tx> (<out><in>)
 //   (qd_polbasis) or [Re Im] for the scalar types.
 // - Geometry: O the segment's origin, D its destination, F and S the first and second hit (FBS, SBS), N a face
 //   normal (oriented to the incidence side where a direction is formed), V the VBS.
@@ -184,13 +184,13 @@ namespace
         Dx = Rx * inv, Dy = Ry * inv, Dz = Rz * inv;
     }
 
-    // Builds incoming Q-basis from in, outgoing U-basis from out, writes the 8-element xprmat and
+    // Builds incoming Q-basis from in, outgoing U-basis from out, writes the 8-element polmat and
     // its power gain. is_scalar takes the single-coefficient path.
     inline void qd_polbasis(double Qx, double Qy, double Qz,
                             double Ux, double Uy, double Uz,
                             double Nx, double Ny, double Nz,
                             std::complex<double> cTE, std::complex<double> cTM,
-                            bool is_scalar, double xprmat[8], double &out_gain)
+                            bool is_scalar, double polmat[8], double &out_gain)
     {
         double eTE_Re = std::real(cTE), eTE_Im = std::imag(cTE);
         double eTM_Re = std::real(cTM), eTM_Im = std::imag(cTM);
@@ -198,9 +198,9 @@ namespace
         if (is_scalar)
         {
             double coeff_Re = eTE_Re, coeff_Im = eTE_Im;
-            xprmat[0] = coeff_Re, xprmat[1] = coeff_Im;
-            xprmat[2] = 0.0, xprmat[3] = 0.0, xprmat[4] = 0.0;
-            xprmat[5] = 0.0, xprmat[6] = 0.0, xprmat[7] = 0.0;
+            polmat[0] = coeff_Re, polmat[1] = coeff_Im;
+            polmat[2] = 0.0, polmat[3] = 0.0, polmat[4] = 0.0;
+            polmat[5] = 0.0, polmat[6] = 0.0, polmat[7] = 0.0;
             out_gain = coeff_Re * coeff_Re + coeff_Im * coeff_Im;
             return;
         }
@@ -242,10 +242,10 @@ namespace
                HH_Re = U2 * Q3 * eTM_Re + U4 * Q4 * eTE_Re,
                HH_Im = U2 * Q3 * eTM_Im + U4 * Q4 * eTE_Im;
 
-        xprmat[0] = VV_Re, xprmat[1] = VV_Im;
-        xprmat[2] = HV_Re, xprmat[3] = HV_Im;
-        xprmat[4] = VH_Re, xprmat[5] = VH_Im;
-        xprmat[6] = HH_Re, xprmat[7] = HH_Im;
+        polmat[0] = VV_Re, polmat[1] = VV_Im;
+        polmat[2] = HV_Re, polmat[3] = HV_Im;
+        polmat[4] = VH_Re, polmat[5] = VH_Im;
+        polmat[6] = HH_Re, polmat[7] = HH_Im;
 
         out_gain = 0.5 * (VV_Re * VV_Re + VV_Im * VV_Im +
                           HV_Re * HV_Re + HV_Im * HV_Im +
@@ -1565,7 +1565,7 @@ namespace
     template <typename dtype>
     struct RmiOut
     {
-        dtype *origN, *destN, *fbsN, *sbsN, *gainN, *xprmatN, *trivecN, *tridirN;
+        dtype *origN, *destN, *fbsN, *sbsN, *gainN, *polmatN, *trivecN, *tridirN;
         dtype *fbs_angleN, *thicknessN, *edge_lengthN, *normal_vecN, *path_dirN;
         uint8_t *out_typeN;
         unsigned *ray_indN;
@@ -1639,8 +1639,8 @@ namespace
         w.set3(out.sbsN, Dx, Dy, Dz);
         w.set1(out.gainN, 1.0);
 
-        const double xprmat[8] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
-        w.set_col(out.xprmatN, xprmat, out.nXPR);
+        const double polmat[8] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+        w.set_col(out.polmatN, polmat, out.nXPR);
 
         if (tube)
         {
@@ -2661,7 +2661,7 @@ void quadriga_lib::ray_mesh_interact(
     arma::Mat<dtype> *fbsN = nullptr,
     arma::Mat<dtype> *sbsN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
-    arma::Mat<dtype> *xprmatN = nullptr,
+    arma::Mat<dtype> *polmatN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
     arma::Mat<dtype> *tridirN = nullptr,
     arma::Col<dtype> *fbs_angleN = nullptr,
@@ -2688,17 +2688,17 @@ void quadriga_lib::ray_mesh_interact(
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
 - **`compact`** *(optional)* — If `true`, no-hit rays are dropped and `n_rayN ≤ n_ray`. If
   `false` (default), all rays are kept (`n_rayN = n_ray`) and no-hit rays are written as a transparent pass-through
-  (gain 1, identity `xprmat`, `out_type = 0`).
+  (gain 1, identity `polmat`, `out_type = 0`).
 
 ## Outputs:
 - **`origN`** — New origins, nudged off the face along the travel direction by 8 float ULP of the hit point's
   coordinate magnitude (past the SBS of a co-located pair, except for reflection); `[n_rayN, 3]`
 - **`destN`** — New destinations along the outgoing direction; `[n_rayN, 3]`
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
-- **`gainN`** — Linear power gain of the interaction, derived from `xprmatN`; `[n_rayN]`
-- **`xprmatN`** — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
-  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, the Jones matrix `M = [VV VH; HV HH]`
-  acting as `e_out = M · e_in`, the incoming V/H basis from the incident direction and the outgoing one from
+- **`gainN`** — Linear power gain of the interaction, derived from `polmatN`; `[n_rayN]`
+- **`polmatN`** — Polarization transfer matrix of amplitude coefficients that carry the interaction gain. Types 0–2:
+  interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`), the Jones matrix `J = [VV VH; HV HH]`
+  acting as `e_out = J · e_in`, the incoming V/H basis from the incident direction and the outgoing one from
   `path_dirN` (`eH = ẑ × k̂` normalized, `eV = eH × k̂`); `[8, n_rayN]`. Types 3–5: `[Re Im]` of the scalar pressure
   coefficient; `[2, n_rayN]`. A transmitted coefficient includes the entered material's `interface_gain`.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
@@ -2781,7 +2781,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                                      arma::Mat<dtype> *fbsN,
                                      arma::Mat<dtype> *sbsN,
                                      arma::Col<dtype> *gainN,
-                                     arma::Mat<dtype> *xprmatN,
+                                     arma::Mat<dtype> *polmatN,
                                      arma::Mat<dtype> *trivecN,
                                      arma::Mat<dtype> *tridirN,
                                      arma::Col<dtype> *fbs_angleN,
@@ -2866,9 +2866,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     if (p_mtl_ind && mtl_ind->max() > MaterialSet.n_mtl)
         throw std::invalid_argument("Entries of 'mtl_ind' cannot exceed the number of materials.");
 
-    qd_check_alias_list<arma::Mat<dtype>>({origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN,
+    qd_check_alias_list<arma::Mat<dtype>>({origN, destN, fbsN, sbsN, gainN, polmatN, trivecN, tridirN, fbs_angleN,
                                            thicknessN, edge_lengthN, normal_vecN, path_dirN},
-                                          {"origN", "destN", "fbsN", "sbsN", "gainN", "xprmatN", "trivecN", "tridirN",
+                                          {"origN", "destN", "fbsN", "sbsN", "gainN", "polmatN", "trivecN", "tridirN",
                                            "fbs_angleN", "thicknessN", "edge_lengthN", "normal_vecN", "path_dirN"},
                                           orig, dest, mesh, trivec, tridir);
     qd_check_alias(ray_indN, "ray_indN", fbs_ind, sbs_ind);
@@ -2937,10 +2937,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         gainN->set_size(n_rayN);
     dtype *p_gainN = gainN ? gainN->memptr() : nullptr;
 
-    const arma::uword nXPR = is_scalar ? 2 : 8; // Number of columns in xprmat (8 for EM, 2 for scalar)
-    if (xprmatN && (xprmatN->n_rows != nXPR || xprmatN->n_cols != n_rayN))
-        xprmatN->set_size(nXPR, n_rayN);
-    dtype *p_xprmatN = xprmatN ? xprmatN->memptr() : nullptr;
+    const arma::uword nXPR = is_scalar ? 2 : 8; // Number of rows in polmat (8 for EM, 2 for scalar)
+    if (polmatN && (polmatN->n_rows != nXPR || polmatN->n_cols != n_rayN))
+        polmatN->set_size(nXPR, n_rayN);
+    dtype *p_xprmatN = polmatN ? polmatN->memptr() : nullptr;
 
     if (trivecN && use_ray_tube && (trivecN->n_rows != n_rayN || trivecN->n_cols != 9))
         trivecN->set_size(n_rayN, 9);
@@ -3188,9 +3188,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
         if (p_xprmatN || p_gainN)
         {
-            double xprmat[8], pgain;
-            qd_polbasis(ODx, ODy, ODz, FDx, FDy, FDz, Nx, Ny, Nz, cTE, cTM, is_scalar, xprmat, pgain);
-            w.set_col(p_xprmatN, xprmat, nXPR);
+            double polmat[8], pgain;
+            qd_polbasis(ODx, ODy, ODz, FDx, FDy, FDz, Nx, Ny, Nz, cTE, cTM, is_scalar, polmat, pgain);
+            w.set_col(p_xprmatN, polmat, nXPR);
             w.set1(p_gainN, pgain);
         }
 
@@ -3221,7 +3221,7 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, float center
                                               const arma::Mat<float> *trivec, const arma::Mat<float> *tridir,
                                               arma::Mat<float> *origN, arma::Mat<float> *destN,
                                               arma::Mat<float> *fbsN, arma::Mat<float> *sbsN,
-                                              arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
+                                              arma::Col<float> *gainN, arma::Mat<float> *polmatN,
                                               arma::Mat<float> *trivecN, arma::Mat<float> *tridirN,
                                               arma::Col<float> *fbs_angleN, arma::Col<float> *thicknessN, arma::Col<float> *edge_lengthN,
                                               arma::Mat<float> *normal_vecN, std::vector<uint8_t> *out_typeN,
@@ -3235,7 +3235,7 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               const arma::Mat<double> *trivec, const arma::Mat<double> *tridir,
                                               arma::Mat<double> *origN, arma::Mat<double> *destN,
                                               arma::Mat<double> *fbsN, arma::Mat<double> *sbsN,
-                                              arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
+                                              arma::Col<double> *gainN, arma::Mat<double> *polmatN,
                                               arma::Mat<double> *trivecN, arma::Mat<double> *tridirN,
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
                                               arma::Mat<double> *normal_vecN, std::vector<uint8_t> *out_typeN,
@@ -3245,7 +3245,7 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
 # ray_state_update
 Per-ray medium state machine with closed-form thin-slab (Fabry-Pérot) resolution
 
-- Corrects the per-event `gainN` / `xprmatN` of [[ray_mesh_interact]] with the medium each ray is known to be in,
+- Corrects the per-event `gainN` / `polmatN` of [[ray_mesh_interact]] with the medium each ray is known to be in,
   and carries that state from event to event in three state words per ray (table below) and the in-medium path
   lengths (`acc_dist_*`):
   - the face is re-evaluated at the incidence of the direction the wave has (`path_dir_prev`) instead of the
@@ -3288,7 +3288,7 @@ void quadriga_lib::ray_state_update(
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
-    arma::Mat<dtype> *xprmatN = nullptr,
+    arma::Mat<dtype> *polmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
     arma::Col<dtype> *acc_dist_geometricN = nullptr,
     arma::Col<dtype> *acc_dist_refractedN = nullptr,
@@ -3355,8 +3355,8 @@ void quadriga_lib::ray_state_update(
   above), compact set; `[n_rayN]`. The previous-medium word may hold a sheet: the boundary behind the ray, never a
   medium it travels in. NULL skips the write.
 - **`gainN`** *(in/out)* — Per-interaction linear power gain, updated in place; `[n_rayN]`. Kept consistent
-  with `xprmatN`. A killed ray (`resolved_typeN == 0`) has `gainN = 0` and an all-zero `xprmatN`.
-- **`xprmatN`** *(in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
+  with `polmatN`. A killed ray (`resolved_typeN == 0`) has `gainN = 0` and an all-zero `polmatN`.
+- **`polmatN`** *(in/out)* — Polarization transfer matrix, updated in place; `[8, n_rayN]` for EM mode,
   `[2, n_rayN]` for scalar mode, layout and basis as in [[ray_mesh_interact]]. On return it also carries the
   in-medium attenuation and excess phase of the leg the ray leaves and, where the series was summed, the factor
   `S`. Spreading loss stays excluded, so the matrix is the complete per-event Jones factor. Where the series is
@@ -3385,7 +3385,7 @@ void quadriga_lib::ray_state_update(
    | Bit  | Flag        | Meaning                                                                        |
    | :--: | :---------: | ------------------------------------------------------------------------------ |
    |   0  | ok          | OK flag (0 = a deferred medium is pending in the buffer word)                  |
-   |   1  | vbs         | VBS correction (gain/xprmat corrected at the VBS instead of FBS/SBS)           |
+   |   1  | vbs         | VBS correction (gain/polmat corrected at the VBS instead of FBS/SBS)           |
    |   2  | resolve     | Internal multi-bounce series accounted for (expect no further internal bounces) |
    |   3  | inside      | Inside-object flag (1 = ray continues inside, 0 = continues outside)           |
    |   4  | fix         | Fix flag (the exit face names another medium than the state, or a sheet event met a deferred medium) |
@@ -3475,7 +3475,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     arma::Col<short> *mtl_ind_current_outN,
                                     arma::Col<short> *mtl_ind_buffer_outN,
                                     arma::Col<dtype> *gainN,
-                                    arma::Mat<dtype> *xprmatN,
+                                    arma::Mat<dtype> *polmatN,
                                     arma::Mat<dtype> *path_dirN,
                                     arma::Col<dtype> *acc_dist_geometricN,
                                     arma::Col<dtype> *acc_dist_refractedN,
@@ -3493,7 +3493,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
     const bool is_scalar = interaction_type >= 3;
     const bool refl_pass = (interaction_type == 0 || interaction_type == 3); // geometry 0
-    const arma::uword nXPR = is_scalar ? 2 : 8;                              // Number of columns in xprmat (8 for EM, 2 for scalar)
+    const arma::uword nXPR = is_scalar ? 2 : 8;                              // Number of rows in polmat (8 for EM, 2 for scalar)
 
     if (!std::isfinite((double)center_freq) || center_freq <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
@@ -3587,8 +3587,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
     // Written arguments (outputs and in/out) against the read-only inputs and against each other
     qd_check_alias_list<arma::Mat<dtype>>(
-        {acc_dist_geometricN, acc_dist_refractedN, gainN, xprmatN, path_dirN, origN, destN, tridirN},
-        {"acc_dist_geometricN", "acc_dist_refractedN", "gainN", "xprmatN", "path_dirN", "origN", "destN", "tridirN"},
+        {acc_dist_geometricN, acc_dist_refractedN, gainN, polmatN, path_dirN, origN, destN, tridirN},
+        {"acc_dist_geometricN", "acc_dist_refractedN", "gainN", "polmatN", "path_dirN", "origN", "destN", "tridirN"},
         orig, dest, fbsN, sbsN, fbs_angleN, normal_vecN, path_dir_prev, acc_dist_geometric, acc_dist_refracted, tridir);
     qd_check_alias_list({mtl_ind_prev_outN, mtl_ind_current_outN, mtl_ind_buffer_outN},
                         {"mtl_ind_prev_outN", "mtl_ind_current_outN", "mtl_ind_buffer_outN"},
@@ -3613,9 +3613,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("In-out 'gainN' must match the length of 'out_typeN'.");
     dtype *p_gainN = gainN ? gainN->memptr() : nullptr;
 
-    if (xprmatN && (xprmatN->n_rows != nXPR || xprmatN->n_cols != n_rayN))
-        throw std::invalid_argument("In-out 'xprmatN' must have size [8, n_rayN] for EM mode or [2, n_rayN] for scalar mode.");
-    dtype *p_xprmatN = xprmatN ? xprmatN->memptr() : nullptr;
+    if (polmatN && (polmatN->n_rows != nXPR || polmatN->n_cols != n_rayN))
+        throw std::invalid_argument("In-out 'polmatN' must have size [8, n_rayN] for EM mode or [2, n_rayN] for scalar mode.");
+    dtype *p_xprmatN = polmatN ? polmatN->memptr() : nullptr;
 
     if (path_dirN && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
         throw std::invalid_argument("In-out 'path_dirN' must have size [n_rayN, 3].");
@@ -3814,7 +3814,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             dist_geo = (val_geo == 0.0) ? val_refract : val_geo;
         };
 
-        // The output of this event: killed (code 0, xprmat and gain zero), scaled by a complex factor, a
+        // The output of this event: killed (code 0, polmat and gain zero), scaled by a complex factor, a
         // transparent pass (identity, optionally keeping the incoming direction), or a new coefficient pair
         // in the basis from dir_prev to dir_next.
         auto kill = [&res_code, p_xprmatN, p_gainN, i_rayN, nXPR]()
@@ -3866,9 +3866,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
         };
         auto write_coeff = [&dir_prev, &dir_next, &N, &w, p_xprmatN, p_gainN, is_scalar, nXPR](std::complex<double> te, std::complex<double> tm)
         {
-            double xprmat[8], pgain;
-            qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2], N[0], N[1], N[2], te, tm, is_scalar, xprmat, pgain);
-            w.set_col(p_xprmatN, xprmat, nXPR);
+            double polmat[8], pgain;
+            qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2], N[0], N[1], N[2], te, tm, is_scalar, polmat, pgain);
+            w.set_col(p_xprmatN, polmat, nXPR);
             w.set1(p_gainN, pgain);
         };
 
@@ -4004,7 +4004,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         };
 
         // The face Ma | Mb at the VBS angle theta_t in place of what ray_mesh_interact wrote at the FBS angle:
-        // coefficients (att included), TIR, the continuation direction, and xprmat from dir_prev and the corrected
+        // coefficients (att included), TIR, the continuation direction, and polmat from dir_prev and the corrected
         // direction; the medium itself is charged by close_leg. geom: 0 reflect, 2 refract, 3 exit into air.
         // Returns the refracted length from the VBS to the virtual destination. A resolved ray is evaluated as
         // any other; only its series is skipped (by the caller).
@@ -4121,7 +4121,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return (P.m > 0.0) ? face_absorption(material(cols, 0), P, it, theta_t, fGHz) : face_absorption(P, C, it, theta_t, fGHz);
         };
 
-        // Closes the leg in medium m out: its gain and phase scaled into xprmat and gain.
+        // Closes the leg in medium m out: its gain and phase scaled into polmat and gain.
         auto close_leg = [&cols, &mtl_current, &in_medium_cosine, &dist_refract, &dist_geo, &leg_bonded_x0, &plate_exit_mtl,
                           &entry_face_absorption, &scale, fGHz, refracted, abs_cos_theta_t, abs_cos_theta, use_vbs, cos_dir_seg,
                           mtl_prev, is_scalar, theta_t](int m)
@@ -4182,7 +4182,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return mtl_exit;
         };
 
-        // The series of the leg in mtl_slab (qd_slab_resolve), per polarization: xprmat is rebuilt from cTE / cTM
+        // The series of the leg in mtl_slab (qd_slab_resolve), per polarization: polmat is rebuilt from cTE / cTM
         // times the per-channel factor, so TE and TM carry their own retardation. mtl_near is the face ahead,
         // mtl_far the one the leg was entered through (symmetric); mtl_back what lies behind a sheet named as
         // mtl_near, where the caller knows it (air otherwise). Returns true where the series was summed.
@@ -4218,7 +4218,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 return false;
             series_summed = true;
 
-            // Scalar mode carries one port and the factor is a pure scale: the stored xprmat is scaled in place
+            // Scalar mode carries one port and the factor is a pure scale: the stored polmat is scaled in place
             // (rebuilding it from cTE would round-trip through dtype differently).
             if (is_scalar)
             {
@@ -4343,7 +4343,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         // A sheet event. The sheet's internal series is inside its composite, so nothing here applies a face
         // coefficient through interact_with or charges the sheet material. In order: the composite against the
         // tracked media (sheet_at_tracked_media); the host leg closed, its series reflecting off the sheet ahead
-        // (sum_series, which rebuilds xprmat from the composite's cTE / cTM, hence this order); a new leg with the
+        // (sum_series, which rebuilds polmat from the composite's cTE / cTM, hence this order); a new leg with the
         // sheet as the previous medium, so the next host leg reflects off it from the other side.
         auto sheet_event = [&cols, &mtl_current, &res_code, &ledger_add, &ledger_set, &dist_geo, &leg_bonded_x0, &sheet_at_tracked_media,
                             &kill, &sum_series, &plate_exit_mtl, &close_leg, &next_current, &next_prev, &next_buffer, &leg_bonded_thickness,
@@ -4609,7 +4609,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
             else if (hit_code == 3 || hit_code == 15 || hit_code == 31) // o-i
             {
                 res_code[3] = true;   // inside (code 9)
-                if (mtl_current == 0) // entry from air: xprmat and gain stay
+                if (mtl_current == 0) // entry from air: polmat and gain stay
                 {
                     next_current = (short)(mtl_fbs | ((material(cols, mtl_fbs).m > 0.0) ? 0 : bent_enter));
                     const bool nonpar = !ray_ends && faces_not_parallel(F, S, p_normal_vecN, i_rayN, n_rayN);
@@ -4745,7 +4745,7 @@ template void quadriga_lib::ray_state_update(int interaction_type, float center_
                                              const arma::Col<float> *acc_dist_geometric, const arma::Col<float> *acc_dist_refracted,
                                              arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
                                              arma::Col<short> *mtl_ind_buffer_outN,
-                                             arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
+                                             arma::Col<float> *gainN, arma::Mat<float> *polmatN,
                                              arma::Mat<float> *path_dirN,
                                              arma::Col<float> *acc_dist_geometricN, arma::Col<float> *acc_dist_refractedN,
                                              std::vector<uint8_t> *resolved_typeN,
@@ -4767,7 +4767,7 @@ template void quadriga_lib::ray_state_update(int interaction_type, double center
                                              const arma::Col<double> *acc_dist_geometric, const arma::Col<double> *acc_dist_refracted,
                                              arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
                                              arma::Col<short> *mtl_ind_buffer_outN,
-                                             arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
+                                             arma::Col<double> *gainN, arma::Mat<double> *polmatN,
                                              arma::Mat<double> *path_dirN,
                                              arma::Col<double> *acc_dist_geometricN, arma::Col<double> *acc_dist_refractedN,
                                              std::vector<uint8_t> *resolved_typeN,

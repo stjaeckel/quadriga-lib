@@ -198,7 +198,7 @@ TEST_CASE("ssf_paths - phase at the ray-data positions returns the ray data")
         CHECK((o.aod(p) == r.aod(i) && o.eod(p) == r.eod(i) && o.aoa(p) == r.aoa(i) && o.eoa(p) == r.eoa(i)));
         for (arma::uword k = 0; k < 2; ++k)
             for (arma::uword e = 0; e < 8; ++e)
-                CHECK(std::abs(o.M(e, p, k) - r.M(e, i, k)) < 1e-14);
+                CHECK(std::abs(o.M(e, p, k) - r.polmat(e, i, k)) < 1e-14);
     }
     // Positions given and equal to those of the rays: the same values
     CHECK(arma::approx_equal(o2.M, o.M, "absdiff", 0.0));
@@ -234,9 +234,9 @@ TEST_CASE("ssf_paths - phase rotation follows TR 7.5-22 for Rx and Tx displaceme
                 const cx ex = std::polar(1.0, -kw * dL);
                 double err = 0.0;
                 for (arma::uword e = 0; e < 4; ++e)
-                    if (std::abs(jx(r.M, e, i, k)) > 0.0)
-                        err = std::max(err, std::abs(jx(o.M, e, p, k) - jx(r.M, e, i, k) * ex) /
-                                                std::abs(jx(r.M, e, i, k)));
+                    if (std::abs(jx(r.polmat, e, i, k)) > 0.0)
+                        err = std::max(err, std::abs(jx(o.M, e, p, k) - jx(r.polmat, e, i, k) * ex) /
+                                                std::abs(jx(r.polmat, e, i, k)));
                 QD_DIAG("%d,%d,%d,%.3e,%.3e\n", (int)q, (int)p, (int)k, err, bound);
                 CHECK(err <= bound + 1e-9);
                 max_first = std::max(max_first, std::abs(kw * dL)), max_bound = std::max(max_bound, bound);
@@ -261,7 +261,7 @@ TEST_CASE("ssf_paths - phase rotation follows TR 7.5-22 for Rx and Tx displaceme
                 const double ph = disp_phase(r, i, eT, eR, kw);
                 INFO("path " << p << ", frequency " << k);
                 for (arma::uword e = 0; e < 4; ++e)
-                    CHECK(std::abs(jx(o.M, e, p, k) - jx(r.M, e, i, k) * std::polar(1.0, ph)) < 1e-12);
+                    CHECK(std::abs(jx(o.M, e, p, k) - jx(r.polmat, e, i, k) * std::polar(1.0, ph)) < 1e-12);
                 CHECK(std::abs(o.len(p) - len3(r.rx_pos - r.tx_pos) - c0 * r.delay(i)) < 1e-12 * o.len(p));
                 CHECK(o.gain(p, k) == r.power(i, k));
             }
@@ -283,7 +283,7 @@ TEST_CASE("ssf_paths - drift at the ray-data positions reproduces the drop geome
     {
         const arma::uword i = ind(p);
         INFO("path " << p << ", ray " << i);
-        CHECK(arma::approx_equal(o.M.col(p), r.M.col(i), "absdiff", 0.0));
+        CHECK(arma::approx_equal(o.M.col(p), r.polmat.col(i), "absdiff", 0.0));
         for (arma::uword k = 0; k < 2; ++k)
             CHECK(std::abs(o.gain(p, k) / (r.power(i, k) * std::pow(10.0, 0.1 * lg(k))) - 1.0) < 1e-12);
         const arma::vec u_t = unit_vec(o.aod(p), o.eod(p)), u_r = unit_vec(o.aoa(p), o.eoa(p));
@@ -346,8 +346,8 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
             for (arma::uword k = 0; k < 2; ++k) // GR matrix M_0 = s·diag(R_par, -R_perp) / Rn at the ray-data ends
                 for (arma::uword e = 0; e < 4; ++e)
                 {
-                    const cx m = jx(r.M, e, 1, k) * s;
-                    r.M(2 * e, 1, k) = m.real(), r.M(2 * e + 1, 1, k) = m.imag();
+                    const cx m = jx(r.polmat, e, 1, k) * s;
+                    r.polmat(2 * e, 1, k) = m.real(), r.polmat(2 * e + 1, 1, k) = m.imag();
                 }
             const arma::vec T = r.tx_pos + dT, R = r.rx_pos + dR, G = specular_point(T, R);
             const po_t o = pth(r, "drift", &T, &R, nullptr, false, &lg);
@@ -388,7 +388,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
                     if (r.path_type(i) != 1)
                     {
                         CHECK(std::abs(o.gain(p, k) / (r.power(i, k) * lin) - 1.0) < 1e-12);
-                        CHECK(arma::approx_equal(o.M.slice(k).col(p), r.M.slice(k).col(i), "absdiff", 0.0));
+                        CHECK(arma::approx_equal(o.M.slice(k).col(p), r.polmat.slice(k).col(i), "absdiff", 0.0));
                         continue;
                     }
                     // GR: power × g(t) / g(0); M(t) = s·diag(R_par(t), -R_perp(t)) / Rn(0)
@@ -405,8 +405,8 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
             // Continuous at the ray-data positions: a 1 µm move changes the GR matrix by far less than 1e-5
             const arma::vec R1 = r.rx_pos + arma::vec{1e-6, 0.0, 0.0};
             const po_t o1 = pth(r, "drift", nullptr, &R1);
-            CHECK(arma::approx_equal(o1.M.col(1), r.M.col(1), "absdiff", 1e-5));
-            CHECK(arma::abs(arma::vectorise(o1.M.col(1) - r.M.col(1))).max() > 0.0);
+            CHECK(arma::approx_equal(o1.M.col(1), r.polmat.col(1), "absdiff", 1e-5));
+            CHECK(arma::abs(arma::vectorise(o1.M.col(1) - r.polmat.col(1))).max() > 0.0);
         }
 
     // A GR matrix with off-diagonal entries: after a move the same matrix as from its diagonal part (the projection
@@ -414,7 +414,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
     {
         rays_t d = make_rays(15, true, true, 6, 2, "38.901", true), f = d;
         for (arma::uword k = 0; k < 2; ++k)
-            f.M(2, 1, k) = 0.3, f.M(5, 1, k) = -0.2;
+            f.polmat(2, 1, k) = 0.3, f.polmat(5, 1, k) = -0.2;
         const arma::vec R = d.rx_pos + dR;
         CHECK(arma::approx_equal(pth(f, "drift", nullptr, &R).M, pth(d, "drift", nullptr, &R).M, "absdiff", 0.0));
     }
@@ -423,7 +423,7 @@ TEST_CASE("ssf_paths - drift recomputes polylines, angles, LOS and GR at moved e
     rays_t r = make_rays(16, true, true, 6, 2, "38.901", true);
     r.gr_eps_re.reset(), r.gr_eps_im.reset();
     const po_t o = pth(r, "drift");
-    CHECK(arma::approx_equal(o.M.col(1), r.M.col(1), "absdiff", 0.0));
+    CHECK(arma::approx_equal(o.M.col(1), r.polmat.col(1), "absdiff", 0.0));
     CHECK(arma::approx_equal(o.gain.row(1), r.power.row(1), "absdiff", 0.0));
 
     // Rx moved to directly below the Tx (vertical LOS): EOD -pi/2 and EOA +pi/2
@@ -889,8 +889,8 @@ TEST_CASE("ssf_paths - outputs that alias inputs")
     CHECK_NOTHROW(quadriga_lib::ssf_paths(keep, lg, g, l, M, ph, &T, nullptr, nullptr, &a, &e));
 
     rays_t x = keep;
-    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, x.M), std::invalid_argument); // M is 'rays.M'
-    CHECK(arma::approx_equal(x.M, keep.M, "absdiff", 0.0));
+    CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, g, l, x.polmat), std::invalid_argument); // polmat is 'rays.polmat'
+    CHECK(arma::approx_equal(x.polmat, keep.polmat, "absdiff", 0.0));
     x = keep;
     CHECK_THROWS_AS(quadriga_lib::ssf_paths(x, lg, x.power, l, M), std::invalid_argument); // path_gain is 'rays.power'
     CHECK(arma::approx_equal(x.power, keep.power, "absdiff", 0.0));

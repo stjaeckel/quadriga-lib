@@ -16,7 +16,7 @@ Antenna-free paths of one link at one position
   `rays` (see Terms) at new Tx and Rx positions (default: the ray-data positions), LOS and GR also at zero power; paths
   in ray order, `ray_ind` maps them to the rays (e.g. `rays["tap"][ray_ind]`)
 - `"phase"`: use the outputs with [[channel.planar]] and the arrays at the positions of `rays`; the displacement
-  phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer identified
+  phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer identified
   and the displacement phase counts twice, without an error
 - `"drift"`: use the outputs at the new positions with [[channel.spherical]] or [[channel.multifreq]]; needs
   the scatterers of [[ssf_scatterers]]
@@ -25,11 +25,11 @@ Antenna-free paths of one link at one position
 | --- | --- | --- |
 | Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
-| `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
+| `polmat` | Ray `polmat` times the displacement phase | Ray `polmat`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `(3, 0)` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
 
 - `"drift"` with an end moved (any coordinate differs from `rays`): GR power by the power law of the method of `rays`
-  (`(d3D / d_GR)²` for the TR methods, 1 for `"quadriga"`), GR `M` the scalar multiple of `diag(R_par, -R_perp)` (TR
+  (`(d3D / d_GR)²` for the TR methods, 1 for `"quadriga"`), GR `polmat` the scalar multiple of `diag(R_par, -R_perp)` (TR
   38.901 eqs. (7.6-38), (7.6-39)) that best fits the stored matrix, which replaces a matrix of another form (e.g. a
   conjugated one). Fallback rays have their longer polyline, also at the positions of `rays`
 - Path gain per frequency: the coefficient power; with `kf_ratio` LOS and GR are rescaled against NLOS so that the
@@ -45,7 +45,7 @@ Antenna-free paths of one link at one position
 
 ## Usage:
 ```
-path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_ind = \
+path_gain, path_length, polmat, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_ind = \
     quadriga_lib.gbsm.ssf_paths( rays, link_gain_dB, *, mobility, tx_pos, rx_pos, kf_ratio, oxygen )
 ```
 
@@ -61,7 +61,7 @@ path_gain, path_length, M, aod, eod, aoa, eoa, fbs_pos, lbs_pos, path_type, ray_
 ## Outputs:
 - **`path_gain`** — Path gains (linear); `(n_path, n_freq)`
 - **`path_length`** — Path lengths in m; `(n_path,)`
-- **`M`** — Polarization transfer matrices, real, rows as in [[channel.planar]]; `(8, n_path, n_freq)`
+- **`polmat`** — Polarization transfer matrices, real, rows as in [[channel.planar]]; `(8, n_path, n_freq)`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** — Departure and arrival angles in rad, GCS; `(n_path,)`
 - **`fbs_pos`**, **`lbs_pos`** — Scatterer positions in m; `(3, n_path)`, `(3, 0)` in `"phase"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS; int64; `(n_path,)`
@@ -92,16 +92,16 @@ py::tuple ssf_paths(const py::dict &rays,
     // Outputs of unknown size (n_path), copied after the call
     arma::mat path_gain, fbs_pos, lbs_pos;
     arma::vec path_length, aod, eod, aoa, eoa;
-    arma::cube M;
+    arma::cube polmat;
     arma::u32_vec path_type;
     arma::uvec ray_ind;
-    quadriga_lib::ssf_paths(rays_a, link_gain_dB_a, path_gain, path_length, M, mobility,
+    quadriga_lib::ssf_paths(rays_a, link_gain_dB_a, path_gain, path_length, polmat, mobility,
                             tx_pos.is_none() ? nullptr : &tx_pos_a, rx_pos.is_none() ? nullptr : &rx_pos_a,
                             kf_ratio.is_none() ? nullptr : &kf_ratio_a, &aod, &eod, &aoa, &eoa, &fbs_pos, &lbs_pos,
                             &path_type, &ray_ind, oxygen_b);
 
     return py::make_tuple(qd_python_copy2numpy(&path_gain), qd_python_copy2numpy(&path_length),
-                          qd_python_copy2numpy(&M), qd_python_copy2numpy(&aod), qd_python_copy2numpy(&eod),
+                          qd_python_copy2numpy(&polmat), qd_python_copy2numpy(&aod), qd_python_copy2numpy(&eod),
                           qd_python_copy2numpy(&aoa), qd_python_copy2numpy(&eoa), qd_python_copy2numpy(&fbs_pos),
                           qd_python_copy2numpy(&lbs_pos), qd_python_copy2numpy<unsigned, py::ssize_t>(&path_type),
                           qd_python_copy2numpy<arma::uword, py::ssize_t>(&ray_ind));

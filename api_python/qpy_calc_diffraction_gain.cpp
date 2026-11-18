@@ -29,7 +29,7 @@ data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mt
     thin_slab_threshold, apply_fspl, apply_phase )
 
 # Unpacked outputs
-gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+gain, polmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
     center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
     thin_slab_threshold, apply_fspl, apply_phase )
 ```
@@ -58,20 +58,20 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
   `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.;
   default: `False`
-- **`apply_phase`** — If `True`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+- **`apply_phase`** — If `True`, multiplies `polmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium
   wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude,
-  so `xprmat` stays normalized. This is the phase [[channel.spherical]] would otherwise add from
+  so `polmat` stays normalized. This is the phase [[channel.spherical]] would otherwise add from
   `path_length`; default: `False`
 
 ## Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `(n_pos,)`. Relative to FSPL by
   default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = True`
-- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
   interleaved complex, column-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row
-  order of `M` in [[channel.spherical]], `(8, n_pos)`; scalar
+  order of `polmat` in [[channel.spherical]], `(8, n_pos)`; scalar
   mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)` with `n_seg` from `lod`
   (e.g. `(3, 2, n_pos)` for lod 2, `(3, 9, n_pos)` for lod 7, `(3, 0, n_pos)` for lod 0)
@@ -115,18 +115,18 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     // Pre-allocate outputs in Python memory and map Armadillo wrappers to them;
     // the size of coord depends on lod and is set by C++ (copied after the call)
     arma::vec gain;
-    arma::mat xprmat;
+    arma::mat polmat;
     arma::cube coord;
     auto gain_p = qd_python_init_output(n_pos, &gain);
-    auto xprmat_p = qd_python_init_output((scalar_mode_b ? 2 : 8), n_pos, &xprmat);
+    auto polmat_p = qd_python_init_output((scalar_mode_b ? 2 : 8), n_pos, &polmat);
 
     // Resolve optional pointer
     const arma::u32_vec *p_sub_mesh_index = sub_mesh_index_a.empty() ? nullptr : &sub_mesh_index_a;
 
     quadriga_lib::calc_diffraction_gain<double>(orig_a, dest_a, mesh_a, mtl_ind_a, mtl_prop_map,
-                                                center_freq, lod, &gain, &xprmat, &coord, verbose,
+                                                center_freq, lod, &gain, &polmat, &coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode_b,
                                                 thin_slab_threshold, apply_fspl_b, apply_phase_b);
 
-    return py::make_tuple(gain_p, xprmat_p, qd_python_copy2numpy(&coord));
+    return py::make_tuple(gain_p, polmat_p, qd_python_copy2numpy(&coord));
 }

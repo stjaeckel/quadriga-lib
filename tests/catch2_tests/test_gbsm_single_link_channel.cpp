@@ -226,7 +226,7 @@ namespace
             CHECK(dd <= 1e-12);
             CHECK(rdiff(c.path_gain[t], e[t].gain) <= 1e-12);
             CHECK(rdiff(c.path_length[t], e[t].len) <= 1e-12);
-            CHECK(arma::approx_equal(c.path_polarization[t], e[t].M, "absdiff", 1e-12));
+            CHECK(arma::approx_equal(c.polmat[t], e[t].M, "absdiff", 1e-12));
             CHECK(arma::approx_equal(c.path_angles[t], e[t].ang, "absdiff", 1e-12));
             if (a.drift())
                 CHECK((arma::approx_equal(c.fbs_pos[t], e[t].fbs, "absdiff", 1e-12) &&

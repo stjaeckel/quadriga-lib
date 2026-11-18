@@ -541,7 +541,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
     // NLOS Jones matrix (linear basis) with common random path phase.
     // Input: XPR (linear H↔V cross-pol ratio). Uses maximal quadrature (±90°) to include linear→circular leakage.
     auto get_Jones_matrix = [&](double XPR_lin,  // Input: Cross-polarization ration, linear scale
-                                double *M_local) // Output: // interleaved Re,Im; col-major: (J11,J21 ; J12,J22), length 8
+                                double *M_local) // Output: // interleaved Re,Im; col-major: (J11,J21 ; J12,J22), rows rx, columns tx, length 8
     {
         if (!M_local || XPR_lin <= 0.0)
             return;
@@ -553,10 +553,10 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         const double theta = V_2PI * qd_rng_uniform(rng); // **shared** absolute phase for both columns
 
         const double Delta = V_PI_2;            // ±90° for max lin→circ mixing
-        const double theta_a = theta;           // column H
-        const double theta_c = theta_a - Delta; //
-        const double theta_d = theta;           // column V uses same absolute phase
-        const double theta_b = theta_d + Delta; //
+        const double theta_a = theta;           // J_11 (rx V, tx V)
+        const double theta_c = theta_a - Delta; // J_21 (rx H, tx V)
+        const double theta_d = theta;           // J_22 (rx H, tx H), same absolute phase as J_11
+        const double theta_b = theta_d + Delta; // J_12 (rx V, tx H)
 
         const std::complex<double> g = std::polar(1.0, phi0);
 

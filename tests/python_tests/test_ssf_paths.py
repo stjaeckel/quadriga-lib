@@ -70,7 +70,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(r["tap"][ri[:2]], [0, 3])
         npt.assert_allclose(pg[:, 0], r["power"][kept, 0] * 1e-9, atol=1e-20, rtol=0)
         npt.assert_allclose(pl, np.linalg.norm(RX - TX) + 299792458 * r["delay"][kept], atol=1e-9, rtol=0)
-        npt.assert_array_equal(M, r["M"][:, kept])
+        npt.assert_array_equal(M, r["polmat"][:, kept])
         npt.assert_array_equal(eoa, r["eoa"][kept])
 
     def test_keywords(self):
@@ -102,13 +102,13 @@ class test_case(unittest.TestCase):
     def test_dict_handling(self):
         d = {k: v for k, v in self.rays.items() if k not in ["gr_eps", "fallback"]}
         d["path_type"] = d["path_type"].astype(np.float32)
-        d["M"] = np.ascontiguousarray(d["M"])
+        d["polmat"] = np.ascontiguousarray(d["polmat"])
         out = gbsm.ssf_paths(d, [-90.0])
         npt.assert_array_equal(out[0], self.out[0])
         npt.assert_array_equal(out[9], self.out[9])
-        m0 = self.rays["M"].copy()
+        m0 = self.rays["polmat"].copy()
         gbsm.ssf_paths(self.rays, [-90.0], mobility="phase", rx_pos=RX[0] + 1.0)
-        npt.assert_array_equal(self.rays["M"], m0)  # input not modified
+        npt.assert_array_equal(self.rays["polmat"], m0)  # input not modified
 
     def test_errors(self):
         r = self.rays

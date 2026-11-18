@@ -66,8 +66,8 @@ class test_case(unittest.TestCase):
         self.seg1 = [f1, f1.copy(), np.array([0.2, 0.1]), np.zeros(2), M]
         self.seg2 = [f2, f2.copy(), np.array([0.5, 0.3]), np.zeros(2), M.copy()]
         self.names = ["tx_array", "rx_array", "irs_array", "tx_pos", "tx_orientation", "rx_pos", "rx_orientation",
-                      "irs_pos", "irs_orientation", "fbs_pos_1", "lbs_pos_1", "path_gain_1", "path_length_1", "M_1",
-                      "fbs_pos_2", "lbs_pos_2", "path_gain_2", "path_length_2", "M_2"]
+                      "irs_pos", "irs_orientation", "fbs_pos_1", "lbs_pos_1", "path_gain_1", "path_length_1", "polmat_1",
+                      "fbs_pos_2", "lbs_pos_2", "path_gain_2", "path_length_2", "polmat_2"]
 
     def args(self, irs=None):
         return [self.omni, self.omni, self.irs if irs is None else irs] + self.geo + self.seg1 + self.seg2

@@ -25,7 +25,7 @@ CONF_DIR = os.path.join(current_dir, "../../data/config")
 TX = np.array([[0.0, 0.0, 10.0]])
 RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5]])
 FC = np.array([3.5e9, 28e9])
-KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
+KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "polmat",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
 
 
@@ -99,7 +99,7 @@ class test_case(unittest.TestCase):
         d["path_type"] = d["path_type"].astype(np.int64)
         d["tap"] = list(d["tap"].astype(float))
         d["delay"] = np.ascontiguousarray(d["delay"][::-1])[::-1]  # non-contiguous view
-        d["M"] = np.ascontiguousarray(d["M"])
+        d["polmat"] = np.ascontiguousarray(d["polmat"])
         r, b_med, _ = gbsm.ssf_scatterers(d)
         self.assertEqual(list(r.keys()), KEYS)  # all keys on output
         self.assertEqual(r["gr_eps"].size, 0)
@@ -109,7 +109,7 @@ class test_case(unittest.TestCase):
         d["gr_eps"] = None
         npt.assert_array_equal(gbsm.ssf_scatterers(d)[0]["lbs_pos"], self.out[0]["lbs_pos"])
         # No rays, the 1-D keys given as None: empty arrays with the dtype of the key table
-        z = dict(self.rays[0], power=np.zeros((0, 2)), M=np.zeros((8, 0, 2)))
+        z = dict(self.rays[0], power=np.zeros((0, 2)), polmat=np.zeros((8, 0, 2)))
         z.update({k: None for k in ["delay", "aod", "eod", "aoa", "eoa", "path_type", "tap"]})
         rz = gbsm.ssf_scatterers(z)[0]
         for k in ["delay", "aod", "eod", "aoa", "eoa", "path_type", "tap"]:

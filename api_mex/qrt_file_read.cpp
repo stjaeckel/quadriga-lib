@@ -17,16 +17,16 @@ Read ray-tracing CIR data from a QRT file
 
 - Reads channel impulse response data from QRT files
 - All output arguments are optional; MATLAB only computes outputs that are requested
-- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
+  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 
 ## Usage:
 ```
 [ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
-    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_M );
+    path_length, polmat, aod, eod, aoa, eoa, path_coord, n_interact, coord, interact_type ] = ...
+    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, uplink, normalize_polmat );
 ```
 
 ## Inputs:
@@ -35,10 +35,10 @@ Read ray-tracing CIR data from a QRT file
   without CIRs, all outputs are empty with `n_out = 0`)
 - **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
 - **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX); logical scalar; default: `false`
-- **`normalize_M`** — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
-    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
     | :-----------: | :---------------------------------------------: | :------------------------------: |
     | 0             | As stored in QRT file                           | -PL                              |
     | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |<br><br>
@@ -55,7 +55,7 @@ Read ray-tracing CIR data from a QRT file
 - **`lbs_pos`** — Last-bounce scatterer positions;  Cell of length `n_out`; elements `[3, n_path]`
 - **`path_gain`** — Path gain in linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
 - **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path]`
-- **`M`** — Polarization transfer matrix; Cell of length `n_out`;
+- **`polmat`** — Polarization transfer matrix; Cell of length `n_out`;
   elements `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
 - **`aod`** — Departure azimuth angles; Cell of length `n_out`; elements `[n_path]`
 - **`eod`** — Departure elevation angles; Cell of length `n_out`; elements `[n_path]`
@@ -91,7 +91,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_cir"); // 1-based -> 0-based
     const arma::uword i_orig = (nrhs < 3) ? 0 : qd_mex_get_index(prhs[2], "i_orig"); // 1-based -> 0-based
     const bool uplink = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "uplink", false);
-    const int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);
+    const int normalize_polmat = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_polmat", 1);
 
     // Initialize cache and file access
     std::ifstream stream(fn, std::ios::in | std::ios::binary);
@@ -177,7 +177,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec tx_pos_buff, tx_orientation_buff, rx_pos_buff, rx_orientation_buff;
     arma::mat fbs_pos, lbs_pos, path_gain;
     arma::vec path_length, aod, eod, aoa, eoa;
-    arma::cube M;
+    arma::cube polmat;
     std::vector<arma::mat> path_coord;
     arma::u32_vec n_interact;
     arma::fmat coord;
@@ -192,7 +192,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_lbs_pos = (nlhs > 6) ? &lbs_pos : nullptr;
     arma::mat *p_path_gain = (nlhs > 7) ? &path_gain : nullptr;
     arma::vec *p_path_length = (nlhs > 8) ? &path_length : nullptr;
-    arma::cube *p_M = (nlhs > 9) ? &M : nullptr;
+    arma::cube *p_polmat = (nlhs > 9) ? &polmat : nullptr;
     arma::vec *p_aod = (nlhs > 10) ? &aod : nullptr;
     arma::vec *p_eod = (nlhs > 11) ? &eod : nullptr;
     arma::vec *p_aoa = (nlhs > 12) ? &aoa : nullptr;
@@ -208,9 +208,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         // Call library function
         CALL_QD(quadriga_lib::qrt_file_read<double>(fn, i_cir[i_out], i_orig, uplink, nullptr,
                                                     p_tx_pos, p_tx_orientation, p_rx_pos, p_rx_orientation,
-                                                    p_fbs_pos, p_lbs_pos, p_path_gain, p_path_length, p_M,
+                                                    p_fbs_pos, p_lbs_pos, p_path_gain, p_path_length, p_polmat,
                                                     p_aod, p_eod, p_aoa, p_eoa,
-                                                    p_path_coord, normalize_M,
+                                                    p_path_coord, normalize_polmat,
                                                     p_no_int, p_coord, p_interact_type, &stream, &cache));
         // Copy to MATLAB
         if (nlhs > 1)
@@ -230,7 +230,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nlhs > 8)
             mxSetCell(plhs[8], i_out, qd_mex_copy2matlab(&path_length));
         if (nlhs > 9)
-            mxSetCell(plhs[9], i_out, qd_mex_copy2matlab(&M));
+            mxSetCell(plhs[9], i_out, qd_mex_copy2matlab(&polmat));
         if (nlhs > 10)
             mxSetCell(plhs[10], i_out, qd_mex_copy2matlab(&aod));
         if (nlhs > 11)

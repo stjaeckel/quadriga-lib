@@ -105,13 +105,13 @@ Also in: [C++](../cpp/channel-statistics.md#calc_cross_polarization_ratio) · [P
 - XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis
 - LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with
   `path_length <= dTR + window_size` are excluded by default
-- Polarization transfer matrix `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+- Polarization transfer matrix `polmat` is the 2x2 Jones matrix `M` (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 1-2 = (V rx, V tx),
   rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its
   receive and transmit polarisation: `M_vv` = rows 1-2, `M_hv` = rows 3-4, `M_vh` = rows 5-6, `M_hh` = rows 7-8
 - V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
   the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries couple circular patterns through `M` as get_channels_spherical couples antenna patterns,
+- The circular entries couple circular patterns through `polmat` as get_channels_spherical couples antenna patterns,
   `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
   (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP); names after the IEEE
   definition for the time convention exp(+j 2 pi f t) of the library's coefficients exp(-j 2 pi f tau).
@@ -120,19 +120,19 @@ Also in: [C++](../cpp/channel-statistics.md#calc_cross_polarization_ratio) · [P
   Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` is co-polar (handedness
   kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR
-- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `M` above about 1e18 overflow and give NaN
+- Normalization of `polmat` does not affect XPR (cancels in the ratio) but does affect `pg`; magnitudes in `polmat` above about 1e18 overflow and give NaN
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`
 
 ### Usage:
 ```matlab
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, ...
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, polmat, path_length, tx_pos, rx_pos, ...
     include_los, window_size );
 ```
 
 ### Inputs:
 - **`powers`** — Path powers in [W]; `[n_path, n_cir]`
-- **`M`** — Polarization transfer matrices with interleaved real/imag parts; `[8, n_path, n_cir]`
+- **`polmat`** — Polarization transfer matrices with interleaved real/imag parts; `[8, n_path, n_cir]`
 - **`path_length`** — Absolute TX-to-RX path lengths; `[n_path, n_cir]`
 - **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
 - **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)

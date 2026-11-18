@@ -658,7 +658,7 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
                write_delay = ch->delay.size() == n_snap,
                write_path_gain = ch->path_gain.size() == n_snap,
                write_path_length = ch->path_length.size() == n_snap,
-               write_path_polarization = ch->path_polarization.size() == n_snap,
+               write_path_polarization = ch->polmat.size() == n_snap,
                write_path_angles = ch->path_angles.size() == n_snap,
                write_path_fbs_pos = ch->fbs_pos.size() == n_snap,
                write_path_lbs_pos = ch->lbs_pos.size() == n_snap,
@@ -686,7 +686,7 @@ static void qHDF_emit_channel_data(h5::output &out, h5::header &hdr, const quadr
         if (write_path_length)
             col("path_length", ch->path_length[i]);
         if (write_path_polarization)
-            mat("path_polarization", ch->path_polarization[i]);
+            mat("path_polarization", ch->polmat[i]);
         if (write_path_angles)
             mat("path_angles", ch->path_angles[i]);
         if (write_path_fbs_pos)
@@ -1267,8 +1267,8 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
         // Polarization transfer function [8, n_path], angles [n_path, 4], scatterer positions [3, n_path]
         if (find_dataset(*sg, "path_polarization", h5::float32, {np, 8}))
         {
-            c.path_polarization.emplace_back(8, n_path, arma::fill::none);
-            read_float(c.path_polarization.back().memptr());
+            c.polmat.emplace_back(8, n_path, arma::fill::none);
+            read_float(c.polmat.back().memptr());
         }
         if (find_dataset(*sg, "path_angles", h5::float32, {4, np}))
         {
@@ -1316,7 +1316,7 @@ static quadriga_lib::channel<dtype> qHDF_read_slot(qHDF_file &h, uint64_t ref, c
         field = std::move(out);
     };
     arrange(c.coeff_re), arrange(c.coeff_im), arrange(c.delay), arrange(c.path_gain), arrange(c.path_length);
-    arrange(c.path_polarization), arrange(c.path_angles), arrange(c.fbs_pos), arrange(c.lbs_pos);
+    arrange(c.polmat), arrange(c.path_angles), arrange(c.fbs_pos), arrange(c.lbs_pos);
     arrange(c.n_interact), arrange(c.interact_coord);
     return c;
 }

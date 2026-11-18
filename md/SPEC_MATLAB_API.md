@@ -278,7 +278,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 | `rx_orientation` | `[3, 1]` or `[3, n_snap]` |
 | `coeff_re`, `coeff_im`, `delay` | `[n_rx, n_tx, n_path, n_snap]` |
 | `path_gain`, `path_length` | `[n_path, n_snap]` |
-| `path_polarization` | `[8, n_path, n_snap]` |
+| `polmat` | `[8, n_path, n_snap]` |
 | `path_angles` | `[n_path, 4, n_snap]` |
 | `fbs_pos` | `[3, n_path, n_snap]` |
 | `lbs_pos` | `[3, n_path, n_snap]` |

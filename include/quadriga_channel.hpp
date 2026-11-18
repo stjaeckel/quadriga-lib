@@ -36,7 +36,7 @@ namespace quadriga_lib
         std::vector<arma::Cube<dtype>> delay;            // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path]
         std::vector<arma::Col<dtype>> path_gain;         // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
         std::vector<arma::Col<dtype>> path_length;       // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
-        std::vector<arma::Mat<dtype>> path_polarization; // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
+        std::vector<arma::Mat<dtype>> polmat;            // Polarization transfer matrix, vector (n_snap) of matrices of size [8, n_path], interleaved complex
         std::vector<arma::Mat<dtype>> path_angles;       // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
         std::vector<arma::Mat<dtype>> fbs_pos;           // First-bounce scatterer positions, matrices of size [3, n_path]
         std::vector<arma::Mat<dtype>> lbs_pos;           // Last-bounce scatterer positions, matrices of size [3, n_path]
@@ -67,7 +67,7 @@ namespace quadriga_lib
                        const arma::Mat<dtype> *interact_coord_add = nullptr,    // Interaction coordinates, matrix of size [3, sum(n_interact)]
                        const arma::Col<dtype> *path_gain_add = nullptr,         // Path gain before antenna patterns, vector of length [n_path_add]
                        const arma::Col<dtype> *path_length_add = nullptr,       // Absolute path length from TX to RX phase center, vector of length [n_path_add]
-                       const arma::Mat<dtype> *path_polarization_add = nullptr, // Polarization transfer function, Matrix of size [8, n_path_add], interleaved complex
+                       const arma::Mat<dtype> *polmat_add = nullptr,            // Polarization transfer matrix, Matrix of size [8, n_path_add], interleaved complex
                        const arma::Mat<dtype> *path_angles_add = nullptr,       // Departure and arrival angles, Matrix of size [n_path_add, 4], {AOD, EOD, AOA, EOA}
                        const arma::Mat<dtype> *fbs_pos_add = nullptr,           // First-bounce scatterer positions, Matrix of size [3, n_path_add]
                        const arma::Mat<dtype> *lbs_pos_add = nullptr);          // Last-bounce scatterer positions, Matrix of size [3, n_path_add]
@@ -75,7 +75,7 @@ namespace quadriga_lib
         // Calculate the the effective path gain (linear scale)
         // - sum up the power of all paths and over all transmit and receive antenna pairs
         // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
-        // - throws an error if neither coeff_re/im nor path_polarization is available
+        // - throws an error if neither coeff_re/im nor polmat is available
         // - returns one value for each snapshot (vector with n_snap elements)
         arma::Col<dtype> calc_effective_path_gain() const;
 
@@ -485,9 +485,9 @@ namespace quadriga_lib
                         std::ifstream *file = nullptr);                 // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
 
     // Read ray-tracing data from QRT file
-    // normalize_M options:
-    //  0 : M as in QRT file, path_gain is -FSPL
-    //  1 : M has a maximum column power of 1 (uplink: row power), path_gain is -FSPL - material losses
+    // normalize_polmat options:
+    //  0 : polmat as in QRT file, path_gain is -FSPL
+    //  1 : polmat has a maximum column power of 1 (uplink: row power), path_gain is -FSPL - material losses
     template <typename dtype>
     void qrt_file_read(const std::string &fn,                               // Path to the QRT file
                        arma::uword i_cir = 0,                               // Snapshot index
@@ -502,13 +502,13 @@ namespace quadriga_lib
                        arma::Mat<dtype> *lbs_pos = nullptr,                 // Last-bounce scatterer positions, matrix of size [3, n_path]
                        arma::Mat<dtype> *path_gain = nullptr,               // Path gain (linear scale), vector of length [n_path, n_freq]
                        arma::Col<dtype> *path_length = nullptr,             // Absolute path length from TX to RX phase center, vector of length [n_path]
-                       arma::Cube<dtype> *M = nullptr,                      // Polarization transfer matrix, matrix of size [8, n_path, n_freq] or [2, n_path, n_freq] for v6 files
+                       arma::Cube<dtype> *polmat = nullptr,                 // Polarization transfer matrix, matrix of size [8, n_path, n_freq] or [2, n_path, n_freq] for v6 files
                        arma::Col<dtype> *aod = nullptr,                     // Departure azimuth angles in [rad], vector of length 'n_path'
                        arma::Col<dtype> *eod = nullptr,                     // Departure elevation angles in [rad], vector of length 'n_path'
                        arma::Col<dtype> *aoa = nullptr,                     // Arrival azimuth angles in [rad], vector of length 'n_path'
                        arma::Col<dtype> *eoa = nullptr,                     // Arrival elevation angles in [rad], vector of length 'n_path'
                        std::vector<arma::Mat<dtype>> *path_coord = nullptr, // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
-                       int normalize_M = 1,                                 // Normalize M options
+                       int normalize_polmat = 1,                            // Normalize polmat options
                        arma::u32_vec *n_interact = nullptr,                     // Number of mesh interactions per path of current RX, vector of length [n_path], 0=LOS
                        arma::fmat *coord = nullptr,                         // Interaction coordinates, size [3, sum(n_interact)]
                        std::vector<uint8_t> *interact_type = nullptr,       // Interaction type codes, length [ sum(n_interact) ]
@@ -531,7 +531,7 @@ namespace quadriga_lib
                                                 const arma::mat &fbs_pos,          // First-bounce scatterer positions in [m], [3, n_path]
                                                 const arma::mat &lbs_pos,          // Last-bounce scatterer positions in [m], [3, n_path]
                                                 const arma::mat &path_gain,        // Path gains (linear), [n_path, n_freq]
-                                                const arma::cube &M,               // Polarization transfer matrices, [8, n_path, n_freq]
+                                                const arma::cube &polmat,          // Polarization transfer matrices, [8, n_path, n_freq]
                                                 const arma::u32_vec &path_type,    // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
                                                 arma::uword i_cir = 0);            // CIR index, stored in path::iC, < 2^32
 
@@ -563,7 +563,7 @@ namespace quadriga_lib
                                 const arma::Mat<dtype> &lbs_pos,          // Last-bounce scatterer positions, matrix of size [3, n_path]
                                 const arma::Col<dtype> &path_gain,        // Path gain (linear scale), vector of length [n_path]
                                 const arma::Col<dtype> &path_length,      // Absolute path length from TX to RX phase center, vector of length [n_path]
-                                const arma::Mat<dtype> &M,                // Polarization transfer matrix, matrix of size [8, n_path]
+                                const arma::Mat<dtype> &polmat,           // Polarization transfer matrix, matrix of size [8, n_path]
                                 arma::Cube<dtype> &coeff_re,              // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> &coeff_im,              // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> &delay,                 // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path]
@@ -592,7 +592,7 @@ namespace quadriga_lib
                                     const std::vector<arma::Mat<dtype>> &lbs_pos,     // Last-bounce scatterer positions, vector (n_snap) of matrices [3, n_path]
                                     const std::vector<arma::Col<dtype>> &path_gain,   // Path gain (linear scale), vector (n_snap) of vectors [n_path]
                                     const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, vector (n_snap) of vectors [n_path]
-                                    const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix, vector (n_snap) of matrices [8, n_path]
+                                    const std::vector<arma::Mat<dtype>> &polmat,      // Polarization transfer matrix, vector (n_snap) of matrices [8, n_path]
                                     std::vector<arma::Cube<dtype>> &coeff_re,         // Output: Channel coefficients, real part, vector (n_snap) of tensors [n_rx, n_tx, n_path]
                                     std::vector<arma::Cube<dtype>> &coeff_im,         // Output: Channel coefficients, imaginary part, vector (n_snap) of tensors [n_rx, n_tx, n_path]
                                     std::vector<arma::Cube<dtype>> &delay,            // Output: Propagation delay in seconds, vector (n_snap) of tensors [n_rx, n_tx, n_path]
@@ -612,7 +612,7 @@ namespace quadriga_lib
     // - TX/RX antenna patterns are interpolated from multi-frequency arrayant vectors at each output frequency
     // - Path gain and polarization transfer matrix are interpolated from freq to freq_new grids
     // - Supports both radio (speed of light) and acoustic (speed of sound) propagation
-    // - Jones matrix M can have 2 rows (scalar pressure: Re, Im of (V rx, V tx) only) or 8 rows (full polarimetric, row
+    // - Jones matrix polmat can have 2 rows (scalar pressure: Re, Im of (V rx, V tx) only) or 8 rows (full polarimetric, row
     //   order as in get_channels_spherical)
     // - NLOS path lengths and add_fake_los_path as in get_channels_spherical
     // - For baseband_freq_response_multi with remove_delay_phase = true, generate the channels with use_absolute_delays = true
@@ -628,7 +628,7 @@ namespace quadriga_lib
                                 const arma::Mat<dtype> &lbs_pos,              // Last-bounce scatterer positions [3, n_path]
                                 const arma::Mat<dtype> &path_gain,            // Path gain (linear), [n_path, n_freq]
                                 const arma::Col<dtype> &path_length,          // Absolute path length TX→RX [n_path]
-                                const arma::Cube<dtype> &M,                   // Polarization transfer matrix [8, n_path, n_freq] or [2, n_path, n_freq]
+                                const arma::Cube<dtype> &polmat,              // Polarization transfer matrix [8, n_path, n_freq] or [2, n_path, n_freq]
                                 const arma::Col<dtype> &freq,                 // Input sample frequencies [Hz], length [n_freq]
                                 const arma::Col<dtype> &freq_new,             // Target frequencies [Hz], length [n_freq_new]
                                 std::vector<arma::Cube<dtype>> &coeff_re,     // Output: real part of coefficients, length [n_freq_new], each [n_rx, n_tx, n_path]
@@ -664,12 +664,12 @@ namespace quadriga_lib
                           const arma::Mat<dtype> &lbs_pos_1,               // Last-bounce scatterer positions of TX-IRS paths, matrix of size [3, n_path_1]
                           const arma::Col<dtype> &path_gain_1,             // Path gain (linear scale) of TX-IRS paths, vector of length [n_path_1]
                           const arma::Col<dtype> &path_length_1,           // Absolute path length from TX to IRS phase center, vector of length [n_path_1]
-                          const arma::Mat<dtype> &M_1,                     // Polarization transfer matrix of TX-IRS paths, matrix of size [8, n_path_1]
+                          const arma::Mat<dtype> &polmat_1,                // Polarization transfer matrix of TX-IRS paths, matrix of size [8, n_path_1]
                           const arma::Mat<dtype> &fbs_pos_2,               // First-bounce scatterer positions of IRS-RX paths, matrix of size [3, n_path_2]
                           const arma::Mat<dtype> &lbs_pos_2,               // Last-bounce scatterer positions of IRS-RX paths, matrix of size [3, n_path_2]
                           const arma::Col<dtype> &path_gain_2,             // Path gain (linear scale) of IRS-RX paths, vector of length [n_path_2]
                           const arma::Col<dtype> &path_length_2,           // Absolute path length from IRS to RX phase center, vector of length [n_path_2]
-                          const arma::Mat<dtype> &M_2,                     // Polarization transfer matrix of IRS-RX paths, matrix of size [8, n_path_2]
+                          const arma::Mat<dtype> &polmat_2,                // Polarization transfer matrix of IRS-RX paths, matrix of size [8, n_path_2]
                           arma::Cube<dtype> &coeff_re,                     // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path_irs]
                           arma::Cube<dtype> &coeff_im,                     // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path_irs]
                           arma::Cube<dtype> &delay,                        // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path_irs]
@@ -711,7 +711,7 @@ namespace quadriga_lib
                              const arma::Col<dtype> &eoa,              // Arrival elevation angles in [rad], vector of length 'n_path'
                              const arma::Col<dtype> &path_gain,        // Path gain (linear scale), vector of length [n_path]
                              const arma::Col<dtype> &path_length,      // Absolute path length from TX to RX phase center, vector of length [n_path]
-                             const arma::Mat<dtype> &M,                // Polarization transfer matrix, matrix of size [8, n_path]
+                             const arma::Mat<dtype> &polmat,           // Polarization transfer matrix, matrix of size [8, n_path]
                              arma::Cube<dtype> &coeff_re,              // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
                              arma::Cube<dtype> &coeff_im,              // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
                              arma::Cube<dtype> &delay,                 // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
@@ -739,7 +739,7 @@ namespace quadriga_lib
                                  const std::vector<arma::Col<dtype>> &eoa,         // Arrival elevation angles in [rad], vector (n_snap) of vectors [n_path]
                                  const std::vector<arma::Col<dtype>> &path_gain,   // Path gain (linear scale), vector (n_snap) of vectors [n_path]
                                  const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, vector (n_snap) of vectors [n_path]
-                                 const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix, vector (n_snap) of matrices [8, n_path]
+                                 const std::vector<arma::Mat<dtype>> &polmat,      // Polarization transfer matrix, vector (n_snap) of matrices [8, n_path]
                                  std::vector<arma::Cube<dtype>> &coeff_re,         // Output: Channel coefficients, real part, vector (n_snap) of tensors [n_rx, n_tx, n_path(+1)]
                                  std::vector<arma::Cube<dtype>> &coeff_im,         // Output: Channel coefficients, imaginary part, vector (n_snap) of tensors [n_rx, n_tx, n_path(+1)]
                                  std::vector<arma::Cube<dtype>> &delay,            // Output: Propagation delay in seconds, vector (n_snap) of tensors [n_rx, n_tx, n_path(+1)]

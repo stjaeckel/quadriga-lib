@@ -6,7 +6,7 @@
 // against the two places in the library that own those models:
 //
 //   - Free-space / spreading loss: qrt_file_read, which folds the path loss into 'path_gain'
-//     when reading a QRT file. A non-normalized file (normalize_M = 0) carries a unit
+//     when reading a QRT file. A non-normalized file (normalize_polmat = 0) carries a unit
 //     polarization matrix, so the returned path_gain IS the path loss and nothing else.
 //   - Propagation phase: get_channels_spherical (EM) and get_channels_multifreq (acoustic),
 //     which rotate the channel coefficient by exp(-j*2*pi*d/lambda) derived from 'path_length'.
@@ -46,7 +46,7 @@ static inline void gains_test_scene(arma::mat &cube, arma::uvec &mtl_ind,
 
 // Write a QRT file holding one TX and 'n_cir' receivers, each reached by a single
 // zero-interaction (LOS) path with a unit polarization matrix. Reading it back with
-// normalize_M = 0 therefore returns path_gain == path loss.
+// normalize_polmat = 0 therefore returns path_gain == path loss.
 //
 // TX and RX coordinates are chosen to be exactly representable in float, since QRT stores
 // positions as float and the comparison distance must survive the round trip unchanged.

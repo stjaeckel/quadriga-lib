@@ -18,7 +18,7 @@ Site-specific simulation tools
 SECTION!*/
 
 /*!MD
-# xpr_update
+# polmat_update
 Thread a polarization transfer (Jones) matrix along a ray path
 
 - Left-multiplies each per-ray state matrix by a new interaction matrix, vectorized across up to
@@ -29,15 +29,15 @@ Thread a polarization transfer (Jones) matrix along a ray path
   `initialize`, `update`, `normalize`, `gain`, and `apply_gain`, so a call can do any combination
   (see Usage)
 - An optional `ray_ind` lets the update set be a subset of the global state, scattered into
-  `xprmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
-- Storage is interleaved complex, column-major, matching the `xprmat` output of
+  `polmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
+- Storage is interleaved complex, column-major, matching the `polmat` output of
   [[calc_diffraction_gain]]. EM mode carries the full 2x2 Jones matrix; scalar mode carries a
   single complex pressure coefficient
 
 ## Declaration:
 ```
-void xpr_update(
-    arma::Mat<dtype> &xprmat,
+void polmat_update(
+    arma::Mat<dtype> &polmat,
     const arma::Mat<dtype> *update = nullptr,
     arma::Col<dtype> *gain = nullptr,
     bool initialize = false,
@@ -47,18 +47,18 @@ void xpr_update(
 ```
 
 ## Arguments:
-- **`xprmat`** — Global XPR state, updated in place. EM mode `[8, n_ray]`, scalar mode
+- **`polmat`** — Polarization transfer matrix, updated in place. EM mode `[8, n_ray]`, scalar mode
   `[2, n_ray]`. If empty on entry it is sized from `update` and seeded to unity (see Usage). A
   pre-sized (non-empty) buffer is treated as accumulated state unless `initialize` is set. When
-  `ray_ind` is given, `xprmat` must already exist, because the extent of the global set cannot be
+  `ray_ind` is given, `polmat` must already exist, because the extent of the global set cannot be
   inferred from a subset.
 - **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
-  match `xprmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
+  match `polmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
   broadcasts one matrix to every update; `nullptr` or empty applies the identity (no multiply).
 - **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
   - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
     normalization. With `normalize == false` this measures the gain without modifying the matrix
-    part of `xprmat` (gain extraction); with `normalize == true` it reports the gain that was
+    part of `polmat` (gain extraction); with `normalize == true` it reports the gain that was
     removed. A value of 0 flags a degenerate (zero / non-finite) matrix the caller should prune.
   - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the
     corresponding `gain` value *after* normalization. Must be non-null and length `n_rayU`.
@@ -67,9 +67,9 @@ void xpr_update(
   update, prior contents discarded); without an `update` it is a pure reset. Use this to
   (re)initialize a pre-sized or reused buffer without reallocating.
 - **`normalize`** — If `true`, each touched column is scaled to unit gain after the update.
-  Untouched columns of `xprmat` are left alone.
+  Untouched columns of `polmat` are left alone.
 - **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
-- **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
+- **`ray_ind`** — Optional map from update index (`0..n_rayU-1`) to global column of `polmat`.
   Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
   `< n_ray`. Duplicate values are allowed: the updates of a column are then applied one after the other
   in update-index order (each with the full initialize -> update -> normalize -> apply_gain sequence),
@@ -79,32 +79,32 @@ void xpr_update(
 ## Usage:
 The flags are composable in one call; the per-column order is always
 initialize -> update -> normalize -> apply_gain. Argument order is
-`(xprmat, update, gain, initialize, normalize, apply_gain, ray_ind)`.
+`(polmat, update, gain, initialize, normalize, apply_gain, ray_ind)`.
 ```
-arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
+arma::Mat<dtype> polmat;                            // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM), labels <out><in>
 
 // (1) Initialization
-xpr_update(M, &U0);                                 // empty M: sized from U0, seeded, M := U0
-xpr_update(M, nullptr, nullptr, true);              // pre-sized M: reset every column to unity
-xpr_update(M, &U0, nullptr, true);                  // pre-sized M: copy-through, M := U0 (ignores old)
+polmat_update(polmat, &U0);                         // empty polmat: sized from U0, seeded, polmat := U0
+polmat_update(polmat, nullptr, nullptr, true);      // pre-sized polmat: reset every column to unity
+polmat_update(polmat, &U0, nullptr, true);          // pre-sized polmat: copy-through, polmat := U0 (ignores old)
 
 // (2) Updating (accumulate onto existing state)
-xpr_update(M, &U);                                  // M := U * M
-xpr_update(M, &Usub, nullptr, false, false, false, &idx);   // scatter: M[:,idx[k]] := Usub[:,k] * M[:,idx[k]]
+polmat_update(polmat, &U);                          // polmat := U * polmat
+polmat_update(polmat, &Usub, nullptr, false, false, false, &idx); // scatter: polmat[:,idx[k]] := Usub[:,k] * polmat[:,idx[k]]
 
 // (3) Gain extraction (measure, leave the matrix part untouched)
 arma::Col<dtype> g;
-xpr_update(M, nullptr, &g);                         // g[k] = gain( M[:,k] )
-xpr_update(M, &U, &g);                              // apply U, then measure into g (no normalize)
+polmat_update(polmat, nullptr, &g);                 // g[k] = gain( polmat[:,k] )
+polmat_update(polmat, &U, &g);                      // apply U, then measure into g (no normalize)
 
 // (4) Normalizing (scale each column to unit gain; optionally update first)
-xpr_update(M, nullptr, nullptr, false, true);       // M[:,k] := M[:,k] / gain( M[:,k] )
-xpr_update(M, &U, nullptr, false, true);            // update, then normalize, one pass
+polmat_update(polmat, nullptr, nullptr, false, true); // polmat[:,k] := polmat[:,k] / gain( polmat[:,k] )
+polmat_update(polmat, &U, nullptr, false, true);    // update, then normalize, one pass
 
 // (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
 //     'g' is read here (apply_gain = true):
-xpr_update(M, nullptr, &g, false, true, true);      // M[:,k] := g[k] * ( M[:,k] / gain( M[:,k] ) )
-xpr_update(M, &U, &g, false, true, true, &idx);     // full chain step: scatter+update+normalize+apply
+polmat_update(polmat, nullptr, &g, false, true, true); // polmat[:,k] := g[k] * ( polmat[:,k] / gain( polmat[:,k] ) )
+polmat_update(polmat, &U, &g, false, true, true, &idx); // full chain step: scatter+update+normalize+apply
 ```
 
 ## Storage layout (column-major, interleaved complex):
@@ -112,13 +112,13 @@ xpr_update(M, &U, &g, false, true, true, &idx);     // full chain step: scatter+
   2x2 is `[VV; HV]` (response to a V input) and column 1 is `[VH; HH]` (response to an H input).
   The labels are `<out><in>`: the first letter is the output (receive) polarisation, the second the input
   (transmit) polarisation, so rows 0-1 = (V out, V in), rows 2-3 = (H out, V in), rows 4-5 = (V out, H in),
-  rows 6-7 = (H out, H in). This is the row order of `M` in [[get_channels_spherical]] (rows = RX, columns = TX).
+  rows 6-7 = (H out, H in). This is the row order of `polmat` in [[get_channels_spherical]] (rows = RX, columns = TX).
 - **Scalar mode**, 2 values per ray: `[Re Im]`.
 - The update is `M_out = M_update * M_state` (new interaction left-multiplies), consistent with
-  `E_out = M * E_in` for column vectors and Armadillo/MATLAB column-major storage.
+  `E_out = polmat * E_in` for column vectors and Armadillo/MATLAB column-major storage.
 
 ## See also:
-- [[calc_diffraction_gain]] (produces `xprmat` in this exact layout)
+- [[calc_diffraction_gain]] (produces `polmat` in this exact layout)
 MD!*/
 
 // OpenMP is only worthwhile once the ray count amortizes fork/join. Below this the serial path
@@ -316,31 +316,31 @@ static bool has_duplicate_index(const arma::uword *idx, arma::uword n, arma::uwo
 #endif
 
 template <typename dtype>
-void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
-                              const arma::Mat<dtype> *update,
-                              arma::Col<dtype> *gain,
-                              bool initialize,
-                              bool normalize,
-                              bool apply_gain,
-                              const arma::uvec *ray_ind)
+void quadriga_lib::polmat_update(arma::Mat<dtype> &polmat,
+                                 const arma::Mat<dtype> *update,
+                                 arma::Col<dtype> *gain,
+                                 bool initialize,
+                                 bool normalize,
+                                 bool apply_gain,
+                                 const arma::uvec *ray_ind)
 {
-    qd_check_alias(&xprmat, "xprmat", update);
-    qd_check_alias(gain, "gain", &xprmat, update);
+    qd_check_alias(&polmat, "polmat", update);
+    qd_check_alias(gain, "gain", &polmat, update);
 
-    const bool have_state = !xprmat.is_empty();
+    const bool have_state = !polmat.is_empty();
     const bool have_update = (update != nullptr) && !update->is_empty();
 
     // Infer mode (EM = 8 rows, scalar = 2) from whichever operand is present.
     arma::uword nXPR = 0;
     if (have_state)
-        nXPR = xprmat.n_rows;
+        nXPR = polmat.n_rows;
     else if (have_update)
         nXPR = update->n_rows;
     else
-        throw std::invalid_argument("At least one of 'xprmat' or 'update' must be non-empty to infer the mode.");
+        throw std::invalid_argument("At least one of 'polmat' or 'update' must be non-empty to infer the mode.");
 
     if (nXPR != 2 && nXPR != 8)
-        throw std::invalid_argument("'xprmat'/'update' must have 2 rows (scalar mode) or 8 rows (EM mode).");
+        throw std::invalid_argument("'polmat'/'update' must have 2 rows (scalar mode) or 8 rows (EM mode).");
     const bool scalar_mode = (nXPR == 2);
 
     // Interpret the update shape.
@@ -348,11 +348,11 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
     if (have_update)
     {
         if (update->n_rows != nXPR)
-            throw std::invalid_argument("'update' row count must match 'xprmat' (2 or 8).");
+            throw std::invalid_argument("'update' row count must match 'polmat' (2 or 8).");
         broadcast = (update->n_cols == 1);
     }
 
-    // Resolve the two index-space sizes: n_ray (columns of the global 'xprmat') and n_rayU (the
+    // Resolve the two index-space sizes: n_ray (columns of the global 'polmat') and n_rayU (the
     // update set, i.e. the loop length and the length of 'ray_ind' / 'gain').
     arma::uword n_ray = 0, n_rayU = 0;
 
@@ -361,31 +361,31 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
         // Scatter into an existing global buffer. The buffer must already exist because a subset
         // does not reveal the global extent.
         if (!have_state)
-            throw std::invalid_argument("'ray_ind' requires an existing (non-empty) 'xprmat'.");
-        n_ray = xprmat.n_cols;
+            throw std::invalid_argument("'ray_ind' requires an existing (non-empty) 'polmat'.");
+        n_ray = polmat.n_cols;
         n_rayU = ray_ind->n_elem;
 
         if (have_update && !broadcast && update->n_cols != n_rayU)
             throw std::invalid_argument("'update' must have 'ray_ind' columns (or 1 to broadcast).");
 
         if (n_rayU > 0 && ray_ind->max() >= n_ray) // guard: max() on an empty uvec is undefined
-            throw std::invalid_argument("'ray_ind' contains a column index outside 'xprmat'.");
+            throw std::invalid_argument("'ray_ind' contains a column index outside 'polmat'.");
     }
     else if (have_state)
     {
         // 1:1 mapping onto the existing buffer.
-        n_ray = xprmat.n_cols;
+        n_ray = polmat.n_cols;
         n_rayU = n_ray;
         if (have_update && !broadcast && update->n_cols != n_ray)
-            throw std::invalid_argument("'update' must have 'xprmat' columns (or 1 to broadcast).");
+            throw std::invalid_argument("'update' must have 'polmat' columns (or 1 to broadcast).");
     }
     else
     {
-        // Empty 'xprmat', no 'ray_ind': size the global buffer from a per-column update.
+        // Empty 'polmat', no 'ray_ind': size the global buffer from a per-column update.
         if (!have_update)
-            throw std::invalid_argument("Cannot size an empty 'xprmat' without a per-column 'update'; pre-size it to use 'initialize' on its own.");
+            throw std::invalid_argument("Cannot size an empty 'polmat' without a per-column 'update'; pre-size it to use 'initialize' on its own.");
         if (broadcast)
-            throw std::invalid_argument("Cannot infer ray count from a broadcast 'update' with an empty 'xprmat'.");
+            throw std::invalid_argument("Cannot infer ray count from a broadcast 'update' with an empty 'polmat'.");
         n_ray = update->n_cols;
         n_rayU = n_ray;
     }
@@ -409,13 +409,13 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
     // but the copy-through / identity seed below writes every touched column without reading it, so
     // no garbage is consumed. (Empty implies every column is touched, so all get written.)
     if (!have_state)
-        xprmat.set_size(nXPR, n_ray);
+        polmat.set_size(nXPR, n_ray);
 
     // Seed a column to unity before the update when the caller asks (initialize) or when the buffer
     // was just allocated and holds no valid state. With an update this becomes a direct copy.
     const bool seed = initialize || !have_state;
 
-    dtype *p_xpr = xprmat.memptr();
+    dtype *p_xpr = polmat.memptr();
     const dtype *p_upd = have_update ? update->memptr() : nullptr;
     const arma::uword *p_idx = ray_ind ? ray_ind->memptr() : nullptr;
     dtype *p_gain = (gain != nullptr) ? gain->memptr() : nullptr;
@@ -431,7 +431,7 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
     // Identical in both loops below.
     auto process = [=](arma::uword iU)
     {
-        arma::uword g = p_idx ? p_idx[iU] : iU; // global column in xprmat
+        arma::uword g = p_idx ? p_idx[iU] : iU; // global column in polmat
         dtype *oX = &p_xpr[nXPR * g];
         const dtype *nX = p_upd ? (broadcast ? p_upd : &p_upd[nXPR * iU]) : (const dtype *)nullptr;
 
@@ -481,10 +481,10 @@ void quadriga_lib::xpr_update(arma::Mat<dtype> &xprmat,
     }
 }
 
-template void quadriga_lib::xpr_update(arma::Mat<float> &xprmat, const arma::Mat<float> *update,
-                                       arma::Col<float> *gain, bool initialize, bool normalize,
-                                       bool apply_gain, const arma::uvec *ray_ind);
+template void quadriga_lib::polmat_update(arma::Mat<float> &polmat, const arma::Mat<float> *update,
+                                          arma::Col<float> *gain, bool initialize, bool normalize,
+                                          bool apply_gain, const arma::uvec *ray_ind);
 
-template void quadriga_lib::xpr_update(arma::Mat<double> &xprmat, const arma::Mat<double> *update,
-                                       arma::Col<double> *gain, bool initialize, bool normalize,
-                                       bool apply_gain, const arma::uvec *ray_ind);
+template void quadriga_lib::polmat_update(arma::Mat<double> &polmat, const arma::Mat<double> *update,
+                                          arma::Col<double> *gain, bool initialize, bool normalize,
+                                          bool apply_gain, const arma::uvec *ray_ind);

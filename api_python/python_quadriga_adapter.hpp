@@ -399,8 +399,8 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
         output["path_gain"] = qd_python_emit_paths<double>(&channel.path_gain, stack, i_snap);
     if (!channel.path_length.empty())
         output["path_length"] = qd_python_emit_paths<double>(&channel.path_length, stack, i_snap);
-    if (!channel.path_polarization.empty())
-        output["path_polarization"] = qd_python_emit_paths<double>(&channel.path_polarization, stack, i_snap);
+    if (!channel.polmat.empty())
+        output["polmat"] = qd_python_emit_paths<double>(&channel.polmat, stack, i_snap);
     if (!channel.path_angles.empty())
         output["path_angles"] = qd_python_emit_paths<double>(&channel.path_angles, stack, i_snap);
 
@@ -512,7 +512,7 @@ static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict
     load("delay", c.delay);
     load("path_gain", c.path_gain);
     load("path_length", c.path_length);
-    load("path_polarization", c.path_polarization); // real interleaved (8, n_path) as in C++
+    load("polmat", c.polmat);                       // real interleaved (8, n_path) as in C++
     load("path_angles", c.path_angles);
     load("fbs_pos", c.fbs_pos);
     load("lbs_pos", c.lbs_pos);
@@ -814,7 +814,7 @@ static py::dict qd_python_plpar2dict(const std::string &pl_model,
 // others optional (missing or None = empty), also any key appended later
 static const char *const qd_python_gbsm_rays_keys[] = {
     "method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa",
-    "eoa", "M", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
+    "eoa", "polmat", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
 static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap"
 
 // Labels, codes or counts (non-negative integers, no index shift) -> u32_vec; None gives an empty vector
@@ -868,7 +868,7 @@ static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const
     r.eod = qd_python_numpy2arma_Col<double>(get("eod"), true);
     r.aoa = qd_python_numpy2arma_Col<double>(get("aoa"), true);
     r.eoa = qd_python_numpy2arma_Col<double>(get("eoa"), true);
-    r.M = qd_python_numpy2arma_Cube<double>(get("M"), true);
+    r.polmat = qd_python_numpy2arma_Cube<double>(get("polmat"), true);
     r.path_type = qd_python_u32_entries(get("path_type"), var_name + ".path_type");
     r.tap = qd_python_u32_entries(get("tap"), var_name + ".tap");
     r.fbs_pos = qd_python_numpy2arma_Mat<double>(get("fbs_pos"), true);
@@ -909,7 +909,7 @@ static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, 
         d["eod"] = qd_python_init_output(n_ray, &r.eod);
         d["aoa"] = qd_python_init_output(n_ray, &r.aoa);
         d["eoa"] = qd_python_init_output(n_ray, &r.eoa);
-        d["M"] = qd_python_init_output(n8, n_ray, n_freq, &r.M);
+        d["polmat"] = qd_python_init_output(n8, n_ray, n_freq, &r.polmat);
         d["path_type"] = qd_python_init_output(n_ray, &r.path_type);
         d["tap"] = qd_python_init_output(n_ray, &r.tap);
         d["gr_eps"] = py::array_t<std::complex<double>>(0);
@@ -976,12 +976,12 @@ static void qd_python_keep_dict_values(const py::dict &dict, std::vector<py::obj
 }
 
 // Frequency selection of the channel wrappers: all snapshots must have the same number of frequencies 'n_freq' in
-// 'path_gain' [n_path, n_freq] and 'M' [8, n_path, n_freq], 'center_freq' is empty or has 'n_freq' entries, and
+// 'path_gain' [n_path, n_freq] and 'polmat' [8, n_path, n_freq], 'center_freq' is empty or has 'n_freq' entries, and
 // 'i_freq' < n_freq (unless there are no snapshots). The slice 'i_freq' of every snapshot is aliased into 'path_gain_f'
-// and 'M_f'; returns the selected center frequency (0 for an empty 'center_freq').
-static double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_gain, const std::vector<arma::Cube<double>> &M,
+// and 'polmat_f'; returns the selected center frequency (0 for an empty 'center_freq').
+static double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_gain, const std::vector<arma::Cube<double>> &polmat,
                                     const arma::Col<double> &center_freq, arma::uword i_freq,
-                                    std::vector<arma::vec> &path_gain_f, std::vector<arma::mat> &M_f)
+                                    std::vector<arma::vec> &path_gain_f, std::vector<arma::mat> &polmat_f)
 {
     const size_t n_snap = path_gain.size();
     arma::uword n_freq = 0ULL;
@@ -993,8 +993,8 @@ static double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_g
         else if (n_freq_i != n_freq)
             throw std::invalid_argument("All entries of 'path_gain' must have the same number of frequencies.");
 
-        if (M[i].n_slices != n_freq_i)
-            throw std::invalid_argument("Inputs 'path_gain' and 'M' must have the same number of frequencies.");
+        if (polmat[i].n_slices != n_freq_i)
+            throw std::invalid_argument("Inputs 'path_gain' and 'polmat' must have the same number of frequencies.");
     }
 
     if (!center_freq.empty() && center_freq.n_elem != n_freq)
@@ -1003,12 +1003,12 @@ static double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_g
     if (n_snap != 0 && i_freq >= n_freq)
         throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
 
-    path_gain_f.clear(), M_f.clear();
-    path_gain_f.reserve(n_snap), M_f.reserve(n_snap);
+    path_gain_f.clear(), polmat_f.clear();
+    path_gain_f.reserve(n_snap), polmat_f.reserve(n_snap);
     for (size_t i = 0; i < n_snap; ++i)
     {
         path_gain_f.emplace_back(const_cast<double *>(path_gain[i].colptr(i_freq)), path_gain[i].n_rows, false, true);
-        M_f.emplace_back(const_cast<double *>(M[i].slice_memptr(i_freq)), M[i].n_rows, M[i].n_cols, false, true);
+        polmat_f.emplace_back(const_cast<double *>(polmat[i].slice_memptr(i_freq)), polmat[i].n_rows, polmat[i].n_cols, false, true);
     }
     return center_freq.empty() ? 0.0 : center_freq.at(i_freq);
 }

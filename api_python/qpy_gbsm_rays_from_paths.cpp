@@ -13,7 +13,7 @@ SECTION!*/
 Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Returns the ray dict of [[ssf_rays]] (`fallback` empty) from path data in the names and order of [[qrt_file_read]],
-  read with `normalize_M = 1` (`uplink = True` gives the reverse link; `normalize_M = 0` leaves only the
+  read with `normalize_polmat = 1` (`uplink = True` gives the reverse link; `normalize_polmat = 0` leaves only the
   free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
@@ -27,7 +27,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 ## Usage:
 ```
 rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, \
-    path_length, M, *, method, path_type, tap, gr_eps )
+    path_length, polmat, *, method, path_type, tap, gr_eps )
 ```
 
 ## Inputs:
@@ -36,7 +36,7 @@ rays = quadriga_lib.gbsm.rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in m; `(3, n_path)`
 - **`path_gain`** — Path gains (linear); `(n_path, n_freq)`
 - **`path_length`** — Path lengths in m; `(n_path,)`
-- **`M`** — Polarization transfer matrices, real, rows as in [[channel.planar]]; `(8, n_path, n_freq)`
+- **`polmat`** — Polarization transfer matrices, real, rows as in [[channel.planar]]; `(8, n_path, n_freq)`
 - **`method`** — Value of `rays["method"]`; sets the GR power law and the default mobility; default: `"quadriga"`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `(n_path,)`; default: None
 - **`tap`** — Tap index; `None`: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also without a GR
@@ -60,7 +60,7 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
                               const py::array_t<double> &lbs_pos,
                               const py::array_t<double> &path_gain,
                               const py::array_t<double> &path_length,
-                              const py::array_t<double> &M,
+                              const py::array_t<double> &polmat,
                               const std::string &method,
                               py::handle path_type,
                               py::handle tap,
@@ -74,7 +74,7 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
     const auto lbs_pos_a = qd_python_numpy2arma_Mat<double>(lbs_pos, true);
     const auto path_gain_a = qd_python_numpy2arma_Mat<double>(path_gain, true);
     const auto path_length_a = qd_python_numpy2arma_Col<double>(path_length, true);
-    const auto M_a = qd_python_numpy2arma_Cube<double>(M, true);
+    const auto polmat_a = qd_python_numpy2arma_Cube<double>(polmat, true);
     const auto path_type_a = qd_python_u32_entries(path_type, "path_type");
     const auto tap_a = qd_python_u32_entries(tap, "tap");
 
@@ -93,7 +93,7 @@ py::dict gbsm_rays_from_paths(const py::array_t<double> &center_freq,
     py::list rays_py = qd_python_init_gbsm_rays(1, fbs_pos_a.n_cols, center_freq_a.n_elem, has_gr, true, rays);
 
     quadriga_lib::gbsm_rays_from_paths(center_freq_a, tx_pos_a, rx_pos_a, fbs_pos_a, lbs_pos_a, path_gain_a,
-                                       path_length_a, M_a, rays[0], method,
+                                       path_length_a, polmat_a, rays[0], method,
                                        path_type.is_none() ? nullptr : &path_type_a, tap.is_none() ? nullptr : &tap_a,
                                        has_gr ? &gr_eps_re : nullptr, has_gr ? &gr_eps_im : nullptr);
 

@@ -222,7 +222,7 @@ namespace quadriga_lib
         arma::vec eod;                  // Elevation of departure in [rad], GCS, [n_ray]
         arma::vec aoa;                  // Azimuth of arrival in [rad], GCS, [n_ray]
         arma::vec eoa;                  // Elevation of arrival in [rad], GCS, [n_ray]
-        arma::cube M;                   // Polarization transfer matrices incl. initial phases, row order of get_channels_*, [8, n_ray, n_freq]
+        arma::cube polmat;              // Polarization transfer matrices incl. initial phases, row order of get_channels_*, [8, n_ray, n_freq]
         arma::u32_vec path_type;        // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_ray]
         arma::u32_vec tap;              // Tap index, rays with equal index form one tap, [n_ray]
         arma::vec gr_eps_re;            // Ground permittivity, real part, [n_freq] or empty; needed where a GR ray is recomputed
@@ -271,7 +271,7 @@ namespace quadriga_lib
 
     // Antenna-free paths of one link at one position
     // - "phase": use the outputs with get_channels_planar and the arrays at the positions of 'rays' (the displacement
-    //   phase is in M); "drift": inputs of get_channels_spherical / get_channels_multifreq and qrt_paths_from_scatterers
+    //   phase is in polmat); "drift": inputs of get_channels_spherical / get_channels_multifreq and qrt_paths_from_scatterers
     // - Rays with zero power at all frequencies are dropped, LOS and GR rays are kept
     // - Validity: "phase" up to about sqrt(lambda * b_eff / 8) per moving end (see gbsm_rays::b_eff),
     //   "drift" up to about 0.2 * b_med per moving end
@@ -279,7 +279,7 @@ namespace quadriga_lib
                    const arma::vec &link_gain_dB,        // Link gain -PL - O2I + 10·lg(SF) at the position in [dB], [n_freq]; 0 for data from paths
                    arma::mat &path_gain,                 // Output: Path gains (linear), [n_path, n_freq]
                    arma::vec &path_length,               // Output: Path lengths in [m], [n_path]
-                   arma::cube &M,                        // Output: Polarization transfer matrices, [8, n_path, n_freq]
+                   arma::cube &polmat,                   // Output: Polarization transfer matrices, [8, n_path, n_freq]
                    const std::string &mobility = "auto", // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
                    const arma::mat *tx_pos = nullptr,    // Optional: Tx position in [m], [3, 1] or [1, 3]; nullptr = rays.tx_pos
                    const arma::mat *rx_pos = nullptr,    // Optional: Rx position in [m], [3, 1] or [1, 3]; nullptr = rays.rx_pos
@@ -304,7 +304,7 @@ namespace quadriga_lib
                               const arma::mat &lbs_pos,                 // Last-bounce scatterer positions in [m], [3, n_path]
                               const arma::mat &path_gain,               // Path gains (linear), [n_path, n_freq]
                               const arma::vec &path_length,             // Path lengths in [m], [n_path]
-                              const arma::cube &M,                      // Polarization transfer matrices, [8, n_path, n_freq]
+                              const arma::cube &polmat,                 // Polarization transfer matrices, [8, n_path, n_freq]
                               gbsm_rays &rays,                          // Output: Ray data, n_ray = n_path
                               const std::string &method = "quadriga",   // Value of rays.method: GR power law and default mobility
                               const arma::u32_vec *path_type = nullptr, // Optional: Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]; nullptr = LOS where FBS = LBS on the direct line, else NLOS

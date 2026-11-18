@@ -66,8 +66,8 @@ TEST_CASE("Channel - OBJ Export")
     M(0, 1) = 0.1;
     M(6, 0) = -1.0;
     M(6, 1) = -0.1;
-    c.path_polarization.push_back(M);
-    c.path_polarization.push_back(M);
+    c.polmat.push_back(M);
+    c.polmat.push_back(M);
 
     c.center_freq = 1.0e9;
 

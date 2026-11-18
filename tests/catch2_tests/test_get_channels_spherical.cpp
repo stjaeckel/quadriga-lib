@@ -2316,7 +2316,7 @@ TEST_CASE("Get Channels Spherical - vec form errors")
     fbs.resize(40, fbs[0]), M.resize(40, M[0]), gain.resize(40, gain[0]), len.resize(40, len[0]);
     M[23] = arma::mat(7, 1, arma::fill::ones), M[5] = M[23];
     CHECK_THROWS_WITH(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
-                      ContainsSubstring("Snapshot 5: ") && ContainsSubstring("'M' must have 8 rows"));
+                      ContainsSubstring("Snapshot 5: ") && ContainsSubstring("'polmat' must have 8 rows"));
     CHECK_THROWS_AS(quadriga_lib::get_channels_spherical_vec<double>(ant, ant, p1, p1, r1, p1, fbs, fbs, gain, len, M, cr, ci, dl),
                     std::invalid_argument);
 }

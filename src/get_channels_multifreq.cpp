@@ -117,10 +117,10 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
 - Aligns four frequency grids: TX array (from `tx_array[i].center_freq`), RX array, input samples (`freq`), and output (`freq_new`)
 - TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [[arrayant_interpolate_multi]])
-- `path_gain` interpolated linearly; `M` interpolated via SLERP per complex entry pair to preserve phase
+- `path_gain` interpolated linearly; `polmat` interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to nearest frequency entry on all four grids
 - `propagation_speed` supports EM (speed of light, default) and acoustic (~343 m/s) simulations
-- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix, rows = RX polarisation V/H, columns = TX polarisation
+- `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix, rows = RX polarisation V/H, columns = TX polarisation
   V/H, column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx),
   rows 6-7 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -158,7 +158,7 @@ void quadriga_lib::get_channels_multifreq(
     const arma::Mat<dtype> &lbs_pos,
     const arma::Mat<dtype> &path_gain,
     const arma::Col<dtype> &path_length,
-    const arma::Cube<dtype> &M,
+    const arma::Cube<dtype> &polmat,
     const arma::Col<dtype> &freq,
     const arma::Col<dtype> &freq_new,
     std::vector<arma::Cube<dtype>> &coeff_re,
@@ -183,9 +183,9 @@ void quadriga_lib::get_channels_multifreq(
 - **`path_gain`** — Linear-scale path gains; `[n_path, n_freq]`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path]`
-- **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
+- **`polmat`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
   `[2, n_path, n_freq]` (scalar)
-- **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq]`
+- **`freq`** — Input sample frequencies for `path_gain` and `polmat`; `[n_freq]`
 - **`freq_new`** — Target output frequencies; `[n_freq_new]`
 - **`use_absolute_delays`** *(optional)* — Include LOS delay in all paths if true
 - **`add_fake_los_path`** *(optional)* — Always add one output path; slot 0 holds the LOS path (zero power if none was
@@ -216,7 +216,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                                           const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
                                           const arma::Mat<dtype> &fbs_pos, const arma::Mat<dtype> &lbs_pos,
                                           const arma::Mat<dtype> &path_gain, const arma::Col<dtype> &path_length,
-                                          const arma::Cube<dtype> &M,
+                                          const arma::Cube<dtype> &polmat,
                                           const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
                                           std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                           std::vector<arma::Cube<dtype>> &delay,
@@ -261,7 +261,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         {
             for (const auto &c : vec)
             {
-                qd_check_alias(&c, names_all[name], &fbs_pos, &lbs_pos, &path_gain, &path_length, &M, &freq, &freq_new);
+                qd_check_alias(&c, names_all[name], &fbs_pos, &lbs_pos, &path_gain, &path_length, &polmat, &freq, &freq_new);
                 if (c.n_elem != 0)
                     ranges.push_back({(std::uintptr_t)c.memptr(), (std::uintptr_t)(c.memptr() + c.n_elem), name});
             }
@@ -291,7 +291,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
     // 0 paths: all path inputs empty; 'fbs_pos' of size [0, n] with n > 0 gives n paths without data (missing data)
     const bool no_paths = fbs_pos.n_elem == 0 && fbs_pos.n_cols == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
-                          path_length.n_elem == 0 && M.n_elem == 0;
+                          path_length.n_elem == 0 && polmat.n_elem == 0;
 
     // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot (delays from the TX-RX
     // geometry) does not depend on the path data, so a dummy NLOS path (1 m longer than the LOS path, never detected
@@ -304,7 +304,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         const arma::Col<dtype> length_d = {std::sqrt(x * x + y * y + z * z) + one};
         const arma::uword n_f = freq.n_elem;
         const arma::Mat<dtype> gain_d(1, n_f, arma::fill::ones);
-        arma::Cube<dtype> M_d((M.n_rows == 2) ? 2 : 8, 1, n_f, arma::fill::zeros);
+        arma::Cube<dtype> M_d((polmat.n_rows == 2) ? 2 : 8, 1, n_f, arma::fill::zeros);
         for (arma::uword f = 0; f < n_f; ++f)
         {
             M_d(0, 0, f) = one;
@@ -339,16 +339,16 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
     // 0 paths without add_fake_los_path: the path inputs are not checked, the outputs are empty [n_rx, n_tx, 0]
     if (!no_paths && (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 ||
-                      path_length.n_elem == 0 || M.n_elem == 0))
-        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' cannot be empty.");
+                      path_length.n_elem == 0 || polmat.n_elem == 0))
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' cannot be empty.");
 
     if (!no_paths && (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3))
         throw std::invalid_argument("Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows.");
 
-    if (!no_paths && M.n_rows != 8 && M.n_rows != 2)
-        throw std::invalid_argument("Input 'M' must have 8 rows (full polarimetric) or 2 rows (scalar pressure).");
+    if (!no_paths && polmat.n_rows != 8 && polmat.n_rows != 2)
+        throw std::invalid_argument("Input 'polmat' must have 8 rows (full polarimetric) or 2 rows (scalar pressure).");
 
-    const bool scalar_M = (M.n_rows == 2);
+    const bool scalar_M = (polmat.n_rows == 2);
 
     const arma::uword n_path = fbs_pos.n_cols;
     const arma::uword n_freq = freq.n_elem;
@@ -366,8 +366,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         throw std::invalid_argument("Input 'path_gain' must have size [n_path, n_freq].");
     if (!no_paths && path_length.n_elem != n_path)
         throw std::invalid_argument("Input 'path_length' must have n_path elements.");
-    if (!no_paths && (M.n_cols != n_path || M.n_slices != n_freq))
-        throw std::invalid_argument("Input 'M' must have size [8|2, n_path, n_freq].");
+    if (!no_paths && (polmat.n_cols != n_path || polmat.n_slices != n_freq))
+        throw std::invalid_argument("Input 'polmat' must have size [8|2, n_path, n_freq].");
     if (propagation_speed <= zero)
         throw std::invalid_argument("Input 'propagation_speed' must be positive.");
 
@@ -685,17 +685,17 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 pg[p] = wA * col_lo[p] + wB * col_hi[p];
         }
 
-        // Interpolate M (Jones matrix) at this frequency (SLERP per complex entry)
-        const arma::uword M_rows = M.n_rows; // 8 or 2
+        // Interpolate polmat (Jones matrix) at this frequency (SLERP per complex entry)
+        const arma::uword M_rows = polmat.n_rows; // 8 or 2
         arma::Mat<dtype> M_f(M_rows, n_path);
         if (fin_exact)
         {
-            std::memcpy(M_f.memptr(), M.slice_memptr(fin_lo), M_rows * n_path * sizeof(dtype));
+            std::memcpy(M_f.memptr(), polmat.slice_memptr(fin_lo), M_rows * n_path * sizeof(dtype));
         }
         else
         {
-            const dtype *M_lo = M.slice_memptr(fin_lo);
-            const dtype *M_hi = M.slice_memptr(fin_hi);
+            const dtype *M_lo = polmat.slice_memptr(fin_lo);
+            const dtype *M_hi = polmat.slice_memptr(fin_hi);
             dtype *Mf = M_f.memptr();
             arma::uword n_pairs = M_rows / 2; // 4 complex pairs for full, 1 for scalar
 
@@ -941,7 +941,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
                     if (scalar_M)
                     {
-                        // Scalar pressure: only the (V rx, V tx) component, M = [Re, Im]
+                        // Scalar pressure: only the (V rx, V tx) component, polmat = [Re, Im]
                         re += pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
                         im += pVrr[R] * pM[1] * pVtr[R] + pVri[R] * pM[0] * pVtr[R] + pVrr[R] * pM[0] * pVti[R] - pVri[R] * pM[1] * pVti[R];
                     }

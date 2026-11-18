@@ -60,7 +60,7 @@ namespace
     {
         in_t in;
         in.cf = r.center_freq, in.T = r.tx_pos, in.R = r.rx_pos, in.fbs = r.fbs_pos, in.lbs = r.lbs_pos;
-        in.pg = r.power, in.M = r.M, in.method = r.method, in.type = r.path_type, in.tap = r.tap;
+        in.pg = r.power, in.M = r.polmat, in.method = r.method, in.type = r.path_type, in.tap = r.tap;
         in.er = r.gr_eps_re, in.ei = r.gr_eps_im, in.has_eps = !r.gr_eps_re.empty();
         in.pl.set_size(r.n_ray());
         for (arma::uword p = 0; p < r.n_ray(); ++p)
@@ -116,7 +116,7 @@ TEST_CASE("gbsm_rays_from_paths - delays, angles and powers from the path data")
     REQUIRE(o.n_ray() == n_path);
     CHECK(arma::approx_equal(o.delay, r.delay, "absdiff", 1e-12 * arma::max(r.delay)));
     CHECK(arma::approx_equal(o.power, r.power, "absdiff", 0.0));
-    CHECK(arma::approx_equal(o.M, r.M, "absdiff", 0.0));
+    CHECK(arma::approx_equal(o.polmat, r.polmat, "absdiff", 0.0));
     CHECK(arma::approx_equal(o.fbs_pos, r.fbs_pos, "absdiff", 0.0));
     CHECK(arma::approx_equal(o.lbs_pos, r.lbs_pos, "absdiff", 0.0));
     CHECK(arma::approx_equal(o.gr_eps_re, r.gr_eps_re, "absdiff", 0.0));
@@ -232,7 +232,7 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
     quadriga_lib::qrt_file_init<double>(fn, r.center_freq, cir_pos, cir_ori);
     quadriga_lib::qrt_file_append<double>(
         fn, quadriga_lib::qrt_paths_from_scatterers(r.center_freq, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
-                                                    r.power, r.M, r.path_type),
+                                                    r.power, r.polmat, r.path_type),
         r.tx_pos);
 
     in_t in;
@@ -279,8 +279,8 @@ TEST_CASE("gbsm_rays_from_paths - a QRT round trip restores the rays")
             const double s_w = std::sqrt(r.power(p, f)), s_r = std::sqrt(o.power(p, f));
             double ref = 0.0, d = 0.0;
             for (arma::uword e = 0; e < 8; ++e)
-                ref = std::max(ref, std::abs(s_w * r.M(e, p, f))),
-                d = std::max(d, std::abs(s_r * o.M(e, p, f) - s_w * r.M(e, p, f)));
+                ref = std::max(ref, std::abs(s_w * r.polmat(e, p, f))),
+                d = std::max(d, std::abs(s_r * o.polmat(e, p, f) - s_w * r.polmat(e, p, f)));
             CHECK(d <= 1e-6 * ref);
             d_rel = std::max(d_rel, (ref > 0.0) ? d / ref : d);
         }
@@ -305,7 +305,7 @@ TEST_CASE("gbsm_rays_from_paths - n_interact of qrt_file_read passes as path_typ
     quadriga_lib::qrt_file_init<double>(fn, r.center_freq, cir_pos, cir_ori);
     quadriga_lib::qrt_file_append<double>(
         fn, quadriga_lib::qrt_paths_from_scatterers(r.center_freq, r.tx_pos, r.rx_pos, r.fbs_pos, r.lbs_pos,
-                                                    r.power, r.M, r.path_type),
+                                                    r.power, r.polmat, r.path_type),
         r.tx_pos);
     arma::vec cf, T, R, pl;
     arma::mat fbs, lbs, pg;
@@ -367,7 +367,7 @@ TEST_CASE("gbsm_rays_from_paths - a pre-initialised object is written in place")
     o.delay.fill(7.0), o.aod.fill(7.0), o.eod.fill(7.0), o.aoa.fill(7.0), o.eoa.fill(7.0), o.tap.fill(7);
 
     const double *p_delay = o.delay.memptr(), *p_power = o.power.memptr(), *p_aod = o.aod.memptr();
-    const double *p_eod = o.eod.memptr(), *p_aoa = o.aoa.memptr(), *p_eoa = o.eoa.memptr(), *p_M = o.M.memptr();
+    const double *p_eod = o.eod.memptr(), *p_aoa = o.aoa.memptr(), *p_eoa = o.eoa.memptr(), *p_M = o.polmat.memptr();
     const double *p_fbs = o.fbs_pos.memptr(), *p_lbs = o.lbs_pos.memptr();
     const unsigned *p_type = o.path_type.memptr(), *p_tap = o.tap.memptr();
 
@@ -385,7 +385,7 @@ TEST_CASE("gbsm_rays_from_paths - a pre-initialised object is written in place")
     CHECK(o.eod.memptr() == p_eod);
     CHECK(o.aoa.memptr() == p_aoa);
     CHECK(o.eoa.memptr() == p_eoa);
-    CHECK(o.M.memptr() == p_M);
+    CHECK(o.polmat.memptr() == p_M);
     CHECK(o.fbs_pos.memptr() == p_fbs);
     CHECK(o.lbs_pos.memptr() == p_lbs);
     CHECK(o.path_type.memptr() == p_type);
@@ -467,9 +467,9 @@ TEST_CASE("gbsm_rays_from_paths - input validation")
     }
     SECTION("M")
     {
-        fails([](in_t &in) { in.M.shed_slice(0); }, "Input 'M' must have size [8, n_path, n_freq].");
-        fails([](in_t &in) { in.M.shed_col(0); }, "Input 'M' must have size [8, n_path, n_freq].");
-        fails([&](in_t &in) { in.M(0, 1, 1) = nan; }, "Input 'M' must be finite.");
+        fails([](in_t &in) { in.M.shed_slice(0); }, "Input 'polmat' must have size [8, n_path, n_freq].");
+        fails([](in_t &in) { in.M.shed_col(0); }, "Input 'polmat' must have size [8, n_path, n_freq].");
+        fails([&](in_t &in) { in.M(0, 1, 1) = nan; }, "Input 'polmat' must be finite.");
     }
     SECTION("method")
     {

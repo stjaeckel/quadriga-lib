@@ -186,7 +186,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("lbs_pos").none(false),
           py::arg("path_gain").none(false),
           py::arg("path_length").none(false),
-          py::arg("M").none(false),
+          py::arg("polmat").none(false),
           py::kw_only(),
           py::arg("method") = "quadriga",
           py::arg("path_type") = py::none(),

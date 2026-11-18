@@ -303,7 +303,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     };
     for (const gbsm_rays &r : rays)
         check(r.tx_pos), check(r.rx_pos), check(r.center_freq), check(r.delay), check(r.power), check(r.aod),
-            check(r.eod), check(r.aoa), check(r.eoa), check(r.M), check(r.path_type), check(r.tap),
+            check(r.eod), check(r.aoa), check(r.eoa), check(r.polmat), check(r.path_type), check(r.tap),
             check(r.gr_eps_re), check(r.gr_eps_im), check(r.fbs_pos), check(r.lbs_pos), check(r.fallback);
 
     if (rays.size() != n_link)
@@ -378,8 +378,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         fit(r.tap, n_ray);
         if (r.power.n_rows != n_ray || r.power.n_cols != Fo)
             r.power.set_size(n_ray, Fo);
-        if (r.M.n_rows != 8 || r.M.n_cols != n_ray || r.M.n_slices != Fo)
-            r.M.set_size(8, n_ray, Fo);
+        if (r.polmat.n_rows != 8 || r.polmat.n_cols != n_ray || r.polmat.n_slices != Fo)
+            r.polmat.set_size(8, n_ray, Fo);
         if (G)
         {
             fit(r.gr_eps_re, Fo), fit(r.gr_eps_im, Fo);
@@ -398,7 +398,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
             r.tx_pos(i) = tx_pos(t, i), r.rx_pos(i) = rx_pos(l, i);
         for (arma::uword k = k0; k <= k1; ++k)
             r.center_freq(k - k0) = center_freq(k);
-        r.M.zeros();
+        r.polmat.zeros();
 
         // LOS and GR rays: the slot values; Jones matrices diag(1, -1) (TR 38.901 eq. (7.5-29)) and
         // diag(R_par, -R_perp) / R with R² = (abs(R_par)² + abs(R_perp)²) / 2 (eqs. (7.6-38) to (7.6-40); R = 0 gives 0)
@@ -412,7 +412,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         for (arma::uword k = k0; k <= k1; ++k)
         {
             const arma::uword o = k - k0;
-            r.power(0, o) = power(l, 0, k), r.M(0, 0, o) = 1.0, r.M(6, 0, o) = -1.0;
+            r.power(0, o) = power(l, 0, k), r.polmat(0, 0, o) = 1.0, r.polmat(6, 0, o) = -1.0;
             if (!G)
                 continue;
             r.power(1, o) = power(l, 1, k);
@@ -421,8 +421,8 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                             std::sqrt(dx * dx + dy * dy), R_par, R_perp);
             const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
             if (R > 0.0)
-                r.M(0, 1, o) = R_par.real() / R, r.M(1, 1, o) = R_par.imag() / R,
-                          r.M(6, 1, o) = -R_perp.real() / R, r.M(7, 1, o) = -R_perp.imag() / R;
+                r.polmat(0, 1, o) = R_par.real() / R, r.polmat(1, 1, o) = R_par.imag() / R,
+                          r.polmat(6, 1, o) = -R_perp.real() / R, r.polmat(7, 1, o) = -R_perp.imag() / R;
         }
         if (N == 0)
             return;
@@ -521,7 +521,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                     r.eoa(i) = fold(eoa(l, s, g), c_spread[3] * alpha[3 * M + m]);
                 }
 
-                // Initial phases 2·pi·Phi(x) - pi with the standard normal CDF Phi; 8-row layout of M: Re/Im of
+                // Initial phases 2·pi·Phi(x) - pi with the standard normal CDF Phi; 8-row layout of polmat: Re/Im of
                 // theta-theta, phi-theta (Rx phi, Tx theta), theta-phi, phi-phi; phase blocks 5, 7, 6, 8
                 const arma::uword block[4] = {5, 7, 6, 8};
                 double ph[4];
@@ -545,7 +545,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                                                            std::polar(sgm, ph[0] + kap), -std::polar(cg, ph[0] + kap)};
                         const int e8[4] = {0, rx_owner ? 2 : 1, rx_owner ? 1 : 2, 3}; // tt, pt, tp, pp
                         for (int e = 0; e < 4; ++e)
-                            r.M(2 * e8[e], i, o) = J[e].real(), r.M(2 * e8[e] + 1, i, o) = J[e].imag();
+                            r.polmat(2 * e8[e], i, o) = J[e].real(), r.polmat(2 * e8[e] + 1, i, o) = J[e].imag();
                         continue;
                     }
 
@@ -566,7 +566,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                     for (int e = 0; e < 4; ++e)
                     {
                         const double a = std::sqrt(amp[e]);
-                        r.M(2 * e, i, o) = a * std::cos(ph[e]), r.M(2 * e + 1, i, o) = a * std::sin(ph[e]);
+                        r.polmat(2 * e, i, o) = a * std::cos(ph[e]), r.polmat(2 * e + 1, i, o) = a * std::sin(ph[e]);
                     }
                 }
             }

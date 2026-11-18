@@ -22,13 +22,13 @@ TEST_CASE("Channel - Effective Path Gain")
     c.rx_pos(2, 1) = 1.0;
 
     // Random polarization
-    c.path_polarization.push_back(arma::mat(8, 1, arma::fill::randn));
-    c.path_polarization.push_back(arma::mat(8, 1, arma::fill::randn));
+    c.polmat.push_back(arma::mat(8, 1, arma::fill::randn));
+    c.polmat.push_back(arma::mat(8, 1, arma::fill::randn));
 
     // Calc effective PG and check results
     auto p = c.calc_effective_path_gain();
-    arma::vec q1 = c.path_polarization[0] % c.path_polarization[0];
-    arma::vec q2 = c.path_polarization[1] % c.path_polarization[1];
+    arma::vec q1 = c.polmat[0] % c.polmat[0];
+    arma::vec q2 = c.polmat[1] % c.polmat[1];
     CHECK(std::abs(arma::sum(q1) - p.at(0)) < 1e-14);
     CHECK(std::abs(arma::sum(q2) - p.at(1)) < 1e-14);
 
@@ -85,7 +85,7 @@ TEST_CASE("Channel - Effective Path Gain")
                                       {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0},
                                       {c.rx_pos(0, 0), c.rx_pos(1, 0), c.rx_pos(2, 0)},
                                       {0.0, 0.0, 0.0}, l, l, l, l,
-                                      c.path_gain[0], c.path_length[0], c.path_polarization[0],
+                                      c.path_gain[0], c.path_length[0], c.polmat[0],
                                       coeff_re, coeff_im, delay);
 
     c.coeff_re.push_back(coeff_re);
@@ -97,14 +97,14 @@ TEST_CASE("Channel - Effective Path Gain")
                                       {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0},
                                       {c.rx_pos(0, 1), c.rx_pos(1,1), c.rx_pos(2, 1)},
                                       {0.0, 0.0, 0.0}, l, l, l, l,
-                                      c.path_gain[1], c.path_length[1], c.path_polarization[1],
+                                      c.path_gain[1], c.path_length[1], c.polmat[1],
                                       coeff_re, coeff_im, delay);
 
     c.coeff_re.push_back(coeff_re);
     c.coeff_im.push_back(coeff_im);
     c.delay.push_back(delay);
 
-    c.path_polarization.clear();
+    c.polmat.clear();
     c.path_length.clear();
     p.reset();
 

@@ -27,7 +27,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
 - The IRS coupling matrix holds the IRS weights and must be given: an `irs_array` or `irs_array_2` struct without
   `coupling_re` / `coupling_im` throws, unlike in the other functions, where it stands for identity
-- Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2`: 2x2 Jones matrices (rows = receive
+- Polarization coupling is applied via the 8-row transfer matrices `polmat_1`, `polmat_2`: 2x2 Jones matrices (rows = receive
   polarisation V/H, columns = transmit polarisation V/H; the IRS receives in segment 1 and transmits in segment 2),
   column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx),
   rows 7-8 = (H rx, H tx)
@@ -48,8 +48,8 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 [ coeff_re, coeff_im, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
     tx_array, rx_array, irs_array, ...
     tx_pos, tx_orientation, rx_pos, rx_orientation, irs_pos, irs_orientation, ...
-    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
-    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
+    fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1, ...
+    fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2, ...
     i_irs, threshold_dB, center_freq, use_absolute_delays, irs_array_2, active_path, use_kernel );
 ```
 
@@ -68,13 +68,13 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1, 1]`
 - **`path_length_1`** — Total path lengths from TX to IRS phase center for TX → IRS paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_1, 1]`
-- **`M_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `[8, n_path_1]`
+- **`polmat_1`** — Polarization transfer matrix for TX → IRS paths, row order as above; `[8, n_path_1]`
 - **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
 - **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
 - **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `[n_path_2, 1]`
 - **`path_length_2`** — Total path lengths from IRS to RX phase center for IRS → RX paths; values shorter than the
   polyline (e.g. 0) use the polyline length; `[n_path_2, 1]`
-- **`M_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
+- **`polmat_2`** — Polarization transfer matrix for IRS → RX paths, row order as above; `[8, n_path_2]`
 - **`i_irs`** — IRS codebook port index, 1-based (one port per column of the IRS coupling matrix); default: `1`
 - **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: `0`
@@ -136,14 +136,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto lbs_pos_1 = qd_mex_get_Mat<double>(prhs[10], false, "lbs_pos_1");
     const auto path_gain_1 = qd_mex_get_Col<double>(prhs[11], false, "path_gain_1");
     const auto path_length_1 = qd_mex_get_Col<double>(prhs[12], false, "path_length_1");
-    const auto M_1 = qd_mex_get_Mat<double>(prhs[13], false, "M_1");
+    const auto polmat_1 = qd_mex_get_Mat<double>(prhs[13], false, "polmat_1");
 
     // Segment IRS → RX
     const auto fbs_pos_2 = qd_mex_get_Mat<double>(prhs[14], false, "fbs_pos_2");
     const auto lbs_pos_2 = qd_mex_get_Mat<double>(prhs[15], false, "lbs_pos_2");
     const auto path_gain_2 = qd_mex_get_Col<double>(prhs[16], false, "path_gain_2");
     const auto path_length_2 = qd_mex_get_Col<double>(prhs[17], false, "path_length_2");
-    const auto M_2 = qd_mex_get_Mat<double>(prhs[18], false, "M_2");
+    const auto polmat_2 = qd_mex_get_Mat<double>(prhs[18], false, "polmat_2");
 
     // Configuration parameters
     const arma::uword i_irs = (nrhs < 20) ? 0 : qd_mex_get_index(prhs[19], "i_irs"); // 1-based -> 0-based
@@ -184,8 +184,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(quadriga_lib::get_channels_irs<double>(tx_array, rx_array, irs_array,
                                                    tx_pos, tx_orientation, rx_pos, rx_orientation,
                                                    irs_pos, irs_orientation,
-                                                   fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1,
-                                                   fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2,
+                                                   fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, polmat_1,
+                                                   fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, polmat_2,
                                                    coeff_re, coeff_im, delay,
                                                    i_irs, threshold_dB, center_freq, use_absolute_delays,
                                                    p_aod, p_eod, p_aoa, p_eoa, p_irs_array_2, p_active_path,

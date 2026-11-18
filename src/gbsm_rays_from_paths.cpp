@@ -18,8 +18,8 @@ SECTION!*/
 Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Fills a [[gbsm_rays]] object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [[qrt_file_read]], read as `qrt_file_read<double>` with `normalize_M = 1` (`uplink = true` gives the reverse
-  link; `normalize_M = 0` leaves only the free-space gain in `power`)
+  [[qrt_file_read]], read as `qrt_file_read<double>` with `normalize_polmat = 1` (`uplink = true` gives the reverse
+  link; `normalize_polmat = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
@@ -38,7 +38,7 @@ void quadriga_lib::gbsm_rays_from_paths(
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
     const arma::vec &path_length,
-    const arma::cube &M,
+    const arma::cube &polmat,
     gbsm_rays &rays,
     const std::string &method = "quadriga",
     const arma::u32_vec *path_type = nullptr,
@@ -53,7 +53,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices; `[8, n_path, n_freq]`
 - **`method`** *(optional)* — Value of `rays.method`; sets the GR power law and the default mobility
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** *(optional)* — Tap index; omitted: LOS 0, GR 3, the others 6, 9, ... in path order; `[n_path]`
@@ -77,7 +77,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
                                         const arma::mat &lbs_pos,
                                         const arma::mat &path_gain,
                                         const arma::vec &path_length,
-                                        const arma::cube &M,
+                                        const arma::cube &polmat,
                                         gbsm_rays &rays,
                                         const std::string &method,
                                         const arma::u32_vec *path_type,
@@ -103,10 +103,10 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
         throw std::invalid_argument("Input 'path_length' must have n_path elements.");
     if (!path_length.is_finite() || arma::any(path_length < 0.0))
         throw std::invalid_argument("Input 'path_length' must be finite and >= 0.");
-    if (M.n_rows != 8 || M.n_cols != n_path || M.n_slices != n_freq)
-        throw std::invalid_argument("Input 'M' must have size [8, n_path, n_freq].");
-    if (!M.is_finite())
-        throw std::invalid_argument("Input 'M' must be finite.");
+    if (polmat.n_rows != 8 || polmat.n_cols != n_path || polmat.n_slices != n_freq)
+        throw std::invalid_argument("Input 'polmat' must have size [8, n_path, n_freq].");
+    if (!polmat.is_finite())
+        throw std::invalid_argument("Input 'polmat' must be finite.");
     if (method != "38.901" && method != "38.901_MF" && method != "quadriga")
         throw std::invalid_argument("Input 'method' must be '38.901', '38.901_MF' or 'quadriga'.");
 
@@ -153,11 +153,11 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
 
     auto check = [&](const auto &m)
     {
-        qd_check_alias(&m, "rays", &center_freq, &tx_pos, &rx_pos, &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
+        qd_check_alias(&m, "rays", &center_freq, &tx_pos, &rx_pos, &fbs_pos, &lbs_pos, &path_gain, &path_length, &polmat,
                        path_type, tap, gr_eps_re, gr_eps_im);
     };
     check(rays.tx_pos), check(rays.rx_pos), check(rays.center_freq), check(rays.delay), check(rays.power);
-    check(rays.aod), check(rays.eod), check(rays.aoa), check(rays.eoa), check(rays.M), check(rays.path_type);
+    check(rays.aod), check(rays.eod), check(rays.aoa), check(rays.eoa), check(rays.polmat), check(rays.path_type);
     check(rays.tap), check(rays.gr_eps_re), check(rays.gr_eps_im), check(rays.fbs_pos), check(rays.lbs_pos);
     check(rays.fallback);
 
@@ -178,7 +178,7 @@ void quadriga_lib::gbsm_rays_from_paths(const arma::vec &center_freq,
 
     rays.method = method;
     rays.center_freq = center_freq, rays.tx_pos = arma::mat(tx_pos.memptr(), 3, 1), rays.rx_pos = arma::mat(rx_pos.memptr(), 3, 1);
-    rays.power = path_gain, rays.M = M, rays.fbs_pos = fbs_pos, rays.lbs_pos = lbs_pos;
+    rays.power = path_gain, rays.polmat = polmat, rays.fbs_pos = fbs_pos, rays.lbs_pos = lbs_pos;
     rays.path_type = type;
     if (tap)
         rays.tap = *tap;

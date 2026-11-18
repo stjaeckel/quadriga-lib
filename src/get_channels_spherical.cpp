@@ -27,7 +27,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 - Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
   V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -60,7 +60,7 @@ void quadriga_lib::get_channels_spherical(
     const arma::Mat<dtype> &lbs_pos,
     const arma::Col<dtype> &path_gain,
     const arma::Col<dtype> &path_length,
-    const arma::Mat<dtype> &M,
+    const arma::Mat<dtype> &polmat,
     arma::Cube<dtype> &coeff_re,
     arma::Cube<dtype> &coeff_im,
     arma::Cube<dtype> &delay,
@@ -86,7 +86,7 @@ void quadriga_lib::get_channels_spherical(
 - **`path_gain`** — Path gains in linear scale; `[n_path]`
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
   (e.g. 0) use the polyline length; `[n_path]`
-- **`M`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
+- **`polmat`** — Polarization transfer matrix, 2x2 Jones matrix column-major, Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx); `[8, n_path]`
 - **`center_freq`** *(optional)* — Center frequency; 0 gives the coefficients at f = 0 (see above)
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
@@ -121,7 +121,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
                                           const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &tx_orientation,
                                           const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
                                           const arma::Mat<dtype> &fbs_pos, const arma::Mat<dtype> &lbs_pos,
-                                          const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &M,
+                                          const arma::Col<dtype> &path_gain, const arma::Col<dtype> &path_length, const arma::Mat<dtype> &polmat,
                                           arma::Cube<dtype> &coeff_re, arma::Cube<dtype> &coeff_im, arma::Cube<dtype> &delay,
                                           dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
@@ -147,13 +147,13 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
 
     qd_check_alias_list({&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa},
                         {"coeff_re", "coeff_im", "delay", "aod", "eod", "aoa", "eoa"},
-                        &fbs_pos, &lbs_pos, &path_gain, &path_length, &M);
+                        &fbs_pos, &lbs_pos, &path_gain, &path_length, &polmat);
 
     // 0 paths with add_fake_los_path: the output holds only the zero-power LOS path. Its slot (delays and angles from
     // the TX-RX geometry) does not depend on the path data, so a dummy NLOS path (1 m longer than the LOS path, never
     // detected as LOS) fills the input; its own slot is dropped.
     if (add_fake_los_path && fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 &&
-        path_length.n_elem == 0 && M.n_elem == 0)
+        path_length.n_elem == 0 && polmat.n_elem == 0)
     {
         const dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
         const arma::Mat<dtype> pos_d = {(Tx + Rx) * (dtype)0.5, (Ty + Ry) * (dtype)0.5, (Tz + Rz) * (dtype)0.5};
@@ -199,7 +199,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     }
 
     // 0 paths without add_fake_los_path: empty outputs of size [n_rx_ports, n_tx_ports, 0]
-    if (fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 && path_length.n_elem == 0 && M.n_elem == 0)
+    if (fbs_pos.n_elem == 0 && lbs_pos.n_elem == 0 && path_gain.n_elem == 0 && path_length.n_elem == 0 && polmat.n_elem == 0)
     {
         const arma::uword n_tx_ports = tx_array.n_ports(), n_rx_ports = rx_array.n_ports();
         for (arma::Cube<dtype> *out : {&coeff_re, &coeff_im, &delay, aod, eod, aoa, eoa})
@@ -209,14 +209,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     }
 
     // Check if the number of paths is consistent in all inputs
-    if (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 || path_length.n_elem == 0 || M.n_elem == 0)
+    if (fbs_pos.n_elem == 0 || lbs_pos.n_elem == 0 || path_gain.n_elem == 0 || path_length.n_elem == 0 || polmat.n_elem == 0)
     {
-        error_message = "Missing data for any of: fbs_pos, lbs_pos, path_gain, path_length, M";
+        error_message = "Missing data for any of: fbs_pos, lbs_pos, path_gain, path_length, polmat";
         throw std::invalid_argument(error_message.c_str());
     }
-    if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || M.n_rows != 8)
+    if (fbs_pos.n_rows != 3 || lbs_pos.n_rows != 3 || polmat.n_rows != 8)
     {
-        error_message = "Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows; 'M' must have 8 rows.";
+        error_message = "Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows; 'polmat' must have 8 rows.";
         throw std::invalid_argument(error_message.c_str());
     }
 
@@ -230,9 +230,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
     const arma::uword n_rx_ports = rx_array.n_ports();                 // Number of RX antenna elements after coupling
     const arma::uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
 
-    if (lbs_pos.n_cols != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || M.n_cols != n_path)
+    if (lbs_pos.n_cols != n_path || path_gain.n_elem != n_path || path_length.n_elem != n_path || polmat.n_cols != n_path)
     {
-        error_message = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'M' must have the same number of columns (n_paths).";
+        error_message = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'polmat' must have the same number of columns (n_paths).";
         throw std::invalid_argument(error_message.c_str());
     }
 
@@ -534,7 +534,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> &t
         const arma::uword o_slice = j * n_links; // Slice offset
 
         // Get column pointers into the precomputed interpolation results
-        const dtype *pM = M.colptr(i);
+        const dtype *pM = polmat.colptr(i);
         const dtype *pVrr = Vr_re.colptr(j), *pVri = Vr_im.colptr(j),
                     *pHrr = Hr_re.colptr(j), *pHri = Hr_im.colptr(j),
                     *pVtr = Vt_re.colptr(j), *pVti = Vt_im.colptr(j),
@@ -675,7 +675,7 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    const arma::Mat<float> &tx_pos, const arma::Mat<float> &tx_orientation,
                                                    const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
                                                    const arma::Mat<float> &fbs_pos, const arma::Mat<float> &lbs_pos,
-                                                   const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &M,
+                                                   const arma::Col<float> &path_gain, const arma::Col<float> &path_length, const arma::Mat<float> &polmat,
                                                    arma::Cube<float> &coeff_re, arma::Cube<float> &coeff_im, arma::Cube<float> &delay,
                                                    float center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
@@ -685,7 +685,7 @@ template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<
                                                    const arma::Mat<double> &tx_pos, const arma::Mat<double> &tx_orientation,
                                                    const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
                                                    const arma::Mat<double> &fbs_pos, const arma::Mat<double> &lbs_pos,
-                                                   const arma::Col<double> &path_gain, const arma::Col<double> &path_length, const arma::Mat<double> &M,
+                                                   const arma::Col<double> &path_gain, const arma::Col<double> &path_length, const arma::Mat<double> &polmat,
                                                    arma::Cube<double> &coeff_re, arma::Cube<double> &coeff_im, arma::Cube<double> &delay,
                                                    double center_freq, bool use_absolute_delays, bool add_fake_los_path,
                                                    arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
@@ -722,7 +722,7 @@ void quadriga_lib::get_channels_spherical_vec(
     const std::vector<arma::Mat<dtype>> &lbs_pos,
     const std::vector<arma::Col<dtype>> &path_gain,
     const std::vector<arma::Col<dtype>> &path_length,
-    const std::vector<arma::Mat<dtype>> &M,
+    const std::vector<arma::Mat<dtype>> &polmat,
     std::vector<arma::Cube<dtype>> &coeff_re,
     std::vector<arma::Cube<dtype>> &coeff_im,
     std::vector<arma::Cube<dtype>> &delay,
@@ -745,7 +745,7 @@ void quadriga_lib::get_channels_spherical_vec(
 - **`rx_orientation`** — Receiver orientations (bank, tilt, heading) in [rad], finite; `[3, n_snap]` or `[3, 1]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions; vectors of length `n_snap`, entries `[3, n_path]`
 - **`path_gain`**, **`path_length`** — Path gains (linear) and path lengths; vectors of length `n_snap`, entries `[n_path]`
-- **`M`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
+- **`polmat`** — Polarization transfer matrices; vector of length `n_snap`, entries `[8, n_path]`
 - **`center_freq`**, **`use_absolute_delays`**, **`add_fake_los_path`**, **`use_kernel`** *(optional)* — As in
   [[get_channels_spherical]], for all snapshots
 
@@ -766,7 +766,7 @@ void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<dtype
                                               const arma::Mat<dtype> &rx_pos, const arma::Mat<dtype> &rx_orientation,
                                               const std::vector<arma::Mat<dtype>> &fbs_pos, const std::vector<arma::Mat<dtype>> &lbs_pos,
                                               const std::vector<arma::Col<dtype>> &path_gain, const std::vector<arma::Col<dtype>> &path_length,
-                                              const std::vector<arma::Mat<dtype>> &M,
+                                              const std::vector<arma::Mat<dtype>> &polmat,
                                               std::vector<arma::Cube<dtype>> &coeff_re, std::vector<arma::Cube<dtype>> &coeff_im,
                                               std::vector<arma::Cube<dtype>> &delay,
                                               dtype center_freq, bool use_absolute_delays, bool add_fake_los_path,
@@ -775,8 +775,8 @@ void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<dtype
                                               std::vector<arma::Cube<std::complex<dtype>>> *coeff, int use_kernel)
 {
     const size_t n_snap = fbs_pos.size();
-    if (lbs_pos.size() != n_snap || path_gain.size() != n_snap || path_length.size() != n_snap || M.size() != n_snap)
-        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must have the same length.");
+    if (lbs_pos.size() != n_snap || path_gain.size() != n_snap || path_length.size() != n_snap || polmat.size() != n_snap)
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' must have the same length.");
 
     const bool parallel = qd_channels_vec_check(tx_array, rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, n_snap, [&](size_t s)
                                                 { return fbs_pos[s].n_cols; }, use_kernel);
@@ -792,7 +792,7 @@ void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::arrayant<dtype
                                          auto col = [s](const arma::Mat<dtype> &m)
                                          { return qd_channels_vec_col(m, s); };
                                          quadriga_lib::get_channels_spherical<dtype>(tx_array, rx_array, col(tx_pos), col(tx_orientation), col(rx_pos), col(rx_orientation),
-                                                                                     fbs_pos[s], lbs_pos[s], path_gain[s], path_length[s], M[s],
+                                                                                     fbs_pos[s], lbs_pos[s], path_gain[s], path_length[s], polmat[s],
                                                                                      cr, ci, delay[s], center_freq, use_absolute_delays, add_fake_los_path,
                                                                                      aod ? &aod->at(s) : nullptr, eod ? &eod->at(s) : nullptr,
                                                                                      aoa ? &aoa->at(s) : nullptr, eoa ? &eoa->at(s) : nullptr, use_kernel);
@@ -804,7 +804,7 @@ template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::array
                                                        const arma::Mat<float> &rx_pos, const arma::Mat<float> &rx_orientation,
                                                        const std::vector<arma::Mat<float>> &fbs_pos, const std::vector<arma::Mat<float>> &lbs_pos,
                                                        const std::vector<arma::Col<float>> &path_gain, const std::vector<arma::Col<float>> &path_length,
-                                                       const std::vector<arma::Mat<float>> &M,
+                                                       const std::vector<arma::Mat<float>> &polmat,
                                                        std::vector<arma::Cube<float>> &coeff_re, std::vector<arma::Cube<float>> &coeff_im,
                                                        std::vector<arma::Cube<float>> &delay,
                                                        float center_freq, bool use_absolute_delays, bool add_fake_los_path,
@@ -817,7 +817,7 @@ template void quadriga_lib::get_channels_spherical_vec(const quadriga_lib::array
                                                        const arma::Mat<double> &rx_pos, const arma::Mat<double> &rx_orientation,
                                                        const std::vector<arma::Mat<double>> &fbs_pos, const std::vector<arma::Mat<double>> &lbs_pos,
                                                        const std::vector<arma::Col<double>> &path_gain, const std::vector<arma::Col<double>> &path_length,
-                                                       const std::vector<arma::Mat<double>> &M,
+                                                       const std::vector<arma::Mat<double>> &polmat,
                                                        std::vector<arma::Cube<double>> &coeff_re, std::vector<arma::Cube<double>> &coeff_im,
                                                        std::vector<arma::Cube<double>> &delay,
                                                        double center_freq, bool use_absolute_delays, bool add_fake_los_path,

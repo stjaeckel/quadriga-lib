@@ -41,7 +41,7 @@ assertEqual( pt(1:3), uint32( [0; 1; 2] ) );
 assertEqual( rays.tap( ri(1:2) ), uint32( [0; 3] ) );
 assertElementsAlmostEqual( pg, rays.power( kept ) * 1e-9, 'absolute', 1e-20 );
 assertElementsAlmostEqual( pl, norm( rx_pos - tx_pos ) + 299792458 * rays.delay( kept ), 'absolute', 1e-9 );
-assertEqual( M, rays.M( :, kept ) );                                          % no displacement
+assertEqual( M, rays.polmat( :, kept ) );                                          % no displacement
 assertEqual( aod_p, rays.aod( kept ) );
 assertEqual( eoa_p, rays.eoa( kept ) );
 
@@ -99,7 +99,7 @@ for f = { 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', 'path_type', 'tap', 'fal
 end
 s.center_freq = [ fc; 2 * fc ];
 s.power = zeros( 0, 2 );
-s.M = zeros( 8, 0, 2 );
+s.polmat = zeros( 8, 0, 2 );
 s.gr_eps_re = [ gre; gre ];
 s.gr_eps_im = [ gim; gim ];
 s.fbs_pos = zeros( 3, 0 );

@@ -39,7 +39,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) �
 
 ### Usage:
 ```matlab
-[ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
+[ gain, polmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
     center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
     apply_fspl, apply_phase );
 ```
@@ -68,20 +68,20 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) �
   distance, matching the `path_length` used by [qrt_file_read](channel-functions.md#qrt_file_read) for a
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
   `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm; default: `false`
-- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+- **`apply_phase`** — If `true`, multiplies `polmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium wave
   speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude, so
-  `xprmat` stays normalized. This is the phase [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from
+  `polmat` stays normalized. This is the phase [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) would otherwise add from
   `path_length`; default: `false`
 
 ### Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos, 1]`. Relative to FSPL by
   default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = true`
-- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
   interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx), the row order
-  of `M` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
+  of `polmat` in [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
   (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
@@ -477,7 +477,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
 
 ### Usage:
 ```matlab
-[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
+[ origN, destN, fbsN, sbsN, gainN, polmatN, trivecN, tridirN, fbs_angleN, thicknessN, ...
     edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
     quadriga_lib.ray_mesh_interact( interaction_type, center_freq, orig, dest, mesh, ...
     mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, compact );
@@ -508,8 +508,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
 - **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2,
   single TE coefficient for types 3–5; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
-  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; includes interaction gain, TE/TM coefficients,
+- **`polmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
+  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, labels `<out><in>` (= `<rx><tx>`); includes interaction gain, TE/TM coefficients,
   incidence plane orientation; excludes in-medium attenuation and FSPL; `[8, n_rayN]`. For types
   3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if

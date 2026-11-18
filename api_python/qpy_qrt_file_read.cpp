@@ -22,8 +22,8 @@ Read ray-tracing CIR data from a QRT file
   significantly speeds up multi-snapshot reads
 - File reading and the conversion to numpy arrays are overlapped: a background thread reads the
   next snapshot into a double buffer while the main thread converts the previous one
-- If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
+- If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `polmat` is the transpose
+  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 - Per-snapshot outputs are returned as lists with one entry per requested snapshot
@@ -31,8 +31,8 @@ Read ray-tracing CIR data from a QRT file
 ## Usage:
 ```
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
-    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
-    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, *, uplink, normalize_M )
+    path_length, polmat, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, *, uplink, normalize_polmat )
 ```
 
 ## Inputs:
@@ -41,11 +41,11 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
   without CIRs, all outputs are empty with `n_out = 0`); default: `None`
 - **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
 - **`uplink`** — If `False`, origin=TX and destination=RX; if `True`, the roles are swapped (origin=RX, destination=TX); default: `False`
-- **`normalize_M`** — Controls `M` and `path_gain` scaling; 0 = values as stored in the QRT file with
-  `path_gain` = -PL; 1 = `M` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
+- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling; 0 = values as stored in the QRT file with
+  `path_gain` = -PL; 1 = `polmat` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
-    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
     | :-----------: | :---------------------------------------------: | :------------------------------: |
     | 0             | As stored in QRT file                           | -PL                              |
     | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |<br><br>
@@ -62,7 +62,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`lbs_pos`** — Last-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
 - **`path_gain`** — Path gain in linear scale; list of length `n_out`; entries `(n_path, n_freq)`
 - **`path_length`** — Absolute path length from TX to RX phase center; list of length `n_out`; entries `(n_path,)`
-- **`M`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
+- **`polmat`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
 - **`aod`** — Departure azimuth angles; list of length `n_out`; entries `(n_path,)`
 - **`eod`** — Departure elevation angles; list of length `n_out`; entries `(n_path,)`
 - **`aoa`** — Arrival azimuth angles; list of length `n_out`; entries `(n_path,)`
@@ -87,7 +87,7 @@ struct qd_qrt_slot
     arma::vec tx_pos, tx_orientation, rx_pos, rx_orientation;
     arma::mat fbs_pos, lbs_pos, path_gain;
     arma::vec path_length, aod, eod, aoa, eoa;
-    arma::cube M;
+    arma::cube polmat;
     std::vector<arma::mat> path_coord;
     arma::u32_vec n_interact;
     arma::fmat coord;
@@ -122,7 +122,7 @@ py::tuple qrt_file_read(const py::handle &fn,
                         py::handle i_cir,
                         arma::uword i_orig,
                         py::handle uplink,
-                        int normalize_M)
+                        int normalize_polmat)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
@@ -159,7 +159,7 @@ py::tuple qrt_file_read(const py::handle &fn,
     auto rx_orientation_py = qd_python_init_output(3, no_out, &rx_orientation);
 
     // Per-snapshot outputs (one list entry per requested snapshot)
-    py::list fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, M_py;
+    py::list fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, polmat_py;
     py::list aod_py, eod_py, aoa_py, eoa_py, path_coord_py, n_interact_py, coord_py, interact_type_py;
 
     // Double buffer, the reader thread fills one slot while the main thread converts the other
@@ -190,8 +190,8 @@ py::tuple qrt_file_read(const py::handle &fn,
                 qd_qrt_slot &s = slot[i % 2ULL];
                 quadriga_lib::qrt_file_read<double>(fn_s, i_cir_a[i], i_orig, uplink_b, nullptr,
                                                     &s.tx_pos, &s.tx_orientation, &s.rx_pos, &s.rx_orientation,
-                                                    &s.fbs_pos, &s.lbs_pos, &s.path_gain, &s.path_length, &s.M,
-                                                    &s.aod, &s.eod, &s.aoa, &s.eoa, &s.path_coord, normalize_M,
+                                                    &s.fbs_pos, &s.lbs_pos, &s.path_gain, &s.path_length, &s.polmat,
+                                                    &s.aod, &s.eod, &s.aoa, &s.eoa, &s.path_coord, normalize_polmat,
                                                     &s.n_interact, &s.coord, &s.interact_type, &stream, &cache);
             }
             catch (const std::exception &e)
@@ -234,7 +234,7 @@ py::tuple qrt_file_read(const py::handle &fn,
         lbs_pos_py.append(qd_python_copy2numpy(&s.lbs_pos));
         path_gain_py.append(qd_python_copy2numpy(&s.path_gain));
         path_length_py.append(qd_python_copy2numpy(&s.path_length));
-        M_py.append(qd_python_copy2numpy(&s.M));
+        polmat_py.append(qd_python_copy2numpy(&s.polmat));
         aod_py.append(qd_python_copy2numpy(&s.aod));
         eod_py.append(qd_python_copy2numpy(&s.eod));
         aoa_py.append(qd_python_copy2numpy(&s.aoa));
@@ -264,7 +264,7 @@ py::tuple qrt_file_read(const py::handle &fn,
 
     // Return tuple
     return py::make_tuple(center_freq_py, tx_pos_py, tx_orientation_py, rx_pos_py, rx_orientation_py,
-                          fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, M_py,
+                          fbs_pos_py, lbs_pos_py, path_gain_py, path_length_py, polmat_py,
                           aod_py, eod_py, aoa_py, eoa_py, path_coord_py, n_interact_py, coord_py,
                           interact_type_py);
 }

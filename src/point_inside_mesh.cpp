@@ -161,7 +161,7 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
                                            &fbs_ind, &sbs_ind,                 // fbs_ind, sbs_ind
                                            nullptr, nullptr,                   // trivec, tridir
                                            nullptr, nullptr, nullptr, nullptr, // origN, destN, fbsN, sbsN
-                                           nullptr, nullptr,                   // gainN, xprmatN
+                                           nullptr, nullptr,                   // gainN, polmatN
                                            nullptr, nullptr,                   // trivecN, tridirN
                                            &fbs_angle, &thickness,             // fbs_angle, thickness
                                            nullptr, nullptr,                   // edge_lengthN, normal_vecN

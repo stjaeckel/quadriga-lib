@@ -213,7 +213,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, *, i_sna
   | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)`  | `(n_rx, n_tx, n_path, n_snap)`       |
   | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
   | `path_length`      | Path length in m                                                         | list of `(n_path_s,)`             | `(n_path, n_snap)`                   |
-  | `path_polarization`| Polarization transfer matrix, real, rows as in [channel.planar](channel-generation-functions.md#channel.planar)        | list of `(8, n_path_s)`           | `(8, n_path, n_snap)`                |
+  | `polmat`           | Polarization transfer matrix, real, rows as in [channel.planar](channel-generation-functions.md#channel.planar)        | list of `(8, n_path_s)`           | `(8, n_path, n_snap)`                |
   | `path_angles`      | Departure and arrival angles (AOD, EOD, AOA, EOA) in rad                 | list of `(n_path_s, 4)`           | `(n_path, 4, n_snap)`                |
   | `fbs_pos`          | First-bounce scatterer positions                                         | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
   | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`           | `(3, n_path, n_snap)`                |
@@ -499,8 +499,8 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [MATLAB](../mex/cha
   significantly speeds up multi-snapshot reads
 - File reading and the conversion to numpy arrays are overlapped: a background thread reads the
   next snapshot into a double buffer while the main thread converts the previous one
-- If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
+- If `uplink = False`, origin is TX and destination is RX; if `True`, roles are swapped and `polmat` is the transpose
+  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal
 - Per-snapshot outputs are returned as lists with one entry per requested snapshot
@@ -508,8 +508,8 @@ Also in: [C++](../cpp/channel-functions.md#qrt_file_read) · [MATLAB](../mex/cha
 ### Usage:
 ```python
 center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, \
-    path_length, M, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
-    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, *, uplink, normalize_M )
+    path_length, polmat, aod, eod, aoa, eoa, path_coord, n_interact, coord, \
+    interact_type = quadriga_lib.channel.qrt_file_read( fn, i_cir, i_orig, *, uplink, normalize_polmat )
 ```
 
 ### Inputs:
@@ -518,11 +518,11 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
   without CIRs, all outputs are empty with `n_out = 0`); default: `None`
 - **`i_orig`** — Origin index, 0-based (origin = TX for downlink); scalar; default: 0
 - **`uplink`** — If `False`, origin=TX and destination=RX; if `True`, the roles are swapped (origin=RX, destination=TX); default: `False`
-- **`normalize_M`** — Controls `M` and `path_gain` scaling; 0 = values as stored in the QRT file with
-  `path_gain` = -PL; 1 = `M` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
+- **`normalize_polmat`** — Controls `polmat` and `path_gain` scaling; 0 = values as stored in the QRT file with
+  `path_gain` = -PL; 1 = `polmat` columns (uplink: rows) scaled to max power 1 and `path_gain` = -PL minus material losses; default: 1
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
-    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
     | :-----------: | :---------------------------------------------: | :------------------------------: |
     | 0             | As stored in QRT file                           | -PL                              |
     | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
@@ -539,7 +539,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`lbs_pos`** — Last-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
 - **`path_gain`** — Path gain in linear scale; list of length `n_out`; entries `(n_path, n_freq)`
 - **`path_length`** — Absolute path length from TX to RX phase center; list of length `n_out`; entries `(n_path,)`
-- **`M`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
+- **`polmat`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
 - **`aod`** — Departure azimuth angles; list of length `n_out`; entries `(n_path,)`
 - **`eod`** — Departure elevation angles; list of length `n_out`; entries `(n_path,)`
 - **`aoa`** — Arrival azimuth angles; list of length `n_out`; entries `(n_path,)`

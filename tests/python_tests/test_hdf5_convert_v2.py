@@ -43,7 +43,7 @@ fixtures = ('hdf5_v2_written.hdf5', 'hdf5_v2_edited.hdf5', 'hdf5_v2_lossy.hdf5')
 
 # Channel dict keys renamed since release 0.12.4, which wrote the oracle: {current key: oracle key}
 oracle_key = {'center_freq': 'center_frequency', 'n_interact': 'no_interact', 'tx_pos': 'tx_position',
-              'rx_pos': 'rx_position'}
+              'rx_pos': 'rx_position', 'polmat': 'path_polarization'}
 
 
 def slot_index(s, dims):
@@ -90,8 +90,8 @@ class test_case(unittest.TestCase):
                                % (quadriga_lib.__file__, version))
         with np.load(os.path.join(data_dir, 'hdf5_v2_expected.npz'), allow_pickle=False) as z:
             cls.oracle = {k: z[k] for k in z.files}
-        # 0.12.4 returned 'path_polarization' as complex (4, n); the channel dict now holds the real (8, n) form,
-        # rows re, im of each entry. Splitting keeps every bit (-0.0, NaN payloads).
+        # 0.12.4 returned 'path_polarization' as complex (4, n); the channel dict now holds the real (8, n) form
+        # under the key 'polmat', rows re, im of each entry. Splitting keeps every bit (-0.0, NaN payloads).
         for k, v in cls.oracle.items():
             if '/chan/path_polarization' in k:
                 pol = np.empty((2 * v.shape[0],) + v.shape[1:], dtype=v.real.dtype)

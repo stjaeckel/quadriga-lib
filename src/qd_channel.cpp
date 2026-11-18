@@ -34,7 +34,7 @@ Class for storing and managing MIMO channel data and metadata across multiple sn
 | `std::vector<arma::Cube<dtype>> delay`            | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds                                      |
 | `std::vector<arma::Col<dtype>> path_gain`         | per snap `[n_path]`                                             | Path gains before antenna pattern                           |
 | `std::vector<arma::Col<dtype>> path_length`       | per snap `[n_path]`                                             | Path lengths TX to RX                                       |
-| `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
+| `std::vector<arma::Mat<dtype>> polmat`            | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
 | `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
 | `std::vector<arma::Mat<dtype>> fbs_pos`           | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
 | `std::vector<arma::Mat<dtype>> lbs_pos`           | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
@@ -95,8 +95,8 @@ arma::uword quadriga_lib::channel<dtype>::n_snap() const
     if (path_length.size() > s_vector)
         s_vector = path_length.size();
 
-    if (path_polarization.size() > s_vector)
-        s_vector = path_polarization.size();
+    if (polmat.size() > s_vector)
+        s_vector = polmat.size();
 
     if (path_angles.size() > s_vector)
         s_vector = path_angles.size();
@@ -152,9 +152,9 @@ arma::uvec quadriga_lib::channel<dtype>::n_path() const
     else if (path_length.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
             p_path[i] = path_length[i].n_elem;
-    else if (path_polarization.size() == n_snap)
+    else if (polmat.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
-            p_path[i] = path_polarization[i].n_cols;
+            p_path[i] = polmat[i].n_cols;
     else if (path_angles.size() == n_snap)
         for (size_t i = 0; i < n_snap; ++i)
             p_path[i] = path_angles[i].n_rows;
@@ -202,7 +202,7 @@ bool quadriga_lib::channel<dtype>::empty() const
     if (path_length.size() != 0)
         return false;
 
-    if (path_polarization.size() != 0)
+    if (polmat.size() != 0)
         return false;
 
     if (path_angles.size() != 0)
@@ -323,13 +323,13 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
             if (path_length[i].n_elem != n_pth[i])
                 return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_length'.";
 
-    if (path_polarization.size() != 0 && path_polarization.size() != n_snap_vector)
-        return std::string("'path_polarization' must be empty or match the number of snapshots.");
+    if (polmat.size() != 0 && polmat.size() != n_snap_vector)
+        return std::string("'polmat' must be empty or match the number of snapshots.");
 
-    if (n_snap_arma != 0ULL && path_polarization.size() == n_snap_vector)
+    if (n_snap_arma != 0ULL && polmat.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
-            if (path_polarization[i].n_rows != 8ULL || path_polarization[i].n_cols != n_pth[i])
-                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'path_polarization'.";
+            if (polmat[i].n_rows != 8ULL || polmat[i].n_cols != n_pth[i])
+                return "Snapshot " + std::to_string(i) + ": Size mismatch in 'polmat'.";
 
     if (path_angles.size() != 0 && path_angles.size() != n_snap_vector)
         return std::string("'path_angles' must be empty or match the number of snapshots.");
@@ -407,7 +407,7 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Mat<dtype> *interact_coord_add = nullptr,
     const arma::Col<dtype> *path_gain_add = nullptr,
     const arma::Col<dtype> *path_length_add = nullptr,
-    const arma::Mat<dtype> *path_polarization_add = nullptr,
+    const arma::Mat<dtype> *polmat_add = nullptr,
     const arma::Mat<dtype> *path_angles_add = nullptr,
     const arma::Mat<dtype> *fbs_pos_add = nullptr,
     const arma::Mat<dtype> *lbs_pos_add = nullptr);
@@ -422,7 +422,7 @@ void quadriga_lib::channel<dtype>::add_paths(
 - **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(n_interact)]`
 - **`path_gain_add`** *(optional)* — Path gains before antenna effects; `[n_path_add]`
 - **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
-- **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
+- **`polmat_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
 - **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
 - **`fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
 - **`lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
@@ -433,7 +433,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
                                              const arma::Cube<dtype> *coeff_re_add, const arma::Cube<dtype> *coeff_im_add, const arma::Cube<dtype> *delay_add,
                                              const arma::u32_vec *n_interact_add, const arma::Mat<dtype> *interact_coord_add,
                                              const arma::Col<dtype> *path_gain_add, const arma::Col<dtype> *path_length_add,
-                                             const arma::Mat<dtype> *path_polarization_add, const arma::Mat<dtype> *path_angles_add,
+                                             const arma::Mat<dtype> *polmat_add, const arma::Mat<dtype> *path_angles_add,
                                              const arma::Mat<dtype> *fbs_pos_add, const arma::Mat<dtype> *lbs_pos_add)
 {
     std::string error_message = this->is_valid();
@@ -537,21 +537,21 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     else if (this->path_length.size() != 0)
         throw std::invalid_argument("The channel object has 'path_length', but no 'path_length_add' is provided!");
 
-    // Check path_polarization
-    if (path_polarization_add != nullptr)
+    // Check polmat
+    if (polmat_add != nullptr)
     {
-        if (this->path_polarization.size() == 0)
-            throw std::invalid_argument("Channel object requires existing 'path_polarization'.");
+        if (this->polmat.size() == 0)
+            throw std::invalid_argument("Channel object requires existing 'polmat'.");
 
         if (!n_path_set)
-            n_path_add = path_polarization_add->n_cols, n_path_set = true;
-        if (path_polarization_add->n_cols != n_path_add)
-            throw std::invalid_argument("Number of columns in 'path_polarization_add' does not match 'n_path_add'");
-        if (path_polarization_add->n_rows != 8ULL)
-            throw std::invalid_argument("Number of rows in 'path_polarization_add' must be 8");
+            n_path_add = polmat_add->n_cols, n_path_set = true;
+        if (polmat_add->n_cols != n_path_add)
+            throw std::invalid_argument("Number of columns in 'polmat_add' does not match 'n_path_add'");
+        if (polmat_add->n_rows != 8ULL)
+            throw std::invalid_argument("Number of rows in 'polmat_add' must be 8");
     }
-    else if (this->path_polarization.size() != 0)
-        throw std::invalid_argument("The channel object has 'path_polarization', but no 'path_polarization_add' is provided!");
+    else if (this->polmat.size() != 0)
+        throw std::invalid_argument("The channel object has 'polmat', but no 'polmat_add' is provided!");
 
     // Check path_angles
     if (path_angles_add != nullptr)
@@ -604,7 +604,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     // The fields of snapshot i_snap are written: an input must not be one of them or share memory with one
     auto check_mat = [&](const arma::Mat<dtype> *out, const char *name)
     {
-        qd_check_alias(out, name, interact_coord_add, path_gain_add, path_length_add, path_polarization_add,
+        qd_check_alias(out, name, interact_coord_add, path_gain_add, path_length_add, polmat_add,
                        path_angles_add, fbs_pos_add, lbs_pos_add);
     };
     if (add_coefficients)
@@ -622,8 +622,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         check_mat(&this->path_gain[i_snap], "path_gain[i_snap]");
     if (path_length_add != nullptr)
         check_mat(&this->path_length[i_snap], "path_length[i_snap]");
-    if (path_polarization_add != nullptr)
-        check_mat(&this->path_polarization[i_snap], "path_polarization[i_snap]");
+    if (polmat_add != nullptr)
+        check_mat(&this->polmat[i_snap], "polmat[i_snap]");
     if (path_angles_add != nullptr)
         check_mat(&this->path_angles[i_snap], "path_angles[i_snap]");
     if (fbs_pos_add != nullptr)
@@ -651,8 +651,8 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_length_add != nullptr)
         this->path_length[i_snap] = arma::join_cols(this->path_length[i_snap], *path_length_add);
 
-    if (path_polarization_add != nullptr)
-        this->path_polarization[i_snap] = arma::join_rows(this->path_polarization[i_snap], *path_polarization_add);
+    if (polmat_add != nullptr)
+        this->polmat[i_snap] = arma::join_rows(this->polmat[i_snap], *polmat_add);
 
     if (path_angles_add != nullptr)
         this->path_angles[i_snap] = arma::join_cols(this->path_angles[i_snap], *path_angles_add);
@@ -669,7 +669,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
 Calculate the effective path gain per snapshot in linear scale
 
 - Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
-- Uses `coeff_re`/`coeff_im` if available; falls back to `path_polarization` assuming ideal XPOL antennas
+- Uses `coeff_re`/`coeff_im` if available; falls back to `polmat` assuming ideal XPOL antennas
 - Throws if neither coefficients nor polarization data are present
 
 ## Declaration:
@@ -690,7 +690,7 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const
     if (n_snap_arma == 0ULL)
         return arma::Col<dtype>();
 
-    if (coeff_re.empty() && path_polarization.empty())
+    if (coeff_re.empty() && polmat.empty())
         throw std::invalid_argument("Neither coefficients nor polarization are provided.");
 
     // Check if data is valid
@@ -724,7 +724,7 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain() const
             }
             else // use polarization
             {
-                const dtype *p_pol = path_polarization[iS].memptr();
+                const dtype *p_pol = polmat[iS].memptr();
                 const dtype *p_gain = has_path_gain ? path_gain[iS].memptr() : nullptr;
                 const dtype *p_length = has_path_length ? path_length[iS].memptr() : nullptr;
 
@@ -818,7 +818,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
     if (this->n_interact.empty() || this->interact_coord.empty())
         throw std::invalid_argument("Ray tracing data (n_interact, interact_coord) is missing.");
 
-    if (this->path_polarization.empty() && this->coeff_re.empty())
+    if (this->polmat.empty() && this->coeff_re.empty())
         throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
 
     // Input validation
@@ -945,10 +945,10 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
             dtype p = (dtype)0.0;
             if (!this->coeff_re.empty()) // Use MIMO coefficients
                 p = calc_power(this->coeff_re[i_snap_in].slice_memptr(i_path), this->coeff_im[i_snap_in].slice_memptr(i_path), n_rx * n_tx);
-            else if (!this->path_polarization.empty()) // Use XPR
+            else if (!this->polmat.empty())            // Use polmat
             {
-                const dtype *p_xpr = this->path_polarization[i_snap_in].colptr(i_path);
-                for (arma::uword m = 0ULL; m < 8ULL; ++m) // sum( xprmat(:,n).^2 )
+                const dtype *p_xpr = this->polmat[i_snap_in].colptr(i_path);
+                for (arma::uword m = 0ULL; m < 8ULL; ++m) // sum( polmat(:,n).^2 )
                     p += *p_xpr * *p_xpr, ++p_xpr;
                 p = (dtype)10.0 * std::log10(p);
                 p += gainF - (dtype)20.0 * std::log10(path_length(i_path));

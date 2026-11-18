@@ -219,7 +219,7 @@ namespace
         r.center_freq.set_size(n_freq);
         for (arma::uword k = 0; k < n_freq; ++k)
             r.center_freq(k) = 3.5e9 + 4.5e9 * (double)k;
-        r.delay.zeros(n_ray), r.power.zeros(n_ray, n_freq), r.M.zeros(8, n_ray, n_freq);
+        r.delay.zeros(n_ray), r.power.zeros(n_ray, n_freq), r.polmat.zeros(8, n_ray, n_freq);
         r.aod.zeros(n_ray), r.eod.zeros(n_ray), r.aoa.zeros(n_ray), r.eoa.zeros(n_ray);
         r.path_type.zeros(n_ray), r.tap.zeros(n_ray);
         if (with_scatterers)
@@ -241,7 +241,7 @@ namespace
             const arma::vec mid = 0.5 * (T + R);
             set_ray(i, D, -D, &mid, &mid);
             for (arma::uword k = 0; k < n_freq; ++k)
-                r.power(i, k) = U(0.5, 1.0), r.M(0, i, k) = 1.0, r.M(6, i, k) = -1.0;
+                r.power(i, k) = U(0.5, 1.0), r.polmat(0, i, k) = 1.0, r.polmat(6, i, k) = -1.0;
             ++i;
         }
         if (has_gr)
@@ -257,8 +257,8 @@ namespace
                 std::complex<double> R_par, R_perp;
                 fresnel(r.gr_eps_re(k), r.gr_eps_im(k), T(2), R(2), d2D, R_par, R_perp);
                 const double Rn = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
-                r.M(0, i, k) = R_par.real() / Rn, r.M(1, i, k) = R_par.imag() / Rn;
-                r.M(6, i, k) = -R_perp.real() / Rn, r.M(7, i, k) = -R_perp.imag() / Rn;
+                r.polmat(0, i, k) = R_par.real() / Rn, r.polmat(1, i, k) = R_par.imag() / Rn;
+                r.polmat(6, i, k) = -R_perp.real() / Rn, r.polmat(7, i, k) = -R_perp.imag() / Rn;
             }
             ++i;
         }
@@ -285,7 +285,7 @@ namespace
             {
                 r.power(i, k) = (j == 2) ? 0.0 : (j == 1) ? 4.0 * r.power(i0, k) : U(0.01, 1.0);
                 for (arma::uword e = 0; e < 8; ++e)
-                    r.M(e, i, k) = U(-1.0, 1.0);
+                    r.polmat(e, i, k) = U(-1.0, 1.0);
             }
         }
         return r;
@@ -460,7 +460,7 @@ namespace
         { return arma::size(x) == arma::size(y) && arma::all(arma::vectorise(x) == arma::vectorise(y)); };
         return a.method == b.method && eq(a.tx_pos, b.tx_pos) && eq(a.rx_pos, b.rx_pos) &&
                eq(a.center_freq, b.center_freq) && eq(a.delay, b.delay) && eq(a.power, b.power) &&
-               eq(a.aod, b.aod) && eq(a.eod, b.eod) && eq(a.aoa, b.aoa) && eq(a.eoa, b.eoa) && eq(a.M, b.M) &&
+               eq(a.aod, b.aod) && eq(a.eod, b.eod) && eq(a.aoa, b.aoa) && eq(a.eoa, b.eoa) && eq(a.polmat, b.polmat) &&
                eq(a.path_type, b.path_type) && eq(a.tap, b.tap) && eq(a.gr_eps_re, b.gr_eps_re) &&
                eq(a.gr_eps_im, b.gr_eps_im) && a.fbs_pos.empty() && b.fbs_pos.empty() && a.lbs_pos.empty() &&
                b.lbs_pos.empty() && a.fallback.empty() && b.fallback.empty();

@@ -15,7 +15,7 @@ Calculate MIMO channel coefficients for planar wave paths
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based (angles ignored).
-- Polarization transfer matrix `M` must be normalized; it is the 2x2 Jones matrix (rows = RX polarisation V/H,
+- Polarization transfer matrix `polmat` must be normalized; it is the 2x2 Jones matrix (rows = RX polarisation V/H,
   columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx),
   rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
 - `path_length` is used as given for the delay and phase of the phase centres (no geometry check).
@@ -34,7 +34,7 @@ Calculate MIMO channel coefficients for planar wave paths
 
 ## Batch mode:
 - If `aod` is a cell array, the function processes `n_snap` snapshots in one call, the snapshots in parallel (OpenMP).
-- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `M` are then cell arrays of length
+- The path inputs `aod`, `eod`, `aoa`, `eoa`, `path_gain`, `path_length` and `polmat` are then cell arrays of length
   `n_snap`.
 - The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
   snapshots.
@@ -45,7 +45,7 @@ Calculate MIMO channel coefficients for planar wave paths
 ## Usage:
 ```
 [ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
-    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, ...
+    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, polmat, ...
     center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
@@ -64,7 +64,7 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`eoa`** — Arrival elevation angles; rad; `[n_path, 1]`, or a cell in batch mode
 - **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; `[n_path, 1]`, or a cell in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
@@ -113,14 +113,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         // Numeric data of class double is not copied
         auto get_Mat = [](const mxArray *a, const char *name) { return qd_mex_get_Mat<double>(a, false, name); };
         auto get_Col = [](const mxArray *a, const char *name) { return qd_mex_get_Col<double>(a, false, name); };
-        const char *error = "Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'M' must all be cell arrays.";
+        const char *error = "Inputs 'aod', 'eod', 'aoa', 'eoa', 'path_gain', 'path_length' and 'polmat' must all be cell arrays.";
         const auto aod = qd_mex_read_cell<arma::vec>(prhs[6], "aod", error, get_Col);
         const auto eod = qd_mex_read_cell<arma::vec>(prhs[7], "eod", error, get_Col);
         const auto aoa = qd_mex_read_cell<arma::vec>(prhs[8], "aoa", error, get_Col);
         const auto eoa = qd_mex_read_cell<arma::vec>(prhs[9], "eoa", error, get_Col);
         const auto path_gain = qd_mex_read_cell<arma::vec>(prhs[10], "path_gain", error, get_Col);
         const auto path_length = qd_mex_read_cell<arma::vec>(prhs[11], "path_length", error, get_Col);
-        const auto M = qd_mex_read_cell<arma::mat>(prhs[12], "M", error, get_Mat);
+        const auto polmat = qd_mex_read_cell<arma::mat>(prhs[12], "polmat", error, get_Mat);
         const auto tx_pos = qd_mex_get_xyz_batch(prhs[2], "tx_pos");
         const auto tx_orientation = qd_mex_get_xyz_batch(prhs[3], "tx_orientation");
         const auto rx_pos = qd_mex_get_xyz_batch(prhs[4], "rx_pos");
@@ -146,7 +146,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         }
 
         CALL_QD(quadriga_lib::get_channels_planar_vec<double>(ant_tx, ant_rx, tx_pos, tx_orientation, rx_pos, rx_orientation,
-                                                              aod, eod, aoa, eoa, path_gain, path_length, M,
+                                                              aod, eod, aoa, eoa, path_gain, path_length, polmat,
                                                               out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
                                                               (nlhs > 3) ? &rx_Doppler : nullptr, nullptr, use_kernel));
         return;
@@ -159,7 +159,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto eoa = qd_mex_get_Col<double>(prhs[9], false, "eoa");
     const auto path_gain = qd_mex_get_Col<double>(prhs[10], false, "path_gain");
     const auto path_length = qd_mex_get_Col<double>(prhs[11], false, "path_length");
-    const auto M = qd_mex_get_Mat<double>(prhs[12], false, "M");
+    const auto polmat = qd_mex_get_Mat<double>(prhs[12], false, "polmat");
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[2], "tx_pos", 3);
     const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[3], "tx_orientation", 3);
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
@@ -184,7 +184,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_planar<double>(ant_tx, ant_rx,
                                                       tx_pos, tx_orientation, rx_pos, rx_orientation,
-                                                      aod, eod, aoa, eoa, path_gain, path_length, M,
+                                                      aod, eod, aoa, eoa, path_gain, path_length, polmat,
                                                       coeff_re, coeff_im, delay,
                                                       center_freq, use_absolute_delays, add_fake_los_path,
                                                       &rx_Doppler, use_kernel));

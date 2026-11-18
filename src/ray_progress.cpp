@@ -868,7 +868,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     arma::fmat origN, destN;                   // Origin and destination after mesh interaction
     arma::fmat fbsN, sbsN;                     // FBS and SBS recomputed with higher precision
     arma::fvec gainN;                          // Interaction gain
-    arma::fmat xprmatN;                        // Polarization transfer function
+    arma::fmat polmatN;                        // Polarization transfer matrix
     arma::fmat trivecN, tridirN;               // Beam front geometry after mesh interaction
     arma::fvec fbs_angleN;                     // Incidence angle at FBS in rad
     arma::fmat normal_vecN;                    // FBS and SBS normal vectors
@@ -964,7 +964,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
         const short *cC = currentN.memptr();
         const short *cB = bufferN.memptr();
         const float *p_fbs = fbsN.memptr();
-        const float *p_xpr = xprmatN.memptr();
+        const float *p_xpr = polmatN.memptr();
         const uint8_t *p_type = interact_type.data();
 
         // Write pointers
@@ -1072,7 +1072,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             quadriga_lib::ray_mesh_interact<float>(interaction_type, center_freq[i_freq], &orig, &dest,
                                                    &mesh, &mtl_ind, &mtl_prop, &fbs_ind, &sbs_ind,
                                                    (beam_mode ? trivec : nullptr), (beam_mode ? tridir : nullptr),
-                                                   nullptr, nullptr, nullptr, nullptr, nullptr, &xprmatN, nullptr, nullptr,
+                                                   nullptr, nullptr, nullptr, nullptr, nullptr, &polmatN, nullptr, nullptr,
                                                    nullptr, nullptr, nullptr, nullptr, &interact_type, &path_dirN, false);
 
             // Zero-copy views of this frequency's incoming state. The geometric accumulator is shared
@@ -1086,14 +1086,14 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                   &interact_type, &mtl_prop, &mtl_ind_fbs, &mtl_ind_sbs,
                                                   &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
                                                   &dir_f, &acc_geo, &acc_ref_f, nullptr, nullptr, nullptr,
-                                                  nullptr, &xprmatN, &path_dirN, nullptr, &acc_refN,
+                                                  nullptr, &polmatN, &path_dirN, nullptr, &acc_refN,
                                                   nullptr, nullptr, (double)thin_slab_threshold,
                                                   nullptr, nullptr, nullptr, nullptr,
                                                   &verdictN); // the paths are the base frequency's, and so is the verdict on each series
 
             scatter_freq(i_freq);
 
-            const float *p_xpr_freq = xprmatN.memptr();
+            const float *p_xpr_freq = polmatN.memptr();
 
 #pragma omp parallel for schedule(static) if (n_rays >= 2048)
             for (long long i_ray = 0; i_ray < (long long)n_rays; ++i_ray)
@@ -1112,7 +1112,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                &fbs_ind, &sbs_ind,
                                                (beam_mode ? trivec : nullptr),
                                                (beam_mode ? tridir : nullptr),
-                                               &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
+                                               &origN, &destN, &fbsN, &sbsN, &gainN, &polmatN,
                                                (beam_mode ? &trivecN : nullptr),
                                                (beam_mode ? &tridirN : nullptr),
                                                &fbs_angleN, nullptr, nullptr,
@@ -1129,7 +1129,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
                                               &dir_0, &acc_geo, &acc_ref_0,
                                               &prevN, &currentN, &bufferN,
-                                              &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
+                                              &gainN, &polmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
                                               nullptr, (double)thin_slab_threshold,
                                               nullptr, nullptr, nullptr, nullptr, nullptr, &verdictN);
@@ -1150,7 +1150,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                                &fbs_ind, &sbs_ind,
                                                (beam_mode ? trivec : nullptr),
                                                (beam_mode ? tridir : nullptr),
-                                               &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN,
+                                               &origN, &destN, &fbsN, &sbsN, &gainN, &polmatN,
                                                (beam_mode ? &trivecN : nullptr),
                                                (beam_mode ? &tridirN : nullptr),
                                                (need_shared ? &fbs_angleN : nullptr), nullptr, nullptr,
@@ -1167,7 +1167,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                               &mtl_ind_prev, &mtl_ind_current, &mtl_ind_buffer,
                                               &dir_0, &acc_geo, &acc_ref_0,
                                               &prevN, &currentN, &bufferN,
-                                              &gainN, &xprmatN, &path_dirN, &acc_geoN, &acc_refN,
+                                              &gainN, &polmatN, &path_dirN, &acc_geoN, &acc_refN,
                                               &interact_type, // Aliasing OK and deliberate
                                               nullptr, (double)thin_slab_threshold,
                                               &origN, &destN, // the segment follows the direction written out of a lossy medium
@@ -1186,7 +1186,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     pre_interaction_gains.reset();
     orig.reset(), dest.reset(), dir_prev.reset(), acc_dist.reset();
     mtl_ind_prev.reset(), mtl_ind_current.reset(), mtl_ind_buffer.reset();
-    origN.reset(), destN.reset(), fbsN.reset(), sbsN.reset(), xprmatN.reset();
+    origN.reset(), destN.reset(), fbsN.reset(), sbsN.reset(), polmatN.reset();
     prevN.reset(), currentN.reset(), bufferN.reset();
     path_dirN.reset(), acc_geoN.reset(), acc_refN.reset(), normal_vecN.reset(), fbs_angleN.reset();
     n_interact.reset(), fbs_ind.reset(), sbs_ind.reset();

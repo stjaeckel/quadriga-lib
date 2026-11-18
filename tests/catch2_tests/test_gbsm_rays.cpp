@@ -97,9 +97,9 @@ TEST_CASE("gbsm_rays - is_valid reports each failed check")
     SECTION("6 eoa finite")
     fails([&](R &r) { r.eoa(6) = -inf; }, "Input 'rays.eoa' must be finite.");
     SECTION("7 M size")
-    fails([&](R &r) { r.M.zeros(8, n_ray, 1); }, "Input 'rays.M' must have size [8, n_ray, n_freq].");
+    fails([&](R &r) { r.polmat.zeros(8, n_ray, 1); }, "Input 'rays.polmat' must have size [8, n_ray, n_freq].");
     SECTION("7 M finite")
-    fails([&](R &r) { r.M(7, 2, 1) = nan; }, "Input 'rays.M' must be finite.");
+    fails([&](R &r) { r.polmat(7, 2, 1) = nan; }, "Input 'rays.polmat' must be finite.");
     SECTION("8 path_type size")
     fails([&](R &r) { r.path_type.resize(n_ray - 1); }, "Input 'rays.path_type' must have n_ray elements.");
     SECTION("8 path_type value")

@@ -16,7 +16,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
   V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 1-2 = (V rx, V tx),
   rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx).
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -39,7 +39,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## Batch mode:
 - If `fbs_pos` is a cell array, the function processes `n_snap` snapshots in one call, the snapshots in parallel
   (OpenMP).
-- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then cell arrays of length `n_snap`, as
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `polmat` are then cell arrays of length `n_snap`, as
   [[qrt_file_read]] returns them for one frequency.
 - The position and orientation inputs are `[3, n_snap]`, one column per snapshot, or a 3-element vector for all
   snapshots.
@@ -51,7 +51,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ```
 [ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
     rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
+    path_length, polmat, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ## Inputs:
@@ -68,7 +68,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
   (e.g. 0) use the polyline length; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
   batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
@@ -121,12 +121,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         // Numeric data of class double is not copied
         auto get_Mat = [](const mxArray *a, const char *name) { return qd_mex_get_Mat<double>(a, false, name); };
         auto get_Col = [](const mxArray *a, const char *name) { return qd_mex_get_Col<double>(a, false, name); };
-        const char *error = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must all be cell arrays.";
+        const char *error = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' must all be cell arrays.";
         const auto fbs_pos = qd_mex_read_cell<arma::mat>(prhs[6], "fbs_pos", error, get_Mat);
         const auto lbs_pos = qd_mex_read_cell<arma::mat>(prhs[7], "lbs_pos", error, get_Mat);
         const auto path_gain = qd_mex_read_cell<arma::vec>(prhs[8], "path_gain", error, get_Col);
         const auto path_length = qd_mex_read_cell<arma::vec>(prhs[9], "path_length", error, get_Col);
-        const auto M = qd_mex_read_cell<arma::mat>(prhs[10], "M", error, get_Mat);
+        const auto polmat = qd_mex_read_cell<arma::mat>(prhs[10], "polmat", error, get_Mat);
         const auto tx_pos = qd_mex_get_xyz_batch(prhs[2], "tx_pos");
         const auto tx_orientation = qd_mex_get_xyz_batch(prhs[3], "tx_orientation");
         const auto rx_pos = qd_mex_get_xyz_batch(prhs[4], "rx_pos");
@@ -147,7 +147,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         }
 
         CALL_QD(quadriga_lib::get_channels_spherical_vec<double>(ant_tx, ant_rx, tx_pos, tx_orientation, rx_pos, rx_orientation,
-                                                                 fbs_pos, lbs_pos, path_gain, path_length, M,
+                                                                 fbs_pos, lbs_pos, path_gain, path_length, polmat,
                                                                  out[0], out[1], out[2], center_freq, use_absolute_delays, add_fake_los_path,
                                                                  (nlhs > 3) ? &out[3] : nullptr, (nlhs > 4) ? &out[4] : nullptr,
                                                                  (nlhs > 5) ? &out[5] : nullptr, (nlhs > 6) ? &out[6] : nullptr, nullptr, use_kernel));
@@ -159,7 +159,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7], false, "lbs_pos");
     const auto path_gain = qd_mex_get_Col<double>(prhs[8], false, "path_gain");
     const auto path_length = qd_mex_get_Col<double>(prhs[9], false, "path_length");
-    const auto M = qd_mex_get_Mat<double>(prhs[10], false, "M");
+    const auto polmat = qd_mex_get_Mat<double>(prhs[10], false, "polmat");
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[2], "tx_pos", 3);
     const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[3], "tx_orientation", 3);
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
@@ -190,7 +190,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 0 paths: C++ returns the zero-power LOS path with add_fake_los_path, else empty outputs
     CALL_QD(quadriga_lib::get_channels_spherical<double>(ant_tx, ant_rx,
                                                          tx_pos, tx_orientation, rx_pos, rx_orientation,
-                                                         fbs_pos, lbs_pos, path_gain, path_length, M,
+                                                         fbs_pos, lbs_pos, path_gain, path_length, polmat,
                                                          coeff_re, coeff_im, delay,
                                                          center_freq, use_absolute_delays, add_fake_los_path,
                                                          p_aod, p_eod, p_aoa, p_eoa, use_kernel));

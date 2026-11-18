@@ -453,7 +453,7 @@ Not in: MATLAB, Python
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
-| `M` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | all |
+| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar) | all |
 | `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
 | `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [ssf_rays](#ssf_rays), [gbsm_rays_from_paths](#gbsm_rays_from_paths) |
@@ -488,8 +488,8 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_rays_from_paths) · [Python](../python/geometry-based-stochastic-model.md#gbsm.rays_from_paths)
 
 - Fills a [gbsm_rays](#gbsm_rays) object (`fallback` cleared; members of the right size keep their memory) from path data in the names and order of
-  [qrt_file_read](channel-functions.md#qrt_file_read), read as `qrt_file_read<double>` with `normalize_M = 1` (`uplink = true` gives the reverse
-  link; `normalize_M = 0` leaves only the free-space gain in `power`)
+  [qrt_file_read](channel-functions.md#qrt_file_read), read as `qrt_file_read<double>` with `normalize_polmat = 1` (`uplink = true` gives the reverse
+  link; `normalize_polmat = 0` leaves only the free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
   GR angles to the image of the other end (z mirrored); 0 if `tx_pos` = `rx_pos`
@@ -508,7 +508,7 @@ void quadriga_lib::gbsm_rays_from_paths(
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
     const arma::vec &path_length,
-    const arma::cube &M,
+    const arma::cube &polmat,
     gbsm_rays &rays,
     const std::string &method = "quadriga",
     const arma::u32_vec *path_type = nullptr,
@@ -523,7 +523,7 @@ void quadriga_lib::gbsm_rays_from_paths(
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`M`** — Polarization transfer matrices; `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices; `[8, n_path, n_freq]`
 - **`method`** *(optional)* — Value of `rays.method`; sets the GR power law and the default mobility
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** *(optional)* — Tap index; omitted: LOS 0, GR 3, the others 6, 9, ... in path order; `[n_path]`
@@ -607,7 +607,7 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 ### Returns:
 - Channel object: `center_freq` `[1]`; `tx_pos`, `rx_pos` (the snapshot positions), `tx_orientation`,
   `rx_orientation` `[3, n_snap]`; per snapshot `coeff_re`, `coeff_im`, `delay` `[n_rx, n_tx, n_tap]` (`"taps"`) or
-  `[n_rx, n_tx, n_path]` (`"rays"`); `"rays"` also `path_gain`, `path_length`, `path_polarization`, `path_angles`
+  `[n_rx, n_tx, n_path]` (`"rays"`); `"rays"` also `path_gain`, `path_length`, `polmat`, `path_angles`
   and in `"drift"` `fbs_pos`, `lbs_pos`; `par_names`, `par_data` with the entries below
 
 ### Entries of `par_names` / `par_data`:
@@ -1098,7 +1098,7 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_paths) · [Pytho
   (also at zero power) and NLOS rays with power > 0 at some frequency; paths in ray order, `ray_ind` maps them to
   the rays (e.g. `rays.tap(ray_ind)`)
 - `"phase"`: use the outputs with [get_channels_planar](channel-generation-functions.md#get_channels_planar) and the arrays at the positions of `rays`; the displacement
-  phase of TR 38.901 eq. (7.5-22) is in `M`. With the arrays at the new positions the LOS path is no longer
+  phase of TR 38.901 eq. (7.5-22) is in `polmat`. With the arrays at the new positions the LOS path is no longer
   identified and the displacement phase counts twice, without an error
 - `"drift"`: use the outputs at the new positions with [get_channels_spherical](channel-generation-functions.md#get_channels_spherical) or [get_channels_multifreq](channel-generation-functions.md#get_channels_multifreq), or
   pass them to [qrt_paths_from_scatterers](channel-functions.md#qrt_paths_from_scatterers); needs the scatterers of [.solve_scatterers](#.solve_scatterers)
@@ -1107,11 +1107,11 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#ssf_paths) · [Pytho
 | --- | --- | --- |
 | Path length | Tx-Rx distance of `rays` + c·delay | Polyline Tx, FBS, LBS, Rx; LOS direct line; GR via the specular point |
 | Angles | Ray data | Geometry: towards FBS and LBS, LOS direct line, GR towards the image points |
-| `M` | Ray `M` times the displacement phase | Ray `M`; GR recomputed when an end moved |
+| `polmat` | Ray `polmat` times the displacement phase | Ray `polmat`; GR recomputed when an end moved |
 | `fbs_pos`, `lbs_pos` | `[3, 0]` | Scatterers of the rays; LOS midpoint of the direct line; GR specular point |
 
 - `"drift"` with an end moved (any coordinate differs from `rays`): GR power by the power law of `rays.method`
-  (`(d3D / d_GR)²` for the TR methods, 1 for `"quadriga"`), GR `M` the scalar multiple of `diag(R_par, -R_perp)` (TR
+  (`(d3D / d_GR)²` for the TR methods, 1 for `"quadriga"`), GR `polmat` the scalar multiple of `diag(R_par, -R_perp)` (TR
   38.901 eqs. (7.6-38), (7.6-39)) that best fits the stored matrix, which replaces a matrix of another form (e.g. a
   conjugated one). Fallback rays have their longer polyline, also at the positions of `rays`
 - Path gain per frequency: the coefficient power; with `kf_ratio` LOS and GR are rescaled against NLOS so that the
@@ -1132,7 +1132,7 @@ void quadriga_lib::ssf_paths(
     const arma::vec &link_gain_dB,
     arma::mat &path_gain,
     arma::vec &path_length,
-    arma::cube &M,
+    arma::cube &polmat,
     const std::string &mobility = "auto",
     const arma::mat *tx_pos = nullptr,
     const arma::mat *rx_pos = nullptr,
@@ -1159,7 +1159,7 @@ void quadriga_lib::ssf_paths(
 ### Outputs:
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`M`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar); `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [get_channels_planar](channel-generation-functions.md#get_channels_planar); `[8, n_path, n_freq]`
 - **`aod`**, **`eod`**, **`aoa`**, **`eoa`** *(optional)* — Departure and arrival angles in [rad], GCS; `[n_path]`
 - **`fbs_pos`**, **`lbs_pos`** *(optional)* — Scatterer positions in [m]; `[3, n_path]`, `[3, 0]` in `"phase"`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS; `[n_path]`

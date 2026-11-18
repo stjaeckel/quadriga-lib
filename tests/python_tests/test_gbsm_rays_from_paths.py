@@ -21,7 +21,7 @@ if package_path not in sys.path:
 import quadriga_lib
 
 gbsm = quadriga_lib.gbsm
-KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
+KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "polmat",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
 C0 = 299792458.0
 
@@ -55,7 +55,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(r["center_freq"], self.fc)
         npt.assert_allclose(r["delay"], (self.pl - self.d) / C0, atol=1e-18, rtol=0)
         npt.assert_array_equal(r["power"], self.pg)
-        npt.assert_array_equal(r["M"], self.M)
+        npt.assert_array_equal(r["polmat"], self.M)
         npt.assert_array_equal(r["fbs_pos"], self.fb)
         npt.assert_array_equal(r["lbs_pos"], self.lb)
         for k in ["path_type", "tap", "fallback"]:
@@ -76,7 +76,7 @@ class test_case(unittest.TestCase):
 
     def test_keywords_and_optional_inputs(self):
         r = gbsm.rays_from_paths(center_freq=self.fc, tx_pos=self.tx, rx_pos=self.rx, fbs_pos=self.fb,
-                                 lbs_pos=self.lb, path_gain=self.pg, path_length=self.pl, M=self.M, method="quadriga",
+                                 lbs_pos=self.lb, path_gain=self.pg, path_length=self.pl, polmat=self.M, method="quadriga",
                                  path_type=self.pt, tap=None, gr_eps=None)
         for k in KEYS[1:]:
             npt.assert_array_equal(r[k], self.rays[k])
@@ -102,14 +102,14 @@ class test_case(unittest.TestCase):
                 np.ascontiguousarray(self.lb), self.pg[::1], self.pl, np.ascontiguousarray(self.M))
         r = gbsm.rays_from_paths(*args, method="quadriga", path_type=self.pt)
         npt.assert_array_equal(r["delay"], self.rays["delay"])
-        npt.assert_array_equal(r["M"], self.M)
+        npt.assert_array_equal(r["polmat"], self.M)
         fb0 = self.fb.copy()
         gbsm.rays_from_paths(*self.args, method="quadriga", path_type=self.pt)
         npt.assert_array_equal(self.fb, fb0)
         r0 = gbsm.rays_from_paths(self.fc, self.tx, self.rx, np.zeros((3, 0)), np.zeros((3, 0)), np.zeros((0, 2)),
                                   np.zeros(0), np.zeros((8, 0, 2)))
         self.assertEqual(r0["delay"].shape, (0,))  # no paths
-        self.assertEqual(r0["M"].shape, (8, 0, 2))
+        self.assertEqual(r0["polmat"].shape, (8, 0, 2))
 
     def test_errors(self):
         with self.assertRaises(ValueError) as ctx:

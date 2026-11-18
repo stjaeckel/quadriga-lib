@@ -16,7 +16,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   using the spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
-- Polarization coupling is applied via the 8-row transfer matrix `M`: the 2x2 Jones matrix (rows = RX polarisation
+- Polarization coupling is applied via the 8-row transfer matrix `polmat`: the 2x2 Jones matrix (rows = RX polarisation
   V/H, columns = TX polarisation V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx).
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -44,7 +44,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## Batch mode:
 - If `fbs_pos` is a `list` of arrays, the function switches to batch mode and processes `n_snap` snapshots
   in one call, the snapshots in parallel (OpenMP in C++).
-- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `M` are then lists of length `n_snap`,
+- The path inputs `fbs_pos`, `lbs_pos`, `path_gain`, `path_length` and `polmat` are then lists of length `n_snap`,
   matching the output format of [[qrt_file_read]]; list entries that are Fortran-contiguous float64 arrays (as
   returned by [[qrt_file_read]]) are read in place, other entries are copied.
 - The position and orientation inputs are `(3, n_snap)` arrays with one column per snapshot; a `(3,)` array
@@ -58,7 +58,7 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## Usage:
 ```
 coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, \
     center_freq, *, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq )
 
 # Departure and arrival angles as well
@@ -78,7 +78,7 @@ coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=T
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
 - **`path_length`** — Total path lengths from TX to RX phase center; values shorter than the TX-FBS-LBS-RX polyline
   (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
-- **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
+- **`polmat`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
   in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
@@ -89,7 +89,7 @@ coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=T
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [[interpolate]];
   `int`; default: 0
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `polmat` and `center_freq` that is
   processed; Python only, since the C++ function takes single-frequency path data; default: `0`
 
 ## Outputs:
@@ -117,7 +117,7 @@ py::tuple get_channels_spherical(const py::dict &tx_array,
                                  py::handle lbs_pos,
                                  py::handle path_gain,
                                  py::handle path_length,
-                                 py::handle M,
+                                 py::handle polmat,
                                  py::handle center_freq,
                                  py::handle use_absolute_delays,
                                  py::handle add_fake_los_path,
@@ -142,21 +142,21 @@ py::tuple get_channels_spherical(const py::dict &tx_array,
     // Batch mode for lists of path arrays; a single snapshot is processed as a batch of one
     const bool batch = qd_python_is_array_list(fbs_pos);
     if (batch && (!qd_python_is_array_list(lbs_pos) || !qd_python_is_array_list(path_gain) ||
-                  !qd_python_is_array_list(path_length) || !qd_python_is_array_list(M)))
-        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must all be lists.");
+                  !qd_python_is_array_list(path_length) || !qd_python_is_array_list(polmat)))
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' must all be lists.");
 
     // Alias the path data, no data is copied
     const auto fbs_pos_a = qd_python_alias_list<arma::Mat<double>>(fbs_pos, batch, keep_alive);
     const auto lbs_pos_a = qd_python_alias_list<arma::Mat<double>>(lbs_pos, batch, keep_alive);
     const auto path_gain_a = qd_python_alias_list<arma::Mat<double>>(path_gain, batch, keep_alive);
     const auto path_length_a = qd_python_alias_list<arma::Col<double>>(path_length, batch, keep_alive);
-    const auto M_a = qd_python_alias_list<arma::Cube<double>>(M, batch, keep_alive);
+    const auto polmat_a = qd_python_alias_list<arma::Cube<double>>(polmat, batch, keep_alive);
     const arma::uword n_snap = (arma::uword)fbs_pos_a.size();
 
     // Needed before the frequency check below, which indexes all five lists
     if (lbs_pos_a.size() != n_snap || path_gain_a.size() != n_snap ||
-        path_length_a.size() != n_snap || M_a.size() != n_snap)
-        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'M' must have the same length.");
+        path_length_a.size() != n_snap || polmat_a.size() != n_snap)
+        throw std::invalid_argument("Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length' and 'polmat' must have the same length.");
 
     // Positions and orientations: one column per snapshot or one for all (checked by the C++ core); a single snapshot
     // takes any 3-element array
@@ -167,8 +167,8 @@ py::tuple get_channels_spherical(const py::dict &tx_array,
 
     // Frequency slice of every snapshot, aliased without copying; path counts are validated by the C++ core
     std::vector<arma::vec> path_gain_f;
-    std::vector<arma::mat> M_f;
-    const double center_freq_sel = qd_python_select_freq(path_gain_a, M_a, center_freq_a, i_freq, path_gain_f, M_f);
+    std::vector<arma::mat> polmat_f;
+    const double center_freq_sel = qd_python_select_freq(path_gain_a, polmat_a, center_freq_a, i_freq, path_gain_f, polmat_f);
 
     // Outputs: numpy memory is mapped to the Armadillo cubes, which C++ writes in place
     std::vector<arma::cube> coeff_re, coeff_im, delay(n_snap), aod(n_snap), eod(n_snap), aoa(n_snap), eoa(n_snap);
@@ -191,7 +191,7 @@ py::tuple get_channels_spherical(const py::dict &tx_array,
     {
         py::gil_scoped_release release;
         quadriga_lib::get_channels_spherical_vec<double>(ant_tx_a, ant_rx_a, tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
-                                                         fbs_pos_a, lbs_pos_a, path_gain_f, path_length_a, M_f,
+                                                         fbs_pos_a, lbs_pos_a, path_gain_f, path_length_a, polmat_f,
                                                          coeff_re, coeff_im, delay,
                                                          center_freq_sel, use_absolute_delays_b, add_fake_los_path_b,
                                                          angles_b ? &aod : nullptr, angles_b ? &eod : nullptr,

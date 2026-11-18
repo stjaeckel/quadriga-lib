@@ -151,7 +151,7 @@ namespace
         // Snapshot data, if the channel has any per-snapshot field
         const size_t ns = n_snap;
         const bool has_snapshot_data = c.coeff_re.size() == ns || c.delay.size() == ns || c.path_gain.size() == ns ||
-                                       c.path_length.size() == ns || c.path_polarization.size() == ns ||
+                                       c.path_length.size() == ns || c.polmat.size() == ns ||
                                        c.path_angles.size() == ns || c.fbs_pos.size() == ns ||
                                        c.lbs_pos.size() == ns || c.n_interact.size() == ns;
         const arma::uvec n_path = c.n_path();
@@ -181,7 +181,7 @@ namespace
             cube(c.delay, "delay");
             col(c.path_gain, "path_gain");
             col(c.path_length, "path_length");
-            mat(c.path_polarization, "path_polarization");
+            mat(c.polmat, "path_polarization");
             mat(c.path_angles, "path_angles");
             mat(c.fbs_pos, "path_fbs_pos");
             mat(c.lbs_pos, "path_lbs_pos");
@@ -437,7 +437,7 @@ namespace
             c.delay.push_back(filled(s % 2 ? cube(1, 1, np) : cube(2, 3, np), o + 20.0, 1e-9));
             c.path_gain.push_back(filled(col(np), o + 30.0));
             c.path_length.push_back(filled(col(np), o + 40.0));
-            c.path_polarization.push_back(filled(mat(8, np), o + 50.0));
+            c.polmat.push_back(filled(mat(8, np), o + 50.0));
             c.path_angles.push_back(filled(mat(np, 4), o + 60.0));
             c.fbs_pos.push_back(filled(mat(3, np), o + 70.0));
             c.lbs_pos.push_back(filled(mat(3, np), o + 80.0));

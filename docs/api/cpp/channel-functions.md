@@ -943,8 +943,8 @@ Also in: [MATLAB](../mex/channel-functions.md#qrt_file_read) · [Python](../pyth
 
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
-- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `M` is the transpose
-  of the downlink `M` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
+- If `uplink = false`, origin is TX and destination is RX; if `true`, roles are swapped and `polmat` is the transpose
+  of the downlink `polmat` (reciprocal channel, no conjugation) with the same `path_gain`; `n_interact`, `coord` and
   `interact_type` keep the stored order (origin to destination) in both directions, and the type codes describe
   that traversal.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
@@ -970,13 +970,13 @@ void quadriga_lib::qrt_file_read(
     arma::Mat<dtype> *lbs_pos = nullptr,
     arma::Mat<dtype> *path_gain = nullptr,
     arma::Col<dtype> *path_length = nullptr,
-    arma::Cube<dtype> *M = nullptr,
+    arma::Cube<dtype> *polmat = nullptr,
     arma::Col<dtype> *aod = nullptr,
     arma::Col<dtype> *eod = nullptr,
     arma::Col<dtype> *aoa = nullptr,
     arma::Col<dtype> *eoa = nullptr,
     std::vector<arma::Mat<dtype>> *path_coord = nullptr,
-    int normalize_M = 1,
+    int normalize_polmat = 1,
     arma::u32_vec *n_interact = nullptr,
     arma::fmat *coord = nullptr,
     std::vector<uint8_t> *interact_type = nullptr,
@@ -989,11 +989,11 @@ void quadriga_lib::qrt_file_read(
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
 - **`uplink`** — If `false`, origin=TX, destination=RX; if `true`, roles are swapped (origin=RX, destination=TX)
-- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+- **`normalize_polmat`** *(optional)* — Controls `polmat` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
 
-    | `normalize_M` | `M`                                             | `path_gain`                      |
+    | `normalize_polmat` | `polmat`                                   | `path_gain`                      |
     | ------------- | ----------------------------------------------- | -------------------------------- |
     | 0             | As stored in QRT file                           | -PL                              |
     | 1             | Max column power = 1; uplink: max row power = 1 | -PL minus material losses        |
@@ -1012,7 +1012,7 @@ void quadriga_lib::qrt_file_read(
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Path gain on linear scale; `[n_path, n_freq]`
 - **`path_length`** — Absolute path length TX to RX phase center; `[n_path]`
-- **`M`** — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
+- **`polmat`** — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
 - **`aod`** — Departure azimuth angles; `[n_path]`
 - **`eod`** — Departure elevation angles; `[n_path]`
 - **`aoa`** — Arrival azimuth angles; `[n_path]`
@@ -1029,12 +1029,12 @@ void quadriga_lib::qrt_file_read(
 std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
 auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
 arma::vec center_freq, tx_pos, rx_pos, path_length;
-arma::mat path_gain; arma::cube M;
+arma::mat path_gain; arma::cube polmat;
 for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
     for (arma::uword io = 0; io < cache.no_orig; ++io)
         quadriga_lib::qrt_file_read<double>("", ic, io, false,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-            nullptr, nullptr, &path_gain, &path_length, &M,
+            nullptr, nullptr, &path_gain, &path_length, &polmat,
             nullptr, nullptr, nullptr, nullptr, nullptr, 1,
             nullptr, nullptr, &stream, &cache);
 ```
@@ -1098,7 +1098,7 @@ Not in: MATLAB, Python
   `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only ([qrt_file_read_raw](#qrt_file_read_raw) returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
-  [qrt_file_read](#qrt_file_read) (`uplink = false`, `normalize_M` 0 or 1) returns sqrt(`path_gain`)·`M` per complex entry
+  [qrt_file_read](#qrt_file_read) (`uplink = false`, `normalize_polmat` 0 or 1) returns sqrt(`path_gain`)·`polmat` per complex entry
   within float32 accuracy, the polyline as `path_length` and `path_type` as `n_interact`
 - `tx_pos` must be the `orig_pos` of [qrt_file_append](#qrt_file_append) and `rx_pos` the CIR position of [qrt_file_init](#qrt_file_init):
   `qrt_file_read` recomputes the lengths from the stored positions; not checked
@@ -1116,7 +1116,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
     const arma::mat &fbs_pos,
     const arma::mat &lbs_pos,
     const arma::mat &path_gain,
-    const arma::cube &M,
+    const arma::cube &polmat,
     const arma::u32_vec &path_type,
     arma::uword i_cir = 0);
 ```
@@ -1127,7 +1127,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`rx_pos`** — Rx position of the CIR in [m]; `[3, 1]` or `[1, 3]`
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m] (GR: `lbs_pos`); `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
-- **`M`** — Polarization transfer matrices, row order of [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, row order of [get_channels_spherical](channel-generation-functions.md#get_channels_spherical); `[8, n_path, n_freq]`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
 

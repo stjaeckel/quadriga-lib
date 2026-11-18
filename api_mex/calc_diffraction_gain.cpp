@@ -25,7 +25,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 
 ## Usage:
 ```
-[ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
+[ gain, polmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
     center_freq, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, thin_slab_threshold, ...
     apply_fspl, apply_phase );
 ```
@@ -54,20 +54,20 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   distance, matching the `path_length` used by [[qrt_file_read]] for a
   transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
   `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm; default: `false`
-- **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+- **`apply_phase`** — If `true`, multiplies `polmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
   using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium wave
   speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude, so
-  `xprmat` stays normalized. This is the phase [[get_channels_spherical]] would otherwise add from
+  `polmat` stays normalized. This is the phase [[get_channels_spherical]] would otherwise add from
   `path_length`; default: `false`
 
 ## Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `[n_pos, 1]`. Relative to FSPL by
   default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = true`
-- **`xprmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
   power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
   interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
   rows 1-2 = (V rx, V tx), rows 3-4 = (H rx, V tx), rows 5-6 = (V rx, H tx), rows 7-8 = (H rx, H tx), the row order
-  of `M` in [[get_channels_spherical]]; `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
+  of `polmat` in [[get_channels_spherical]]; `[8, n_pos]`; scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]` with `n_seg` from `lod`
   (e.g. `[3, 2, n_pos]` for lod 2, `[3, 9, n_pos]` for lod 7, `[3, 0, n_pos]` for lod 0)
 
@@ -114,21 +114,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Initialize output containers
     arma::vec gain;
-    arma::mat xprmat;
+    arma::mat polmat;
     arma::cube coord;
 
     plhs[0] = qd_mex_init_output(&gain, n_pos);
 
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&xprmat, (scalar_mode ? 2 : 8), n_pos);
+        plhs[1] = qd_mex_init_output(&polmat, (scalar_mode ? 2 : 8), n_pos);
 
     arma::vec *p_gain = gain.empty() ? nullptr : &gain;
-    arma::mat *p_xprmat = xprmat.empty() ? nullptr : &xprmat;
+    arma::mat *p_polmat = polmat.empty() ? nullptr : &polmat;
     arma::cube *p_coord = (nlhs > 2) ? &coord : nullptr; // Size depends on lod, set by C++
     arma::u32_vec *p_sub_mesh_index = sub_mesh_ind.empty() ? nullptr : &sub_mesh_ind;
 
     CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
-                                                center_freq, lod, p_gain, p_xprmat, p_coord, verbose,
+                                                center_freq, lod, p_gain, p_polmat, p_coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode,
                                                 thin_slab_threshold, apply_fspl, apply_phase));
 

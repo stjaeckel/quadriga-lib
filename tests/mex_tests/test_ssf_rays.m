@@ -16,7 +16,7 @@ N = sp.NumClusters - 1;
 M = sp.NumSubPaths;
 n_ray = 2 + N * M;                                                            % LOS, GR, N clusters of M rays
 fields = { 'method', 'tx_pos', 'rx_pos', 'center_freq', 'delay', 'power', 'aod', 'eod', 'aoa', 'eoa', ...
-    'M', 'path_type', 'tap', 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
+    'polmat', 'path_type', 'tap', 'gr_eps_re', 'gr_eps_im', 'fbs_pos', 'lbs_pos', 'fallback' };
 
 % 'quadriga': clusters of all frequencies, the shared "ray" set
 [ d, p, aod, eod, aoa, eoa ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp, rnd, 'quadriga', [], [], [], ...
@@ -47,7 +47,7 @@ for l = 1 : 3
     assertEqual( size(r.delay), [n_ray, 1] );
     assertEqual( size(r.power), [n_ray, 2] );
     assertEqual( size(r.eoa), [n_ray, 1] );
-    assertEqual( size(r.M), [8, n_ray, 2] );
+    assertEqual( size(r.polmat), [8, n_ray, 2] );
     assertTrue( isa(r.path_type, 'uint32') && isa(r.tap, 'uint32') && isa(r.fallback, 'uint32') );
     assertEqual( r.path_type(1:3), uint32( [0; 1; 2] ) );                     % codes, not shifted
     assertEqual( r.tap(1:3), uint32( [0; 3; 6] ) );
@@ -86,19 +86,19 @@ r4 = mf( int32(2), [], [], gre, gim );                                        % 
 assertEqual( r4(1).delay, r3(1).delay );
 assertEqual( r4(1).method, '38.901_MF' );
 rt = mf( 1, 'additive', '38.901', gre, gim, false, true );
-assertEqual( rt(3).M, r2(3).M );
+assertEqual( rt(3).polmat, r2(3).polmat );
 assertEqual( rt(3).aod, r2(3).aod );
 rt = mf( 1, 'rotation', [], gre, gim );
 assertTrue( max(abs(rt(3).eod - r2(3).eod)) > 1e-6 );
 rt = mf( 1, [], 'quadriga', gre, gim );
-assertTrue( max(abs(rt(3).M(:) - r2(3).M(:))) > 1e-6 );
+assertTrue( max(abs(rt(3).polmat(:) - r2(3).polmat(:))) > 1e-6 );
 rt = mf( 1, [], [], gre, gim, true );
-assertTrue( max(abs(rt(3).M(:) - r2(3).M(:))) > 1e-6 );
+assertTrue( max(abs(rt(3).polmat(:) - r2(3).polmat(:))) > 1e-6 );
 assertEqual( rt(3).delay, r2(3).delay );
 rt = mf( 1, [], [], gre, gim, [], false );
-assertEqual( rt(3).M(2 : 2 : 8, 3 : end), zeros(4, n_ray - 2) );              % initial phases 0: real matrices
+assertEqual( rt(3).polmat(2 : 2 : 8, 3 : end), zeros(4, n_ray - 2) );              % initial phases 0: real matrices
 r5 = mf( [], [], [], gre, gim, [], [] );
-assertEqual( r5(2).M, r2(2).M );
+assertEqual( r5(2).polmat, r2(2).polmat );
 
 % Default method '38.901' at one frequency; 'rnd_ray' as [n_link, n_gen]
 [ d1, p1, a1, e1, b1, f1 ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp(:, 1, :), rnd, '38.901', ...

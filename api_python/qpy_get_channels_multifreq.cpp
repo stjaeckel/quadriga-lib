@@ -17,10 +17,10 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - Aligns four frequency grids: TX array (`tx_array['center_freq']`), RX array (`rx_array['center_freq']`), input samples (`freq`), and output (`freq_new`)
 - Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
-- `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
+- `path_gain` is interpolated linearly; `polmat` is interpolated via SLERP per complex entry pair to preserve phase
 - Coupling matrices are interpolated across frequencies (SLERP for complex pairs); pass 3D coupling `(n_elem, n_ports, n_freq)` for per-frequency coupling
 - Extrapolation clamps to the nearest frequency entry on all four grids
-- `M` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+- `polmat` accepts 8 rows (full polarimetric: the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with Re/Im interleaved: rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx),
   rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx)) or 2 rows (scalar pressure: Re, Im of the (V rx, V tx) entry only)
 - NLOS paths: the path length between the TX and RX phase centres is `max(path_length, d_poly)`, where `d_poly` is the
@@ -48,7 +48,7 @@ Compute channel coefficients for spherical waves across multiple frequencies
 ## Usage:
 ```
 coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
-    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, polmat, \
     freq, freq_new, *, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel )
 ```
 
@@ -65,9 +65,9 @@ coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
 - **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq)`
 - **`path_length`** — Absolute TX-to-RX path lengths (between the phase centres); values shorter than the
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
-- **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
+- **`polmat`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
   `(2, n_path, n_freq)` scalar pressure
-- **`freq`** — Input sample frequencies for `path_gain` and `M`; `(n_freq,)`
+- **`freq`** — Input sample frequencies for `path_gain` and `polmat`; `(n_freq,)`
 - **`freq_new`** — Target output frequencies; `(n_freq_new,)`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
@@ -95,7 +95,7 @@ py::tuple get_channels_multifreq(const py::dict &tx_array,
                                  const py::array_t<double> &lbs_pos,
                                  const py::array_t<double> &path_gain,
                                  const py::array_t<double> &path_length,
-                                 const py::array_t<double> &M,
+                                 const py::array_t<double> &polmat,
                                  const py::array_t<double> &freq,
                                  const py::array_t<double> &freq_new,
                                  py::handle use_absolute_delays,
@@ -115,7 +115,7 @@ py::tuple get_channels_multifreq(const py::dict &tx_array,
     const auto lbs_pos_a = qd_python_numpy2arma_Mat(lbs_pos, true);
     const auto path_gain_a = qd_python_numpy2arma_Mat(path_gain, true);
     const auto path_length_a = qd_python_numpy2arma_Col(path_length, true);
-    const auto M_a = qd_python_numpy2arma_Cube(M, true);
+    const auto polmat_a = qd_python_numpy2arma_Cube(polmat, true);
     const auto tx_pos_a = qd_python_numpy2arma_Col(tx_pos, true, false, "tx_pos", 3);
     const auto tx_orientation_a = qd_python_numpy2arma_Col(tx_orientation, true, false, "tx_orientation", 3);
     const auto rx_pos_a = qd_python_numpy2arma_Col(rx_pos, true, false, "rx_pos", 3);
@@ -137,7 +137,7 @@ py::tuple get_channels_multifreq(const py::dict &tx_array,
     auto delay_py = qd_python_init_output(n_ports_rx, n_ports_tx, n_path, n_freq_new, &delay);
     quadriga_lib::get_channels_multifreq<double>(ant_tx_vec, ant_rx_vec,
                                                  tx_pos_a, tx_orientation_a, rx_pos_a, rx_orientation_a,
-                                                 fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, M_a,
+                                                 fbs_pos_a, lbs_pos_a, path_gain_a, path_length_a, polmat_a,
                                                  freq_a, freq_new_a,
                                                  coeff_re, coeff_im, delay,
                                                  use_absolute_delays_b, add_fake_los_path_b, propagation_speed, &coeff,

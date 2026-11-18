@@ -52,7 +52,7 @@ def full_channel(n_path=(3, 2)):
         'delay': [q(2, 3, n) for n in n_path],
         'path_gain': [q(n) for n in n_path],
         'path_length': [q(n) for n in n_path],
-        'path_polarization': [q(8, n) for n in n_path],
+        'polmat': [q(8, n) for n in n_path],
         'path_angles': [q(n, 4) for n in n_path],
         'fbs_pos': [q(3, n) for n in n_path],
         'lbs_pos': [q(3, n) for n in n_path],
@@ -398,13 +398,13 @@ class test_case(unittest.TestCase):
             with self.assertRaises(ValueError, msg=msg) as ctx:
                 channel.hdf5_write_channel(fn, chan, **kwargs)
             self.assertIn(msg, str(ctx.exception))
-        # The complex (4, n_path) form of 'path_polarization' used before is rejected, not reinterpreted
-        old = dict(c, path_polarization=[np.ones((4, 1), complex)])
+        # The complex (4, n_path) form used before is rejected, not reinterpreted
+        old = dict(c, polmat=[np.ones((4, 1), complex)])
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', getattr(np, 'exceptions', np).ComplexWarning)  # numpy casts the complex input
             with self.assertRaises(ValueError) as ctx:
                 channel.hdf5_write_channel(fn, old)
-        self.assertIn("Snapshot 0: Size mismatch in 'path_polarization'", str(ctx.exception))
+        self.assertIn("Snapshot 0: Size mismatch in 'polmat'", str(ctx.exception))
         self.assertEqual(channel.hdf5_read_layout(fn)[1].sum(), 0)  # nothing was written
 
         with self.assertRaises(TypeError):
@@ -441,7 +441,7 @@ class test_case(unittest.TestCase):
             channel.hdf5_read_channel(fn, None, None, None, None, None)
         c = chan[0]
         shapes = {'coeff': (2, 3, 3, 2), 'delay': (2, 3, 3, 2), 'path_gain': (3, 2), 'path_length': (3, 2),
-                  'path_polarization': (8, 3, 2), 'path_angles': (3, 4, 2), 'fbs_pos': (3, 3, 2),
+                  'polmat': (8, 3, 2), 'path_angles': (3, 4, 2), 'fbs_pos': (3, 3, 2),
                   'lbs_pos': (3, 3, 2), 'n_interact': (3, 2), 'interact_coord': (3, 3, 2)}
         for key, shape in shapes.items():
             self.assertEqual(c[key].shape, shape, key)
@@ -518,7 +518,7 @@ class test_case(unittest.TestCase):
 
         chan, _ = channel.hdf5_read_channel(fn, 0, 0, 0, 0, i_snap=[1, 0])  # 0-based, reversed order
         c = chan[0]
-        for key in ['coeff', 'delay', 'path_gain', 'path_polarization', 'n_interact', 'interact_coord']:
+        for key in ['coeff', 'delay', 'path_gain', 'polmat', 'n_interact', 'interact_coord']:
             self.assert_same(c[key], [ref[key][1], ref[key][0]], key)
         self.assert_same(c['tx_pos'], ref['tx_pos'][:, [1, 0]])  # per-snapshot columns follow
         self.assert_same(c['rx_pos'], ref['rx_pos'])             # a shared column stays

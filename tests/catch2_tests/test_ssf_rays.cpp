@@ -66,7 +66,7 @@ namespace
             }
             const std::complex<double> J[4] = {e.J[4 * i], e.J[4 * i + 2], e.J[4 * i + 1], e.J[4 * i + 3]};
             for (int j = 0; j < 4; ++j) // rows tt, pt, tp, pp of the 8-row layout
-                d_J = std::max(d_J, std::abs(std::complex<double>(r.M(2 * j, i, 0), r.M(2 * j + 1, i, 0)) - J[j]));
+                d_J = std::max(d_J, std::abs(std::complex<double>(r.polmat(2 * j, i, 0), r.polmat(2 * j + 1, i, 0)) - J[j]));
         }
         QD_DIAG("%s,%llu,%llu,%.3e,%.3e,%.3e\n", in.method.c_str(), (unsigned long long)l,
                 (unsigned long long)r.n_ray(), d_rel, d_ang, d_J);
@@ -141,7 +141,7 @@ TEST_CASE("ssf_rays - output layout: entries, sizes, path types, taps and empty 
                 CHECK(arma::all(r.center_freq == (qd ? in.fc : arma::vec{in.fc(F - 1)})));
                 CHECK(r.n_ray() == n_ray);
                 CHECK(arma::size(r.power) == arma::size(n_ray, Fo));
-                CHECK(arma::size(r.M) == arma::size(8, n_ray, Fo));
+                CHECK(arma::size(r.polmat) == arma::size(8, n_ray, Fo));
                 for (const arma::vec *a : {&r.aod, &r.eod, &r.aoa, &r.eoa})
                     CHECK(a->n_elem == n_ray);
                 REQUIRE((r.path_type.n_elem == n_ray && r.tap.n_elem == n_ray));
@@ -481,14 +481,14 @@ TEST_CASE("ssf_rays - LOS and GR rays carry the slot values and the TR Jones mat
                 CHECK(r.eoa(s) == in.cl.eoa(l, s, 0));
                 CHECK((los ? r.power(s, 0) > 0.0 : r.power(s, 0) == 0.0)); // NLOS: kept at power 0
             }
-            CHECK(arma::all(r.M.slice(0).col(0) == arma::vec{1, 0, 0, 0, 0, 0, -1, 0}));
+            CHECK(arma::all(r.polmat.slice(0).col(0) == arma::vec{1, 0, 0, 0, 0, 0, -1, 0}));
             const geo_t geo = geometry(in.f, l);
             std::complex<double> R_par, R_perp;
             fresnel(in.f.eps_re(l, 0), in.f.eps_im(l, 0), geo.h_t, geo.h_r, geo.d2D, R_par, R_perp);
             const double R = std::sqrt(geo.R2[0]);
             const arma::vec e = {R_par.real() / R, R_par.imag() / R, 0, 0, 0, 0, -R_perp.real() / R,
                                  -R_perp.imag() / R};
-            CHECK(arma::approx_equal(r.M.slice(0).col(1), e, "absdiff", 1e-12));
+            CHECK(arma::approx_equal(r.polmat.slice(0).col(1), e, "absdiff", 1e-12));
         }
     }
 }
@@ -566,7 +566,7 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
         pos(r.tx_pos), pos(r.rx_pos), vec(r.center_freq, 1), vec(r.delay, n_ray);
         r.power.~Mat(), new (&r.power) arma::mat(p, n_ray, 1, false, true), ptr.push_back(p), p += n_ray;
         vec(r.aod, n_ray), vec(r.eod, n_ray), vec(r.aoa, n_ray), vec(r.eoa, n_ray);
-        r.M.~Cube(), new (&r.M) arma::cube(p, 8, n_ray, 1, false, true), ptr.push_back(p), p += 8 * n_ray;
+        r.polmat.~Cube(), new (&r.polmat) arma::cube(p, 8, n_ray, 1, false, true), ptr.push_back(p), p += 8 * n_ray;
         vec(r.gr_eps_re, 1), vec(r.gr_eps_im, 1), u32(r.path_type, n_ray), u32(r.tap, n_ray);
     }
     CHECK_NOTHROW(call(in, rays));
@@ -578,7 +578,7 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
                               (const void *)r.center_freq.memptr(), (const void *)r.delay.memptr(),
                               (const void *)r.power.memptr(), (const void *)r.aod.memptr(),
                               (const void *)r.eod.memptr(), (const void *)r.aoa.memptr(), (const void *)r.eoa.memptr(),
-                              (const void *)r.M.memptr(), (const void *)r.gr_eps_re.memptr(),
+                              (const void *)r.polmat.memptr(), (const void *)r.gr_eps_re.memptr(),
                               (const void *)r.gr_eps_im.memptr(), (const void *)r.path_type.memptr(),
                               (const void *)r.tap.memptr()})
             CHECK(q == ptr[j++]);
@@ -587,7 +587,7 @@ TEST_CASE("ssf_rays - pre-sized entries are written in place")
 
     // Wrong sizes and stale scatterers are replaced
     std::vector<quadriga_lib::gbsm_rays> other(2);
-    other[0] = ref[2], other[0].delay.zeros(5), other[0].M.zeros(8, 2, 3), other[0].fbs_pos.zeros(3, n_ray);
+    other[0] = ref[2], other[0].delay.zeros(5), other[0].polmat.zeros(8, 2, 3), other[0].fbs_pos.zeros(3, n_ray);
     other[0].lbs_pos.zeros(3, n_ray), other[0].fallback.zeros(n_ray), other[0].gr_eps_re.reset();
     call(in, other);
     REQUIRE(other.size() == 3);
@@ -617,9 +617,9 @@ TEST_CASE("ssf_rays - random_phase false gives zero initial phases")
         for (arma::uword i = 2; i < r.n_ray(); ++i)
         {
             INFO("link " << l << ", ray " << i);
-            CHECK((r.M(1, i, 0) == 0.0 && r.M(3, i, 0) == 0.0 && r.M(5, i, 0) == 0.0 && r.M(7, i, 0) == 0.0));
-            CHECK((r.M(0, i, 0) == 1.0 && r.M(6, i, 0) == 1.0));
-            CHECK((r.M(2, i, 0) > 0.0 && r.M(2, i, 0) == r.M(4, i, 0)));
+            CHECK((r.polmat(1, i, 0) == 0.0 && r.polmat(3, i, 0) == 0.0 && r.polmat(5, i, 0) == 0.0 && r.polmat(7, i, 0) == 0.0));
+            CHECK((r.polmat(0, i, 0) == 1.0 && r.polmat(6, i, 0) == 1.0));
+            CHECK((r.polmat(2, i, 0) > 0.0 && r.polmat(2, i, 0) == r.polmat(4, i, 0)));
         }
         check_link(r, in, l);
     }

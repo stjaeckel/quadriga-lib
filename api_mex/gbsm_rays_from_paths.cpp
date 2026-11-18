@@ -15,7 +15,7 @@ SECTION!*/
 Ray data of one link from path data (positions, gains, lengths, polarization), e.g. read with qrt_file_read
 
 - Returns the ray struct of [[ssf_rays]] (`fallback` empty) from path data in the names and order of [[qrt_file_read]],
-  read with `normalize_M = 1` (`uplink = true` gives the reverse link; `normalize_M = 0` leaves only the
+  read with `normalize_polmat = 1` (`uplink = true` gives the reverse link; `normalize_polmat = 0` leaves only the
   free-space gain in `power`)
 - `delay` = (path length - Tx-Rx distance) / c, `power` = path gain. Angles point from the Tx to the first of
   `fbs_pos`, `lbs_pos`, `rx_pos` that differs from it and from the Rx to the first of `lbs_pos`, `fbs_pos`, `tx_pos`;
@@ -28,7 +28,7 @@ Ray data of one link from path data (positions, gains, lengths, polarization), e
 ## Usage:
 ```
 rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, ...
-    path_length, M, method, path_type, tap, gr_eps_re, gr_eps_im );
+    path_length, polmat, method, path_type, tap, gr_eps_re, gr_eps_im );
 ```
 
 ## Inputs:
@@ -37,7 +37,7 @@ rays = quadriga_lib.gbsm_rays_from_paths( center_freq, tx_pos, rx_pos, fbs_pos, 
 - **`fbs_pos`**, **`lbs_pos`** — First- and last-bounce scatterer positions in [m]; `[3, n_path]`
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`path_length`** — Path lengths in [m]; `[n_path]`
-- **`M`** — Polarization transfer matrices, rows as in [[get_channels_planar]]; `[8, n_path, n_freq]`
+- **`polmat`** — Polarization transfer matrices, rows as in [[get_channels_planar]]; `[8, n_path, n_freq]`
 - **`method`** — Value of `rays.method`; sets the GR power law and the default mobility; default: `'quadriga'`
 - **`path_type`** *(optional)* — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
 - **`tap`** — Tap index; `[n_path]`; default: LOS 0, GR 3, the others 6, 9, ... in path order (3 is kept for GR also
@@ -69,7 +69,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat lbs_pos = qd_mex_get_Mat<double>(prhs[4], false, "lbs_pos");
     const arma::mat path_gain = qd_mex_get_Mat<double>(prhs[5], false, "path_gain");
     const arma::vec path_length = qd_mex_get_Col<double>(prhs[6], false, "path_length");
-    const arma::cube M = qd_mex_get_Cube<double>(prhs[7], false, "M");
+    const arma::cube polmat = qd_mex_get_Cube<double>(prhs[7], false, "polmat");
     const std::string method = (nrhs < 9) ? std::string("quadriga") : qd_mex_get_string(prhs[8], "quadriga", "method");
     const arma::u32_vec path_type = (nrhs < 10) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[9], false, "path_type");
     const arma::u32_vec tap = (nrhs < 11) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[10], false, "tap");
@@ -83,7 +83,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     plhs[0] = qd_mex_init_gbsm_rays(1, fbs_pos.n_cols, center_freq.n_elem, has_gr, true, rays);
 
     CALL_QD(quadriga_lib::gbsm_rays_from_paths(center_freq, tx_pos, rx_pos, fbs_pos, lbs_pos, path_gain, path_length,
-                                               M, rays[0], method, path_type.empty() ? nullptr : &path_type,
+                                               polmat, rays[0], method, path_type.empty() ? nullptr : &path_type,
                                                tap.empty() ? nullptr : &tap, gr_eps_re.empty() ? nullptr : &gr_eps_re,
                                                gr_eps_im.empty() ? nullptr : &gr_eps_im));
 

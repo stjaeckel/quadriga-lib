@@ -101,7 +101,7 @@ static void run(fz::input &in)
         if (mask & 16)
             c.path_length.push_back(in.col<T>(sz(n_path)));
         if (mask & 32)
-            c.path_polarization.push_back(in.mat<T>(sz(8), sz(n_path)));
+            c.polmat.push_back(in.mat<T>(sz(8), sz(n_path)));
         if (mask & 64)
             c.path_angles.push_back(in.mat<T>(sz(n_path), sz(4)));
         if (mask & 128)

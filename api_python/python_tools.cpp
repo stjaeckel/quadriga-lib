@@ -71,7 +71,7 @@ void quadriga_lib_tools(py::module_ &m)
 
     m.def("calc_cross_polarization_ratio", &calc_cross_polarization_ratio,
           py::arg("powers"),
-          py::arg("M"),
+          py::arg("polmat"),
           py::arg("path_length"),
           py::arg("tx_pos").none(false),
           py::arg("rx_pos").none(false),

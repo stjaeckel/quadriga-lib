@@ -16,7 +16,7 @@ inline int omp_get_max_threads() { return 1; }
 inline void omp_set_num_threads(int) {}
 #endif
 
-// Reference: the same updates applied in chunks of 1000 (below the OpenMP threshold of xpr_update, so each chunk runs
+// Reference: the same updates applied in chunks of 1000 (below the OpenMP threshold of polmat_update, so each chunk runs
 // serially), i.e. one after the other in update-index order
 static void xpr_update_chunked(arma::mat &X, const arma::mat &U, arma::vec *gain, bool normalize, bool apply_gain,
                                const arma::uvec &idx)
@@ -31,7 +31,7 @@ static void xpr_update_chunked(arma::mat &X, const arma::mat &U, arma::vec *gain
         arma::vec gg;
         if (apply_gain)
             gg = gain->subvec(s, e);
-        quadriga_lib::xpr_update<double>(X, &uu, gain ? &gg : nullptr, false, normalize, apply_gain, &ii);
+        quadriga_lib::polmat_update<double>(X, &uu, gain ? &gg : nullptr, false, normalize, apply_gain, &ii);
         if (gain && !apply_gain)
             g_out.subvec(s, e) = gg;
     }
@@ -39,7 +39,7 @@ static void xpr_update_chunked(arma::mat &X, const arma::mat &U, arma::vec *gain
         *gain = g_out;
 }
 
-TEST_CASE("xpr_update - duplicate ray_ind entries give the single-thread result for any thread count")
+TEST_CASE("polmat_update - duplicate ray_ind entries give the single-thread result for any thread count")
 {
     const int n_threads_before = omp_get_max_threads();
 
@@ -51,7 +51,7 @@ TEST_CASE("xpr_update - duplicate ray_ind entries give the single-thread result 
         U(0, i) = std::cos(1e-5), U(2, i) = std::sin(1e-5), U(4, i) = -std::sin(1e-5), U(6, i) = std::cos(1e-5);
 
     arma::mat Xref(8, 4);
-    quadriga_lib::xpr_update<double>(Xref, nullptr, nullptr, true);
+    quadriga_lib::polmat_update<double>(Xref, nullptr, nullptr, true);
     xpr_update_chunked(Xref, U, nullptr, false, false, idx);
     CHECK(std::abs(Xref(0, 0) - std::cos(2.0)) < 1e-9);
     CHECK(std::abs(Xref(2, 0) - std::sin(2.0)) < 1e-9);
@@ -60,8 +60,8 @@ TEST_CASE("xpr_update - duplicate ray_ind entries give the single-thread result 
     {
         omp_set_num_threads(nt);
         arma::mat X(8, 4);
-        quadriga_lib::xpr_update<double>(X, nullptr, nullptr, true);
-        quadriga_lib::xpr_update<double>(X, &U, nullptr, false, false, false, &idx);
+        quadriga_lib::polmat_update<double>(X, nullptr, nullptr, true);
+        quadriga_lib::polmat_update<double>(X, &U, nullptr, false, false, false, &idx);
         INFO("threads " << nt);
         CHECK(arma::approx_equal(X, Xref, "absdiff", 0.0));
     }
@@ -94,8 +94,8 @@ TEST_CASE("xpr_update - duplicate ray_ind entries give the single-thread result 
         INFO("threads " << nt);
         arma::mat X1 = X0, X2 = X0;
         arma::vec g1, g2 = gin;
-        quadriga_lib::xpr_update<double>(X1, &RU, &g1, false, true, false, &ridx);
-        quadriga_lib::xpr_update<double>(X2, &B, &g2, false, true, true, &ridx);
+        quadriga_lib::polmat_update<double>(X1, &RU, &g1, false, true, false, &ridx);
+        quadriga_lib::polmat_update<double>(X2, &B, &g2, false, true, true, &ridx);
         CHECK(arma::approx_equal(X1, Xr1, "absdiff", 0.0));
         CHECK(arma::approx_equal(g1, gr1, "absdiff", 0.0));
         CHECK(arma::approx_equal(X2, Xr2, "absdiff", 0.0));
@@ -109,7 +109,7 @@ TEST_CASE("xpr_update - duplicate ray_ind entries give the single-thread result 
     {
         omp_set_num_threads(nt);
         arma::mat Xu = X0;
-        quadriga_lib::xpr_update<double>(Xu, &UU, nullptr, false, false, false, &uidx);
+        quadriga_lib::polmat_update<double>(Xu, &UU, nullptr, false, false, false, &uidx);
         INFO("threads " << nt);
         CHECK(arma::approx_equal(Xu, Xu_ref, "absdiff", 0.0));
     }
@@ -117,22 +117,22 @@ TEST_CASE("xpr_update - duplicate ray_ind entries give the single-thread result 
     omp_set_num_threads(n_threads_before);
 }
 
-TEST_CASE("xpr_update - separate inputs that alias xprmat")
+TEST_CASE("polmat_update - separate inputs that alias polmat")
 {
-    arma::mat xprmat(8, 2, arma::fill::ones), update(8, 1, arma::fill::ones);
+    arma::mat polmat(8, 2, arma::fill::ones), update(8, 1, arma::fill::ones);
     arma::vec gain;
     arma::uvec ray_ind = {1};
-    CHECK_NOTHROW(quadriga_lib::xpr_update(xprmat, &update, &gain, false, false, false, &ray_ind));
+    CHECK_NOTHROW(quadriga_lib::polmat_update(polmat, &update, &gain, false, false, false, &ray_ind));
 
-    arma::mat x = xprmat;
-    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &x, &gain, false, false, false, &ray_ind), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &x), std::invalid_argument);
-    CHECK(arma::approx_equal(x, xprmat, "absdiff", 0.0));
+    arma::mat x = polmat;
+    CHECK_THROWS_AS(quadriga_lib::polmat_update(x, &x, &gain, false, false, false, &ray_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::polmat_update(x, &x), std::invalid_argument);
+    CHECK(arma::approx_equal(x, polmat, "absdiff", 0.0));
 
-    // gain on the memory of xprmat or update
+    // gain on the memory of polmat or update
     arma::vec g_on_x(x.memptr(), 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &update, &g_on_x), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::polmat_update(x, &update, &g_on_x), std::invalid_argument);
     arma::mat u = x;
     arma::vec g_on_u(u.memptr(), 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::xpr_update(x, &u, &g_on_u), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::polmat_update(x, &u, &g_on_u), std::invalid_argument);
 }

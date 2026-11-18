@@ -21,13 +21,13 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis.
 - LOS paths are identified by comparing path length against direct TX-RX distance `dTR`; paths with
   `path_length <= dTR + window_size` are excluded by default (`include_los = false`).
-- Polarization transfer matrix `M` is the 2x2 Jones matrix (rows = RX polarisation V/H, columns = TX polarisation
+- Polarization transfer matrix `polmat` is the 2x2 Jones matrix `M` (rows = RX polarisation V/H, columns = TX polarisation
   V/H), stored column-major with interleaved real/imaginary parts, 8 rows per path: rows 0-1 = (V rx, V tx),
   rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx). Below, `M_<rx><tx>` names an entry by its
   receive and transmit polarisation: `M_vv` = rows 0-1, `M_hv` = rows 2-3, `M_vh` = rows 4-5, `M_hh` = rows 6-7
 - V-XPR and H-XPR are ratios per receive polarisation: V-XPR is the power received in V from V transmission over
   the power received in V from H transmission; H-XPR likewise for the H receive polarisation
-- The circular entries couple circular patterns through `M` as [[get_channels_spherical]] couples antenna patterns,
+- The circular entries couple circular patterns through `polmat` as [[get_channels_spherical]] couples antenna patterns,
   `c(r, t) = r^T M t` (plain transpose), with the same circular vectors at both ends, each in that antenna's own
   (e_theta, e_phi) frame: L = (V, H) = (1, +j) / sqrt(2) (LHCP), R = (1, -j) / sqrt(2) (RHCP). The names follow the
   IEEE definition (rotation seen along the propagation direction) for the time convention exp(+j 2 pi f t), which the
@@ -37,7 +37,7 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
   Co-polar means the same circular vector at both ends: the LOS matrix `diag(1, -1)` of [[get_channels_spherical]] is
   co-polar (handedness kept), `diag(1, 1)` (one mirrored component, as by a single reflection) is cross-polar.
 - LHCP-XPR and RHCP-XPR are ratios per receive polarisation, like V-XPR and H-XPR.
-- Normalization of `M` does not affect XPR (cancels in ratio) but does affect `pg`; magnitudes in `M` above about
+- Normalization of `polmat` does not affect XPR (cancels in ratio) but does affect `pg`; magnitudes in `polmat` above about
   1e18 overflow and give NaN.
 - If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`.
@@ -46,7 +46,7 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 ```
 void quadriga_lib::calc_cross_polarization_ratio(
     const std::vector<arma::Col<dtype>> &powers,
-    const std::vector<arma::Mat<dtype>> &M,
+    const std::vector<arma::Mat<dtype>> &polmat,
     const std::vector<arma::Col<dtype>> &path_length,
     const arma::Mat<dtype> &tx_pos,
     const arma::Mat<dtype> &rx_pos,
@@ -58,7 +58,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
 
 ## Inputs:
 - **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
-- **`M`** — Polarization transfer matrices; `[n_cir]` vector, each element of size `[8, n_path]`
+- **`polmat`** — Polarization transfer matrices; `[n_cir]` vector, each element of size `[8, n_path]`
 - **`path_length`** — Absolute TX-to-RX path lengths; same structure as `powers`
 - **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` or `[3, n_cir]`
 - **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` or `[3, n_cir]`
@@ -82,7 +82,7 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,
-                                                 const std::vector<arma::Mat<dtype>> &M,
+                                                 const std::vector<arma::Mat<dtype>> &polmat,
                                                  const std::vector<arma::Col<dtype>> &path_length,
                                                  const arma::Mat<dtype> &tx_pos,
                                                  const arma::Mat<dtype> &rx_pos,
@@ -96,8 +96,8 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
     if (n_cir == 0)
         throw std::invalid_argument("Input 'powers' must not be empty.");
 
-    if ((arma::uword)M.size() != n_cir)
-        throw std::invalid_argument("Input 'M' must have the same number of elements as 'powers'.");
+    if ((arma::uword)polmat.size() != n_cir)
+        throw std::invalid_argument("Input 'polmat' must have the same number of elements as 'powers'.");
 
     if ((arma::uword)path_length.size() != n_cir)
         throw std::invalid_argument("Input 'path_length' must have the same number of elements as 'powers'.");
@@ -124,8 +124,8 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
     qd_check_alias(pg, "pg", &tx_pos, &rx_pos);
     qd_check_alias_outputs(xpr, "xpr", pg, "pg");
     for (arma::uword i = 0; i < n_cir; ++i)
-        qd_check_alias(xpr, "xpr", &powers[i], &M[i], &path_length[i]),
-            qd_check_alias(pg, "pg", &powers[i], &M[i], &path_length[i]);
+        qd_check_alias(xpr, "xpr", &powers[i], &polmat[i], &path_length[i]),
+            qd_check_alias(pg, "pg", &powers[i], &polmat[i], &path_length[i]);
 
     // --- Initialize outputs ---
     if (xpr != nullptr)
@@ -149,8 +149,8 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
         if (n_path == 0)
             continue;
 
-        if (M[i].n_rows != 8 || M[i].n_cols != n_path)
-            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'M' must have 8 rows and " + std::to_string(n_path) + " columns.");
+        if (polmat[i].n_rows != 8 || polmat[i].n_cols != n_path)
+            throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'polmat' must have 8 rows and " + std::to_string(n_path) + " columns.");
 
         if (path_length[i].n_elem != n_path)
             throw std::invalid_argument("Entry " + std::to_string(i) + ": Input 'path_length' must have " + std::to_string(n_path) + " elements.");
@@ -169,7 +169,7 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
         dtype P_LL = (dtype)0, P_RL = (dtype)0, P_LR = (dtype)0, P_RR = (dtype)0;
         dtype P_total = (dtype)0;
 
-        const dtype *pM = M[i].memptr();
+        const dtype *pM = polmat[i].memptr();
         const dtype *pP = powers[i].memptr();
         const dtype *pL = path_length[i].memptr();
 
@@ -279,7 +279,7 @@ void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dty
 
 template void quadriga_lib::calc_cross_polarization_ratio(
     const std::vector<arma::Col<float>> &powers,
-    const std::vector<arma::Mat<float>> &M,
+    const std::vector<arma::Mat<float>> &polmat,
     const std::vector<arma::Col<float>> &path_length,
     const arma::Mat<float> &tx_pos,
     const arma::Mat<float> &rx_pos,
@@ -290,7 +290,7 @@ template void quadriga_lib::calc_cross_polarization_ratio(
 
 template void quadriga_lib::calc_cross_polarization_ratio(
     const std::vector<arma::Col<double>> &powers,
-    const std::vector<arma::Mat<double>> &M,
+    const std::vector<arma::Mat<double>> &polmat,
     const std::vector<arma::Col<double>> &path_length,
     const arma::Mat<double> &tx_pos,
     const arma::Mat<double> &rx_pos,

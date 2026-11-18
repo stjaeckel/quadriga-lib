@@ -25,7 +25,7 @@ CONF_DIR = os.path.join(current_dir, "../../data/config")
 TX = np.array([[0.0, 0.0, 10.0]])
 RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5], [120.0, -40.0, 7.5]])
 FC = np.array([6e9, 30e9])
-KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "M",
+KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "polmat",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
 
 
@@ -81,8 +81,8 @@ class test_case(unittest.TestCase):
             self.assertEqual(r["delay"].shape, (n_ray,))
             self.assertEqual(r["power"].shape, (n_ray, 2))
             self.assertEqual(r["eoa"].shape, (n_ray,))
-            self.assertEqual(r["M"].shape, (8, n_ray, 2))
-            self.assertEqual(r["M"].dtype, np.float64)
+            self.assertEqual(r["polmat"].shape, (8, n_ray, 2))
+            self.assertEqual(r["polmat"].dtype, np.float64)
             for k in ["path_type", "tap", "fallback"]:
                 self.assertEqual(r[k].dtype, np.uint32)
             npt.assert_array_equal(r["path_type"][:3], [0, 1, 2])  # codes
@@ -116,21 +116,21 @@ class test_case(unittest.TestCase):
                            lsp_sigma=self.sig, delay=cm[0], power=cm[1], aod=cm[2], eod=cm[3], aoa=cm[4], eoa=cm[5],
                            rnd_ray=self.rr, method="38.901_MF", i_freq=1, angle_model="additive",
                            pol_model="38.901", gr_eps=self.gr_eps, pol_variability=False, random_phase=True)
-        npt.assert_array_equal(r2[2]["M"], r1[2]["M"])
+        npt.assert_array_equal(r2[2]["polmat"], r1[2]["polmat"])
 
     def test_optional_inputs(self):
         r0 = self.mf()
         r1 = self.mf(pol_variability=None, random_phase=None)
-        npt.assert_array_equal(r1[2]["M"], r0[2]["M"])
+        npt.assert_array_equal(r1[2]["polmat"], r0[2]["polmat"])
         r = self.mf(angle_model="rotation")
         self.assertGreater(np.max(np.abs(r[2]["eod"] - r0[2]["eod"])), 1e-6)
         r = self.mf(pol_model="quadriga")
-        self.assertGreater(np.max(np.abs(r[2]["M"] - r0[2]["M"])), 1e-6)
+        self.assertGreater(np.max(np.abs(r[2]["polmat"] - r0[2]["polmat"])), 1e-6)
         r = self.mf(pol_variability=True)
-        self.assertGreater(np.max(np.abs(r[2]["M"] - r0[2]["M"])), 1e-6)
+        self.assertGreater(np.max(np.abs(r[2]["polmat"] - r0[2]["polmat"])), 1e-6)
         npt.assert_array_equal(r[2]["delay"], r0[2]["delay"])
         r = self.mf(random_phase=np.bool_(False))
-        npt.assert_array_equal(r[2]["M"][1::2, 2:], 0.0)  # initial phases 0: real matrices
+        npt.assert_array_equal(r[2]["polmat"][1::2, 2:], 0.0)  # initial phases 0: real matrices
         # Default method "38.901" at one frequency
         cl = self.cm
         rd = gbsm.ssf_rays(self.sp, TX, RX, FC[:1], self.lsp[:, :1], self.mu[:, :1], self.sig[:, :1],
@@ -145,7 +145,7 @@ class test_case(unittest.TestCase):
         args[4] = np.ascontiguousarray(self.lsp)
         r = gbsm.ssf_rays(*args, method="quadriga", gr_eps=self.gr_eps)
         npt.assert_array_equal(r[1]["delay"], self.rays[1]["delay"])
-        npt.assert_array_equal(r[1]["M"], self.rays[1]["M"])
+        npt.assert_array_equal(r[1]["polmat"], self.rays[1]["polmat"])
         r = gbsm.ssf_rays(*self.args, method="quadriga", gr_eps=self.gr_eps.real)  # real array: imaginary part 0
         self.assertEqual(r[0]["gr_eps"].dtype, np.complex128)
         npt.assert_array_equal(r[0]["gr_eps"].imag, 0.0)

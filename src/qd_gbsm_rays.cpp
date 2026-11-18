@@ -65,7 +65,7 @@ Class for the ray data of one link (geometry-based stochastic model)
 | `delay` | `arma::vec`, `[n_ray]` | Delays in [s] relative to the LOS delay d3D / c, d3D the Tx-Rx distance | all |
 | `power` | `arma::mat`, `[n_ray, n_freq]` | Coefficient powers (linear) without link gain; data from paths: path gain | all |
 | `aod`, `eod`, `aoa`, `eoa` | `arma::vec`, `[n_ray]` | Departure and arrival azimuth and elevation in [rad], GCS | all |
-| `M` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | all |
+| `polmat` | `arma::cube`, `[8, n_ray, n_freq]` | Polarization transfer matrices incl. initial phases, rows as in [[get_channels_planar]] | all |
 | `path_type` | `arma::u32_vec`, `[n_ray]` | 0 = LOS, 1 = GR, 2 = NLOS | all |
 | `tap` | `arma::u32_vec`, `[n_ray]` | Tap index; rays with equal index form one tap | all |
 | `gr_eps_re`, `gr_eps_im` | `arma::vec`, `[n_freq]` or empty | Ground permittivity `gr_eps_re - j·gr_eps_im`; needed where a GR ray is recomputed | [[ssf_rays]], [[gbsm_rays_from_paths]] |
@@ -141,10 +141,10 @@ std::string quadriga_lib::gbsm_rays::is_valid() const
         if (!p.second->is_finite())
             return "Input 'rays." + p.first + "' must be finite.";
     }
-    if (M.n_rows != 8 || M.n_cols != n || M.n_slices != nf)
-        return "Input 'rays.M' must have size [8, n_ray, n_freq].";
-    if (!M.is_finite())
-        return "Input 'rays.M' must be finite.";
+    if (polmat.n_rows != 8 || polmat.n_cols != n || polmat.n_slices != nf)
+        return "Input 'rays.polmat' must have size [8, n_ray, n_freq].";
+    if (!polmat.is_finite())
+        return "Input 'rays.polmat' must be finite.";
     if (path_type.n_elem != n)
         return "Input 'rays.path_type' must have n_ray elements.";
     if (arma::any(path_type > 2))
