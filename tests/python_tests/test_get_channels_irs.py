@@ -155,8 +155,8 @@ class test_case(unittest.TestCase):
             coeff, _, act = self.call(threshold_dB=100.0, active_path=mask)
             npt.assert_array_equal(act, [True, False, False, True])
             npt.assert_array_equal(coeff.ravel(), ref[0].ravel()[[0, 3]])
-        # use_kernel reaches C++: GENERIC equals auto, 3 is rejected
-        npt.assert_array_equal(self.call(use_kernel=1)[0], ref[0])
+        # use_kernel reaches C++: GENERIC agrees with auto within the float32 accuracy of AVX2, 3 is rejected
+        npt.assert_allclose(self.call(use_kernel=1)[0], ref[0], rtol=0, atol=1e-6 * np.abs(ref[0]).max())
         with self.assertRaises(ValueError) as ctx:
             self.call(use_kernel=3)
         self.assertIn("use_kernel", str(ctx.exception))

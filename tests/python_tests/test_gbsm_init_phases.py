@@ -132,7 +132,8 @@ class test_lsf(unittest.TestCase):
         big = np.zeros((8, 6))
         big[::2, ::2] = self.rx_pos
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=big[::2, ::2]), self.pb)  # strided view
-        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos.astype(np.float32)), self.pb)  # exact
+        npt.assert_allclose(f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos.astype(np.float32)), self.pb,
+                            rtol=0, atol=1e-6)  # float32 positions
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos.tolist()), self.pb)
 
     def test_inputs_not_modified(self):

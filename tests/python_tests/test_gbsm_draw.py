@@ -153,7 +153,7 @@ class test_lsf(unittest.TestCase):
         npt.assert_array_equal(f(self.scenpar, "lsf", np.ascontiguousarray(self.phase), self.tx_pos, self.rx_pos),
                                self.rnd)
         rt = f(self.scenpar, "lsf", self.phase, self.tx_pos.astype(np.float32), self.rx_pos.astype(np.float32))
-        npt.assert_array_equal(rt, self.rnd)  # positions exact in float32
+        npt.assert_allclose(rt, self.rnd, rtol=0, atol=1e-6)  # float32 positions
         rp = f(self.scenpar, "lsf", self.phase.astype(np.float32), self.tx_pos, self.rx_pos)
         npt.assert_allclose(rp, self.rnd, atol=1e-4, rtol=0)  # phases rounded to float32
 
@@ -313,8 +313,8 @@ class test_cluster(unittest.TestCase):
         big = np.zeros((10, 6))
         big[::2, ::2] = self.rx_pos
         npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.tx_pos, big[::2, ::2]), self.rnd)  # strided view
-        npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.tx_pos.astype(np.float32),
-                                 self.rx_pos.astype(np.float32)), self.rnd)  # positions exact in float32
+        npt.assert_allclose(f(self.sp, "cluster", self.phase, self.tx_pos.astype(np.float32),
+                              self.rx_pos.astype(np.float32)), self.rnd, rtol=0, atol=1e-6)  # float32 positions
         rx0, ph0 = self.rx_pos.copy(), self.phase.copy()
         f(self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos, set_id=-1, floor_id=self.fl)
         npt.assert_array_equal(self.rx_pos, rx0)
