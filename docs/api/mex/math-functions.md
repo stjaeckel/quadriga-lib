@@ -15,7 +15,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-math-f
 ## calc_rotation_matrix
 Calculate rotation matrices from Euler angles
 
-Also in: [C++](../cpp/math-functions.md#calc_rotation_matrix) · Not in: Python
+Also in: [C++](../cpp/math-functions.md#calc_rotation_matrix) · [Python](../python/math-functions.md#calc_rotation_matrix)
 
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, heading) in column-major order (9 elements
   per orientation)
@@ -113,7 +113,7 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 ## fast_sincos
 Compute elementwise approximate sine and/or cosine of a vector
 
-Also in: [C++](../cpp/math-functions.md#fast_sincos) · Not in: Python
+Also in: [C++](../cpp/math-functions.md#fast_sincos) · [Python](../python/math-functions.md#fast_sincos)
 
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for
   abs(x) <= 1e10 (the argument is reduced in double precision where single precision is not enough)
@@ -146,7 +146,7 @@ cos_x = quadriga_lib.fast_sincos(x, true);
 ## interp
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 
-Also in: [C++](../cpp/math-functions.md#interp_2D) · Not in: Python
+Also in: [C++](../cpp/math-functions.md#interp_2D) · [Python](../python/math-functions.md#interp)
 
 - Interpolates given input data at specified output points.
 - Outside the range of the data sampling points, the nearest end value is returned (constant extrapolation);
@@ -169,7 +169,8 @@ output = quadriga_lib.interp( x, [], input, x_new );           % 1D case
 - **`input`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
   enables interpolation for multiple datasets simultaneously.
 - **`x_new`** — Output x-axis sampling points; Length: `[nx_new]`
-- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty
+- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty, empty or omitted
+  when `y` is empty
 
 ### Output:
 - **`output`**  —  Interpolated data `[ny_new, nx_new, ne]` or `[1, nx_new, ne]` for 1D case

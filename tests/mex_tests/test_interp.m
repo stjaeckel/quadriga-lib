@@ -94,3 +94,14 @@ end
 assertTrue( failed );
 O = quadriga_lib.interp( [0 1], [0 1], [0 1; 2 3], 0.5, 0.5 );
 assertElementsAlmostEqual( O, 1.5, 'absolute', 1e-13 );
+
+% 1D data (y empty) with a non-empty y_new is an error naming y_new; an empty y_new is accepted
+failed = false;
+try
+    [~] = quadriga_lib.interp( [0 1], [], [0 1], 0.5, 0.5 );
+catch ME
+    failed = ~isempty(strfind(ME.message, '''y_new'''));
+end
+assertTrue( failed );
+O = quadriga_lib.interp( [0 1], [], [0 1], 0.5, [] );
+assertElementsAlmostEqual( O, 0.5, 'absolute', 1e-13 );

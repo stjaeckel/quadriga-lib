@@ -16,6 +16,9 @@ namespace py = pybind11;
 #include "qpy_calc_rician_k_factor.cpp"
 #include "qpy_calc_cross_polarization_ratio.cpp"
 #include "qpy_fast_geo2cart.cpp"
+#include "qpy_calc_rotation_matrix.cpp"
+#include "qpy_fast_sincos.cpp"
+#include "qpy_interp.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
@@ -83,4 +86,21 @@ void quadriga_lib_tools(py::module_ &m)
           py::kw_only(),
           py::arg("combine") = true,
           py::arg("use_kernel") = 0);
+
+    m.def("calc_rotation_matrix", &calc_rotation_matrix,
+          py::arg("orientation").none(false),
+          py::kw_only(),
+          py::arg("transposed") = false);
+
+    m.def("fast_sincos", &fast_sincos,
+          py::arg("x").none(false),
+          py::kw_only(),
+          py::arg("use_kernel") = 0);
+
+    m.def("interp", &interp,
+          py::arg("x").none(false),
+          py::arg("y"),
+          py::arg("input").none(false),
+          py::arg("x_new").none(false),
+          py::arg("y_new") = py::none());
 }

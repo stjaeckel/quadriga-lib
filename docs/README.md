@@ -50,9 +50,9 @@ Version 0.12.5. Every page of quadriga-lib.org has a Markdown version; the API r
 - [Python: Channel generation functions](api/python/channel-generation-functions.md): 5 functions
 - [Python: Channel statistics](api/python/channel-statistics.md): 5 functions
 - [Python: Geometry-based stochastic model](api/python/geometry-based-stochastic-model.md): 16 functions
-- [Python: Math functions](api/python/math-functions.md): 2 functions
+- [Python: Math functions](api/python/math-functions.md): 5 functions
 - [Python: Miscellaneous / Tools](api/python/miscellaneous-tools.md): 3 functions
-- [Python: Site-specific simulation tools](api/python/site-specific-simulation-tools.md): 14 functions
+- [Python: Site-specific simulation tools](api/python/site-specific-simulation-tools.md): 16 functions
 - [Python: Sum-of-sinusoids random number generator](api/python/sum-of-sinusoids-random-number-generator.md): 14 functions
 
 ## Optional

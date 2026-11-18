@@ -698,8 +698,13 @@ TEST_CASE("Calc Diffraction Gain - Input validation")
     arma::uvec mtl_ind_short = arma::ones<arma::uvec>(5);
     CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain(orig, dest, cube, mtl_ind_short, mtl_map, 10.0e9, 0, &gain), std::invalid_argument);
 
-    // Non-positive center frequency
-    CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain(orig, dest, cube, mtl_ind, mtl_map, 0.0, 0, &gain), std::invalid_argument);
+    // Non-positive or non-finite center frequency, here and in generate_diffraction_paths
+    arma::cube rx, ry, rz, w;
+    for (double f : {0.0, -1.0, arma::datum::nan, arma::datum::inf})
+    {
+        CHECK_THROWS_AS(quadriga_lib::calc_diffraction_gain(orig, dest, cube, mtl_ind, mtl_map, f, 0, &gain), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::generate_diffraction_paths<double>(orig, dest, f, 1, rx, ry, rz, w), std::invalid_argument);
+    }
 
     // Material index exceeding 16383, the 14-bit index of the state words
     arma::uvec mtl_ind_big = mtl_ind;

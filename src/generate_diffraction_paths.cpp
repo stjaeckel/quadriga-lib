@@ -84,10 +84,10 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     if (dest.n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have 3 columns containing the x,y,z coordinates.");
     if (dest.n_rows != n_pos)
-        throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'dest' don't match.");
 
-    if (center_freq <= (dtype)0.0)
-        throw std::invalid_argument("Input 'center_freq' must be larger that 0.");
+    if (!std::isfinite(center_freq) || center_freq <= (dtype)0.0)
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
 
     arma::uword n_path = 0; // Number of diffraction arcs
     arma::uword n_seg = 0;  // Number of segments per arc

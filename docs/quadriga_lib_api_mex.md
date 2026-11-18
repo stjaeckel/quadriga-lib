@@ -3081,7 +3081,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#.solve_scatterers) · [Python](quadriga_l
 ## calc_rotation_matrix
 Calculate rotation matrices from Euler angles
 
-Also in: [C++](quadriga_lib_api_cpp.md#calc_rotation_matrix) · Not in: Python
+Also in: [C++](quadriga_lib_api_cpp.md#calc_rotation_matrix) · [Python](quadriga_lib_api_python.md#calc_rotation_matrix)
 
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, heading) in column-major order (9 elements
   per orientation)
@@ -3179,7 +3179,7 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 ## fast_sincos
 Compute elementwise approximate sine and/or cosine of a vector
 
-Also in: [C++](quadriga_lib_api_cpp.md#fast_sincos) · Not in: Python
+Also in: [C++](quadriga_lib_api_cpp.md#fast_sincos) · [Python](quadriga_lib_api_python.md#fast_sincos)
 
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for
   abs(x) <= 1e10 (the argument is reduced in double precision where single precision is not enough)
@@ -3212,7 +3212,7 @@ cos_x = quadriga_lib.fast_sincos(x, true);
 ## interp
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 
-Also in: [C++](quadriga_lib_api_cpp.md#interp_2D) · Not in: Python
+Also in: [C++](quadriga_lib_api_cpp.md#interp_2D) · [Python](quadriga_lib_api_python.md#interp)
 
 - Interpolates given input data at specified output points.
 - Outside the range of the data sampling points, the nearest end value is returned (constant extrapolation);
@@ -3235,7 +3235,8 @@ output = quadriga_lib.interp( x, [], input, x_new );           % 1D case
 - **`input`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
   enables interpolation for multiple datasets simultaneously.
 - **`x_new`** — Output x-axis sampling points; Length: `[nx_new]`
-- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty
+- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty, empty or omitted
+  when `y` is empty
 
 ### Output:
 - **`output`**  —  Interpolated data `[ny_new, nx_new, ne]` or `[1, nx_new, ne]` for 1D case
@@ -3411,7 +3412,7 @@ mesh = quadriga_lib.cube( scale, rotation, location, n_div );
 ## generate_diffraction_paths
 Generate elliptic propagation paths and weights for diffraction gain estimation
 
-Also in: [C++](quadriga_lib_api_cpp.md#generate_diffraction_paths) · Not in: Python
+Also in: [C++](quadriga_lib_api_cpp.md#generate_diffraction_paths) · [Python](quadriga_lib_api_python.md#generate_diffraction_paths)
 
 - Generates inputs required by [calc_diffraction_gain](#calc_diffraction_gain): elliptic-arc paths sampling
   the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
@@ -3928,7 +3929,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_triangle_intersect) · [Python](quadr
 ## subdivide_triangles
 Subdivide triangles into smaller triangles
 
-Also in: [C++](quadriga_lib_api_cpp.md#subdivide_triangles) · Not in: Python
+Also in: [C++](quadriga_lib_api_cpp.md#subdivide_triangles) · [Python](quadriga_lib_api_python.md#subdivide_triangles)
 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in · n_div · n_div`

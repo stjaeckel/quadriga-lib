@@ -19,7 +19,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/cpp_api.html#sec-math-f
 ## calc_rotation_matrix
 Calculate rotation matrices from Euler angles
 
-Also in: [MATLAB](../mex/math-functions.md#calc_rotation_matrix) · Not in: Python
+Also in: [MATLAB](../mex/math-functions.md#calc_rotation_matrix) · [Python](../python/math-functions.md#calc_rotation_matrix)
 
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
 - R = Rz(heading)·Ry(tilt)·Rx(bank), right-handed as in 3GPP TR 38.901; a positive tilt turns the x-axis down
@@ -208,7 +208,7 @@ void fast_geo2cart(
 ## fast_sincos
 Compute elementwise approximate sine and/or cosine of a vector
 
-Also in: [MATLAB](../mex/math-functions.md#fast_sincos) · Not in: Python
+Also in: [MATLAB](../mex/math-functions.md#fast_sincos) · [Python](../python/math-functions.md#fast_sincos)
 
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for |x| <= 1e10
   (both kernels; the argument is reduced in double precision where single precision is not enough)
@@ -280,7 +280,7 @@ void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
 ## interp_2D
 Perform linear interpolation (1D or 2D) on multiple data sets
 
-Also in: [MATLAB](../mex/math-functions.md#interp) · Not in: Python
+Also in: [MATLAB](../mex/math-functions.md#interp) · [Python](../python/math-functions.md#interp)
 
 - Interpolates given input data at specified output points.
 - Outside the range of the input sample points, the nearest end value is returned (constant extrapolation);

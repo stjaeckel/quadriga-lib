@@ -155,13 +155,13 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
     // Check for correct number of rows
     if (dest.n_rows != n_pos)
-        throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
+        throw std::invalid_argument("Number of rows in 'orig' and 'dest' don't match.");
     if (mtl_ind.n_elem != n_mesh)
         throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
 
     // Frequency in GHz
-    if (center_freq <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+    if (!std::isfinite(center_freq) || center_freq <= (dtype)0.0)
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
 
     // Material indices are carried as 14 bits of the signed 16-bit state words by ray_state_update.
     // Range and table validation happens inside ray_mesh_interact / ray_state_update.

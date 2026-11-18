@@ -5057,7 +5057,7 @@ void quadriga_lib::gbsm_rays::solve_scatterers(double d_min = 2.0);
 ## calc_rotation_matrix
 Calculate rotation matrices from Euler angles
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#calc_rotation_matrix) · Not in: Python
+Also in: [MATLAB](quadriga_lib_api_mex.md#calc_rotation_matrix) · [Python](quadriga_lib_api_python.md#calc_rotation_matrix)
 
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
 - R = Rz(heading)·Ry(tilt)·Rx(bank), right-handed as in 3GPP TR 38.901; a positive tilt turns the x-axis down
@@ -5246,7 +5246,7 @@ void fast_geo2cart(
 ## fast_sincos
 Compute elementwise approximate sine and/or cosine of a vector
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#fast_sincos) · Not in: Python
+Also in: [MATLAB](quadriga_lib_api_mex.md#fast_sincos) · [Python](quadriga_lib_api_python.md#fast_sincos)
 
 - Max absolute error about 1.3e-7 (2^-22.9) against the exact sine / cosine of the input value for |x| <= 1e10
   (both kernels; the argument is reduced in double precision where single precision is not enough)
@@ -5318,7 +5318,7 @@ void quadriga_lib::fast_slerp(const arma::vec &A_re, const arma::vec &A_im,
 ## interp_2D
 Perform linear interpolation (1D or 2D) on multiple data sets
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#interp) · Not in: Python
+Also in: [MATLAB](quadriga_lib_api_mex.md#interp) · [Python](quadriga_lib_api_python.md#interp)
 
 - Interpolates given input data at specified output points.
 - Outside the range of the input sample points, the nearest end value is returned (constant extrapolation);
@@ -5682,7 +5682,7 @@ arma::Mat<dtype> quadriga_lib::cube(
 ## generate_diffraction_paths
 Generate elliptic propagation paths and weights for diffraction gain estimation
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#generate_diffraction_paths) · Not in: Python
+Also in: [MATLAB](quadriga_lib_api_mex.md#generate_diffraction_paths) · [Python](quadriga_lib_api_python.md#generate_diffraction_paths)
 
 - Generates inputs required by [calc_diffraction_gain](#calc_diffraction_gain): elliptic-arc paths sampling the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
 - Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the semi-major axis
@@ -7304,7 +7304,7 @@ arma::uword quadriga_lib::subdivide_rays(
 ## subdivide_triangles
 Subdivide triangles into smaller triangles
 
-Also in: [MATLAB](quadriga_lib_api_mex.md#subdivide_triangles) · Not in: Python
+Also in: [MATLAB](quadriga_lib_api_mex.md#subdivide_triangles) · [Python](quadriga_lib_api_python.md#subdivide_triangles)
 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`

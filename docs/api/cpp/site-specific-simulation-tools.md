@@ -281,7 +281,7 @@ arma::Mat<dtype> quadriga_lib::cube(
 ## generate_diffraction_paths
 Generate elliptic propagation paths and weights for diffraction gain estimation
 
-Also in: [MATLAB](../mex/site-specific-simulation-tools.md#generate_diffraction_paths) · Not in: Python
+Also in: [MATLAB](../mex/site-specific-simulation-tools.md#generate_diffraction_paths) · [Python](../python/site-specific-simulation-tools.md#generate_diffraction_paths)
 
 - Generates inputs required by [calc_diffraction_gain](#calc_diffraction_gain): elliptic-arc paths sampling the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
 - Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the semi-major axis
@@ -1903,7 +1903,7 @@ arma::uword quadriga_lib::subdivide_rays(
 ## subdivide_triangles
 Subdivide triangles into smaller triangles
 
-Also in: [MATLAB](../mex/site-specific-simulation-tools.md#subdivide_triangles) · Not in: Python
+Also in: [MATLAB](../mex/site-specific-simulation-tools.md#subdivide_triangles) · [Python](../python/site-specific-simulation-tools.md#subdivide_triangles)
 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`

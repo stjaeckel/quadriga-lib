@@ -10,6 +10,7 @@ namespace py = pybind11;
 // Include parts
 #include "qpy_calc_diffraction_gain.cpp"
 #include "qpy_cube.cpp"
+#include "qpy_generate_diffraction_paths.cpp"
 #include "qpy_icosphere.cpp"
 #include "qpy_mitsuba_xml_file_write.cpp"
 #include "qpy_obj_file_read.cpp"
@@ -22,6 +23,7 @@ namespace py = pybind11;
 #include "qpy_triangle_mesh_aabb.cpp"
 #include "qpy_triangle_mesh_segmentation.cpp"
 #include "qpy_plane.cpp"
+#include "qpy_subdivide_triangles.cpp"
 
 void quadriga_lib_RTtools(py::module_ &m)
 {
@@ -146,5 +148,18 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::kw_only(),
           py::arg("target_size") = 1024,
           py::arg("vec_size") = 1,
+          py::arg("mtl_ind") = py::none());
+
+    m.def("generate_diffraction_paths", &generate_diffraction_paths,
+          py::arg("orig").none(false),
+          py::arg("dest").none(false),
+          py::arg("center_freq"),
+          py::arg("lod"),
+          py::kw_only(),
+          py::arg("scalar_mode") = false);
+
+    m.def("subdivide_triangles", &subdivide_triangles,
+          py::arg("n_div"),
+          py::arg("triangles_in").none(false),
           py::arg("mtl_ind") = py::none());
 }

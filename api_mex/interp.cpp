@@ -35,7 +35,8 @@ output = quadriga_lib.interp( x, [], input, x_new );           % 1D case
 - **`input`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
   enables interpolation for multiple datasets simultaneously.
 - **`x_new`** — Output x-axis sampling points; Length: `[nx_new]`
-- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty
+- **`y_new`** — Output y-axis sampling points; Length: `[ny_new]`; required when `y` is not empty, empty or omitted
+  when `y` is empty
 
 ## Output:
 - **`output`**  —  Interpolated data `[ny_new, nx_new, ne]` or `[1, nx_new, ne]` for 1D case
@@ -52,6 +53,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool twoD = mxGetNumberOfElements(prhs[1]) != 0;
     if (twoD && nrhs < 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'y_new' is required when 'y' is given (2D case).");
+    if (!twoD && nrhs > 4 && mxGetNumberOfElements(prhs[4]) != 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'y_new' must be empty when 'y' is empty (1D case).");
 
     if (mxIsSingle(prhs[0]))
     {

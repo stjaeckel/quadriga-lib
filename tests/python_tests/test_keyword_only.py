@@ -29,6 +29,7 @@ POSITIONAL_OPTIONAL = {
     "RTtools.point_inside_mesh": ("obj_ind",),
     "RTtools.ray_point_intersect": ("sub_cloud_ind",),
     "RTtools.ray_triangle_intersect": ("sub_mesh_ind", "aabb"),
+    "RTtools.subdivide_triangles": ("mtl_ind",),
     "RTtools.triangle_mesh_aabb": ("sub_mesh_ind",),
     "arrayant.generate": ("res",),
     "arrayant.generate_speaker": ("driver_type",),
@@ -60,6 +61,7 @@ POSITIONAL_OPTIONAL = {
     "tools.acdf": ("bins",),
     "tools.fast_cart2geo": ("y", "z"),
     "tools.fast_geo2cart": ("el", "len"),
+    "tools.interp": ("y_new",),
 }
 
 SUBMODULES = sorted(n for n in dir(quadriga_lib) if type(getattr(quadriga_lib, n)) is type(quadriga_lib))

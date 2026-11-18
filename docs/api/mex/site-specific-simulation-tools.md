@@ -134,7 +134,7 @@ mesh = quadriga_lib.cube( scale, rotation, location, n_div );
 ## generate_diffraction_paths
 Generate elliptic propagation paths and weights for diffraction gain estimation
 
-Also in: [C++](../cpp/site-specific-simulation-tools.md#generate_diffraction_paths) · Not in: Python
+Also in: [C++](../cpp/site-specific-simulation-tools.md#generate_diffraction_paths) · [Python](../python/site-specific-simulation-tools.md#generate_diffraction_paths)
 
 - Generates inputs required by [calc_diffraction_gain](#calc_diffraction_gain): elliptic-arc paths sampling
   the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
@@ -651,7 +651,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_triangle_intersect) 
 ## subdivide_triangles
 Subdivide triangles into smaller triangles
 
-Also in: [C++](../cpp/site-specific-simulation-tools.md#subdivide_triangles) · Not in: Python
+Also in: [C++](../cpp/site-specific-simulation-tools.md#subdivide_triangles) · [Python](../python/site-specific-simulation-tools.md#subdivide_triangles)
 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in · n_div · n_div`

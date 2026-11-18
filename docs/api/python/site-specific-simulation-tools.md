@@ -6,6 +6,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-sit
 | --- | --- |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh |
 | [cube](#cube) | Construct a triangulated cube mesh |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Generate elliptic propagation paths and weights for diffraction gain estimation |
 | [icosphere](#icosphere) | Construct a geodesic polyhedron from recursive icosahedron subdivision |
 | [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Write a triangular mesh to a Mitsuba 3 XML scene file |
 | [obj_file_read](#obj_file_read) | Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials |
@@ -16,6 +17,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/python_api.html#sec-sit
 | [point_inside_mesh](#point_inside_mesh) | Test whether 3D points are inside a triangle mesh using raycasting |
 | [ray_point_intersect](#ray_point_intersect) | Calculate intersections of ray beams with points in 3D space |
 | [ray_triangle_intersect](#ray_triangle_intersect) | Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm |
+| [subdivide_triangles](#subdivide_triangles) | Subdivide triangles into smaller triangles |
 | [triangle_mesh_aabb](#triangle_mesh_aabb) | Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes |
 | [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing |
 
@@ -126,6 +128,52 @@ mesh = quadriga_lib.RTtools.cube( scale, rotation, location, *, n_div )
 
 ### Outputs:
 - **`mesh`** — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); `(12 · n_div^2, 9)`
+
+---
+<a id="generate_diffraction_paths"></a>
+## generate_diffraction_paths
+Generate elliptic propagation paths and weights for diffraction gain estimation
+
+Also in: [C++](../cpp/site-specific-simulation-tools.md#generate_diffraction_paths) · [MATLAB](../mex/site-specific-simulation-tools.md#generate_diffraction_paths)
+
+- Generates inputs required by [calc_diffraction_gain](#calc_diffraction_gain): elliptic-arc paths sampling the Fresnel ellipsoid volume
+  between each TX-RX pair, plus per-segment weights
+- Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the semi-major axis
+- Weights are derived from the knife-edge diffraction model; initial weights normalized so
+  `sum(prod(weight, axis=2), axis=1) = 1`
+
+### Usage:
+```python
+ray_x, ray_y, ray_z, weight = quadriga_lib.RTtools.generate_diffraction_paths( orig, dest, \
+    center_freq, lod, *, scalar_mode )
+```
+
+### Inputs:
+- **`orig`** — TX positions; `(n_pos, 3)`
+- **`dest`** — RX positions; `(n_pos, 3)`
+- **`center_freq`** — Center frequency in Hz; in scalar mode the acoustic frequency
+- **`lod`** — Level of detail; controls `n_path` and `n_seg`:
+   | `lod` | `n_path` | `n_seg` | Note  |
+   | ----- | -------- | ------- | ----- |
+   | 1     | 7        | 3       | -     |
+   | 2     | 19       | 3       | -     |
+   | 3     | 37       | 4       | -     |
+   | 4     | 61       | 5       | -     |
+   | 5     | 1        | 2       | debug |
+   | 6     | 2        | 2       | debug |
+   | 7     | 1        | 10      | direct line in 10 segments |
+
+- **`scalar_mode`** — `True` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
+  default: `False` (EM, `299792458 / center_freq`)
+
+### Outputs:
+- **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `(n_pos, n_path, n_seg-1)`
+- **`ray_y`** — y-coordinates of path waypoints (excluding endpoints); `(n_pos, n_path, n_seg-1)`
+- **`ray_z`** — z-coordinates of path waypoints (excluding endpoints); `(n_pos, n_path, n_seg-1)`
+- **`weight`** — Per-segment weights; `(n_pos, n_path, n_seg)`
+
+### See also:
+- [calc_diffraction_gain](#calc_diffraction_gain) (consumes the output of this function)
 
 ---
 <a id="icosphere"></a>
@@ -552,6 +600,33 @@ fbs, sbs, n_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, d
 - [triangle_mesh_aabb](#triangle_mesh_aabb) (compute AABBs)
 - [ray_point_intersect](#ray_point_intersect) (beam interactions with sampling points)
 - [icosphere](#icosphere) (generate ray beams)
+
+---
+<a id="subdivide_triangles"></a>
+## subdivide_triangles
+Subdivide triangles into smaller triangles
+
+Also in: [C++](../cpp/site-specific-simulation-tools.md#subdivide_triangles) · [MATLAB](../mex/site-specific-simulation-tools.md#subdivide_triangles)
+
+- Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
+- Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
+- Material indices are duplicated from the parent triangle to all sub-triangles
+
+### Usage:
+```python
+triangles_out, mtl_ind_out = quadriga_lib.RTtools.subdivide_triangles( n_div, triangles_in, mtl_ind )
+```
+
+### Inputs:
+- **`n_div`** — Number of subdivisions per edge, > 0
+- **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_triangles_in, 9)`
+- **`mtl_ind`** — Material indices per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read)), passed through unchanged;
+  `(n_triangles_in,)`; default: `None`
+
+### Outputs:
+- **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `(n_triangles_out, 9)`
+- **`mtl_ind_out`** — Material indices for subdivided triangles; int64; `(n_triangles_out,)`; empty when `mtl_ind` is
+  `None`
 
 ---
 <a id="triangle_mesh_aabb"></a>
