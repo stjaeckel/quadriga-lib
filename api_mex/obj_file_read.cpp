@@ -74,8 +74,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::string fn = (nrhs < 1) ? "" : qd_mex_get_string(prhs[0], "");
-    const std::string fn_csv = (nrhs < 2) ? "" : qd_mex_get_string(prhs[1], "");
+    const std::string fn = (nrhs < 1) ? "" : qd_mex_get_string(prhs[0], "", "fn");
+    const std::string fn_csv = (nrhs < 2) ? "" : qd_mex_get_string(prhs[1], "", "fn_csv");
     const bool csv_strict = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "csv_strict", false);
 
     // Output containers

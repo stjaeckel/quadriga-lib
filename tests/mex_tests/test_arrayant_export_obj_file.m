@@ -194,12 +194,12 @@ catch ME
     end
 end
 
-% freq = 0 (out of bound, must be >= 1)
+% freq = 0 (1-based index)
 try
     quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_mf, 30, 'jet', 1.0, 2, [], 0);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'out of bound';
+    expectedErrorMessage = 'Input ''i_freq'' cannot be 0 (1-based index).';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

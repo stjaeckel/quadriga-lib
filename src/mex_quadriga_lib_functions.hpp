@@ -58,44 +58,49 @@ inline mxArray *qd_mex_arrayant2struct_multi(const std::vector<quadriga_lib::arr
     return output;
 }
 
-inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *input, bool validate = false, bool copy = false)
+inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *input, bool validate = false, bool copy = false,
+                                                             const std::string &var_name = "")
 {
     if (!mxIsStruct(input))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+    {
+        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
+    auto fld = [&](const char *f) { return var_name.empty() ? std::string(f) : var_name + "." + f; }; // Names in errors
 
     quadriga_lib::arrayant<double> ant;
 
     // Mandatory fields
-    ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_re"), copy, "e_theta_re");
-    ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_im"), copy, "e_theta_im");
-    ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_re"), copy, "e_phi_re");
-    ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_im"), copy, "e_phi_im");
-    ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "azimuth_grid"), copy, "azimuth_grid");
-    ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "elevation_grid"), copy, "elevation_grid");
+    ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_re", 0, var_name), copy, fld("e_theta_re"));
+    ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_im", 0, var_name), copy, fld("e_theta_im"));
+    ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_re", 0, var_name), copy, fld("e_phi_re"));
+    ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_im", 0, var_name), copy, fld("e_phi_im"));
+    ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "azimuth_grid", 0, var_name), copy, fld("azimuth_grid"));
+    ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "elevation_grid", 0, var_name), copy, fld("elevation_grid"));
 
     arma::uword n_elements = ant.e_theta_re.n_slices;
 
     // Optional fields
-    if (qd_mex_has_field(input, "element_pos") && !mxIsEmpty(qd_mex_get_field(input, "element_pos")))
-        ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos"), copy, "element_pos");
+    if (qd_mex_has_field(input, "element_pos") && !mxIsEmpty(qd_mex_get_field(input, "element_pos", 0, var_name)))
+        ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos", 0, var_name), copy, fld("element_pos"));
     else
         ant.element_pos.zeros(3, n_elements);
 
-    if (qd_mex_has_field(input, "coupling_re") && !mxIsEmpty(qd_mex_get_field(input, "coupling_re")))
-        ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re"), copy, "coupling_re");
-    else if (!(qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im"))))
+    if (qd_mex_has_field(input, "coupling_re") && !mxIsEmpty(qd_mex_get_field(input, "coupling_re", 0, var_name)))
+        ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re", 0, var_name), copy, fld("coupling_re"));
+    else if (!(qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", 0, var_name))))
         ant.coupling_re.eye(n_elements, n_elements);
 
-    if (qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im")))
-        ant.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im"), copy, "coupling_im");
+    if (qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", 0, var_name)))
+        ant.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im", 0, var_name), copy, fld("coupling_im"));
     else
         ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
 
-    if (qd_mex_has_field(input, "center_freq") && !mxIsEmpty(qd_mex_get_field(input, "center_freq")))
-        ant.center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq"), "center_freq", 299792458.0);
+    if (qd_mex_has_field(input, "center_freq") && !mxIsEmpty(qd_mex_get_field(input, "center_freq", 0, var_name)))
+        ant.center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", 0, var_name), fld("center_freq"), 299792458.0);
 
-    if (qd_mex_has_field(input, "name") && !mxIsEmpty(qd_mex_get_field(input, "name")))
-        ant.name = qd_mex_get_string(qd_mex_get_field(input, "name"));
+    if (qd_mex_has_field(input, "name") && !mxIsEmpty(qd_mex_get_field(input, "name", 0, var_name)))
+        ant.name = qd_mex_get_string(qd_mex_get_field(input, "name", 0, var_name), "", fld("name"));
 
     if (validate)
     {
@@ -107,10 +112,15 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
     return ant;
 }
 
-inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(const mxArray *input, bool validate = false, bool copy = false)
+inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(const mxArray *input, bool validate = false, bool copy = false,
+                                                                                const std::string &var_name = "")
 {
     if (!mxIsStruct(input))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+    {
+        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
+    auto fld = [&](const char *f) { return var_name.empty() ? std::string(f) : var_name + "." + f; }; // Names in errors
 
     // Check for optional fields
     bool has_element_pos = qd_mex_has_field(input, "element_pos");
@@ -123,35 +133,35 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
     std::vector<quadriga_lib::arrayant<double>> ant(n_elem);
     for (size_t n = 0; n < n_elem; ++n)
     {
-        ant[n].e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_re", n), copy, "e_theta_re");
-        ant[n].e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_im", n), copy, "e_theta_im");
-        ant[n].e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_re", n), copy, "e_phi_re");
-        ant[n].e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_im", n), copy, "e_phi_im");
-        ant[n].azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "azimuth_grid", n), copy, "azimuth_grid");
-        ant[n].elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "elevation_grid", n), copy, "elevation_grid");
+        ant[n].e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_re", n, var_name), copy, fld("e_theta_re"));
+        ant[n].e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_theta_im", n, var_name), copy, fld("e_theta_im"));
+        ant[n].e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_re", n, var_name), copy, fld("e_phi_re"));
+        ant[n].e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_im", n, var_name), copy, fld("e_phi_im"));
+        ant[n].azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "azimuth_grid", n, var_name), copy, fld("azimuth_grid"));
+        ant[n].elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "elevation_grid", n, var_name), copy, fld("elevation_grid"));
 
         arma::uword n_elements = ant[n].e_theta_re.n_slices;
 
-        if (has_center_freq && !mxIsEmpty(qd_mex_get_field(input, "center_freq", n)))
-            ant[n].center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", n), "center_freq", 299792458.0);
+        if (has_center_freq && !mxIsEmpty(qd_mex_get_field(input, "center_freq", n, var_name)))
+            ant[n].center_freq = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", n, var_name), fld("center_freq"), 299792458.0);
 
-        if (has_element_pos && !mxIsEmpty(qd_mex_get_field(input, "element_pos", n)))
-            ant[n].element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos", n), copy, "element_pos");
+        if (has_element_pos && !mxIsEmpty(qd_mex_get_field(input, "element_pos", n, var_name)))
+            ant[n].element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos", n, var_name), copy, fld("element_pos"));
         else
             ant[n].element_pos.zeros(3, n_elements);
 
-        if (has_coupling_re && !mxIsEmpty(qd_mex_get_field(input, "coupling_re", n)))
-            ant[n].coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re", n), copy, "coupling_re");
-        else if (!(has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n))))
+        if (has_coupling_re && !mxIsEmpty(qd_mex_get_field(input, "coupling_re", n, var_name)))
+            ant[n].coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re", n, var_name), copy, fld("coupling_re"));
+        else if (!(has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n, var_name))))
             ant[n].coupling_re.eye(n_elements, n_elements);
 
-        if (has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n)))
-            ant[n].coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im", n), copy, "coupling_im");
+        if (has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n, var_name)))
+            ant[n].coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im", n, var_name), copy, fld("coupling_im"));
         else
             ant[n].coupling_im.zeros(ant[n].coupling_re.n_rows, ant[n].coupling_re.n_cols);
 
-        if (has_name && !mxIsEmpty(qd_mex_get_field(input, "name", n)))
-            ant[n].name = qd_mex_get_string(qd_mex_get_field(input, "name", n));
+        if (has_name && !mxIsEmpty(qd_mex_get_field(input, "name", n, var_name)))
+            ant[n].name = qd_mex_get_string(qd_mex_get_field(input, "name", n, var_name), "", fld("name"));
     }
 
     if (validate)
@@ -293,10 +303,15 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     return output;
 }
 
-inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool validate = false, bool copy = false)
+inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool validate = false, bool copy = false,
+                                                                       const std::string &var_name = "")
 {
     if (!mxIsStruct(input))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+    {
+        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
+    auto fld = [&](const char *f) { return var_name.empty() ? std::string(f) : var_name + "." + f; }; // Names in errors
 
     const size_t n_chan = (size_t)mxGetNumberOfElements(input);
     std::vector<quadriga_lib::channel<double>> chan;
@@ -310,52 +325,49 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         quadriga_lib::channel<double> c;
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "name"))
-            c.name = qd_mex_get_string(fp);
+            c.name = qd_mex_get_string(fp, "", fld("name"));
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "tx_pos"))
-            c.tx_pos = qd_mex_get_Mat<double>(fp, copy, "tx_pos");
+            c.tx_pos = qd_mex_get_Mat<double>(fp, copy, fld("tx_pos"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_pos"))
-            c.rx_pos = qd_mex_get_Mat<double>(fp, copy, "rx_pos");
+            c.rx_pos = qd_mex_get_Mat<double>(fp, copy, fld("rx_pos"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "tx_orientation"))
-            c.tx_orientation = qd_mex_get_Mat<double>(fp, copy, "tx_orientation");
+            c.tx_orientation = qd_mex_get_Mat<double>(fp, copy, fld("tx_orientation"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_orientation"))
-            c.rx_orientation = qd_mex_get_Mat<double>(fp, copy, "rx_orientation");
+            c.rx_orientation = qd_mex_get_Mat<double>(fp, copy, fld("rx_orientation"));
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "coeff_re"))
-            c.coeff_re = qd_mex_matlab2vector_Cube<double>(fp, 3, "coeff_re");
+            c.coeff_re = qd_mex_matlab2vector_Cube<double>(fp, 3, fld("coeff_re"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "coeff_im"))
-            c.coeff_im = qd_mex_matlab2vector_Cube<double>(fp, 3, "coeff_im");
+            c.coeff_im = qd_mex_matlab2vector_Cube<double>(fp, 3, fld("coeff_im"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "delay"))
-            c.delay = qd_mex_matlab2vector_Cube<double>(fp, 3, "delay");
+            c.delay = qd_mex_matlab2vector_Cube<double>(fp, 3, fld("delay"));
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_gain"))
-            c.path_gain = qd_mex_matlab2vector_Col<double>(fp, 1, "path_gain");
+            c.path_gain = qd_mex_matlab2vector_Col<double>(fp, 1, fld("path_gain"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_length"))
-            c.path_length = qd_mex_matlab2vector_Col<double>(fp, 1, "path_length");
+            c.path_length = qd_mex_matlab2vector_Col<double>(fp, 1, fld("path_length"));
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_polarization"))
-            c.path_polarization = qd_mex_matlab2vector_Mat<double>(fp, 2, "path_polarization");
+            c.path_polarization = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("path_polarization"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_angles"))
-            c.path_angles = qd_mex_matlab2vector_Mat<double>(fp, 2, "path_angles");
+            c.path_angles = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("path_angles"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "fbs_pos"))
-            c.fbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, "fbs_pos");
+            c.fbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("fbs_pos"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "lbs_pos"))
-            c.lbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, "lbs_pos");
+            c.lbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("lbs_pos"));
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "n_interact"))
-            c.n_interact = qd_mex_matlab2vector_Col<unsigned>(fp, 1, "n_interact");
+            c.n_interact = qd_mex_matlab2vector_Col<unsigned>(fp, 1, fld("n_interact"));
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "interact_coord"))
-            c.interact_coord = qd_mex_matlab2vector_Mat<double>(fp, 2, "interact_coord");
+            c.interact_coord = qd_mex_matlab2vector_Mat<double>(fp, 2, fld("interact_coord"));
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "center_freq"))
-            c.center_freq = qd_mex_get_Col<double>(fp, copy, "center_freq");
+            c.center_freq = qd_mex_get_Col<double>(fp, copy, fld("center_freq"));
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "initial_position"))
         {
-            const int initial_position = qd_mex_get_scalar<int>(fp, "initial_position", 1);
-            if (initial_position < 1)
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Field 'initial_position' must be >= 1 (1-based index).");
-            c.initial_position = initial_position - 1;
+            c.initial_position = qd_mex_get_index<int>(fp, fld("initial_position")); // 1-based -> 0-based
         }
 
         // Prune zero-padded trailing columns in interact_coord (round-trip artifacts)

@@ -54,8 +54,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::vec dist = qd_mex_get_Col<double>(prhs[1]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
+    const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
 
     // Output allocation (invalid sizes are left to the library to reject)
     const arma::uword n_dim = spatial_freq.n_cols, n_grid = (dist.n_elem < 2) ? 0 : 4 * dist.n_elem - 3;

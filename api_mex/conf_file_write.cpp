@@ -75,7 +75,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::string fn = qd_mex_get_string(prhs[0]);
+    const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
     const auto scenpar = qd_mex_struct2scenpar(prhs[1], "scenpar");
 
@@ -93,7 +93,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         short_names = qd_mex_get_strings(prhs[3], "short_names");
     }
 
-    const std::string ref = (nrhs < 5) ? std::string() : qd_mex_get_string(prhs[4]);
+    const std::string ref = (nrhs < 5) ? std::string() : qd_mex_get_string(prhs[4], "", "ref");
 
     if (nrhs > 5 && !mxIsEmpty(prhs[5]))
     {

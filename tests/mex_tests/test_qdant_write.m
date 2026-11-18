@@ -139,7 +139,7 @@ try
     quadriga_lib.qdant_write('testm.qdant', ant);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Field ''e_phi_re'' not found at index 1!';
+    expectedErrorMessage = 'Field ''e_phi_re'' not found in ''arrayant'' at index 1.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

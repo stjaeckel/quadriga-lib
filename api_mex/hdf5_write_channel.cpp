@@ -60,14 +60,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read filename
-    const std::string fn = qd_mex_get_string(prhs[0]);
+    const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
     // Parse 'chan' (mandatory, struct or struct array)
     if (!mxIsStruct(prhs[1]) || mxGetNumberOfElements(prhs[1]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'chan' must be a non-empty struct.");
 
-    std::vector<quadriga_lib::channel<double>> channels;
-    CALL_QD(channels = qd_mex_struct2channel(prhs[1], true));
+    auto channels = qd_mex_struct2channel(prhs[1], true, false, "chan"); // Validates; errors name 'chan'
     const arma::uword n_chan = (arma::uword)channels.size();
 
     // Parse 'par' (optional, struct array of same size as 'chan', or empty)
@@ -80,35 +79,29 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'par' must have the same number of elements as 'chan'.");
     }
 
-    // Parse location indices (scalar broadcast or vector of length n_chan)
-    auto get_index = [&](int arg_idx, unsigned default_val, const char *name) -> arma::Col<unsigned>
+    // Parse location indices, 1-based -> 0-based (scalar broadcast or vector of length n_chan)
+    auto get_index = [&](int arg_idx, const char *name) -> arma::Col<unsigned>
     {
         if (arg_idx >= nrhs || mxGetNumberOfElements(prhs[arg_idx]) == 0)
-            return arma::Col<unsigned>(1).fill(default_val);
-        return qd_mex_get_Col<unsigned>(prhs[arg_idx], false, name);
+            return arma::Col<unsigned>(1, arma::fill::zeros);
+        return qd_mex_get_index_Col<unsigned>(prhs[arg_idx], name);
     };
 
     arma::Col<unsigned> ix_vec, iy_vec, iz_vec, iw_vec;
 
     // ix: default = 1:n_chan
     if (nrhs > 3 && mxGetNumberOfElements(prhs[3]) != 0)
-        ix_vec = qd_mex_get_Col<unsigned>(prhs[3], false, "ix");
+        ix_vec = get_index(3, "ix");
     else
-    {
-        ix_vec.set_size(n_chan);
-        for (arma::uword i = 0; i < n_chan; ++i)
-            ix_vec.at(i) = (unsigned)(i + 1);
-    }
-    iy_vec = get_index(4, 1, "iy");
-    iz_vec = get_index(5, 1, "iz");
-    iw_vec = get_index(6, 1, "iw");
+        ix_vec = arma::regspace<arma::Col<unsigned>>(0, 1, (unsigned)n_chan - 1);
+    iy_vec = get_index(4, "iy");
+    iz_vec = get_index(5, "iz");
+    iw_vec = get_index(6, "iw");
 
     auto check_idx = [&](const arma::Col<unsigned> &v, const char *name)
     {
         if (v.n_elem != 1 && v.n_elem != n_chan)
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input '%s' must be a scalar or a vector of length numel(chan).", name);
-        if (arma::any(v == 0))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input '%s' cannot contain zeros (1-based indexing).", name);
     };
     check_idx(ix_vec, "ix");
     check_idx(iy_vec, "iy");
@@ -122,10 +115,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Create file with a default layout if it does not exist
     if (storage_space.at(0) == 0)
     {
-        unsigned nx = std::max((unsigned)n_chan, ix_vec.max());
-        unsigned ny = iy_vec.max();
-        unsigned nz = iz_vec.max();
-        unsigned nw = iw_vec.max();
+        unsigned nx = std::max((unsigned)n_chan, ix_vec.max() + 1);
+        unsigned ny = iy_vec.max() + 1;
+        unsigned nz = iz_vec.max() + 1;
+        unsigned nw = iw_vec.max() + 1;
         CALL_QD(quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw));
         storage_space.at(0) = nx;
         storage_space.at(1) = ny;
@@ -163,7 +156,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 c.par_names.push_back(field_name);
 
                 if (mxIsClass(field_data, "char"))
-                    c.par_data.push_back(std::any(qd_mex_get_string(field_data)));
+                    c.par_data.push_back(std::any(qd_mex_get_string(field_data, "", "par." + field_name)));
                 else
                     c.par_data.push_back(qd_mex_anycast(field_data, "par." + field_name, false));
             }
@@ -175,9 +168,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         unsigned iz = iz_vec.n_elem == 1 ? iz_vec.at(0) : iz_vec.at(k);
         unsigned iw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
 
-        // Write (convert to 0-based)
         int return_code = 0;
-        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(fn, &c, ix - 1, iy - 1, iz - 1, iw - 1));
+        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(fn, &c, ix, iy, iz, iw));
         if (return_code == 1)
             any_overwrite = true;
     }

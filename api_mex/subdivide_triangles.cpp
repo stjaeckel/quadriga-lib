@@ -44,7 +44,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    const arma::mat triangles_in = qd_mex_get_Mat<double>(prhs[1]);
+    const arma::mat triangles_in = qd_mex_get_Mat<double>(prhs[1], false, "triangles_in");
     const arma::uword n_div = qd_mex_get_scalar<arma::uword>(prhs[0], "n_div", 0);
 
     // Material index: 1-based in C++ as well (0 = no material), no shift intended

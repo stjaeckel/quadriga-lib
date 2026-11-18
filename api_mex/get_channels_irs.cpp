@@ -5,9 +5,9 @@
 #include "mex_quadriga_lib_functions.hpp"
 
 // IRS array struct: the coupling matrix holds the IRS weights; without one, C++ throws instead of using identity
-static inline quadriga_lib::arrayant<double> qd_irs_struct2arrayant(const mxArray *input)
+static inline quadriga_lib::arrayant<double> qd_irs_struct2arrayant(const mxArray *input, const std::string &var_name)
 {
-    auto ant = qd_mex_struct2arrayant(input);
+    auto ant = qd_mex_struct2arrayant(input, false, false, var_name);
     auto given = [&](const char *name)
     { return qd_mex_has_field(input, name) && !mxIsEmpty(qd_mex_get_field(input, name)); };
     if (!given("coupling_re") && !given("coupling_im"))
@@ -119,9 +119,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Antenna arrays
-    const auto tx_array = qd_mex_struct2arrayant(prhs[0]);
-    const auto rx_array = qd_mex_struct2arrayant(prhs[1]);
-    const auto irs_array = qd_irs_struct2arrayant(prhs[2]);
+    const auto tx_array = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
+    const auto rx_array = qd_mex_struct2arrayant(prhs[1], false, false, "rx_array");
+    const auto irs_array = qd_irs_struct2arrayant(prhs[2], "irs_array");
 
     // Positions and orientations
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[3], "tx_pos", 3);
@@ -132,21 +132,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto irs_orientation = qd_mex_typecast_Col<double>(prhs[8], "irs_orientation", 3);
 
     // Segment TX → IRS
-    const auto fbs_pos_1 = qd_mex_get_Mat<double>(prhs[9]);
-    const auto lbs_pos_1 = qd_mex_get_Mat<double>(prhs[10]);
-    const auto path_gain_1 = qd_mex_get_Col<double>(prhs[11]);
-    const auto path_length_1 = qd_mex_get_Col<double>(prhs[12]);
-    const auto M_1 = qd_mex_get_Mat<double>(prhs[13]);
+    const auto fbs_pos_1 = qd_mex_get_Mat<double>(prhs[9], false, "fbs_pos_1");
+    const auto lbs_pos_1 = qd_mex_get_Mat<double>(prhs[10], false, "lbs_pos_1");
+    const auto path_gain_1 = qd_mex_get_Col<double>(prhs[11], false, "path_gain_1");
+    const auto path_length_1 = qd_mex_get_Col<double>(prhs[12], false, "path_length_1");
+    const auto M_1 = qd_mex_get_Mat<double>(prhs[13], false, "M_1");
 
     // Segment IRS → RX
-    const auto fbs_pos_2 = qd_mex_get_Mat<double>(prhs[14]);
-    const auto lbs_pos_2 = qd_mex_get_Mat<double>(prhs[15]);
-    const auto path_gain_2 = qd_mex_get_Col<double>(prhs[16]);
-    const auto path_length_2 = qd_mex_get_Col<double>(prhs[17]);
-    const auto M_2 = qd_mex_get_Mat<double>(prhs[18]);
+    const auto fbs_pos_2 = qd_mex_get_Mat<double>(prhs[14], false, "fbs_pos_2");
+    const auto lbs_pos_2 = qd_mex_get_Mat<double>(prhs[15], false, "lbs_pos_2");
+    const auto path_gain_2 = qd_mex_get_Col<double>(prhs[16], false, "path_gain_2");
+    const auto path_length_2 = qd_mex_get_Col<double>(prhs[17], false, "path_length_2");
+    const auto M_2 = qd_mex_get_Mat<double>(prhs[18], false, "M_2");
 
     // Configuration parameters
-    arma::uword i_irs = (nrhs < 20) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[19], "i_irs", 1);
+    const arma::uword i_irs = (nrhs < 20) ? 0 : qd_mex_get_index(prhs[19], "i_irs"); // 1-based -> 0-based
     double threshold_dB = (nrhs < 21) ? -140.0 : qd_mex_get_scalar<double>(prhs[20], "threshold_dB", -140.0);
     double center_freq = (nrhs < 22) ? 0.0 : qd_mex_get_scalar<double>(prhs[21], "center_freq", 0.0);
     bool use_absolute_delays = (nrhs < 23) ? false : qd_mex_get_scalar<bool>(prhs[22], "use_absolute_delays", false);
@@ -155,20 +155,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::arrayant<double> irs_array_2;
     bool use_alternative_irs = (nrhs > 23) && !mxIsEmpty(prhs[23]);
     if (use_alternative_irs)
-        irs_array_2 = qd_irs_struct2arrayant(prhs[23]);
+        irs_array_2 = qd_irs_struct2arrayant(prhs[23], "irs_array_2");
 
-    const auto active_path = (nrhs < 25 || mxIsEmpty(prhs[24])) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[24]);
+    const auto active_path = (nrhs < 25 || mxIsEmpty(prhs[24])) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[24], "active_path");
     const int use_kernel = (nrhs < 26) ? 0 : qd_mex_get_scalar<int>(prhs[25], "use_kernel", 0);
 
     // Codebook port index: 1-based (MATLAB) -> 0-based (C++)
     const arma::uword n_codebook = irs_array.coupling_re.n_cols; // 0 = missing coupling, reported by C++
-    if (i_irs == 0 || (n_codebook != 0 && i_irs > n_codebook))
+    if (n_codebook != 0 && i_irs >= n_codebook)
     {
         std::string msg = "Input 'i_irs' must be from 1 to " + std::to_string(n_codebook == 0 ? 1 : n_codebook) +
                           " (1-based codebook port index, one per column of the IRS coupling matrix).";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
-    i_irs -= 1;
 
     // Output containers — size is runtime-dependent (filtered by threshold_dB / active_path)
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;

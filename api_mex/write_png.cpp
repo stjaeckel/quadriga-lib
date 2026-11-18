@@ -47,9 +47,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    const std::string fn = qd_mex_get_string(prhs[0]);
-    const arma::mat data = qd_mex_get_Mat<double>(prhs[1]);
-    const std::string colormap = (nrhs < 3) ? std::string("jet") : qd_mex_get_string(prhs[2], "jet");
+    const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
+    const arma::mat data = qd_mex_get_Mat<double>(prhs[1], false, "data");
+    const std::string colormap = (nrhs < 3) ? std::string("jet") : qd_mex_get_string(prhs[2], "jet", "colormap");
     const double min_val = (nrhs < 4) ? NAN : qd_mex_get_scalar<double>(prhs[3], "min_val", NAN);
     const double max_val = (nrhs < 5) ? NAN : qd_mex_get_scalar<double>(prhs[4], "max_val", NAN);
     const bool log_transform = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "log_transform", false);

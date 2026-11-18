@@ -59,7 +59,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    std::string fn = qd_mex_get_string(prhs[0]);
+    std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     unsigned id = (nrhs < 3) ? 0 : qd_mex_get_scalar<unsigned>(prhs[2], "id", 0);
     arma::u32_mat layout = (nrhs < 4) ? arma::u32_mat() : qd_mex_typecast_Mat<unsigned>(prhs[3], "layout");
 
@@ -72,12 +72,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool is_multi = mxGetNumberOfElements(prhs[1]) > 1;
     if (is_multi)
     {
-        ant_multi = qd_mex_struct2arrayant_multi(prhs[1], true);
+        ant_multi = qd_mex_struct2arrayant_multi(prhs[1], true, false, "arrayant");
         if (id != 0 || !layout.empty())
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'id' and 'layout' are not allowed for multi-frequency arrays.");
     }
     else
-        ant = qd_mex_struct2arrayant(prhs[1], true);
+        ant = qd_mex_struct2arrayant(prhs[1], true, false, "arrayant");
 
     // Check if files exists in multi-freq mode and throw error if yes
     if (is_multi && std::filesystem::exists(fn))

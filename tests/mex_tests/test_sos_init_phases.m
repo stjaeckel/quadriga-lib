@@ -50,7 +50,7 @@ assert_throws( @() quadriga_lib.sos_init_phases( 7, 0, 42 ), 'n_gen' );         
 assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, -2 ), 'seed' );
 
 % Counts and the seed are validated by the wrapper before the conversion to an integer type
-msg_seed = 'Input ''seed'' must be an integer from -1 to 9223372036854775807.';
+msg_seed = 'Input ''seed'' must be -1 or a non-negative integer.';
 assert_cpp_error( @() quadriga_lib.sos_init_phases( -1, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_init_phases( NaN, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_init_phases( [], 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );

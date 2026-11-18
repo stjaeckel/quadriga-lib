@@ -70,7 +70,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat path_gain = qd_mex_get_Mat<double>(prhs[5], false, "path_gain");
     const arma::vec path_length = qd_mex_get_Col<double>(prhs[6], false, "path_length");
     const arma::cube M = qd_mex_get_Cube<double>(prhs[7], false, "M");
-    const std::string method = (nrhs < 9) ? std::string("quadriga") : qd_mex_get_string(prhs[8], "quadriga");
+    const std::string method = (nrhs < 9) ? std::string("quadriga") : qd_mex_get_string(prhs[8], "quadriga", "method");
     const arma::u32_vec path_type = (nrhs < 10) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[9], false, "path_type");
     const arma::u32_vec tap = (nrhs < 11) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[10], false, "tap");
     const arma::vec gr_eps_re = (nrhs < 12) ? arma::vec() : qd_mex_get_Col<double>(prhs[11], false, "gr_eps_re");

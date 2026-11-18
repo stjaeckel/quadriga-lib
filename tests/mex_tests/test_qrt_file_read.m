@@ -262,7 +262,7 @@ try
     quadriga_lib.qrt_file_read(fn, 0, 1, false, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Entries in ''i_cir'' must be >= 1';
+    expectedErrorMessage = 'Entries in ''i_cir'' cannot be 0 (1-based index).';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end
@@ -272,7 +272,7 @@ try
     quadriga_lib.qrt_file_read(fn, 1, 0, false, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = '''i_orig'' must be >= 1';
+    expectedErrorMessage = 'Input ''i_orig'' cannot be 0 (1-based index).';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end

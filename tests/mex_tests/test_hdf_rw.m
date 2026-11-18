@@ -359,7 +359,7 @@ chanR = quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, []);
 assertEqual(chanR.coeff_re, double(single(coeff_re)));
 
 % Snapshot index out of bounds
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 0), 'out of bounds' );
+assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 0), 'Entries in ''i_snap'' cannot be 0 (1-based index).' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 4), 'out of bounds' );
 
 % Snap on slot with no structured data errors
@@ -453,7 +453,7 @@ quadriga_lib.hdf5_write_channel(fn, chan_ip, [], 6);
 [chanR, ~] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 1);
 assertFalse(isfield(chanR, 'initial_position'));
 chan_ip.initial_position = int32(0);
-assert_cpp_error(@() quadriga_lib.hdf5_write_channel(fn, chan_ip, [], 6), 'must be >= 1 (1-based index)');
+assert_cpp_error(@() quadriga_lib.hdf5_write_channel(fn, chan_ip, [], 6), 'Input ''chan.initial_position'' cannot be 0 (1-based index).');
 
 % Combined par + chan write with sparse field set
 rx_pos = rand(3, 3);
@@ -537,9 +537,9 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, [1, 2, 3], [], 7), 'In
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, struct([]), [], 7), 'Input ''chan'' must be a non-empty struct' );
 
 % Zero or non-integer location is rejected
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 0), 'cannot contain zeros' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 7, 1, 1, 0), 'Input ''iw'' cannot contain zeros' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 1.5), 'must be integers from 0 to 4294967295.' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 0), 'Entries in ''ix'' cannot be 0 (1-based index).' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 7, 1, 1, 0), 'Entries in ''iw'' cannot be 0 (1-based index).' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 1.5), 'Entries in ''ix'' must be integers from 1 to 4294967295.' );
 
 % Errors from C++: index outside the layout, invalid channel, unsupported par type
 assert_cpp_error( @() quadriga_lib.hdf5_write_channel(fn, chan, [], 129), 'Index out of bound.' );
@@ -674,9 +674,9 @@ assert_cpp_error( @() quadriga_lib.hdf5_read_channel('does_not_exist.hdf5'), 'do
 
 % Index out of bounds or not an integer on read
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 999), 'out of bounds' );   % nx = 10
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 0), 'Index ''ix'' out of bounds.' );
+assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 0), 'Entries in ''ix'' cannot be 0 (1-based index).' );
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 1, 1, 1, 2), 'Index ''iw'' out of bounds.' );
-assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 1.5), 'must be integers from 0 to 4294967295.' );
+assert_cpp_error( @() quadriga_lib.hdf5_read_channel(fn2, 1.5), 'Entries in ''ix'' must be integers from 1 to 4294967295.' );
 
 % Argument counts
 assert_cpp_error( @() quadriga_lib.hdf5_read_channel(), 'Wrong number of input arguments.' );
@@ -692,7 +692,7 @@ assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, 'd5', rand(2,3,4,2,2), 1
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, 'sp', sparse([0 0 1.5]), 1, 1), ...
     'Input ''data'' is sparse; sparse inputs are not supported.' );
 assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, 'x', 1, 0, 1), 'cannot be 0 (1-based index).' );
-assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, 'x', 1, 1.5, 1), 'Input ''ix'' must be an integer from 0 to 4294967295.' );
+assert_cpp_error( @() quadriga_lib.hdf5_write_dset(fn3, 'x', 1, 1.5, 1), 'Input ''ix'' must be an integer from 1 to 4294967295.' );
 quadriga_lib.hdf5_write_dset(fn3, 'd3', reshape(1:24, 2, 3, 4), 1, 1);     % 3-D is supported
 assertEqual( quadriga_lib.hdf5_read_dset(fn3, 'd3', 1, 1), reshape(1:24, 2, 3, 4) );
 assertEqual( numel(quadriga_lib.hdf5_read_dset_names(fn3, 1, 1)), 1 );   % nothing else was written

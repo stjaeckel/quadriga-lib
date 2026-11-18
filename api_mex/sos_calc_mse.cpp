@@ -87,9 +87,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::vec acf = qd_mex_get_Col<double>(prhs[1]);
-    const arma::vec dist = qd_mex_get_Col<double>(prhs[2]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
+    const arma::vec acf = qd_mex_get_Col<double>(prhs[1], false, "acf");
+    const arma::vec dist = qd_mex_get_Col<double>(prhs[2], false, "dist");
     const arma::uword n_dir = (nrhs < 4) ? 10 : qd_mex_sos_count(prhs[3], "n_dir", 10.0);
 
     // Wrap optional pointers

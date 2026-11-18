@@ -70,13 +70,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (n_freq1 > 1)
     {
-        ant1_multi = qd_mex_struct2arrayant_multi(prhs[0], false);
-        ant2_multi = qd_mex_struct2arrayant_multi(prhs[1], false);
+        ant1_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant_in1");
+        ant2_multi = qd_mex_struct2arrayant_multi(prhs[1], false, false, "arrayant_in2");
     }
     else
     {
-        ant1 = qd_mex_struct2arrayant(prhs[0], false);
-        ant2 = qd_mex_struct2arrayant(prhs[1], false);
+        ant1 = qd_mex_struct2arrayant(prhs[0], false, false, "arrayant_in1");
+        ant2 = qd_mex_struct2arrayant(prhs[1], false, false, "arrayant_in2");
     }
 
     // Output containers

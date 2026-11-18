@@ -102,13 +102,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'rays' must be a 1x1 struct.");
 
     // Read inputs; the library validates the arrays
-    const auto tx_array = qd_mex_struct2arrayant(prhs[0]);
-    const auto rx_array = qd_mex_struct2arrayant(prhs[1]);
+    const auto tx_array = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
+    const auto rx_array = qd_mex_struct2arrayant(prhs[1], false, false, "rx_array");
     const auto rays = qd_mex_struct2gbsm_rays(prhs[2], 0, false, "rays");
     const arma::vec link_gain_dB = qd_mex_get_Col<double>(prhs[3], false, "link_gain_dB");
-    const std::string mobility = (nrhs < 5) ? std::string("auto") : qd_mex_get_string(prhs[4], "auto");
-    const std::string output = (nrhs < 6) ? std::string("taps") : qd_mex_get_string(prhs[5], "taps");
-    arma::uword i_freq = (nrhs < 7) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[6], "i_freq", 1);
+    const std::string mobility = (nrhs < 5) ? std::string("auto") : qd_mex_get_string(prhs[4], "auto", "mobility");
+    const std::string output = (nrhs < 6) ? std::string("taps") : qd_mex_get_string(prhs[5], "taps", "output");
+    const arma::uword i_freq = (nrhs < 7) ? 0 : qd_mex_get_index(prhs[6], "i_freq"); // 1-based -> 0-based
     const arma::mat tx_pos = (nrhs < 8) ? arma::mat() : qd_mex_get_Mat<double>(prhs[7], false, "tx_pos");
     const arma::mat rx_pos = (nrhs < 9) ? arma::mat() : qd_mex_get_Mat<double>(prhs[8], false, "rx_pos");
     const arma::mat tx_ori = (nrhs < 10) ? arma::mat() : qd_mex_get_Mat<double>(prhs[9], false, "tx_orientation");
@@ -117,9 +117,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool oxygen = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "oxygen", false);
     const bool use_absolute_delays = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "use_absolute_delays", false);
 
-    if (i_freq == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_freq' cannot be 0 (1-based index).");
-    i_freq -= 1; // 1-based (MATLAB) -> 0-based (C++)
 
     // The result is returned by value and copied
     quadriga_lib::channel<double> chan;

@@ -83,7 +83,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             if (in == nullptr)
                 a = mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL);
             else if (mxIsChar(in))
-                a = mxCreateString(qd_mex_get_string(in).c_str());
+                a = mxCreateString(qd_mex_get_string(in, "", "rays." + f).c_str());
             else // An empty cell or struct (non-empty ones are rejected when read) is copied as an empty double
             {
                 a = mxIsLogical(in) ? mxCreateLogicalArray(mxGetNumberOfDimensions(in), mxGetDimensions(in))

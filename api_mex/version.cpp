@@ -29,15 +29,12 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    (void)prhs; // No inputs
     if (nrhs != 0)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Incorrect number of input arguments.");
-        if ( mxIsSingle(prhs[0])) // Useless line to avoid error with flags "-Werror=unused-but-set-variable"
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Oops.");
-    }
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Incorrect number of output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     std::string quadriga_lib_version = quadriga_lib::quadriga_lib_version();
 

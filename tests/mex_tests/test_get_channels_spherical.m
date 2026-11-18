@@ -213,6 +213,12 @@ assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, tx, or
 assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs{1}, pg, pl, Mc), 'quadriga_lib:CPPerror');
 Mc_bad = Mc; Mc_bad{2} = Mc{2}(1:7, :); % the error names the snapshot 1-based
 assert_throws( @() quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc_bad), 'Snapshot 2: ' );
+% Errors in an array struct name the argument
+assert_throws( @() quadriga_lib.get_channels_spherical(ant2, 1, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc), 'Input ''rx_array'' must be a struct.' );
+ant_bad = rmfield(ant2, 'e_theta_re');
+assert_throws( @() quadriga_lib.get_channels_spherical(ant_bad, ant2, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc), 'Field ''e_theta_re'' not found in ''tx_array'' at index 1.' );
+ant_bad = ant2; ant_bad.azimuth_grid = 'abc';
+assert_throws( @() quadriga_lib.get_channels_spherical(ant2, ant_bad, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc), 'Input ''rx_array.azimuth_grid'' has an unsupported data type.' );
 
 end
 

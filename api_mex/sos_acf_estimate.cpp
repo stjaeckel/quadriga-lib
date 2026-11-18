@@ -88,12 +88,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::vec phase = qd_mex_get_Col<double>(prhs[1]);
-    const arma::vec bins = qd_mex_get_Col<double>(prhs[2]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
+    const arma::vec phase = qd_mex_get_Col<double>(prhs[1], false, "phase");
+    const arma::vec bins = qd_mex_get_Col<double>(prhs[2], false, "bins");
     const arma::uword n_pos = qd_mex_sos_count(prhs[3], "n_pos", 0.0);
-    const arma::vec acf = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4]);
-    const arma::vec dist = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
+    const arma::vec acf = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4], false, "acf");
+    const arma::vec dist = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "dist");
     const arma::sword seed = (nrhs < 7) ? -1 : qd_mex_get_seed(prhs[6]);
 
     // Output allocation

@@ -104,13 +104,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs (3D -> vec of length 1, 4D -> vec of length n_freq)
-    const auto coeff_re = qd_mex_get_CubeVec<double>(prhs[0]);
-    const auto coeff_im = qd_mex_get_CubeVec<double>(prhs[1]);
-    const auto delay = qd_mex_get_CubeVec<double>(prhs[2]);
-    const auto pilot_grid_in = qd_mex_get_Col<double>(prhs[3]);
+    const auto coeff_re = qd_mex_get_CubeVec<double>(prhs[0], false, "coeff_re");
+    const auto coeff_im = qd_mex_get_CubeVec<double>(prhs[1], false, "coeff_im");
+    const auto delay = qd_mex_get_CubeVec<double>(prhs[2], false, "delay");
+    const auto pilot_grid_in = qd_mex_get_Col<double>(prhs[3], false, "pilot_grid");
     const double bandwidth = qd_mex_get_scalar<double>(prhs[4], "bandwidth", 0.0);
-    const auto center_freq = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
-    const auto carrier_freq_in = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6]);
+    const auto center_freq = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "center_freq");
+    const auto carrier_freq_in = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "carrier_freq");
     const int use_kernel = (nrhs < 9) ? 0 : qd_mex_get_scalar<int>(prhs[8], "use_kernel", 0);
 
     // i_snap signals multi-snap mode. Scalar 0 = all snapshots; non-empty
@@ -120,14 +120,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
     {
         has_isnap = true;
-        arma::uvec idx = qd_mex_get_Col<arma::uword>(prhs[7], false, "i_snap");
-        if (!(idx.n_elem == 1 && idx[0] == 0))
-        {
-            if (idx.min() < 1)
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror",
-                                  "Snapshot indices must be 1-based (>=1) or scalar 0 for all snapshots.");
-            i_snap = idx - 1; // 1-based MATLAB -> 0-based C++
-        }
+        if (mxGetNumberOfElements(prhs[7]) != 1 || qd_mex_get_scalar<double>(prhs[7], "i_snap") != 0.0)
+            i_snap = qd_mex_get_index_Col(prhs[7], "i_snap"); // 1-based -> 0-based; scalar 0 = all snapshots
     }
 
     // Identify which carrier source(s) the user supplied

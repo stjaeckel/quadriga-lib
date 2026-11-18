@@ -60,12 +60,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const auto fn = qd_mex_get_string(prhs[0]);
+    const auto fn = qd_mex_get_string(prhs[0], "", "fn");
 
     const auto max_paths = qd_mex_get_scalar<arma::uword>(prhs[1], "max_paths", 0);
     const auto gain_max_dB = qd_mex_get_scalar<double>(prhs[2], "gain_max_dB", -60.0);
     const auto gain_min_dB = qd_mex_get_scalar<double>(prhs[3], "gain_min_dB", -140.0);
-    const auto colormap = qd_mex_get_string(prhs[4], "jet");
+    const auto colormap = qd_mex_get_string(prhs[4], "jet", "colormap");
     const auto radius_max = qd_mex_get_scalar<double>(prhs[5], "radius_max", 0.05);
     const auto radius_min = qd_mex_get_scalar<double>(prhs[6], "radius_min", 0.01);
     const auto n_edges = qd_mex_get_scalar<arma::uword>(prhs[7], "n_edges", 5);
@@ -73,8 +73,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Construct channel object from input data
     auto c = quadriga_lib::channel<double>();
 
-    c.rx_pos = qd_mex_get_Mat<double>(prhs[8]);
-    c.tx_pos = qd_mex_get_Mat<double>(prhs[9]);
+    c.rx_pos = qd_mex_get_Mat<double>(prhs[8], false, "rx_pos");
+    c.tx_pos = qd_mex_get_Mat<double>(prhs[9], false, "tx_pos");
     c.n_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[10], 1, "n_interact");
     c.interact_coord = qd_mex_matlab2vector_Mat<double>(prhs[11], 2, "interact_coord");
     c.center_freq = qd_mex_get_Col<double>(prhs[12], false, "center_freq");
@@ -82,10 +82,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     c.coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[14], 3, "coeff_im");
 
     // Snapshot indices: 1-based (MATLAB) -> 0-based (C++), copy so we don't mutate caller memory
-    arma::uvec i_snap = (nrhs < 16) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[15], true, "i_snap");
-    if (arma::any(i_snap == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_snap' cannot be 0 (1-based index).");
-    i_snap -= 1;
+    const arma::uvec i_snap = (nrhs < 16) ? arma::uvec() : qd_mex_get_index_Col(prhs[15], "i_snap");
 
     // The loop below reads one entry of n_interact and interact_coord per snapshot of the coefficients
     if (c.n_interact.size() != c.coeff_re.size())

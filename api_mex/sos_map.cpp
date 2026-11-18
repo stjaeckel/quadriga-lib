@@ -57,11 +57,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::mat phase = qd_mex_get_Mat<double>(prhs[1]);
-    const arma::vec x = qd_mex_get_Col<double>(prhs[2]);
-    const arma::vec y = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3]);
-    const arma::vec z = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4]);
+    const arma::mat spatial_freq = qd_mex_get_Mat<double>(prhs[0], false, "spatial_freq");
+    const arma::mat phase = qd_mex_get_Mat<double>(prhs[1], false, "phase");
+    const arma::vec x = qd_mex_get_Col<double>(prhs[2], false, "x");
+    const arma::vec y = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3], false, "y");
+    const arma::vec z = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4], false, "z");
     const bool uniform = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "uniform", false);
     const int use_kernel = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "use_kernel", 0);
 

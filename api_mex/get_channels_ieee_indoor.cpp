@@ -98,25 +98,25 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Parse antenna objects
-    auto ant_tx = qd_mex_struct2arrayant(prhs[0]);
-    auto ant_rx = qd_mex_struct2arrayant(prhs[1]);
+    auto ant_tx = qd_mex_struct2arrayant(prhs[0], false, false, "ap_array");
+    auto ant_rx = qd_mex_struct2arrayant(prhs[1], false, false, "sta_array");
 
     // Read model parameters
-    std::string ChannelType = qd_mex_get_string(prhs[2]);
-    double CarrierFreq_Hz = (nrhs < 4) ? 5.25e9 : qd_mex_get_scalar<double>(prhs[3], "CarrierFreq_GHz", 5.25e9);
-    double tap_spacing_s = (nrhs < 5) ? 10.0e-9 : qd_mex_get_scalar<double>(prhs[4], "tap_spacing_ns", 10.0e-9);
+    std::string ChannelType = qd_mex_get_string(prhs[2], "", "channel_type");
+    double CarrierFreq_Hz = (nrhs < 4) ? 5.25e9 : qd_mex_get_scalar<double>(prhs[3], "center_freq", 5.25e9);
+    double tap_spacing_s = (nrhs < 5) ? 10.0e-9 : qd_mex_get_scalar<double>(prhs[4], "tap_spacing_s", 10.0e-9);
     arma::uword n_users = (nrhs < 6) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[5], "n_users", 1);
     double observation_time = (nrhs < 7) ? 0.0 : qd_mex_get_scalar<double>(prhs[6], "observation_time", 0.0);
     double update_rate = (nrhs < 8) ? 1.0e-3 : qd_mex_get_scalar<double>(prhs[7], "update_rate", 1.0e-3);
     double speed_station_kmh = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "speed_station_kmh", 0.0);
     double speed_env_kmh = (nrhs < 10) ? 1.2 : qd_mex_get_scalar<double>(prhs[9], "speed_env_kmh", 1.2);
-    arma::vec Dist = (nrhs < 11) ? arma::vec{4.99} : qd_mex_get_Col<double>(prhs[10]);
+    arma::vec Dist = (nrhs < 11) ? arma::vec{4.99} : qd_mex_get_Col<double>(prhs[10], false, "dist_m");
     arma::uvec n_floors = (nrhs < 12) ? arma::uvec{0} : qd_mex_get_Col<arma::uword>(prhs[11], false, "n_floors");
     bool uplink = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "uplink", false);
-    arma::mat offset_angles = (nrhs < 14) ? arma::mat{} : qd_mex_get_Mat<double>(prhs[13]);
+    arma::mat offset_angles = (nrhs < 14) ? arma::mat{} : qd_mex_get_Mat<double>(prhs[13], false, "offset_angles");
     arma::uword n_subpath = (nrhs < 15) ? 20 : qd_mex_get_scalar<arma::uword>(prhs[14], "n_subpath", 20);
-    double Doppler_effect = (nrhs < 16) ? 50.0 : qd_mex_get_scalar<double>(prhs[15], "Doppler_effect", 50.0);
-    arma::sword seed = (nrhs < 17) ? -1 : qd_mex_get_scalar<arma::sword>(prhs[16], "seed", -1);
+    double Doppler_effect = (nrhs < 16) ? 50.0 : qd_mex_get_scalar<double>(prhs[15], "doppler_effect", 50.0);
+    const arma::sword seed = (nrhs < 17) ? -1 : (arma::sword)qd_mex_get_seed(prhs[16]);
     double KF_linear = (nrhs < 18) ? NAN : qd_mex_get_scalar<double>(prhs[17], "KF_linear", NAN);
     double XPR_NLOS_linear = (nrhs < 19) ? NAN : qd_mex_get_scalar<double>(prhs[18], "XPR_NLOS_linear", NAN);
     double SF_std_dB_LOS = (nrhs < 20) ? NAN : qd_mex_get_scalar<double>(prhs[19], "SF_std_dB_LOS", NAN);

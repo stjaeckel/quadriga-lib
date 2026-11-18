@@ -77,11 +77,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[0], 1);
-    const std::vector<arma::mat> M = qd_mex_matlab2vector_Mat<double>(prhs[1], 2);
-    const std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[2], 1);
-    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3]);
-    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4]);
+    const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[0], 1, "powers");
+    const std::vector<arma::mat> M = qd_mex_matlab2vector_Mat<double>(prhs[1], 2, "M");
+    const std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[2], 1, "path_length");
+    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3], false, "tx_pos");
+    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4], false, "rx_pos");
 
     const bool include_los = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "include_los", false);
     const double window_size = (nrhs < 7) ? 0.01 : qd_mex_get_scalar<double>(prhs[6], "window_size", 0.01);

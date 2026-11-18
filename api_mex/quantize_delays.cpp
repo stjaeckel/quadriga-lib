@@ -74,9 +74,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs: 4D arrays are split along the 4th dimension into std::vector<arma::Cube>
-    const auto coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[0], 3);
-    const auto coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[1], 3);
-    const auto delay = qd_mex_matlab2vector_Cube<double>(prhs[2], 3);
+    const auto coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[0], 3, "coeff_re");
+    const auto coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[1], 3, "coeff_im");
+    const auto delay = qd_mex_matlab2vector_Cube<double>(prhs[2], 3, "delay");
 
     // Optional scalar parameters
     double tap_spacing = (nrhs < 4) ? 5.0e-9 : qd_mex_get_scalar<double>(prhs[3], "tap_spacing", 5.0e-9);

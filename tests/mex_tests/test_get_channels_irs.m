@@ -380,12 +380,12 @@ ant_sw.coupling_re = ant_irs_diff.coupling_re(:, [2 1]);
 ant_sw.coupling_im = ant_irs_diff.coupling_im(:, [2 1]);
 args_sw = args; args_sw{3} = ant_sw;
 assertEqual( quadriga_lib.get_channels_irs( args_sw{:}, 1 ), cr_p2 );
-for bad = [0, 3]
+for bad = {{0, 'Input ''i_irs'' cannot be 0 (1-based index).'}, {3, 'Input ''i_irs'' must be from 1 to 2'}}
     failed = false;
     try
-        [~] = quadriga_lib.get_channels_irs( args{:}, bad );
+        [~] = quadriga_lib.get_channels_irs( args{:}, bad{1}{1} );
     catch ME
-        failed = ~isempty(strfind(ME.message, 'i_irs')) && ~isempty(strfind(ME.message, '1 to 2'));
+        failed = ~isempty(strfind(ME.message, bad{1}{2}));
     end
     assertTrue( failed );
 end

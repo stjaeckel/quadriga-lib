@@ -124,7 +124,7 @@ assert_throws( @() out9( ant, az, el ), 'Wrong number of output arguments.' );
 assert_throws( @() out5( ant_m, az, el ), 'Multi-frequency mode supports at most 4 outputs' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el, [0, 1] ), 'cannot be 0 (1-based index)' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant_m([]), az, el ), 'Input ''arrayant'' cannot be empty.' );
-assert_throws( @() quadriga_lib.arrayant_interpolate( 1, az, el ), 'Input must be a struct.' );
+assert_throws( @() quadriga_lib.arrayant_interpolate( 1, az, el ), 'Input ''arrayant'' must be a struct.' );
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, [], [] ), 'Input ''azimuth'' must have 1 or n_out rows.' ); % C++
 assert_throws( @() quadriga_lib.arrayant_interpolate( ant, az, el(1:2) ), ...
     'Input ''elevation'' must have the same size as ''azimuth''.' );                   % C++

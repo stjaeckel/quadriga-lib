@@ -50,9 +50,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    arma::cube x = qd_mex_get_Cube<double>(prhs[0]);
-    arma::mat y = (nrhs < 2) ? arma::mat() : qd_mex_get_Mat<double>(prhs[1]);
-    arma::mat z = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2]);
+    arma::cube x = qd_mex_get_Cube<double>(prhs[0], false, "x");
+    arma::mat y = (nrhs < 2) ? arma::mat() : qd_mex_get_Mat<double>(prhs[1], false, "y");
+    arma::mat z = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2], false, "z");
     const int use_kernel = (nrhs < 4) ? 0 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 0);
 
     // Split data

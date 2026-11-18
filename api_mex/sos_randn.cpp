@@ -80,11 +80,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::vec dist_decorr = qd_mex_get_Col<double>(prhs[0]);
-    const arma::mat pos = qd_mex_get_Mat<double>(prhs[1]);
-    const arma::mat pos_b = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2]);
-    const arma::vec dist_decorr_b = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3]);
-    const std::string preset = (nrhs < 5) ? std::string("Comb256") : qd_mex_get_string(prhs[4], "Comb256");
+    const arma::vec dist_decorr = qd_mex_get_Col<double>(prhs[0], false, "dist_decorr");
+    const arma::mat pos = qd_mex_get_Mat<double>(prhs[1], false, "pos");
+    const arma::mat pos_b = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2], false, "pos_b");
+    const arma::vec dist_decorr_b = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3], false, "dist_decorr_b");
+    const std::string preset = (nrhs < 5) ? std::string("Comb256") : qd_mex_get_string(prhs[4], "Comb256", "preset");
     const arma::sword seed = (nrhs < 6) ? -1 : qd_mex_get_seed(prhs[5]);
 
     // Output allocation

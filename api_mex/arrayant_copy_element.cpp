@@ -54,22 +54,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     size_t n_freq = (size_t)mxGetNumberOfElements(prhs[0]);
 
     if (n_freq > 1)
-        ant_multi = qd_mex_struct2arrayant_multi(prhs[0], true, true);
+        ant_multi = qd_mex_struct2arrayant_multi(prhs[0], true, true, "arrayant_in");
     else
-        ant = qd_mex_struct2arrayant(prhs[0], true, true);
+        ant = qd_mex_struct2arrayant(prhs[0], true, true, "arrayant_in");
 
     // Read source and destination indices (1-based -> 0-based)
-    arma::uvec source = qd_mex_get_Col<arma::uword>(prhs[1], true, "i_source");
-    arma::uvec dest = qd_mex_get_Col<arma::uword>(prhs[2], true, "i_target");
+    const arma::uvec source = qd_mex_get_index_Col(prhs[1], "i_source");
+    const arma::uvec dest = qd_mex_get_index_Col(prhs[2], "i_target");
 
     if (source.n_elem == 0 || dest.n_elem == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'i_source' and 'i_target' cannot be empty.");
-
-    if (arma::any(source == 0) || arma::any(dest == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_source' / 'i_target' cannot be 0 (1-based index).");
-
-    source -= 1;
-    dest -= 1;
 
     if (source.n_elem > 1 && source.n_elem != dest.n_elem)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "When copying multiple elements, 'i_source' and 'i_target' must have the same length.");

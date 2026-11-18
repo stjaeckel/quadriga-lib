@@ -191,6 +191,14 @@ assertElementsAlmostEqual(chan_a(1).coeff_im,  chan_b(1).coeff_im,  'absolute', 
 assertElementsAlmostEqual(chan_a(1).delay,     chan_b(1).delay,     'absolute', 0);
 assertElementsAlmostEqual(chan_a(1).path_gain, chan_b(1).path_gain, 'absolute', 0);
 
+% A seed below -1 is rejected
+try
+    call_ieee(ant, ant, 'B', 'seed', -2);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    assertTrue(~isempty(strfind(ME.message, 'Input ''seed'' must be -1 or a non-negative integer.')), ME.message);
+end
+
 
 % ---------------------------------------------------------------------
 % 6) Wall penetration loss (NEW: n_walls / wall_loss)

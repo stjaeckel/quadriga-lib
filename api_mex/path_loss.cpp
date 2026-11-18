@@ -106,10 +106,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto plpar = qd_mex_struct2plpar(prhs[0], pl_model, pl_order, "plpar");
     const auto scenpar = qd_mex_struct2scenpar(prhs[1], "scenpar");
     const arma::vec center_freq = qd_mex_get_Col<double>(prhs[2], false, "center_freq");
-    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3]);
-    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4]);
-    const arma::vec d2d_in = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
-    const arma::vec rnd_he = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6]);
+    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3], false, "tx_pos");
+    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4], false, "rx_pos");
+    const arma::vec d2d_in = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "d2d_in");
+    const arma::vec rnd_he = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6], false, "rnd_he");
 
     // Output allocation
     arma::mat pl_dB, sf_sigma_dB;

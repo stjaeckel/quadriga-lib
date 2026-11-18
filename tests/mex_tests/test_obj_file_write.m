@@ -365,7 +365,7 @@ face_ind0 = face_ind; face_ind0(3,2) = 0;
 assert_cpp_error( @() quadriga_lib.obj_file_write( fn, [], [], [], [], [], vert_list, face_ind0 ), ...
     'Entries in ''face_ind'' cannot be 0 (1-based index).' );
 assert_cpp_error( @() quadriga_lib.obj_file_write( fn, [], [], [], [], [], vert_list, face_ind - 0.5 ), ...
-    'Entries in ''face_ind'' must be integers from 0 to' );
+    'Entries in ''face_ind'' must be positive integers.' );
 
 % None of the error cases should have produced a file
 assertTrue( exist(fn,'file') ~= 2 );

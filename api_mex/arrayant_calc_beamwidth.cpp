@@ -57,16 +57,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be an arrayant struct or struct array.");
 
     // Element indices: 1-based MATLAB -> 0-based C++ (empty = all elements)
-    arma::uvec i_element = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_element");
-    if (arma::any(i_element == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");
-    i_element -= 1;
+    const arma::uvec i_element = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_element");
     const double threshold_dB = (nrhs < 3) ? 3.0 : qd_mex_get_scalar<double>(prhs[2], "threshold_dB", 3.0);
 
     // A single struct is a one-entry vector; the outputs are [n_out, n_freq] either way
     const int n_out = (nlhs == 0) ? 1 : nlhs;
     arma::mat out[4];
-    const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]); // Validated by the C++ function
+    const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant"); // Validated by the C++ function
     CALL_QD(quadriga_lib::arrayant_calc_beamwidth_multi(ant_multi, &i_element, threshold_dB, &out[0],
                                                         n_out > 1 ? &out[1] : nullptr, n_out > 2 ? &out[2] : nullptr,
                                                         n_out > 3 ? &out[3] : nullptr));

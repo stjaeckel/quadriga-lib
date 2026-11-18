@@ -62,21 +62,15 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 ## Index conversion
 - MATLAB users give and get 1-based indices. Indices that are 0-based in C++ are shifted by the wrapper (-1 on input, +1 on output); indices that are 1-based in C++ pass through unchanged.
 - This includes indices in error messages. C++ messages name an entry of a vector input only by the prefixes `Entry <i>: ` and `Snapshot <i>: ` (0-based, see `md/SPEC_CPP_API.md`, "Input validation"). A wrapper passes C++ messages to MATLAB with `CALL_QD` or `qd_mex_cpp_error` (`src/mex_helper_functions.hpp`), which rewrite these prefixes to 1-based; never with `mexErrMsgIdAndTxt` directly. A message the wrapper writes itself states its indices 1-based.
-- Index inputs that get converted MUST be read with `copy = true`. Without the copy, the Armadillo object may borrow the memory of the MATLAB input, and editing it in place modifies the caller's variable (undefined behavior).
-- Always check for zeros before subtracting, otherwise unsigned indices wrap around:
+- Read index inputs that get converted with `qd_mex_get_index` (scalar) or `qd_mex_get_index_Col` (vector). They copy the input, reject 0 with `"Input 'x' cannot be 0 (1-based index)."` / `"Entries in 'x' cannot be 0 (1-based index)."` and non-integers with `"... must be an integer from 1 to <max>."`, and return the indices 0-based:
 ```
 // Vector index input, 1-based (MATLAB) -> 0-based (C++), empty = C++ default
-arma::uvec i_element = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true, "i_element");
-if (arma::any(i_element == 0))
-    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");
-i_element -= 1;
+const arma::uvec i_element = (nrhs < 3) ? arma::uvec() : qd_mex_get_index_Col(prhs[2], "i_element");
 
-// Scalar index input
-arma::uword i_orig = (nrhs < 4) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[3], "i_orig", 1);
-if (i_orig == 0)
-    mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_orig' cannot be 0 (1-based index).");
-i_orig -= 1;
+// Scalar index input, default 1 (MATLAB) = 0 (C++)
+const arma::uword i_orig = (nrhs < 4) ? 0 : qd_mex_get_index(prhs[3], "i_orig");
 ```
+- A matrix of indices is read with `qd_mex_get_index_Col` and reshaped (`face_ind` in `obj_file_write.cpp`). Never subtract 1 from an array read with `copy = false`: it may borrow the memory of the MATLAB input, and editing it in place modifies the caller's variable.
 - Index outputs are shifted after the C++ call and before they are handed to MATLAB:
 ```
 if (nlhs > 2)
@@ -104,12 +98,19 @@ if (nlhs > 2)
 // ---------- Inputs: MATLAB -> C++ ----------
 
 // Scalar, casts to dtype; returns default_value for empty input "[]"; more than one element raises
-// "Input 'x' must be a scalar.". Integer types need an integer value in range.
+// "Input 'x' must be a scalar.". Integer types need an integer value in range. The error states the range for
+// types up to 32 bit ("must be an integer from 0 to 4294967295.") and only the sign for 64-bit types ("must be a
+// non-negative integer.", "must be a positive integer." for indices).
 dtype qd_mex_get_scalar(const mxArray *input, std::string var_name, dtype default_value);
 dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = ""); // floating point only; NaN for "[]"
 
-// Seed of a random number generator: -1 (random) or 0 ... 2^63-1; -1 for empty input
-long long qd_mex_get_seed(const mxArray *input, const std::string &var_name = "seed");
+// Seed of a random number generator: -1 (random) or 0 ... 2^63-1; -1 for empty input; errors with
+// "Input 'seed' must be -1 or a non-negative integer."
+long long qd_mex_get_seed(const mxArray *input, const std::string &var_name = "seed"); // every seed input is read with it
+
+// 1-based index (MATLAB) -> 0-based (C++); integer dtype; returns 0 (the first index) for empty input
+dtype qd_mex_get_index(const mxArray *input, const std::string &var_name);
+arma::Col<dtype> qd_mex_get_index_Col(const mxArray *input, const std::string &var_name); // copy, empty for "[]"
 
 // Char array -> std::string; returns default_value for empty input (the second argument is NOT a name);
 // errors name 'var_name' if given
@@ -195,16 +196,20 @@ mxArray *qd_mex_init_output(std::vector<arma::Cube<dtype>> *input, size_t n_rows
 mxArray *qd_mex_make_struct(const std::vector<std::string> &fields, size_t N = 1); // 1xN struct array; no fields -> 0x0 struct
 void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *data, size_t n = 0); // n = element index, 0-based
 bool qd_mex_has_field(const mxArray *strct, const std::string &field);
-mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0); // errors if field is missing
+mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0,
+                          const std::string &var_name = ""); // errors if field is missing, naming 'var_name' if given
 
 // ---------- mex_quadriga_lib_functions.hpp ----------
 
-quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *input, bool validate = false, bool copy = false);
-std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(const mxArray *input, bool validate = false, bool copy = false);
+quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *input, bool validate = false, bool copy = false,
+                                                      const std::string &var_name = "");
+std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(const mxArray *input, bool validate = false, bool copy = false,
+                                                                         const std::string &var_name = "");
 mxArray *qd_mex_arrayant2struct(const quadriga_lib::arrayant<double> &ant);
 mxArray *qd_mex_arrayant2struct_multi(const std::vector<quadriga_lib::arrayant<double>> &ant);
 
-std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool validate = false, bool copy = false);
+std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool validate = false, bool copy = false,
+                                                                 const std::string &var_name = "");
 mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<double>> &chan, bool validate = false);
 
 // std::any (string, scalar, arma::Col / Row / Mat / Cube) -> MATLAB array of the same type; no value -> []
@@ -252,7 +257,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 | `name` | string | no |
 
 - A 1x1 struct is a single-frequency arrayant; a 1xN struct array is a frequency-dependent (multi-frequency) model and maps to `std::vector<quadriga_lib::arrayant<double>>`.
-- Reading: `qd_mex_struct2arrayant(prhs[i], validate, copy)` or `qd_mex_struct2arrayant_multi(...)`.
+- Reading: `qd_mex_struct2arrayant(prhs[i], validate, copy, "tx_array")` or `qd_mex_struct2arrayant_multi(...)`; errors name the argument and its field, e.g. `"Input 'tx_array.e_theta_re' ..."`.
   - `validate = true` runs the arrayant validation and throws on inconsistent data. Use `false` when the C++ function validates its inputs anyway.
   - `copy = false` borrows the MATLAB memory (read-only). Use `copy = true` whenever the arrayant object is modified after reading (e.g. by functions that work in place such as `arrayant_copy_element`, `arrayant_remove_zeros` or `arrayant_rotate_pattern`).
 - Writing: `plhs[0] = qd_mex_arrayant2struct(ant);` or `qd_mex_arrayant2struct_multi(ant_vec);`
@@ -283,7 +288,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 | `initial_position` | scalar; int32; 1-based (0-based in C++); absent = 1 |
 
 - A field carries the name of its C++ member; exception: a member that is a `std::vector` over snapshots becomes one array (see above).
-- Reading: `qd_mex_struct2channel(prhs[i], validate, copy)` always returns a `std::vector`; all fields are optional, missing fields leave the member empty. Wrap the call in `CALL_QD` when `validate = true`.
+- Reading: `qd_mex_struct2channel(prhs[i], validate, copy, "chan")` always returns a `std::vector`; all fields are optional, missing fields leave the member empty. Do not wrap it in `CALL_QD`: it raises its own MATLAB errors, and in Octave `CALL_QD` catches them and repeats the function name in the message.
 - Writing: `plhs[0] = qd_mex_channel2struct(chan_vec);` A member becomes a field when at least one channel fills it; the other channels get `[]` in that field. An empty vector returns a `0x0` struct.
 - Unstructured data (`par_names` / `par_data`, a list of `std::any`) is NOT part of the channel struct. It is exchanged through a separate `par` struct, converted with `qd_mex_anycast` / `qd_mex_any2matlab`; see `hdf5_write_channel.cpp` and `hdf5_read_channel.cpp`.
 - In the documentation, refer to [[hdf5_read_channel]] for the field layout instead of repeating the table.
@@ -322,6 +327,7 @@ if (nrhs < 1 || nrhs > 2)
 if (nlhs > 3)
     mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 ```
+- Every wrapper checks an upper limit on `nrhs` and on `nlhs` (and a lower limit on `nrhs` where inputs are mandatory); these two texts are the only messages for wrong argument counts.
 - A C++ function without results gives a wrapper without outputs: `nlhs > 0` is an error, and the `## Outputs:` section is omitted.
 
 ## Input conversion

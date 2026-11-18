@@ -50,8 +50,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::vector<arma::vec> delays = qd_mex_matlab2vector_Col<double>(prhs[0], 1);
-    const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[1], 1);
+    const std::vector<arma::vec> delays = qd_mex_matlab2vector_Col<double>(prhs[0], 1, "delays");
+    const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[1], 1, "powers");
     const double threshold_dB = (nrhs < 3) ? 100.0 : qd_mex_get_scalar<double>(prhs[2], "threshold_dB", 100.0);
     const double granularity = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "granularity", 0.0);
 

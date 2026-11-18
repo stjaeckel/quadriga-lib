@@ -58,9 +58,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs (empty = use C++ defaults)
-    const arma::vec scale = (nrhs < 1) ? arma::vec() : qd_mex_get_Col<double>(prhs[0]);
-    const arma::vec rotation = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
-    const arma::vec location = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2]);
+    const arma::vec scale = (nrhs < 1) ? arma::vec() : qd_mex_get_Col<double>(prhs[0], false, "scale");
+    const arma::vec rotation = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1], false, "rotation");
+    const arma::vec location = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2], false, "location");
     const arma::uword n_div = (nrhs < 4) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[3], "n_div", 1);
 
     // Call library function (returns mesh by value)

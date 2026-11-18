@@ -104,8 +104,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Parse antenna objects
-    auto ant_tx = qd_mex_struct2arrayant(prhs[0]);
-    auto ant_rx = qd_mex_struct2arrayant(prhs[1]);
+    auto ant_tx = qd_mex_struct2arrayant(prhs[0], false, false, "tx_array");
+    auto ant_rx = qd_mex_struct2arrayant(prhs[1], false, false, "rx_array");
 
     const double center_freq = (nrhs < 12) ? 0.0 : qd_mex_get_scalar<double>(prhs[11], "center_freq", 0.0);
     const bool use_absolute_delays = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "use_absolute_delays", false);
@@ -155,11 +155,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Single snapshot
-    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6]);
-    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7]);
-    const auto path_gain = qd_mex_get_Col<double>(prhs[8]);
-    const auto path_length = qd_mex_get_Col<double>(prhs[9]);
-    const auto M = qd_mex_get_Mat<double>(prhs[10]);
+    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6], false, "fbs_pos");
+    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7], false, "lbs_pos");
+    const auto path_gain = qd_mex_get_Col<double>(prhs[8], false, "path_gain");
+    const auto path_length = qd_mex_get_Col<double>(prhs[9], false, "path_length");
+    const auto M = qd_mex_get_Mat<double>(prhs[10], false, "M");
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[2], "tx_pos", 3);
     const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[3], "tx_orientation", 3);
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);

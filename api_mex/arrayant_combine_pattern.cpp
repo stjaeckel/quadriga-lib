@@ -59,21 +59,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!mxIsStruct(prhs[0]) || mxGetNumberOfElements(prhs[0]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in' must be an arrayant struct or struct array.");
 
-    const arma::vec freq_new = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
-    const arma::vec az = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2]);
-    const arma::vec el = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3]);
+    const arma::vec freq_new = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1], false, "freq_new");
+    const arma::vec az = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2], false, "azimuth_grid_new");
+    const arma::vec el = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3], false, "elevation_grid_new");
     const double propagation_speed = (nrhs < 5) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[4], "propagation_speed", 299792458.0);
 
     if (freq_new.n_elem > 1 || mxGetNumberOfElements(prhs[0]) > 1) // Multi-frequency
     {
-        const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]); // Validated by the C++ function
+        const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant_in"); // Validated by the C++ function
         std::vector<quadriga_lib::arrayant<double>> out;
         CALL_QD(out = quadriga_lib::arrayant_combine_pattern_multi(ant_multi, &az, &el, &freq_new, propagation_speed));
         plhs[0] = (out.size() == 1) ? qd_mex_arrayant2struct(out[0]) : qd_mex_arrayant2struct_multi(out);
         return;
     }
 
-    auto ant = qd_mex_struct2arrayant(prhs[0]); // Validated by the C++ function
+    auto ant = qd_mex_struct2arrayant(prhs[0], false, false, "arrayant_in"); // Validated by the C++ function
     if (freq_new.n_elem == 1) // Scalar frequency override
         ant.center_freq = freq_new[0];
 

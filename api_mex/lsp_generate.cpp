@@ -99,10 +99,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
     const arma::vec center_freq = qd_mex_get_Col<double>(prhs[1], false, "center_freq");
-    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2]);
-    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[3]);
-    const arma::mat rnd = qd_mex_get_Mat<double>(prhs[4]);
-    const arma::mat sf_sigma_dB = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5]);
+    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2], false, "tx_pos");
+    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[3], false, "rx_pos");
+    const arma::mat rnd = qd_mex_get_Mat<double>(prhs[4], false, "rnd");
+    const arma::mat sf_sigma_dB = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5], false, "sf_sigma_dB");
     const bool cholesky = (nrhs < 7) ? true : qd_mex_get_scalar<bool>(prhs[6], "cholesky", true);
     const bool clip_spreads = (nrhs < 8) ? true : qd_mex_get_scalar<bool>(prhs[7], "clip_spreads", true);
 

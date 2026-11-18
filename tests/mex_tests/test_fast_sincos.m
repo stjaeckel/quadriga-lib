@@ -72,9 +72,9 @@ assertTrue(isa(s1, 'single'));
 assert_close(s1, sin(x), 1e-6);
 
 %% Malformed input is rejected by the MEX helpers
-assert_cpp_error( @() quadriga_lib.fast_sincos( sparse([0 0 1.5]) ), 'Sparse inputs are not supported.' );
+assert_cpp_error( @() quadriga_lib.fast_sincos( sparse([0 0 1.5]) ), 'Input ''x'' is sparse; sparse inputs are not supported.' );
 assert_cpp_error( @() quadriga_lib.fast_sincos( [0 0 1.5], sparse(true) ), 'Input ''cos_only'' is sparse' );
-assert_cpp_error( @() quadriga_lib.fast_sincos( ones(2,2,2,2,2) ), 'Inputs with more than 4 dimensions are not supported.' );
+assert_cpp_error( @() quadriga_lib.fast_sincos( ones(2,2,2,2,2) ), 'Input ''x'' has more than 4 dimensions.' );
 s = quadriga_lib.fast_sincos( ones(2,2,2,2) );                  % 4 dimensions are supported (all 16 values)
 assertEqual( numel(s), 16 );
 

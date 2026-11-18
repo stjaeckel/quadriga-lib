@@ -61,8 +61,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
+    const arma::mat orig = qd_mex_get_Mat<double>(prhs[0], false, "orig");
+    const arma::mat dest = qd_mex_get_Mat<double>(prhs[1], false, "dest");
     const double center_freq = qd_mex_get_scalar<double>(prhs[2], "center_freq", 0.0);
     if (mxGetNumberOfElements(prhs[3]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'lod' cannot be empty.");

@@ -86,7 +86,8 @@ function test_point_inside_mesh
     % ───────────────────────────────────────────────────────────────
     assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, zeros(12,1)), 'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
     assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, [ones(11,1); 0]), 'Entries in ''obj_ind'' cannot be 0 (1-based index).' );
-    assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, ones(12,1)*1.5), 'Entries in ''obj_ind'' must be integers from 0 to' );
+    assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, ones(12,1)*1.5), 'Entries in ''obj_ind'' must be positive integers.' );
+    assert_cpp_error( @() quadriga_lib.point_inside_mesh(points, mesh, [], 0, 1), 'Wrong number of input arguments.' );
     res = quadriga_lib.point_inside_mesh(points, mesh, uint32(obj_ind));
     assertEqual(uint64([2; 0]), res);
 end

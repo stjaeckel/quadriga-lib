@@ -38,7 +38,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    const arma::cube orientation = qd_mex_get_Cube<double>(prhs[0]);
+    const arma::cube orientation = qd_mex_get_Cube<double>(prhs[0], false, "orientation");
     const bool transposed = (nrhs < 2) ? false : qd_mex_get_scalar<bool>(prhs[1], "transposed", false);
 
     arma::cube rotation;

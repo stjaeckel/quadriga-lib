@@ -57,15 +57,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (use_double_input)
     {
         Xd.~Cube<double>();
-        ::new (&Xd) arma::cube(qd_mex_reinterpret_Cube<double>(prhs[0]));
+        ::new (&Xd) arma::cube(qd_mex_reinterpret_Cube<double>(prhs[0], false, "x"));
     }
     else if (mxIsSingle(prhs[0]))
     {
         Xs.~Cube<float>();
-        ::new (&Xs) arma::fcube(qd_mex_reinterpret_Cube<float>(prhs[0]));
+        ::new (&Xs) arma::fcube(qd_mex_reinterpret_Cube<float>(prhs[0], false, "x"));
     }
     else
-        Xs = qd_mex_typecast_Cube<float>(prhs[0]);
+        Xs = qd_mex_typecast_Cube<float>(prhs[0], "x");
 
     arma::uword n_rows = use_double_input ? Xd.n_rows : Xs.n_rows;
     arma::uword n_cols = use_double_input ? Xd.n_cols : Xs.n_cols;

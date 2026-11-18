@@ -94,7 +94,7 @@ try
     data = quadriga_lib.arrayant_generate('3gpp', [], [], [], [], [], 2, 1, [], [], [], [], [], [], [], trash);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Field ''e_theta_im'' not found at index 1!';
+    expectedErrorMessage = 'Field ''e_theta_im'' not found in ''pattern'' at index 1.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -105,7 +105,7 @@ try
     data = quadriga_lib.arrayant_generate('3gpp', [], [], [], [], [], 2, 1, [], [], [], [], [], [], [], trash);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''e_theta_re'' has an unsupported data type.';
+    expectedErrorMessage = 'Input ''pattern.e_theta_re'' has an unsupported data type.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -115,7 +115,7 @@ try
     data = quadriga_lib.arrayant_generate('3gpp', [], [], [], [], [], 2, 1, [], [], [], [], [], [], [], 0.1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input must be a struct.';
+    expectedErrorMessage = 'Input ''pattern'' must be a struct.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -184,7 +184,7 @@ try
     data = quadriga_lib.arrayant_generate();
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Arrayant type name missing.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

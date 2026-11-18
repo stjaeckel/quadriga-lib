@@ -76,15 +76,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::string model = qd_mex_get_string(prhs[0]);
-    const arma::vec d2d_out = qd_mex_get_Col<double>(prhs[1]);
-    const arma::vec h_bs = qd_mex_get_Col<double>(prhs[2]);
-    const arma::vec h_ut = qd_mex_get_Col<double>(prhs[3]);
+    const std::string model = qd_mex_get_string(prhs[0], "", "model");
+    const arma::vec d2d_out = qd_mex_get_Col<double>(prhs[1], false, "d2d_out");
+    const arma::vec h_bs = qd_mex_get_Col<double>(prhs[2], false, "h_bs");
+    const arma::vec h_ut = qd_mex_get_Col<double>(prhs[3], false, "h_ut");
     auto clutter = [&](int k, const std::string &name) // omitted or [] = NaN (TR default), else a scalar
     { return (nrhs <= k) ? NAN : qd_mex_get_scalar<double>(prhs[k], name, NAN); };
     const double d_clutter = clutter(4, "d_clutter"), r_clutter = clutter(5, "r_clutter");
     const double h_clutter = clutter(6, "h_clutter");
-    const arma::vec rnd_g = (nrhs < 8) ? arma::vec() : qd_mex_get_Col<double>(prhs[7]);
+    const arma::vec rnd_g = (nrhs < 8) ? arma::vec() : qd_mex_get_Col<double>(prhs[7], false, "rnd_g");
     const arma::vec center_freq = (nrhs < 9) ? arma::vec() : qd_mex_get_Col<double>(prhs[8], false, "center_freq");
 
     // Output allocation; the soft LOS state needs both 'rnd_g' and 'center_freq', else it is returned as []

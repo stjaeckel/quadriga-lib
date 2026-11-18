@@ -164,17 +164,28 @@ inline void qd_mex_visit_data(const mxArray *input, const std::string &var_name,
     mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
 }
 
-// Helper: error for integer input that does not fit dtype, e.g. "Input 'x' must be an integer from 0 to 4294967295."
+// Helper: error for integer input that does not fit dtype
+// - Types up to 32 bit state the range, e.g. "Input 'x' must be an integer from 0 to 4294967295."
+// - 64-bit types state only the sign, e.g. "Input 'x' must be a non-negative integer."; their limits lie far
+//   beyond any value an input can sensibly have
+// - one_based: the range starts at 1 (1-based index inputs)
 template <typename dtype>
-inline void qd_mex_integer_error(const std::string &var_name, bool scalar)
+inline void qd_mex_integer_error(const std::string &var_name, bool scalar, bool one_based = false)
 {
-    const std::string range = "from " + std::to_string(std::numeric_limits<dtype>::min()) +
-                              " to " + std::to_string(std::numeric_limits<dtype>::max()) + ".";
-    std::string msg;
-    if (scalar)
-        msg = (var_name.empty() ? std::string("Input") : "Input '" + var_name + "'") + " must be an integer " + range;
+    std::string what; // Completes "must be ..."
+    if constexpr (sizeof(dtype) < 8)
+    {
+        const std::string lo = one_based ? std::string("1") : std::to_string(std::numeric_limits<dtype>::min());
+        what = std::string(scalar ? "an integer" : "integers") + " from " + lo + " to " + std::to_string(std::numeric_limits<dtype>::max());
+    }
+    else if (one_based)
+        what = scalar ? "a positive integer" : "positive integers";
+    else if constexpr (std::is_signed_v<dtype>)
+        what = scalar ? "an integer" : "integers";
     else
-        msg = (var_name.empty() ? std::string("Entries") : "Entries in '" + var_name + "'") + " must be integers " + range;
+        what = scalar ? "a non-negative integer" : "non-negative integers";
+    const std::string msg = scalar ? (var_name.empty() ? std::string("Input") : "Input '" + var_name + "'") + " must be " + what + "."
+                                   : (var_name.empty() ? std::string("Entries") : "Entries in '" + var_name + "'") + " must be " + what + ".";
     mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
 }
 
@@ -270,11 +281,35 @@ inline long long qd_mex_get_seed(const mxArray *input, const std::string &var_na
     const long long seed = qd_mex_read_scalar<long long>(input, var_name, -1LL, bad);
     if (bad || seed < -1LL)
     {
-        const std::string msg = "Input '" + var_name + "' must be an integer from -1 to " +
-                                std::to_string(std::numeric_limits<long long>::max()) + ".";
+        const std::string msg = "Input '" + var_name + "' must be -1 or a non-negative integer.";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
     return seed;
+}
+
+// Read a 1-based index (MATLAB) and return it 0-based (C++); any integer type except bool
+// - Returns 0 (the first index) for empty input
+// - 0 raises "Input 'x' cannot be 0 (1-based index)."; NaN, Inf, fractional, negative or too large values raise
+//   "Input 'x' must be an integer from 1 to <max>."
+template <typename dtype = arma::uword>
+inline dtype qd_mex_get_index(const mxArray *input, const std::string &var_name)
+{
+    static_assert(std::is_integral_v<dtype> && !std::is_same_v<dtype, bool>, "qd_mex_get_index: integer types only.");
+    if (mxGetNumberOfElements(input) == 0)
+        return dtype(0);
+
+    bool bad = false;
+    const dtype value = qd_mex_read_scalar<dtype>(input, var_name, dtype(0), bad);
+    if constexpr (std::is_signed_v<dtype>)
+        bad |= value < 0;
+    if (bad)
+        qd_mex_integer_error<dtype>(var_name, true, true);
+    if (value == 0)
+    {
+        const std::string msg = "Input '" + var_name + "' cannot be 0 (1-based index).";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
+    return value - 1;
 }
 
 // Read a string input from MATLAB and convert it to a std::string
@@ -287,7 +322,7 @@ inline std::string qd_mex_get_string(const mxArray *input, std::string default_v
 
     if (input == nullptr || !mxIsClass(input, "char"))
     {
-        const std::string msg = var_name.empty() ? "Input must be a string (character array)"
+        const std::string msg = var_name.empty() ? "Input must be a string (character array)."
                                                  : "Input '" + var_name + "' must be a string (character array).";
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
     }
@@ -595,6 +630,39 @@ inline std::vector<arma::Cube<dtype>> qd_mex_get_CubeVec(const mxArray *input, b
                : qd_mex_typecast_CubeVec<dtype>(input, var_name);
 }
 
+// Read a vector of 1-based indices (MATLAB) and return them 0-based (C++), as a copy
+// - Returns an empty vector for empty input
+// - A 0 raises "Entries in 'x' cannot be 0 (1-based index)."; NaN, Inf, fractional, negative or too large values
+//   raise "Entries in 'x' must be integers from 1 to <max>."
+template <typename dtype = arma::uword>
+inline arma::Col<dtype> qd_mex_get_index_Col(const mxArray *input, const std::string &var_name)
+{
+    static_assert(std::is_integral_v<dtype> && std::is_unsigned_v<dtype>, "qd_mex_get_index_Col: unsigned integer types only.");
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input, var_name);
+    if (n_data == 0)
+        return arma::Col<dtype>();
+
+    arma::Col<dtype> output(n_data, arma::fill::none);
+    dtype *ptr = output.memptr();
+    bool bad = false, zero = false;
+    qd_mex_visit_data(input, var_name, [&](auto *src)
+                      {
+                          for (size_t m = 0; m < n_data; ++m)
+                          {
+                              ptr[m] = qd_mex_cast<dtype>(src[m], bad);
+                              zero |= ptr[m] == 0;
+                              --ptr[m]; // Wraps for 0, which raises the error below
+                          } });
+    if (bad)
+        qd_mex_integer_error<dtype>(var_name, false, true);
+    if (zero)
+    {
+        const std::string msg = "Entries in '" + var_name + "' cannot be 0 (1-based index).";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
+    return output;
+}
+
 // Read a MATLAB cell array of strings (or a single char string) into a std::vector<std::string>
 // - Every cell element must be a char array; unset elements (cell(1,1)) and other types raise an error
 inline std::vector<std::string> qd_mex_get_strings(const mxArray *input, const std::string &var_name = "")
@@ -605,12 +673,16 @@ inline std::vector<std::string> qd_mex_get_strings(const mxArray *input, const s
 
     if (mxIsChar(input)) // single string -> one entry
     {
-        out.push_back(qd_mex_get_string(input));
+        out.push_back(qd_mex_get_string(input, "", var_name));
         return out;
     }
 
     if (!mxIsCell(input))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Object/material names must be a cell array of strings.");
+    {
+        const std::string msg = var_name.empty() ? "Input must be a cell array of strings."
+                                                 : "Input '" + var_name + "' must be a cell array of strings.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
 
     size_t n = mxGetNumberOfElements(input);
     out.reserve(n);
@@ -623,7 +695,7 @@ inline std::vector<std::string> qd_mex_get_strings(const mxArray *input, const s
                                     (var_name.empty() ? std::string("") : " of '" + var_name + "'") + " is not a string.";
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
         }
-        out.push_back(qd_mex_get_string(element));
+        out.push_back(qd_mex_get_string(element, "", var_name));
     }
 
     return out;
@@ -1209,18 +1281,22 @@ inline bool qd_mex_has_field(const mxArray *strct, const std::string &field)
     return mxGetField(strct, 0, field.c_str()) != nullptr;
 }
 
-inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0)
+inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0, const std::string &var_name = "")
 {
+    const std::string in = var_name.empty() ? std::string("") : " in '" + var_name + "'";
     if (!mxIsStruct(strct))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+    {
+        const std::string msg = var_name.empty() ? "Input must be a struct." : "Input '" + var_name + "' must be a struct.";
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", msg.c_str());
+    }
 
     size_t n_elem = (size_t)mxGetNumberOfElements(strct);
     if (n >= n_elem)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Struct index " + std::to_string(n + 1) + " out of range (size " + std::to_string(n_elem) + ").").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Struct index " + std::to_string(n + 1) + in + " out of range (size " + std::to_string(n_elem) + ").").c_str());
 
     mxArray *data = mxGetField(strct, (mwIndex)n, field.c_str());
     if (data == nullptr)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + field + "' not found at index " + std::to_string(n + 1) + "!").c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "%s", ("Field '" + field + "' not found" + in + " at index " + std::to_string(n + 1) + ".").c_str());
     return data;
 }
 

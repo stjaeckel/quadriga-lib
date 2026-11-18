@@ -55,11 +55,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (mxIsSingle(prhs[0]))
     {
-        const arma::fvec x = qd_mex_get_Col<float>(prhs[0]);
-        const arma::fvec y = twoD ? qd_mex_get_Col<float>(prhs[1]) : arma::fvec(1);
-        const arma::fcube input = qd_mex_get_Cube<float>(prhs[2]);
-        const arma::fvec x_new = qd_mex_get_Col<float>(prhs[3]);
-        const arma::fvec y_new = (nrhs > 4 && twoD) ? qd_mex_get_Col<float>(prhs[4]) : arma::fvec(1);
+        const arma::fvec x = qd_mex_get_Col<float>(prhs[0], false, "x");
+        const arma::fvec y = twoD ? qd_mex_get_Col<float>(prhs[1], false, "y") : arma::fvec(1);
+        const arma::fcube input = qd_mex_get_Cube<float>(prhs[2], false, "input");
+        const arma::fvec x_new = qd_mex_get_Col<float>(prhs[3], false, "x_new");
+        const arma::fvec y_new = (nrhs > 4 && twoD) ? qd_mex_get_Col<float>(prhs[4], false, "y_new") : arma::fvec(1);
 
         arma::fcube output;
         plhs[0] = qd_mex_init_output(&output, y_new.n_elem, x_new.n_elem, input.n_slices);
@@ -68,11 +68,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     else
     {
-        const arma::vec x = qd_mex_get_Col<double>(prhs[0]);
-        const arma::vec y = twoD ? qd_mex_get_Col<double>(prhs[1]) : arma::vec(1);
-        const arma::cube input = qd_mex_get_Cube<double>(prhs[2]);
-        const arma::vec x_new = qd_mex_get_Col<double>(prhs[3]);
-        const arma::vec y_new = (nrhs > 4 && twoD) ? qd_mex_get_Col<double>(prhs[4]) : arma::vec(1);
+        const arma::vec x = qd_mex_get_Col<double>(prhs[0], false, "x");
+        const arma::vec y = twoD ? qd_mex_get_Col<double>(prhs[1], false, "y") : arma::vec(1);
+        const arma::cube input = qd_mex_get_Cube<double>(prhs[2], false, "input");
+        const arma::vec x_new = qd_mex_get_Col<double>(prhs[3], false, "x_new");
+        const arma::vec y_new = (nrhs > 4 && twoD) ? qd_mex_get_Col<double>(prhs[4], false, "y_new") : arma::vec(1);
 
         arma::cube output;
         plhs[0] = qd_mex_init_output(&output, y_new.n_elem, x_new.n_elem, input.n_slices);

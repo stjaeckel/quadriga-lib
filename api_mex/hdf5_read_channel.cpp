@@ -81,7 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read filename
-    const std::string fn = qd_mex_get_string(prhs[0]);
+    const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
 
     // Read storage layout (returns [0,0,0,0] if file does not exist)
     arma::Col<unsigned> storage_space;
@@ -99,19 +99,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nx == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "HDF5 file does not exist or has no layout.");
 
-    // Parse index inputs: omitted/empty -> 1:n_dim; vector -> validated as-is
+    // Parse index inputs (1-based -> 0-based): omitted/empty -> all; vector -> validated against the layout
     auto parse_idx = [&](int arg_idx, unsigned n_dim, const char *name) -> arma::Col<unsigned>
     {
         if (arg_idx >= nrhs || mxGetNumberOfElements(prhs[arg_idx]) == 0)
-        {
-            arma::Col<unsigned> v(n_dim);
-            for (unsigned i = 0; i < n_dim; ++i)
-                v.at(i) = i + 1;
-            return v;
-        }
-        arma::Col<unsigned> v = qd_mex_get_Col<unsigned>(prhs[arg_idx], false, name);
+            return arma::regspace<arma::Col<unsigned>>(0, 1, n_dim - 1);
+        const arma::Col<unsigned> v = qd_mex_get_index_Col<unsigned>(prhs[arg_idx], name);
         for (auto val : v)
-            if (val == 0 || val > n_dim)
+            if (val >= n_dim)
                 mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Index '%s' out of bounds.", name);
         return v;
     };
@@ -122,7 +117,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::Col<unsigned> iw_vec = parse_idx(4, nw, "iw");
 
     // Parse i_snap
-    arma::uvec i_snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5], true, "i_snap");
+    const arma::uvec i_snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_index_Col(prhs[5], "i_snap"); // 1-based -> 0-based
 
     const arma::uword n_sel = ix_vec.n_elem * iy_vec.n_elem * iz_vec.n_elem * iw_vec.n_elem;
     if (!i_snap.is_empty() && n_sel > 1)
@@ -137,10 +132,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             for (arma::uword y = 0; y < iy_vec.n_elem; ++y)
                 for (arma::uword x = 0; x < ix_vec.n_elem; ++x)
                 {
-                    const unsigned ix0 = ix_vec.at(x) - 1;
-                    const unsigned iy0 = iy_vec.at(y) - 1;
-                    const unsigned iz0 = iz_vec.at(z) - 1;
-                    const unsigned iw0 = iw_vec.at(w) - 1;
+                    const unsigned ix0 = ix_vec.at(x);
+                    const unsigned iy0 = iy_vec.at(y);
+                    const unsigned iz0 = iz_vec.at(z);
+                    const unsigned iw0 = iw_vec.at(w);
 
                     // Fast empty-slot check via channel_id (avoids per-slot HDF5 read)
                     const unsigned lin_idx = ix0 + iy0 * nx + iz0 * nx * ny + iw0 * nx * ny * nz;
@@ -169,12 +164,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         quadriga_lib::channel<double> &channel = channels[0];
         const arma::uword n_snap_full = channel.n_snap();
-        for (auto &s : i_snap)
-        {
-            if (s == 0 || s > n_snap_full)
-                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Snapshot index out of bounds.");
-            --s;
-        }
+        if (arma::any(i_snap >= n_snap_full))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Snapshot index out of bounds.");
 
         quadriga_lib::channel<double> sub;
         sub.name = channel.name;

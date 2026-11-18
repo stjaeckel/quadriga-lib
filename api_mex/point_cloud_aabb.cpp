@@ -47,17 +47,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    const arma::mat points = qd_mex_get_Mat<double>(prhs[0]);
-    arma::u32_vec sub_cloud_ind = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true, "sub_cloud_ind");
+    const arma::mat points = qd_mex_get_Mat<double>(prhs[0], false, "points");
+    const arma::u32_vec sub_cloud_ind = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_index_Col<unsigned>(prhs[1], "sub_cloud_ind"); // 1-based -> 0-based
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    // Convert sub_mesh_ind to 0-based
-    for (unsigned &val : sub_cloud_ind)
-    {
-        if (val == 0)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_cloud_ind' cannot be 0.");
-        --val;
-    }
 
     // Wrap optional input pointer
     const arma::u32_vec *p_sub_cloud_index = sub_cloud_ind.empty() ? nullptr : &sub_cloud_ind;

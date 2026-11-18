@@ -92,7 +92,7 @@ try
     [~] = quadriga_lib.arrayant_calc_directivity( ant_cf );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''center_freq'' must be a scalar.';
+    expectedErrorMessage = 'Input ''arrayant.center_freq'' must be a scalar.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

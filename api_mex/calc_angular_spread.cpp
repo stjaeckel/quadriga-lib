@@ -59,12 +59,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 3 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 5)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments (max 5).");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs: convert MATLAB matrices to std::vector<arma::vec>
-    const std::vector<arma::vec> az = qd_mex_matlab2vector_Col<double>(prhs[0], 1);
-    const std::vector<arma::vec> el = qd_mex_matlab2vector_Col<double>(prhs[1], 1);
-    const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[2], 1);
+    const std::vector<arma::vec> az = qd_mex_matlab2vector_Col<double>(prhs[0], 1, "az");
+    const std::vector<arma::vec> el = qd_mex_matlab2vector_Col<double>(prhs[1], 1, "el");
+    const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[2], 1, "powers");
 
     const bool wrapping = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "wrapping", false);
     const bool calc_bank_angle = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "calc_bank_angle", false);

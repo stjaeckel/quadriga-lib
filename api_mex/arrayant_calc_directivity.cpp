@@ -44,13 +44,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be an arrayant struct or struct array.");
 
     // Element indices: 1-based MATLAB -> 0-based C++ (empty = all elements)
-    arma::uvec i_element = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_element");
-    if (arma::any(i_element == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");
-    i_element -= 1;
+    const arma::uvec i_element = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_element");
 
     // A single struct is a one-entry vector; the output is [n_out, n_freq] either way
-    const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]); // Validated by the C++ function
+    const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant"); // Validated by the C++ function
     arma::mat directivity_dBi;
     CALL_QD(quadriga_lib::arrayant_calc_directivity_multi(ant_multi, directivity_dBi, &i_element));
     plhs[0] = qd_mex_copy2matlab(&directivity_dBi);

@@ -107,17 +107,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const auto scenpar = qd_mex_struct2scenpar(prhs[0], "scenpar");
-    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[1]);
-    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[2]);
-    const arma::cube lsp = qd_mex_get_Cube<double>(prhs[3]);
-    const arma::mat rnd = qd_mex_get_Mat<double>(prhs[4]);
-    const std::string method = (nrhs < 6) ? std::string("38.901") : qd_mex_get_string(prhs[5], "38.901");
-    const arma::cube rnd_freq = (nrhs < 7) ? arma::cube() : qd_mex_get_Cube<double>(prhs[6]);
-    const arma::cube lsp_anchor = (nrhs < 8) ? arma::cube() : qd_mex_get_Cube<double>(prhs[7]);
-    const arma::mat eod_offset_deg = (nrhs < 9) ? arma::mat() : qd_mex_get_Mat<double>(prhs[8]);
-    const arma::vec abs_toa = (nrhs < 10) ? arma::vec() : qd_mex_get_Col<double>(prhs[9]);
-    const arma::mat gr_eps_re = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10]);
-    const arma::mat gr_eps_im = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11]);
+    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[1], false, "tx_pos");
+    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[2], false, "rx_pos");
+    const arma::cube lsp = qd_mex_get_Cube<double>(prhs[3], false, "lsp");
+    const arma::mat rnd = qd_mex_get_Mat<double>(prhs[4], false, "rnd");
+    const std::string method = (nrhs < 6) ? std::string("38.901") : qd_mex_get_string(prhs[5], "38.901", "method");
+    const arma::cube rnd_freq = (nrhs < 7) ? arma::cube() : qd_mex_get_Cube<double>(prhs[6], false, "rnd_freq");
+    const arma::cube lsp_anchor = (nrhs < 8) ? arma::cube() : qd_mex_get_Cube<double>(prhs[7], false, "lsp_anchor");
+    const arma::mat eod_offset_deg = (nrhs < 9) ? arma::mat() : qd_mex_get_Mat<double>(prhs[8], false, "eod_offset_deg");
+    const arma::vec abs_toa = (nrhs < 10) ? arma::vec() : qd_mex_get_Col<double>(prhs[9], false, "abs_toa");
+    const arma::mat gr_eps_re = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10], false, "gr_eps_re");
+    const arma::mat gr_eps_im = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11], false, "gr_eps_im");
     const std::vector<bool> o2i = (nrhs < 13) ? std::vector<bool>() : qd_mex_matlab2vector_Bool(prhs[12], "o2i");
     const arma::u32_vec n_cluster =
         (nrhs < 14) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[13], false, "n_cluster");

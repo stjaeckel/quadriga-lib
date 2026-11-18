@@ -135,18 +135,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::cube aoa = qd_mex_get_Cube<double>(prhs[11], false, "aoa");
     const arma::cube eoa = qd_mex_get_Cube<double>(prhs[12], false, "eoa");
     const arma::cube rnd_ray = qd_mex_get_Cube<double>(prhs[13], false, "rnd_ray");
-    const std::string method = (nrhs < 15) ? std::string("38.901") : qd_mex_get_string(prhs[14], "38.901");
-    arma::uword i_freq = (nrhs < 16) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[15], "i_freq", 1);
-    const std::string angle_model = (nrhs < 17) ? std::string("additive") : qd_mex_get_string(prhs[16], "additive");
-    const std::string pol_model = (nrhs < 18) ? std::string("38.901") : qd_mex_get_string(prhs[17], "38.901");
+    const std::string method = (nrhs < 15) ? std::string("38.901") : qd_mex_get_string(prhs[14], "38.901", "method");
+    const arma::uword i_freq = (nrhs < 16) ? 0 : qd_mex_get_index(prhs[15], "i_freq"); // 1-based -> 0-based
+    const std::string angle_model = (nrhs < 17) ? std::string("additive") : qd_mex_get_string(prhs[16], "additive", "angle_model");
+    const std::string pol_model = (nrhs < 18) ? std::string("38.901") : qd_mex_get_string(prhs[17], "38.901", "pol_model");
     const arma::mat gr_eps_re = (nrhs < 19) ? arma::mat() : qd_mex_get_Mat<double>(prhs[18], false, "gr_eps_re");
     const arma::mat gr_eps_im = (nrhs < 20) ? arma::mat() : qd_mex_get_Mat<double>(prhs[19], false, "gr_eps_im");
     const bool pol_variability = (nrhs < 21) ? false : qd_mex_get_scalar<bool>(prhs[20], "pol_variability", false);
     const bool random_phase = (nrhs < 22) ? true : qd_mex_get_scalar<bool>(prhs[21], "random_phase", true);
 
-    if (i_freq == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'i_freq' cannot be 0 (1-based index).");
-    i_freq -= 1; // 1-based (MATLAB) -> 0-based (C++)
 
     // An omitted or empty input selects the default; with zero links an empty input other than [] counts as given
     auto given = [&](int i)

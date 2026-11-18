@@ -76,17 +76,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    const auto ant = qd_mex_struct2arrayant_multi(prhs[0]);
+    const auto ant = qd_mex_struct2arrayant_multi(prhs[0], false, false, "arrayant");
     if (ant.empty())
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' cannot be empty.");
     const auto az = qd_mex_get_Mat<double>(prhs[1], false, "azimuth");
     const auto el = qd_mex_get_Mat<double>(prhs[2], false, "elevation");
 
     // Element indices: 1-based (MATLAB) -> 0-based (C++), empty = all elements
-    arma::uvec i_element = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], true, "i_element");
-    if (arma::any(i_element == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");
-    i_element -= 1;
+    const arma::uvec i_element = (nrhs < 4) ? arma::uvec() : qd_mex_get_index_Col(prhs[3], "i_element");
 
     const auto orientation = (nrhs < 5) ? arma::cube() : qd_mex_get_Cube<double>(prhs[4], false, "orientation");
     const auto element_pos = (nrhs < 6) ? arma::mat() : qd_mex_get_Mat<double>(prhs[5], false, "element_pos");

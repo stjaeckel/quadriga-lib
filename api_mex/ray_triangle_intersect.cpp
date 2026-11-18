@@ -62,26 +62,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 5)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Load inputs (cast to double if needed)
-    arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
-    arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
-    arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
+    arma::mat orig = qd_mex_get_Mat<double>(prhs[0], false, "orig");
+    arma::mat dest = qd_mex_get_Mat<double>(prhs[1], false, "dest");
+    arma::mat mesh = qd_mex_get_Mat<double>(prhs[2], false, "mesh");
 
     // Optional inputs
-    arma::u32_vec sub_mesh_ind = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[3], true, "sub_mesh_ind");
-    arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4]);
+    arma::u32_vec sub_mesh_ind = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_index_Col<unsigned>(prhs[3], "sub_mesh_ind"); // 1-based -> 0-based
+    arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4], false, "aabb");
     int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
 
-    // Convert sub_mesh_ind to 0-based
-    for (unsigned &val : sub_mesh_ind)
-    {
-        if (val == 0)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_mesh_ind' cannot be 0.");
-        --val;
-    }
 
     // Number of rays
     arma::uword n_rays = orig.n_rows;

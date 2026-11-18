@@ -59,7 +59,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read inputs; a char array is one directory, also when it is empty (= current directory)
     std::vector<std::string> dirs;
     if (mxIsChar(prhs[0]))
-        dirs.push_back(qd_mex_get_string(prhs[0]));
+        dirs.push_back(qd_mex_get_string(prhs[0], "", "dirs"));
     else if (mxIsCell(prhs[0]))
         dirs = qd_mex_get_strings(prhs[0], "dirs");
     else

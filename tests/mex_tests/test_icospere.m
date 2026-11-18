@@ -52,12 +52,12 @@ catch ME
 end
 
 %% Integer inputs must be integers in the range of the C++ type
-assert_cpp_error( @() quadriga_lib.icosphere( -1, 1 ), 'Input ''n_div'' must be an integer from 0 to 18446744073709551615.' );
-assert_cpp_error( @() quadriga_lib.icosphere( NaN, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( 2.5, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( Inf, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( 1e30, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( int32(-1), 1 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( -1, 1 ), 'Input ''n_div'' must be a non-negative integer.' );
+assert_cpp_error( @() quadriga_lib.icosphere( NaN, 1 ), 'Input ''n_div'' must be a non-negative integer.' );
+assert_cpp_error( @() quadriga_lib.icosphere( 2.5, 1 ), 'Input ''n_div'' must be a non-negative integer.' );
+assert_cpp_error( @() quadriga_lib.icosphere( Inf, 1 ), 'Input ''n_div'' must be a non-negative integer.' );
+assert_cpp_error( @() quadriga_lib.icosphere( 1e30, 1 ), 'Input ''n_div'' must be a non-negative integer.' );
+assert_cpp_error( @() quadriga_lib.icosphere( int32(-1), 1 ), 'Input ''n_div'' must be a non-negative integer.' );
 assert_cpp_error( @() quadriga_lib.icosphere( sparse(2), 1 ), 'Input ''n_div'' is sparse' );
 center = quadriga_lib.icosphere( 2.0, 1 );                                    % integer-valued double is fine
 assertEqual( size(center), [80,3] );

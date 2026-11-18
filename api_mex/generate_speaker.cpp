@@ -77,20 +77,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    const std::string driver_type = (nrhs < 1) ? "piston" : qd_mex_get_string(prhs[0], "piston");
+    const std::string driver_type = (nrhs < 1) ? "piston" : qd_mex_get_string(prhs[0], "piston", "driver_type");
     const double radius = (nrhs < 2) ? 0.05 : qd_mex_get_scalar<double>(prhs[1], "radius", 0.05);
     const double lower_cutoff = (nrhs < 3) ? 80.0 : qd_mex_get_scalar<double>(prhs[2], "lower_cutoff", 80.0);
     const double upper_cutoff = (nrhs < 4) ? 12000.0 : qd_mex_get_scalar<double>(prhs[3], "upper_cutoff", 12000.0);
     const double lower_rolloff_slope_dB = (nrhs < 5) ? 12.0 : qd_mex_get_scalar<double>(prhs[4], "lower_rolloff_slope_dB", 12.0);
     const double upper_rolloff_slope_dB = (nrhs < 6) ? 12.0 : qd_mex_get_scalar<double>(prhs[5], "upper_rolloff_slope_dB", 12.0);
     const double sensitivity_dB = (nrhs < 7) ? 85.0 : qd_mex_get_scalar<double>(prhs[6], "sensitivity_dB", 85.0);
-    const std::string radiation_type = (nrhs < 8) ? "hemisphere" : qd_mex_get_string(prhs[7], "hemisphere");
+    const std::string radiation_type = (nrhs < 8) ? "hemisphere" : qd_mex_get_string(prhs[7], "hemisphere", "radiation_type");
     const double hor_coverage_deg = (nrhs < 9) ? NAN : qd_mex_get_scalar<double>(prhs[8], "hor_coverage_deg", NAN);
     const double ver_coverage_deg = (nrhs < 10) ? NAN : qd_mex_get_scalar<double>(prhs[9], "ver_coverage_deg", NAN);
     const double horn_control_freq = (nrhs < 11) ? NAN : qd_mex_get_scalar<double>(prhs[10], "horn_control_freq", NAN);
     const double baffle_width = (nrhs < 12) ? 0.15 : qd_mex_get_scalar<double>(prhs[11], "baffle_width", 0.15);
     const double baffle_height = (nrhs < 13) ? 0.25 : qd_mex_get_scalar<double>(prhs[12], "baffle_height", 0.25);
-    const arma::vec center_freq = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13]);
+    const arma::vec center_freq = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13], false, "center_freq");
     const double angular_resolution_deg = (nrhs < 15) ? 5.0 : qd_mex_get_scalar<double>(prhs[14], "angular_resolution_deg", 5.0);
 
     // Call library function

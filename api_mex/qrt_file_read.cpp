@@ -87,16 +87,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::string fn = qd_mex_get_string(prhs[0]);
-    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1], true, "i_cir");
-    arma::uword i_orig = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 1);
+    const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
+    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_index_Col(prhs[1], "i_cir"); // 1-based -> 0-based
+    const arma::uword i_orig = (nrhs < 3) ? 0 : qd_mex_get_index(prhs[2], "i_orig"); // 1-based -> 0-based
     const bool uplink = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "uplink", false);
     const int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);
-
-    // Convert 1-based (MATLAB) to 0-based (C++); guard against unsigned underflow
-    if (i_orig == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'i_orig' must be >= 1 (1-based indices).");
-    i_orig -= 1;
 
     // Initialize cache and file access
     std::ifstream stream(fn, std::ios::in | std::ios::binary);
@@ -108,12 +103,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (cache.no_cir != 0)
             i_cir = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir) - 1);
     }
-    else // Convert 1-based (MATLAB) to 0-based (C++); guard against unsigned underflow
+    else
     {
-        if (arma::any(i_cir == 0))
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_cir' must be >= 1 (1-based indices).");
-        i_cir -= 1;
-
         if (arma::any(i_cir >= (arma::uword)cache.no_cir))
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "CIR index exceeds number of CIRs in file.");
     }

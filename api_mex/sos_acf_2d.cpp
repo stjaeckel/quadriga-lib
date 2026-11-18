@@ -50,8 +50,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::vec acf = qd_mex_get_Col<double>(prhs[0]);
-    const arma::vec dist = qd_mex_get_Col<double>(prhs[1]);
+    const arma::vec acf = qd_mex_get_Col<double>(prhs[0], false, "acf");
+    const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
 
     // Output allocation (a table with fewer than 2 samples is left to the library to reject)
     const arma::uword n_grid = (acf.n_elem < 2) ? 0 : 4 * acf.n_elem - 3;

@@ -82,7 +82,7 @@ assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2.9, 1 ), 'Input ''n
 assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1.9 ), 'Input ''n_dim'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10.9 ), 'Input ''n_dir'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, 3.9 ), ...
-    'Input ''seed'' must be an integer from -1 to 9223372036854775807.' );
+    'Input ''seed'' must be -1 or a non-negative integer.' );
 f1 = quadriga_lib.sos_generate( acf, dist, 2.0, 1.0, true, 10.0, true, 0, 0, 3.0 );
 f2 = quadriga_lib.sos_generate( acf, dist, 2, 1, true, 10, true, 0, 0, 3 );
 assertEqual( f1, f2 );

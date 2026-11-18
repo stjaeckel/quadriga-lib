@@ -92,8 +92,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Parse multi-frequency antenna struct arrays
-    auto ant_tx = qd_mex_struct2arrayant_multi(prhs[0]);
-    auto ant_rx = qd_mex_struct2arrayant_multi(prhs[1]);
+    auto ant_tx = qd_mex_struct2arrayant_multi(prhs[0], false, false, "tx_array");
+    auto ant_rx = qd_mex_struct2arrayant_multi(prhs[1], false, false, "rx_array");
 
     if (ant_tx.empty())
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "tx_array must not be empty.");
@@ -101,17 +101,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "rx_array must not be empty.");
 
     // Parse other arguments
-    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6]);
-    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7]);
-    const auto path_gain = qd_mex_get_Mat<double>(prhs[8]);
-    const auto path_length = qd_mex_get_Col<double>(prhs[9]);
-    const auto M = qd_mex_get_Cube<double>(prhs[10]);
+    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6], false, "fbs_pos");
+    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7], false, "lbs_pos");
+    const auto path_gain = qd_mex_get_Mat<double>(prhs[8], false, "path_gain");
+    const auto path_length = qd_mex_get_Col<double>(prhs[9], false, "path_length");
+    const auto M = qd_mex_get_Cube<double>(prhs[10], false, "M");
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[2], "tx_pos", 3);
     const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[3], "tx_orientation", 3);
     const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
     const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[5], "rx_orientation", 3);
-    const auto freq = qd_mex_get_Col<double>(prhs[11]);
-    const auto freq_new = qd_mex_get_Col<double>(prhs[12]);
+    const auto freq = qd_mex_get_Col<double>(prhs[11], false, "freq");
+    const auto freq_new = qd_mex_get_Col<double>(prhs[12], false, "freq_new");
     bool use_absolute_delays = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "use_absolute_delays", false);
     bool add_fake_los_path = (nrhs < 15) ? false : qd_mex_get_scalar<bool>(prhs[14], "add_fake_los_path", false);
     double propagation_speed = (nrhs < 16) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[15], "propagation_speed", 299792458.0);

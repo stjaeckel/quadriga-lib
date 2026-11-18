@@ -63,22 +63,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned usage = (nrhs < 3) ? 0 : qd_mex_get_scalar<unsigned>(prhs[2], "usage", 0);
 
     // Element indices: 1-based MATLAB -> 0-based C++ (empty = all elements)
-    arma::uvec i_element = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], true, "i_element");
-    if (arma::any(i_element == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");
-    i_element -= 1;
+    const arma::uvec i_element = (nrhs < 4) ? arma::uvec() : qd_mex_get_index_Col(prhs[3], "i_element");
 
     if (mxGetNumberOfElements(prhs[0]) > 1) // Multi-frequency
     {
         // Usage 3 and 4 (no grid adjustment) are what the multi-frequency function always does for 0 and 1
         const unsigned usage_multi = (usage == 3) ? 0 : ((usage == 4) ? 1 : usage);
-        auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, true); // Validated by the C++ function
+        auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], false, true, "arrayant_in"); // Validated by the C++ function
         CALL_QD(quadriga_lib::arrayant_rotate_pattern_multi(ant_multi, orientation, usage_multi, &i_element));
         plhs[0] = qd_mex_arrayant2struct_multi(ant_multi);
         return;
     }
 
-    auto ant = qd_mex_struct2arrayant(prhs[0], false, true); // Validated by the C++ function
+    auto ant = qd_mex_struct2arrayant(prhs[0], false, true, "arrayant_in"); // Validated by the C++ function
     CALL_QD(quadriga_lib::arrayant_rotate_pattern(ant, orientation, usage, &i_element));
     plhs[0] = qd_mex_arrayant2struct(ant);
 }

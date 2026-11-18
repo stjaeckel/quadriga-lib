@@ -66,9 +66,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const arma::vec center_freq = qd_mex_get_Col<double>(prhs[0], false, "center_freq");
-    const arma::mat rnd = qd_mex_get_Mat<double>(prhs[1]);
+    const arma::mat rnd = qd_mex_get_Mat<double>(prhs[1], false, "rnd");
     const std::vector<std::string> models = qd_mex_get_strings(prhs[2], "models");
-    const arma::vec weights = qd_mex_get_Col<double>(prhs[3]);
+    const arma::vec weights = qd_mex_get_Col<double>(prhs[3], false, "weights");
     const double d2d_in_max = (nrhs < 5) ? 25.0 : qd_mex_get_scalar<double>(prhs[4], "d2d_in_max", 25.0);
 
     // Output allocation

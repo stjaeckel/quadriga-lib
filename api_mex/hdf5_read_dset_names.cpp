@@ -50,16 +50,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
-    unsigned ix = (nrhs < 2) ? 1U : qd_mex_get_scalar<unsigned>(prhs[1], "ix", 1U);
-    unsigned iy = (nrhs < 3) ? 1U : qd_mex_get_scalar<unsigned>(prhs[2], "iy", 1U);
-    unsigned iz = (nrhs < 4) ? 1U : qd_mex_get_scalar<unsigned>(prhs[3], "iz", 1U);
-    unsigned iw = (nrhs < 5) ? 1U : qd_mex_get_scalar<unsigned>(prhs[4], "iw", 1U);
-    if (ix == 0U || iy == 0U || iz == 0U || iw == 0U)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Inputs 'ix', 'iy', 'iz' and 'iw' cannot be 0 (1-based index).");
+    const unsigned ix = (nrhs < 2) ? 0U : qd_mex_get_index<unsigned>(prhs[1], "ix"); // 1-based -> 0-based
+    const unsigned iy = (nrhs < 3) ? 0U : qd_mex_get_index<unsigned>(prhs[2], "iy"); // 1-based -> 0-based
+    const unsigned iz = (nrhs < 4) ? 0U : qd_mex_get_index<unsigned>(prhs[3], "iz"); // 1-based -> 0-based
+    const unsigned iw = (nrhs < 5) ? 0U : qd_mex_get_index<unsigned>(prhs[4], "iw"); // 1-based -> 0-based
     const std::string prefix = (nrhs < 6) ? std::string("par_") : qd_mex_get_string(prhs[5], "par_", "prefix");
-
-    // Convert to 0-based indices for the C++ call
-    --ix, --iy, --iz, --iw;
 
     // Read dataset names
     std::vector<std::string> names;

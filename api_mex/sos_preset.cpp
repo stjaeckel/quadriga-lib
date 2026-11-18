@@ -59,7 +59,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::string name = qd_mex_get_string(prhs[0]);
+    const std::string name = qd_mex_get_string(prhs[0], "", "name");
     const double dist_decorr = (nrhs < 2) ? 10.0 : qd_mex_get_scalar<double>(prhs[1], "dist_decorr", 10.0);
 
     // Output allocation; the number of sinusoids is known only after the call

@@ -67,7 +67,7 @@ assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], [], NaN ), 'Input ''
 assert_throws( @() quadriga_lib.sos_randn( dd, pos, [], [], [], -2 ), 'seed' );                        % wrapper
 
 %% Seeds: uint64 seeds keep their value; seeds above 2^63-1 and non-integer seeds are rejected
-msg_seed = 'Input ''seed'' must be an integer from -1 to 9223372036854775807.';
+msg_seed = 'Input ''seed'' must be -1 or a non-negative integer.';
 assert_cpp_error( @() quadriga_lib.sos_randn( dd, pos, [], [], [], intmax('uint64') ), msg_seed );
 assert_cpp_error( @() quadriga_lib.sos_randn( dd, pos, [], [], [], uint64(2)^63 ), msg_seed );
 assert_cpp_error( @() quadriga_lib.sos_randn( dd, pos, [], [], [], 2.5 ), msg_seed );

@@ -85,12 +85,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 3)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Load inputs (cast to double if needed)
-    const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
-    const arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
+    const arma::mat orig = qd_mex_get_Mat<double>(prhs[0], false, "orig");
+    const arma::mat dest = qd_mex_get_Mat<double>(prhs[1], false, "dest");
+    const arma::mat mesh = qd_mex_get_Mat<double>(prhs[2], false, "mesh");
     const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3], false, "mtl_ind");
 
     // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
@@ -101,12 +101,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_freq");
     int lod = (nrhs < 7) ? 2 : qd_mex_get_scalar<int>(prhs[6], "lod", 2);
     int verbose = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "verbose", 0);
-    arma::u32_vec sub_mesh_ind = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true, "sub_mesh_ind");
-
-    if (!sub_mesh_ind.empty() && arma::any(sub_mesh_ind == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'sub_mesh_ind' cannot be 0 (1-based index).");
-    else // Convert to 0-based
-        sub_mesh_ind -= 1;
+    arma::u32_vec sub_mesh_ind = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_index_Col<unsigned>(prhs[8], "sub_mesh_ind"); // 1-based -> 0-based
 
     int use_kernel = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "use_kernel", 0);
     int gpu_id = (nrhs < 11) ? 0 : qd_mex_get_scalar<int>(prhs[10], "gpu_id", 0);

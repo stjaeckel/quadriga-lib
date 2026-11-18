@@ -42,21 +42,18 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 2)
+    if (nrhs < 2 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    const auto points_arma = qd_mex_get_Mat<double>(prhs[0]);
-    const auto mesh_arma = qd_mex_get_Mat<double>(prhs[1]);
+    const auto points_arma = qd_mex_get_Mat<double>(prhs[0], false, "points");
+    const auto mesh_arma = qd_mex_get_Mat<double>(prhs[1], false, "mesh");
     double distance = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "distance", 0.0);
 
     // Object index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
-    arma::uvec obj_ind_arma = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true, "obj_ind");
-    if (arma::any(obj_ind_arma == 0))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'obj_ind' cannot be 0 (1-based index).");
-    obj_ind_arma -= 1;
+    const arma::uvec obj_ind_arma = (nrhs < 3) ? arma::uvec() : qd_mex_get_index_Col(prhs[2], "obj_ind");
 
     const arma::uvec *p_obj_ind = obj_ind_arma.is_empty() ? nullptr : &obj_ind_arma;
 

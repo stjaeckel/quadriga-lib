@@ -57,9 +57,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     // Read input data
-    arma::mat az = qd_mex_get_Mat<double>(prhs[0]);
-    arma::mat el = qd_mex_get_Mat<double>(prhs[1]);
-    arma::mat len = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2]);
+    arma::mat az = qd_mex_get_Mat<double>(prhs[0], false, "az");
+    arma::mat el = qd_mex_get_Mat<double>(prhs[1], false, "el");
+    arma::mat len = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2], false, "len");
     const int use_kernel = (nrhs < 4) ? 0 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 0);
     const bool split = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "split", false);
 

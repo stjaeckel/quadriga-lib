@@ -57,7 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const int n_out = (nlhs == 0) ? 1 : nlhs;
 
     // Read inputs
-    std::string fn = qd_mex_get_string(prhs[0]);
+    std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     bool read_all = (nrhs < 2) || mxIsEmpty(prhs[1]);
     unsigned id = read_all ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id", 1);
 

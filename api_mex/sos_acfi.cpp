@@ -44,9 +44,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::vec acf = qd_mex_get_Col<double>(prhs[0]);
-    const arma::vec dist = qd_mex_get_Col<double>(prhs[1]);
-    const arma::vec d = qd_mex_get_Col<double>(prhs[2]);
+    const arma::vec acf = qd_mex_get_Col<double>(prhs[0], false, "acf");
+    const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
+    const arma::vec d = qd_mex_get_Col<double>(prhs[2], false, "d");
 
     // Output allocation
     arma::vec val;

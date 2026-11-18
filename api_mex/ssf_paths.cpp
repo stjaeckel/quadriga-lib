@@ -87,7 +87,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read inputs
     const auto rays = qd_mex_struct2gbsm_rays(prhs[0], 0, false, "rays");
     const arma::vec link_gain_dB = qd_mex_get_Col<double>(prhs[1], false, "link_gain_dB");
-    const std::string mobility = (nrhs < 3) ? std::string("auto") : qd_mex_get_string(prhs[2], "auto");
+    const std::string mobility = (nrhs < 3) ? std::string("auto") : qd_mex_get_string(prhs[2], "auto", "mobility");
     const arma::vec tx_pos = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3], false, "tx_pos");
     const arma::vec rx_pos = (nrhs < 5) ? arma::vec() : qd_mex_get_Col<double>(prhs[4], false, "rx_pos");
     const arma::vec kf_ratio = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5], false, "kf_ratio");

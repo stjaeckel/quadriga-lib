@@ -9,7 +9,7 @@ try
     [~] = quadriga_lib.version(1);
 catch ME
     failed = strcmp(ME.identifier, 'quadriga_lib:CPPerror') && ...
-        ~isempty(strfind(ME.message, 'Incorrect number of input arguments.'));
+        ~isempty(strfind(ME.message, 'Wrong number of input arguments.'));
 end
 assertTrue( failed );
 
@@ -18,7 +18,7 @@ try
     [~, ~] = quadriga_lib.version();
 catch ME
     failed = strcmp(ME.identifier, 'quadriga_lib:CPPerror') && ...
-        ~isempty(strfind(ME.message, 'Incorrect number of output arguments.'));
+        ~isempty(strfind(ME.message, 'Wrong number of output arguments.'));
 end
 assertTrue( failed );
 

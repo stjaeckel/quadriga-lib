@@ -138,16 +138,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     const arma::uvec el_0 = {0}, el_1 = {1}; // Elements turned by the polarization rotations of custom patterns
 
-    if (nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Arrayant type name missing.");
-
-    if (nrhs > 16)
+    if (nrhs < 1 || nrhs > 16)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    std::string array_type = qd_mex_get_string(prhs[0]);
+    std::string array_type = qd_mex_get_string(prhs[0], "", "type");
     double res = (nrhs < 2) ? 0.0 : qd_mex_get_scalar<double>(prhs[1], "res", 0.0);
     double freq = (nrhs < 3) ? 299792458.0 : qd_mex_get_scalar<double>(prhs[2], "freq", 299792458.0);
     double az_3dB = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "az_3dB", 0.0);
@@ -192,7 +189,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         if (nrhs > 15) // Use custom pattern
         {
-            auto custom_array = qd_mex_struct2arrayant(prhs[15], true);
+            auto custom_array = qd_mex_struct2arrayant(prhs[15], true, false, "pattern");
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_ula<double>(N, freq, spacing, &custom_array));
         }
         else if (pol == 2 || pol == 5 || pol == 3 || pol == 6) // Build dual-polarized base pattern and pass to ULA
@@ -221,7 +218,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         const double tilt = (nrhs < 10) ? 0.0 : qd_mex_get_scalar<double>(prhs[9], "tilt_dir", 0.0);
         if (nrhs > 15) // Use custom pattern
         {
-            auto custom_array = qd_mex_struct2arrayant(prhs[15], true);
+            auto custom_array = qd_mex_struct2arrayant(prhs[15], true, false, "pattern");
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array));
         }
         else if (az_3dB > 0.0 && el_3dB > 0.0) // Use custom beam width
@@ -247,7 +244,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         arma::mat dir(3, 1);
         if (nrhs > 9)
-            dir = qd_mex_get_Mat<double>(prhs[9]);
+            dir = qd_mex_get_Mat<double>(prhs[9], false, "dir");
         else
             dir(2, 0) = 1.0;
 

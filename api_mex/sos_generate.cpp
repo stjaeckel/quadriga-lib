@@ -102,8 +102,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const arma::vec acf = qd_mex_get_Col<double>(prhs[0]);
-    const arma::vec dist = qd_mex_get_Col<double>(prhs[1]);
+    const arma::vec acf = qd_mex_get_Col<double>(prhs[0], false, "acf");
+    const arma::vec dist = qd_mex_get_Col<double>(prhs[1], false, "dist");
     const arma::uword n_coeff = qd_mex_sos_count(prhs[2], "n_coeff", 0.0);
     const arma::uword n_dim = (nrhs < 4) ? 3 : qd_mex_sos_count(prhs[3], "n_dim", 3.0);
     const bool uniform_smp = (nrhs < 5) ? true : qd_mex_get_scalar<bool>(prhs[4], "uniform_smp", true);
