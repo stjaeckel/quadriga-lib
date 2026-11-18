@@ -38,7 +38,7 @@ Read metadata from a QRT file
 - **`orig_names`** — Names of origin points; cell array of strings; `[n_orig]`
 - **`dest_names`** — Names of destination points; cell array of strings; `[n_dest]`
 - **`version`** — QRT file version number; int32 scalar
-- **`center_freq`** — Center frequencies in Hz; single; `[n_freq]`
+- **`center_freq`** — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); single; `[n_freq]`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles; single; `[n_cir, 3]`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[n_orig, 3]`

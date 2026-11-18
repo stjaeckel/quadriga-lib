@@ -176,6 +176,23 @@ class test_case(unittest.TestCase):
         M0n = res[9][0]   # output index 9 = M (list), [0] = first snapshot
         npt.assert_allclose(M0n[:, 0, 1], [1, 0, 0, 0, 0, 0, -1, 0], atol=1.5e-4, rtol=0)
 
+    # A v5 file storing Hz reads the same frequencies and path gains as the GHz file
+    def test_read_v5_stored_hz(self):
+        import tempfile
+        with open(FN_V5, 'rb') as f:
+            data = bytearray(f.read())
+        data[27:35] = np.array([1.0e9, 1.5e9], dtype=np.float32).tobytes()  # after ID and 4 counters
+        with tempfile.TemporaryDirectory() as d:
+            fn = os.path.join(d, 'v5_hz.qrt')
+            with open(fn, 'wb') as f:
+                f.write(data)
+            parse_freq = channel.qrt_file_parse(fn)[8]
+            res_hz = channel.qrt_file_read(fn, [1], 0, False, 0)
+        res_ghz = channel.qrt_file_read(FN_V5, [1], 0, False, 0)
+        npt.assert_allclose(parse_freq, [1.0e9, 1.5e9], rtol=1e-6, atol=0)
+        npt.assert_allclose(res_hz[0], [1.0e9, 1.5e9], rtol=1e-6, atol=0)
+        npt.assert_allclose(res_hz[7][0], res_ghz[7][0], rtol=1e-12, atol=0)
+
     # ------------------------------------------------------------------
     # qrt_file_read - multiple snapshots in one call (shared read cache)
     # ------------------------------------------------------------------

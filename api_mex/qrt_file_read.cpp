@@ -5,6 +5,7 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Channel functions
@@ -123,11 +124,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Return frequencies in Hz
     arma::vec center_freq;
     plhs[0] = qd_mex_init_output(&center_freq, cache.no_freq);
+    const double freq_scale = qd_qrt_freq_scale(cache.freq.memptr(), cache.freq.n_elem, cache.version);
     for (unsigned i_freq = 0; i_freq < cache.no_freq; ++i_freq)
-        if (cache.version == 6) // Scalar mode, stored in Hz
-            center_freq[i_freq] = (double)cache.freq[i_freq];
-        else // EM Mode, stored in GHz
-            center_freq[i_freq] = 1.0e9 * (double)cache.freq[i_freq];
+        center_freq[i_freq] = (double)cache.freq[i_freq] * freq_scale;
 
     // Initialize output data structures
     arma::mat tx_pos, tx_orientation, rx_pos, rx_orientation;

@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 #include <thread>
 #include <mutex>
@@ -146,8 +147,9 @@ py::tuple qrt_file_read(const py::handle &fn,
     arma::uword n_freq = (arma::uword)cache.no_freq;
     arma::vec center_freq;
     auto center_freq_py = qd_python_init_output(n_freq, &center_freq);
+    const double freq_scale = qd_qrt_freq_scale(cache.freq.memptr(), cache.freq.n_elem, cache.version);
     for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
-        center_freq[i_freq] = (cache.version == 6) ? (double)cache.freq[i_freq] : 1.0e9 * (double)cache.freq[i_freq];
+        center_freq[i_freq] = (double)cache.freq[i_freq] * freq_scale;
 
     // Fixed-size outputs, one column per requested snapshot
     arma::mat tx_pos, tx_orientation, rx_pos, rx_orientation;

@@ -369,4 +369,16 @@ for k = 6:18
     assertEqual(size(out{k}), [0, 1]);
 end
 
+% ---------- v5 file storing Hz: same frequencies and path gains as the GHz file ----------
+% The frequency list starts at byte 27 (ID, n_orig, n_cir, n_dest, n_freq)
+fn_hz = [tempname, '.qrt'];
+copyfile(fn5, fn_hz);
+fid = fopen(fn_hz, 'r+'); fseek(fid, 27, 'bof'); fwrite(fid, single([1.0e9, 1.5e9]), 'single'); fclose(fid);
+[~, ~, ~, ~, ~, ~, ~, ~, center_freq_p] = quadriga_lib.qrt_file_parse(fn_hz);
+[center_freq_hz, ~, ~, ~, ~, ~, ~, path_gain_hz] = quadriga_lib.qrt_file_read(fn_hz, 2, 1, false, 0);
+delete(fn_hz);
+assertElementsAlmostEqual(center_freq_p, single([1.0e9; 1.5e9]), 'relative', 1e-6);
+assertElementsAlmostEqual(center_freq_hz, [1.0e9; 1.5e9], 'relative', 1e-6);
+assertElementsAlmostEqual(path_gain_hz{1}, path_gain5, 'relative', 1e-12);
+
 end

@@ -822,4 +822,19 @@ static inline int qd_kernel_auto_avx2(int use_kernel)
     return (use_kernel == 1 || !avx2_available) ? 1 : 2;
 }
 
+// Factor from the frequencies stored in a QRT file of the given version to Hz: 1 or 1e9.
+// v4 files store GHz and v6 files Hz. v5 files written before the library stored Hz hold GHz, so a v5 list
+// whose values are all below 1000 is taken as GHz (an EM frequency below 1 kHz does not occur).
+// 'freq' holds the 'n_freq' stored values.
+static inline double qd_qrt_freq_scale(const float *freq, size_t n_freq, int version)
+{
+    if (version == 6)
+        return 1.0;
+    if (version == 5)
+        for (size_t i = 0; i < n_freq; ++i)
+            if (freq[i] >= 1000.0f)
+                return 1.0;
+    return 1.0e9;
+}
+
 #endif

@@ -99,7 +99,7 @@ TEST_CASE("QRT Write - init writes a parseable header")
     CHECK(n_dest == 2ULL);
     CHECK(n_freq == 1ULL);
     REQUIRE(center_freq_f.n_elem == 1);
-    CHECK(std::abs(center_freq_f(0) / 3.75e9f - 1.0f) < 1.0e-6f); // Hz in, Hz out; the file stores GHz
+    CHECK(std::abs(center_freq_f(0) / 3.75e9f - 1.0f) < 1.0e-6f); // Hz in, Hz out
 
     // CIR positions round-trip.
     REQUIRE(rd_cir_pos.n_rows == 4);
@@ -144,6 +144,77 @@ TEST_CASE("QRT Write - scalar init selects v6")
     std::remove(fn.c_str());
 }
 
+TEST_CASE("QRT Write - v5 files store Hz, older v5 files store GHz")
+{
+    std::string fn = "tests/data/test_write_freq_unit.qrt";
+
+    arma::fvec freq = {3.75e9f, 28.0e9f};
+    arma::fmat cir_pos(1, 3, arma::fill::zeros);
+    quadriga_lib::qrt_file_init<float>(fn, freq, cir_pos, arma::fmat(), {"RX"}, {0u}, 1, false);
+    std::vector<path> paths = {make_em_path(0, 1, 2, {10})};
+    arma::fvec tx_pos = {10.0f, 0.0f, 0.0f};
+    quadriga_lib::qrt_file_append<float>(fn, paths, tx_pos, nullptr, "TX");
+
+    // The frequency list follows the ID (11 bytes) and the counters n_orig, n_cir, n_dest, n_freq
+    const std::streamoff freq_offset = 11 + 4 * sizeof(unsigned);
+    auto stored = [&]()
+    {
+        arma::fvec f(2);
+        std::ifstream in(fn, std::ios::binary);
+        in.seekg(freq_offset);
+        in.read((char *)f.memptr(), 2 * sizeof(float));
+        return f;
+    };
+    auto patch = [&](float f0, float f1)
+    {
+        float f[2] = {f0, f1};
+        std::fstream io(fn, std::ios::in | std::ios::out | std::ios::binary);
+        io.seekp(freq_offset);
+        io.write((char *)f, 2 * sizeof(float));
+    };
+
+    // Reads the frequencies through qrt_file_parse, the cache and qrt_file_read (with and without the cache);
+    // returns the path gain
+    auto check_read = [&](const arma::vec &expected_Hz, const arma::fvec &expected_cache)
+    {
+        arma::fvec parse_freq;
+        quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &parse_freq);
+        CHECK(arma::approx_equal(parse_freq, arma::conv_to<arma::fvec>::from(expected_Hz), "reldiff", 1.0e-6f));
+
+        std::ifstream stream(fn, std::ios::binary);
+        auto cache = quadriga_lib::qrt_read_cache_init(fn, &stream);
+        CHECK(arma::approx_equal(cache.freq, expected_cache, "absdiff", 0.0f));
+
+        arma::vec read_freq, read_freq_cached;
+        arma::mat path_gain, path_gain_cached;
+        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &read_freq, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            nullptr, &path_gain);
+        quadriga_lib::qrt_file_read<double>(fn, 0, 0, false, &read_freq_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            nullptr, &path_gain_cached, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            nullptr, nullptr, 1, nullptr, nullptr, nullptr, &stream, &cache);
+        CHECK(arma::approx_equal(read_freq, expected_Hz, "reldiff", 1.0e-6));
+        CHECK(arma::approx_equal(read_freq_cached, expected_Hz, "reldiff", 1.0e-6));
+        CHECK(arma::approx_equal(path_gain_cached, path_gain, "absdiff", 0.0));
+        return path_gain;
+    };
+
+    CHECK(arma::approx_equal(stored(), freq, "absdiff", 0.0f));
+    arma::mat gain_Hz = check_read(arma::conv_to<arma::vec>::from(freq), freq);
+
+    // The same file as written before the library stored Hz: same frequencies and path gains
+    patch(3.75f, 28.0f);
+    arma::mat gain_GHz = check_read({3.75e9, 28.0e9}, {3.75f, 28.0f});
+    CHECK(arma::approx_equal(gain_GHz, gain_Hz, "reldiff", 1.0e-6));
+
+    // A v5 list is GHz when all values are below 1000, else Hz
+    patch(999.0f, 1.5f);
+    check_read({999.0e9, 1.5e9}, {999.0f, 1.5f});
+    patch(1.5f, 1000.0f);
+    check_read({1.5, 1000.0}, {1.5f, 1000.0f});
+
+    std::remove(fn.c_str());
+}
+
 TEST_CASE("QRT Write - init argument validation")
 {
     std::string fn = "tests/data/test_write_bad.qrt";
@@ -155,6 +226,15 @@ TEST_CASE("QRT Write - init argument validation")
     // Empty frequency vector.
     CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec(), cir_pos, cir_orient, names, off, 1, false),
                     std::invalid_argument);
+    // Frequencies: non-finite or <= 0; below 1 kHz in an EM file (an acoustic file may go lower)
+    for (float f : {NAN, INFINITY, 0.0f, -1.0e9f})
+        CHECK_THROWS_WITH(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{3.0e9f, f}, cir_pos, cir_orient, names, off, 1, true),
+                          "Input 'center_freq' must be finite and > 0.");
+    CHECK_THROWS_WITH(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{3.0e9f, 999.0f}, cir_pos, cir_orient, names, off, 1, false),
+                      "Input 'center_freq' must be at least 1 kHz for an EM file.");
+    quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1000.0f}, cir_pos, cir_orient, names, off, 1, false);
+    quadriga_lib::qrt_file_init<float>(fn, arma::fvec{20.0f}, cir_pos, cir_orient, names, off, 1, true);
+    std::remove(fn.c_str());
     // n_orig == 0.
     CHECK_THROWS_AS(quadriga_lib::qrt_file_init<float>(fn, arma::fvec{1.0e9f}, cir_pos, cir_orient, names, off, 0, false),
                     std::invalid_argument);

@@ -68,6 +68,17 @@ namespace
         return ver;
     }
 
+    // Reads the frequency count and list of a v5 / v6 header (they follow the three counters); advances 'pos'
+    inline void qrt_read_freq_list(std::ifstream &f, size_t file_size, size_t &pos, unsigned &n_freq, arma::fvec &freq)
+    {
+        f.read((char *)&n_freq, sizeof(unsigned));
+        pos += sizeof(unsigned);
+        qrt_check_fits(f, file_size, pos, n_freq, sizeof(float), "n_freq");
+        freq.set_size(n_freq);
+        f.read((char *)freq.memptr(), n_freq * sizeof(float));
+        pos += (size_t)n_freq * sizeof(float);
+    }
+
     // Number of stored orientation columns (bank, tilt, head) for a format byte, as the readers decode it
     inline size_t qrt_orientation_columns(uint8_t fmt)
     {
@@ -117,7 +128,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
   | `no_cir`           | `unsigned`   | Number of CIRs per origin                                                                       |
   | `no_dest`          | `unsigned`   | Number of destinations (RX)                                                                     |
   | `no_freq`          | `unsigned`   | Number of frequency bands                                                                       |
-  | `freq`             | `arma::fvec` | Frequency in GHz; `[no_freq]`                                                                   |
+  | `freq`             | `arma::fvec` | Frequencies as stored: GHz in v4 and in v5 when all are below 1000, else Hz; `[no_freq]`        |
   | `cir_pos`          | `arma::fmat` | CIR positions; `[no_cir, 3]`                                                                    |
   | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[no_cir, 3]`                                                         |
   | `orig_pos_all`     | `arma::fmat` | Origin positions; `[no_orig, 3]`                                                                |
@@ -160,14 +171,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
     cache.no_freq = 1;
     cache.freq.zeros(1);
     if (cache.version > 4)
-    {
-        fileR.read((char *)&cache.no_freq, sizeof(unsigned));
-        pos += sizeof(unsigned);
-        qrt_check_fits(fileR, file_size, pos, cache.no_freq, sizeof(float), "n_freq");
-        cache.freq.set_size(cache.no_freq);
-        fileR.read((char *)cache.freq.memptr(), cache.no_freq * sizeof(float));
-        pos += (size_t)cache.no_freq * sizeof(float);
-    }
+        qrt_read_freq_list(fileR, file_size, pos, cache.no_freq, cache.freq);
 
     // CIR metadata (read all)
     if (cache.no_cir != 0)
@@ -312,7 +316,7 @@ void quadriga_lib::qrt_file_init(
 ## Inputs:
 - **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
   opened, so an invalid input throws and leaves an existing file unchanged)
-- **`center_freq`** — Center frequencies in Hz; `[n_freq]`, 1 to 127 entries; an EM file stores them in GHz
+- **`center_freq`** — Center frequencies in Hz, finite and > 0, at least 1 kHz for an EM file; `[n_freq]`, 1 to 127 entries; stored in Hz as `float`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
 - **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[n_dest]`
@@ -337,6 +341,10 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
 {
     if (center_freq.n_elem == 0 || center_freq.n_elem > 127)
         throw std::invalid_argument("Input 'center_freq' must have 1 to 127 elements.");
+    if (!center_freq.is_finite() || arma::any(center_freq <= dtype(0)))
+        throw std::invalid_argument("Input 'center_freq' must be finite and > 0.");
+    if (!scalar_mode && arma::any(center_freq < dtype(1000))) // The readers take a v5 list below 1000 as GHz
+        throw std::invalid_argument("Input 'center_freq' must be at least 1 kHz for an EM file.");
     if (n_orig == 0)
         throw std::invalid_argument("Input 'n_orig' must be at least 1.");
 
@@ -402,9 +410,7 @@ void quadriga_lib::qrt_file_init(const std::string &fn,
     fileW.write((char *)&n_dest, sizeof(unsigned));
     fileW.write((char *)&n_freq, sizeof(unsigned));
 
-    // EM files (v5) store the frequencies in GHz, scalar files (v6) in Hz
-    const arma::Col<dtype> freq_stored = scalar_mode ? center_freq : arma::Col<dtype>(center_freq / dtype(1.0e9));
-    wr_col(fileW, freq_stored.memptr(), n_freq);
+    wr_col(fileW, center_freq.memptr(), n_freq);
 
     if (n_cir != 0)
     {
@@ -744,7 +750,7 @@ void quadriga_lib::qrt_file_parse(
 - **`orig_names`** *(optional)* — Names of origin points; `[n_orig]`
 - **`dest_names`** *(optional)* — Names of destination points; `[n_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[n_freq]`
+- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); `[n_freq]`
 - **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[n_cir, 3]`
 - **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[n_cir, 3]`
 - **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[n_orig, 3]`
@@ -804,14 +810,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 
     arma::fvec l_freq(1, arma::fill::zeros); // Version 4: read from the first origin below; 0 Hz if there is no origin
     if (ver > 4)
-    {
-        fileR.read((char *)&l_no_freq, sizeof(unsigned));
-        pos += sizeof(unsigned);
-        qrt_check_fits(fileR, file_size, pos, l_no_freq, sizeof(float), "n_freq");
-        l_freq.set_size(l_no_freq);
-        fileR.read((char *)l_freq.memptr(), l_no_freq * sizeof(float));
-        pos += (size_t)l_no_freq * sizeof(float);
-    }
+        qrt_read_freq_list(fileR, file_size, pos, l_no_freq, l_freq);
 
     // CIR metadata
     arma::fmat l_cir_pos;
@@ -964,8 +963,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
             fileR.read((char *)l_freq.memptr(), sizeof(float));
             qrt_check_stream(fileR);
         }
-        if (ver != 6) // EM files store GHz, scalar files (v6) Hz
-            l_freq *= 1.0e9f;
+        l_freq *= (float)qd_qrt_freq_scale(l_freq.memptr(), l_freq.n_elem, ver);
         *center_freq = std::move(l_freq);
     }
 
@@ -1201,14 +1199,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
         // Frequencies (v5/v6: stored in header)
         if (ver > 4)
-        {
-            fileR.read((char *)&l_no_freq, sizeof(unsigned));
-            pos += sizeof(unsigned);
-            qrt_check_fits(fileR, file_size, pos, l_no_freq, sizeof(float), "n_freq");
-            l_freq_buf.set_size(l_no_freq);
-            fileR.read((char *)l_freq_buf.memptr(), l_no_freq * sizeof(float));
-            pos += (size_t)l_no_freq * sizeof(float);
-        }
+            qrt_read_freq_list(fileR, file_size, pos, l_no_freq, l_freq_buf);
 
         // CIR metadata (selective read for i_cir)
         {
@@ -1368,6 +1359,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
     arma::uword n_freq = (arma::uword)l_no_freq;
     bool v6 = (ver == 6);
+    const double freq_scale = qd_qrt_freq_scale(p_freq, n_freq, ver); // Stored frequency to Hz
 
     // TX slot reserved but not yet appended
     if (l_path_data_offset == 0)
@@ -1377,7 +1369,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         {
             center_freq->set_size(n_freq);
             for (arma::uword k = 0; k < n_freq; ++k)
-                center_freq->at(k) = v6 ? (dtype)p_freq[k] : (dtype)p_freq[k] * (dtype)1e9;
+                center_freq->at(k) = (dtype)p_freq[k] * (dtype)freq_scale;
         }
         if (tx_pos)
             tx_pos->zeros(3, 1);
@@ -1490,10 +1482,9 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
     // Gain at 1 m (path-loss reference)
     // EM: FSPL reference. Scalar: 1/r spreading, frequency-independent.
-    // p_freq is GHz for v4/v5 and Hz for v6; qd_gain_at_1m expects Hz.
     arma::vec gain_at_1m(n_freq);
     for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
-        gain_at_1m[i_freq] = qd_gain_at_1m((double)p_freq[i_freq] * (v6 ? 1.0 : 1.0e9), v6);
+        gain_at_1m[i_freq] = qd_gain_at_1m((double)p_freq[i_freq] * freq_scale, v6);
 
     // Air absorption in dB/m (ISO 9613-1, T = 20 C, RH = 50 %, p = 1 atm).
     // Zero for v4/v5 (EM) so the per-path loop works uniformly.
@@ -1507,7 +1498,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     {
         center_freq->set_size(n_freq);
         for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
-            center_freq->at(i_freq) = v6 ? (dtype)p_freq[i_freq] : (dtype)p_freq[i_freq] * (dtype)1e9;
+            center_freq->at(i_freq) = (dtype)p_freq[i_freq] * (dtype)freq_scale;
     }
 
     // Output: positions

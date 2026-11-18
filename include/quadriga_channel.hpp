@@ -397,7 +397,7 @@ namespace quadriga_lib
         unsigned no_cir = 0;            // Number of CIRs per origin
         unsigned no_dest = 0;           // Number of destinations (RX)
         unsigned no_freq = 1;           // Number of frequency bands
-        arma::fvec freq;                // Frequency in GHz, length [no_freq]
+        arma::fvec freq;                // Frequencies as stored (GHz in v4 and in v5 when all < 1000, else Hz), [no_freq]
         arma::fmat cir_pos;             // CIR positions, size [no_cir, 3]
         arma::fmat cir_orientation;     // CIR orientations (Euler), size [no_cir, 3]
         arma::fmat orig_pos_all;        // Origin positions, size [no_orig, 3]

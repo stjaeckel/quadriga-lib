@@ -739,7 +739,7 @@ void quadriga_lib::qrt_file_init(
 ### Inputs:
 - **`fn`** — Path to the QRT file to create (truncated if it exists; all inputs are checked before the file is
   opened, so an invalid input throws and leaves an existing file unchanged)
-- **`center_freq`** — Center frequencies in Hz; `[n_freq]`, 1 to 127 entries; an EM file stores them in GHz
+- **`center_freq`** — Center frequencies in Hz, finite and > 0, at least 1 kHz for an EM file; `[n_freq]`, 1 to 127 entries; stored in Hz as `float`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; `[n_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles (bank, tilt, head); `[n_cir, 3]` or empty for none
 - **`dest_names`** — Receiver (MT) names, at most 255 characters each; `[n_dest]`
@@ -798,7 +798,7 @@ void quadriga_lib::qrt_file_parse(
 - **`orig_names`** *(optional)* — Names of origin points; `[n_orig]`
 - **`dest_names`** *(optional)* — Names of destination points; `[n_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for EM files (v4, v5); `[n_freq]`
+- **`center_freq`** *(optional)* — Center frequencies in Hz, converted from GHz for files that store GHz (v4, and v5 when all stored values are below 1000); `[n_freq]`
 - **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[n_cir, 3]`
 - **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[n_cir, 3]`
 - **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[n_orig, 3]`
@@ -1044,7 +1044,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
   | `no_cir`           | `unsigned`   | Number of CIRs per origin                                                                       |
   | `no_dest`          | `unsigned`   | Number of destinations (RX)                                                                     |
   | `no_freq`          | `unsigned`   | Number of frequency bands                                                                       |
-  | `freq`             | `arma::fvec` | Frequency in GHz; `[no_freq]`                                                                   |
+  | `freq`             | `arma::fvec` | Frequencies as stored: GHz in v4 and in v5 when all are below 1000, else Hz; `[no_freq]`        |
   | `cir_pos`          | `arma::fmat` | CIR positions; `[no_cir, 3]`                                                                    |
   | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[no_cir, 3]`                                                         |
   | `orig_pos_all`     | `arma::fmat` | Origin positions; `[no_orig, 3]`                                                                |
