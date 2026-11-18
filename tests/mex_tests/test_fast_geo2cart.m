@@ -73,6 +73,7 @@ assertEqual( size(c), [3,2,6] )
 assert( isa(c,'double') );
 
 c = quadriga_lib.fast_geo2cart(e,e,e);
+assertEqual( c, quadriga_lib.fast_geo2cart(e,e,e,0) );   % default kernel: 0 (auto)
 assertEqual( size(c), [3,2,6] )
 assert( isa(c,'double') );
 

@@ -16,7 +16,7 @@ path_length = [0,0];
 M = [1,1 ; 0,0 ; 0,0 ; 0,0 ; 0,0 ; 0,0 ; -1,-1 ; 0,0];
 
 [coeff_re, coeff_im, delay, aod, eod, aoa, eoa] = quadriga_lib.get_channels_spherical( ant, ant, ...
-    fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1, 0 );
+    [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1, 0 );
 
 aod = aod * 180/pi;
 eod = eod * 180/pi;
@@ -62,7 +62,7 @@ assertElementsAlmostEqual( delay(:,:,1), [d0,d1;d1,d0]/C, 'absolute', 1e-13 );
 assertElementsAlmostEqual( delay(:,:,2), [e0,e2;e1,e3]/C, 'absolute', 1e-13 );
 
 % Kernel selection (input 15): 0 = auto and 1 = GENERIC give the default result, 2 = AVX2 where available
-args = { ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1, 0 };
+args = { ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1, 0 };
 [cr_1, ci_1] = quadriga_lib.get_channels_spherical( args{:}, 1 );
 assertEqual( cr_1, coeff_re );
 assertEqual( ci_1, coeff_im );
@@ -87,14 +87,14 @@ catch ME
 end
 
 % Exception handling
-[~] = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
+[~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
 
 ant = rmfield(ant,'element_pos');
-[~] = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
+[~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
 
 ant = rmfield(ant,'coupling_re');
 try
-    [~] = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
+    [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Transmit antenna: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
@@ -104,11 +104,11 @@ catch ME
 end
 
 ant = rmfield(ant,'coupling_im');
-[~] = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
+[~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
 
 % Mismatching n_path
 try
-    [~] = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos(:,[1,2,2]), fbs_pos, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
+    [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos(:,[1,2,2]), fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Inputs ''fbs_pos'', ''lbs_pos'', ''path_gain'', ''path_length'', and ''M'' must have the same number of columns (n_paths)';
@@ -119,7 +119,7 @@ end
 
 % Wrong size of TX position
 try
-    [~] = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, M, [0;0;1;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
+    [~] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;1;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''tx_pos'' has incorrect number of elements.';
@@ -135,8 +135,8 @@ C = 299792458.0;
 fc = 3.0e9;
 L_true = 100.0 + 40.0 * sqrt(2.0);
 for L = [L_true, 0.0]
-    [cr, ci, dl] = quadriga_lib.get_channels_spherical( ant, ant, [30;40;0], [70;40;0], 1, L, [1;0;0;0;0;0;-1;0], ...
-        [0;0;0], [0;0;0], [100;0;0], [0;0;0], fc, 1);
+    [cr, ci, dl] = quadriga_lib.get_channels_spherical( ant, ant, [0;0;0], [0;0;0], [100;0;0], [0;0;0], [30;40;0], ...
+        [70;40;0], 1, L, [1;0;0;0;0;0;-1;0], fc, 1);
     L_exp = max(L, 140.0);
     assertElementsAlmostEqual( dl * C, L_exp, 'absolute', 1e-6 );
     assertElementsAlmostEqual( cr, cos(2*pi*fc/C * L_exp), 'absolute', 1e-6 );
@@ -146,11 +146,11 @@ end
 % 0 paths with add_fake_los_path: one zero-power LOS path with the LOS delay (as in C++ and Python)
 ant1 = quadriga_lib.arrayant_generate('omni');
 e = zeros(0, 1);
-[cr, ci, dl, ad, ed, aa, ea] = quadriga_lib.get_channels_spherical(ant1, ant1, zeros(3,0), zeros(3,0), e, e, zeros(8,0), [0;0;0], [0;0;0], [10;0;0], [0;0;0], 1e9, true, true);
+[cr, ci, dl, ad, ed, aa, ea] = quadriga_lib.get_channels_spherical(ant1, ant1, [0;0;0], [0;0;0], [10;0;0], [0;0;0], zeros(3,0), zeros(3,0), e, e, zeros(8,0), 1e9, true, true);
 assertEqual( [cr, ci], [0, 0] );
 assertElementsAlmostEqual( dl, 10 / C, 'absolute', 1e-18 );
 assertElementsAlmostEqual( [ad, ed, abs(aa), ea], [0, 0, pi, 0], 'absolute', 1e-14 );   % aa = +/- pi
-[~, ~, dl] = quadriga_lib.get_channels_spherical(ant1, ant1, zeros(3,0), zeros(3,0), e, e, zeros(8,0), [0;0;0], [0;0;0], [10;0;0], [0;0;0], 1e9, false, true);
+[~, ~, dl] = quadriga_lib.get_channels_spherical(ant1, ant1, [0;0;0], [0;0;0], [10;0;0], [0;0;0], zeros(3,0), zeros(3,0), e, e, zeros(8,0), 1e9, false, true);
 assertEqual( dl, 0 );
 % Per antenna pair: the delays and angles of a real LOS path (moved to slot 0) with the same geometry
 ant2 = ant1; ant2.e_theta_re(:,:,2) = 1; ant2.e_theta_im(:,:,2) = 0; ant2.e_phi_re(:,:,2) = 0; ant2.e_phi_im(:,:,2) = 0;
@@ -158,8 +158,8 @@ ant2.element_pos = [0.3, -0.2; 0.1, 0.4; 0, 0.2]; ant2.coupling_re = [1, 0.3; 0,
 tx = [1;2;3]; rx = [11;-3;5];
 for abs_dl = [true, false]
     o0 = cell(1, 7); oL = cell(1, 7);
-    [o0{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, zeros(3,0), zeros(3,0), e, e, zeros(8,0), tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, abs_dl, true);
-    [oL{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, (tx+rx)/2, (tx+rx)/2, 1, norm(rx-tx), [1;0;0;0;0;0;-1;0], tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, abs_dl, true);
+    [o0{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, tx, [0;0;0.3], rx, [0;0;-0.2], zeros(3,0), zeros(3,0), e, e, zeros(8,0), 1e9, abs_dl, true);
+    [oL{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, tx, [0;0;0.3], rx, [0;0;-0.2], (tx+rx)/2, (tx+rx)/2, 1, norm(rx-tx), [1;0;0;0;0;0;-1;0], 1e9, abs_dl, true);
     assertEqual( size(o0{3}), [2, 2] );
     assertEqual( [o0{1}, o0{2}], zeros(2, 4) );
     for k = 3:7
@@ -169,7 +169,7 @@ end
 
 % 0 paths without add_fake_los_path: empty outputs [n_rx_ports, n_tx_ports, 0] (as in C++ and Python)
 o0 = cell(1, 7);
-[o0{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, zeros(3,0), zeros(3,0), e, e, zeros(8,0), tx, [0;0;0.3], rx, [0;0;-0.2], 1e9, true, false);
+[o0{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, tx, [0;0;0.3], rx, [0;0;-0.2], zeros(3,0), zeros(3,0), e, e, zeros(8,0), 1e9, true, false);
 for k = 1:7
     assertEqual( [size(o0{k}, 1), size(o0{k}, 2), size(o0{k}, 3)], [2, 2, 0] );
 end
@@ -191,28 +191,28 @@ end
 tx = [zeros(2, n_snap); 1:n_snap]; ori = [0; 0; 0.1]; rx = [20; 0; 1];
 for fake_los = [false, true]
     ob = cell(1, 7);
-    [ob{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx, ori, rx, ori, 3e9, false, fake_los);
+    [ob{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc, 3e9, false, fake_los);
     assertEqual( size(ob{1}), [n_snap, 1] );
     for s = 1:n_snap
         os = cell(1, 7);
-        [os{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, fbs{s}, lbs{s}, pg{s}, pl{s}, Mc{s}, tx(:, s), ori, rx, ori, 3e9, false, fake_los);
+        [os{:}] = quadriga_lib.get_channels_spherical(ant2, ant2, tx(:, s), ori, rx, ori, fbs{s}, lbs{s}, pg{s}, pl{s}, Mc{s}, 3e9, false, fake_los);
         for k = 1:7
             assertEqual( size(ob{k}{s}), size(os{k}) );
             assertElementsAlmostEqual( ob{k}{s}, os{k}, 'absolute', 1e-12 );
         end
     end
 end
-[~, ~, dl] = quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx(:, 1)', ori, rx', ori); % row vectors: shared
+[~, ~, dl] = quadriga_lib.get_channels_spherical(ant2, ant2, tx(:, 1)', ori, rx', ori, fbs, lbs, pg, pl, Mc); % row vectors: shared
 assertEqual( numel(dl), n_snap );
-cr = quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx, ori, rx, ori); % without output argument, coeff_re goes to ans
-quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx, ori, rx, ori);
+cr = quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc); % without output argument, coeff_re goes to ans
+quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc);
 assertTrue( iscell(ans) );
 assertEqual( ans, cr );
-assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc, tx(:, 1:2), ori, rx, ori), 'quadriga_lib:CPPerror');
-assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs(1:3), pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');
-assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs{1}, pg, pl, Mc, tx, ori, rx, ori), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, tx(:, 1:2), ori, rx, ori, fbs, lbs, pg, pl, Mc), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs(1:3), pg, pl, Mc), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs{1}, pg, pl, Mc), 'quadriga_lib:CPPerror');
 Mc_bad = Mc; Mc_bad{2} = Mc{2}(1:7, :); % the error names the snapshot 1-based
-assert_throws( @() quadriga_lib.get_channels_spherical(ant2, ant2, fbs, lbs, pg, pl, Mc_bad, tx, ori, rx, ori), 'Snapshot 2: ' );
+assert_throws( @() quadriga_lib.get_channels_spherical(ant2, ant2, tx, ori, rx, ori, fbs, lbs, pg, pl, Mc_bad), 'Snapshot 2: ' );
 
 end
 

@@ -93,8 +93,8 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
   when not empty; `(n_path_1 · n_path_2,)`; default: `None`
 - **`use_kernel`** — Kernel of both segments, as in [[channel.spherical]]: 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; raises if unavailable); auto selects GENERIC in this version; `int`; default: 0
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
 
 ## Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_rx, n_tx, n_path_irs)`

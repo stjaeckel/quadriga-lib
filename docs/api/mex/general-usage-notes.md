@@ -7,6 +7,7 @@ Quadriga-Lib 0.12.5 · Web page: http://quadriga-lib.org/mex_api.html#sec-genera
 - The conventions and shared quantities of the C++ [Glossary](../cpp/general-usage-notes.md#glossary) apply; the points below are specific to MATLAB / Octave.
 - All functions live in the `+quadriga_lib` package and are called as `quadriga_lib.function_name(...)`.
 - Numeric inputs accept any numeric type and are cast internally; default is `double` unless stated otherwise (e.g. `uint64` for some index arguments).
+- Arguments have the names, order and defaults of the C++ function unless the function states otherwise.
 - Inputs with a stated default, or marked *(optional)*, can be omitted or passed as `[]`; all others are required. Output arguments are optional via `nargout`; a call without assignment returns the first output as `ans`, and outputs after the first are returned only when requested.
 - Invalid inputs (shape/domain) and problems with a file's access or content raise a MATLAB error with the identifier `quadriga_lib:CPPerror`.
 - Index conventions: 1-based unless the field is explicitly called 0-based.

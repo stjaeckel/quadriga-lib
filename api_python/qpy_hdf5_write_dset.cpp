@@ -29,17 +29,17 @@ Write a single unstructured dataset to an HDF5 file
 
 ## Usage:
 ```
-quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
+quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix )
 ```
 
 ## Input Arguments:
 - **`fn`** — Filename of the HDF5 file
+- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
+- **`data`** — Data to be written; type must be supported (see above); cannot be empty
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
-- **`data`** — Data to be written; type must be supported (see above); cannot be empty
 - **`prefix`** — Prefix prepended to `name` in the HDF5 file; alphanumeric and underscores only; str; default: `'par_'`
 
 ## See also:
@@ -48,16 +48,12 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
 MD!*/
 
 void hdf5_write_dset(const py::handle &fn,
+                     const std::string &name,
+                     const py::handle data,
                      unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                     const std::string name = "",
-                     const py::handle data = py::none(),
-                     const std::string prefix = "par_")
+                     const std::string &prefix)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
-
-    // Check if data is None
-    if (data.is_none())
-        throw std::invalid_argument("Data not provided.");
 
     if (name.empty())
         throw std::invalid_argument("Dataset name not provided.");

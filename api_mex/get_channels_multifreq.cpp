@@ -46,13 +46,17 @@ Compute channel coefficients for spherical waves across multiple frequencies
 ## Usage:
 ```
 [ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, ...
     freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel );
 ```
 
 ## Inputs:
 - **`tx_array`** — Multi-frequency TX arrayant struct array; one entry per input frequency, see [[arrayant_generate]]
 - **`rx_array`** — Multi-frequency RX arrayant struct array; one entry per input frequency, see [[arrayant_generate]]
+- **`tx_pos`** — Transmitter position, finite; `[3, 1]`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
+- **`rx_pos`** — Receiver position, finite; `[3, 1]`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
 - **`path_gain`** — Linear-scale path gains per input frequency; `[n_path, n_freq]`
@@ -60,10 +64,6 @@ Compute channel coefficients for spherical waves across multiple frequencies
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `[n_path, 1]`
 - **`M`** — Polarization transfer matrix, row order as above; `[8, n_path, n_freq]` (full pol) or
   `[2, n_path, n_freq]` (scalar pressure)
-- **`tx_pos`** — Transmitter position, finite; `[3, 1]`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
-- **`rx_pos`** — Receiver position, finite; `[3, 1]`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`
 - **`freq`** — Input sample frequencies for `path_gain` and `M`; `[n_freq, 1]`
 - **`freq_new`** — Target output frequencies; `[n_freq_new, 1]`
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
@@ -101,15 +101,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "rx_array must not be empty.");
 
     // Parse other arguments
-    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[2]);
-    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[3]);
-    const auto path_gain = qd_mex_get_Mat<double>(prhs[4]);
-    const auto path_length = qd_mex_get_Col<double>(prhs[5]);
-    const auto M = qd_mex_get_Cube<double>(prhs[6]);
-    const auto tx_pos = qd_mex_typecast_Col<double>(prhs[7], "tx_pos", 3);
-    const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[8], "tx_orientation", 3);
-    const auto rx_pos = qd_mex_typecast_Col<double>(prhs[9], "rx_pos", 3);
-    const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[10], "rx_orientation", 3);
+    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6]);
+    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7]);
+    const auto path_gain = qd_mex_get_Mat<double>(prhs[8]);
+    const auto path_length = qd_mex_get_Col<double>(prhs[9]);
+    const auto M = qd_mex_get_Cube<double>(prhs[10]);
+    const auto tx_pos = qd_mex_typecast_Col<double>(prhs[2], "tx_pos", 3);
+    const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[3], "tx_orientation", 3);
+    const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
+    const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[5], "rx_orientation", 3);
     const auto freq = qd_mex_get_Col<double>(prhs[11]);
     const auto freq_new = qd_mex_get_Col<double>(prhs[12]);
     bool use_absolute_delays = (nrhs < 14) ? false : qd_mex_get_scalar<bool>(prhs[13], "use_absolute_delays", false);

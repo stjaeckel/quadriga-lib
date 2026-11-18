@@ -148,8 +148,8 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
 ```
 
 ### Inputs:
-- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
-- **`radius`** — Radius of icosphere in meters; finite and positive; default: 1
+- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces
+- **`radius`** — Radius of icosphere in meters; finite and positive
 - **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical
   azimuth/elevation (false); default: false
 
@@ -184,7 +184,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#mitsuba_xml_file_write) 
 ### Usage:
 ```python
 quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
-    mtl_names, bsdf, map_to_itu )
+    mtl_names, bsdf, map_to_itu_materials )
 ```
 
 ### Input Arguments:
@@ -196,7 +196,7 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
 - **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`; default: `None`
-- **`map_to_itu`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
+- **`map_to_itu_materials`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (source for mesh data and BSDF field layout)
@@ -470,17 +470,17 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_point_intersect) · 
 
 ### Usage:
 ```python
-hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir,
-    points, sub_cloud_ind, use_kernel, gpu_id )
+hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
+    tridir, sub_cloud_ind, use_kernel, gpu_id )
 ```
 
 ### Inputs:
+- **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `(n_ray, 3)`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `(n_ray, 9)`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `(n_ray, 9)`
-- **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
   `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
@@ -567,11 +567,11 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#triangle_mesh_aabb) · [
 
 ### Usage:
 ```python
-aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_ind, vec_size )
+aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size )
 ```
 
 ### Inputs:
-- **`triangles`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB
   of the entire mesh is returned; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
@@ -601,15 +601,15 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#triangle_mesh_segmentati
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
+data = quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
 
 # Unpacked outputs
-triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
-    quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
+mesh_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
+    quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
 ```
 
 ### Inputs:
-- **`triangles`** — Triangle vertices, each row `[x1,y1,z1,x2,y2,z2,x3,y3,z3]`; `(n_mesh, 9)`
+- **`mesh`** — Triangle vertices, each row `[x1,y1,z1,x2,y2,z2,x3,y3,z3]`; `(n_mesh, 9)`
 - **`target_size`** — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024
 - **`vec_size`** — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count
   is rounded up to a multiple of this value; default: 1
@@ -617,7 +617,7 @@ triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
   [obj_file_read](#obj_file_read)); `(n_mesh,)` or `None`; default: `None`
 
 ### Outputs:
-- **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
-- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
-- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_triangles_out,)`
-- **`mtl_ind_out`** — Reordered and padded material indices; `(n_triangles_out,)`; empty if `mtl_ind` is not provided
+- **`mesh_out`** — Reordered and padded triangle vertices; `(n_mesh_out, 9)`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; uint32; `(n_sub,)`
+- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_mesh_out,)`
+- **`mtl_ind_out`** — Reordered and padded material indices; `(n_mesh_out,)`; empty if `mtl_ind` is not provided

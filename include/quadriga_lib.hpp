@@ -132,7 +132,7 @@ namespace quadriga_lib
         const arma::Col<short> &mtl_ind_current,                             // Current medium (0 = outside), [n_ray]
         const arma::fmat &points,                                            // Receive points in 3D Space, Size: [n_points, 3]
         const arma::u32_vec *sub_cloud_ind = nullptr,                        // Sub-cloud index, 0-based, Length: [n_sub]
-        const arma::u32_vec *point_ind = nullptr,                            // Mapping "points" to "pointsR", 1-based, Length: [ n_pointsR ]
+        const arma::u32_vec *point_ind = nullptr,                            // Mapping "points" to "points_out", 1-based, Length: [ n_points_out ]
         const std::vector<bool> *subdiv_flag_in = nullptr,                   // Optional: List of beam to subdivide, [n_ray], NULL/empty = none
         float max_path_length = 10e3,                                        // Maximum path length
         float min_gain_dB = -140.0f,                                         // Minimum gain below which a path is terminated

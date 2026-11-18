@@ -120,6 +120,7 @@ class test_case(unittest.TestCase):
         g_auto = quadriga_lib.tools.fast_cart2geo(e, use_kernel=0)  # auto
         g_gen = quadriga_lib.tools.fast_cart2geo(e, use_kernel=1)   # GENERIC (double)
         np.testing.assert_allclose(g_auto, g_gen, atol=1e-5)
+        np.testing.assert_array_equal(quadriga_lib.tools.fast_cart2geo(e), g_auto)  # default kernel: 0 (auto)
 
         # AVX2 path: matches GENERIC when available (single precision internally),
         # otherwise raises -- accept either for portability.

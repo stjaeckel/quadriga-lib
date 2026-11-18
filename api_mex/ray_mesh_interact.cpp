@@ -19,8 +19,8 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
   front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
   FBS=SBS with opposing normals → media-to-media
-- With `compact = true` (default), rays with `fbs_ind = 0` (no interaction) are dropped, so
-  `n_rayN ≤ n_ray`; with `compact = false` all rays are kept and no-hit rays pass through unchanged
+- With `compact = true`, rays with `fbs_ind = 0` (no interaction) are dropped, so `n_rayN ≤ n_ray`; with
+  `compact = false` (default) all rays are kept and no-hit rays pass through unchanged
 - Output direction encoding (spherical/Cartesian) matches input `tridir` format
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves)
 - Types 3–5 (scalar) use a single TE-only coefficient, suitable for acoustic simulation with
@@ -54,7 +54,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
 - **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
   `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
-  transparent pass-through; logical; default: true
+  transparent pass-through; logical; default: false
 
 ## Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
@@ -130,7 +130,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[8], false, "sbs_ind");
     const auto trivec = (nrhs < 10) ? arma::mat() : qd_mex_get_Mat<double>(prhs[9]);
     const auto tridir = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10]);
-    const auto compact = (nrhs < 12) ? true : qd_mex_get_scalar<bool>(prhs[11], "compact", true);
+    const auto compact = (nrhs < 12) ? false : qd_mex_get_scalar<bool>(prhs[11], "compact", false);
 
     // Number of output rays: all rays when compact == false, else only rays that hit (fbs_ind != 0)
     arma::uword n_rayN = orig.n_rows;

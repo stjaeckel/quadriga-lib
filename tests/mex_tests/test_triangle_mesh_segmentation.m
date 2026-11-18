@@ -15,7 +15,7 @@ mesh = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
 
 mtl_ind = (1:12)';   % 1-based per-face material index (each face its own material)
 
-[mesh_sub, mtl_ind_sub] = quadriga_lib.subdivide_triangles(mesh, 3, mtl_ind);
+[mesh_sub, mtl_ind_sub] = quadriga_lib.subdivide_triangles(3, mesh, mtl_ind);
 
 % Test 1: Mesh size is already below threshold, test padding
 [mesh_seg, sub_mesh_ind, mesh_ind, mtl_ind_seg] = quadriga_lib.triangle_mesh_segmentation(mesh_sub, 1024, 8, mtl_ind_sub);

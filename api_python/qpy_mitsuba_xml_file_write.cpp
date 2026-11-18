@@ -27,7 +27,7 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 ## Usage:
 ```
 quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
-    mtl_names, bsdf, map_to_itu )
+    mtl_names, bsdf, map_to_itu_materials )
 ```
 
 ## Input Arguments:
@@ -39,7 +39,7 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
 - **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `(mtl_names.size(), 17)`; default: `None`
-- **`map_to_itu`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
+- **`map_to_itu_materials`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
 
 ## See also:
 - [[obj_file_read]] (source for mesh data and BSDF field layout)
@@ -53,11 +53,11 @@ void mitsuba_xml_file_write(const py::handle &fn,
                             py::list obj_names,
                             py::list mtl_names,
                             const py::handle &bsdf,
-                            py::handle map_to_itu)
+                            py::handle map_to_itu_materials)
 {
     const std::string fn_s = qd_python_path(fn, "fn");
 
-    const bool map_to_itu_b = qd_python_flag(map_to_itu, false, "map_to_itu");
+    const bool map_to_itu_b = qd_python_flag(map_to_itu_materials, false, "map_to_itu_materials");
 
     const arma::mat vert_list_a = qd_python_numpy2arma_Mat(vert_list, true);
     const arma::umat face_ind_a = qd_python_numpy2arma_Mat(face_ind, true);

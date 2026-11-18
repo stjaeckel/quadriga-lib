@@ -21,17 +21,17 @@ Calculate intersections of ray beams with points in 3D space
 
 ## Usage:
 ```
-[ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, ...
+[ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, ...
     sub_cloud_ind, use_kernel, gpu_id );
 ```
 
 ## Inputs:
+- **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
-- **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`sub_cloud_ind`** — Segment boundary indices for the point cloud; use [[point_cloud_segmentation]] to generate;
   sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
   uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
@@ -60,10 +60,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::mat trivec = qd_mex_get_Mat<double>(prhs[1]);
-    const arma::mat tridir = qd_mex_get_Mat<double>(prhs[2]);
-    const arma::mat points = qd_mex_get_Mat<double>(prhs[3]);
+    const arma::mat orig = qd_mex_get_Mat<double>(prhs[1]);
+    const arma::mat trivec = qd_mex_get_Mat<double>(prhs[2]);
+    const arma::mat tridir = qd_mex_get_Mat<double>(prhs[3]);
+    const arma::mat points = qd_mex_get_Mat<double>(prhs[0]);
     arma::u32_vec sub_cloud_ind = (nrhs < 5) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[4], true, "sub_cloud_ind");
     const int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     const int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);

@@ -73,5 +73,5 @@ void write_png(const py::handle &fn,            // Output file name
     const bool log_transform_b = qd_python_flag(log_transform, false, "log_transform");
 
     auto data_arma = qd_python_numpy2arma_Mat(data, true);
-    quadriga_lib::write_png(data_arma, fn_s, colormap, min_val, max_val, log_transform_b);
+    quadriga_lib::write_png(fn_s, data_arma, colormap, min_val, max_val, log_transform_b);
 }

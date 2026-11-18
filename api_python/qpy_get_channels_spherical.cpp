@@ -58,21 +58,25 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## Usage:
 ```
 # Complex coefficients (default)
-coeff, delays = quadriga_lib.channel.spherical( ant_tx, ant_rx, \
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path, angles, complex, i_freq, use_kernel )
+coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    center_freq, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq, complex=True )
 
 # Real and imaginary parts as separate arrays
-coeff_re, coeff_im, delays = quadriga_lib.channel.spherical( ..., complex=False )
+coeff_re, coeff_im, delay = quadriga_lib.channel.spherical( ..., complex=False )
 
 # Departure and arrival angles as well
-coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
+coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
 ```
 
 ## Inputs:
-- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate]]; a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate]]; a 4D dict raises
   `ValueError` (use [[channel.multifreq]])
-- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
+- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
@@ -80,29 +84,25 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
   (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
 - **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
   in batch mode
-- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory and, with element
   coupling, the time to convert them to the ports; default: `False`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
-  processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [[interpolate]];
   `int`; default: 0
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ## Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
-- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`aod`** — Azimuth of departure in the GCS, in rad; `(n_ports_rx, n_ports_tx, n_path)`; only with `angles=True`
 - **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
 - **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`
@@ -174,24 +174,24 @@ static void qd_keep_dict_values(const py::dict &dict, std::vector<py::object> &k
         keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
 }
 
-py::tuple get_channels_spherical(const py::dict &ant_tx,
-                                 const py::dict &ant_rx,
+py::tuple get_channels_spherical(const py::dict &tx_array,
+                                 const py::dict &rx_array,
+                                 py::handle tx_pos,
+                                 py::handle tx_orientation,
+                                 py::handle rx_pos,
+                                 py::handle rx_orientation,
                                  py::handle fbs_pos,
                                  py::handle lbs_pos,
                                  py::handle path_gain,
                                  py::handle path_length,
                                  py::handle M,
-                                 py::handle tx_pos,
-                                 py::handle tx_orientation,
-                                 py::handle rx_pos,
-                                 py::handle rx_orientation,
                                  py::handle center_freq,
                                  py::handle use_absolute_delays,
                                  py::handle add_fake_los_path,
                                  py::handle angles,
-                                 py::handle complex,
+                                 const int use_kernel,
                                  const arma::uword i_freq,
-                                 const int use_kernel)
+                                 py::handle complex)
 {
     const bool use_absolute_delays_b = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
     const bool add_fake_los_path_b = qd_python_flag(add_fake_los_path, false, "add_fake_los_path");
@@ -200,12 +200,12 @@ py::tuple get_channels_spherical(const py::dict &ant_tx,
 
     // References to every aliased Python array, held until the function returns (the GIL is released below)
     std::vector<py::object> keep_alive;
-    qd_keep_dict_values(ant_tx, keep_alive);
-    qd_keep_dict_values(ant_rx, keep_alive);
+    qd_keep_dict_values(tx_array, keep_alive);
+    qd_keep_dict_values(rx_array, keep_alive);
 
     // Parse the antenna arrays and center frequencies, common to both code paths
-    const auto ant_tx_a = qd_python_dict2arrayant(ant_tx, true);
-    const auto ant_rx_a = qd_python_dict2arrayant(ant_rx, true);
+    const auto ant_tx_a = qd_python_dict2arrayant(tx_array, true);
+    const auto ant_rx_a = qd_python_dict2arrayant(rx_array, true);
     const auto center_freq_a = qd_python_numpy2arma_Col<double>(center_freq, true);
 
     arma::uword n_ports_tx = ant_tx_a.n_ports();

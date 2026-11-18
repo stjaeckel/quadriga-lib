@@ -177,7 +177,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         // Write (convert to 0-based)
         int return_code = 0;
-        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(&c, fn, ix - 1, iy - 1, iz - 1, iw - 1));
+        CALL_QD(return_code = quadriga_lib::hdf5_write_channel(fn, &c, ix - 1, iy - 1, iz - 1, iw - 1));
         if (return_code == 1)
             any_overwrite = true;
     }

@@ -12,11 +12,11 @@ points(:, 3) = points(:, 3) + 1.0;
 [ orig, ~, trivec, tridir ] = quadriga_lib.icosphere( 20, 1, 1 );
 orig = orig - [10,20,30];
 
-hit_count = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points );
+hit_count = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir );
 assertTrue( all( hit_count == uint32(1) ) );
 
 % Test second output: ray_ind shape, type, 1-based content
-[hit_count, ray_ind] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points );
+[hit_count, ray_ind] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir );
 assertTrue( isa(ray_ind, 'uint32') );
 assertTrue( isa(hit_count, 'uint32') );
 
@@ -26,34 +26,34 @@ nz = ray_ind(ray_ind ~= 0);
 assertTrue( all( nz >= 1 & nz <= uint32(size(orig,1)) ) ); % indices are 1-based
 
 % Empty sub_cloud_ind behaves like omitting it
-hit_count_e = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, [] );
+hit_count_e = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, [] );
 assertEqual( hit_count, hit_count_e );
 
 % Valid manual sub_cloud_ind (split into two halves of 8 points each)
 sub_idx = uint32([1, 9]);
-[hit_count_s, ray_ind_s] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, sub_idx );
+[hit_count_s, ray_ind_s] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, sub_idx );
 assertEqual( hit_count, hit_count_s );
 assertEqual( ray_ind, ray_ind_s );
 
 % Integration with point_cloud_segmentation: results must match after un-permuting
 [pointsR, sub_cloud_ind, ~, reverse_ind] = ...
     quadriga_lib.point_cloud_segmentation( points, 4, 8 );
-hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_ind );
+hit_count_R = quadriga_lib.ray_point_intersect( pointsR, orig, trivec, tridir, sub_cloud_ind );
 assertEqual( hit_count, hit_count_R(reverse_ind) );
 
 % Explicit GENERIC kernel must produce the same result as auto
-hit_count_g = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, [], 1 );
+hit_count_g = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, [], 1 );
 assertEqual( hit_count, hit_count_g );
 
 % Sub-clouds that are not aligned to the SIMD vector size are accepted by every kernel
 sub_idx = uint32([1, 4, 12]);
-[hit_count_u, ray_ind_u] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, sub_idx );
+[hit_count_u, ray_ind_u] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, sub_idx );
 assertEqual( hit_count, hit_count_u );
 assertEqual( ray_ind, ray_ind_u );
-hit_count_u = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, sub_idx, 1 );
+hit_count_u = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, sub_idx, 1 );
 assertEqual( hit_count, hit_count_u );
 [pointsR, sub_cloud_ind, ~, reverse_ind] = quadriga_lib.point_cloud_segmentation( points, 3 );
-hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_ind );
+hit_count_R = quadriga_lib.ray_point_intersect( pointsR, orig, trivec, tridir, sub_cloud_ind );
 assertEqual( hit_count, hit_count_R(reverse_ind) );
 
 try % 3 imputs
@@ -67,7 +67,7 @@ catch ME
 end
 
 try % 8 imputs
-    quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, 1, 0, 0, 0 );
+    quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, 1, 0, 0, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -77,7 +77,7 @@ catch ME
 end
 
 try % 3 outputs
-    [~,~,~] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, 1);
+    [~,~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -87,7 +87,7 @@ catch ME
 end
 
 try % orig error
-    [~,~] = quadriga_lib.ray_point_intersect( orig(1:2,:), trivec, tridir, points);
+    [~,~] = quadriga_lib.ray_point_intersect( points, orig(1:2,:), trivec, tridir);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Number of rows in ''orig'' and ''trivec'' dont match.';
@@ -97,7 +97,7 @@ catch ME
 end
 
 try % orig error
-    [~,~] = quadriga_lib.ray_point_intersect( orig(:,1:2), trivec, tridir, points);
+    [~,~] = quadriga_lib.ray_point_intersect( points, orig(:,1:2), trivec, tridir);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''orig'' must have 3 columns containing x,y,z coordinates.';
@@ -107,7 +107,7 @@ catch ME
 end
 
 try % trivec error
-    [~,~] = quadriga_lib.ray_point_intersect( orig, trivec(:,1:2), tridir, points);
+    [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec(:,1:2), tridir);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''trivec'' must have 9 columns containing x,y,z coordinates of ray tube vertices.';
@@ -117,7 +117,7 @@ catch ME
 end
 
 try % tridir error
-    [~,~] = quadriga_lib.ray_point_intersect( orig, trivec, tridir(1:2,:), points);
+    [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir(1:2,:));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Number of rows in ''orig'' and ''tridir'' dont match.';
@@ -127,7 +127,7 @@ catch ME
 end
 
 try % tridir error
-    [~,~] = quadriga_lib.ray_point_intersect( orig, trivec, tridir(:,1:2), points);
+    [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir(:,1:2));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''tridir'' must have 9 columns containing ray directions in Cartesian format.';
@@ -137,7 +137,7 @@ catch ME
 end
 
 try % points error
-    [~,~] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points(:));
+    [~,~] = quadriga_lib.ray_point_intersect( points(:), orig, trivec, tridir);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''points'' must have 3 columns containing x,y,z coordinates.';
@@ -147,7 +147,7 @@ catch ME
 end
 
 try % sub-cloud error
-    [~,~] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, [2,8]);
+    [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, [2,8]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'First sub-cloud must start at the first point.';
@@ -157,7 +157,7 @@ catch ME
 end
 
 try % sub-cloud error
-    [~,~] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, [1,33]);
+    [~,~] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, [1,33]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sub-cloud indices cannot exceed number of points.';

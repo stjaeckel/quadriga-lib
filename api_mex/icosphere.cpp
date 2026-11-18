@@ -24,8 +24,8 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 ```
 
 ## Inputs:
-- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
-- **`radius`** — Radius of icosphere in meters; finite and positive; default: 1
+- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces
+- **`radius`** — Radius of icosphere in meters; finite and positive
 - **`direction_xyz`** — Output directions in Cartesian (true) or spherical azimuth/elevation (false); default: false
 
 ## Outputs:
@@ -40,14 +40,14 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs > 3)
+    if (nrhs < 2 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input arguments
-    const arma::uword n_div = (nrhs < 1) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[0], "n_div", 1);
-    const double radius = (nrhs < 2) ? 1.0 : qd_mex_get_scalar<double>(prhs[1], "radius", 1.0);
+    const arma::uword n_div = qd_mex_get_scalar<arma::uword>(prhs[0], "n_div", 0);
+    const double radius = qd_mex_get_scalar<double>(prhs[1], "radius");
     const bool direction_xyz = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "direction_xyz", false);
 
     // Output sizes are known up front; the largest output (20 * n_div^2 faces, 9 values each) must fit into 64 bits,

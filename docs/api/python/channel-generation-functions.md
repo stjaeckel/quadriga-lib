@@ -41,7 +41,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_ieee_indoor) 
 chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
-   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack )
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack=False )
 ```
 
 ### Inputs:
@@ -70,7 +70,7 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, Carri
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default; default: NAN
 - **`n_walls`** *(optional)* — Number of walls per user TGax models; `(n_users,)` or `(1,)`; default: 0
 - **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
-- **`stack`** *(optional)* — If `True`, per-snapshot data is stacked into a single array along an appended 
+- **`stack`** *(optional)* — Keyword-only; if `True`, per-snapshot data is stacked into a single array along an appended 
   snapshot axis instead of being returned as a list of per-snapshot arrays; default: False
 
 ### Output:
@@ -175,8 +175,8 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
   when not empty; `(n_path_1 · n_path_2,)`; default: `None`
 - **`use_kernel`** — Kernel of both segments, as in [channel.spherical](#channel.spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; raises if unavailable); auto selects GENERIC in this version; `int`; default: 0
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_rx, n_tx, n_path_irs)`
@@ -204,7 +204,7 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 
 - Multi-frequency extension of [channel.spherical](#channel.spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (`ant_tx['center_freq']`), RX array (`ant_rx['center_freq']`), input samples (`freq`), and output (`freq_new`)
+- Aligns four frequency grids: TX array (`tx_array['center_freq']`), RX array (`rx_array['center_freq']`), input samples (`freq`), and output (`freq_new`)
 - Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
@@ -239,17 +239,21 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_multifreq) ·
 
 ### Usage:
 ```python
-coeff, delay = quadriga_lib.channel.multifreq( ant_tx, ant_rx, fbs_pos, \
-    lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq, \
-    freq_new, use_absolute_delays, add_fake_los_path, propagation_speed )
+coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel, complex=True )
 
 coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [generate](array-antenna-functions.md#generate);
+- **`tx_array`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [generate](array-antenna-functions.md#generate);
   4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
-- **`ant_rx`** — RX arrayant dict; same format as `ant_tx`
+- **`rx_array`** — RX arrayant dict; same format as `tx_array`
+- **`tx_pos`** — Transmitter position, finite; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
+- **`rx_pos`** — Receiver position, finite; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
 - **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq)`
@@ -257,20 +261,16 @@ coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
 - **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
   `(2, n_path, n_freq)` scalar pressure
-- **`tx_pos`** — Transmitter position, finite; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
-- **`rx_pos`** — Receiver position, finite; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
 - **`freq`** — Input sample frequencies for `path_gain` and `M`; `(n_freq,)`
 - **`freq_new`** — Target output frequencies; `(n_freq_new,)`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate); `int`; default: 0
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
@@ -316,19 +316,23 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_planar) · [M
 
 ### Usage:
 ```python
-coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ant_tx, ant_rx, \
-    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path )
+coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
+    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq, complex=True )
 
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
+coeff_re, coeff_im, delay, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
 
-coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
+coeff, delay, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](array-antenna-functions.md#generate); a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](array-antenna-functions.md#generate); a 4D dict raises
   `ValueError` (use [channel.multifreq](#channel.multifreq))
-- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
+- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`aod`** — Departure azimuth angles in rad; `(n_path,)`
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
@@ -336,27 +340,23 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
   coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
-  processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate); `int`; default: 0
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
-- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
 ### See also:
@@ -417,21 +417,25 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_spherical) ·
 ### Usage:
 ```python
 # Complex coefficients (default)
-coeff, delays = quadriga_lib.channel.spherical( ant_tx, ant_rx, \
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path, angles, complex, i_freq, use_kernel )
+coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    center_freq, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq, complex=True )
 
 # Real and imaginary parts as separate arrays
-coeff_re, coeff_im, delays = quadriga_lib.channel.spherical( ..., complex=False )
+coeff_re, coeff_im, delay = quadriga_lib.channel.spherical( ..., complex=False )
 
 # Departure and arrival angles as well
-coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
+coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](array-antenna-functions.md#generate); a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](array-antenna-functions.md#generate); a 4D dict raises
   `ValueError` (use [channel.multifreq](#channel.multifreq))
-- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
+- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
@@ -439,29 +443,25 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
   (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
 - **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
   in batch mode
-- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory and, with element
   coupling, the time to convert them to the ports; default: `False`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
-  processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [interpolate](array-antenna-functions.md#interpolate);
   `int`; default: 0
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
-- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`aod`** — Azimuth of departure in the GCS, in rad; `(n_ports_rx, n_ports_tx, n_path)`; only with `angles=True`
 - **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
 - **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`

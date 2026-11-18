@@ -161,7 +161,7 @@ py::array_t<py::ssize_t> hdf5_write_channel(const py::handle &fn,
         unsigned cw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
 
         // Write (indices are 0-based, passed through unchanged)
-        int return_code = quadriga_lib::hdf5_write_channel(&c, fn_s, cx, cy, cz, cw);
+        int return_code = quadriga_lib::hdf5_write_channel(fn_s, &c, cx, cy, cz, cw);
         if (return_code == 1)
             any_overwrite = true;
     }

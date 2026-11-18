@@ -22,7 +22,7 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 
 ## Usage:
 ```
-[ pointsR, sub_cloud_ind, forward_ind, reverse_ind ] = ...
+[ points_out, sub_cloud_ind, forward_ind, reverse_ind ] = ...
     quadriga_lib.point_cloud_segmentation( points, target_size, vec_size );
 ```
 
@@ -33,10 +33,10 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
   [[ray_point_intersect]] accepts any value, padding (e.g. 8 for AVX2) only improves its speed; default: 1
 
 ## Outputs:
-- **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_ind`** — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_ind`** — 1-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `[n_points_out, 3]`
+- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `points_out`; `[n_sub]`
+- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; `[n_points_out]`
+- **`reverse_ind`** — 1-based row in `points_out` of each row of `points`; `[n_points]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -53,7 +53,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
     // Outputs (sizes are determined by C++ at runtime)
-    arma::mat pointsR;
+    arma::mat points_out;
     arma::u32_vec sub_cloud_ind, forward_ind, reverse_ind;
 
     // Wrap optional output pointers using nlhs guard
@@ -62,7 +62,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::u32_vec *p_reverse_index = (nlhs > 3) ? &reverse_ind : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::point_cloud_segmentation<double>(&points, &pointsR, &sub_cloud_ind,
+    CALL_QD(quadriga_lib::point_cloud_segmentation<double>(&points, &points_out, &sub_cloud_ind,
                                                            target_size, vec_size,
                                                            p_forward_index, p_reverse_index));
 
@@ -73,7 +73,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         reverse_ind += 1;
 
     // Copy outputs to MATLAB
-    plhs[0] = qd_mex_copy2matlab(&pointsR);
+    plhs[0] = qd_mex_copy2matlab(&points_out);
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&sub_cloud_ind);
     if (nlhs > 2)

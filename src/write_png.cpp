@@ -26,8 +26,8 @@ Write a data matrix to a color-coded PNG file
 ## Declaration:
 ```
 void quadriga_lib::write_png(
-    const arma::Mat<dtype> &data,
     const std::string &fn,
+    const arma::Mat<dtype> &data,
     const std::string &colormap = "jet",
     dtype min_val = NAN,
     dtype max_val = NAN,
@@ -35,8 +35,8 @@ void quadriga_lib::write_png(
 ```
 
 ## Inputs:
-- **`data`** — Input data matrix
 - **`fn`** — Output `.png` file path
+- **`data`** — Input data matrix
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for valid values
 - **`min_val`** *(optional)* — Lower clipping bound; NaN (the default): data minimum
 - **`max_val`** *(optional)* — Upper clipping bound; NaN (the default): data maximum
@@ -44,7 +44,7 @@ void quadriga_lib::write_png(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::write_png(const arma::Mat<dtype> &data, const std::string &fn, const std::string &colormap,
+void quadriga_lib::write_png(const std::string &fn, const arma::Mat<dtype> &data, const std::string &colormap,
                              dtype min_val, dtype max_val, bool log_transform)
 {
     if (data.n_elem == 0)
@@ -132,8 +132,8 @@ void quadriga_lib::write_png(const arma::Mat<dtype> &data, const std::string &fn
         throw std::runtime_error("PNG encoder error: '" + std::string(lodepng_error_text(error)) + "'");
 }
 
-template void quadriga_lib::write_png(const arma::Mat<float> &data, const std::string &fn, const std::string &colormap,
+template void quadriga_lib::write_png(const std::string &fn, const arma::Mat<float> &data, const std::string &colormap,
                                       float min_val, float max_val, bool log_transform);
 
-template void quadriga_lib::write_png(const arma::Mat<double> &data, const std::string &fn, const std::string &colormap,
+template void quadriga_lib::write_png(const std::string &fn, const arma::Mat<double> &data, const std::string &colormap,
                                       double min_val, double max_val, bool log_transform);

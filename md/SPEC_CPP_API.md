@@ -104,6 +104,11 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 - Entry format: one bullet under the fitting bold group label of the glossary (a new label where none fits). A quantity starts with its name in backticks, then meaning, unit, index base and shape in this order (as in the argument comments), leaving out what does not apply. A convention starts with a short label and goes under "General conventions". An entry gives its reason in a short clause only where the reason helps a user judge a deviation.
 - After 1.0, released names stay. A rename in a minor release needs a justification that its benefit clearly outweighs the breakage for users.
 
+# WRAPPER INTERFACE
+- The MATLAB / Octave and Python wrappers take the names, the argument order and the defaults of the C++ declaration, so that users learn one interface for all three APIs. Where a wrapper differs, its documentation block says how and why.
+- The file name is the first argument of every function that reads or writes a file; new arguments are appended, with a default.
+- In Python, `complex` and `stack` are keyword-only (`md/SPEC_PYTHON_API.md`, "Standard flags").
+
 # IMPLEMENTATION GUIDELINES
 
 ## Source file

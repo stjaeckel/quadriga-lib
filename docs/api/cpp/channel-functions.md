@@ -310,7 +310,7 @@ Read an unstructured dataset from an HDF5 file at a specified 4D index
 
 Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_dset) · [Python](../python/channel-functions.md#hdf5_read_dset)
 
-- Reads a user-defined dataset stored under `prefix + par_name` (e.g., `"par_carrier_frequency"`).
+- Reads a user-defined dataset stored under `prefix + name` (e.g., `"par_carrier_frequency"`).
 - Returns an empty `std::any` if the dataset does not exist at the specified slot or name.
 - Use [any_type_id](#any_type_id) to determine the contained type and shape, then `std::any_cast` to that type.
 - Returned types: a scalar dataset gives a scalar; a 1D dataset an `arma::Col`, also when it has a single element;
@@ -325,7 +325,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_dset) · [Python](../pyt
 ```cpp
 std::any quadriga_lib::hdf5_read_dset(
     const std::string &fn,
-    const std::string &par_name,
+    const std::string &name,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -335,12 +335,12 @@ std::any quadriga_lib::hdf5_read_dset(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`par_name`** — Dataset name without prefix, e.g., `"carrier_frequency"`
+- **`name`** — Dataset name without prefix, e.g., `"carrier_frequency"`
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`prefix`** *(optional)* — Dataset name prefix prepended before `par_name`
+- **`prefix`** *(optional)* — Dataset name prefix prepended before `name`
 
 ### Returns:
 - `std::any` containing the dataset, or empty `std::any` if not found
@@ -363,7 +363,7 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_read_dset_names) · [Python](
 ```cpp
 arma::uword quadriga_lib::hdf5_read_dset_names(
     const std::string &fn,
-    std::vector<std::string> *par_names,
+    std::vector<std::string> *names,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -373,7 +373,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`par_names`** — Pointer to vector receiving dataset names (without prefix)
+- **`names`** — Pointer to vector receiving dataset names (without prefix)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -475,8 +475,8 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_channel) · [Python](..
 ### Declaration:
 ```cpp
 int quadriga_lib::hdf5_write_channel(
-    const quadriga_lib::channel<dtype> *ch,
     const std::string &fn,
+    const quadriga_lib::channel<dtype> *chan,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -484,8 +484,8 @@ int quadriga_lib::hdf5_write_channel(
 ```
 
 ### Inputs:
-- **`ch`** — Pointer to the channel object to write
 - **`fn`** — Path to the HDF5 file
+- **`chan`** — Pointer to the channel object to write
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -505,7 +505,7 @@ Write a single unstructured dataset to an HDF5 file at a specified 4D index
 
 Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_dset) · [Python](../python/channel-functions.md#hdf5_write_dset)
 
-- Dataset is stored under `prefix + par_name`; name must contain only alphanumeric characters and underscores.
+- Dataset is stored under `prefix + name`; name must contain only alphanumeric characters and underscores.
 - Adds the dataset to the slot and keeps everything else stored there (channel data and other datasets); an empty
   slot is reserved for it. A later [hdf5_write_channel](#hdf5_write_channel) to the same slot replaces the slot completely, including the
   datasets written with this function.
@@ -522,8 +522,8 @@ Also in: [MATLAB](../mex/channel-functions.md#hdf5_write_dset) · [Python](../py
 ```cpp
 void quadriga_lib::hdf5_write_dset(
     const std::string &fn,
-    const std::string &par_name,
-    const std::any *par_data,
+    const std::string &name,
+    const std::any *data,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -533,13 +533,13 @@ void quadriga_lib::hdf5_write_dset(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`par_name`** — Dataset name without prefix; alphanumeric and underscores only
-- **`par_data`** — Pointer to the data to write; type must be supported (see above)
+- **`name`** — Dataset name without prefix; alphanumeric and underscores only
+- **`data`** — Pointer to the data to write; type must be supported (see above)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`prefix`** *(optional)* — Prefix prepended to `par_name` in the HDF5 file
+- **`prefix`** *(optional)* — Prefix prepended to `name` in the HDF5 file
 
 ### See also:
 - [hdf5_read_dset](#hdf5_read_dset) (read an unstructured dataset by name)

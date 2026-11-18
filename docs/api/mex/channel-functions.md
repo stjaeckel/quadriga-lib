@@ -153,13 +153,15 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_create_file) · [Python](../pyth
 
 ### Usage:
 ```matlab
-storage_space = quadriga_lib.hdf5_create_file( fn, storage_dims );
+storage_space = quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw );
 ```
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file to create; string
-- **`storage_dims`** — Size of the storage layout; vector with 1-4 elements, i.e. `[nx]`, `[nx, ny]`, 
-  `[nx, ny, nz]` or `[nx, ny, nz, nw]`; default: `[65536, 1, 1, 1]`
+- **`nx`** — Number of slots along dimension X; default: 65536
+- **`ny`** — Number of slots along dimension Y; default: 1
+- **`nz`** — Number of slots along dimension Z; default: 1
+- **`nw`** — Number of slots along dimension W; default: 1
 
 ### Output:
 - **`storage_space`** — Actual storage dimensions used; `[4]`; uint32
@@ -252,14 +254,16 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_dset) · [Python](../python
 
 ### Usage:
 ```matlab
-dset = quadriga_lib.hdf5_read_dset( fn, location, name, prefix );
+dset = quadriga_lib.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix );
 ```
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file; string
-- **`location`** — Slot location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`,
-  `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; pass `[]` for default `[1, 1, 1, 1]`
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; string
+- **`ix`** — 1-based slot index along dimension X; scalar; default: 1
+- **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
+- **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
+- **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; string; default: `'par_'`
 
 ### Outputs:
@@ -284,13 +288,15 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_dset_names) · [Python](../
 
 ### Usage:
 ```matlab
-names = quadriga_lib.hdf5_read_dset_names( fn, location, prefix );
+names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw, prefix );
 ```
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file; string
-- **`location`** — Slot location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`,
-  `[ix, iy, iz]` or `[ix, iy, iz, iw]`; default:  `[1, 1, 1, 1]`
+- **`ix`** — 1-based slot index along dimension X; scalar; default: 1
+- **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
+- **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
+- **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix used to identify unstructured datasets; string; default: `'par_'`
 
 ### Outputs:
@@ -346,13 +352,15 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_reshape_layout) · [Python](../p
 
 ### Usage:
 ```matlab
-storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
+storage_space = quadriga_lib.hdf5_reshape_layout( fn, nx, ny, nz, nw );
 ```
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file; string
-- **`storage_dims`** — New storage layout; vector with 1-4 elements,
-  i.e. `[nx]`, `[nx, ny]`, `[nx, ny, nz]` or `[nx, ny, nz, nw]`; default: `[65536, 1, 1, 1]`
+- **`nx`** — New number of slots along dimension X
+- **`ny`** — New number of slots along dimension Y; default: 1
+- **`nz`** — New number of slots along dimension Z; default: 1
+- **`nw`** — New number of slots along dimension W; default: 1
 
 ### Outputs:
 - **`storage_space`** — New storage dimensions `[nx, ny, nz, nw]`; `[4]`; uint32
@@ -429,15 +437,17 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_write_dset) · [Python](../pytho
 
 ### Usage:
 ```matlab
-storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
+storage_dims = quadriga_lib.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix );
 ```
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file; string
-- **`location`** — Slot location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`,
-  `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; pass `[]` for default `[1, 1, 1, 1]`
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; string
 - **`data`** — Data to be written; type must be supported (see above); cannot be empty
+- **`ix`** — 1-based slot index along dimension X; scalar; default: 1
+- **`iy`** — 1-based slot index along dimension Y; scalar; default: 1
+- **`iz`** — 1-based slot index along dimension Z; scalar; default: 1
+- **`iw`** — 1-based slot index along dimension W; scalar; default: 1
 - **`prefix`** — Prefix prepended to `name` in the HDF5 file; string; default: `'par_'`
 
 ### Outputs:

@@ -39,7 +39,7 @@ Channel coefficients of one link at one frequency over one segment
 ```
 chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, \
     output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
-    use_absolute_delays, stack )
+    use_absolute_delays, stack=False )
 ```
 
 ## Inputs:
@@ -60,7 +60,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays (`"phase"`: of the ray-data positions); default:
   `False`
-- **`stack`** — Snapshot layout of `chan` as in [[hdf5_read_channel]]; default: `False`
+- **`stack`** — Keyword-only; snapshot layout of `chan` as in [[hdf5_read_channel]]; default: `False`
 
 ## Outputs:
 - **`chan`** — Channel dict, layout as documented in [[hdf5_read_channel]]: `center_freq` `(1,)`;

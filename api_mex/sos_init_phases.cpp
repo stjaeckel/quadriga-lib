@@ -49,7 +49,7 @@ phase = quadriga_lib.sos_init_phases( n_coeff, n_gen, seed );
 
 ## Inputs:
 - **`n_coeff`** — Number of sinusoids; must be > 0
-- **`n_gen`** — Number of generators; must be > 0; default: 1
+- **`n_gen`** — Number of generators; must be > 0
 - **`seed`** — Seed of the random stream; integer from -1 to 2^63-1; -1 seeds from the system random
   device and gives different phases on each call; default: -1
 
@@ -64,14 +64,14 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs < 1 || nrhs > 3)
+    if (nrhs < 2 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
     const arma::uword n_coeff = qd_mex_sos_count(prhs[0], "n_coeff", 0.0);
-    const arma::uword n_gen = (nrhs < 2) ? 1 : qd_mex_sos_count(prhs[1], "n_gen", 1.0);
+    const arma::uword n_gen = qd_mex_sos_count(prhs[1], "n_gen", 0.0);
     const arma::sword seed = (nrhs < 3) ? -1 : qd_mex_get_seed(prhs[2]);
 
     // Output allocation

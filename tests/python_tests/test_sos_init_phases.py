@@ -61,13 +61,13 @@ class test_case(unittest.TestCase):
     def test_optional_inputs(self):
         ref = quadriga_lib.sos.init_phases(7, 3, 42)
 
-        # n_gen = 1 and seed = -1 (system random device: new values on each call)
-        p1 = quadriga_lib.sos.init_phases(9)
-        p2 = quadriga_lib.sos.init_phases(9)
+        # seed = -1 (system random device: new values on each call)
+        p1 = quadriga_lib.sos.init_phases(9, 1)
+        p2 = quadriga_lib.sos.init_phases(9, 1)
         self.assertEqual(p1.shape, (9, 1))
         self.assertGreater(np.max(np.abs(p1 - p2)), 1e-6)
 
-        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, seed=42), ref[:, :1])
+        npt.assert_array_equal(quadriga_lib.sos.init_phases(7, 1, seed=42), ref[:, :1])
 
         p3 = quadriga_lib.sos.init_phases(7, 3, -1)
         self.assertGreater(np.max(np.abs(p3 - ref)), 1e-6)
@@ -78,7 +78,7 @@ class test_case(unittest.TestCase):
     def test_errors(self):
         # Thrown by C++: std::invalid_argument -> ValueError
         with self.assertRaises(ValueError) as ctx:
-            quadriga_lib.sos.init_phases(0)
+            quadriga_lib.sos.init_phases(0, 1)
         self.assertIn("n_coeff", str(ctx.exception))
 
         with self.assertRaises(ValueError) as ctx:
@@ -92,12 +92,14 @@ class test_case(unittest.TestCase):
         # Rejected by pybind11
         with self.assertRaises(TypeError):
             quadriga_lib.sos.init_phases()
+        with self.assertRaises(TypeError):  # n_gen is mandatory, as in C++
+            quadriga_lib.sos.init_phases(7)
         with self.assertRaises(TypeError):
             quadriga_lib.sos.init_phases(7, no_such_argument=1)
         with self.assertRaises(TypeError):
-            quadriga_lib.sos.init_phases(-7)   # unsigned
+            quadriga_lib.sos.init_phases(-7, 1)   # unsigned
         with self.assertRaises(TypeError):
-            quadriga_lib.sos.init_phases(7.0)  # no implicit conversion from float
+            quadriga_lib.sos.init_phases(7.0, 1)  # no implicit conversion from float
 
     def test_output_size_overflow(self):
         # The byte size of the output exceeds the address range; rejected before numpy sees the strides

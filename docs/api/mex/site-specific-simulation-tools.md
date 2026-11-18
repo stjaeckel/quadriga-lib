@@ -190,8 +190,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#icosphere) · [Python](.
 ```
 
 ### Inputs:
-- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
-- **`radius`** — Radius of icosphere in meters; finite and positive; default: 1
+- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces
+- **`radius`** — Radius of icosphere in meters; finite and positive
 - **`direction_xyz`** — Output directions in Cartesian (true) or spherical azimuth/elevation (false); default: false
 
 ### Outputs:
@@ -405,7 +405,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_cloud_segmentation
 
 ### Usage:
 ```matlab
-[ pointsR, sub_cloud_ind, forward_ind, reverse_ind ] = ...
+[ points_out, sub_cloud_ind, forward_ind, reverse_ind ] = ...
     quadriga_lib.point_cloud_segmentation( points, target_size, vec_size );
 ```
 
@@ -416,10 +416,10 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#point_cloud_segmentation
   [ray_point_intersect](#ray_point_intersect) accepts any value, padding (e.g. 8 for AVX2) only improves its speed; default: 1
 
 ### Outputs:
-- **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_ind`** — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_ind`** — 1-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `[n_points_out, 3]`
+- **`sub_cloud_ind`** — 1-based starting index of each sub-cloud within `points_out`; `[n_sub]`
+- **`forward_ind`** — 1-based row in `points` of each row of `points_out`; padding entries are `0`; `[n_points_out]`
+- **`reverse_ind`** — 1-based row in `points_out` of each row of `points`; `[n_points]`
 
 ---
 <a id="point_inside_mesh"></a>
@@ -465,8 +465,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
 - Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
   front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
   FBS=SBS with opposing normals → media-to-media
-- With `compact = true` (default), rays with `fbs_ind = 0` (no interaction) are dropped, so
-  `n_rayN ≤ n_ray`; with `compact = false` all rays are kept and no-hit rays pass through unchanged
+- With `compact = true`, rays with `fbs_ind = 0` (no interaction) are dropped, so `n_rayN ≤ n_ray`; with
+  `compact = false` (default) all rays are kept and no-hit rays pass through unchanged
 - Output direction encoding (spherical/Cartesian) matches input `tridir` format
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves)
 - Types 3–5 (scalar) use a single TE-only coefficient, suitable for acoustic simulation with
@@ -500,7 +500,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
 - **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
   `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
-  transparent pass-through; logical; default: true
+  transparent pass-through; logical; default: false
 
 ### Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
@@ -569,17 +569,17 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_point_intersect) · 
 
 ### Usage:
 ```matlab
-[ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, ...
+[ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( points, orig, trivec, tridir, ...
     sub_cloud_ind, use_kernel, gpu_id );
 ```
 
 ### Inputs:
+- **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
-- **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`sub_cloud_ind`** — Segment boundary indices for the point cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate;
   sub-clouds need not be aligned to the SIMD vector size (padding with `vec_size` is optional and only improves speed);
   uint32; `[n_sub]`; default: `[]` (not using sub-clouds)
@@ -659,19 +659,19 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#subdivide_triangles) · 
 
 ### Usage:
 ```matlab
-[ triangles_out, mtl_ind_out ] = quadriga_lib.subdivide_triangles( triangles_in, n_div, mtl_ind_in );
+[ triangles_out, mtl_ind_out ] = quadriga_lib.subdivide_triangles( n_div, triangles_in, mtl_ind );
 ```
 
 ### Inputs:
-- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
 - **`n_div`** — Number of subdivisions per edge
-- **`mtl_ind_in`** — 1-based material index per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read));
+- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
+- **`mtl_ind`** — 1-based material index per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read));
   0 = no material; `[n_triangles_in]`; passed through unchanged; default: `[]`
 
 ### Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
 - **`mtl_ind_out`** — Material indices for the subdivided triangles, 1-based; uint64; `[n_triangles_out]`; only
-  populated if `mtl_ind_in` is given
+  populated if `mtl_ind` is given
 
 ---
 <a id="triangle_mesh_aabb"></a>
@@ -716,25 +716,25 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#triangle_mesh_segmentati
   zero-sized dummy triangles to align row counts to `vec_size`
 - Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_ind` uses 0 to mark
   padding entries
-- If `mtl_ind_in` is provided, material indices are reordered and padded in the same way
+- If `mtl_ind` is provided, material indices are reordered and padded in the same way
 
 ### Usage:
 ```matlab
-[ triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out ] = ...
-    quadriga_lib.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_ind_in );
+[ mesh_out, sub_mesh_ind, mesh_ind, mtl_ind_out ] = ...
+    quadriga_lib.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind );
 ```
 
 ### Inputs:
-- **`triangles_in`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
+- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`target_size`** — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024
 - **`vec_size`** — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count is rounded
   up to a multiple of this value; default: 1
-- **`mtl_ind_in`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read));
+- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read));
   0 = no material; `[n_mesh]` or empty; passed through unchanged; default: `[]`
 
 ### Outputs:
-- **`triangles_out`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
-- **`mesh_ind`** — 1-based row in `triangles_in` of each row of `triangles_out` (0 = padding); uint32; `[n_meshR]`
+- **`mesh_out`** — Reordered and padded triangle vertices; `[n_mesh_out, 9]`
+- **`sub_mesh_ind`** — 1-based start indices of sub-meshes in `mesh_out`; uint32; `[n_sub]`
+- **`mesh_ind`** — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); uint32; `[n_mesh_out]`
 - **`mtl_ind_out`** — Reordered and padded material indices, 1-based; padding entries get 0 (no material); uint64;
-  `[n_meshR]`; only populated if `mtl_ind_in` is given
+  `[n_mesh_out]`; only populated if `mtl_ind` is given

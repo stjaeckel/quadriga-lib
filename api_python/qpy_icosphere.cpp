@@ -26,8 +26,8 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
 ```
 
 ## Inputs:
-- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
-- **`radius`** — Radius of icosphere in meters; finite and positive; default: 1
+- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces
+- **`radius`** — Radius of icosphere in meters; finite and positive
 - **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical
   azimuth/elevation (false); default: false
 

@@ -22,7 +22,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 ```
 arma::uword triangle_mesh_segmentation(
     const arma::Mat<dtype> *mesh,
-    arma::Mat<dtype> *meshR,
+    arma::Mat<dtype> *mesh_out,
     arma::u32_vec *sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
@@ -38,10 +38,10 @@ arma::uword triangle_mesh_segmentation(
 - **`mtl_ind`** *(optional)* — Material indices per triangle (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 
 ## Outputs:
-- **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
-- **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
-- **`mesh_ind`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
+- **`mesh_out`** — Reordered and padded triangle vertices; `[n_mesh_out, 9]`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; `[n_sub]`
+- **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_mesh_out]`
+- **`mesh_ind`** *(optional)* — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); `[n_mesh_out]`
 
 ## Returns:
 - Number of created sub-meshes `n_sub`
@@ -53,7 +53,7 @@ MD!*/
 
 template <typename dtype>
 arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,
-                                                     arma::Mat<dtype> *meshR,
+                                                     arma::Mat<dtype> *mesh_out,
                                                      arma::u32_vec *sub_mesh_ind,
                                                      arma::uword target_size,
                                                      arma::uword vec_size,
@@ -71,11 +71,11 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
 
     arma::uword n_mesh = mesh->n_rows;
 
-    if (meshR == nullptr)
-        throw std::invalid_argument("Output 'meshR' cannot be NULL.");
+    if (mesh_out == nullptr)
+        throw std::invalid_argument("Output 'mesh_out' cannot be NULL.");
     if (sub_mesh_ind == nullptr)
         throw std::invalid_argument("Output 'sub_mesh_ind' cannot be NULL.");
-    qd_check_alias(meshR, "meshR", mesh);
+    qd_check_alias(mesh_out, "mesh_out", mesh);
     qd_check_alias(mtl_ind_out, "mtl_ind_out", mtl_ind);
     qd_check_alias_outputs(sub_mesh_ind, "sub_mesh_ind", mesh_ind, "mesh_ind");
 
@@ -198,8 +198,8 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
     }
 
     // Assemble output
-    meshR->set_size(n_out, 9);
-    dtype *p_mesh_out = meshR->memptr();
+    mesh_out->set_size(n_out, 9);
+    dtype *p_mesh_out = mesh_out->memptr();
 
     const arma::uword *p_mtl_in = process_mtl_ind ? mtl_ind->memptr() : nullptr;
     arma::uword *p_mtl_out = nullptr;
@@ -283,10 +283,10 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
     return n_sub;
 }
 
-template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<float> *mesh, arma::Mat<float> *meshR,
+template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<float> *mesh, arma::Mat<float> *mesh_out,
                                                               arma::u32_vec *sub_mesh_ind, arma::uword target_size, arma::uword vec_size,
                                                               const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);
 
-template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<double> *mesh, arma::Mat<double> *meshR,
+template arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<double> *mesh, arma::Mat<double> *mesh_out,
                                                               arma::u32_vec *sub_mesh_ind, arma::uword target_size, arma::uword vec_size,
                                                               const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out, arma::u32_vec *mesh_ind);

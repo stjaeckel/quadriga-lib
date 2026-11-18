@@ -65,7 +65,7 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
   a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
   default: `False`
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
-- **`complex`** — Return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
+- **`complex`** — Keyword-only; return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
   default: `True`
 
 ## Outputs:

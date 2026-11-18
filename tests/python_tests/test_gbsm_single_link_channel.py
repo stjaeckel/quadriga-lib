@@ -126,6 +126,9 @@ class test_case(unittest.TestCase):
         rx2 = np.vstack([RX, RX + [1.0, 0.0, 0.0]])
         c0 = self.call(rx_pos=rx2)[0]
         c1 = self.call(rx_pos=rx2, stack=True)[0]
+        with self.assertRaises(TypeError):  # stack is keyword-only
+            gbsm.single_link_channel(self.tx, self.rx, self.rays, [-90.0], "auto", "taps", 0, None, None, None, None,
+                                     None, False, False, True)
         self.assertIsInstance(c1["coeff"], np.ndarray)
         self.assertEqual(c1["coeff"].shape, (2, 1, self.taps.size, 2))
         npt.assert_array_equal(c1["coeff"][..., 1], c0["coeff"][1])

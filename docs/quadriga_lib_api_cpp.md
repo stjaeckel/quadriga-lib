@@ -1982,7 +1982,7 @@ Read an unstructured dataset from an HDF5 file at a specified 4D index
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset) · [Python](quadriga_lib_api_python.md#hdf5_read_dset)
 
-- Reads a user-defined dataset stored under `prefix + par_name` (e.g., `"par_carrier_frequency"`).
+- Reads a user-defined dataset stored under `prefix + name` (e.g., `"par_carrier_frequency"`).
 - Returns an empty `std::any` if the dataset does not exist at the specified slot or name.
 - Use [any_type_id](#any_type_id) to determine the contained type and shape, then `std::any_cast` to that type.
 - Returned types: a scalar dataset gives a scalar; a 1D dataset an `arma::Col`, also when it has a single element;
@@ -1997,7 +1997,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset) · [Python](quadriga_l
 ```cpp
 std::any quadriga_lib::hdf5_read_dset(
     const std::string &fn,
-    const std::string &par_name,
+    const std::string &name,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2007,12 +2007,12 @@ std::any quadriga_lib::hdf5_read_dset(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`par_name`** — Dataset name without prefix, e.g., `"carrier_frequency"`
+- **`name`** — Dataset name without prefix, e.g., `"carrier_frequency"`
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`prefix`** *(optional)* — Dataset name prefix prepended before `par_name`
+- **`prefix`** *(optional)* — Dataset name prefix prepended before `name`
 
 ### Returns:
 - `std::any` containing the dataset, or empty `std::any` if not found
@@ -2035,7 +2035,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_read_dset_names) · [Python](quad
 ```cpp
 arma::uword quadriga_lib::hdf5_read_dset_names(
     const std::string &fn,
-    std::vector<std::string> *par_names,
+    std::vector<std::string> *names,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2045,7 +2045,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`par_names`** — Pointer to vector receiving dataset names (without prefix)
+- **`names`** — Pointer to vector receiving dataset names (without prefix)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -2147,8 +2147,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_channel) · [Python](quadri
 ### Declaration:
 ```cpp
 int quadriga_lib::hdf5_write_channel(
-    const quadriga_lib::channel<dtype> *ch,
     const std::string &fn,
+    const quadriga_lib::channel<dtype> *chan,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2156,8 +2156,8 @@ int quadriga_lib::hdf5_write_channel(
 ```
 
 ### Inputs:
-- **`ch`** — Pointer to the channel object to write
 - **`fn`** — Path to the HDF5 file
+- **`chan`** — Pointer to the channel object to write
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
@@ -2177,7 +2177,7 @@ Write a single unstructured dataset to an HDF5 file at a specified 4D index
 
 Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset) · [Python](quadriga_lib_api_python.md#hdf5_write_dset)
 
-- Dataset is stored under `prefix + par_name`; name must contain only alphanumeric characters and underscores.
+- Dataset is stored under `prefix + name`; name must contain only alphanumeric characters and underscores.
 - Adds the dataset to the slot and keeps everything else stored there (channel data and other datasets); an empty
   slot is reserved for it. A later [hdf5_write_channel](#hdf5_write_channel) to the same slot replaces the slot completely, including the
   datasets written with this function.
@@ -2194,8 +2194,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#hdf5_write_dset) · [Python](quadriga_
 ```cpp
 void quadriga_lib::hdf5_write_dset(
     const std::string &fn,
-    const std::string &par_name,
-    const std::any *par_data,
+    const std::string &name,
+    const std::any *data,
     unsigned ix = 0,
     unsigned iy = 0,
     unsigned iz = 0,
@@ -2205,13 +2205,13 @@ void quadriga_lib::hdf5_write_dset(
 
 ### Inputs:
 - **`fn`** — Path to the HDF5 file
-- **`par_name`** — Dataset name without prefix; alphanumeric and underscores only
-- **`par_data`** — Pointer to the data to write; type must be supported (see above)
+- **`name`** — Dataset name without prefix; alphanumeric and underscores only
+- **`data`** — Pointer to the data to write; type must be supported (see above)
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
 - **`iz`** *(optional)* — Slot index in z-dimension
 - **`iw`** *(optional)* — Slot index in w-dimension
-- **`prefix`** *(optional)* — Prefix prepended to `par_name` in the HDF5 file
+- **`prefix`** *(optional)* — Prefix prepended to `name` in the HDF5 file
 
 ### See also:
 - [hdf5_read_dset](#hdf5_read_dset) (read an unstructured dataset by name)
@@ -5763,7 +5763,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#obj_file_read) · [Python](quadriga_li
 - Geometry indices (`face_ind`, `obj_ind`) are 0-based. Material indices (`mtl_ind`, `csv_ind`) are
   1-based, with 0 reserved for the outside / no-material state (faces with no assigned material;
   for `csv_ind` in non-strict mode, also materials absent from the table).
-- With an empty `fn_obj`, geometry and `.mtl` outputs are empty and only the table (`csv_names`, `csv_prop`) 
+- With an empty `fn`, geometry and `.mtl` outputs are empty and only the table (`csv_names`, `csv_prop`) 
   is populated — useful for inspecting a CSV or the default library. If `fn_csv` is also empty, the built-in default table is returned.
 - The material model and its columns: [The quadriga-lib Material Model and Ray-Surface Physics](http://quadriga-lib.org/quadriga_lib_material_model.md); the CSV format
   of the material table: [Data Formats](formats.md)
@@ -5771,7 +5771,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#obj_file_read) · [Python](quadriga_li
 ### Declaration:
 ```cpp
 arma::uword quadriga_lib::obj_file_read(
-    const std::string &fn_obj = "",
+    const std::string &fn = "",
     arma::Mat<dtype> *mesh = nullptr,
     arma::Mat<dtype> *vert_list = nullptr,
     arma::umat *face_ind = nullptr,
@@ -5788,7 +5788,7 @@ arma::uword quadriga_lib::obj_file_read(
 ```
 
 ### Inputs:
-- **`fn_obj`** — Path to the `.obj` file; empty loads only the material table
+- **`fn`** — Path to the `.obj` file; empty loads only the material table
 - **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
   to index 0 (no material) unless `csv_strict` is set. Empty uses the built-in ITU-R P.2040 default table.
 - **`csv_strict`** — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to index 0 (no material)
@@ -6050,7 +6050,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_segmentation) · [Python](
 ```cpp
 arma::uword quadriga_lib::point_cloud_segmentation(
     const arma::Mat<dtype> *points,
-    arma::Mat<dtype> *pointsR,
+    arma::Mat<dtype> *points_out,
     arma::u32_vec *sub_cloud_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
@@ -6065,10 +6065,10 @@ arma::uword quadriga_lib::point_cloud_segmentation(
   [ray_point_intersect](#ray_point_intersect) accepts any value, padding (e.g. 8 for AVX2) only improves its speed
 
 ### Outputs:
-- **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
-- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
-- **`forward_ind`** *(optional)* — 1-based row in `points` of each row of `pointsR`; padding entries are `0`; `[n_pointsR]`
-- **`reverse_ind`** *(optional)* — 0-based row in `pointsR` of each row of `points`; `[n_points]`
+- **`points_out`** — Reorganized point cloud with points grouped by sub-cloud; `[n_points_out, 3]`
+- **`sub_cloud_ind`** — 0-based starting index of each sub-cloud within `points_out`; `[n_sub]`
+- **`forward_ind`** *(optional)* — 1-based row in `points` of each row of `points_out`; padding entries are `0`; `[n_points_out]`
+- **`reverse_ind`** *(optional)* — 0-based row in `points_out` of each row of `points`; `[n_points]`
 
 ### Returns:
 - Number of generated sub-clouds `n_sub`
@@ -7225,7 +7225,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_segmentation) · [Python
 ```cpp
 arma::uword triangle_mesh_segmentation(
     const arma::Mat<dtype> *mesh,
-    arma::Mat<dtype> *meshR,
+    arma::Mat<dtype> *mesh_out,
     arma::u32_vec *sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
@@ -7241,10 +7241,10 @@ arma::uword triangle_mesh_segmentation(
 - **`mtl_ind`** *(optional)* — Material indices per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 
 ### Outputs:
-- **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
-- **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
-- **`mesh_ind`** *(optional)* — 1-based row in `mesh` of each row of `meshR` (0 = padding); `[n_meshR]`
+- **`mesh_out`** — Reordered and padded triangle vertices; `[n_mesh_out, 9]`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; `[n_sub]`
+- **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_mesh_out]`
+- **`mesh_ind`** *(optional)* — 1-based row in `mesh` of each row of `mesh_out` (0 = padding); `[n_mesh_out]`
 
 ### Returns:
 - Number of created sub-meshes `n_sub`
@@ -7310,8 +7310,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#write_png) · [Python](quadriga_lib_ap
 ### Declaration:
 ```cpp
 void quadriga_lib::write_png(
-    const arma::Mat<dtype> &data,
     const std::string &fn,
+    const arma::Mat<dtype> &data,
     const std::string &colormap = "jet",
     dtype min_val = NAN,
     dtype max_val = NAN,
@@ -7319,8 +7319,8 @@ void quadriga_lib::write_png(
 ```
 
 ### Inputs:
-- **`data`** — Input data matrix
 - **`fn`** — Output `.png` file path
+- **`data`** — Input data matrix
 - **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for valid values
 - **`min_val`** *(optional)* — Lower clipping bound; NaN (the default): data minimum
 - **`max_val`** *(optional)* — Upper clipping bound; NaN (the default): data maximum

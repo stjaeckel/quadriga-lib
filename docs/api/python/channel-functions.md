@@ -205,7 +205,7 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_channel) · [MATLAB](../mex
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, stack )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, stack=False )
 ```
 
 ### Inputs:
@@ -215,7 +215,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
 - **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
-- **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
+- **`stack`** — Keyword-only; if `True`, stack snapshots. Default: `False` (return as list)
 
 ### Outputs:
 - **`chan`** — List of dicts with the following keys:
@@ -266,16 +266,16 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_read_dset) · [MATLAB](../mex/ch
 
 ### Usage:
 ```python
-dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix )
 ```
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file
+- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
 
 ### Outputs:
@@ -373,7 +373,7 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file
-- **`nx`** — Number of elements on the x-dimension; default: 65536
+- **`nx`** — Number of elements on the x-dimension
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
 - **`nw`** — Number of elements on the w-dimension; default: 1
@@ -451,17 +451,17 @@ Also in: [C++](../cpp/channel-functions.md#hdf5_write_dset) · [MATLAB](../mex/c
 
 ### Usage:
 ```python
-quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
+quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix )
 ```
 
 ### Input Arguments:
 - **`fn`** — Filename of the HDF5 file
+- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
+- **`data`** — Data to be written; type must be supported (see above); cannot be empty
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
-- **`data`** — Data to be written; type must be supported (see above); cannot be empty
 - **`prefix`** — Prefix prepended to `name` in the HDF5 file; alphanumeric and underscores only; str; default: `'par_'`
 
 ### See also:
@@ -632,11 +632,11 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
   2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
-- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
+- **`stack`** — Keyword-only; if `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
-- **`complex`** — If `True`, return combined complex coefficients `coeff_q`; if `False`, return
+- **`complex`** — Keyword-only; if `True`, return combined complex coefficients `coeff_q`; if `False`, return
   separate `coeff_re_q` and `coeff_im_q`; default: `True`
-- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
+- **`coeff`** — Keyword-only; complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
   mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
 ### Outputs:

@@ -35,7 +35,7 @@ x, y, z = quadriga_lib.tools.fast_geo2cart( az, el, len, combine=False )
 - **`len`** — Vector length `(n, m)`; omit for unit length; ignored for combined input; default: None
 - **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate x, y, z  arrays; default: True
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws
-  if unavailable); other values raise; default: 1
+  if unavailable); other values raise; default: 0
 
 ## Outputs:
 - **`cart`** — Combined Cartesian coordinates `(3, n, m)`; row 0 = x, row 1 = y, row 2 = z; returned when `combine` is True

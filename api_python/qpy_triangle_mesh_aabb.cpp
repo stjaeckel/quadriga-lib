@@ -20,11 +20,11 @@ Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-me
 
 ## Usage:
 ```
-aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_ind, vec_size )
+aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size )
 ```
 
 ## Inputs:
-- **`triangles`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB
   of the entire mesh is returned; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
@@ -36,11 +36,11 @@ aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_ind, vec_siz
 - [[triangle_mesh_segmentation]] (for calculating sub-meshes)
 MD!*/
 
-py::array_t<double> triangle_mesh_aabb(const py::array_t<double> &triangles,
+py::array_t<double> triangle_mesh_aabb(const py::array_t<double> &mesh,
                                        const py::handle &sub_mesh_ind,
                                        arma::uword vec_size)
 {
-    const auto triangles_arma = qd_python_numpy2arma_Mat(triangles, true);
+    const auto triangles_arma = qd_python_numpy2arma_Mat(mesh, true);
     const auto sub_mesh_index_arma = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true);
 
     arma::mat aabb;

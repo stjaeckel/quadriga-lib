@@ -79,7 +79,9 @@ class test_case(unittest.TestCase):
     def test_keyword_arguments(self):
         ok = self.call(scenpar=self.sp, center_freq=self.fc, tx_pos=self.tx_pos, rx_pos=self.rx_pos, rnd=self.rnd,
                        sf_sigma_dB=None, cholesky=True, clip_spreads=True, complex=True)
-        op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True, True)
+        op = self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True, complex=True)
+        with self.assertRaises(TypeError):  # complex is keyword-only
+            self.call(self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd, None, True, True, True)
         for a, b, c in zip(ok, op, self.out):
             npt.assert_array_equal(a, c)
             npt.assert_array_equal(b, c)
@@ -134,7 +136,7 @@ class test_case(unittest.TestCase):
 
     def test_flags(self):
         args = (self.sp, self.fc, self.tx_pos, self.rx_pos, self.rnd)
-        out = self.call(*args, None, None, None, None)  # None selects the default of each flag
+        out = self.call(*args, None, None, None, complex=None)  # None selects the default of each flag
         self.assertEqual(len(out), 6)
         for a, b in zip(out, self.out):
             npt.assert_array_equal(a, b)

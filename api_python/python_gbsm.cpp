@@ -94,6 +94,7 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("sf_sigma_dB") = py::none(),
           py::arg("cholesky") = true,
           py::arg("clip_spreads") = true,
+          py::kw_only(),
           py::arg("complex") = true);
 
     m.def("los_probability", &los_probability,
@@ -189,5 +190,6 @@ void quadriga_lib_gbsm(py::module_ &m)
           py::arg("kf_ratio") = py::none(),
           py::arg("oxygen") = false,
           py::arg("use_absolute_delays") = false,
+          py::kw_only(),
           py::arg("stack") = false);
 }

@@ -13,7 +13,7 @@ mesh = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
            1     1     1   ,    1    -1     1   ,    1    -1    -1;   % 11 East Upper
           -1     1     1   ,    1     1     1   ,    1     1    -1 ]; % 12 North Upper
 
-mesh_sub = quadriga_lib.subdivide_triangles(mesh, 3);
+mesh_sub = quadriga_lib.subdivide_triangles(3, mesh);
 
 % Test no output
 quadriga_lib.triangle_mesh_aabb( mesh_sub );

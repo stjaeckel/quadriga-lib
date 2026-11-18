@@ -103,7 +103,7 @@ def _ieee_call(ant_ap, ant_sta, model, *,
         offset_angles, n_subpath, Doppler_effect, seed,
         KF_linear, XPR_NLOS_linear,
         SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m,
-        n_walls, wall_loss, stack)
+        n_walls, wall_loss, stack=stack)
 
 
 # ============================================================================
@@ -538,6 +538,7 @@ class test_case(unittest.TestCase):
                       speed_station_kmh=30.0, seed=2024)
 
         chan_list = _ieee_call(ant, ant, "B", stack=False, **common)
+        self.assertIn("*, stack", channel.ieee_indoor.__doc__)  # stack is keyword-only
         chan_stk = _ieee_call(ant, ant, "B", stack=True, **common)
 
         self.assertEqual(len(chan_list), 1)

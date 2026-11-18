@@ -24,13 +24,15 @@ Reshape the storage layout inside an existing HDF5 file
 
 ## Usage:
 ```
-storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
+storage_space = quadriga_lib.hdf5_reshape_layout( fn, nx, ny, nz, nw );
 ```
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file; string
-- **`storage_dims`** — New storage layout; vector with 1-4 elements,
-  i.e. `[nx]`, `[nx, ny]`, `[nx, ny, nz]` or `[nx, ny, nz, nw]`; default: `[65536, 1, 1, 1]`
+- **`nx`** — New number of slots along dimension X
+- **`ny`** — New number of slots along dimension Y; default: 1
+- **`nz`** — New number of slots along dimension Z; default: 1
+- **`nw`** — New number of slots along dimension W; default: 1
 
 ## Outputs:
 - **`storage_space`** — New storage dimensions `[nx, ny, nz, nw]`; `[4]`; uint32
@@ -42,22 +44,17 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || nrhs > 2)
+    if (nrhs < 2 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::string fn = qd_mex_get_string(prhs[0]);
-    const arma::u32_vec storage_dims = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], false, "storage_dims");
-
-    unsigned nx = storage_dims.is_empty() ? 65536 : storage_dims.at(0);
-    unsigned ny = storage_dims.n_elem > 1 ? storage_dims.at(1) : 1;
-    unsigned nz = storage_dims.n_elem > 2 ? storage_dims.at(2) : 1;
-    unsigned nw = storage_dims.n_elem > 3 ? storage_dims.at(3) : 1;
-
-    if (nx == 0|| ny == 0|| nz == 0|| nw == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'storage_dims' cannot contain zeros.");
+    const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
+    const unsigned nx = qd_mex_get_scalar<unsigned>(prhs[1], "nx", 0U);
+    const unsigned ny = (nrhs < 3) ? 1U : qd_mex_get_scalar<unsigned>(prhs[2], "ny", 1U);
+    const unsigned nz = (nrhs < 4) ? 1U : qd_mex_get_scalar<unsigned>(prhs[3], "nz", 1U);
+    const unsigned nw = (nrhs < 5) ? 1U : qd_mex_get_scalar<unsigned>(prhs[4], "nw", 1U);
 
     // Reshape layout
     CALL_QD(quadriga_lib::hdf5_reshape_layout(fn, nx, ny, nz, nw));

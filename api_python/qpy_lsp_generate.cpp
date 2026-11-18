@@ -65,7 +65,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
 - **`clip_spreads`** — `True`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause 7.5 step 4);
   `lsp_mu` and `lsp_sigma` are not affected; default: True
-- **`complex`** — See the description; default: True
+- **`complex`** — Keyword-only; see the description; default: True
 
 ## Outputs:
 - **`lsp`** — Large-scale parameters; slices: 0 DS in s; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA in

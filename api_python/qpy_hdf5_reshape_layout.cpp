@@ -27,7 +27,7 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file
-- **`nx`** — Number of elements on the x-dimension; default: 65536
+- **`nx`** — Number of elements on the x-dimension
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
 - **`nw`** — Number of elements on the w-dimension; default: 1

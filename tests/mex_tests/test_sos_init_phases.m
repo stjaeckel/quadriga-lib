@@ -23,12 +23,12 @@ phase5 = quadriga_lib.sos_init_phases( 7, 3, 43 );
 assertTrue( max(abs(phase5(:) - phase(:))) > 0.1 );
 
 %% Optional inputs: omitted, empty, explicit
-p1 = quadriga_lib.sos_init_phases( 9 );                                        % n_gen = 1, random seed
+p1 = quadriga_lib.sos_init_phases( 9, 1 );                                     % random seed
 assertEqual( size(p1), [9, 1] );
-p2 = quadriga_lib.sos_init_phases( 9, [], [] );
+p2 = quadriga_lib.sos_init_phases( 9, 1, [] );
 assertEqual( size(p2), [9, 1] );
 assertTrue( max(abs(p1 - p2)) > 1e-6 );                                        % seed -1: new values
-p3 = quadriga_lib.sos_init_phases( 7, [], 42 );
+p3 = quadriga_lib.sos_init_phases( 7, 1, 42 );
 assertEqual( p3, phase(:, 1) );
 p4 = quadriga_lib.sos_init_phases( 7, 3, -1 );
 assertTrue( max(abs(p4(:) - phase(:))) > 1e-6 );
@@ -42,6 +42,7 @@ assertEqual( phase6, phase );
 
 %% Errors
 assert_throws( @() quadriga_lib.sos_init_phases(), 'Wrong number of input arguments.' );
+assert_throws( @() quadriga_lib.sos_init_phases( 7 ), 'Wrong number of input arguments.' );   % n_gen is mandatory
 assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, 42, 1 ), 'Wrong number of input arguments.' );
 assert_throws( @() out2( 7, 3, 42 ), 'Wrong number of output arguments.' );
 assert_throws( @() quadriga_lib.sos_init_phases( 0, 3, 42 ), 'n_coeff' );       % thrown by C++
@@ -50,9 +51,9 @@ assert_throws( @() quadriga_lib.sos_init_phases( 7, 3, -2 ), 'seed' );
 
 % Counts and the seed are validated by the wrapper before the conversion to an integer type
 msg_seed = 'Input ''seed'' must be an integer from -1 to 9223372036854775807.';
-assert_cpp_error( @() quadriga_lib.sos_init_phases( -1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
-assert_cpp_error( @() quadriga_lib.sos_init_phases( NaN ), 'Input ''n_coeff'' must be an integer >= 1.' );
-assert_cpp_error( @() quadriga_lib.sos_init_phases( [] ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( -1, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( NaN, 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
+assert_cpp_error( @() quadriga_lib.sos_init_phases( [], 1 ), 'Input ''n_coeff'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, -1 ), 'Input ''n_gen'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, Inf ), 'Input ''n_gen'' must be an integer >= 1.' );
 assert_cpp_error( @() quadriga_lib.sos_init_phases( 7, 3, NaN ), msg_seed );

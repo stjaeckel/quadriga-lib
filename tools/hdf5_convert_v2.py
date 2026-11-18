@@ -290,7 +290,7 @@ def main(argv):
                     if filled or par:
                         qc.hdf5_write_channel(tmp, chan, par or None, ix, iy, iz, iw)
                     for name, value in extra:
-                        qc.hdf5_write_dset(tmp, ix, iy, iz, iw, name, value, prefix='')
+                        qc.hdf5_write_dset(tmp, name, value, ix, iy, iz, iw, prefix='')
                 except Exception as e:
                     text = e.args[0] if isinstance(e, KeyError) and e.args else e
                     raise Failure("slot (%d, %d, %d, %d), group '%s': %s; nothing was written"

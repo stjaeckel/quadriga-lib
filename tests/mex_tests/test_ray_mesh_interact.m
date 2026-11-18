@@ -229,9 +229,10 @@ dest_c = [ 0.0, 0.0, 0.0;  0.0, 3.0, 0.0;  0.0, 0.5, 0.5];
 [ ~, ~, ~, fbs_ind_c, sbs_ind_c ] = quadriga_lib.ray_triangle_intersect( orig_c, dest_c, mesh );
 assertTrue( fbs_ind_c(2) == 0 );   % ray 2 really misses
 
-% compact = true (default): missed ray dropped, ray_indN maps survivors to 1-based input indices
+% compact = true: missed ray dropped, ray_indN maps survivors to 1-based input indices
 [ origN, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, out_typeN, ~, ray_indN ] = ...
-    quadriga_lib.ray_mesh_interact( 0, 10e9, orig_c, dest_c, mesh, mtl_c_ind, mtl_c_st, fbs_ind_c, sbs_ind_c );
+    quadriga_lib.ray_mesh_interact( 0, 10e9, orig_c, dest_c, mesh, mtl_c_ind, mtl_c_st, fbs_ind_c, sbs_ind_c, ...
+    [], [], true );
 assertEqual( size(origN,1), 2 );
 assertEqual( double(ray_indN(:)), [1;3] );
 
@@ -248,6 +249,12 @@ assertEqual( double(out_typeN(2)), 0 );                                 % no val
 assertElementsAlmostEqual( xprmatN(:,2), [1;0;0;0;0;0;1;0], 'absolute', 1e-9 );  % identity column
 assertTrue( gainN(1) < 1 && gainN(3) < 1 );                             % survivors actually interacted
 assertTrue( bitand(double(out_typeN(1)),1) ~= 0 && bitand(double(out_typeN(3)),1) ~= 0 );
+
+% compact = false is the default
+[ ~, ~, ~, ~, gainD, ~, ~, ~, ~, ~, ~, ~, ~, ~, ray_indD ] = ...
+    quadriga_lib.ray_mesh_interact( 0, 10e9, orig_c, dest_c, mesh, mtl_c_ind, mtl_c_st, fbs_ind_c, sbs_ind_c );
+assertEqual( gainD, gainN );
+assertEqual( ray_indD, ray_indN );
 
 % path_dirN direction contract (45 deg into West face, eps 1.5)
 orig_pd = [-1.5, 0.0, 0.0]; dest_pd = [0.0, 0.0, 1.5];

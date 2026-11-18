@@ -442,6 +442,8 @@ class test_quantize_delays(unittest.TestCase):
             coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=False, complex=False)
         cre_s, cim_s, dl_s = quadriga_lib.channel.quantize_delays(
             coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=True, complex=False)
+        with self.assertRaises(TypeError):  # stack and complex are keyword-only
+            quadriga_lib.channel.quantize_delays(cre, cim, dl, 5e-9, 48, 1.0, 0, True)
 
         for arr in (cre_s, cim_s, dl_s):
             self.assertIsInstance(arr, np.ndarray)

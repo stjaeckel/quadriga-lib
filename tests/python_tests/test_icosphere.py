@@ -20,7 +20,9 @@ class test_case(unittest.TestCase):
 
     def test(self):
 
-        center, length, vert, direction = RTtools.icosphere()
+        center, length, vert, direction = RTtools.icosphere(1, 1.0)
+        with self.assertRaises(TypeError):  # n_div and radius are mandatory, as in C++
+            RTtools.icosphere(1)
 
         self.assertEqual(center.shape, (20,3))
         self.assertEqual(length.shape, (20,))
@@ -51,7 +53,7 @@ class test_n_div_too_large(unittest.TestCase):
     def test(self):
         for n_div in (2**31 + 1, 2**30, 2**32):
             with self.assertRaisesRegex(ValueError, "Input 'n_div' is too large."):
-                RTtools.icosphere(n_div)
+                RTtools.icosphere(n_div, 1.0)
 
 
 if __name__ == '__main__':

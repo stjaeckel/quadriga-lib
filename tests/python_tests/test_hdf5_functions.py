@@ -264,10 +264,12 @@ class test_case(unittest.TestCase):
         self.assertEqual(has_data[9, 0, 0, 0], 1)
         self.assertEqual(channel.hdf5_read_channel(fn, 9)[0][0]['name'], 'c')
 
-        # Default layout: 65536 slots in x
+        # nx is mandatory, as in C++
         fn = self.fn('reshape_default.hdf5')
         channel.hdf5_create_file(fn, 256, 256)
-        channel.hdf5_reshape_layout(fn)
+        with self.assertRaises(TypeError):
+            channel.hdf5_reshape_layout(fn)
+        channel.hdf5_reshape_layout(fn, 65536)
         npt.assert_array_equal(channel.hdf5_read_layout(fn)[0], [65536, 1, 1, 1])
 
     def test_reshape_layout_errors(self):
@@ -435,6 +437,8 @@ class test_case(unittest.TestCase):
 
         # Stack model: one array per key with the snapshot on the last axis, zero-padded to the largest n_path
         chan, _ = channel.hdf5_read_channel(fn, stack=True)
+        with self.assertRaises(TypeError):  # stack is keyword-only
+            channel.hdf5_read_channel(fn, None, None, None, None, None, True)
         c = chan[0]
         shapes = {'coeff': (2, 3, 3, 2), 'delay': (2, 3, 3, 2), 'path_gain': (3, 2), 'path_length': (3, 2),
                   'path_polarization': (8, 3, 2), 'path_angles': (3, 4, 2), 'fbs_pos': (3, 3, 2),
@@ -578,8 +582,8 @@ class test_case(unittest.TestCase):
 
         # Default slot 0; positional and keyword arguments reach their dimension
         self.assertIsNone(channel.hdf5_write_dset(fn, name='zeta', data=1.0))
-        channel.hdf5_write_dset(fn, 0, 0, 0, 0, 'alpha', 2.0)
-        channel.hdf5_write_dset(fn, 1, 0, 1, 1, 'b', np.arange(3.0))
+        channel.hdf5_write_dset(fn, 'alpha', 2.0, 0, 0, 0, 0)
+        channel.hdf5_write_dset(fn, 'b', np.arange(3.0), 1, 0, 1, 1)
         channel.hdf5_write_dset(fn=fn, ix=0, iy=1, iz=0, iw=1, name='c', data='text')
 
         has_data = channel.hdf5_read_layout(fn)[1]
@@ -597,16 +601,16 @@ class test_case(unittest.TestCase):
         self.assertEqual(channel.hdf5_read_dset_names(fn, 5), [])     # outside the layout
 
         self.assertEqual(channel.hdf5_read_dset(fn, name='zeta'), 1.0)
-        self.assertEqual(channel.hdf5_read_dset(fn, 0, 0, 0, 0, 'alpha'), 2.0)
-        self.assert_same(channel.hdf5_read_dset(fn, 1, 0, 1, 1, 'b'), np.arange(3.0))
+        self.assertEqual(channel.hdf5_read_dset(fn, 'alpha', 0, 0, 0, 0), 2.0)
+        self.assert_same(channel.hdf5_read_dset(fn, 'b', 1, 0, 1, 1), np.arange(3.0))
         self.assertEqual(channel.hdf5_read_dset(fn=fn, ix=0, iy=1, iz=0, iw=1, name='c'), 'text')
         self.assertIsNone(channel.hdf5_read_dset(fn, name='missing'))  # missing dataset
-        self.assertIsNone(channel.hdf5_read_dset(fn, 1, name='zeta'))  # empty slot
-        self.assertIsNone(channel.hdf5_read_dset(fn, 5, name='zeta'))  # outside the layout
+        self.assertIsNone(channel.hdf5_read_dset(fn, 'zeta', 1))  # empty slot
+        self.assertIsNone(channel.hdf5_read_dset(fn, 'zeta', 5))  # outside the layout
 
         # The dataset is added to a slot with channel data; both are kept
         channel.hdf5_write_channel(fn, minimal_channel('ch'), ix=1, iy=1)
-        channel.hdf5_write_dset(fn, 1, 1, name='extra', data=np.int64(4))
+        channel.hdf5_write_dset(fn, 'extra', np.int64(4), 1, 1)
         chan, par = channel.hdf5_read_channel(fn, 1, 1, 0, 0)
         self.assertEqual(chan[0]['name'], 'ch')
         self.assert_same(par, {'extra': 4})
@@ -614,8 +618,8 @@ class test_case(unittest.TestCase):
     def test_dset_prefix(self):
         fn = self.fn('dset_prefix.hdf5')
         channel.hdf5_create_file(fn, 2)
-        channel.hdf5_write_dset(fn, 0, 0, 0, 0, 'a', 1.0)
-        channel.hdf5_write_dset(fn, 0, 0, 0, 0, 'b', np.arange(2.0), 'x_')        # positional
+        channel.hdf5_write_dset(fn, 'a', 1.0, 0, 0, 0, 0)
+        channel.hdf5_write_dset(fn, 'b', np.arange(2.0), 0, 0, 0, 0, 'x_')        # positional
         channel.hdf5_write_dset(fn, name='c', data='text')
         channel.hdf5_write_dset(fn, name='d', data=np.int32(4), prefix='x_')      # keyword
 
@@ -625,7 +629,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(channel.hdf5_read_dset_names(fn, 1, prefix='x_'), [])
 
         self.assert_same(channel.hdf5_read_dset(fn, name='b', prefix='x_'), np.arange(2.0))
-        self.assertEqual(channel.hdf5_read_dset(fn, 0, 0, 0, 0, 'd', 'x_'), 4)
+        self.assertEqual(channel.hdf5_read_dset(fn, 'd', 0, 0, 0, 0, 'x_'), 4)
         self.assertEqual(channel.hdf5_read_dset(fn, name='x_d', prefix=''), 4)
         self.assertIsNone(channel.hdf5_read_dset(fn, name='b'))                    # looked up as 'par_b'
         self.assertEqual(channel.hdf5_read_dset(fn, name='a', prefix='par_'), 1.0)
@@ -641,12 +645,12 @@ class test_case(unittest.TestCase):
         fn = self.fn('dset_types.hdf5')
         channel.hdf5_create_file(fn, 1)
         for name, (v, expected, typ) in typed_values().items():
-            channel.hdf5_write_dset(fn, 0, 0, 0, 0, name, v)
+            channel.hdf5_write_dset(fn, name, v, 0, 0, 0, 0)
             self.assert_value(channel.hdf5_read_dset(fn, name=name), expected, typ, name)
 
         # Strided arrays are written with their values
         for name, v in strided_inputs().items():
-            channel.hdf5_write_dset(fn, 0, 0, 0, 0, name, v)
+            channel.hdf5_write_dset(fn, name, v, 0, 0, 0, 0)
             r = channel.hdf5_read_dset(fn, name=name)
             self.assertEqual(r.shape, v.shape, name)
             self.assert_value(r, v, v.dtype, name)
@@ -657,7 +661,7 @@ class test_case(unittest.TestCase):
                         'm13': np.ones((1, 3)), 'm32': np.arange(6.0).reshape(3, 2), 'c111': np.ones((1, 1, 1)),
                         'c311': np.ones((3, 1, 1)), 'c113': np.ones((1, 1, 3)),
                         'u1': np.array([7], dtype=np.uint32)}.items():
-            channel.hdf5_write_dset(fn, 0, 0, 0, 0, name, v)
+            channel.hdf5_write_dset(fn, name, v, 0, 0, 0, 0)
             self.assert_same(channel.hdf5_read_dset(fn, name=name), v, name)
 
         # Unsupported types
@@ -665,13 +669,13 @@ class test_case(unittest.TestCase):
                         'complex': np.ones(2, complex), 'f16': np.ones(2, np.float16),
                         'four_d': np.ones((1, 2, 1, 2)), 'list': [1.0, 2.0]}.items():
             with self.assertRaises(ValueError, msg=name):
-                channel.hdf5_write_dset(fn, 0, 0, 0, 0, name, v)
+                channel.hdf5_write_dset(fn, name, v, 0, 0, 0, 0)
 
         # The caller's arrays are not modified; read-only arrays are accepted
         x = np.asfortranarray(np.arange(12.0).reshape(3, 4))
         x0 = x.copy()
         x.flags.writeable = False
-        channel.hdf5_write_dset(fn, 0, 0, 0, 0, 'x', x)
+        channel.hdf5_write_dset(fn, 'x', x, 0, 0, 0, 0)
         npt.assert_array_equal(x, x0)
         npt.assert_array_equal(channel.hdf5_read_dset(fn, name='x'), x0)
 
@@ -685,8 +689,7 @@ class test_case(unittest.TestCase):
 
         channel.hdf5_create_file(fn, 2, 2)
         channel.hdf5_write_dset(fn, name='x', data=1.0)
-        for kwargs, msg in [({'name': 'y'}, 'Data not provided.'),                    # thrown by the wrapper
-                            ({'name': '', 'data': 1.0}, 'Dataset name not provided.'),
+        for kwargs, msg in [({'name': '', 'data': 1.0}, 'Dataset name not provided.'),  # thrown by the wrapper
                             ({'ix': 3, 'name': 'y', 'data': 1.0}, 'Location exceeds storage space in HDF file.'),
                             ({'ix': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),  # thrown by C++
                             ({'iy': 2, 'name': 'y', 'data': 1.0}, 'Index out of bound.'),
@@ -700,9 +703,13 @@ class test_case(unittest.TestCase):
         self.assertIn("Dataset 'par_x' already exists.", str(ctx.exception))
         self.assertEqual(channel.hdf5_read_dset_names(fn), ['x'])  # nothing else was written
 
-        # Rejected by pybind11: 'name' has no default
+        # Rejected by pybind11: 'name' and 'data' have no default
         with self.assertRaises(TypeError):
             channel.hdf5_write_dset(fn, data=1.0)
+        with self.assertRaises(TypeError):
+            channel.hdf5_write_dset(fn, 'x')
+        with self.assertRaises(TypeError):
+            channel.hdf5_write_dset(fn, 'x', None)
         with self.assertRaises(TypeError):
             channel.hdf5_read_dset(fn)
         with self.assertRaises(TypeError):

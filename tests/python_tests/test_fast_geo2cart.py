@@ -145,6 +145,7 @@ class test_case(unittest.TestCase):
         g_auto = quadriga_lib.tools.fast_geo2cart(az, el, length, use_kernel=0)
         g_gen = quadriga_lib.tools.fast_geo2cart(az, el, length, use_kernel=1)
         np.testing.assert_allclose(g_auto, g_gen, atol=1e-5)
+        np.testing.assert_array_equal(quadriga_lib.tools.fast_geo2cart(az, el, length), g_auto)  # default kernel: 0
 
         try:
             g_avx2 = quadriga_lib.tools.fast_geo2cart(az, el, length, use_kernel=2)

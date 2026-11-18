@@ -21,7 +21,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
 - Wrappers and tests must work in both MATLAB and Octave.
 
 # INTERFACE: WHAT THE PLAN OR SPEC SETTLES
-The interface is derived from the C++ declaration and documentation block, existing or settled in the same plan or spec. The plan or the spec settles the MATLAB interface:
+The interface is derived from the C++ declaration and documentation block, existing or settled in the same plan or spec: names, order and defaults follow `md/SPEC_CPP_API.md`, section "WRAPPER INTERFACE". The plan or the spec settles the MATLAB interface:
 - the MATLAB usage line: order and names of inputs and outputs, in/out splits
 - which inputs are optional and their defaults
 - which arguments are indices and their base on the C++ side

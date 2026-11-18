@@ -39,19 +39,23 @@ Calculate MIMO channel coefficients for planar wave paths
 
 ## Usage:
 ```
-coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ant_tx, ant_rx, \
-    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path )
+coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
+    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq, complex=True )
 
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
+coeff_re, coeff_im, delay, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
 
-coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
+coeff, delay, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 ```
 
 ## Inputs:
-- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate]]; a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [[generate]]; a 4D dict raises
   `ValueError` (use [[channel.multifreq]])
-- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
+- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`aod`** — Departure azimuth angles in rad; `(n_path,)`
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
@@ -59,27 +63,23 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
   coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
-  processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [[interpolate]]; `int`; default: 0
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ## Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
-- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
 ## See also:
@@ -88,8 +88,12 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 - [[generate]] (antenna array generator)
 MD!*/
 
-py::tuple get_channels_planar(const py::dict &ant_tx,
-                              const py::dict &ant_rx,
+py::tuple get_channels_planar(const py::dict &tx_array,
+                              const py::dict &rx_array,
+                              const py::array_t<double> &tx_pos,
+                              const py::array_t<double> &tx_orientation,
+                              const py::array_t<double> &rx_pos,
+                              const py::array_t<double> &rx_orientation,
                               const py::array_t<double> &aod,
                               const py::array_t<double> &eod,
                               const py::array_t<double> &aoa,
@@ -97,24 +101,20 @@ py::tuple get_channels_planar(const py::dict &ant_tx,
                               const py::array_t<double> &path_gain,
                               const py::array_t<double> &path_length,
                               const py::array_t<double> &M,
-                              const py::array_t<double> &tx_pos,
-                              const py::array_t<double> &tx_orientation,
-                              const py::array_t<double> &rx_pos,
-                              const py::array_t<double> &rx_orientation,
                               py::handle center_freq,
                               py::handle use_absolute_delays,
                               py::handle add_fake_los_path,
-                              py::handle complex,
+                              const int use_kernel,
                               const arma::uword i_freq,
-                              const int use_kernel)
+                              py::handle complex)
 {
     const bool use_absolute_delays_b = qd_python_flag(use_absolute_delays, false, "use_absolute_delays");
     const bool add_fake_los_path_b = qd_python_flag(add_fake_los_path, false, "add_fake_los_path");
     const bool want_complex = qd_python_flag(complex, true, "complex");
 
     // Parse input arguments
-    const auto ant_tx_a = qd_python_dict2arrayant(ant_tx, true);
-    const auto ant_rx_a = qd_python_dict2arrayant(ant_rx, true);
+    const auto ant_tx_a = qd_python_dict2arrayant(tx_array, true);
+    const auto ant_rx_a = qd_python_dict2arrayant(rx_array, true);
     const auto aod_a = qd_python_numpy2arma_Col(aod, true);
     const auto eod_a = qd_python_numpy2arma_Col(eod, true);
     const auto aoa_a = qd_python_numpy2arma_Col(aoa, true);

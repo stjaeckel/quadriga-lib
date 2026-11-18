@@ -218,7 +218,7 @@ namespace quadriga_lib
 
     // Read Wavefront .obj file — see obj_file_read documentation block for details
     template <typename dtype>
-    arma::uword obj_file_read(const std::string &fn_obj = "",                                          // File name, must end with .obj
+    arma::uword obj_file_read(const std::string &fn = "",                                              // File name, must end with .obj
                               arma::Mat<dtype> *mesh = nullptr,                                        // Triangle vertices, Size: [n_mesh, 9]
                               arma::Mat<dtype> *vert_list = nullptr,                                   // Vertex list, Size: [n_vert, 3]
                               arma::umat *face_ind = nullptr,                                          // 0-based vertex indices per face, Size: [n_mesh, 3]
@@ -288,17 +288,17 @@ namespace quadriga_lib
     // - Creates the "sub_cloud_ind" indicating the start index of each sub-cloud
     // - A "vec_size" can be used to align the sub-clouds to a given vector size for SIMD processing (AVX or CUDA)
     // - For vec_size > 1, unused elements in a sub-cloud are padded with points at the center of the sub-cloud AABB
-    // - "forward_ind" contains for each row of "pointsR" its row in "points" in 1-based notation, padded with 0s for vec_size > 1
-    // - "reverse_ind" contains for each row of "points" its row in "pointsR" in 0-based notation
+    // - "forward_ind" contains for each row of "points_out" its row in "points" in 1-based notation, padded with 0s for vec_size > 1
+    // - "reverse_ind" contains for each row of "points" its row in "points_out" in 0-based notation
     // - Returns number of sub-clouds "n_sub"
     template <typename dtype>
     arma::uword point_cloud_segmentation(const arma::Mat<dtype> *points,          // Points in 3D Space (input), Size: [ n_points, 3 ]
-                                         arma::Mat<dtype> *pointsR,               // Reorganized points (output), Size: [ n_pointsR, 3 ]
+                                         arma::Mat<dtype> *points_out,            // Reorganized points (output), Size: [ n_points_out, 3 ]
                                          arma::u32_vec *sub_cloud_ind,            // Sub-cloud index, 0-based, Length: [ n_sub ]
                                          arma::uword target_size = 1024,          // Target value for the sub-cloud size
                                          arma::uword vec_size = 1,                // Vector size for SIMD processing (e.g. 8 for AVX2)
-                                         arma::u32_vec *forward_ind = nullptr,    // Row in "points" of each row of "pointsR", 1-based, Length: [ n_pointsR ]
-                                         arma::u32_vec *reverse_ind = nullptr);   // Row in "pointsR" of each row of "points", 0-based, Length: [ n_points ]
+                                         arma::u32_vec *forward_ind = nullptr,    // Row in "points" of each row of "points_out", 1-based, Length: [ n_points_out ]
+                                         arma::u32_vec *reverse_ind = nullptr);   // Row in "points_out" of each row of "points", 0-based, Length: [ n_points ]
 
     // Split a point cloud into two sub-clouds along a given axis
     // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)
@@ -482,13 +482,13 @@ namespace quadriga_lib
     // Reorganize a 3D mesh into smaller sub-meshes for faster processing
     template <typename dtype>
     arma::uword triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,         // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
-                                           arma::Mat<dtype> *meshR,              // Reorganized mesh (output), Size: [ n_meshR, 9 ]
+                                           arma::Mat<dtype> *mesh_out,           // Reorganized mesh (output), Size: [ n_mesh_out, 9 ]
                                            arma::u32_vec *sub_mesh_ind,          // Sub-mesh index, 0-based, Length: [ n_sub ]
                                            arma::uword target_size = 1024,       // Target value for the sub-mesh size
                                            arma::uword vec_size = 1,             // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
                                            const arma::uvec *mtl_ind = nullptr,  // Material indices (input); [ n_mesh ]
-                                           arma::uvec *mtl_ind_out = nullptr,    // Material indices (output); [ n_meshR ]
-                                           arma::u32_vec *mesh_ind = nullptr);   // Row in "mesh" of each row of "meshR", 1-based, Length: [ n_meshR ]
+                                           arma::uvec *mtl_ind_out = nullptr,    // Material indices (output); [ n_mesh_out ]
+                                           arma::u32_vec *mesh_ind = nullptr);   // Row in "mesh" of each row of "mesh_out", 1-based, Length: [ n_mesh_out ]
 
     // Split a 3D mesh into two sub-meshes along a given axis
     // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)
@@ -503,8 +503,8 @@ namespace quadriga_lib
 
     // Write data to PNG file
     template <typename dtype>
-    void write_png(const arma::Mat<dtype> &data,        // Data matrix
-                   const std::string &fn,               // Filename of the PNG file, string
+    void write_png(const std::string &fn,               // Filename of the PNG file, string
+                   const arma::Mat<dtype> &data,        // Data matrix
                    const std::string &colormap = "jet", // Colormap
                    dtype min_val = NAN,                 // Lower clipping bound, NaN = data minimum
                    dtype max_val = NAN,                 // Upper clipping bound, NaN = data maximum

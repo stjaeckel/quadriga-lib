@@ -425,10 +425,10 @@ end
 % (i_1 - 1) * n_path_2 + i_2
 irs_1 = ant_irs; irs_1.coupling_re = ant_irs.coupling_re(:, 1); irs_1.coupling_im = ant_irs.coupling_im(:, 1);
 to = [0.1; 0.2; 0.3]; ro = [-0.2; 0.1; 2.0]; io = [0.3; -0.1; 1.2];
-[r1, i1, d1, aod1, eod1] = quadriga_lib.get_channels_spherical( ant_tx, irs_1, fbs_pos_1, lbs_pos_1, ...
-    path_gain_1, path_length_1, M_1, tx_pos, to, irs_pos, io, 3.5e9, true );
-[r2, i2, d2, ~, ~, aoa2, eoa2] = quadriga_lib.get_channels_spherical( irs_1, ant_rx, fbs_pos_2, lbs_pos_2, ...
-    path_gain_2, path_length_2, M_2, irs_pos, io, rx_pos, ro, 3.5e9, true );
+[r1, i1, d1, aod1, eod1] = quadriga_lib.get_channels_spherical( ant_tx, irs_1, tx_pos, to, ...
+    irs_pos, io, fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, 3.5e9, true );
+[r2, i2, d2, ~, ~, aoa2, eoa2] = quadriga_lib.get_channels_spherical( irs_1, ant_rx, irs_pos, io, ...
+    rx_pos, ro, fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, 3.5e9, true );
 p1 = repelem(1:2, 2); p2 = repmat(1:2, 1, 2);
 c_ref = complex(r1(:, :, p1), i1(:, :, p1)) .* complex(r2(:, :, p2), i2(:, :, p2));
 o = cell(1, 8);

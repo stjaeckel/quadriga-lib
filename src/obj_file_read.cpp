@@ -467,7 +467,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 - Geometry indices (`face_ind`, `obj_ind`) are 0-based. Material indices (`mtl_ind`, `csv_ind`) are
   1-based, with 0 reserved for the outside / no-material state (faces with no assigned material;
   for `csv_ind` in non-strict mode, also materials absent from the table).
-- With an empty `fn_obj`, geometry and `.mtl` outputs are empty and only the table (`csv_names`, `csv_prop`) 
+- With an empty `fn`, geometry and `.mtl` outputs are empty and only the table (`csv_names`, `csv_prop`) 
   is populated — useful for inspecting a CSV or the default library. If `fn_csv` is also empty, the built-in default table is returned.
 - The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
   of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
@@ -475,7 +475,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 ## Declaration:
 ```
 arma::uword quadriga_lib::obj_file_read(
-    const std::string &fn_obj = "",
+    const std::string &fn = "",
     arma::Mat<dtype> *mesh = nullptr,
     arma::Mat<dtype> *vert_list = nullptr,
     arma::umat *face_ind = nullptr,
@@ -492,7 +492,7 @@ arma::uword quadriga_lib::obj_file_read(
 ```
 
 ## Inputs:
-- **`fn_obj`** — Path to the `.obj` file; empty loads only the material table
+- **`fn`** — Path to the `.obj` file; empty loads only the material table
 - **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
   to index 0 (no material) unless `csv_strict` is set. Empty uses the built-in ITU-R P.2040 default table.
 - **`csv_strict`** — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to index 0 (no material)
@@ -523,7 +523,7 @@ arma::uword quadriga_lib::obj_file_read(
 MD!*/
 
 template <typename dtype>
-arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dtype> *mesh, arma::Mat<dtype> *vert_list,
+arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *vert_list,
                                         arma::umat *face_ind, arma::uvec *obj_ind, std::vector<std::string> *obj_names,
                                         arma::uvec *mtl_ind, std::vector<std::string> *mtl_names, arma::Mat<dtype> *bsdf,
                                         const std::string &fn_csv, arma::uvec *csv_ind, std::vector<std::string> *csv_names,
@@ -589,7 +589,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     };
 
     // Table-only mode: no geometry, just populate the requested material-table outputs
-    if (fn_obj.empty())
+    if (fn.empty())
     {
         empty_geometry_outputs();
         if (want_csv_table)
@@ -601,15 +601,15 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     }
 
     // Open the .obj file
-    std::filesystem::path obj_file{fn_obj};
+    std::filesystem::path obj_file{fn};
     if (!std::filesystem::exists(obj_file))
-        throw std::runtime_error("Error opening file: '" + fn_obj + "' does not exist.");
+        throw std::runtime_error("Error opening file: '" + fn + "' does not exist.");
     if (!std::filesystem::is_regular_file(obj_file))
-        throw std::runtime_error("Error opening file: '" + fn_obj + "' is not a regular file.");
+        throw std::runtime_error("Error opening file: '" + fn + "' is not a regular file.");
 
     std::ifstream fileR{obj_file, std::ios::in};
     if (!fileR.is_open())
-        throw std::runtime_error("Error opening file: failed to open '" + fn_obj + "'.");
+        throw std::runtime_error("Error opening file: failed to open '" + fn + "'.");
 
     // Pass 1: count vertices and faces
     arma::uword n_vert = 0, n_faces = 0;
@@ -731,7 +731,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
                 return it2->second + 1;
         }
         if (csv_strict)
-            throw std::runtime_error("Material '" + raw + "' referenced in '" + fn_obj + "' is not present in the material table.");
+            throw std::runtime_error("Material '" + raw + "' referenced in '" + fn + "' is not present in the material table.");
         return 0; // 0 = no material (outside)
     };
 
@@ -762,7 +762,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         if (line.length() > 2 && line[0] == 'v' && line[1] == ' ')
         {
             if (i_vert >= n_vert)
-                throw std::runtime_error("Error reading vertex data in '" + fn_obj + "'.");
+                throw std::runtime_error("Error reading vertex data in '" + fn + "'.");
             if (need_vert)
             {
                 double x = 0.0, y = 0.0, z = 0.0;
@@ -779,22 +779,22 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         if (line.length() > 2 && line[0] == 'f' && line[1] == ' ')
         {
             if (i_face >= n_faces)
-                throw std::runtime_error("Error reading face data in '" + fn_obj + "'.");
+                throw std::runtime_error("Error reading face data in '" + fn + "'.");
 
             unsigned long long mag[4];
             bool neg[4];
             const int n_ref = parse_face_refs(line.c_str(), mag, neg);
             if (n_ref < 3)
-                throw std::runtime_error("Error reading face data in '" + fn_obj + "'.");
+                throw std::runtime_error("Error reading face data in '" + fn + "'.");
             if (n_ref > 3)
-                throw std::runtime_error("Mesh in '" + fn_obj + "' is not triangulated (quads/n-gons unsupported).");
+                throw std::runtime_error("Mesh in '" + fn + "' is not triangulated (quads/n-gons unsupported).");
 
             // 0-based vertex index; index 0 and indices beyond the vertices defined so far are invalid
             arma::uword abc[3];
             for (int k = 0; k < 3; ++k)
             {
                 if (mag[k] == 0 || mag[k] > (unsigned long long)i_vert)
-                    throw std::runtime_error("Error reading face data in '" + fn_obj + "': face " + std::to_string(i_face + 1) +
+                    throw std::runtime_error("Error reading face data in '" + fn + "': face " + std::to_string(i_face + 1) +
                                              " references a vertex that is 0 or beyond the " + std::to_string(i_vert) +
                                              " vertices defined before it.");
                 abc[k] = neg[k] ? i_vert - (arma::uword)mag[k] : (arma::uword)mag[k] - 1;
@@ -896,13 +896,13 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     return n_faces;
 }
 
-template arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<float> *mesh, arma::Mat<float> *vert_list,
+template arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<float> *mesh, arma::Mat<float> *vert_list,
                                                  arma::umat *face_ind, arma::uvec *obj_ind, std::vector<std::string> *obj_names,
                                                  arma::uvec *mtl_ind, std::vector<std::string> *mtl_names, arma::Mat<float> *bsdf,
                                                  const std::string &fn_csv, arma::uvec *csv_ind, std::vector<std::string> *csv_names,
                                                  std::unordered_map<std::string, std::vector<float>> *csv_prop, bool csv_strict);
 
-template arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<double> *mesh, arma::Mat<double> *vert_list,
+template arma::uword quadriga_lib::obj_file_read(const std::string &fn, arma::Mat<double> *mesh, arma::Mat<double> *vert_list,
                                                  arma::umat *face_ind, arma::uvec *obj_ind, std::vector<std::string> *obj_names,
                                                  arma::uvec *mtl_ind, std::vector<std::string> *mtl_names, arma::Mat<double> *bsdf,
                                                  const std::string &fn_csv, arma::uvec *csv_ind, std::vector<std::string> *csv_names,

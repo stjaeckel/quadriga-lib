@@ -24,7 +24,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
   - `python3 -m pytest tests/python_tests/test_<function_name>.py -x -s` — run one test file; this is the normal way to iterate on one wrapper
 
 # INTERFACE: WHAT THE PLAN OR SPEC SETTLES
-The interface is derived from the C++ declaration and documentation block, existing or settled in the same plan or spec, and from the MEX wrapper where one exists (see "REFERENCE FROM THE MEX WRAPPER"). The plan or the spec settles the Python interface:
+The interface is derived from the C++ declaration and documentation block, existing or settled in the same plan or spec: names, order and defaults follow `md/SPEC_CPP_API.md`, section "WRAPPER INTERFACE"; "DIFFERENCES FROM THE MEX WRAPPER" lists where the Python wrapper of a function with a MEX wrapper differs from it. The plan or the spec settles the Python interface:
 - the Python name and the submodule
 - the usage line: order and kwarg names of the inputs, order of the returned tuple, in/out splits
 - which inputs are optional and their defaults
@@ -54,7 +54,7 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 - the Python usage line and the submodule
 - the test results with the actual output of the run; do not report a test as passing that was not run
 - compiler warnings, if any
-- every deviation from the C++ interface or the MEX wrapper and why, and anything that was not tested
+- every deviation from the C++ interface and why, and anything that was not tested
 
 # IMPLEMENTATION GUIDELINES
 
@@ -439,7 +439,7 @@ auto bins_out_py = qd_python_copy2numpy(&bins_out);
 - A `std::vector<arma::Col/Mat/Cube>` with ragged sizes is returned as a `list` (`qd_python_copy2list`), or as one zero-padded array with the vector index on the last axis (`qd_python_stack2numpy`, see the `stack` flag). A regular 4D output with known dimensions uses the zero-copy `qd_python_init_output(..., &vector<Cube>)` overload.
 
 ## Standard flags
-- Two keyword flags are standard and are added wherever they apply. They are the last arguments of the wrapper, in this order, and each gets one line in the `## Inputs:` section.
+- Two keyword flags are standard and are added wherever they apply. They are keyword-only: the registration puts `py::kw_only()` before them, and they are the last arguments of the wrapper, in this order. A new positional argument goes before the marker. Each flag gets one line in the `## Inputs:` section, which says that it is keyword-only.
 - Both are flags in the sense of "Flags" (read with `qd_python_flag`).
 - **`complex`** (`bool`, default: `true`) — applies when the C++ function outputs `X_re` / `X_im` pairs.
   - `complex=True`: each pair is returned as one complex array `X`.
@@ -477,8 +477,8 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
 - The kwarg names in `py::arg(...)` must match the C++ parameter names of the wrapper AND the names in the `## Usage:` line. These are what the user types as keyword arguments from Python.
 - One `py::arg(...)` line per parameter, in the order of the wrapper signature. Include defaults for all optional parameters; mandatory parameters have no default and come first.
 
-# REFERENCE FROM THE MEX WRAPPER
-- Where a MEX wrapper exists, the plan or spec takes its argument order, in/out splits, default values, argument names and computed outputs as the reference. The Python wrapper differs only in:
+# DIFFERENCES FROM THE MEX WRAPPER
+- Both wrappers follow the C++ declaration (`md/SPEC_CPP_API.md`, "WRAPPER INTERFACE"). Where a MEX wrapper exists, the Python wrapper has the same in/out splits and computed outputs and differs from it only in:
   - **Indices**: stay 0-based; no `+1` / `-1` conversions and no zero-checks.
   - **Outputs**: always computed and returned; no `nlhs` gates or `nullptr` patterns for outputs.
   - **Heading**: no case conversion.

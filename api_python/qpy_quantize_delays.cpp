@@ -63,11 +63,11 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
   2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
-- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
+- **`stack`** — Keyword-only; if `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
-- **`complex`** — If `True`, return combined complex coefficients `coeff_q`; if `False`, return
+- **`complex`** — Keyword-only; if `True`, return combined complex coefficients `coeff_q`; if `False`, return
   separate `coeff_re_q` and `coeff_im_q`; default: `True`
-- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
+- **`coeff`** — Keyword-only; complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
   mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
 ## Outputs:

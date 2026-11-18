@@ -2,20 +2,23 @@ function test_subdivide_triangles
 
 tri = rand(12,9);
 
-tro = quadriga_lib.subdivide_triangles(tri);
+tro = quadriga_lib.subdivide_triangles(1, tri);
 assertEqual( tri, tro );
 
-tro = quadriga_lib.subdivide_triangles(tri,2);
+% n_div is mandatory and comes first, as in C++
+assertExceptionThrown( @() quadriga_lib.subdivide_triangles(tri), 'quadriga_lib:CPPerror' );
+
+tro = quadriga_lib.subdivide_triangles(2,tri);
 assertEqual( size(tro), [48,9] );
 assertEqual( tri(1,1:3), tro(1,1:3) );
 assertEqual( tri(1,1:3), tro(1,1:3) );
 
-tros = quadriga_lib.subdivide_triangles(single(tri),2);
+tros = quadriga_lib.subdivide_triangles(2,single(tri));
 assertTrue( isa(tros,'double') );
 assertElementsAlmostEqual( single(tro), tros, 'absolute', 1e-7 );
 
 mtli = uint64(randi(5, 12, 1));   % 1-based per-face material index
-[tros, mtlo] = quadriga_lib.subdivide_triangles(tri, 2, mtli);
+[tros, mtlo] = quadriga_lib.subdivide_triangles(2, tri, mtli);
 
 assertEqual( size(mtlo), [48, 1] );
 assertEqual( mtlo(1:4), repmat(mtli(1), 4, 1) );   % parent 1 -> 4 sub-triangles
@@ -23,16 +26,16 @@ assertEqual( mtlo(5:8), repmat(mtli(2), 4, 1) );   % parent 2 -> 4 sub-triangles
 
 % 1-based in C++ as well (0 = no material): indices pass through unchanged, also 0
 mtl0 = mtli; mtl0(2) = 0;
-[~, mtlo0] = quadriga_lib.subdivide_triangles(tri, 2, mtl0);
+[~, mtlo0] = quadriga_lib.subdivide_triangles(2, tri, mtl0);
 assertEqual( mtlo0(5:8), zeros(4, 1, 'uint64') );
 assertEqual( mtlo0([1:4, 9:48]), mtlo([1:4, 9:48]) );
 
 % 0 outputs
-quadriga_lib.subdivide_triangles(tri, 2, mtli);
+quadriga_lib.subdivide_triangles(2, tri, mtli);
 
 
 try % 5 imputs
-    quadriga_lib.subdivide_triangles(tri,2, mtli, 1);
+    quadriga_lib.subdivide_triangles(2,tri, mtli, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -52,7 +55,7 @@ catch ME
 end
 
 try % 3outputs
-    [~,~,~] =  quadriga_lib.subdivide_triangles(tri,2, mtli);
+    [~,~,~] =  quadriga_lib.subdivide_triangles(2,tri, mtli);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -62,7 +65,7 @@ catch ME
 end
 
 try
-    tro = quadriga_lib.subdivide_triangles(rand(3,3));
+    tro = quadriga_lib.subdivide_triangles(1, rand(3,3));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''triangles_in'' must have 9 columns.';
@@ -72,7 +75,7 @@ catch ME
 end
 
 try % wrong mtl_ind length
-    [~,~] = quadriga_lib.subdivide_triangles(tri, 2, mtli(1));
+    [~,~] = quadriga_lib.subdivide_triangles(2, tri, mtli(1));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Number of triangles in ''triangles_in'' and length of ''mtl_ind'' do not match.';
@@ -85,7 +88,7 @@ end
 for n_div = [2^31 + 1, 2^30, 2^32]
     failed = false;
     try
-        [~, ~] = quadriga_lib.subdivide_triangles(tri, n_div, mtli);
+        [~, ~] = quadriga_lib.subdivide_triangles(n_div, tri, mtli);
     catch ME
         failed = strcmp(ME.identifier, 'quadriga_lib:CPPerror') && ~isempty(strfind(ME.message, 'Input ''n_div'' is too large.'));
     end

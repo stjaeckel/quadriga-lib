@@ -451,7 +451,7 @@ phase = quadriga_lib.sos_init_phases( n_coeff, n_gen, seed );
 
 ### Inputs:
 - **`n_coeff`** — Number of sinusoids; must be > 0
-- **`n_gen`** — Number of generators; must be > 0; default: 1
+- **`n_gen`** — Number of generators; must be > 0
 - **`seed`** — Seed of the random stream; integer from -1 to 2^63-1; -1 seeds from the system random
   device and gives different phases on each call; default: -1
 

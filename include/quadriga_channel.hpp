@@ -229,12 +229,12 @@ namespace quadriga_lib
     // - One writer per file at a time (no file locking)
     // - Throws an error if the requested index in the file has not been reserved during hdf5_create_file
     template <typename dtype>                                      // Float or double
-    int hdf5_write_channel(const quadriga_lib::channel<dtype> *ch, // Channel object to write
-                           const std::string &fn,                  // Filename of the HDF5 file
-                           unsigned ix = 0,                        // x-Index in the HDF file
-                           unsigned iy = 0,                        // y-Index in the HDF file
-                           unsigned iz = 0,                        // z-Index in the HDF file
-                           unsigned iw = 0);                       // w-Index in the HDF file
+    int hdf5_write_channel(const std::string &fn,                    // Filename of the HDF5 file
+                           const quadriga_lib::channel<dtype> *chan, // Channel object to write
+                           unsigned ix = 0,                          // x-Index in the HDF file
+                           unsigned iy = 0,                          // y-Index in the HDF file
+                           unsigned iz = 0,                          // z-Index in the HDF file
+                           unsigned iw = 0);                         // w-Index in the HDF file
 
     // Read the storage layout of channel data inside an HDF5 file
     // - Returns 4-element vector with storage layout in form: {nx, ny, nz, nw}
@@ -269,13 +269,13 @@ namespace quadriga_lib
 
     // Read single unstructured dataset from HDF5 file
     // - Besides structured channel data, extra datasets of various types can be added
-    // - They are identified by a prefix (usually "par_") followed by a dataset name (par_name)
+    // - They are identified by a prefix (usually "par_") followed by a dataset name (name)
     // - Returns a std::any object, that can be further analyzed using the function quadriga_lib::any_type_id
     // - Returns empty std::any if there is no dataset at this location or under this name
     // - Scalar datasets are returned as scalars, 1D datasets as arma::Col (also with one element)
     // - Throws if the file does not exist or is not a version-3 channel file
     std::any hdf5_read_dset(const std::string &fn,               // Filename of the HDF5 file
-                            const std::string &par_name,         // Dataset name without the prefix (typically "par_")
+                            const std::string &name,             // Dataset name without the prefix (typically "par_")
                             unsigned ix = 0,                     // x-Index in the HDF file
                             unsigned iy = 0,                     // y-Index in the HDF file
                             unsigned iz = 0,                     // z-Index in the HDF file
@@ -284,10 +284,10 @@ namespace quadriga_lib
 
     // Read names of the unstructured datasets from the HDF file
     // - Returns number of the unstructured datasets at the given location
-    // - par_names will contain all dataset name without the prefix
+    // - names will contain all dataset names without the prefix
     // - Throws if the file does not exist or is not a version-3 channel file
     arma::uword hdf5_read_dset_names(const std::string &fn,               // Filename of the HDF5 file
-                                     std::vector<std::string> *par_names, // Output data
+                                     std::vector<std::string> *names,     // Output data
                                      unsigned ix = 0,                     // x-Index in the HDF file
                                      unsigned iy = 0,                     // y-Index in the HDF file
                                      unsigned iz = 0,                     // z-Index in the HDF file
@@ -307,8 +307,8 @@ namespace quadriga_lib
     // - Creates the file if it does not exist; an existing file must be a version-3 channel file
     // - One writer per file at a time (no file locking)
     void hdf5_write_dset(const std::string &fn,               // Filename of the HDF5 file
-                         const std::string &par_name,         // Dataset name without the prefix (typically "par_")
-                         const std::any *par_data,            // Data to be written
+                         const std::string &name,             // Dataset name without the prefix (typically "par_")
+                         const std::any *data,                // Data to be written
                          unsigned ix = 0,                     // x-Index in the HDF file
                          unsigned iy = 0,                     // y-Index in the HDF file
                          unsigned iz = 0,                     // z-Index in the HDF file

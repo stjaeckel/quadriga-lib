@@ -20,8 +20,7 @@ import quadriga_lib
 class test_case(unittest.TestCase):
     """Tests for quadriga_lib.RTtools.ray_point_intersect
 
-    API: ray_point_intersect(orig, trivec, tridir, points,
-                             sub_cloud_ind=<empty>, use_kernel=0, gpu_id=0)
+    API: ray_point_intersect(points, orig, trivec, tridir, sub_cloud_ind=<empty>, use_kernel=0, gpu_id=0)
 
     Outputs (compressed sparse row layout):
       hit_count  : uint32 ndarray of shape (n_points,)
@@ -129,8 +128,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(n_points, 16)
 
         hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points
-        )
+            points, orig, trivec, tridir)
         sets = self._csr_to_sets(hit_ind, hit_offset, n_points)
         expected = [{0, 1}, {1}, set(), {0}] + [set()] * 12
 
@@ -152,8 +150,7 @@ class test_case(unittest.TestCase):
         """A full icosphere of beams must hit every test point exactly once."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points
-        )
+            points, orig, trivec, tridir)
         npt.assert_array_equal(
             hit_count.astype(np.uint32),
             np.ones(points.shape[0], dtype=np.uint32),
@@ -171,8 +168,7 @@ class test_case(unittest.TestCase):
         """Verify dtype, shape, and structure of all three outputs."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points
-        )
+            points, orig, trivec, tridir)
         n_points = points.shape[0]
 
         # hit_count
@@ -209,8 +205,7 @@ class test_case(unittest.TestCase):
         """hit_offset must start at 0, be monotone, and end at len(hit_ind)."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points
-        )
+            points, orig, trivec, tridir)
         offs = np.asarray(hit_offset).astype(np.int64)
 
         self.assertEqual(int(offs[0]), 0, "hit_offset[0] must be 0")
@@ -227,8 +222,7 @@ class test_case(unittest.TestCase):
         """numpy.split reproduces the per-point list form documented for migration."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points
-        )
+            points, orig, trivec, tridir)
         n_points = points.shape[0]
 
         parts = self._csr_to_list(hit_ind, hit_offset)
@@ -251,8 +245,7 @@ class test_case(unittest.TestCase):
         for kernel in (0, 1):
             with self.subTest(use_kernel=kernel):
                 hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
-                    orig, trivec, tridir, points, use_kernel=kernel
-                )
+                    points, orig, trivec, tridir, use_kernel=kernel)
                 self.assertEqual(np.asarray(hit_ind).size, 0)
                 npt.assert_array_equal(
                     np.asarray(hit_count).astype(np.int64), np.zeros(n_points, dtype=np.int64)
@@ -275,8 +268,7 @@ class test_case(unittest.TestCase):
         self.assertNotEqual(n_points % 8, 0, "test needs an unaligned point count")
 
         hc_gen, hi_gen, ho_gen = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, use_kernel=1
-        )
+            points, orig, trivec, tridir, use_kernel=1)
         self.assertGreater(
             int(np.asarray(hc_gen).sum()), 0, "test would be vacuous with no hits"
         )
@@ -284,8 +276,7 @@ class test_case(unittest.TestCase):
 
         try:
             hc_avx, hi_avx, ho_avx = quadriga_lib.RTtools.ray_point_intersect(
-                orig, trivec, tridir, points, use_kernel=2
-            )
+                points, orig, trivec, tridir, use_kernel=2)
         except Exception as e:
             self.skipTest(f"AVX2 kernel not available: {e}")
             return
@@ -306,8 +297,7 @@ class test_case(unittest.TestCase):
         n_points = points.shape[0]
 
         hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, use_kernel=1
-        )
+            points, orig, trivec, tridir, use_kernel=1)
         self.assertGreater(
             int(np.asarray(hit_count).max()), 1, "test needs a point with several hits"
         )
@@ -326,17 +316,14 @@ class test_case(unittest.TestCase):
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
 
         hit_a, idx_a, off_a = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points
-        )
+            points, orig, trivec, tridir)
         empty_idx = np.array([], dtype=np.uint32)
         hit_b, idx_b, off_b = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, sub_cloud_ind=empty_idx
-        )
+            points, orig, trivec, tridir, sub_cloud_ind=empty_idx)
         # Manual SIMD-aligned segmentation: split into halves of 8.
         manual_idx = np.array([0, 8], dtype=np.uint32)
         hit_c, idx_c, off_c = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, sub_cloud_ind=manual_idx
-        )
+            points, orig, trivec, tridir, sub_cloud_ind=manual_idx)
 
         npt.assert_array_equal(hit_a, hit_b)
         npt.assert_array_equal(hit_a, hit_c)
@@ -354,7 +341,7 @@ class test_case(unittest.TestCase):
         """The mandatory arrays refuse None; sub_cloud_ind=None equals omitted."""
         orig, trivec, tridir, _, _ = self._two_beam_setup()
         points = np.array([[0.0, 0.0, 1.0], [0.06, 0.0, 2.0]])
-        args = (orig, trivec, tridir, points)
+        args = (points, orig, trivec, tridir)
         ref = quadriga_lib.RTtools.ray_point_intersect(*args)
         out = quadriga_lib.RTtools.ray_point_intersect(*args, None)
         for a, b in zip(ref, out):
@@ -368,26 +355,23 @@ class test_case(unittest.TestCase):
         """Permuted point cloud + auto-generated sub_cloud_ind must match unsegmented after un-permuting."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_ref, _, _ = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points
-        )
+            points, orig, trivec, tridir)
         pointsR, sub_cloud_ind, _, reverse_ind = (
             quadriga_lib.RTtools.point_cloud_segmentation(points, 4, 8)
         )
         hit_R, _, _ = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, pointsR, sub_cloud_ind=sub_cloud_ind
-        )
+            pointsR, orig, trivec, tridir, sub_cloud_ind=sub_cloud_ind)
         npt.assert_array_equal(hit_ref, hit_R[reverse_ind])
 
     def test_unaligned_sub_cloud_ind(self):
         """Sub-clouds that are not aligned to the SIMD vector size are accepted by every kernel."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
-        hit_ref, idx_ref, off_ref = quadriga_lib.RTtools.ray_point_intersect(orig, trivec, tridir, points)
+        hit_ref, idx_ref, off_ref = quadriga_lib.RTtools.ray_point_intersect(points, orig, trivec, tridir)
         sci = np.array([0, 3, 11], dtype=np.uint32)
         for kernel in (0, 1):
             with self.subTest(use_kernel=kernel):
                 hit, idx, off = quadriga_lib.RTtools.ray_point_intersect(
-                    orig, trivec, tridir, points, sub_cloud_ind=sci, use_kernel=kernel
-                )
+                    points, orig, trivec, tridir, sub_cloud_ind=sci, use_kernel=kernel)
                 npt.assert_array_equal(hit, hit_ref)
                 npt.assert_array_equal(idx, idx_ref)
                 npt.assert_array_equal(off, off_ref)
@@ -396,11 +380,9 @@ class test_case(unittest.TestCase):
         """auto and GENERIC kernel must produce identical results."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_auto, idx_auto, off_auto = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, use_kernel=0
-        )
+            points, orig, trivec, tridir, use_kernel=0)
         hit_gen, idx_gen, off_gen = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, use_kernel=1
-        )
+            points, orig, trivec, tridir, use_kernel=1)
         npt.assert_array_equal(hit_auto, hit_gen)
         npt.assert_array_equal(off_auto, off_gen)
         n = points.shape[0]
@@ -412,12 +394,10 @@ class test_case(unittest.TestCase):
         """AVX2 kernel must agree with GENERIC if available; skip otherwise."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_gen, idx_gen, off_gen = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, use_kernel=1
-        )
+            points, orig, trivec, tridir, use_kernel=1)
         try:
             hit_avx, idx_avx, off_avx = quadriga_lib.RTtools.ray_point_intersect(
-                orig, trivec, tridir, points, use_kernel=2
-            )
+                points, orig, trivec, tridir, use_kernel=2)
         except ValueError as e:
             self.skipTest(f"AVX2 kernel not available: {e}")
             return
@@ -432,12 +412,10 @@ class test_case(unittest.TestCase):
         """CUDA kernel must agree with GENERIC if available; skip otherwise."""
         orig, trivec, tridir, points = self._icosphere_setup(n_div=20)
         hit_gen, idx_gen, off_gen = quadriga_lib.RTtools.ray_point_intersect(
-            orig, trivec, tridir, points, use_kernel=1
-        )
+            points, orig, trivec, tridir, use_kernel=1)
         try:
             hit_cuda, idx_cuda, off_cuda = quadriga_lib.RTtools.ray_point_intersect(
-                orig, trivec, tridir, points, use_kernel=3, gpu_id=0
-            )
+                points, orig, trivec, tridir, use_kernel=3, gpu_id=0)
         except ValueError as e:
             self.skipTest(f"CUDA kernel not available: {e}")
             return
@@ -457,56 +435,50 @@ class test_case(unittest.TestCase):
             (
                 "orig row count mismatch with trivec",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
-                    orig[:2, :], trivec, tridir, points
-                ),
+                    points, orig[:2, :], trivec, tridir),
             ),
             (
                 "orig must have 3 columns",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
-                    orig[:, :2], trivec, tridir, points
-                ),
+                    points, orig[:, :2], trivec, tridir),
             ),
             (
                 "trivec must have 9 columns",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
-                    orig, trivec[:, :2], tridir, points
-                ),
+                    points, orig, trivec[:, :2], tridir),
             ),
             (
                 "tridir row count mismatch with orig",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
-                    orig, trivec, tridir[:2, :], points
-                ),
+                    points, orig, trivec, tridir[:2, :]),
             ),
             (
                 "tridir must have 9 columns",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
-                    orig, trivec, tridir[:, :2], points
-                ),
+                    points, orig, trivec, tridir[:, :2]),
             ),
             (
                 "points must have 3 columns",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
-                    orig, trivec, tridir, points[:, :2]
-                ),
+                    points[:, :2], orig, trivec, tridir),
             ),
             (
                 "sub_cloud_ind must start at 0",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
+                    points,
                     orig,
                     trivec,
                     tridir,
-                    points,
                     sub_cloud_ind=np.array([2, 8], dtype=np.uint32),
                 ),
             ),
             (
                 "sub_cloud_ind exceeds number of points",
                 lambda: quadriga_lib.RTtools.ray_point_intersect(
+                    points,
                     orig,
                     trivec,
                     tridir,
-                    points,
                     sub_cloud_ind=np.array([0, 33], dtype=np.uint32),
                 ),
             ),

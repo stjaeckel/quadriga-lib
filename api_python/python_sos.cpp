@@ -33,7 +33,7 @@ void quadriga_lib_sos(py::module_ &m)
 
     m.def("init_phases", &sos_init_phases,
           py::arg("n_coeff"),
-          py::arg("n_gen") = 1,
+          py::arg("n_gen"),
           py::arg("seed") = -1);
 
     m.def("acfi", &sos_acfi,

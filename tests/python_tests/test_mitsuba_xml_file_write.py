@@ -104,7 +104,8 @@ class test_case(unittest.TestCase):
             quadriga_lib.RTtools.mitsuba_xml_file_write(fn, vert_list=cube.reshape(-1, 3),
                                                         face_ind=np.arange(3 * n, dtype=np.uint64).reshape(n, 3),
                                                         obj_ind=np.zeros(n, np.uint64), mtl_ind=np.ones(n, np.uint64),
-                                                        obj_names=['o'], mtl_names=['concrete'], map_to_itu=True)
+                                                        obj_names=['o'], mtl_names=['concrete'],
+                                                        map_to_itu_materials=True)
             self.assertIn('itu', open(fn).read())
         finally:
             shutil.rmtree(d, ignore_errors=True)
@@ -125,12 +126,12 @@ class test_case(unittest.TestCase):
             ref = open(fn).read()
             write(pathlib.Path(fn), *args)
             self.assertEqual(open(fn).read(), ref)
-            write(fn, *args, bsdf=None, map_to_itu=None)
+            write(fn, *args, bsdf=None, map_to_itu_materials=None)
             self.assertEqual(open(fn).read(), ref)
 
             with self.assertRaises(TypeError) as ctx:
-                write(fn, *args, map_to_itu=2.5)
-            self.assertIn("'map_to_itu'", str(ctx.exception))
+                write(fn, *args, map_to_itu_materials=2.5)
+            self.assertIn("'map_to_itu_materials'", str(ctx.exception))
 
             with self.assertRaises(TypeError):
                 write(fn, *args[:-1])  # mtl_names omitted

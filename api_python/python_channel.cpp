@@ -72,6 +72,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("iz") = py::none(),
           py::arg("iw") = py::none(),
           py::arg("i_snap") = py::none(),
+          py::kw_only(),
           py::arg("stack") = false);
 
     m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
@@ -80,17 +81,17 @@ void quadriga_lib_channel(py::module_ &m)
 
     m.def("hdf5_read_dset", &hdf5_read_dset,
           py::arg("fn"),
+          py::arg("name"),
           py::arg("ix") = 0,
           py::arg("iy") = 0,
           py::arg("iz") = 0,
           py::arg("iw") = 0,
-          py::arg("name"),
           py::arg("prefix") = "par_");
 
     m.def("hdf5_read_layout", &hdf5_read_layout, py::arg("fn"));
 
     m.def("hdf5_reshape_layout", &hdf5_reshape_layout, py::arg("fn"),
-          py::arg("nx") = 65536, py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);
+          py::arg("nx"), py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);
 
     m.def("hdf5_write_channel", &hdf5_write_channel,
           py::arg("fn"),
@@ -102,9 +103,9 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("iw") = py::none());
 
     m.def("hdf5_write_dset", &hdf5_write_dset, py::arg("fn"),
-          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
           py::arg("name"),
-          py::arg("data") = py::none(),
+          py::arg("data").none(false),
+          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
           py::arg("prefix") = "par_");
 
     m.def("ieee_indoor", &get_channels_ieee_indoor,
@@ -132,6 +133,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("dBP_m") = NAN,
           py::arg("n_walls") = py::array_t<arma::uword>(),
           py::arg("wall_loss") = 5.0,
+          py::kw_only(),
           py::arg("stack") = false);
 
     m.def("irs", &get_channels_irs,
@@ -166,8 +168,12 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("complex") = true);
 
     m.def("planar", &get_channels_planar,
-          py::arg("ant_tx"),
-          py::arg("ant_rx"),
+          py::arg("tx_array"),
+          py::arg("rx_array"),
+          py::arg("tx_pos").none(false),
+          py::arg("tx_orientation").none(false),
+          py::arg("rx_pos").none(false),
+          py::arg("rx_orientation").none(false),
           py::arg("aod").none(false),
           py::arg("eod").none(false),
           py::arg("aoa").none(false),
@@ -175,56 +181,55 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("path_gain").none(false),
           py::arg("path_length").none(false),
           py::arg("M").none(false),
+          py::arg("center_freq") = py::none(),
+          py::arg("use_absolute_delays") = false,
+          py::arg("add_fake_los_path") = false,
+          py::arg("use_kernel") = 0,
+          py::arg("i_freq") = 0,
+          py::kw_only(),
+          py::arg("complex") = true);
+
+    m.def("spherical", &get_channels_spherical,
+          py::arg("tx_array"),
+          py::arg("rx_array"),
           py::arg("tx_pos").none(false),
           py::arg("tx_orientation").none(false),
           py::arg("rx_pos").none(false),
           py::arg("rx_orientation").none(false),
-          py::arg("center_freq") = py::none(),
-          py::arg("use_absolute_delays") = false,
-          py::arg("add_fake_los_path") = false,
-          py::arg("complex") = true,
-          py::arg("i_freq") = 0,
-          py::arg("use_kernel") = 0);
-
-    m.def("spherical", &get_channels_spherical,
-          py::arg("ant_tx"),
-          py::arg("ant_rx"),
           py::arg("fbs_pos").none(false),
           py::arg("lbs_pos").none(false),
           py::arg("path_gain").none(false),
           py::arg("path_length").none(false),
           py::arg("M").none(false),
-          py::arg("tx_pos").none(false),
-          py::arg("tx_orientation").none(false),
-          py::arg("rx_pos").none(false),
-          py::arg("rx_orientation").none(false),
           py::arg("center_freq") = py::none(),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false,
-          py::arg("complex") = true,
+          py::arg("use_kernel") = 0,
           py::arg("i_freq") = 0,
-          py::arg("use_kernel") = 0);
+          py::kw_only(),
+          py::arg("complex") = true);
 
     m.def("multifreq", &get_channels_multifreq,
-          py::arg("ant_tx"),
-          py::arg("ant_rx"),
+          py::arg("tx_array"),
+          py::arg("rx_array"),
+          py::arg("tx_pos").none(false),
+          py::arg("tx_orientation").none(false),
+          py::arg("rx_pos").none(false),
+          py::arg("rx_orientation").none(false),
           py::arg("fbs_pos").none(false),
           py::arg("lbs_pos").none(false),
           py::arg("path_gain").none(false),
           py::arg("path_length").none(false),
           py::arg("M").none(false),
-          py::arg("tx_pos").none(false),
-          py::arg("tx_orientation").none(false),
-          py::arg("rx_pos").none(false),
-          py::arg("rx_orientation").none(false),
           py::arg("freq").none(false),
           py::arg("freq_new").none(false),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("propagation_speed") = 299792458.0,
-          py::arg("complex") = true,
-          py::arg("use_kernel") = 0);
+          py::arg("use_kernel") = 0,
+          py::kw_only(),
+          py::arg("complex") = true);
 
     m.def("quantize_delays", &quantize_delays,
           py::arg("coeff_re") = py::none(),
@@ -234,6 +239,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("max_taps") = 48,
           py::arg("power_exponent") = 1.0,
           py::arg("fix_taps") = 0,
+          py::kw_only(),
           py::arg("stack") = false,
           py::arg("complex") = true,
           py::arg("coeff") = py::none());

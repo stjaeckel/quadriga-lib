@@ -50,13 +50,19 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 ## Usage:
 ```
 [ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, ...
-    rx_array, fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, ...
-    rx_orientation, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
+    rx_array, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
+    path_length, M, center_freq, use_absolute_delays, add_fake_los_path, use_kernel );
 ```
 
 ## Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [[arrayant_generate]]
 - **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [[arrayant_generate]]
+- **`tx_pos`** — Transmitter position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
+  `[3, n_snap]` in batch mode
+- **`rx_pos`** — Receiver position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
+  `[3, n_snap]` in batch mode
 - **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`, or a cell of length `n_snap` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`, or a cell of length `n_snap` in batch mode
 - **`path_gain`** — Path gains in linear scale; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
@@ -64,12 +70,6 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   (e.g. 0) use the polyline length; `[n_path, 1]`, or a cell of length `n_snap` in batch mode
 - **`M`** — Polarization transfer matrix, Jones row order as above; `[8, n_path]`, or a cell of length `n_snap` in
   batch mode
-- **`tx_pos`** — Transmitter position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
-  `[3, n_snap]` in batch mode
-- **`rx_pos`** — Receiver position, finite; `[3, 1]`, or `[3, n_snap]` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `[3, 1]`, or
-  `[3, n_snap]` in batch mode
 - **`center_freq`** — Center frequency in Hz; 0 (or empty) gives the coefficients at f = 0 (see above); default: 0
 - **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
 - **`add_fake_los_path`** — If `true`, always adds one output path; slot 1 holds the LOS path (zero power if none was
@@ -134,21 +134,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_ports_rx = ant_rx.n_ports();
 
     // Batch mode: path data as cell arrays, one entry per snapshot
-    if (mxIsCell(prhs[2]))
+    if (mxIsCell(prhs[6]))
     {
         auto get_Mat = [](const mxArray *a, const char *name) { return qd_mex_get_Mat<double>(a, false, name); };
         auto get_Col = [](const mxArray *a, const char *name) { return qd_mex_get_Col<double>(a, false, name); };
-        const auto fbs_pos = read_cell<arma::mat>(prhs[2], "fbs_pos", get_Mat);
-        const auto lbs_pos = read_cell<arma::mat>(prhs[3], "lbs_pos", get_Mat);
-        const auto path_gain = read_cell<arma::vec>(prhs[4], "path_gain", get_Col);
-        const auto path_length = read_cell<arma::vec>(prhs[5], "path_length", get_Col);
-        const auto M = read_cell<arma::mat>(prhs[6], "M", get_Mat);
+        const auto fbs_pos = read_cell<arma::mat>(prhs[6], "fbs_pos", get_Mat);
+        const auto lbs_pos = read_cell<arma::mat>(prhs[7], "lbs_pos", get_Mat);
+        const auto path_gain = read_cell<arma::vec>(prhs[8], "path_gain", get_Col);
+        const auto path_length = read_cell<arma::vec>(prhs[9], "path_length", get_Col);
+        const auto M = read_cell<arma::mat>(prhs[10], "M", get_Mat);
         auto get_xyz = [](const mxArray *a, const char *name) // A 3-element vector (row or column) applies to all snapshots
         { return mxGetNumberOfElements(a) == 3 ? arma::mat(qd_mex_typecast_Col<double>(a, name, 3)) : qd_mex_get_Mat<double>(a, false, name); };
-        const auto tx_pos = get_xyz(prhs[7], "tx_pos");
-        const auto tx_orientation = get_xyz(prhs[8], "tx_orientation");
-        const auto rx_pos = get_xyz(prhs[9], "rx_pos");
-        const auto rx_orientation = get_xyz(prhs[10], "rx_orientation");
+        const auto tx_pos = get_xyz(prhs[2], "tx_pos");
+        const auto tx_orientation = get_xyz(prhs[3], "tx_orientation");
+        const auto rx_pos = get_xyz(prhs[4], "rx_pos");
+        const auto rx_orientation = get_xyz(prhs[5], "rx_orientation");
 
         // Outputs: cell arrays, the C++ function writes into the MATLAB memory of their entries
         const size_t n_snap = fbs_pos.size();
@@ -173,15 +173,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Single snapshot
-    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[2]);
-    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[3]);
-    const auto path_gain = qd_mex_get_Col<double>(prhs[4]);
-    const auto path_length = qd_mex_get_Col<double>(prhs[5]);
-    const auto M = qd_mex_get_Mat<double>(prhs[6]);
-    const auto tx_pos = qd_mex_typecast_Col<double>(prhs[7], "tx_pos", 3);
-    const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[8], "tx_orientation", 3);
-    const auto rx_pos = qd_mex_typecast_Col<double>(prhs[9], "rx_pos", 3);
-    const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[10], "rx_orientation", 3);
+    const auto fbs_pos = qd_mex_get_Mat<double>(prhs[6]);
+    const auto lbs_pos = qd_mex_get_Mat<double>(prhs[7]);
+    const auto path_gain = qd_mex_get_Col<double>(prhs[8]);
+    const auto path_length = qd_mex_get_Col<double>(prhs[9]);
+    const auto M = qd_mex_get_Mat<double>(prhs[10]);
+    const auto tx_pos = qd_mex_typecast_Col<double>(prhs[2], "tx_pos", 3);
+    const auto tx_orientation = qd_mex_typecast_Col<double>(prhs[3], "tx_orientation", 3);
+    const auto rx_pos = qd_mex_typecast_Col<double>(prhs[4], "rx_pos", 3);
+    const auto rx_orientation = qd_mex_typecast_Col<double>(prhs[5], "rx_orientation", 3);
 
     // Derived inputs
     arma::uword n_path = add_fake_los_path ? fbs_pos.n_cols + 1 : fbs_pos.n_cols;

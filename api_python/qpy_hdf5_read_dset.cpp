@@ -24,16 +24,16 @@ Read a single unstructured dataset from an HDF5 file
 
 ## Usage:
 ```
-dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix )
 ```
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file
+- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
 
 ## Outputs:
@@ -46,8 +46,8 @@ dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
 MD!*/
 
 py::object hdf5_read_dset(const py::handle &fn,
-                          unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                           const std::string &name,
+                          unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                           const std::string &prefix)
 {
     const std::string fn_s = qd_python_path(fn, "fn");

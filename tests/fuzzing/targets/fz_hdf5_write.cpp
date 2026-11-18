@@ -181,9 +181,9 @@ static void run(fz::input &in)
         fz::clean([&] { quadriga_lib::hdf5_create_file(fn, nx, ny, nz, nw); });
     }
     unsigned ix = (unsigned)in.index(2), iy = (unsigned)in.index(2), iz = (unsigned)in.size(1), iw = (unsigned)in.size(1);
-    fz::clean([&] { quadriga_lib::hdf5_write_channel(&c, fn, ix, iy, iz, iw); });
+    fz::clean([&] { quadriga_lib::hdf5_write_channel(fn, &c, ix, iy, iz, iw); });
     if (in.ConsumeBool()) // overwrite the slot
-        fz::clean([&] { quadriga_lib::hdf5_write_channel(&c, fn, ix, iy, iz, iw); });
+        fz::clean([&] { quadriga_lib::hdf5_write_channel(fn, &c, ix, iy, iz, iw); });
     {
         std::string name = fuzzed_name(in);
         std::any par = fuzzed_any<T>(in);

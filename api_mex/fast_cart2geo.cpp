@@ -33,7 +33,7 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - **`y`** — Y-coordinates; `[n, m]` or empty; ignored for combined input
 - **`z`** — Z-coordinates; `[n, m]` or empty; ignored for combined input
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 
-  (throws if AVX2 unavailable); other values throw; default: 1
+  (throws if AVX2 unavailable); other values throw; default: 0
 
 ## Outputs:
 - **`az`** — Azimuth angles in radians; `[n, m]`
@@ -53,7 +53,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube x = qd_mex_get_Cube<double>(prhs[0]);
     arma::mat y = (nrhs < 2) ? arma::mat() : qd_mex_get_Mat<double>(prhs[1]);
     arma::mat z = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2]);
-    const int use_kernel = (nrhs < 4) ? 1 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 1);
+    const int use_kernel = (nrhs < 4) ? 0 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 0);
 
     // Split data
     arma::uword nm = x.n_elem, n = x.n_cols, m = x.n_slices;

@@ -29,7 +29,7 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("y") = py::none(),
           py::arg("z") = py::none(),
           py::arg("combine") = true,
-          py::arg("use_kernel") = 1);
+          py::arg("use_kernel") = 0);
 
     m.def("write_png", &write_png,
           py::arg("fn"),
@@ -74,5 +74,5 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("el") = py::none(),
           py::arg("len") = py::none(),
           py::arg("combine") = true,
-          py::arg("use_kernel") = 1);
+          py::arg("use_kernel") = 0);
 }

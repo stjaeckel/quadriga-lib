@@ -66,7 +66,10 @@ class test_case(unittest.TestCase):
         ori = np.array([[0.1], [0.2], [0.3]])
         pos = np.array([[1.0, 0.0], [0.0, 2.0], [0.0, 0.5]])
         pos_res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0], ori, pos, None, True, True,
-                                                    False, 1, False)
+                                                    False, 1, complex=False)
+        with self.assertRaises(TypeError):  # complex is keyword-only
+            quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, [1, 0], ori, pos, None, True, True, False, 1,
+                                              False)
         kw_res = quadriga_lib.arrayant.interpolate(arrayant=self.ant, azimuth=self.az, elevation=self.el, i_element=[1, 0],
                                                    orientation=ori, element_pos=pos, freq_new=None, dist=True,
                                                    local_angles=True, fast_access=False, use_kernel=1, complex=False)

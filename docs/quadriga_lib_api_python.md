@@ -14,6 +14,7 @@ lang: en-US
 - Array inputs take numpy arrays in any memory order; lists, scalars and other numeric dtypes are converted (copied). Outputs are numpy arrays: float64 for real values, complex128 for complex values; integer outputs have the dtype stated at the output.
 - Complex data: many functions take or return complex arrays where C++ uses separate `_re` / `_im` arrays or interleaved rows; some select the form with a `complex` flag. Each function states its form.
 - Data structures (array antennas, channels, scenario parameters, ray data) are dicts; the function that defines one lists its keys. Each call builds a new arrayant from an arrayant dict, so its data is checked in full on every call.
+- Arguments have the names, order and defaults of the C++ function unless the function states otherwise. The flags `complex` and `stack` are keyword-only: pass them as `complex=False`, `stack=True`.
 - Optional inputs state their default and can be omitted; an optional array can also be passed as `None`. Flags (bool options) take a `bool` or `numpy.bool_`; `None` selects the default, any other type raises `TypeError`. File names take a `str`, `bytes` or path-like object (e.g. `pathlib.Path`). Several outputs are returned as a tuple in the order of the Usage line.
 - Errors: invalid inputs (shape/domain, an index outside the layout of a file) raise `ValueError`, a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) `RuntimeError`, an index out of range of an input array `IndexError`; a call that does not match the signature (missing required argument, unknown keyword, `None` for a required array, a value of the wrong type) raises `TypeError`. Messages name the argument.
 
@@ -591,7 +592,7 @@ V_re, V_im, H_re, H_im = quadriga_lib.arrayant.interpolate( arrayant, azimuth, e
   a copy; raises otherwise. With `False`, such arrays are read without a copy as well and others are copied;
   default: `False`
 - **`use_kernel`** — Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2 (raises if unavailable); `int`; default: 0
-- **`complex`** — Return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
+- **`complex`** — Keyword-only; return `V` and `H` as complex arrays; with `False`, return `V_re, V_im, H_re, H_im` in their place;
   default: `True`
 
 ### Outputs:
@@ -949,7 +950,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_channel) · [MATLAB](quadriga_l
 
 ### Usage:
 ```python
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, stack )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, stack=False )
 ```
 
 ### Inputs:
@@ -959,7 +960,7 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, i_snap, 
 - **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
 - **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
 - **`i_snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
-- **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
+- **`stack`** — Keyword-only; if `True`, stack snapshots. Default: `False` (return as list)
 
 ### Outputs:
 - **`chan`** — List of dicts with the following keys:
@@ -1010,16 +1011,16 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_read_dset) · [MATLAB](quadriga_lib_
 
 ### Usage:
 ```python
-dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name, prefix )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, name, ix, iy, iz, iw, prefix )
 ```
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file
+- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without the prefix, e.g. `'carrier_frequency'`; str
 - **`prefix`** — Prefix prepended to `name` when looking up the dataset; str; default: `'par_'`
 
 ### Outputs:
@@ -1117,7 +1118,7 @@ quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 
 ### Inputs:
 - **`fn`** — Filename of the HDF5 file
-- **`nx`** — Number of elements on the x-dimension; default: 65536
+- **`nx`** — Number of elements on the x-dimension
 - **`ny`** — Number of elements on the y-dimension; default: 1
 - **`nz`** — Number of elements on the z-dimension; default: 1
 - **`nw`** — Number of elements on the w-dimension; default: 1
@@ -1195,17 +1196,17 @@ Also in: [C++](quadriga_lib_api_cpp.md#hdf5_write_dset) · [MATLAB](quadriga_lib
 
 ### Usage:
 ```python
-quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data, prefix )
+quadriga_lib.channel.hdf5_write_dset( fn, name, data, ix, iy, iz, iw, prefix )
 ```
 
 ### Input Arguments:
 - **`fn`** — Filename of the HDF5 file
+- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
+- **`data`** — Data to be written; type must be supported (see above); cannot be empty
 - **`ix`** — Storage index for the x-dimension; 0-based; default: 0
 - **`iy`** — Storage index for the y-dimension; 0-based; default: 0
 - **`iz`** — Storage index for the z-dimension; 0-based; default: 0
 - **`iw`** — Storage index for the w-dimension; 0-based; default: 0
-- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
-- **`data`** — Data to be written; type must be supported (see above); cannot be empty
 - **`prefix`** — Prefix prepended to `name` in the HDF5 file; alphanumeric and underscores only; str; default: `'par_'`
 
 ### See also:
@@ -1376,11 +1377,11 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re
 - **`power_exponent`** — Interpolation exponent α; default: 1.0
 - **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
   2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
-- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
+- **`stack`** — Keyword-only; if `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
   arrays; default: `False`
-- **`complex`** — If `True`, return combined complex coefficients `coeff_q`; if `False`, return
+- **`complex`** — Keyword-only; if `True`, return combined complex coefficients `coeff_q`; if `False`, return
   separate `coeff_re_q` and `coeff_im_q`; default: `True`
-- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
+- **`coeff`** — Keyword-only; complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
   mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
 ### Outputs:
@@ -1430,7 +1431,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_ieee_indoor) · [MATLAB](qua
 chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
-   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack )
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack=False )
 ```
 
 ### Inputs:
@@ -1459,7 +1460,7 @@ chan = quadriga_lib.channel.ieee_indoor( ap_array, sta_array, ChannelType, Carri
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default; default: NAN
 - **`n_walls`** *(optional)* — Number of walls per user TGax models; `(n_users,)` or `(1,)`; default: 0
 - **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
-- **`stack`** *(optional)* — If `True`, per-snapshot data is stacked into a single array along an appended 
+- **`stack`** *(optional)* — Keyword-only; if `True`, per-snapshot data is stacked into a single array along an appended 
   snapshot axis instead of being returned as a list of per-snapshot arrays; default: False
 
 ### Output:
@@ -1564,8 +1565,8 @@ coeff, delay, active_path_out, aod, eod, aoa, eoa = quadriga_lib.channel.irs( ..
   when not empty; `(n_path_1 · n_path_2,)`; default: `None`
 - **`use_kernel`** — Kernel of both segments, as in [channel.spherical](#channel.spherical): 0 = auto, 1 = GENERIC, 2 = AVX2 (single
   precision; raises if unavailable); auto selects GENERIC in this version; `int`; default: 0
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; keyword-only; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_rx, n_tx, n_path_irs)`
@@ -1593,7 +1594,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadr
 
 - Multi-frequency extension of [channel.spherical](#channel.spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (`ant_tx['center_freq']`), RX array (`ant_rx['center_freq']`), input samples (`freq`), and output (`freq_new`)
+- Aligns four frequency grids: TX array (`tx_array['center_freq']`), RX array (`rx_array['center_freq']`), input samples (`freq`), and output (`freq_new`)
 - Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
@@ -1628,17 +1629,21 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_multifreq) · [MATLAB](quadr
 
 ### Usage:
 ```python
-coeff, delay = quadriga_lib.channel.multifreq( ant_tx, ant_rx, fbs_pos, \
-    lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq, \
-    freq_new, use_absolute_delays, add_fake_los_path, propagation_speed )
+coeff, delay = quadriga_lib.channel.multifreq( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    freq, freq_new, use_absolute_delays, add_fake_los_path, propagation_speed, use_kernel, complex=True )
 
 coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [generate](#generate);
+- **`tx_array`** — Multi-frequency TX arrayant dict; pattern fields 3D `(n_el, n_az, n_elem)` or 4D `(n_el, n_az, n_elem, n_freq)`; see [generate](#generate);
   4D input requires `center_freq` with one value per frequency entry `(n_freq,)`
-- **`ant_rx`** — RX arrayant dict; same format as `ant_tx`
+- **`rx_array`** — RX arrayant dict; same format as `tx_array`
+- **`tx_pos`** — Transmitter position, finite; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
+- **`rx_pos`** — Receiver position, finite; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
 - **`path_gain`** — Linear-scale path gains, one column per input frequency; `(n_path, n_freq)`
@@ -1646,20 +1651,16 @@ coeff_re, coeff_im, delay = quadriga_lib.channel.multifreq( ..., complex=False )
   TX-FBS-LBS-RX polyline (e.g. 0) use the polyline length; `(n_path,)`
 - **`M`** — Polarization transfer matrix, row order as above; `(8, n_path, n_freq)` full pol or
   `(2, n_path, n_freq)` scalar pressure
-- **`tx_pos`** — Transmitter position, finite; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
-- **`rx_pos`** — Receiver position, finite; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`
 - **`freq`** — Input sample frequencies for `path_gain` and `M`; `(n_freq,)`
 - **`freq_new`** — Target output frequencies; `(n_freq_new,)`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [interpolate](#interpolate); `int`; default: 0
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path_out, n_freq_new)`
@@ -1705,19 +1706,23 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_planar) · [MATLAB](quadriga
 
 ### Usage:
 ```python
-coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ant_tx, ant_rx, \
-    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path )
+coeff, delay, rx_Doppler = quadriga_lib.channel.planar( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_gain, path_length, M, \
+    center_freq, use_absolute_delays, add_fake_los_path, use_kernel, i_freq, complex=True )
 
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
+coeff_re, coeff_im, delay, rx_Doppler = quadriga_lib.channel.planar( ..., complex=False )
 
-coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
+coeff, delay, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](#generate); a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](#generate); a 4D dict raises
   `ValueError` (use [channel.multifreq](#channel.multifreq))
-- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
+- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`aod`** — Departure azimuth angles in rad; `(n_path,)`
 - **`eod`** — Departure elevation angles in rad; `(n_path,)`
 - **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
@@ -1725,27 +1730,23 @@ coeff, delays, rx_Doppler = quadriga_lib.channel.planar( ..., i_freq=1 )
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`
 - **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
 - **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
-- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the
   coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
-  processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation: 0 = auto, 1 = GENERIC, 2 = AVX2 (single precision; raises if
   unavailable); auto selects GENERIC in this version, see [interpolate](#interpolate); `int`; default: 0
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
-- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
 ### See also:
@@ -1806,21 +1807,25 @@ Also in: [C++](quadriga_lib_api_cpp.md#get_channels_spherical) · [MATLAB](quadr
 ### Usage:
 ```python
 # Complex coefficients (default)
-coeff, delays = quadriga_lib.channel.spherical( ant_tx, ant_rx, \
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path, angles, complex, i_freq, use_kernel )
+coeff, delay = quadriga_lib.channel.spherical( tx_array, rx_array, \
+    tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, \
+    center_freq, use_absolute_delays, add_fake_los_path, angles, use_kernel, i_freq, complex=True )
 
 # Real and imaginary parts as separate arrays
-coeff_re, coeff_im, delays = quadriga_lib.channel.spherical( ..., complex=False )
+coeff_re, coeff_im, delay = quadriga_lib.channel.spherical( ..., complex=False )
 
 # Departure and arrival angles as well
-coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
+coeff, delay, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=True )
 ```
 
 ### Inputs:
-- **`ant_tx`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](#generate); a 4D dict raises
+- **`tx_array`** — Transmit arrayant dict with single-frequency (3D) patterns, see [generate](#generate); a 4D dict raises
   `ValueError` (use [channel.multifreq](#channel.multifreq))
-- **`ant_rx`** — Receive arrayant dict with single-frequency (3D) patterns; as `ant_tx`
+- **`rx_array`** — Receive arrayant dict with single-frequency (3D) patterns; as `tx_array`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`, or a list of length `n_snap` in batch mode
 - **`path_gain`** — Path gains in linear scale; `(n_path, n_freq)`, or a list of length `n_snap` in batch mode
@@ -1828,29 +1833,25 @@ coeff, delays, aod, eod, aoa, eoa = quadriga_lib.channel.spherical( ..., angles=
   (e.g. 0) use the polyline length; `(n_path,)`, or a list of length `n_snap` in batch mode
 - **`M`** — Polarization transfer matrix, Jones row order as above; `(8, n_path, n_freq)`, or a list of length `n_snap`
   in batch mode
-- **`tx_pos`** — Transmitter position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_pos`** — Receiver position in Cartesian coordinates, finite; `(3,)`, or `(3, n_snap)` in batch mode
-- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading), finite; `(3,)`, or `(3, n_snap)` in batch mode
 - **`center_freq`** — Center frequencies in Hz; `(n_freq,)`; an entry of `0` or `None` gives the coefficients at f = 0 (see above); default: `None`
 - **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
 - **`add_fake_los_path`** — If `True`, always adds one output path; slot 0 holds the LOS path (zero power if none was
   found); a LOS path found in the input leaves a zero-power path in its original slot; default: `False`
 - **`angles`** — If `True`, also return the departure and arrival angles; `False` saves their memory and, with element
   coupling, the time to convert them to the ports; default: `False`
-- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
-  separate `coeff_re` and `coeff_im`; default: `True`
-- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
-  processed; default: `0`
 - **`use_kernel`** — Kernel of the antenna interpolation and of the coefficient computation: 0 = auto, 1 = GENERIC,
   2 = AVX2 (single precision; raises if unavailable); auto selects GENERIC in this version, see [interpolate](#interpolate);
   `int`; default: 0
+- **`i_freq`** — Frequency index (0-based) selecting the slice of `path_gain`, `M` and `center_freq` that is
+  processed; Python only, since the C++ function takes single-frequency path data; default: `0`
+- **`complex`** — Keyword-only; if `True`, combine coefficients into a single complex array `coeff`; if `False`,
+  return separate `coeff_re` and `coeff_im`; default: `True`
 
 ### Outputs:
 - **`coeff`** — Complex channel coefficients (`complex=True`); `(n_ports_rx, n_ports_tx, n_path)`
 - **`coeff_re`** — Real part of channel coefficients (`complex=False`), replaces `coeff`; same shape
 - **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape
-- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`delay`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
 - **`aod`** — Azimuth of departure in the GCS, in rad; `(n_ports_rx, n_ports_tx, n_path)`; only with `angles=True`
 - **`eod`** — Elevation of departure in the GCS, in rad; same shape; only with `angles=True`
 - **`aoa`** — Azimuth of arrival in the GCS, in rad; same shape; only with `angles=True`
@@ -2536,7 +2537,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#gbsm_single_link_channel) · [MATLAB](qua
 ```python
 chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, \
     output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
-    use_absolute_delays, stack )
+    use_absolute_delays, stack=False )
 ```
 
 ### Inputs:
@@ -2557,7 +2558,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays (`"phase"`: of the ray-data positions); default:
   `False`
-- **`stack`** — Snapshot layout of `chan` as in [hdf5_read_channel](#hdf5_read_channel); default: `False`
+- **`stack`** — Keyword-only; snapshot layout of `chan` as in [hdf5_read_channel](#hdf5_read_channel); default: `False`
 
 ### Outputs:
 - **`chan`** — Channel dict, layout as documented in [hdf5_read_channel](#hdf5_read_channel): `center_freq` `(1,)`;
@@ -2698,7 +2699,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
 - **`clip_spreads`** — `True`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause 7.5 step 4);
   `lsp_mu` and `lsp_sigma` are not affected; default: True
-- **`complex`** — See the description; default: True
+- **`complex`** — Keyword-only; see the description; default: True
 
 ### Outputs:
 - **`lsp`** — Large-scale parameters; slices: 0 DS in s; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA in
@@ -3230,7 +3231,7 @@ az, el, length = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine=False )
 - **`y`** — Y-coordinates `(n, m)`; provide together with `z` for separate inputs; default: None
 - **`z`** — Z-coordinates `(n, m)`; provide together with `y`; default: None
 - **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate az, el, length arrays; default: True
-- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); other values raise; default: 1
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); other values raise; default: 0
 
 ### Outputs:
 - **`geo_coords`** — Combined geographic coordinates `(3, n, m)`; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when `combine` is True
@@ -3267,7 +3268,7 @@ x, y, z = quadriga_lib.tools.fast_geo2cart( az, el, len, combine=False )
 - **`len`** — Vector length `(n, m)`; omit for unit length; ignored for combined input; default: None
 - **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate x, y, z  arrays; default: True
 - **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws
-  if unavailable); other values raise; default: 1
+  if unavailable); other values raise; default: 0
 
 ### Outputs:
 - **`cart`** — Combined Cartesian coordinates `(3, n, m)`; row 0 = x, row 1 = y, row 2 = z; returned when `combine` is True
@@ -3484,8 +3485,8 @@ center, length, vert, direction = quadriga_lib.RTtools.icosphere( n_div, radius,
 ```
 
 ### Inputs:
-- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
-- **`radius`** — Radius of icosphere in meters; finite and positive; default: 1
+- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces
+- **`radius`** — Radius of icosphere in meters; finite and positive
 - **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical
   azimuth/elevation (false); default: false
 
@@ -3520,7 +3521,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#mitsuba_xml_file_write) · Not in: MATLAB
 ### Usage:
 ```python
 quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, \
-    mtl_names, bsdf, map_to_itu )
+    mtl_names, bsdf, map_to_itu_materials )
 ```
 
 ### Input Arguments:
@@ -3532,7 +3533,7 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
 - **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`; default: `None`
-- **`map_to_itu`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
+- **`map_to_itu_materials`** *(optional)* — If `True`, maps material names to ITU presets recognised by Sionna RT; default: `False`
 
 ### See also:
 - [obj_file_read](#obj_file_read) (source for mesh data and BSDF field layout)
@@ -3806,17 +3807,17 @@ Also in: [C++](quadriga_lib_api_cpp.md#ray_point_intersect) · [MATLAB](quadriga
 
 ### Usage:
 ```python
-hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir,
-    points, sub_cloud_ind, use_kernel, gpu_id )
+hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
+    tridir, sub_cloud_ind, use_kernel, gpu_id )
 ```
 
 ### Inputs:
+- **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `(n_ray, 3)`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `(n_ray, 9)`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `(n_ray, 9)`
-- **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
   `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
@@ -3903,11 +3904,11 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_aabb) · [MATLAB](quadriga_
 
 ### Usage:
 ```python
-aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_ind, vec_size )
+aabb = quadriga_lib.RTtools.triangle_mesh_aabb( mesh, sub_mesh_ind, vec_size )
 ```
 
 ### Inputs:
-- **`triangles`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; further columns are ignored; `(n_triangles, 9)`
 - **`sub_mesh_ind`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB
   of the entire mesh is returned; uint32; `(n_sub,)`; default: `None`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA); default: 1
@@ -3937,15 +3938,15 @@ Also in: [C++](quadriga_lib_api_cpp.md#triangle_mesh_segmentation) · [MATLAB](q
 ### Usage:
 ```python
 # Output as tuple
-data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
+data = quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
 
 # Unpacked outputs
-triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
-    quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
+mesh_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
+    quadriga_lib.RTtools.triangle_mesh_segmentation( mesh, target_size, vec_size, mtl_ind )
 ```
 
 ### Inputs:
-- **`triangles`** — Triangle vertices, each row `[x1,y1,z1,x2,y2,z2,x3,y3,z3]`; `(n_mesh, 9)`
+- **`mesh`** — Triangle vertices, each row `[x1,y1,z1,x2,y2,z2,x3,y3,z3]`; `(n_mesh, 9)`
 - **`target_size`** — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024
 - **`vec_size`** — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count
   is rounded up to a multiple of this value; default: 1
@@ -3953,10 +3954,10 @@ triangles_out, sub_mesh_ind, mesh_ind, mtl_ind_out = \
   [obj_file_read](#obj_file_read)); `(n_mesh,)` or `None`; default: `None`
 
 ### Outputs:
-- **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
-- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
-- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_triangles_out,)`
-- **`mtl_ind_out`** — Reordered and padded material indices; `(n_triangles_out,)`; empty if `mtl_ind` is not provided
+- **`mesh_out`** — Reordered and padded triangle vertices; `(n_mesh_out, 9)`
+- **`sub_mesh_ind`** — 0-based start indices of sub-meshes in `mesh_out`; uint32; `(n_sub,)`
+- **`mesh_ind`** — 1-based row in the input mesh of each output triangle (0 = padding); uint32; `(n_mesh_out,)`
+- **`mtl_ind_out`** — Reordered and padded material indices; `(n_mesh_out,)`; empty if `mtl_ind` is not provided
 
 ---
 
@@ -4404,7 +4405,7 @@ phase = quadriga_lib.sos.init_phases( n_coeff, n_gen, seed )
 
 ### Inputs:
 - **`n_coeff`** — Number of sinusoids; `int`; must be > 0
-- **`n_gen`** — Number of generators; `int`; must be > 0; default: 1
+- **`n_gen`** — Number of generators; `int`; must be > 0
 - **`seed`** — Seed of the random stream; `int`; must be >= -1; -1 seeds from the system random
   device and gives different phases on each call; default: -1
 

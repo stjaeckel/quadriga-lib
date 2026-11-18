@@ -33,7 +33,7 @@ az, el, length = quadriga_lib.tools.fast_cart2geo( cart, y, z, combine=False )
 - **`y`** — Y-coordinates `(n, m)`; provide together with `z` for separate inputs; default: None
 - **`z`** — Z-coordinates `(n, m)`; provide together with `y`; default: None
 - **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate az, el, length arrays; default: True
-- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); other values raise; default: 1
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); other values raise; default: 0
 
 ## Outputs:
 - **`geo_coords`** — Combined geographic coordinates `(3, n, m)`; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when `combine` is True

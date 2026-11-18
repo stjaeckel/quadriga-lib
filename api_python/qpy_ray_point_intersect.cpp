@@ -24,17 +24,17 @@ Calculate intersections of ray beams with points in 3D space
 
 ## Usage:
 ```
-hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir,
-    points, sub_cloud_ind, use_kernel, gpu_id )
+hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( points, orig, trivec,
+    tridir, sub_cloud_ind, use_kernel, gpu_id )
 ```
 
 ## Inputs:
+- **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `(n_ray, 3)`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order
   `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `(n_ray, 9)`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
   order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `(n_ray, 9)`
-- **`points`** — 3D point cloud coordinates; `(n_points, 3)`
 - **`sub_cloud_ind`** *(optional)* — 0-based segment boundary indices for the point cloud
   (see `quadriga_lib.point_cloud_segmentation`); sub-clouds need not be aligned to the SIMD vector size (padding with
   `vec_size` is optional and only improves speed); uint32; `(n_sub,)`; default: `None`
@@ -56,10 +56,10 @@ hit_count, hit_ind, hit_offset = quadriga_lib.RTtools.ray_point_intersect( orig,
 - [[ray_triangle_intersect]] (for calculating intersection of rays and triangles)
 MD!*/
 
-py::tuple ray_point_intersect(const py::array_t<double> &orig,
+py::tuple ray_point_intersect(const py::array_t<double> &points,
+                              const py::array_t<double> &orig,
                               const py::array_t<double> &trivec,
                               const py::array_t<double> &tridir,
-                              const py::array_t<double> &points,
                               const py::handle &sub_cloud_ind,
                               int use_kernel,
                               int gpu_id)

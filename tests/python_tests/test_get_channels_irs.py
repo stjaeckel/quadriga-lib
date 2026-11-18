@@ -99,8 +99,8 @@ class test_case(unittest.TestCase):
         tp, to, rp, ro, ip, io = args[3:9]
         seg1, seg2 = args[9:14], args[14:19]
         irs_1 = dict(irs, coupling_re=irs["coupling_re"][:, :1], coupling_im=irs["coupling_im"][:, :1])
-        c1, d1, aod, eod, _, _ = quadriga_lib.channel.spherical(tx, irs_1, *seg1, tp, to, ip, io, 3.5e9, True, angles=True)
-        c2, d2, _, _, aoa, eoa = quadriga_lib.channel.spherical(irs_1, rx, *seg2, ip, io, rp, ro, 3.5e9, True, angles=True)
+        c1, d1, aod, eod, _, _ = quadriga_lib.channel.spherical(tx, irs_1, tp, to, ip, io, *seg1, 3.5e9, True, angles=True)
+        c2, d2, _, _, aoa, eoa = quadriga_lib.channel.spherical(irs_1, rx, ip, io, rp, ro, *seg2, 3.5e9, True, angles=True)
         shape = (2, 1, 4)
         pair_1 = lambda x: np.broadcast_to(x[:, :, :, None], (2, 1, 2, 2)).reshape(shape)
         pair_2 = lambda x: np.broadcast_to(x[:, :, None, :], (2, 1, 2, 2)).reshape(shape)

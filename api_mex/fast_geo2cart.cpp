@@ -17,11 +17,9 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 - Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
 - Optional outputs `sin_az`, `cos_az`, `sin_el`, `cos_el` return intermediate sin/cos values; omit from the
   output list to skip their computation
-- Defaults to the GENERIC kernel (`use_kernel=1`) to preserve full double precision, matching
-  MATLAB's default numeric type
-- Set `use_kernel=0` for auto-selection or `use_kernel=2` to force AVX2; the AVX2 kernel
-  computes sine and cosine in single precision (angles reduced in double precision first; max. error
-  about 1.3e-7 for angles up to 1e10), results widened back
+- The AVX2 kernel (selected by `use_kernel=0` where available, forced by `use_kernel=2`) computes sine and
+  cosine in single precision (angles reduced in double precision first; max. error about 1.3e-7 for angles up
+  to 1e10), results widened back; `use_kernel=1` keeps full double precision
 
 ## Usage:
 ```
@@ -37,7 +35,7 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 - **`el`** — Elevation angles in radians; `[n, m]`
 - **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
 - **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
-  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 1
+  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); other values throw; default: 0
 - **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
   return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
 
@@ -62,7 +60,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat az = qd_mex_get_Mat<double>(prhs[0]);
     arma::mat el = qd_mex_get_Mat<double>(prhs[1]);
     arma::mat len = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2]);
-    const int use_kernel = (nrhs < 4) ? 1 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 1);
+    const int use_kernel = (nrhs < 4) ? 0 : qd_mex_get_scalar<int>(prhs[3], "use_kernel", 0);
     const bool split = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "split", false);
 
     if (split && nlhs > 7)

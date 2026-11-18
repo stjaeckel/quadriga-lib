@@ -24,7 +24,7 @@ TEST_CASE("Write PNG")
         for (arma::uword c = 0; c < N; ++c)
             gradient(r, c) = scale * c;
 
-    quadriga_lib::write_png(gradient, "test.png");
+    quadriga_lib::write_png("test.png", gradient);
 
     REQUIRE(std::filesystem::exists("test.png"));
 
@@ -35,7 +35,7 @@ TEST_CASE("Write PNG")
 static std::vector<int> png_colour_rows(const arma::mat &data, double mi = NAN, double ma = NAN, bool lg = false)
 {
     const std::string fn = "test_png_range.png";
-    quadriga_lib::write_png<double>(data, fn, "jet", mi, ma, lg);
+    quadriga_lib::write_png<double>(fn, data, "jet", mi, ma, lg);
     std::vector<unsigned char> img;
     unsigned w = 0, h = 0;
     unsigned err = lodepng::decode(img, w, h, fn);
@@ -92,23 +92,23 @@ TEST_CASE("Write PNG - Degenerate ranges / NaN / Inf")
 
     // Errors: inverted user range, empty matrix
     std::remove("test_png_err.png");
-    CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(4, 4, arma::fill::randu), "test_png_err.png", "jet", 2.0, 1.0),
+    CHECK_THROWS_AS(quadriga_lib::write_png<double>("test_png_err.png", arma::mat(4, 4, arma::fill::randu), "jet", 2.0, 1.0),
                     std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(), "test_png_err.png"), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::write_png<double>("test_png_err.png", arma::mat()), std::invalid_argument);
     // Infinite limits throw (NaN selects the data minimum / maximum)
     for (double v : {inf, -inf})
     {
-        CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(4, 4, arma::fill::randu), "test_png_err.png", "jet", v, nan),
+        CHECK_THROWS_AS(quadriga_lib::write_png<double>("test_png_err.png", arma::mat(4, 4, arma::fill::randu), "jet", v, nan),
                         std::invalid_argument);
-        CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(4, 4, arma::fill::randu), "test_png_err.png", "jet", nan, v),
+        CHECK_THROWS_AS(quadriga_lib::write_png<double>("test_png_err.png", arma::mat(4, 4, arma::fill::randu), "jet", nan, v),
                         std::invalid_argument);
     }
-    CHECK_THROWS_AS(quadriga_lib::write_png<double>(arma::mat(0, 5), "test_png_err.png"), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::write_png<double>("test_png_err.png", arma::mat(0, 5)), std::invalid_argument);
     CHECK_FALSE(std::filesystem::exists("test_png_err.png"));
 
     // Float input takes the same path
     arma::fmat df = {{1.0f, 1.0f}};
-    quadriga_lib::write_png<float>(df, "test_png_f.png");
+    quadriga_lib::write_png<float>("test_png_f.png", df);
     std::vector<unsigned char> img;
     unsigned w = 0, h = 0;
     REQUIRE(lodepng::decode(img, w, h, "test_png_f.png") == 0);

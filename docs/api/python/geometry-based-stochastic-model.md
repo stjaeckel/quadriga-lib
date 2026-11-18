@@ -472,7 +472,7 @@ Also in: [C++](../cpp/geometry-based-stochastic-model.md#gbsm_single_link_channe
 ```python
 chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, link_gain_dB, mobility, \
     output, i_freq, tx_pos, rx_pos, tx_orientation, rx_orientation, kf_ratio, oxygen, \
-    use_absolute_delays, stack )
+    use_absolute_delays, stack=False )
 ```
 
 ### Inputs:
@@ -493,7 +493,7 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays (`"phase"`: of the ray-data positions); default:
   `False`
-- **`stack`** — Snapshot layout of `chan` as in [hdf5_read_channel](channel-functions.md#hdf5_read_channel); default: `False`
+- **`stack`** — Keyword-only; snapshot layout of `chan` as in [hdf5_read_channel](channel-functions.md#hdf5_read_channel); default: `False`
 
 ### Outputs:
 - **`chan`** — Channel dict, layout as documented in [hdf5_read_channel](channel-functions.md#hdf5_read_channel): `center_freq` `(1,)`;
@@ -634,7 +634,7 @@ lsp, abs_toa, gr_eps_re, gr_eps_im, eod_offset_deg, lsp_mu, \
   XPR last); `False`: symmetric square root (legacy QuaDRiGa); default: True
 - **`clip_spreads`** — `True`: limit ASD and ASA to 104 deg, ESD and ESA to 52 deg (TR 38.901 clause 7.5 step 4);
   `lsp_mu` and `lsp_sigma` are not affected; default: True
-- **`complex`** — See the description; default: True
+- **`complex`** — Keyword-only; see the description; default: True
 
 ### Outputs:
 - **`lsp`** — Large-scale parameters; slices: 0 DS in s; 1 KF, 2 SF and 7 XPR linear; 3 ASD, 4 ASA, 5 ESD, 6 ESA in

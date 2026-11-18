@@ -55,5 +55,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const bool log_transform = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "log_transform", false);
 
     // Call library function
-    CALL_QD(quadriga_lib::write_png<double>(data, fn, colormap, min_val, max_val, log_transform));
+    CALL_QD(quadriga_lib::write_png<double>(fn, data, colormap, min_val, max_val, log_transform));
 }

@@ -1,26 +1,30 @@
 function test_icospere
 
-quadriga_lib.icosphere;
+quadriga_lib.icosphere(1, 1);
 
-center = quadriga_lib.icosphere;
+center = quadriga_lib.icosphere(1, 1);
 assertEqual( size(center), [20,3] );
 
-center2 = quadriga_lib.icosphere([],2);
+% n_div and radius are mandatory, as in C++
+assert_cpp_error( @() quadriga_lib.icosphere(), 'Wrong number of input arguments.' );
+assert_cpp_error( @() quadriga_lib.icosphere(1), 'Wrong number of input arguments.' );
+
+center2 = quadriga_lib.icosphere(1,2);
 assertElementsAlmostEqual( 2*center, center2, 'absolute', 1e-14 );
 
 [center, length] = quadriga_lib.icosphere(1,3);
 assertElementsAlmostEqual( sqrt(sum(center.^2,2)), length, 'absolute', 1e-14 );
 
-[center, ~, vert] = quadriga_lib.icosphere(2);
+[center, ~, vert] = quadriga_lib.icosphere(2, 1);
 assertElementsAlmostEqual( sum((center + vert(:,1:3)).^2,2), ones(80,1), 'absolute', 1e-14 );
 assertElementsAlmostEqual( sum((center + vert(:,4:6)).^2,2), ones(80,1), 'absolute', 1e-14 );
 assertElementsAlmostEqual( sum((center + vert(:,7:9)).^2,2), ones(80,1), 'absolute', 1e-14 );
 
-[~, ~, ~, dir] = quadriga_lib.icosphere(2);
+[~, ~, ~, dir] = quadriga_lib.icosphere(2, 1);
 assertTrue( all(all(abs(dir(:,[1,3,5]) )<=pi)) );
 assertTrue( all(all(abs(dir(:,[2,4,6]) )<=pi/2)) );
 
-[~, ~, ~, dir] = quadriga_lib.icosphere(2, [], 1);
+[~, ~, ~, dir] = quadriga_lib.icosphere(2, 1, 1);
 
 assertTrue( all(sum(dir(:,1:3).^2,2) - 1 < 1e-14));
 assertTrue( all(sum(dir(:,4:6).^2,2) - 1 < 1e-14));
@@ -28,7 +32,7 @@ assertTrue( all(sum(dir(:,7:9).^2,2) - 1 < 1e-14));
 
 
 try % 4 imputs
-    [~,~,~,~,~] = quadriga_lib.icosphere;
+    [~,~,~,~,~] = quadriga_lib.icosphere(1, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -48,23 +52,23 @@ catch ME
 end
 
 %% Integer inputs must be integers in the range of the C++ type
-assert_cpp_error( @() quadriga_lib.icosphere( -1 ), 'Input ''n_div'' must be an integer from 0 to 18446744073709551615.' );
-assert_cpp_error( @() quadriga_lib.icosphere( NaN ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( 2.5 ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( Inf ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( 1e30 ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( int32(-1) ), 'Input ''n_div'' must be an integer from 0 to' );
-assert_cpp_error( @() quadriga_lib.icosphere( sparse(2) ), 'Input ''n_div'' is sparse' );
-center = quadriga_lib.icosphere( 2.0 );                                    % integer-valued double is fine
+assert_cpp_error( @() quadriga_lib.icosphere( -1, 1 ), 'Input ''n_div'' must be an integer from 0 to 18446744073709551615.' );
+assert_cpp_error( @() quadriga_lib.icosphere( NaN, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( 2.5, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( Inf, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( 1e30, 1 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( int32(-1), 1 ), 'Input ''n_div'' must be an integer from 0 to' );
+assert_cpp_error( @() quadriga_lib.icosphere( sparse(2), 1 ), 'Input ''n_div'' is sparse' );
+center = quadriga_lib.icosphere( 2.0, 1 );                                    % integer-valued double is fine
 assertEqual( size(center), [80,3] );
-center = quadriga_lib.icosphere( uint64(2) );
+center = quadriga_lib.icosphere( uint64(2), 1 );
 assertEqual( size(center), [80,3] );
 
 % The radius must be finite and positive; n_div must not overflow the output size
 assert_cpp_error( @() quadriga_lib.icosphere( 1, 0 ), 'Input ''radius'' must be a finite positive number.' );
 assert_cpp_error( @() quadriga_lib.icosphere( 1, NaN ), 'Input ''radius'' must be a finite positive number.' );
 assert_cpp_error( @() quadriga_lib.icosphere( 1, Inf ), 'Input ''radius'' must be a finite positive number.' );
-assert_cpp_error( @() quadriga_lib.icosphere( 2^32 ), 'Input ''n_div'' is too large.' );
+assert_cpp_error( @() quadriga_lib.icosphere( 2^32, 1 ), 'Input ''n_div'' is too large.' );
 % Checked before the outputs are allocated: 20 * n_div^2 wraps to a huge but representable count for 2^31 + 1
 assert_cpp_error( @() icosphere4( 2^31 + 1 ), 'Input ''n_div'' is too large.' );
 assert_cpp_error( @() icosphere4( 2^30 ), 'Input ''n_div'' is too large.' );
@@ -72,7 +76,7 @@ end
 
 % Request all 4 outputs, so that the wrapper allocates them (an anonymous function requests none)
 function icosphere4(n_div)
-[~, ~, ~, ~] = quadriga_lib.icosphere( n_div );
+[~, ~, ~, ~] = quadriga_lib.icosphere( n_div, 1 );
 end
 
 % Assert that fn() raises quadriga_lib:CPPerror with a message that contains expected (substring).

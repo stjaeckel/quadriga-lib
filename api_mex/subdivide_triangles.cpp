@@ -20,35 +20,35 @@ Subdivide triangles into smaller triangles
 
 ## Usage:
 ```
-[ triangles_out, mtl_ind_out ] = quadriga_lib.subdivide_triangles( triangles_in, n_div, mtl_ind_in );
+[ triangles_out, mtl_ind_out ] = quadriga_lib.subdivide_triangles( n_div, triangles_in, mtl_ind );
 ```
 
 ## Inputs:
-- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
 - **`n_div`** — Number of subdivisions per edge
-- **`mtl_ind_in`** — 1-based material index per triangle (the `csv_ind` output of [[obj_file_read]]);
+- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
+- **`mtl_ind`** — 1-based material index per triangle (the `csv_ind` output of [[obj_file_read]]);
   0 = no material; `[n_triangles_in]`; passed through unchanged; default: `[]`
 
 ## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
 - **`mtl_ind_out`** — Material indices for the subdivided triangles, 1-based; uint64; `[n_triangles_out]`; only
-  populated if `mtl_ind_in` is given
+  populated if `mtl_ind` is given
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs < 1 || nrhs > 3)
+    if (nrhs < 2 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    const arma::mat triangles_in = qd_mex_get_Mat<double>(prhs[0]);
-    const arma::uword n_div = (nrhs < 2) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[1], "n_div", 1);
+    const arma::mat triangles_in = qd_mex_get_Mat<double>(prhs[1]);
+    const arma::uword n_div = qd_mex_get_scalar<arma::uword>(prhs[0], "n_div", 0);
 
     // Material index: 1-based in C++ as well (0 = no material), no shift intended
-    const arma::uvec mtl_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], false, "mtl_ind_in");
+    const arma::uvec mtl_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], false, "mtl_ind");
 
     // Compute output sizes; the output (n_triangles_in * n_div^2 rows, 9 values each) must fit into 64 bits,
     // checked before the outputs are allocated (same check and message as in C++)

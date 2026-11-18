@@ -131,9 +131,10 @@ assertElementsAlmostEqual( az1, az2, 'absolute', 1e-5 );
 assertElementsAlmostEqual( el1, el2, 'absolute', 1e-5 );
 assertElementsAlmostEqual( le1, le2, 'absolute', 1e-5 );
 
-% use_kernel=[] falls back to default (1)
+% use_kernel=[] and an omitted use_kernel fall back to the default (0, auto)
 [az3,el3,le3] = quadriga_lib.fast_cart2geo(e, [], [], []);
-assertElementsAlmostEqual( az1, az3, 'absolute', 1e-5 );
+assertEqual( az3, az1 );
+assertEqual( quadriga_lib.fast_cart2geo(e), az1 );
 
 % Kernel values outside 0, 1, 2 are rejected (they used to run the auto kernel silently)
 for k = [3, 99]
