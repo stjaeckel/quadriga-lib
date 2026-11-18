@@ -224,7 +224,7 @@ namespace
     void hits(Cfg &C, const Scene &S)
     {
         arma::u32_vec ni, si;
-        quadriga_lib::ray_triangle_intersect<float>(&C.orig, &C.dest, &S.mesh, nullptr, nullptr,
+        quadriga_lib::ray_triangle_intersect<float>(C.orig, C.dest, S.mesh, nullptr, nullptr,
                                                     &ni, &C.fbs_ind, &si, nullptr, nullptr);
     }
 
@@ -808,7 +808,7 @@ TEST_CASE("ray_commit - point_ind agrees with point_cloud_segmentation")
 
     arma::fmat PR;
     arma::u32_vec sci, fwd;
-    quadriga_lib::point_cloud_segmentation<float>(&P0, &PR, &sci, 8, 8, &fwd);
+    quadriga_lib::point_cloud_segmentation<float>(P0, PR, sci, 8, 8, &fwd);
 
     // The scenario is only meaningful when alignment padding was actually inserted
     REQUIRE(PR.n_rows > n_pt);
@@ -843,7 +843,7 @@ TEST_CASE("ray_commit - padding is committed when point_ind is omitted")
 
     arma::fmat PR;
     arma::u32_vec sci, fwd;
-    quadriga_lib::point_cloud_segmentation<float>(&P0, &PR, &sci, 8, 8, &fwd);
+    quadriga_lib::point_cloud_segmentation<float>(P0, PR, sci, 8, 8, &fwd);
     REQUIRE(PR.n_rows > n_pt);
 
     Opt with_map, without_map;

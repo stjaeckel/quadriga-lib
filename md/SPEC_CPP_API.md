@@ -89,7 +89,7 @@ The conventions a declaration follows, for writing one in the plan or the spec a
   - **Mandatory** inputs and outputs (and in-place updated data) are passed by **reference**: `const arma::Mat<dtype> &input`, `arma::Mat<dtype> &output`. No `nullptr` check is needed or possible.
   - **Optional** inputs and outputs are passed by **pointer**, default-initialized to `nullptr`: `const arma::Mat<dtype> *input = nullptr`, `arma::Mat<dtype> *output = nullptr`. A `nullptr` input means "not provided"; a `nullptr` output is not allocated and not computed.
   - Strings and Armadillo containers are never passed by value: `const &` when mandatory, a pointer when optional. A string option with a literal default stays a reference (`const std::string &colormap = "jet"`). `std::string_view` is not used for arguments of public functions.
-  - Many existing declarations (most of `quadriga_tools.hpp`) pass mandatory arguments by pointer as well. That is the older style: follow an existing declaration as it is, but declare the mandatory arguments of a *new* function by reference.
+  - `ray_mesh_interact` and `ray_state_update` still pass mandatory arguments by pointer (older style, kept until the planned engine rework). Declare the mandatory arguments of every other function, new or changed, by reference.
 - Results are returned through output arguments; a computed array is never returned. The return value is used for an object from a reader, generator or factory (`arrayant`, `channel`, a mesh, a colormap, a path list), a count, status or read object (also next to output arguments), or a single computed scalar, and is documented under "Returns". See the glossary entry "Results".
 - Default values exist only in the header, never in the definition.
 - Functions that are not templates use fixed types (e.g. the `float`-only ray-tracing pipeline).
@@ -158,9 +158,8 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
   - `"Input 'mesh' must have 9 columns."`
   - `"Input 'dest' must have size [n_ray, 3]."`
   - `"Number of elements in 'fbs_ind' does not match number of rows in 'orig'."`
-  - `"Output 'center' cannot be NULL."`
 - A message that refers to one entry of a vector input (an arrayant of a multi-frequency vector, a snapshot) starts with the prefix `"Entry <i>: "`, for snapshots `"Snapshot <i>: "`, with the 0-based index, e.g. `"Entry 2: Number of elements (4) does not match the first entry (2)."`. This is the only form in which a message names an index: not `'coeff_re[3]'`, `"element 3 of 'az'"` or `"at index 3"`, and no index value in the text (`"the first entry"`, `"contains indices that exceed the number of elements"`). The MEX wrappers rewrite the prefixes to 1-based, so the message is right in all three languages. A message wrapping another keeps its prefix: `"Input 'arrayant_vec' is not valid: Entry 2: ..."`. The rule is for messages of the C++ library; a message a wrapper writes itself states its indices in the base of its language (1-based in MATLAB, 0-based in Python).
-- Check in this order per argument: not empty, shape, value range; then the consistency between arguments. Mandatory arguments passed by reference need no null check; a mandatory argument that an existing declaration passes by pointer is checked for `nullptr` first.
+- Check in this order per argument: not empty, shape, value range; then the consistency between arguments. Mandatory arguments passed by reference need no null check; the mandatory pointer arguments of `ray_mesh_interact` and `ray_state_update` are checked for `nullptr` first.
 - Validation must reject input that would otherwise cause undefined behavior (out-of-bounds indices into the mesh or the material table, zero where a division follows). Do not validate what is cheap to tolerate and expensive to check, unless the contract asks for it.
 - Parameters that are unused in a build configuration are silenced with `(void)name;` inside the matching `#if`.
 

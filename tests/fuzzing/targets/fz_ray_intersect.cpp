@@ -66,7 +66,7 @@ static void run(fz::input &in)
     if (in.ConsumeBool())
     {
         arma::Mat<T> center;
-        fz::clean([&] { quadriga_lib::icosphere<T>(in.ConsumeIntegralInRange<arma::uword>(1, 2), T(1), &center, nullptr, &trivec, &tridir, true); });
+        fz::clean([&] { quadriga_lib::icosphere<T>(in.ConsumeIntegralInRange<arma::uword>(1, 2), T(1), center, nullptr, &trivec, &tridir, true); });
         n_ray = center.n_rows;
         orig = center;
         for (arma::uword c = 0; c < 3 && n_ray != 0; ++c)
@@ -96,7 +96,7 @@ static void run(fz::input &in)
     if (smi_mode == 2)
         fz::clean([&]
                   { arma::Mat<T> meshR;
-                    quadriga_lib::triangle_mesh_segmentation<T>(&mesh, &meshR, &sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
+                    quadriga_lib::triangle_mesh_segmentation<T>(mesh, meshR, sub_mesh_ind, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
                     mesh = meshR; });
     if (aabb_mode == 1)
         aabb = geo<T>(in, near(in, std::max(sub_mesh_ind.n_elem, (arma::uword)1)), near(in, 6));
@@ -123,7 +123,7 @@ static void run(fz::input &in)
     }
     const bool all = in.ConsumeBool();
     fz::clean([&]
-              { quadriga_lib::ray_triangle_intersect<T>(&orig_copy, &dest_copy, &mesh, fbs, sbs, all ? &n_interact : nullptr,
+              { quadriga_lib::ray_triangle_intersect<T>(orig_copy, dest_copy, mesh, fbs, sbs, all ? &n_interact : nullptr,
                                                         all ? &fbs_ind : nullptr, &sbs_ind, smi_mode ? &sub_mesh_ind : nullptr,
                                                         aabb_mode ? &aabb : nullptr, kernel); });
 
@@ -136,7 +136,7 @@ static void run(fz::input &in)
     if (sci_mode == 2)
         fz::clean([&]
                   { arma::Mat<T> pointsR;
-                    quadriga_lib::point_cloud_segmentation<T>(&points, &pointsR, &sub_cloud_ind, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
+                    quadriga_lib::point_cloud_segmentation<T>(points, pointsR, sub_cloud_ind, in.ConsumeIntegralInRange<arma::uword>(1, 16), in.ConsumeIntegralInRange<arma::uword>(1, 8));
                     points = pointsR; });
 
     std::vector<unsigned> hit_ind(in.size(3));

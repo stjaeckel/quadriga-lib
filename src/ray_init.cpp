@@ -199,7 +199,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
             // Make a small icosphere
             arma::fmat orig_tmp, intersect_tmp;
             arma::fvec length_tmp;
-            arma::uword n_rays_test = quadriga_lib::icosphere<float>(12, 0.01f, &orig_tmp, &length_tmp);
+            arma::uword n_rays_test = quadriga_lib::icosphere<float>(12, 0.01f, orig_tmp, &length_tmp);
 
             // Test origin and destinations
             arma::fmat dest_tmp(n_rays_test, 3, arma::fill::none);
@@ -217,7 +217,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
             }
 
             // Get intersect coordinates
-            quadriga_lib::ray_triangle_intersect<float>(&orig_tmp, &dest_tmp, mesh, &intersect_tmp, nullptr, nullptr, nullptr, nullptr, sub_mesh_ptr, aabb_ptr);
+            quadriga_lib::ray_triangle_intersect<float>(orig_tmp, dest_tmp, *mesh, &intersect_tmp, nullptr, nullptr, nullptr, nullptr, sub_mesh_ptr, aabb_ptr);
 
             // Nearest obstacle along the probe sphere
             float *p_intersect = intersect_tmp.memptr();
@@ -269,7 +269,7 @@ arma::uword quadriga_lib::ray_init(arma::uword n_ray_target,
     // Generate rays
     arma::fmat orig_local, dest_local;
     arma::fvec orig_length_local;
-    quadriga_lib::icosphere<float>(n_div, r0, &orig_local, &orig_length_local, trivec, tridir, true);
+    quadriga_lib::icosphere<float>(n_div, r0, orig_local, &orig_length_local, trivec, tridir, true);
     const float *p_orig_local = orig_local.memptr(), *p_length_local = orig_length_local.memptr();
 
     bool has_orig = orig != nullptr;

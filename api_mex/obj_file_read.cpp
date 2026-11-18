@@ -68,13 +68,13 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs > 3)
+    if (nrhs < 1 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    const std::string fn = (nrhs < 1) ? "" : qd_mex_get_string(prhs[0], "", "fn");
+    const std::string fn = qd_mex_get_string(prhs[0], "", "fn");
     const std::string fn_csv = (nrhs < 2) ? "" : qd_mex_get_string(prhs[1], "", "fn_csv");
     const bool csv_strict = (nrhs < 3) ? false : qd_mex_get_scalar<bool>(prhs[2], "csv_strict", false);
 

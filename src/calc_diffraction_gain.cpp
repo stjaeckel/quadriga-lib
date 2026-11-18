@@ -349,7 +349,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
 
             // Calculate interaction points of rays and 3D mesh
             arma::Col<unsigned> n_interact, fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect<dtype>(&s_orig, &s_dest, &mesh, nullptr, nullptr,
+            quadriga_lib::ray_triangle_intersect<dtype>(s_orig, s_dest, mesh, nullptr, nullptr,
                                                         &n_interact, &fbs_ind, &sbs_ind,
                                                         sub_mesh_ind, &aabb, use_kernel, gpu_id);
 

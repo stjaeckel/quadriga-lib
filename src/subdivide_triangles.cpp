@@ -23,8 +23,8 @@ Subdivide triangles into smaller triangles
 ```
 arma::uword quadriga_lib::subdivide_triangles(
     arma::uword n_div,
-    const arma::Mat<dtype> *triangles_in,
-    arma::Mat<dtype> *triangles_out,
+    const arma::Mat<dtype> &triangles_in,
+    arma::Mat<dtype> &triangles_out,
     const arma::uvec *mtl_ind = nullptr,
     arma::uvec *mtl_ind_out = nullptr);
 ```
@@ -45,26 +45,24 @@ MD!*/
 // Subdivide triangles into smaller triangles
 template <typename dtype>
 arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
-                                              const arma::Mat<dtype> *triangles_in,
-                                              arma::Mat<dtype> *triangles_out,
+                                              const arma::Mat<dtype> &triangles_in,
+                                              arma::Mat<dtype> &triangles_out,
                                               const arma::uvec *mtl_ind,
                                               arma::uvec *mtl_ind_out)
 {
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
 
-    if (triangles_in == nullptr || triangles_in->n_elem == 0)
-        throw std::invalid_argument("Input 'triangles_in' cannot be NULL.");
+    if (triangles_in.n_elem == 0)
+        throw std::invalid_argument("Input 'triangles_in' cannot be empty.");
 
-    if (triangles_in->n_cols != 9)
+    if (triangles_in.n_cols != 9)
         throw std::invalid_argument("Input 'triangles_in' must have 9 columns.");
 
-    if (triangles_out == nullptr)
-        throw std::invalid_argument("Output 'triangles_out' cannot be NULL.");
-    qd_check_alias(triangles_out, "triangles_out", triangles_in);
+    qd_check_alias(&triangles_out, "triangles_out", &triangles_in);
     qd_check_alias(mtl_ind_out, "mtl_ind_out", mtl_ind);
 
-    arma::uword n_triangles_in = (arma::uword)triangles_in->n_rows;
+    arma::uword n_triangles_in = (arma::uword)triangles_in.n_rows;
 
     // The number of output values, n_triangles_in * n_div^2 * 9, must fit into 64 bits
     const arma::uword uword_max = std::numeric_limits<arma::uword>::max();
@@ -78,8 +76,8 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
     if (process_mtl_ind && mtl_ind->n_elem != n_triangles_in)
         throw std::invalid_argument("Number of triangles in 'triangles_in' and length of 'mtl_ind' do not match.");
 
-    if (triangles_out->n_cols != 9 || triangles_out->n_rows != n_triangles_out)
-        triangles_out->set_size(n_triangles_out, 9);
+    if (triangles_out.n_cols != 9 || triangles_out.n_rows != n_triangles_out)
+        triangles_out.set_size(n_triangles_out, 9);
 
     if (process_mtl_ind && mtl_ind_out->n_elem != n_triangles_out)
         mtl_ind_out->set_size(n_triangles_out);
@@ -87,8 +85,8 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
     // Process each triangle
     arma::uword cnt = 0;                                  // Counter
     dtype stp = dtype(1.0) / dtype(n_div);                // Step size
-    const dtype *p_triangles_in = triangles_in->memptr(); // Pointer to input memory
-    dtype *p_triangles_out = triangles_out->memptr();     // Pointer to output memory
+    const dtype *p_triangles_in = triangles_in.memptr();  // Pointer to input memory
+    dtype *p_triangles_out = triangles_out.memptr();      // Pointer to output memory
     const arma::uword *p_mtl_ind = process_mtl_ind ? mtl_ind->memptr() : nullptr;
     arma::uword *p_mtl_ind_out = process_mtl_ind ? mtl_ind_out->memptr() : nullptr;
 
@@ -170,8 +168,8 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
     return n_triangles_out;
 }
 
-template arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<float> *triangles_in, arma::Mat<float> *triangles_out,
+template arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<float> &triangles_in, arma::Mat<float> &triangles_out,
                                                        const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out);
 
-template arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<double> *triangles_in, arma::Mat<double> *triangles_out,
+template arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<double> &triangles_in, arma::Mat<double> &triangles_out,
                                                        const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out);

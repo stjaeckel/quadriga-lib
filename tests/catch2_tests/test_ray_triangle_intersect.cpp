@@ -28,7 +28,7 @@ TEST_CASE("Ray-Triangle Intersect - Simple Mode")
     arma::mat fbs, sbs;
     arma::u32_vec n_interact, fbs_ind, sbs_ind;
 
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
 
     arma::mat T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
@@ -59,13 +59,13 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
 
     // Subdivide the mesh into smaller chunks
     arma::mat cube_sub = cube;
-    quadriga_lib::subdivide_triangles(3, &cube, &cube_sub);
+    quadriga_lib::subdivide_triangles(3, cube, cube_sub);
 
     // Build sub-meshes
     arma::mat cube_re;
     arma::u32_vec cube_index;
 
-    auto n_sub = quadriga_lib::triangle_mesh_segmentation(&cube_sub, &cube_re, &cube_index, 64, 8);
+    auto n_sub = quadriga_lib::triangle_mesh_segmentation(cube_sub, cube_re, cube_index, 64, 8);
     CHECK(n_sub == 3);
 
     // Single ray
@@ -76,7 +76,7 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
     arma::u32_vec n_interact, fbs_ind, sbs_ind;
 
     // Run intersect algorithm without sub-mesh
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
 
     // Check results
     arma::mat T = {{0.9, -1.0, 0.5}};
@@ -89,7 +89,7 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
     unsigned sbs_0 = sbs_ind.at(0);
     
     // Run intersect algorithm with sub-mesh
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, &cube_index);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube_re, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, &cube_index);
 
     // Check results
     T = {{0.9, -1.0, 0.5}};
@@ -114,20 +114,20 @@ TEST_CASE("Ray-Triangle Intersect - Invalid use_kernel")
     for (int k : {7, -1, 4})
     {
         INFO("use_kernel = " << k);
-        CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, nullptr, nullptr, nullptr, &fbs_ind,
+        CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, nullptr, nullptr, nullptr, &fbs_ind,
                                                                      nullptr, nullptr, nullptr, k),
                         std::invalid_argument);
     }
 
     // 2 = AVX2 throws when AVX2 is not available
     if (!quadriga_lib::quadriga_lib_has_AVX2())
-        CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, nullptr, nullptr, nullptr, &fbs_ind,
+        CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, nullptr, nullptr, nullptr, &fbs_ind,
                                                                      nullptr, nullptr, nullptr, 2),
                         std::invalid_argument);
 
     for (int k : {0, 1})
     {
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, nullptr, nullptr, nullptr, &fbs_ind,
+        quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, nullptr, nullptr, nullptr, &fbs_ind,
                                                      nullptr, nullptr, nullptr, k);
         CHECK(fbs_ind.at(0) == 1);
     }
@@ -165,7 +165,7 @@ static void rti_equal_distance_hits()
 
         // Through the shared edge and through the shared vertex: the lower index is the FBS
         arma::Mat<dtype> orig = {{0.5, 0.5, 1}, {0, 0, 1}, {1, 1, 1}}, dest = {{0.5, 0.5, -1}, {0, 0, -1}, {1, 1, -1}};
-        quadriga_lib::ray_triangle_intersect<dtype>(&orig, &dest, &square, nullptr, nullptr, &no, &fi, &si,
+        quadriga_lib::ray_triangle_intersect<dtype>(orig, dest, square, nullptr, nullptr, &no, &fi, &si,
                                                     nullptr, nullptr, kernel);
         for (arma::uword r = 0; r < 3; ++r)
         {
@@ -177,7 +177,7 @@ static void rti_equal_distance_hits()
         // Six hits at the same distance: FBS and SBS are the two lowest indices
         orig = {{0, 0, 1}}, dest = {{0, 0, -1}};
         arma::Mat<dtype> fbs, sbs;
-        quadriga_lib::ray_triangle_intersect<dtype>(&orig, &dest, &fan, &fbs, &sbs, &no, &fi, &si, nullptr, nullptr, kernel);
+        quadriga_lib::ray_triangle_intersect<dtype>(orig, dest, fan, &fbs, &sbs, &no, &fi, &si, nullptr, nullptr, kernel);
         CHECK(no(0) == 6);
         CHECK(fi(0) == 3);
         CHECK(si(0) == 6);
@@ -209,9 +209,9 @@ TEST_CASE("Ray-Triangle Intersect - Rays in a plane of the bounding box")
             const arma::mat &mesh = (c == 1) ? wall_y : wall_z;
             const arma::mat &d = (c == 2) ? dest_m0 : dest;
             arma::u32_vec f1, f2;
-            quadriga_lib::ray_triangle_intersect<double>(&orig, &d, &mesh, nullptr, nullptr, nullptr, &f1, nullptr,
+            quadriga_lib::ray_triangle_intersect<double>(orig, d, mesh, nullptr, nullptr, nullptr, &f1, nullptr,
                                                          nullptr, nullptr, kernel);
-            quadriga_lib::ray_triangle_intersect<double>(&orig, &d, &mesh, nullptr, nullptr, nullptr, &f2, nullptr,
+            quadriga_lib::ray_triangle_intersect<double>(orig, d, mesh, nullptr, nullptr, nullptr, &f2, nullptr,
                                                          nullptr, &big, kernel);
             CHECK(f1(0) == 1);
             CHECK(f2(0) == 1);
@@ -219,7 +219,7 @@ TEST_CASE("Ray-Triangle Intersect - Rays in a plane of the bounding box")
             // Float input, computed AABB
             arma::fmat orig_f = arma::conv_to<arma::fmat>::from(orig), d_f = arma::conv_to<arma::fmat>::from(d);
             arma::fmat mesh_f = arma::conv_to<arma::fmat>::from(mesh);
-            quadriga_lib::ray_triangle_intersect<float>(&orig_f, &d_f, &mesh_f, nullptr, nullptr, nullptr, &f1, nullptr,
+            quadriga_lib::ray_triangle_intersect<float>(orig_f, d_f, mesh_f, nullptr, nullptr, nullptr, &f1, nullptr,
                                                         nullptr, nullptr, kernel);
             CHECK(f1(0) == 1);
         }
@@ -253,8 +253,8 @@ TEST_CASE("Ray-Triangle Intersect - Double input far from the origin")
         }
         arma::mat fbs1, fbs2;
         arma::u32_vec fi1, fi2;
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, &fbs1, nullptr, nullptr, &fi1, nullptr, nullptr, nullptr, 1);
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, &fbs2, nullptr, nullptr, &fi2, nullptr, nullptr, nullptr, 2);
+        quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, &fbs1, nullptr, nullptr, &fi1, nullptr, nullptr, nullptr, 1);
+        quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, &fbs2, nullptr, nullptr, &fi2, nullptr, nullptr, nullptr, 2);
         for (arma::uword i = 0; i < 2000; ++i)
         {
             if (fi1(i) == 0 || fi2(i) == 0) // Rays at a face boundary may differ, the hit position is checked
@@ -280,20 +280,20 @@ TEST_CASE("ray_triangle_intersect - outputs that alias inputs")
     const arma::mat o0 = {{0, 0, 1}}, d0 = {{0, 0, -2}};
     arma::mat o = o0, d = d0, f, s;
     arma::u32_vec ni, fi, si, smi = {0};
-    CHECK_NOTHROW(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &s, &ni, &fi, &si, &smi));
+    CHECK_NOTHROW(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &f, &s, &ni, &fi, &si, &smi));
 
     // Advancing rays in place is rejected, the inputs stay unchanged
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &o, &s), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &d), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &d, &o), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &f), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &s, &ni, &ni), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &f, &s, &ni, &fi, &si, &si), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &o, &s), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &f, &d), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &d, &o), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &f, &f), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &f, &s, &ni, &ni), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &f, &s, &ni, &fi, &si, &si), std::invalid_argument);
     CHECK(arma::approx_equal(o, o0, "absdiff", 0.0));
     CHECK(arma::approx_equal(d, d0, "absdiff", 0.0));
 
     arma::mat view(mesh.memptr(), 1, 3, false, true);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&o, &d, &mesh, &view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(o, d, mesh, &view), std::invalid_argument);
 }
 
 TEST_CASE("Ray-Triangle Intersect - Mesh with extra columns and row count of dest")
@@ -312,11 +312,11 @@ TEST_CASE("Ray-Triangle Intersect - Mesh with extra columns and row count of des
         INFO("kernel " << kernel);
         arma::mat fbs9, sbs9, fbs10, sbs10;
         arma::u32_vec no9, fi9, si9, no10, fi10, si10;
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh9, &fbs9, &sbs9, &no9, &fi9, &si9, nullptr, nullptr, kernel);
+        quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh9, &fbs9, &sbs9, &no9, &fi9, &si9, nullptr, nullptr, kernel);
         CHECK(no9.at(0) == 2);
         CHECK(no9.at(1) == 0);
 
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh10, &fbs10, &sbs10, &no10, &fi10, &si10, nullptr, nullptr, kernel);
+        quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh10, &fbs10, &sbs10, &no10, &fi10, &si10, nullptr, nullptr, kernel);
         CHECK(arma::approx_equal(fbs10, fbs9, "absdiff", 0.0));
         CHECK(arma::approx_equal(sbs10, sbs9, "absdiff", 0.0));
         CHECK(arma::all(no10 == no9));
@@ -327,16 +327,16 @@ TEST_CASE("Ray-Triangle Intersect - Mesh with extra columns and row count of des
         quadriga_lib::triangle_mesh_aabb(mesh10, aabb);
         quadriga_lib::triangle_mesh_aabb(mesh9, aabb9);
         CHECK(arma::approx_equal(aabb, aabb9, "absdiff", 0.0));
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh10, &fbs10, &sbs10, &no10, &fi10, &si10, nullptr, &aabb, kernel);
+        quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh10, &fbs10, &sbs10, &no10, &fi10, &si10, nullptr, &aabb, kernel);
         CHECK(arma::all(fi10 == fi9));
     }
 
     arma::mat mesh8 = mesh9.cols(0, 7);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh8), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh8), std::invalid_argument);
     arma::mat aabb8;
     CHECK_THROWS_AS(quadriga_lib::triangle_mesh_aabb(mesh8, aabb8), std::invalid_argument);
 
     arma::mat dest3 = arma::join_cols(dest, dest.row(0)), dest1 = dest.row(0);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest3, &mesh9), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest1, &mesh9), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(orig, dest3, mesh9), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::ray_triangle_intersect<double>(orig, dest1, mesh9), std::invalid_argument);
 }

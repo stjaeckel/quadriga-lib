@@ -62,7 +62,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::u32_vec *p_reverse_index = (nlhs > 3) ? &reverse_ind : nullptr;
 
     // Call library function
-    CALL_QD(quadriga_lib::point_cloud_segmentation<double>(&points, &points_out, &sub_cloud_ind,
+    CALL_QD(quadriga_lib::point_cloud_segmentation<double>(points, points_out, sub_cloud_ind,
                                                            target_size, vec_size,
                                                            p_forward_index, p_reverse_index));
 

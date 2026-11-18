@@ -107,7 +107,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_aabb = aabb.empty() ? nullptr : &aabb;
 
     // Call library function
-    CALL_QD(quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &mesh, p_fbs, p_sbs,
+    CALL_QD(quadriga_lib::ray_triangle_intersect<double>(orig, dest, mesh, p_fbs, p_sbs,
                                                          p_no_interact, p_fbs_ind, p_sbs_ind,
                                                          p_sub_mesh_index, p_aabb, use_kernel, gpu_id));
 }

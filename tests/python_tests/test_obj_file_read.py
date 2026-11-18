@@ -264,6 +264,13 @@ class test_case(unittest.TestCase):
             quadriga_lib.RTtools.obj_file_read("bla.obj")
         self.assertIn("'bla.obj' does not exist", str(context.exception))
 
+        # The file name is mandatory; an empty name reads only the material table
+        with self.assertRaises(TypeError):
+            quadriga_lib.RTtools.obj_file_read()
+        mesh_e, *_, csv_names_e, _ = quadriga_lib.RTtools.obj_file_read("")
+        self.assertEqual(mesh_e.size, 0)
+        self.assertGreater(len(csv_names_e), 0)
+
         os.remove(fn)
 
     def test_custom_materials_csv(self):

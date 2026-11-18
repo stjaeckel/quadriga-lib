@@ -80,7 +80,7 @@ struct QdMassSheet
 
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         if (fbs_ind.n_elem == 0 || fbs_ind(0) == 0)
             return std::numeric_limits<double>::quiet_NaN();
 

@@ -73,10 +73,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Wrap optional pointers
-    // Wrap optional pointers
     const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
     arma::uvec *p_mtl_ind_out = mtl_ind_out.is_empty() ? nullptr : &mtl_ind_out;
 
     // Call library function
-    CALL_QD(quadriga_lib::subdivide_triangles<double>(n_div, &triangles_in, &triangles_out, p_mtl_ind, p_mtl_ind_out));
+    CALL_QD(quadriga_lib::subdivide_triangles<double>(n_div, triangles_in, triangles_out, p_mtl_ind, p_mtl_ind_out));
 }

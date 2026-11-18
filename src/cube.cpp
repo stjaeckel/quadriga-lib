@@ -94,7 +94,7 @@ arma::Mat<dtype> quadriga_lib::cube(const arma::vec &scale,
 
     // Subdivide each triangle into n_div^2 smaller triangles
     arma::Mat<dtype> mesh;
-    quadriga_lib::subdivide_triangles(n_div, &base, &mesh);
+    quadriga_lib::subdivide_triangles(n_div, base, mesh);
 
     // Rotation matrix R = Rz * Ry * Rx (Blender Euler XYZ convention)
     double ca = std::cos(rx), sa = std::sin(rx);

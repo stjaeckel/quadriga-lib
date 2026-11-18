@@ -42,7 +42,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)", "[wave]")
     // Calculate interaction location
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
@@ -162,7 +162,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)", "[wave]")
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
@@ -304,7 +304,7 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)", "[w
 
     arma::fmat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::fmat T = {{1.0, 0.6, 0.0}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
@@ -477,7 +477,7 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)", "[wave]")
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &msh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, msh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat T = {{1.0, 0.6, 0.0}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
@@ -594,7 +594,7 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)", "[
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &msh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, msh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat T = {{1.0, 0.6, 0.0}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
@@ -691,7 +691,7 @@ TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence", "[wave]")
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &cube, &fbs, &sbs, nullptr, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect<double>(orig, dest, cube, &fbs, &sbs, nullptr, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     arma::mat tridir = {{0.0, 45.0, 0.0, 45.0, 0.0, 45.0}};
@@ -738,7 +738,7 @@ TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling", "[wave]")
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     // ε_r = 1, σ = 0 (no reflection, no in-medium loss)
     // att = 6 dB @ 2 GHz, attB = 1  →  at 10 GHz:  Att = 6·(10/2)^1 = 30 dB, on the transmission-class gain
@@ -775,7 +775,7 @@ TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption (medium_gain)", "[wave
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     // ε_r = 1.5, σ = 0, α = 2 dB/m @ 5 GHz, αB = 1 (linear)
     //   →  at 10 GHz:  α(f) = 2·(10/5)^1 = 4 dB/m
@@ -818,7 +818,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)"
     arma::mat dest = {{0.0, 0.0, 1.5}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     arma::mat tridir = {{0.0, 45.0, 0.0, 45.0, 0.0, 45.0}};
@@ -864,7 +864,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction
     arma::mat dest = {{0.0, 0.0, 1.5}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     arma::mat tridir = {{0.0, 45.0, 0.0, 45.0, 0.0, 45.0}};
@@ -914,7 +914,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium", "
     arma::mat dest = {{2.0, 0.0, 0.5}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.01, 0.01, 0.0, -0.01, -0.01, 0.0, 0.01, 0.0}};
     arma::mat tridir = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
@@ -957,7 +957,7 @@ TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant", 
     arma::mat dest = {{2.0, 0.0, 0.5}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.01, 0.01, 0.0, -0.01, -0.01, 0.0, 0.01, 0.0}};
     arma::mat tridir = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
@@ -995,7 +995,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss (medium_gain)"
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     arma::mat tridir = {{45.0, 0.0, 45.0, 0.0, 45.0, 0.0}};
@@ -1040,7 +1040,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat mtl_prop = {{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; // eps_r = 1.5
     mtl_prop = repmat(mtl_prop, 12, 1);
@@ -1123,7 +1123,7 @@ TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip", "[wave]")
     {
         arma::mat fbs, sbs;
         arma::u32_vec sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
         arma::mat origN, destN, path_dirN;
         quadriga_lib::ray_mesh_interact(
@@ -1181,7 +1181,7 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::uvec mtl_ind;
     std::unordered_map<std::string, std::vector<double>> mtl_map;
@@ -1232,7 +1232,7 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     arma::mat orig_in = {{-1.5, 0.0, 0.0}}, dest_in = {{0.0, 0.0, 1.5}}; // 45 deg into the West face
     arma::mat fbs_in, sbs_in;
     arma::u32_vec fbs_in_ind, sbs_in_ind;
-    quadriga_lib::ray_triangle_intersect(&orig_in, &dest_in, &cube, &fbs_in, &sbs_in, NULL, &fbs_in_ind, &sbs_in_ind);
+    quadriga_lib::ray_triangle_intersect(orig_in, dest_in, cube, &fbs_in, &sbs_in, NULL, &fbs_in_ind, &sbs_in_ind);
 
     auto gain_of = [&](int type, double att)
     {
@@ -1264,7 +1264,7 @@ TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmissio
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
     arma::uvec mtl_ind;
@@ -1332,7 +1332,7 @@ TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-thro
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
@@ -1385,7 +1385,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat mtl_prop = repmat(arma::mat{{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1); // TIR at 45 deg
     arma::uvec mtl_ind;
@@ -1436,7 +1436,7 @@ TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     arma::mat tridir = arma::mat{{45.0, 0.0, 45.0, 0.0, 45.0, 0.0}} * deg2rad; // spherical az/el
@@ -1538,7 +1538,7 @@ TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding", "[wave]")
         arma::mat dest = {{0.0, 0.0, 1.5}};
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
         arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
         arma::uvec mtl_ind;
@@ -1564,7 +1564,7 @@ TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding", "[wave]")
         arma::mat dest = {{2.0, 1.6, 0.0}};
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
         arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
         arma::uvec mtl_ind;
@@ -1601,7 +1601,7 @@ TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding", "[wave]")
         arma::mat dest = {{2.0, 1.6, 0.0}};
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &msh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, msh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
         std::vector<uint8_t> otype;
         quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
@@ -1625,7 +1625,7 @@ TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding", "[wave]")
         arma::mat dest = {{2.0, 1.6, 0.0}};
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
         arma::mat mp = repmat(arma::mat{{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
         arma::uvec mtl_ind;
@@ -1656,7 +1656,7 @@ TEST_CASE("Ray-Mesh Interact - compact = false keeps missed rays in place", "[wa
 
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
     REQUIRE(fbs_ind(1) == 0); // ray 1 really misses
 
     arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
@@ -1736,7 +1736,7 @@ TEST_CASE("Diagnostic - Interface energy split per polarization", "[wave]")
             qd_ray_at(thd, orig, dest);
             arma::mat fbs, sbs;
             arma::u32_vec fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+            quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
             arma::mat origN, destN, xprmatN;
             arma::vec gainN;
@@ -1863,7 +1863,7 @@ TEST_CASE("Diagnostic - Transmission convention baseline, single interface", "[w
                     qd_ray_at(thd, orig, dest);
                     arma::mat fbs, sbs;
                     arma::u32_vec fbs_ind, sbs_ind;
-                    quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+                    quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
                     arma::mat origN, destN, xprmatN;
                     arma::vec gainN;
@@ -1990,7 +1990,7 @@ TEST_CASE("Diagnostic - Thin sheet composite vs analytic slab", "[wave]")
             qd_ray_at(thd, orig, dest);
             arma::mat fbs, sbs;
             arma::u32_vec fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+            quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
             arma::mat origN, destN, xprmatN;
             arma::vec gainN;
@@ -2112,7 +2112,7 @@ TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_int
         qd_ray_at(thd, orig, dest);
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
         arma::mat origN, destN, xprmatN;
         arma::vec gainN;
@@ -2278,7 +2278,7 @@ TEST_CASE("Diagnostic - In-slab cosine projection, two ways", "[wave]")
         qd_ray_at(thd, orig, dest);
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
         arma::mat origN, destN, path_dirN, normal_vecN;
         quadriga_lib::ray_mesh_interact(1, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
@@ -2662,7 +2662,7 @@ TEST_CASE("ray_mesh_interact - outputs that alias inputs", "[wave]")
     const arma::mat o0 = {{-1.5, 0.0, 0.0}}, d0 = {{0.0, 0.0, 1.5}};
     arma::mat orig = o0, dest = d0, fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind, ray_indN;
-    quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &cube, &fbs, &sbs, nullptr, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect<double>(orig, dest, cube, &fbs, &sbs, nullptr, &fbs_ind, &sbs_ind);
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}}, tridir = {{0.0, 0.7, 0.0, 0.7, 0.0, 0.7}};
 
     arma::mat origN, destN, fbsN, xprmatN, trivecN;

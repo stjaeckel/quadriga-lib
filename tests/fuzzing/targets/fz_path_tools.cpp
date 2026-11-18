@@ -76,7 +76,7 @@ static void run(fz::input &in)
         const int mask = in.ConsumeIntegralInRange<int>(0, 31);
         const bool reverse = in.ConsumeBool();
         fz::clean([&]
-                  { quadriga_lib::coord2path<T>({p[0], p[1], p[2]}, {p[3], p[4], p[5]}, &n_interact, &interact_coord,
+                  { quadriga_lib::coord2path<T>({p[0], p[1], p[2]}, {p[3], p[4], p[5]}, n_interact, interact_coord,
                                                 (mask & 1) ? &path_length : nullptr, (mask & 2) ? &fbs_pos : nullptr,
                                                 (mask & 4) ? &lbs_pos : nullptr, (mask & 8) ? &path_angles : nullptr,
                                                 (mask & 16) ? &path_coord : nullptr, reverse); });
@@ -94,8 +94,8 @@ static void run(fz::input &in)
             active_path[i] = in.ConsumeBool();
         const bool rev_1 = in.ConsumeBool(), rev_2 = in.ConsumeBool(), use_active = in.ConsumeBool();
         fz::clean([&]
-                  { quadriga_lib::combine_irs_coord<T>({irs[0], irs[1], irs[2]}, &n_interact_1, &coord_1, &n_interact_2, &coord_2,
-                                                       &n_interact, &interact_coord, rev_1, rev_2, use_active ? &active_path : nullptr); });
+                  { quadriga_lib::combine_irs_coord<T>({irs[0], irs[1], irs[2]}, n_interact_1, coord_1, n_interact_2, coord_2,
+                                                       n_interact, interact_coord, rev_1, rev_2, use_active ? &active_path : nullptr); });
     }
 
     // Tubes around a path; up to 16 points, up to 16 edges
@@ -104,7 +104,7 @@ static void run(fz::input &in)
         arma::umat faces;
         const T radius = in.ConsumeBool() ? T(0.1) : in.value<T>();
         const arma::uword n_edges = in.size(16);
-        fz::clean([&] { quadriga_lib::path_to_tube<T>(&path_coord, &vert, &faces, radius, n_edges); });
+        fz::clean([&] { quadriga_lib::path_to_tube<T>(path_coord, vert, faces, radius, n_edges); });
     }
 
     // Diffraction ellipsoids

@@ -599,7 +599,7 @@ TEST_CASE("Sheet between two bodies - nothing is created and the wave left in ai
                 {
                     const arma::mat fm = mesh.rows(2 * k, 2 * k + 1);
                     arma::u32_vec h;
-                    quadriga_lib::ray_triangle_intersect<double>(&o2, &d2, &fm, nullptr, nullptr, nullptr, &h);
+                    quadriga_lib::ray_triangle_intersect<double>(o2, d2, fm, nullptr, nullptr, nullptr, &h);
                     t[k - 1] = (unsigned)(2 * k) + h(0);
                 }
                 struct Out

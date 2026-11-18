@@ -17,7 +17,7 @@ TEST_CASE("Tools - Path 2 Tube")
 
     arma::mat vert;
     arma::umat faces;
-    quadriga_lib::path_to_tube(&path, &vert, &faces, 0.1, 3);
+    quadriga_lib::path_to_tube(path, vert, faces, 0.1, 3);
 }
 
 TEST_CASE("Tools - Path 2 Tube Short segments")
@@ -28,7 +28,7 @@ TEST_CASE("Tools - Path 2 Tube Short segments")
 
     arma::fmat vert;
     arma::umat faces;
-    quadriga_lib::path_to_tube(&path, &vert, &faces, 0.1f, 4);
+    quadriga_lib::path_to_tube(path, vert, faces, 0.1f, 4);
 
     CHECK(vert.n_cols == 12ULL);
 }

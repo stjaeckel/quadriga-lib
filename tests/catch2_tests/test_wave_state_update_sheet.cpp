@@ -957,7 +957,7 @@ TEST_CASE("Traced solid - air | slab | air chain against the analytic slab", "[w
 
             arma::mat fbs, sbs;
             arma::u32_vec fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL,
+            quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL,
                                                  &fbs_ind, &sbs_ind);
             REQUIRE(fbs_ind.n_elem == 1);
             REQUIRE(fbs_ind(0) != 0);
@@ -1109,7 +1109,7 @@ TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[w
 
             arma::mat fbs, sbs;
             arma::u32_vec fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL,
+            quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL,
                                                  &fbs_ind, &sbs_ind);
             REQUIRE(fbs_ind.n_elem == 1);
             REQUIRE(fbs_ind(0) != 0);
@@ -3460,7 +3460,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
         diag_ray_at(thd, orig, dest);
         arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)first));
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
         arma::vec gainN;
         quadriga_lib::ray_mesh_interact(4, api_freq(f_hz, true), &orig, &dest, &mesh, &mtl_ind, &mtl,
@@ -3862,7 +3862,7 @@ TEST_CASE("Measurement - a host entered from a lossy solid across a bare face", 
             diag_ray_at(thd, orig, dest);
             arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)first));
             arma::u32_vec fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+            quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
             arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
             arma::vec gainN;
             quadriga_lib::ray_mesh_interact(4, api_freq(f_hz, true), &orig, &dest, &mesh, &mtl_ind, &mtl,
@@ -3968,7 +3968,7 @@ TEST_CASE("Recovery behind a lossy solid - EM, a second transition and a sheet i
         diag_ray_at(thd, orig, dest);
         arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)first));
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
         arma::vec gainN;
         quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,

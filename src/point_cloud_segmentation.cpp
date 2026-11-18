@@ -20,9 +20,9 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 ## Declaration:
 ```
 arma::uword quadriga_lib::point_cloud_segmentation(
-    const arma::Mat<dtype> *points,
-    arma::Mat<dtype> *points_out,
-    arma::u32_vec *sub_cloud_ind,
+    const arma::Mat<dtype> &points,
+    arma::Mat<dtype> &points_out,
+    arma::u32_vec &sub_cloud_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
     arma::u32_vec *forward_ind = nullptr,
@@ -52,9 +52,9 @@ MD!*/
 
 // Reorganize a point cloud into smaller sub-clouds for faster processing
 template <typename dtype>
-arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *points,
-                                                   arma::Mat<dtype> *points_out,
-                                                   arma::u32_vec *sub_cloud_ind,
+arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> &points,
+                                                   arma::Mat<dtype> &points_out,
+                                                   arma::u32_vec &sub_cloud_ind,
                                                    arma::uword target_size,
                                                    arma::uword vec_size,
                                                    arma::u32_vec *forward_ind,
@@ -62,23 +62,15 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
 {
 
     // Input validation
-    if (points == nullptr)
-        throw std::invalid_argument("Input 'points' cannot be NULL.");
-    if (points->n_cols != 3)
+    if (points.n_cols != 3)
         throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
-    if (points->n_rows == 0)
+    if (points.n_rows == 0)
         throw std::invalid_argument("Input 'points' must have at least one face.");
 
-    arma::uword n_points = points->n_rows;
+    arma::uword n_points = points.n_rows;
 
-    if (points_out == nullptr)
-        throw std::invalid_argument("Output 'points_out' cannot be NULL.");
-    if (sub_cloud_ind == nullptr)
-        throw std::invalid_argument("Output 'sub_cloud_ind' cannot be NULL.");
-    qd_check_alias(points_out, "points_out", points);
-    qd_check_alias_outputs(sub_cloud_ind, "sub_cloud_ind", forward_ind, "forward_ind");
-    qd_check_alias_outputs(sub_cloud_ind, "sub_cloud_ind", reverse_ind, "reverse_ind");
-    qd_check_alias_outputs(forward_ind, "forward_ind", reverse_ind, "reverse_ind");
+    qd_check_alias(&points_out, "points_out", &points);
+    qd_check_alias_list({&sub_cloud_ind, forward_ind, reverse_ind}, {"sub_cloud_ind", "forward_ind", "reverse_ind"});
 
     if (target_size == 0)
         throw std::invalid_argument("Input 'target_size' cannot be 0.");
@@ -89,12 +81,12 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
     std::vector<arma::Mat<dtype>> c; // Vector of sub-clouds
 
     // Add first item (creates a copy of the data)
-    c.push_back(*points);
+    c.push_back(points);
 
     // Create base index (0-based)
     std::vector<arma::uvec> fwd_ind; // Index list
     {
-        arma::uvec base_index(points->n_rows, arma::fill::none);
+        arma::uvec base_index(points.n_rows, arma::fill::none);
         arma::uword *p = base_index.memptr();
         for (arma::uword i = 0; i < n_points; ++i)
             p[i] = i;
@@ -111,7 +103,7 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
             arma::s32_vec split_ind;
 
             // Split on longest axis
-            int split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 0, &split_ind);
+            int split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 0, &split_ind);
 
             // Check the split proportions, must have at least a 10 / 90 split
             float p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
@@ -123,18 +115,18 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
             {
                 // Test second axis
                 if (first_test == 2 || first_test == 3) // Test x-axis
-                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 1, &split_ind);
+                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 1, &split_ind);
                 else // Test y-axis
-                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 2, &split_ind);
+                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 2, &split_ind);
 
                 p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
                 split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
 
                 // If we still failed, we test the third axis
                 if ((first_test == 1 && split_success == -2) || (first_test == 2 && split_success == -1))
-                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 3, &split_ind);
+                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 3, &split_ind);
                 else if (first_test == 3 && split_success == -1)
-                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 2, &split_ind);
+                    split_success = quadriga_lib::point_cloud_split(*sub_cloud_it, pointsA, pointsB, 2, &split_ind);
 
                 p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
                 split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
@@ -182,8 +174,8 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
 
     // Get the sub-cloud indices
     arma::uword n_sub = c.size(), n_out = 0;
-    sub_cloud_ind->set_size(n_sub);
-    unsigned *p_sub_ind = sub_cloud_ind->memptr();
+    sub_cloud_ind.set_size(n_sub);
+    unsigned *p_sub_ind = sub_cloud_ind.memptr();
 
     for (arma::uword i_sub = 0; i_sub < n_sub; ++i_sub)
     {
@@ -194,8 +186,8 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
     }
 
     // Assemble output
-    points_out->set_size(n_out, 3);
-    dtype *p_points_out = points_out->memptr();
+    points_out.set_size(n_out, 3);
+    dtype *p_points_out = points_out.memptr();
 
     unsigned *p_forward_index = nullptr;
     if (forward_ind != nullptr || reverse_ind != nullptr)
@@ -274,8 +266,8 @@ arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *point
     return n_sub;
 }
 
-template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<float> *points, arma::Mat<float> *points_out, arma::u32_vec *sub_cloud_ind,
+template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<float> &points, arma::Mat<float> &points_out, arma::u32_vec &sub_cloud_ind,
                                                             arma::uword target_size, arma::uword vec_size, arma::u32_vec *forward_ind, arma::u32_vec *reverse_ind);
 
-template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<double> *points, arma::Mat<double> *points_out, arma::u32_vec *sub_cloud_ind,
+template arma::uword quadriga_lib::point_cloud_segmentation(const arma::Mat<double> &points, arma::Mat<double> &points_out, arma::u32_vec &sub_cloud_ind,
                                                             arma::uword target_size, arma::uword vec_size, arma::u32_vec *forward_ind, arma::u32_vec *reverse_ind);

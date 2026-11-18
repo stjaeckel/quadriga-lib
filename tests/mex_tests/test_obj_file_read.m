@@ -210,15 +210,8 @@ fclose(f);
 assertEqual( mtl_names{1,1}, 'not_a_real_material' );  % raw name kept on .mtl side
 assertTrue( all( csv_ind == 0 ) );                     % unmatched, non-strict -> no material
 
-% Same scene, strict -> error
-try
-    [~,~,~,~,~,~,~,~,csv_ind] = quadriga_lib.obj_file_read(fn, '', true);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised')
-        error('moxunit:exceptionNotRaised', 'Expected an error for unknown material in strict mode!');
-    end
-end
+% Same scene, strict -> error (the table is consulted only when csv_ind is requested)
+assert_throws( @() out9(fn, '', true), 'Material ''not_a_real_material'' referenced in' );
 delete(fn);
 
 % Recreate the simple cube for the argument-count error cases
@@ -230,38 +223,22 @@ fprintf(f,'%s\n','v -1  1 0');
 fprintf(f,'%s\n','f 1 2 3');
 fclose(f);
 
+% No file name
+assert_throws( @() quadriga_lib.obj_file_read(), 'Wrong number of input arguments.' );
+
+% An empty file name reads only the material table
+[ mesh_e, ~, ~, ~, ~, ~, ~, ~, ~, csv_names_e ] = quadriga_lib.obj_file_read('');
+assertTrue( isempty(mesh_e) );
+assertTrue( numel(csv_names_e) > 0 );
+
 % Too many inputs
-try
-    quadriga_lib.obj_file_read(fn,'bla',true,99);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of input arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end 
+assert_throws( @() quadriga_lib.obj_file_read(fn,'bla',true,99), 'Wrong number of input arguments.' );
 
 % Too many outputs (12 requested, max 11)
-try
-    [~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.obj_file_read(fn);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Wrong number of output arguments.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+assert_throws( @() out12(fn), 'Wrong number of output arguments.' );
 
 % Wrong file name
-try
-    quadriga_lib.obj_file_read('bla.obj');
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Error opening file: ''bla.obj'' does not exist.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+assert_throws( @() quadriga_lib.obj_file_read('bla.obj'), 'Error opening file: ''bla.obj'' does not exist.' );
 
 delete(fn);
 
@@ -280,4 +257,26 @@ elseif isfield(defaults, key)
 else
     v = 0.0;
 end
+end
+
+% Assert that fn() raises an error whose message contains expected (substring).
+function assert_throws(fn, expected)
+try
+    fn();
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expected)) %#ok<STREMP>
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expected, '", GOT: "', ME.message, '"']);
+    end
+end
+end
+
+% Request one output more than obj_file_read allows (11)
+function out12(varargin)
+[~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~] = quadriga_lib.obj_file_read( varargin{:} ); %#ok<ASGLU>
+end
+
+% Request the first 9 outputs (up to csv_ind)
+function out9(varargin)
+[~, ~, ~, ~, ~, ~, ~, ~, ~] = quadriga_lib.obj_file_read( varargin{:} ); %#ok<ASGLU>
 end

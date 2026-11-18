@@ -76,5 +76,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_direction = direction.empty() ? nullptr : &direction;
 
     // Call library function
-    CALL_QD(quadriga_lib::icosphere<double>(n_div, radius, &center, p_length, p_vert, p_direction, direction_xyz));
+    CALL_QD(quadriga_lib::icosphere<double>(n_div, radius, center, p_length, p_vert, p_direction, direction_xyz));
 }

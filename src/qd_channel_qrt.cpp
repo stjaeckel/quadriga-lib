@@ -1656,16 +1656,16 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
         const arma::Col<dtype> o_pos = {Ox, Oy, Oz}, d_pos = {Dx, Dy, Dz};
         if (want_angles && want_length)
-            quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
+            quadriga_lib::coord2path<dtype>(o_pos, d_pos, no_intR, coordD,
                                             &path_length_local, fbs_pos, lbs_pos, &path_angles, path_coord, uplink);
         else if (want_angles && !want_length)
-            quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
+            quadriga_lib::coord2path<dtype>(o_pos, d_pos, no_intR, coordD,
                                             nullptr, fbs_pos, lbs_pos, &path_angles, path_coord, uplink);
         else if (!want_angles && want_length)
-            quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
+            quadriga_lib::coord2path<dtype>(o_pos, d_pos, no_intR, coordD,
                                             &path_length_local, fbs_pos, lbs_pos, nullptr, path_coord, uplink);
         else // want_none
-            quadriga_lib::coord2path<dtype>(o_pos, d_pos, &no_intR, &coordD,
+            quadriga_lib::coord2path<dtype>(o_pos, d_pos, no_intR, coordD,
                                             nullptr, fbs_pos, lbs_pos, nullptr, path_coord, uplink);
 
         // Adjust path gain to include the path loss

@@ -45,7 +45,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
         double t = std::tan(thd * QPI / 180.0);
         arma::mat orig{{1.0, 0.37, 0.0}}, dest{{-1.0, 0.37 + 2.0 * t, 0.0}}, fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         std::vector<uint8_t> ot;
         quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -212,7 +212,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
             arma::uvec mtl_ind(mesh.n_rows, arma::fill::value((arma::uword)m));
             arma::mat fbs, sbs, fbsN, sbsN, nv;
             arma::u32_vec nh, fi, si;
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+            quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
             Ev E;
             arma::vec gain, fang;
             std::vector<uint8_t> ot, rt;
@@ -293,7 +293,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec fang;
         std::vector<uint8_t> ot, rt;
@@ -538,7 +538,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
         double t = std::tan(th);
         arma::mat orig{{1.0, 0.37, 0.0}}, dest{{-1.0, 0.37 + 2.0 * t, 0.0}}, fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         std::vector<uint8_t> ot;
         quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -755,7 +755,7 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -1033,7 +1033,7 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -1513,7 +1513,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -2110,7 +2110,7 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived",
     {
         arma::mat fbs, sbs, fbsN, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -2231,7 +2231,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             in_state = in;
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -2647,7 +2647,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
             in_state = in;
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3013,7 +3013,7 @@ TEST_CASE("Leak direction - the direction a closed face writes for a wave launch
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3151,7 +3151,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3520,7 +3520,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3890,7 +3890,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
         arma::mat mesh = build({0.0, dS}, {2, 2}, {false, true}, mi), orig, dest, fbs, sbs;
         diag_ray_at(thd, orig, dest);
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         auto dirv = [](double a, double z)
         {
             arma::rowvec v = {std::cos(a * QPI / 180.0), std::sin(a * QPI / 180.0), z};

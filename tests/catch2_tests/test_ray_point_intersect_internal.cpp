@@ -159,7 +159,7 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
     // Create sub-cloud index with vec_size=8
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
@@ -169,7 +169,7 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
 
     // Generate ray beams from icosphere
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
@@ -213,7 +213,7 @@ TEST_CASE("RPI Internal - Simple Mode (float, GENERIC)")
     // The original 16 points must each be hit; padded points may or may not be hit
     // Use reverse_ind to check only the original points
     arma::u32_vec reverse_ind;
-    quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8, nullptr, &reverse_ind);
+    quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8, nullptr, &reverse_ind);
     for (arma::uword i = 0; i < points.n_rows; ++i)
         CHECK(hit_count.at(reverse_ind.at(i)) >= 1);
 }
@@ -253,7 +253,7 @@ TEST_CASE("RPI Internal - Simple Mode (double, GENERIC)")
 
     // Generate ray beams
     arma::mat orig, trivec, tridir;
-    quadriga_lib::icosphere<double>(2, 1.0, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<double>(2, 1.0, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0;
     orig.col(1) -= 20.0;
     orig.col(2) -= 30.0;
@@ -318,7 +318,7 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
 
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
@@ -327,7 +327,7 @@ TEST_CASE("RPI Internal - Simple Mode (AVX2 vs GENERIC)")
 
     // Generate ray beams
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
@@ -421,7 +421,7 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
 
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
@@ -430,7 +430,7 @@ TEST_CASE("RPI Internal - Simple Mode (CUDA vs GENERIC)")
 
     // Generate ray beams
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
@@ -540,7 +540,7 @@ TEST_CASE("RPI Internal - Dense Grid (double, GENERIC)")
 
     // Generate ray beams (icosphere with enough resolution to cover the grid)
     arma::mat orig, trivec, tridir;
-    quadriga_lib::icosphere<double>(8, 1.0, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<double>(8, 1.0, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0;
     orig.col(1) -= 20.0;
     orig.col(2) -= 30.0;
@@ -610,7 +610,7 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
     // Segment with vec_size=8
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind;
-    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 128, 8);
+    arma::uword n_sub = quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 128, 8);
     size_t n_point = pointsR.n_rows;
     size_t n_sub_s = ((n_sub + 7) / 8) * 8;
 
@@ -619,7 +619,7 @@ TEST_CASE("RPI Internal - Dense Grid (AVX2 vs GENERIC)")
 
     // Generate ray beams
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(8, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(8, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;

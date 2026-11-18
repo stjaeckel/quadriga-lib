@@ -48,9 +48,9 @@ Convert a 3D path into a tube surface mesh for visualization
 ## Declaration:
 ```
 void quadriga_lib::path_to_tube(
-    const arma::Mat<dtype> *path_coord,
-    arma::Mat<dtype> *vert,
-    arma::umat *faces,
+    const arma::Mat<dtype> &path_coord,
+    arma::Mat<dtype> &vert,
+    arma::umat &faces,
     dtype radius = 1.0,
     arma::uword n_edges = 5);
 ```
@@ -67,23 +67,17 @@ MD!*/
 
 // Convert paths to tubes
 template <typename dtype>
-void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dtype> *vert, arma::umat *faces, dtype radius, arma::uword n_edges)
+void quadriga_lib::path_to_tube(const arma::Mat<dtype> &path_coord, arma::Mat<dtype> &vert, arma::umat &faces, dtype radius, arma::uword n_edges)
 {
-    if (path_coord == nullptr)
-        throw std::invalid_argument("Input 'path_coord' cannot be NULL.");
-    if (vert == nullptr)
-        throw std::invalid_argument("Output 'vert' cannot be NULL.");
-    if (faces == nullptr)
-        throw std::invalid_argument("Output 'faces' cannot be NULL.");
-    qd_check_alias(vert, "vert", path_coord);
+    qd_check_alias(&vert, "vert", &path_coord);
 
-    if (path_coord->n_rows != 3ULL)
+    if (path_coord.n_rows != 3ULL)
         throw std::invalid_argument("Input 'path_coord' must have 3 rows containing x,y,z coordinates.");
 
-    if (path_coord->n_cols < 2ULL)
+    if (path_coord.n_cols < 2ULL)
         throw std::invalid_argument("Input 'path_coord' must have 2 or more columns.");
 
-    if (!path_coord->is_finite())
+    if (!path_coord.is_finite())
         throw std::invalid_argument("Input 'path_coord' must contain only finite values.");
 
     double radius_d = (double)radius;
@@ -94,9 +88,9 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         throw std::invalid_argument("Number of edges mut be >= 3.");
 
     // There might be co-located vertices on the path. These need to be merged together
-    arma::uword n_coord = path_coord->n_cols;
+    arma::uword n_coord = path_coord.n_cols;
     arma::uword n_segments_in = n_coord - 1ULL;
-    const dtype *p_coord = path_coord->memptr();
+    const dtype *p_coord = path_coord.memptr();
 
     dtype length_limit = (dtype)2.0 * radius;
     arma::Col<dtype> seg_length(n_segments_in, arma::fill::none);
@@ -237,14 +231,14 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
     arma::uword n_vert = (n_coord + n_split) * n_edges;
     arma::uword n_faces = (n_coord - 1ULL) * n_edges;
 
-    if (vert->n_rows != 3ULL || vert->n_cols != n_vert)
-        vert->zeros(3ULL, n_vert);
+    if (vert.n_rows != 3ULL || vert.n_cols != n_vert)
+        vert.zeros(3ULL, n_vert);
 
-    if (faces->n_rows != 4 || faces->n_cols != n_faces)
-        faces->zeros(4ULL, n_faces);
+    if (faces.n_rows != 4 || faces.n_cols != n_faces)
+        faces.zeros(4ULL, n_faces);
 
-    dtype *p_vert = vert->memptr();
-    arma::uword *p_face = faces->memptr();
+    dtype *p_vert = vert.memptr();
+    arma::uword *p_face = faces.memptr();
 
     double x0 = 0.0, x1 = 0.0, x2 = 0.0;              // Point v0
     double y0 = 0.0, y1 = 0.0, y2 = 0.0;              // Point v1
@@ -412,7 +406,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
                                     d * (-hx - gx) + x1, d * (-hy - gy) + y1, d * (-hz - gz) + z1};
 
             // Calculate intersection points with the plane
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &proj_plane, &fbs);
+            quadriga_lib::ray_triangle_intersect(orig, dest, proj_plane, &fbs);
         }
 
         // Write FBS coordinates to output
@@ -446,8 +440,8 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
     }
 }
 
-template void quadriga_lib::path_to_tube(const arma::Mat<float> *path_coord, arma::Mat<float> *vert, arma::umat *faces,
+template void quadriga_lib::path_to_tube(const arma::Mat<float> &path_coord, arma::Mat<float> &vert, arma::umat &faces,
                                          float radius, arma::uword n_edges);
 
-template void quadriga_lib::path_to_tube(const arma::Mat<double> *path_coord, arma::Mat<double> *vert, arma::umat *faces,
+template void quadriga_lib::path_to_tube(const arma::Mat<double> &path_coord, arma::Mat<double> &vert, arma::umat &faces,
                                          double radius, arma::uword n_edges);

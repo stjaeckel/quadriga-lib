@@ -110,7 +110,7 @@ static void run(fz::input &in)
     arma::Mat<T> sub = mesh, sub_out(in.size(3), in.size(10));
     arma::uvec mtl_sub = mtl_ind;
     fz::clean([&]
-              { quadriga_lib::subdivide_triangles<T>(n_div_t, &sub, in_place ? &sub : &sub_out, use_mtl ? &mtl_sub : nullptr,
+              { quadriga_lib::subdivide_triangles<T>(n_div_t, sub, in_place ? sub : sub_out, use_mtl ? &mtl_sub : nullptr,
                                                      in_place ? &mtl_sub : &mtl_ind_out); });
 
     // Segmentation; vec_size is small or the largest value
@@ -119,11 +119,11 @@ static void run(fz::input &in)
     arma::uvec mtl_ind_seg;
     const arma::uword target_size = in.size(70);
     const arma::uword vec_size = in.ConsumeIntegralInRange<int>(0, 15) == 0 ? std::numeric_limits<arma::uword>::max() : in.size(33);
-    const int seg_mask = in.ConsumeIntegralInRange<int>(0, 7);
+    const int seg_mask = in.ConsumeIntegralInRange<int>(0, 3);
     fz::clean([&]
-              { quadriga_lib::triangle_mesh_segmentation<T>(&mesh, (seg_mask & 1) ? &meshR : nullptr, &sub_mesh_ind, target_size, vec_size,
-                                                            (seg_mask & 2) ? &mtl_ind : nullptr, (seg_mask & 2) ? &mtl_ind_seg : nullptr,
-                                                            (seg_mask & 4) ? &mesh_ind : nullptr); });
+              { quadriga_lib::triangle_mesh_segmentation<T>(mesh, meshR, sub_mesh_ind, target_size, vec_size,
+                                                            (seg_mask & 1) ? &mtl_ind : nullptr, (seg_mask & 1) ? &mtl_ind_seg : nullptr,
+                                                            (seg_mask & 2) ? &mesh_ind : nullptr); });
 
     // AABB of fuzzed or segmented sub-meshes
     arma::u32_vec smi(in.size(8));
@@ -155,17 +155,17 @@ static void run(fz::input &in)
     }
     const int axis = in.ConsumeIntegralInRange<int>(-1, 4);
     const bool use_split_ind = in.ConsumeBool();
-    fz::clean([&] { quadriga_lib::triangle_mesh_split<T>(&split_mesh, outA, outB, axis, use_split_ind ? &split_ind : nullptr); });
+    fz::clean([&] { quadriga_lib::triangle_mesh_split<T>(split_mesh, *outA, *outB, axis, use_split_ind ? &split_ind : nullptr); });
 
     // Icosphere with all output combinations
     arma::Mat<T> center, vert, direction;
     arma::Col<T> length;
     const arma::uword n_div_i = n_div(in);
     const T radius = in.value<T>();
-    const int ico_mask = in.ConsumeIntegralInRange<int>(0, 15);
+    const int ico_mask = in.ConsumeIntegralInRange<int>(0, 7);
     fz::clean([&]
-              { quadriga_lib::icosphere<T>(n_div_i, radius, (ico_mask & 1) ? &center : nullptr, (ico_mask & 2) ? &length : nullptr,
-                                           (ico_mask & 4) ? &vert : nullptr, (ico_mask & 8) ? &direction : nullptr, in.ConsumeBool()); });
+              { quadriga_lib::icosphere<T>(n_div_i, radius, center, (ico_mask & 1) ? &length : nullptr,
+                                           (ico_mask & 2) ? &vert : nullptr, (ico_mask & 4) ? &direction : nullptr, in.ConsumeBool()); });
 }
 
 void fuzz_one(const uint8_t *data, size_t size)

@@ -24,7 +24,7 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 arma::uword quadriga_lib::icosphere(
     arma::uword n_div,
     dtype radius,
-    arma::Mat<dtype> *center,
+    arma::Mat<dtype> &center,
     arma::Col<dtype> *length = nullptr,
     arma::Mat<dtype> *vert = nullptr,
     arma::Mat<dtype> *direction = nullptr,
@@ -48,7 +48,7 @@ MD!*/
 
 // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
 template <typename dtype>
-arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype> *center, arma::Col<dtype> *length,
+arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype> &center, arma::Col<dtype> *length,
                                     arma::Mat<dtype> *vert, arma::Mat<dtype> *direction, bool direction_xyz)
 {
     if (n_div == 0)
@@ -65,17 +65,10 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<d
     arma::uword n_faces = n_div * n_div * 20;
 
     // Set sizes
-    if (center == nullptr)
-        throw std::invalid_argument("Output 'center' cannot be NULL.");
-    qd_check_alias_outputs(center, "center", length, "length");
-    qd_check_alias_outputs(center, "center", vert, "vert");
-    qd_check_alias_outputs(center, "center", direction, "direction");
-    qd_check_alias_outputs(length, "length", vert, "vert");
-    qd_check_alias_outputs(length, "length", direction, "direction");
-    qd_check_alias_outputs(vert, "vert", direction, "direction");
+    qd_check_alias_list<arma::Mat<dtype>>({&center, length, vert, direction}, {"center", "length", "vert", "direction"});
 
-    if (center->n_rows != n_faces || center->n_cols != 3)
-        center->set_size(n_faces, 3);
+    if (center.n_rows != n_faces || center.n_cols != 3)
+        center.set_size(n_faces, 3);
 
     if (length != nullptr && length->n_elem != n_faces)
         length->set_size(n_faces);
@@ -122,11 +115,11 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<d
 
     // Subdivide faces of the isohedron
     arma::Mat<double> icosphere;
-    quadriga_lib::subdivide_triangles(n_div, &isohedron, &icosphere);
+    quadriga_lib::subdivide_triangles(n_div, isohedron, icosphere);
 
     // Get pointers for direct memory access
     double *p_icosphere = icosphere.memptr();
-    dtype *p_dest = center->memptr();
+    dtype *p_dest = center.memptr();
     dtype *p_length = (length == nullptr) ? nullptr : length->memptr();
     dtype *p_vert = (vert == nullptr) ? nullptr : vert->memptr();
     dtype *p_direction = calc_directions ? direction->memptr() : nullptr;
@@ -230,8 +223,8 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<d
     return n_faces;
 }
 
-template arma::uword quadriga_lib::icosphere(arma::uword n_div, float radius, arma::Mat<float> *center, arma::Col<float> *length,
+template arma::uword quadriga_lib::icosphere(arma::uword n_div, float radius, arma::Mat<float> &center, arma::Col<float> *length,
                                              arma::Mat<float> *vert, arma::Mat<float> *direction, bool direction_as_spheric);
 
-template arma::uword quadriga_lib::icosphere(arma::uword n_div, double radius, arma::Mat<double> *center, arma::Col<double> *length,
+template arma::uword quadriga_lib::icosphere(arma::uword n_div, double radius, arma::Mat<double> &center, arma::Col<double> *length,
                                              arma::Mat<double> *vert, arma::Mat<double> *direction, bool direction_as_spheric);

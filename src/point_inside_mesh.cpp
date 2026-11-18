@@ -89,7 +89,7 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
     {
         arma::Mat<dtype> tmp;
         auto n_div = (arma::uword)std::ceil(distance) + 1;
-        quadriga_lib::icosphere<dtype>(n_div, 1000.0, &tmp);
+        quadriga_lib::icosphere<dtype>(n_div, 1000.0, tmp);
         n_cast += tmp.n_rows;
 
         direction.set_size(n_cast, 3);
@@ -145,14 +145,14 @@ void quadriga_lib::point_inside_mesh(const arma::Mat<dtype> &points,
     // Carry obj_ind through the reordering/padding so fbs_ind (into meshR) maps correctly.
     arma::uvec obj_ind_R;
     bool have_obj = (obj_ind != nullptr && obj_ind->n_elem != 0);
-    quadriga_lib::triangle_mesh_segmentation(&mesh, &meshR, &sub_mesh_ind, target_size, 8,
+    quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, target_size, 8,
                                              have_obj ? obj_ind : nullptr,
                                              have_obj ? &obj_ind_R : nullptr);
 
     // Calculate intersections
     arma::Mat<dtype> fbs, sbs;
     arma::u32_vec n_interact, fbs_ind, sbs_ind;
-    ray_triangle_intersect(&orig, &dest, &meshR, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, &sub_mesh_ind);
+    ray_triangle_intersect(orig, dest, meshR, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind, &sub_mesh_ind);
 
     // Calculate the incidence angles
     arma::Col<dtype> fbs_angle, thickness;

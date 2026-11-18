@@ -62,7 +62,7 @@ py::tuple triangle_mesh_segmentation(const py::array_t<double> &mesh,
     const arma::uvec *p_mtl_ind = mtl_ind_a.is_empty() ? nullptr : &mtl_ind_a;
     arma::uvec *p_mtl_ind_out = mtl_ind_a.is_empty() ? nullptr : &mtl_ind_out;
 
-    quadriga_lib::triangle_mesh_segmentation<double>(&triangles_a, &mesh_out, &sub_mesh_ind,
+    quadriga_lib::triangle_mesh_segmentation<double>(triangles_a, mesh_out, sub_mesh_ind,
                                                      target_size, vec_size,
                                                      p_mtl_ind, p_mtl_ind_out, &mesh_ind);
 

@@ -34,9 +34,9 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 ## Declaration:
 ```
 void quadriga_lib::ray_triangle_intersect(
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *mesh,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &dest,
+    const arma::Mat<dtype> &mesh,
     arma::Mat<dtype> *fbs = nullptr,
     arma::Mat<dtype> *sbs = nullptr,
     arma::u32_vec *n_interact = nullptr,
@@ -73,7 +73,7 @@ void quadriga_lib::ray_triangle_intersect(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest, const arma::Mat<dtype> *mesh,
+void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> &orig, const arma::Mat<dtype> &dest, const arma::Mat<dtype> &mesh,
                                           arma::Mat<dtype> *fbs, arma::Mat<dtype> *sbs, arma::u32_vec *n_interact,
                                           arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
                                           const arma::u32_vec *sub_mesh_ind, const arma::Mat<dtype> *aabb,
@@ -85,33 +85,27 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 #endif
 
     // Input validation
-    if (orig == nullptr)
-        throw std::invalid_argument("Input 'orig' cannot be NULL.");
-    if (orig->n_elem == 0)
+    if (orig.n_elem == 0)
         throw std::invalid_argument("Inputs cannot be empty.");
-    if (orig->n_cols < 3)
+    if (orig.n_cols < 3)
         throw std::invalid_argument("Input 'orig' must have at least 3 columns containing x,y,z coordinates.");
 
-    arma::uword n_ray = orig->n_rows;
+    arma::uword n_ray = orig.n_rows;
 
-    if (dest == nullptr)
-        throw std::invalid_argument("Input 'dest' cannot be NULL.");
-    if (dest->n_cols < 3)
+    if (dest.n_cols < 3)
         throw std::invalid_argument("Input 'dest' must have at least 3 columns containing x,y,z coordinates.");
-    if (dest->n_rows != n_ray)
+    if (dest.n_rows != n_ray)
         throw std::invalid_argument("Number of elements in 'orig' and 'dest' dont match.");
 
-    if (mesh == nullptr)
-        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
-    if (mesh->n_elem == 0)
+    if (mesh.n_elem == 0)
         throw std::invalid_argument("Inputs cannot be empty.");
-    if (mesh->n_cols < 9)
+    if (mesh.n_cols < 9)
         throw std::invalid_argument("Input 'mesh' must have at least 9 columns containing x,y,z coordinates of 3 vertices.");
 
-    arma::uword n_mesh = mesh->n_rows;
+    arma::uword n_mesh = mesh.n_rows;
 
-    qd_check_alias(fbs, "fbs", orig, dest, mesh, aabb);
-    qd_check_alias(sbs, "sbs", orig, dest, mesh, aabb);
+    qd_check_alias(fbs, "fbs", &orig, &dest, &mesh, aabb);
+    qd_check_alias(sbs, "sbs", &orig, &dest, &mesh, aabb);
     qd_check_alias_outputs(fbs, "fbs", sbs, "sbs");
     qd_check_alias(n_interact, "n_interact", sub_mesh_ind);
     qd_check_alias(fbs_ind, "fbs_ind", sub_mesh_ind);
@@ -178,7 +172,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     arma::Mat<dtype> aabb_computed;
     if (aabb == nullptr)
     {
-        quadriga_lib::triangle_mesh_aabb(*mesh, aabb_computed, sub_mesh_ind);
+        quadriga_lib::triangle_mesh_aabb(mesh, aabb_computed, sub_mesh_ind);
         aabb = &aabb_computed;
     }
     else
@@ -195,13 +189,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     const dtype *Zmin = aabb->colptr(4), *Zmax = aabb->colptr(5);
 
     // Mesh vertex pointers
-    const dtype *Tx = mesh->colptr(0), *Ty = mesh->colptr(1), *Tz = mesh->colptr(2);
-    const dtype *Ux = mesh->colptr(3), *Uy = mesh->colptr(4), *Uz = mesh->colptr(5);
-    const dtype *Vx = mesh->colptr(6), *Vy = mesh->colptr(7), *Vz = mesh->colptr(8);
+    const dtype *Tx = mesh.colptr(0), *Ty = mesh.colptr(1), *Tz = mesh.colptr(2);
+    const dtype *Ux = mesh.colptr(3), *Uy = mesh.colptr(4), *Uz = mesh.colptr(5);
+    const dtype *Vx = mesh.colptr(6), *Vy = mesh.colptr(7), *Vz = mesh.colptr(8);
 
     // Pointer to origin and destination coordinates
-    const dtype *ox = orig->colptr(0), *oy = orig->colptr(1), *oz = orig->colptr(2);
-    const dtype *dx = dest->colptr(0), *dy = dest->colptr(1), *dz = dest->colptr(2);
+    const dtype *ox = orig.colptr(0), *oy = orig.colptr(1), *oz = orig.colptr(2);
+    const dtype *dx = dest.colptr(0), *dy = dest.colptr(1), *dz = dest.colptr(2);
 
     // Define and initialize temporary variables
     arma::Col<dtype> Wf(n_ray), Ws(n_ray); // Normalized FBS and SBS hit distances, initialized to 0
@@ -294,13 +288,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
 }
 
-template void quadriga_lib::ray_triangle_intersect(const arma::Mat<float> *orig, const arma::Mat<float> *dest, const arma::Mat<float> *mesh,
+template void quadriga_lib::ray_triangle_intersect(const arma::Mat<float> &orig, const arma::Mat<float> &dest, const arma::Mat<float> &mesh,
                                                    arma::Mat<float> *fbs, arma::Mat<float> *sbs, arma::u32_vec *n_interact,
                                                    arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
                                                    const arma::u32_vec *sub_mesh_ind, const arma::Mat<float> *aabb,
                                                    int use_kernel, int gpu_id);
 
-template void quadriga_lib::ray_triangle_intersect(const arma::Mat<double> *orig, const arma::Mat<double> *dest, const arma::Mat<double> *mesh,
+template void quadriga_lib::ray_triangle_intersect(const arma::Mat<double> &orig, const arma::Mat<double> &dest, const arma::Mat<double> &mesh,
                                                    arma::Mat<double> *fbs, arma::Mat<double> *sbs, arma::u32_vec *n_interact,
                                                    arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
                                                    const arma::u32_vec *sub_mesh_ind, const arma::Mat<double> *aabb,

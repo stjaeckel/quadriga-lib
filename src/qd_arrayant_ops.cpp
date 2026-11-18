@@ -865,7 +865,7 @@ void quadriga_lib::arrayant_export_obj_file(const std::string &fn, const arrayan
     size_t n_faces, n_vert;
     {
         arma::mat center, vert;
-        n_faces = quadriga_lib::icosphere<double>(icosphere_n_div, 1.0, &center, nullptr, &vert);
+        n_faces = quadriga_lib::icosphere<double>(icosphere_n_div, 1.0, center, nullptr, &vert);
 
         vertices_icosphere.set_size(3 * n_faces, 3);
         faces_icosphere.set_size(n_faces, 3);

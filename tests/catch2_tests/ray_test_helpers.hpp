@@ -2025,7 +2025,7 @@ namespace ub
         V gain, fang;
         arma::u32_vec nh, fi, si;
         std::vector<uint8_t> ot, rt, vo;
-        quadriga_lib::ray_triangle_intersect<T>(&o, &d, &ms, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect<T>(o, d, ms, &fbs, &sbs, &nh, &fi, &si);
         if (opt.fi_in)
             fi(0) = opt.fi_in, si(0) = opt.si_in;
         const bool tube = opt.trivec && opt.tridir;
@@ -2604,7 +2604,7 @@ struct QdSheetFace
 
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         if (fbs_ind.n_elem == 0 || fbs_ind(0) == 0)
             return std::numeric_limits<double>::quiet_NaN();
 
@@ -2886,7 +2886,7 @@ namespace
     Hits intersect(const Cfg &C, const Scene &S, const arma::u32_vec *smi = nullptr)
     {
         Hits H;
-        quadriga_lib::ray_triangle_intersect<float>(&C.orig, &C.dest, &S.mesh, nullptr, nullptr,
+        quadriga_lib::ray_triangle_intersect<float>(C.orig, C.dest, S.mesh, nullptr, nullptr,
                                                     &H.n_interact, &H.fbs_ind, &H.sbs_ind,
                                                     smi, nullptr);
         return H;
@@ -3228,7 +3228,7 @@ static double rmi_gain(int interaction_type, double freq,
 {
     arma::mat fbs, sbs;
     arma::u32_vec fbs_ind, sbs_ind;
-    quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::vec gainN;
     quadriga_lib::ray_mesh_interact<double>(interaction_type, api_freq(freq, interaction_type >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,

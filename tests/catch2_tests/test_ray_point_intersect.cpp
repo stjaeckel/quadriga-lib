@@ -98,11 +98,11 @@ TEST_CASE("Ray-Point Intersect - Simple Mode")
     // Create a sub-cloud index
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind, reverse_ind;
-    quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8, nullptr, &reverse_ind);
+    quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8, nullptr, &reverse_ind);
 
     // Generate a set of ray beams
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
 
     // Change the location
     orig.col(0) -= 10.0f;
@@ -144,7 +144,7 @@ TEST_CASE("Ray-Point Intersect - Ray Subdivision")
 
     // Generate a set of ray beams
     arma::mat orig, trivec, tridir;
-    quadriga_lib::icosphere<double>(12, 1.0, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<double>(12, 1.0, orig, nullptr, &trivec, &tridir, true);
 
     // Change the location
     orig.col(0) -= 10.0;
@@ -202,10 +202,10 @@ TEST_CASE("Ray-Point Intersect - CSR Outputs")
 
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind;
-    quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
+    quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8);
 
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
@@ -239,10 +239,10 @@ TEST_CASE("Ray-Point Intersect - Optional Outputs")
 
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind;
-    quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
+    quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8);
 
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
@@ -310,10 +310,10 @@ TEST_CASE("Ray-Point Intersect - Kernel Equivalence")
 
     arma::fmat pointsR;
     arma::u32_vec sub_cloud_ind;
-    quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 8);
+    quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 8);
 
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
@@ -371,7 +371,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned Point Count")
     }
 
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(2, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(2, 1.0f, orig, nullptr, &trivec, &tridir, true);
     orig.col(0) -= 10.0f;
     orig.col(1) -= 20.0f;
     orig.col(2) -= 30.0f;
@@ -545,7 +545,7 @@ TEST_CASE("Ray-Point Intersect - Input Validation")
     arma::fmat points(8, 3, arma::fill::ones);
 
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(1, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(1, 1.0f, orig, nullptr, &trivec, &tridir, true);
 
     arma::fmat empty;
     CHECK_THROWS_AS(quadriga_lib::ray_point_intersect(empty, orig, trivec, tridir), std::invalid_argument);
@@ -602,7 +602,7 @@ TEST_CASE("Ray-Point Intersect - Invalid use_kernel")
 {
     arma::fmat points(8, 3, arma::fill::ones);
     arma::fmat orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(1, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(1, 1.0f, orig, nullptr, &trivec, &tridir, true);
 
     for (int k : {7, -1, 4})
     {
@@ -629,7 +629,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
     // kernel accepts them and returns the same hits as without sub-clouds.
     arma::arma_rng::set_seed(5);
     arma::mat center, vert, tridir;
-    quadriga_lib::icosphere<double>(2, 1.0, &center, nullptr, &vert, &tridir, true);
+    quadriga_lib::icosphere<double>(2, 1.0, center, nullptr, &vert, &tridir, true);
     arma::mat trivec = vert;
     for (arma::uword c = 0; c < 9; ++c)
         trivec.col(c) += center.col(c % 3);
@@ -638,7 +638,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
     arma::mat points = arma::randu<arma::mat>(3000, 3) * 20.0 - 10.0;
     arma::mat pR;
     arma::u32_vec sci_seg;
-    quadriga_lib::point_cloud_segmentation(&points, &pR, &sci_seg);
+    quadriga_lib::point_cloud_segmentation(points, pR, sci_seg);
     REQUIRE(pR.n_rows == 3000);
     REQUIRE(arma::any(sci_seg - 8 * (sci_seg / 8) != 0)); // unaligned
 
@@ -668,7 +668,7 @@ TEST_CASE("Ray-Point Intersect - Unaligned sub-clouds")
 TEST_CASE("ray_point_intersect - outputs that alias inputs")
 {
     arma::fmat points = {{5.0f, 0.0f, 0.0f}, {0.0f, 5.0f, 0.0f}}, orig, trivec, tridir;
-    quadriga_lib::icosphere<float>(1, 1.0f, &orig, nullptr, &trivec, &tridir, true);
+    quadriga_lib::icosphere<float>(1, 1.0f, orig, nullptr, &trivec, &tridir, true);
     std::vector<unsigned> hit_ind;
     arma::u32_vec hit_offset, hit_count, sci = {0};
     std::vector<arma::u32_vec> hpp;

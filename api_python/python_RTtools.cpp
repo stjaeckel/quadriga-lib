@@ -68,13 +68,13 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("map_to_itu_materials") = false);
 
     m.def("obj_file_read", &obj_file_read,
-          py::arg("fn") = "",
+          py::arg("fn"),
           py::arg("fn_csv") = "",
           py::kw_only(),
           py::arg("csv_strict") = false);
 
     m.def("obj_file_write", &obj_file_write,
-          py::arg("fn") = "",
+          py::arg("fn"),
           py::arg("mesh") = py::none(),
           py::arg("obj_ind") = py::none(),
           py::arg("mtl_ind") = py::none(),

@@ -22,9 +22,9 @@ Split a 3D triangular mesh into two sub-meshes along a given axis
 ## Declaration:
 ```
 int triangle_mesh_split(
-    const arma::Mat<dtype> *mesh,
-    arma::Mat<dtype> *meshA,
-    arma::Mat<dtype> *meshB,
+    const arma::Mat<dtype> &mesh,
+    arma::Mat<dtype> &meshA,
+    arma::Mat<dtype> &meshB,
     int axis = 0,
     arma::Col<int> *split_ind = nullptr);
 ```
@@ -46,29 +46,21 @@ int triangle_mesh_split(
 MD!*/
 
 template <typename dtype>
-int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh,
-                                      arma::Mat<dtype> *meshA,
-                                      arma::Mat<dtype> *meshB,
+int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> &mesh,
+                                      arma::Mat<dtype> &meshA,
+                                      arma::Mat<dtype> &meshB,
                                       int axis,
                                       arma::Col<int> *split_ind)
 {
-    if (mesh == nullptr)
-        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
-    if (meshA == nullptr)
-        throw std::invalid_argument("Output 'meshA' cannot be NULL.");
-    if (meshB == nullptr)
-        throw std::invalid_argument("Output 'meshB' cannot be NULL.");
-    qd_check_alias(meshA, "meshA", mesh);
-    qd_check_alias(meshB, "meshB", mesh);
-    qd_check_alias_outputs(meshA, "meshA", meshB, "meshB");
+    qd_check_alias_list({&meshA, &meshB}, {"meshA", "meshB"}, &mesh);
 
     // Calculate bounding box
     arma::Mat<dtype> aabb;
-    quadriga_lib::triangle_mesh_aabb(*mesh, aabb);
+    quadriga_lib::triangle_mesh_aabb(mesh, aabb);
 
-    arma::uword n_face = mesh->n_rows;
+    arma::uword n_face = mesh.n_rows;
     arma::uword n_mesh = 9 * n_face; // First 9 columns (column-major), further columns are ignored
-    const dtype *p_mesh = mesh->memptr();
+    const dtype *p_mesh = mesh.memptr();
 
     // Find longest axis
     dtype x = aabb.at(0, 1) - aabb.at(0, 0);
@@ -125,19 +117,19 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh,
     }
 
     // Adjust output size
-    meshA->set_size(n_faceA, 9);
-    meshB->set_size(n_faceB, 9);
+    meshA.set_size(n_faceA, 9);
+    meshB.set_size(n_faceB, 9);
 
-    dtype *p_meshA = meshA->memptr();
-    dtype *p_meshB = meshB->memptr();
+    dtype *p_meshA = meshA.memptr();
+    dtype *p_meshB = meshB.memptr();
 
     bool write_split_ind = false;
     int *p_split_ind = nullptr;
     if (split_ind != nullptr)
     {
         write_split_ind = true;
-        if (split_ind->n_elem != mesh->n_rows)
-            split_ind->zeros(mesh->n_rows);
+        if (split_ind->n_elem != mesh.n_rows)
+            split_ind->zeros(mesh.n_rows);
         else
             split_ind->zeros();
         p_split_ind = split_ind->memptr();
@@ -168,14 +160,14 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh,
     return axis;
 }
 
-template int quadriga_lib::triangle_mesh_split(const arma::Mat<float> *mesh,
-                                               arma::Mat<float> *meshA,
-                                               arma::Mat<float> *meshB,
+template int quadriga_lib::triangle_mesh_split(const arma::Mat<float> &mesh,
+                                               arma::Mat<float> &meshA,
+                                               arma::Mat<float> &meshB,
                                                int axis,
                                                arma::Col<int> *split_ind);
 
-template int quadriga_lib::triangle_mesh_split(const arma::Mat<double> *mesh,
-                                               arma::Mat<double> *meshA,
-                                               arma::Mat<double> *meshB,
+template int quadriga_lib::triangle_mesh_split(const arma::Mat<double> &mesh,
+                                               arma::Mat<double> &meshA,
+                                               arma::Mat<double> &meshB,
                                                int axis,
                                                arma::Col<int> *split_ind);

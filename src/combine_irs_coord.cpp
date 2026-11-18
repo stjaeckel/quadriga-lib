@@ -25,12 +25,12 @@ Combine path interaction coordinates for IRS-assisted TX → RX channels
 ```
 void quadriga_lib::combine_irs_coord(
     const arma::Mat<dtype> &irs_pos,
-    const arma::u32_vec *n_interact_1,
-    const arma::Mat<dtype> *interact_coord_1,
-    const arma::u32_vec *n_interact_2,
-    const arma::Mat<dtype> *interact_coord_2,
-    arma::u32_vec *n_interact,
-    arma::Mat<dtype> *interact_coord,
+    const arma::u32_vec &n_interact_1,
+    const arma::Mat<dtype> &interact_coord_1,
+    const arma::u32_vec &n_interact_2,
+    const arma::Mat<dtype> &interact_coord_2,
+    arma::u32_vec &n_interact,
+    arma::Mat<dtype> &interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
     const std::vector<bool> *active_path = nullptr);
@@ -60,31 +60,19 @@ MD!*/
 // Combine path interaction coordinates for Intelligent Reflective Surfaces (IRS)
 template <typename dtype>
 void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
-                                     const arma::u32_vec *n_interact_1, const arma::Mat<dtype> *interact_coord_1,
-                                     const arma::u32_vec *n_interact_2, const arma::Mat<dtype> *interact_coord_2,
-                                     arma::u32_vec *n_interact, arma::Mat<dtype> *interact_coord,
+                                     const arma::u32_vec &n_interact_1, const arma::Mat<dtype> &interact_coord_1,
+                                     const arma::u32_vec &n_interact_2, const arma::Mat<dtype> &interact_coord_2,
+                                     arma::u32_vec &n_interact, arma::Mat<dtype> &interact_coord,
                                      bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path)
 {
     const dtype *p_irs = qd_xyz(irs_pos, "irs_pos");
     const dtype Ix = p_irs[0], Iy = p_irs[1], Iz = p_irs[2];
 
-    if (n_interact_1 == nullptr)
-        throw std::invalid_argument("Input 'n_interact_1' cannot be NULL.");
-    if (interact_coord_1 == nullptr)
-        throw std::invalid_argument("Input 'interact_coord_1' cannot be NULL.");
-    if (n_interact_2 == nullptr)
-        throw std::invalid_argument("Input 'n_interact_2' cannot be NULL.");
-    if (interact_coord_2 == nullptr)
-        throw std::invalid_argument("Input 'interact_coord_2' cannot be NULL.");
-    if (n_interact == nullptr)
-        throw std::invalid_argument("Output 'n_interact' cannot be NULL.");
-    if (interact_coord == nullptr)
-        throw std::invalid_argument("Output 'interact_coord' cannot be NULL.");
-    qd_check_alias(n_interact, "n_interact", n_interact_1, n_interact_2);
-    qd_check_alias(interact_coord, "interact_coord", interact_coord_1, interact_coord_2);
+    qd_check_alias(&n_interact, "n_interact", &n_interact_1, &n_interact_2);
+    qd_check_alias(&interact_coord, "interact_coord", &interact_coord_1, &interact_coord_2);
 
-    arma::uword n_path_1 = n_interact_1->n_elem;
-    arma::uword n_path_2 = n_interact_2->n_elem;
+    arma::uword n_path_1 = n_interact_1.n_elem;
+    arma::uword n_path_2 = n_interact_2.n_elem;
     arma::uword n_path = n_path_1 * n_path_2;
 
     // The coordinates must hold exactly the interactions counted in 'n_interact_1' / '_2'
@@ -93,19 +81,19 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
     arma::uword sum_1 = 0ULL, sum_2 = 0ULL, max_1 = 0ULL, max_2 = 0ULL;
     for (arma::uword i = 0ULL; i < n_path_1; ++i)
     {
-        const arma::uword v = (arma::uword)n_interact_1->at(i);
+        const arma::uword v = (arma::uword)n_interact_1.at(i);
         sum_1 += v, max_1 = v > max_1 ? v : max_1;
     }
     for (arma::uword i = 0ULL; i < n_path_2; ++i)
     {
-        const arma::uword v = (arma::uword)n_interact_2->at(i);
+        const arma::uword v = (arma::uword)n_interact_2.at(i);
         sum_2 += v, max_2 = v > max_2 ? v : max_2;
     }
     if (max_1 + max_2 + 1ULL > (arma::uword)UINT_MAX)
         throw std::invalid_argument("The interaction count of a combined path exceeds the 32-bit range.");
-    if (interact_coord_1->n_cols != sum_1 || (sum_1 != 0ULL && interact_coord_1->n_rows != 3ULL))
+    if (interact_coord_1.n_cols != sum_1 || (sum_1 != 0ULL && interact_coord_1.n_rows != 3ULL))
         throw std::invalid_argument("Input 'interact_coord_1' must have 3 rows and sum(n_interact_1) = " + std::to_string(sum_1) + " columns.");
-    if (interact_coord_2->n_cols != sum_2 || (sum_2 != 0ULL && interact_coord_2->n_rows != 3ULL))
+    if (interact_coord_2.n_cols != sum_2 || (sum_2 != 0ULL && interact_coord_2.n_rows != 3ULL))
         throw std::invalid_argument("Input 'interact_coord_2' must have 3 rows and sum(n_interact_2) = " + std::to_string(sum_2) + " columns.");
     arma::uword n_path_irs = n_path;
 
@@ -125,16 +113,16 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
 
     if (n_path_irs == 0ULL)
     {
-        n_interact->reset();
-        interact_coord->reset();
+        n_interact.reset();
+        interact_coord.reset();
         return;
     }
 
     // Get the number of interactions in the output
-    n_interact->set_size(n_path_irs);
-    const unsigned *pI1 = n_interact_1->memptr();
-    const unsigned *pI2 = n_interact_2->memptr();
-    unsigned *pI = n_interact->memptr();
+    n_interact.set_size(n_path_irs);
+    const unsigned *pI1 = n_interact_1.memptr();
+    const unsigned *pI2 = n_interact_2.memptr();
+    unsigned *pI = n_interact.memptr();
 
     arma::uword i_path_irs = 0ULL, i_path = 0ULL, sum_no_interact = 0ULL;
     for (arma::uword i_path_1 = 0ULL; i_path_1 < n_path_1; ++i_path_1)
@@ -155,7 +143,7 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
 
     // Calculate the output coordinates
     i_path_irs = 0ULL, i_path = 0ULL;
-    interact_coord->set_size(3ULL, sum_no_interact);
+    interact_coord.set_size(3ULL, sum_no_interact);
 
     arma::uword i_start_1 = 0ULL, i_col = 0ULL, n_bytes_per_col = 3ULL * sizeof(dtype);
     for (arma::uword i_path_1 = 0ULL; i_path_1 < n_path_1; ++i_path_1)
@@ -166,7 +154,7 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
         if (n_int_1 != 0ULL)
         {
             arma::uword i_end_1 = i_start_1 + n_int_1 - 1ULL;
-            seg_1 = interact_coord_1->cols(i_start_1, i_end_1);
+            seg_1 = interact_coord_1.cols(i_start_1, i_end_1);
             i_start_1 = i_end_1 + 1ULL;
         }
         if (reverse_segment_1 && n_int_1 > 1ULL)
@@ -181,17 +169,17 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
             {
                 arma::Mat<dtype> seg_2;
                 if (n_int_2 != 0ULL)
-                    seg_2 = interact_coord_2->cols(i_start_2, i_start_2 + n_int_2 - 1ULL);
+                    seg_2 = interact_coord_2.cols(i_start_2, i_start_2 + n_int_2 - 1ULL);
                 if (reverse_segment_2 && n_int_2 > 1ULL)
                     seg_2 = arma::fliplr(seg_2);
 
                 if (n_int_1 != 0ULL)
                 {
-                    std::memcpy(interact_coord->colptr(i_col), seg_1.memptr(), n_int_1 * n_bytes_per_col);
+                    std::memcpy(interact_coord.colptr(i_col), seg_1.memptr(), n_int_1 * n_bytes_per_col);
                     i_col += n_int_1;
                 }
 
-                dtype *p_col = interact_coord->colptr(i_col);
+                dtype *p_col = interact_coord.colptr(i_col);
                 p_col[0] = Ix;
                 p_col[1] = Iy;
                 p_col[2] = Iz;
@@ -199,7 +187,7 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
 
                 if (n_int_2 != 0ULL)
                 {
-                    std::memcpy(interact_coord->colptr(i_col), seg_2.memptr(), n_int_2 * n_bytes_per_col);
+                    std::memcpy(interact_coord.colptr(i_col), seg_2.memptr(), n_int_2 * n_bytes_per_col);
                     i_col += n_int_2;
                 }
             }
@@ -211,13 +199,13 @@ void quadriga_lib::combine_irs_coord(const arma::Mat<dtype> &irs_pos,
 }
 
 template void quadriga_lib::combine_irs_coord(const arma::Mat<float> &irs_pos,
-                                              const arma::u32_vec *n_interact_1, const arma::Mat<float> *interact_coord_1,
-                                              const arma::u32_vec *n_interact_2, const arma::Mat<float> *interact_coord_2,
-                                              arma::u32_vec *n_interact, arma::Mat<float> *interact_coord,
+                                              const arma::u32_vec &n_interact_1, const arma::Mat<float> &interact_coord_1,
+                                              const arma::u32_vec &n_interact_2, const arma::Mat<float> &interact_coord_2,
+                                              arma::u32_vec &n_interact, arma::Mat<float> &interact_coord,
                                               bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path);
 
 template void quadriga_lib::combine_irs_coord(const arma::Mat<double> &irs_pos,
-                                              const arma::u32_vec *n_interact_1, const arma::Mat<double> *interact_coord_1,
-                                              const arma::u32_vec *n_interact_2, const arma::Mat<double> *interact_coord_2,
-                                              arma::u32_vec *n_interact, arma::Mat<double> *interact_coord,
+                                              const arma::u32_vec &n_interact_1, const arma::Mat<double> &interact_coord_1,
+                                              const arma::u32_vec &n_interact_2, const arma::Mat<double> &interact_coord_2,
+                                              arma::u32_vec &n_interact, arma::Mat<double> &interact_coord,
                                               bool reverse_segment_1, bool reverse_segment_2, const std::vector<bool> *active_path);

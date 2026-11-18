@@ -921,7 +921,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
         // Calculate path coordinates
         arma::Col<dtype> path_length;
         std::vector<arma::Mat<dtype>> path_coord;
-        quadriga_lib::coord2path<dtype>(arma::Col<dtype>{tx, ty, tz}, arma::Col<dtype>{rx, ry, rz}, &this->n_interact[i_snap_in], &this->interact_coord[i_snap_in],
+        quadriga_lib::coord2path<dtype>(arma::Col<dtype>{tx, ty, tz}, arma::Col<dtype>{rx, ry, rz}, this->n_interact[i_snap_in], this->interact_coord[i_snap_in],
                                         &path_length, nullptr, nullptr, nullptr, &path_coord);
 
         // Calculate path power
@@ -1042,7 +1042,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(const std::string &fn
                     // Calculate vertices and faces
                     arma::Mat<dtype> vert;
                     arma::umat faces;
-                    quadriga_lib::path_to_tube(&path_coord[i_path_sorted], &vert, &faces, radius, (arma::uword)n_edges);
+                    quadriga_lib::path_to_tube(path_coord[i_path_sorted], vert, faces, radius, (arma::uword)n_edges);
 
                     // Write vertices to file
                     arma::uword n_vert = vert.n_cols;

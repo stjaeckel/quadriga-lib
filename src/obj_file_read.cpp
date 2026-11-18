@@ -475,7 +475,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 ## Declaration:
 ```
 arma::uword quadriga_lib::obj_file_read(
-    const std::string &fn = "",
+    const std::string &fn,
     arma::Mat<dtype> *mesh = nullptr,
     arma::Mat<dtype> *vert_list = nullptr,
     arma::umat *face_ind = nullptr,

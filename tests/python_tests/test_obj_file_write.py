@@ -497,6 +497,10 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError):
             quadriga_lib.RTtools.obj_file_write(fn)
 
+        # The file name is mandatory
+        with self.assertRaises(TypeError):
+            quadriga_lib.RTtools.obj_file_write(mesh=mesh)
+
         # File name does not end in .obj
         with self.assertRaises(ValueError):
             quadriga_lib.RTtools.obj_file_write("cube.txt", mesh)

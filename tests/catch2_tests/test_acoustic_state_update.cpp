@@ -456,7 +456,7 @@ TEST_CASE("Leak reciprocity - a mass-law panel on a rigid wall as a sheet and as
             arma::mat orig = {{xa, -0.4, 0.1}}, dest = {{xb, -0.4 + dy, 0.1}};
             arma::mat fbs, sbs;
             arma::u32_vec fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+            quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
             arma::mat origN, destN, xprmatN;
             arma::vec gainN;
             quadriga_lib::ray_mesh_interact(4, api_freq(f_hz, true), &orig, &dest, &mesh, &mtl_ind, &mtl,
@@ -963,7 +963,7 @@ TEST_CASE("Ports of a mass-law face from inside - the reflect port is the other 
         arma::mat orig = {{xa, -0.4, 0.1}}, dest = {{xb, -0.4 + dy, 0.1}};
         arma::mat fbs, sbs;
         arma::u32_vec fbs_ind, sbs_ind;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         arma::mat origN, destN, xprmatN;
         arma::vec gainN;
         quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,
@@ -1160,7 +1160,7 @@ TEST_CASE("Leak direction - a closed face hands the wall behind a traced layer t
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         E.o = orig, E.d = dest;
         arma::vec gain, fang;
@@ -1481,7 +1481,7 @@ TEST_CASE("Leak direction - a closed face hands the wall behind a traced layer t
             {
                 arma::mat fbs, sbs, fbsN, sbsN, nv;
                 arma::u32_vec nh, fi, si;
-                quadriga_lib::ray_triangle_intersect(&oo, &dd, &mesh, &fbs, &sbs, &nh, &fi, &si);
+                quadriga_lib::ray_triangle_intersect(oo, dd, mesh, &fbs, &sbs, &nh, &fi, &si);
                 Tb E;
                 arma::vec gain, fang;
                 std::vector<uint8_t> ot, rt;
@@ -1570,7 +1570,7 @@ TEST_CASE("Bonded mass - the plate at any depth", "[acoustic]")
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -2960,7 +2960,7 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived -
     {
         arma::mat fbs, sbs, fbsN, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3080,7 +3080,7 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
             in_state = in;
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3239,7 +3239,7 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
             in_state = in;
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3408,7 +3408,7 @@ TEST_CASE("Leak direction - a wave held in a mass-law body keeps its direction a
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3625,7 +3625,7 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
@@ -3817,7 +3817,7 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle - the mas
     {
         arma::mat fbs, sbs, sbsN, nv;
         arma::u32_vec nh, fi, si;
-        quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, &nh, &fi, &si);
+        quadriga_lib::ray_triangle_intersect(orig, dest, mesh, &fbs, &sbs, &nh, &fi, &si);
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;

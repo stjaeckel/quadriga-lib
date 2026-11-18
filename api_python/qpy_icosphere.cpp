@@ -61,7 +61,7 @@ py::tuple icosphere(arma::uword n_div, double radius, py::handle direction_xyz)
     auto vert_p = qd_python_init_output(n_faces, 9, &vert);
     auto cdirection_p = qd_python_init_output(n_faces, n_dir_cols, &direction);
 
-    quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz_b);
+    quadriga_lib::icosphere<double>(n_div, radius, center, &length, &vert, &direction, direction_xyz_b);
 
     return py::make_tuple(center_p, length_p, vert_p, cdirection_p);
 }

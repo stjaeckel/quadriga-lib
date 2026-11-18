@@ -12,7 +12,7 @@ lang: en-US
 - All functions and classes live in the `quadriga_lib` namespace.
 - Default include: `#include "quadriga_lib.hpp"`.
 - Template parameter `dtype` is `float` or `double` unless stated.
-- Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.
+- Mandatory arguments are references; optional ones are pointers with a `nullptr` default (input not given, output not computed). `ray_mesh_interact` and `ray_state_update` still take mandatory arguments by pointer and throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - An output cannot be the same object as an input or another output, nor share memory with one; such a call throws `std::invalid_argument`. Exceptions are stated in the function documentation.
 - Invalid inputs (shape/domain, an index outside the layout of a file) cause a `std::invalid_argument`; a problem with a file's access or content (missing, unreadable, truncated, malformed, unsupported) a `std::runtime_error`.
@@ -5566,12 +5566,12 @@ Not in: MATLAB, Python
 ```cpp
 void quadriga_lib::combine_irs_coord(
     const arma::Mat<dtype> &irs_pos,
-    const arma::u32_vec *n_interact_1,
-    const arma::Mat<dtype> *interact_coord_1,
-    const arma::u32_vec *n_interact_2,
-    const arma::Mat<dtype> *interact_coord_2,
-    arma::u32_vec *n_interact,
-    arma::Mat<dtype> *interact_coord,
+    const arma::u32_vec &n_interact_1,
+    const arma::Mat<dtype> &interact_coord_1,
+    const arma::u32_vec &n_interact_2,
+    const arma::Mat<dtype> &interact_coord_2,
+    arma::u32_vec &n_interact,
+    arma::Mat<dtype> &interact_coord,
     bool reverse_segment_1 = false,
     bool reverse_segment_2 = false,
     const std::vector<bool> *active_path = nullptr);
@@ -5614,8 +5614,8 @@ Not in: MATLAB, Python
 void quadriga_lib::coord2path(
     const arma::Mat<dtype> &tx_pos,
     const arma::Mat<dtype> &rx_pos,
-    const arma::u32_vec *n_interact,
-    const arma::Mat<dtype> *interact_coord,
+    const arma::u32_vec &n_interact,
+    const arma::Mat<dtype> &interact_coord,
     arma::Col<dtype> *path_length = nullptr,
     arma::Mat<dtype> *fbs_pos = nullptr,
     arma::Mat<dtype> *lbs_pos = nullptr,
@@ -5627,8 +5627,8 @@ void quadriga_lib::coord2path(
 ### Inputs:
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
-- **`n_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
-- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(n_interact)]`
+- **`n_interact`** — Number of interactions per path (0 = LOS); `[n_path]`
+- **`interact_coord`** — Interaction coordinates in path order; must have 3 rows; `[3, sum(n_interact)]`
 - **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 
 ### Outputs:
@@ -5744,7 +5744,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#icosphere) · [Python](quadriga_lib_ap
 arma::uword quadriga_lib::icosphere(
     arma::uword n_div,
     dtype radius,
-    arma::Mat<dtype> *center,
+    arma::Mat<dtype> &center,
     arma::Col<dtype> *length = nullptr,
     arma::Mat<dtype> *vert = nullptr,
     arma::Mat<dtype> *direction = nullptr,
@@ -5927,7 +5927,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#obj_file_read) · [Python](quadriga_li
 ### Declaration:
 ```cpp
 arma::uword quadriga_lib::obj_file_read(
-    const std::string &fn = "",
+    const std::string &fn,
     arma::Mat<dtype> *mesh = nullptr,
     arma::Mat<dtype> *vert_list = nullptr,
     arma::umat *face_ind = nullptr,
@@ -6004,7 +6004,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#obj_file_write) · [Python](quadriga_l
 ### Declaration:
 ```cpp
 void obj_file_write(
-    const std::string &fn = "",
+    const std::string &fn,
     const arma::Mat<dtype> *mesh = nullptr,
     const arma::uvec *obj_ind = nullptr,
     const arma::uvec *mtl_ind = nullptr,
@@ -6100,9 +6100,9 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 void quadriga_lib::path_to_tube(
-    const arma::Mat<dtype> *path_coord,
-    arma::Mat<dtype> *vert,
-    arma::umat *faces,
+    const arma::Mat<dtype> &path_coord,
+    arma::Mat<dtype> &vert,
+    arma::umat &faces,
     dtype radius = 1.0,
     arma::uword n_edges = 5);
 ```
@@ -6205,9 +6205,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#point_cloud_segmentation) · [Python](
 ### Declaration:
 ```cpp
 arma::uword quadriga_lib::point_cloud_segmentation(
-    const arma::Mat<dtype> *points,
-    arma::Mat<dtype> *points_out,
-    arma::u32_vec *sub_cloud_ind,
+    const arma::Mat<dtype> &points,
+    arma::Mat<dtype> &points_out,
+    arma::u32_vec &sub_cloud_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
     arma::u32_vec *forward_ind = nullptr,
@@ -6249,9 +6249,9 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 int quadriga_lib::point_cloud_split(
-    const arma::Mat<dtype> *points,
-    arma::Mat<dtype> *pointsA,
-    arma::Mat<dtype> *pointsB,
+    const arma::Mat<dtype> &points,
+    arma::Mat<dtype> &pointsA,
+    arma::Mat<dtype> &pointsB,
     int axis = 0,
     arma::Col<int> *split_ind = nullptr);
 ```
@@ -7164,9 +7164,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#ray_triangle_intersect) · [Python](qu
 ### Declaration:
 ```cpp
 void quadriga_lib::ray_triangle_intersect(
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *mesh,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &dest,
+    const arma::Mat<dtype> &mesh,
     arma::Mat<dtype> *fbs = nullptr,
     arma::Mat<dtype> *sbs = nullptr,
     arma::u32_vec *n_interact = nullptr,
@@ -7315,8 +7315,8 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#subdivide_triangles) · [Python](quadr
 ```cpp
 arma::uword quadriga_lib::subdivide_triangles(
     arma::uword n_div,
-    const arma::Mat<dtype> *triangles_in,
-    arma::Mat<dtype> *triangles_out,
+    const arma::Mat<dtype> &triangles_in,
+    arma::Mat<dtype> &triangles_out,
     const arma::uvec *mtl_ind = nullptr,
     arma::uvec *mtl_ind_out = nullptr);
 ```
@@ -7380,9 +7380,9 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#triangle_mesh_segmentation) · [Python
 ### Declaration:
 ```cpp
 arma::uword triangle_mesh_segmentation(
-    const arma::Mat<dtype> *mesh,
-    arma::Mat<dtype> *mesh_out,
-    arma::u32_vec *sub_mesh_ind,
+    const arma::Mat<dtype> &mesh,
+    arma::Mat<dtype> &mesh_out,
+    arma::u32_vec &sub_mesh_ind,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
     const arma::uvec *mtl_ind = nullptr,
@@ -7425,9 +7425,9 @@ Not in: MATLAB, Python
 ### Declaration:
 ```cpp
 int triangle_mesh_split(
-    const arma::Mat<dtype> *mesh,
-    arma::Mat<dtype> *meshA,
-    arma::Mat<dtype> *meshB,
+    const arma::Mat<dtype> &mesh,
+    arma::Mat<dtype> &meshA,
+    arma::Mat<dtype> &meshB,
     int axis = 0,
     arma::Col<int> *split_ind = nullptr);
 ```

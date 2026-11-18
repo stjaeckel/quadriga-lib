@@ -23,8 +23,8 @@ Convert path interaction coordinates into FBS/LBS positions, path length, and an
 void quadriga_lib::coord2path(
     const arma::Mat<dtype> &tx_pos,
     const arma::Mat<dtype> &rx_pos,
-    const arma::u32_vec *n_interact,
-    const arma::Mat<dtype> *interact_coord,
+    const arma::u32_vec &n_interact,
+    const arma::Mat<dtype> &interact_coord,
     arma::Col<dtype> *path_length = nullptr,
     arma::Mat<dtype> *fbs_pos = nullptr,
     arma::Mat<dtype> *lbs_pos = nullptr,
@@ -36,8 +36,8 @@ void quadriga_lib::coord2path(
 ## Inputs:
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, 1]` or `[1, 3]`
-- **`n_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
-- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(n_interact)]`
+- **`n_interact`** — Number of interactions per path (0 = LOS); `[n_path]`
+- **`interact_coord`** — Interaction coordinates in path order; must have 3 rows; `[3, sum(n_interact)]`
 - **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 
 ## Outputs:
@@ -50,34 +50,31 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dtype> &rx_pos,
-                              const arma::u32_vec *n_interact, const arma::Mat<dtype> *interact_coord,
+                              const arma::u32_vec &n_interact, const arma::Mat<dtype> &interact_coord,
                               arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos,
                               arma::Mat<dtype> *path_angles, std::vector<arma::Mat<dtype>> *path_coord, bool reverse_path)
 {
     const dtype *p_tx = qd_xyz(tx_pos, "tx_pos"), *p_rx = qd_xyz(rx_pos, "rx_pos");
     const dtype Tx = p_tx[0], Ty = p_tx[1], Tz = p_tx[2], Rx = p_rx[0], Ry = p_rx[1], Rz = p_rx[2];
 
-    if (n_interact == nullptr)
-        throw std::invalid_argument("Input 'n_interact' cannot be NULL.");
-
-    size_t n_path = (size_t)n_interact->n_elem;
+    size_t n_path = (size_t)n_interact.n_elem;
 
     // Calculate the total number of interactions (64-bit sum, a 32-bit sum can wrap)
     size_t n_interact_total = 0;
-    const unsigned *p_interact = n_interact->memptr();
+    const unsigned *p_interact = n_interact.memptr();
     for (size_t i = 0; i < n_path; ++i)
         n_interact_total += (size_t)p_interact[i];
 
-    if (interact_coord == nullptr || interact_coord->n_rows != 3)
+    if (interact_coord.n_rows != 3)
         throw std::invalid_argument("Input 'interact_coord' must have 3 rows.");
 
-    if (interact_coord->n_cols != n_interact_total)
+    if (interact_coord.n_cols != n_interact_total)
         throw std::invalid_argument("Number of columns of 'interact_coord' must match the sum of 'n_interact'.");
 
-    qd_check_alias(path_length, "path_length", interact_coord);
-    qd_check_alias(fbs_pos, "fbs_pos", interact_coord);
-    qd_check_alias(lbs_pos, "lbs_pos", interact_coord);
-    qd_check_alias(path_angles, "path_angles", interact_coord);
+    qd_check_alias(path_length, "path_length", &interact_coord);
+    qd_check_alias(fbs_pos, "fbs_pos", &interact_coord);
+    qd_check_alias(lbs_pos, "lbs_pos", &interact_coord);
+    qd_check_alias(path_angles, "path_angles", &interact_coord);
     qd_check_alias_outputs(path_length, "path_length", fbs_pos, "fbs_pos");
     qd_check_alias_outputs(path_length, "path_length", lbs_pos, "lbs_pos");
     qd_check_alias_outputs(path_length, "path_length", path_angles, "path_angles");
@@ -86,7 +83,7 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
     qd_check_alias_outputs(lbs_pos, "lbs_pos", path_angles, "path_angles");
     if (path_coord != nullptr)
         for (const auto &m : *path_coord)
-            qd_check_alias(&m, "path_coord", interact_coord);
+            qd_check_alias(&m, "path_coord", &interact_coord);
 
     constexpr double los_limit = 1.0e-4;
 
@@ -103,7 +100,7 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
         path_coord->resize(n_path);
 
     // Get pointers
-    const dtype *p_coord = interact_coord->memptr();
+    const dtype *p_coord = interact_coord.memptr();
     dtype *p_length = path_length == nullptr ? nullptr : path_length->memptr();
     dtype *p_fbs = fbs_pos == nullptr ? nullptr : fbs_pos->memptr();
     dtype *p_lbs = lbs_pos == nullptr ? nullptr : lbs_pos->memptr();
@@ -237,8 +234,8 @@ void quadriga_lib::coord2path(const arma::Mat<dtype> &tx_pos, const arma::Mat<dt
     }
 }
 
-template void quadriga_lib::coord2path(const arma::Mat<float> &tx_pos, const arma::Mat<float> &rx_pos, const arma::u32_vec *n_interact, const arma::Mat<float> *interact_coord,
+template void quadriga_lib::coord2path(const arma::Mat<float> &tx_pos, const arma::Mat<float> &rx_pos, const arma::u32_vec &n_interact, const arma::Mat<float> &interact_coord,
                                        arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles, std::vector<arma::Mat<float>> *path_coord, bool reverse_path);
 
-template void quadriga_lib::coord2path(const arma::Mat<double> &tx_pos, const arma::Mat<double> &rx_pos, const arma::u32_vec *n_interact, const arma::Mat<double> *interact_coord,
+template void quadriga_lib::coord2path(const arma::Mat<double> &tx_pos, const arma::Mat<double> &rx_pos, const arma::u32_vec &n_interact, const arma::Mat<double> &interact_coord,
                                        arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles, std::vector<arma::Mat<double>> *path_coord, bool reverse_path);

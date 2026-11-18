@@ -669,7 +669,7 @@ namespace mt
             std::vector<double> pin(nf, (double)n), miss(nf);
             for (int g = 0; g < 10 && orig.n_rows; ++g)
             {
-                quadriga_lib::ray_triangle_intersect<float>(&orig, &dest, &mesh, nullptr, nullptr, &noi, &fbs, &sbs);
+                quadriga_lib::ray_triangle_intersect<float>(orig, dest, mesh, nullptr, nullptr, &noi, &fbs, &sbs);
                 for (size_t q = 0; q < nf; ++q)
                     miss[q] = power(q, true);
                 quadriga_lib::ray_progress(mesh, mi, pal, cf, {0.0f, 0.0f, 0.0f}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr, 10, 3, 255, 0,

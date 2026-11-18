@@ -1498,7 +1498,7 @@ struct RsuAliasCase
     RsuAliasCase()
     {
         mtl_ind.zeros(cube.n_rows);
-        quadriga_lib::ray_triangle_intersect<double>(&orig, &dest, &cube, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
+        quadriga_lib::ray_triangle_intersect<double>(orig, dest, cube, &fbs, &sbs, &n_interact, &fbs_ind, &sbs_ind);
         quadriga_lib::ray_mesh_interact<double>(1, 1.0e9, &orig, &dest, &cube, &mtl_ind, &air, &fbs_ind, &sbs_ind, nullptr, nullptr,
                                         nullptr, nullptr, &fbsN, &sbsN, &gainN, &xprmatN, nullptr, nullptr, &fbs_angleN, nullptr,
                                         nullptr, &normal_vecN, &out_typeN, &path_dirN);

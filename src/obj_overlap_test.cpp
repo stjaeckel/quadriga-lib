@@ -637,7 +637,7 @@ void quadriga_lib::obj_overlap_test(const arma::Mat<dtype> &mesh, const arma::uv
             arma::Mat<dtype> faces_t = faces->rows(0, 8).t();     // [9, n_faces].t() → [n_faces, 9]
 
             OMP_SAFE_CALL(omp_failed, omp_error,
-                          quadriga_lib::ray_triangle_intersect<dtype>(&edge_orig_t, &edge_dest_t, &faces_t,
+                          quadriga_lib::ray_triangle_intersect<dtype>(edge_orig_t, edge_dest_t, faces_t,
                                                                       nullptr, nullptr, nullptr, &hit, &hit_2));
 
             if (hit.n_elem != n_edges || hit_2.n_elem != n_edges) // Failed, the error is thrown after the loop

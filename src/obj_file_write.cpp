@@ -355,7 +355,7 @@ Write a triangulated Wavefront .obj (and .mtl) file
 ## Declaration:
 ```
 void obj_file_write(
-    const std::string &fn = "",
+    const std::string &fn,
     const arma::Mat<dtype> *mesh = nullptr,
     const arma::uvec *obj_ind = nullptr,
     const arma::uvec *mtl_ind = nullptr,

@@ -586,7 +586,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     if (max_interactions) // 0 disables tracing outright, no intersect and no subdivision
     {
         if (run_intersector)
-            quadriga_lib::ray_triangle_intersect<float>(&orig, &dest, &mesh, nullptr, nullptr, &n_interact,
+            quadriga_lib::ray_triangle_intersect<float>(orig, dest, mesh, nullptr, nullptr, &n_interact,
                                                         &fbs_ind, &sbs_ind, sub_mesh_ind, aabb_ptr);
 
         // Delegated arrays are read in place, never copied

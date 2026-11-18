@@ -213,7 +213,7 @@ namespace
     // Fill fbs_ind / sbs_ind from the intersector, exactly as a caller would
     void intersect(Beams &B, const Scene &S)
     {
-        quadriga_lib::ray_triangle_intersect<float>(&B.orig, &B.dest, &S.mesh, nullptr, nullptr,
+        quadriga_lib::ray_triangle_intersect<float>(B.orig, B.dest, S.mesh, nullptr, nullptr,
                                                     nullptr, &B.fbs_ind, &B.sbs_ind, nullptr, nullptr);
     }
 

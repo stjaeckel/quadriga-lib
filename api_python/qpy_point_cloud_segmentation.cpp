@@ -50,7 +50,7 @@ py::tuple point_cloud_segmentation(const py::array_t<double> &points,
     arma::mat points_out;
     arma::u32_vec sub_cloud_ind, forward_ind, reverse_ind;
 
-    quadriga_lib::point_cloud_segmentation<double>(&points_arma, &points_out, &sub_cloud_ind,
+    quadriga_lib::point_cloud_segmentation<double>(points_arma, points_out, sub_cloud_ind,
                                                    target_size, vec_size, &forward_ind, &reverse_ind);
 
     auto points_out_p = qd_python_copy2numpy(&points_out);

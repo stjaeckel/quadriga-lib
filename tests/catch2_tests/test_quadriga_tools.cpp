@@ -97,21 +97,21 @@ TEST_CASE("Quadriga tools - Icosphere")
     arma::fvec length;
 
     // Number of subdivisions cannot be zero
-    REQUIRE_THROWS_AS(quadriga_lib::icosphere<float>(0, 1.0, &center), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::icosphere<float>(0, 1.0, center), std::invalid_argument);
 
-    size_t n = quadriga_lib::icosphere<float>(1, 1.0, &center);
+    size_t n = quadriga_lib::icosphere<float>(1, 1.0, center);
     CHECK(n == 20);
 
-    n = quadriga_lib::icosphere<float>(1, 1.0, &center, &length);
+    n = quadriga_lib::icosphere<float>(1, 1.0, center, &length);
     arma::fvec sumRow = arma::sqrt(sum(arma::abs(pow(center, 2)), 1));
     CHECK(arma::approx_equal(length, sumRow, "absdiff", 2e-7));
 
-    n = quadriga_lib::icosphere<float>(2, 1.0, &center, &length);
+    n = quadriga_lib::icosphere<float>(2, 1.0, center, &length);
     CHECK(n == 80);
     sumRow = arma::sqrt(sum(arma::abs(pow(center, 2)), 1));
     CHECK(arma::approx_equal(length, sumRow, "absdiff", 2e-7));
 
-    n = quadriga_lib::icosphere<float>(2, 1.0, &center, &length, &vert);
+    n = quadriga_lib::icosphere<float>(2, 1.0, center, &length, &vert);
     arma::fvec squaredSum = arma::sum(arma::square(arma::abs(center + vert.cols(0, 2))), 1);
     auto test = arma::fvec(80, arma::fill::ones);
     CHECK(arma::approx_equal(squaredSum, test, "absdiff", 2e-7));
@@ -122,7 +122,7 @@ TEST_CASE("Quadriga tools - Icosphere")
     squaredSum = sum(arma::square(arma::abs(center + vert.cols(6, 8))), 1);
     CHECK(arma::approx_equal(squaredSum, test, "absdiff", 2e-7));
 
-    n = quadriga_lib::icosphere<float>(2, 2.0, &center, &length, &vert, &direction);
+    n = quadriga_lib::icosphere<float>(2, 2.0, center, &length, &vert, &direction);
     CHECK(direction.n_rows == 80);
     CHECK(direction.n_cols == 6);
 
@@ -133,7 +133,7 @@ TEST_CASE("Quadriga tools - Icosphere")
     bool allElementsWithinRange = arma::all(arma::vectorise(arma::abs(direction)) <= arma::datum::pi);
     CHECK(allElementsWithinRange);
 
-    quadriga_lib::icosphere<float>(2, 2.0, &center, &length, &vert, &direction, 1);
+    quadriga_lib::icosphere<float>(2, 2.0, center, &length, &vert, &direction, 1);
     test.ones(80);
 
     arma::fvec x = direction.col(0) % direction.col(0) +
@@ -176,12 +176,12 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
     // Subdivide the mesh into smaller chunks
     arma::fmat cube_sub = cube;
     arma::uvec mtl_ind_sub;
-    quadriga_lib::subdivide_triangles(3, &cube, &cube_sub, &mtl_ind, &mtl_ind_sub);
+    quadriga_lib::subdivide_triangles(3, cube, cube_sub, &mtl_ind, &mtl_ind_sub);
     // Case 1 - Mesh size is already below threshold, test padding
     arma::fmat cube_re;
     arma::uvec mtl_ind_re;
     arma::u32_vec cube_index, mesh_ind;
-    auto n_sub = quadriga_lib::triangle_mesh_segmentation(&cube_sub, &cube_re, &cube_index, 1024, 8,
+    auto n_sub = quadriga_lib::triangle_mesh_segmentation(cube_sub, cube_re, cube_index, 1024, 8,
                                                           &mtl_ind_sub, &mtl_ind_re, &mesh_ind);
 
     CHECK(n_sub == 1);
@@ -204,7 +204,7 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
     CHECK(arma::all(mesh_ind.subvec(108, 111) == U));
 
     // Case 2 - Subdivide, no padding
-    n_sub = quadriga_lib::triangle_mesh_segmentation(&cube_sub, &cube_re, &cube_index, 64, 1,
+    n_sub = quadriga_lib::triangle_mesh_segmentation(cube_sub, cube_re, cube_index, 64, 1,
                                                      &mtl_ind_sub, &mtl_ind_re, &mesh_ind);
     CHECK(n_sub == 3);
     CHECK(cube_re.n_rows == 108);
@@ -236,7 +236,7 @@ static void check_mesh_split_extra_column(bool add_column, dtype extra)
 
     arma::Mat<dtype> A, B;
     arma::Col<int> split_ind;
-    int axis = quadriga_lib::triangle_mesh_split<dtype>(&mesh, &A, &B, 1, &split_ind);
+    int axis = quadriga_lib::triangle_mesh_split<dtype>(mesh, A, B, 1, &split_ind);
 
     REQUIRE(axis == 1);
     REQUIRE(A.n_rows == 2);
@@ -282,7 +282,7 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
     arma::s32_vec split_ind;
 
     // Split along longest axis
-    int res = quadriga_lib::point_cloud_split(&points, &pointsA, &pointsB, 0, &split_ind);
+    int res = quadriga_lib::point_cloud_split(points, pointsA, pointsB, 0, &split_ind);
 
     CHECK(res == 2);
     CHECK(arma::approx_equal(pointsA, points.submat(0, 0, 7, 2), "absdiff", 1e-14));
@@ -296,7 +296,7 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
 
     points.col(1) *= 0.1f;
 
-    size_t n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 4, 5,
+    size_t n_sub = quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 4, 5,
                                                           &forward_ind, &reverse_ind);
 
     arma::u32_vec I;
@@ -339,7 +339,7 @@ TEST_CASE("Quadriga tools - Subdivide Rays")
     arma::Mat<float> trivec;
     arma::Mat<float> tridir;
 
-    quadriga_lib::icosphere<float>(2, 2.0, &orig, nullptr, &trivec, &tridir);
+    quadriga_lib::icosphere<float>(2, 2.0, orig, nullptr, &trivec, &tridir);
 
     arma::Mat<float> origN;
     arma::Mat<float> trivecN;
@@ -406,7 +406,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
     std::vector<arma::mat> path_coord;
 
     // Forward LOS path
-    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &n_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, n_interact, interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord);
 
     arma::mat M = {5.0, 5.0, 5.0};
@@ -425,7 +425,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
     CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
 
     // Reverse LOS path
-    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &n_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, n_interact, interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord, true);
 
     M = {5.0, 5.0, 5.0};
@@ -446,7 +446,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
     M = {{10.0, 0.0}, {10.0, 0.0}, {10.0, 0.0}};
     CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
 
-    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &n_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, n_interact, interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord);
 
     M = {2.0, 2.0, 2.0};
@@ -466,7 +466,7 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
 
     // Reverse path
 
-    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, &n_interact, &interact_coord,
+    quadriga_lib::coord2path({Tx, Ty, Tz}, {Rx, Ry, Rz}, n_interact, interact_coord,
                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord, true);
 
     M = {8.0, 2.0, 2.0};
@@ -494,7 +494,7 @@ TEST_CASE("Quadriga tools - coord2path interaction count sum does not wrap at 32
     arma::mat fbs_pos, lbs_pos, path_angles;
     std::vector<arma::mat> path_coord;
 
-    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &n_interact, &interact_coord,
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, n_interact, interact_coord,
                                              &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord),
                     std::invalid_argument);
 }
@@ -541,7 +541,7 @@ TEST_CASE("Quadriga tools - coord2path example")
     quadriga_lib::coord2path<double>(
         {0.0, 0.0, 0.0},  {// TX at origin
         10.0, 0.0, 0.0}, // RX at x = 10 m
-        &n_interact, &interact, &lengths, &fbs, &lbs, &angles, &coords, 1);
+        n_interact, interact, &lengths, &fbs, &lbs, &angles, &coords, 1);
 
     arma::mat T = {{10, 0}, {0, 0}, {0, 0}};
     CHECK(arma::approx_equal(coords[0], T, "absdiff", 1e-12));
@@ -557,30 +557,30 @@ TEST_CASE("Quadriga tools - Point cloud split of identical points")
     arma::mat pointsA = {{1.0, 2.0, 3.0}}, pointsB = {{4.0, 5.0, 6.0}};
     arma::mat A0 = pointsA, B0 = pointsB;
 
-    int res = quadriga_lib::point_cloud_split(&points, &pointsA, &pointsB);
+    int res = quadriga_lib::point_cloud_split(points, pointsA, pointsB);
     CHECK(res < 0);
     CHECK(arma::approx_equal(pointsA, A0, "absdiff", 0.0));
     CHECK(arma::approx_equal(pointsB, B0, "absdiff", 0.0));
 
     for (int axis = 1; axis <= 3; ++axis)
-        CHECK(quadriga_lib::point_cloud_split(&points, &pointsA, &pointsB, axis) == -axis);
+        CHECK(quadriga_lib::point_cloud_split(points, pointsA, pointsB, axis) == -axis);
 }
 
 TEST_CASE("Quadriga tools - Subdivision count too large")
 {
     // n_div^2 wraps to 0 in 64 bits for n_div = 2^32; the output count must be checked before any allocation
     arma::mat t = {{0, 0, 0, 1, 0, 0, 0, 1, 0}}, out;
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1ULL << 32, &t, &out), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(arma::uword(-1), &t, &out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1ULL << 32, t, out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(arma::uword(-1), t, out), std::invalid_argument);
     CHECK(out.n_elem == 0);
 
     // 2^60 * 9 values fit into 64 bits but not into memory: an allocation error, no crash
-    CHECK_THROWS(quadriga_lib::subdivide_triangles(1ULL << 30, &t, &out));
+    CHECK_THROWS(quadriga_lib::subdivide_triangles(1ULL << 30, t, out));
 
     arma::mat center;
-    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1ULL << 32, 1.0, &center), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(arma::uword(-1), 1.0, &center), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1ULL << 29, 1.0, &center), std::invalid_argument); // 20 * 2^58 * 9
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1ULL << 32, 1.0, center), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(arma::uword(-1), 1.0, center), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1ULL << 29, 1.0, center), std::invalid_argument); // 20 * 2^58 * 9
     CHECK(center.n_elem == 0);
 
     CHECK_THROWS_AS(quadriga_lib::cube<double>({1.0}, {}, {}, 1ULL << 32), std::invalid_argument);
@@ -591,25 +591,26 @@ TEST_CASE("subdivide_triangles - outputs that alias inputs")
 {
     arma::mat t = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {1, 2, 3, 4, 5, 7, -1, 0, 2}}, out;
     arma::uvec mtl = {3, 5}, mtl_out;
-    CHECK_NOTHROW(quadriga_lib::subdivide_triangles(3, &t, &out, &mtl, &mtl_out));
+    CHECK_NOTHROW(quadriga_lib::subdivide_triangles(3, t, out, &mtl, &mtl_out));
 
     // An output that is its own input is rejected before anything is written
     arma::mat t2 = t;
     arma::uvec mtl2 = mtl;
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, &t2, &t2, &mtl, &mtl_out), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, &t, &out, &mtl2, &mtl2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, t2, t2, &mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(3, t, out, &mtl2, &mtl2), std::invalid_argument);
     CHECK(arma::approx_equal(t2, t, "absdiff", 0.0));
     CHECK(arma::all(mtl2 == mtl));
+    CHECK_THROWS_WITH(quadriga_lib::subdivide_triangles(3, arma::mat(), out), "Input 'triangles_in' cannot be empty.");
 
     // n_div = 1 keeps the size, an output on the memory of the input is rejected as well
     arma::mat view(t2.memptr(), t2.n_rows, t2.n_cols, false, true);
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1, &t2, &view, &mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(1, t2, view, &mtl, &mtl_out), std::invalid_argument);
 
     // An invalid material list leaves the output untouched
     out.set_size(1, 1);
     out(0, 0) = 9.0;
     arma::uvec bad = {1, 2, 3};
-    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(2, &t, &out, &bad, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::subdivide_triangles(2, t, out, &bad, &mtl_out), std::invalid_argument);
     CHECK(out.n_elem == 1);
 }
 
@@ -619,43 +620,43 @@ TEST_CASE("Quadriga tools - Icosphere radius must be finite and positive")
     for (double r : {0.0, -1.0, (double)NAN, (double)INFINITY})
     {
         INFO("radius = " << r);
-        CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, r, &center), std::invalid_argument);
+        CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, r, center), std::invalid_argument);
     }
     arma::fmat center_f;
-    CHECK_THROWS_AS(quadriga_lib::icosphere<float>(1, 0.0f, &center_f), std::invalid_argument);
-    CHECK(quadriga_lib::icosphere<double>(1, 1e-3, &center) == 20);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<float>(1, 0.0f, center_f), std::invalid_argument);
+    CHECK(quadriga_lib::icosphere<double>(1, 1e-3, center) == 20);
 }
 
 TEST_CASE("triangle_mesh_split - outputs that alias inputs")
 {
     arma::mat mesh = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {10, 0, 0, 11, 0, 0, 10, 1, 0}}, A, B;
     arma::Col<int> split_ind;
-    CHECK_NOTHROW(quadriga_lib::triangle_mesh_split(&mesh, &A, &B, 1, &split_ind));
+    CHECK_NOTHROW(quadriga_lib::triangle_mesh_split(mesh, A, B, 1, &split_ind));
 
     arma::mat m = mesh;
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &m, &B, 1, &split_ind), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &A, &m, 1, &split_ind), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &A, &A, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(m, m, B, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(m, A, m, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(m, A, A, 1, &split_ind), std::invalid_argument);
     CHECK(arma::approx_equal(m, mesh, "absdiff", 0.0));
 
     arma::mat view(m.memptr(), 1, 9, false, true);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(&m, &view, &B, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_split(m, view, B, 1), std::invalid_argument);
 }
 
 TEST_CASE("point_cloud_split - outputs that alias inputs")
 {
     arma::mat points = {{0, 0, 0}, {1, 0, 0}, {10, 0, 0}}, A, B;
     arma::Col<int> split_ind;
-    CHECK_NOTHROW(quadriga_lib::point_cloud_split(&points, &A, &B, 1, &split_ind));
+    CHECK_NOTHROW(quadriga_lib::point_cloud_split(points, A, B, 1, &split_ind));
 
     arma::mat p = points;
-    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &p, &B, 1, &split_ind), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &A, &p, 1, &split_ind), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &A, &A, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(p, p, B, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(p, A, p, 1, &split_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(p, A, A, 1, &split_ind), std::invalid_argument);
     CHECK(arma::approx_equal(p, points, "absdiff", 0.0));
 
     arma::mat view(p.memptr(), 2, 3, false, true);
-    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(&p, &A, &view, 1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_split(p, A, view, 1), std::invalid_argument);
 }
 
 TEST_CASE("triangle_mesh_segmentation - outputs that alias inputs")
@@ -663,13 +664,13 @@ TEST_CASE("triangle_mesh_segmentation - outputs that alias inputs")
     arma::mat mesh = {{0, 0, 0, 1, 0, 0, 0, 1, 0}, {10, 0, 0, 11, 0, 0, 10, 1, 0}, {20, 0, 0, 21, 0, 0, 20, 1, 0}}, meshR;
     arma::u32_vec sub_mesh_ind, mesh_ind;
     arma::uvec mtl = {1, 2, 3}, mtl_out;
-    CHECK_NOTHROW(quadriga_lib::triangle_mesh_segmentation(&mesh, &meshR, &sub_mesh_ind, 1, 2, &mtl, &mtl_out, &mesh_ind));
+    CHECK_NOTHROW(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, &mtl, &mtl_out, &mesh_ind));
 
     arma::mat m = mesh;
     arma::uvec mt = mtl;
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(&m, &m, &sub_mesh_ind, 1, 2, &mtl, &mtl_out), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(&mesh, &meshR, &sub_mesh_ind, 1, 2, &mt, &mt), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(&mesh, &meshR, &sub_mesh_ind, 1, 2, &mtl, &mtl_out, &sub_mesh_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(m, m, sub_mesh_ind, 1, 2, &mtl, &mtl_out), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, &mt, &mt), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::triangle_mesh_segmentation(mesh, meshR, sub_mesh_ind, 1, 2, &mtl, &mtl_out, &sub_mesh_ind), std::invalid_argument);
     CHECK(arma::approx_equal(m, mesh, "absdiff", 0.0));
     CHECK(arma::all(mt == mtl));
 }
@@ -678,12 +679,12 @@ TEST_CASE("point_cloud_segmentation - outputs that alias inputs")
 {
     arma::mat points = {{0, 0, 0}, {10, 0, 0}, {20, 0, 0}}, pointsR;
     arma::u32_vec sub_cloud_ind, fwd, rev;
-    CHECK_NOTHROW(quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 1, 2, &fwd, &rev));
+    CHECK_NOTHROW(quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 1, 2, &fwd, &rev));
 
     arma::mat p = points;
-    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(&p, &p, &sub_cloud_ind, 1, 2), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 1, 2, &sub_cloud_ind), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_ind, 1, 2, &fwd, &fwd), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(p, p, sub_cloud_ind, 1, 2), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 1, 2, &sub_cloud_ind), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::point_cloud_segmentation(points, pointsR, sub_cloud_ind, 1, 2, &fwd, &fwd), std::invalid_argument);
     CHECK(arma::approx_equal(p, points, "absdiff", 0.0));
 }
 
@@ -694,21 +695,21 @@ TEST_CASE("coord2path - outputs that alias inputs")
     arma::vec path_length;
     arma::mat fbs, lbs, angles;
     std::vector<arma::mat> path_coord;
-    CHECK_NOTHROW(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &n_interact, &coord, &path_length, &fbs, &lbs, &angles, &path_coord));
+    CHECK_NOTHROW(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, n_interact, coord, &path_length, &fbs, &lbs, &angles, &path_coord));
 
     c = coord;
-    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &n_interact, &c, &path_length, &c), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &n_interact, &c, &path_length, (arma::mat *)nullptr, (arma::mat *)nullptr, &c), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &n_interact, &c, &path_length, &fbs, &fbs), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, n_interact, c, &path_length, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, n_interact, c, &path_length, (arma::mat *)nullptr, (arma::mat *)nullptr, &c), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, n_interact, c, &path_length, &fbs, &fbs), std::invalid_argument);
     CHECK(arma::approx_equal(c, coord, "absdiff", 0.0));
 
     // The input is an element of the output vector
     std::vector<arma::mat> pc(2);
     pc[0] = coord;
-    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &n_interact, &pc[0], (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, &pc), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, n_interact, pc[0], (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, &pc), std::invalid_argument);
 
     arma::vec view(c.memptr(), 2, false, true);
-    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, &n_interact, &c, &view), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::coord2path({0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, n_interact, c, &view), std::invalid_argument);
 }
 
 TEST_CASE("subdivide_rays - outputs that alias inputs")
@@ -738,10 +739,10 @@ TEST_CASE("icosphere - outputs that alias inputs")
 {
     arma::mat center, vert, direction;
     arma::vec length;
-    CHECK_NOTHROW(quadriga_lib::icosphere<double>(1, 1.0, &center, &length, &vert, &direction));
-    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, &length, &center), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, &length, &vert, &vert), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, &center, nullptr, nullptr, &center), std::invalid_argument);
+    CHECK_NOTHROW(quadriga_lib::icosphere<double>(1, 1.0, center, &length, &vert, &direction));
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, center, &length, &center), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, center, &length, &vert, &vert), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::icosphere<double>(1, 1.0, center, nullptr, nullptr, &center), std::invalid_argument);
 }
 
 TEST_CASE("calc_rotation_matrix - heading, tilt and bank are right-handed (3GPP TR 38.901)")
@@ -773,16 +774,16 @@ TEST_CASE("Quadriga tools - coord2path and combine_irs_coord position shapes")
 
     arma::vec len, len_row;
     arma::mat fbs, fbs_row, ang, ang_row;
-    quadriga_lib::coord2path<double>(tx, rx, &n_interact, &coord, &len, &fbs, nullptr, &ang);
-    quadriga_lib::coord2path<double>(arma::mat(tx.t()), arma::mat(rx.t()), &n_interact, &coord, &len_row, &fbs_row, nullptr, &ang_row);
+    quadriga_lib::coord2path<double>(tx, rx, n_interact, coord, &len, &fbs, nullptr, &ang);
+    quadriga_lib::coord2path<double>(arma::mat(tx.t()), arma::mat(rx.t()), n_interact, coord, &len_row, &fbs_row, nullptr, &ang_row);
     CHECK(arma::approx_equal(len, len_row, "absdiff", 0.0));
     CHECK(arma::approx_equal(fbs, fbs_row, "absdiff", 0.0));
     CHECK(arma::approx_equal(ang, ang_row, "absdiff", 0.0));
     for (const arma::mat &b : bad)
     {
         arma::vec l = len;
-        CHECK_THROWS_WITH(quadriga_lib::coord2path(b, rx, &n_interact, &coord, &l), ContainsSubstring("Input 'tx_pos' must have 3 elements"));
-        CHECK_THROWS_WITH(quadriga_lib::coord2path(tx, b, &n_interact, &coord, &l), ContainsSubstring("Input 'rx_pos' must have 3 elements"));
+        CHECK_THROWS_WITH(quadriga_lib::coord2path(b, rx, n_interact, coord, &l), ContainsSubstring("Input 'tx_pos' must have 3 elements"));
+        CHECK_THROWS_WITH(quadriga_lib::coord2path(tx, b, n_interact, coord, &l), ContainsSubstring("Input 'rx_pos' must have 3 elements"));
         CHECK(arma::approx_equal(l, len, "absdiff", 0.0));
     }
 
@@ -790,14 +791,14 @@ TEST_CASE("Quadriga tools - coord2path and combine_irs_coord position shapes")
     const arma::mat c1 = coord, c2(3, 0), irs = arma::vec{5.0, 5.0, 1.0};
     arma::u32_vec n_out, n_out_row;
     arma::mat c_out, c_out_row;
-    quadriga_lib::combine_irs_coord(irs, &n1, &c1, &n2, &c2, &n_out, &c_out);
-    quadriga_lib::combine_irs_coord(arma::mat(irs.t()), &n1, &c1, &n2, &c2, &n_out_row, &c_out_row);
+    quadriga_lib::combine_irs_coord(irs, n1, c1, n2, c2, n_out, c_out);
+    quadriga_lib::combine_irs_coord(arma::mat(irs.t()), n1, c1, n2, c2, n_out_row, c_out_row);
     CHECK(arma::all(n_out == n_out_row));
     CHECK(arma::approx_equal(c_out, c_out_row, "absdiff", 0.0));
     for (const arma::mat &b : bad)
     {
         arma::mat c = c_out;
-        CHECK_THROWS_WITH(quadriga_lib::combine_irs_coord(b, &n1, &c1, &n2, &c2, &n_out, &c), ContainsSubstring("Input 'irs_pos' must have 3 elements"));
+        CHECK_THROWS_WITH(quadriga_lib::combine_irs_coord(b, n1, c1, n2, c2, n_out, c), ContainsSubstring("Input 'irs_pos' must have 3 elements"));
         CHECK(arma::approx_equal(c, c_out, "absdiff", 0.0));
     }
 }

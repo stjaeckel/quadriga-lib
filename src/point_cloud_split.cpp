@@ -23,9 +23,9 @@ Split a point cloud into two sub-clouds along a spatial axis
 ## Declaration:
 ```
 int quadriga_lib::point_cloud_split(
-    const arma::Mat<dtype> *points,
-    arma::Mat<dtype> *pointsA,
-    arma::Mat<dtype> *pointsB,
+    const arma::Mat<dtype> &points,
+    arma::Mat<dtype> &pointsA,
+    arma::Mat<dtype> &pointsB,
     int axis = 0,
     arma::Col<int> *split_ind = nullptr);
 ```
@@ -50,29 +50,21 @@ MD!*/
 
 // Split a point cloud into two sub-clouds along a given axis
 template <typename dtype>
-int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points,
-                                    arma::Mat<dtype> *pointsA,
-                                    arma::Mat<dtype> *pointsB,
+int quadriga_lib::point_cloud_split(const arma::Mat<dtype> &points,
+                                    arma::Mat<dtype> &pointsA,
+                                    arma::Mat<dtype> &pointsB,
                                     int axis,
                                     arma::Col<int> *split_ind)
 {
-    if (points == nullptr)
-        throw std::invalid_argument("Input 'points' cannot be NULL.");
-    if (pointsA == nullptr)
-        throw std::invalid_argument("Output 'pointsA' cannot be NULL.");
-    if (pointsB == nullptr)
-        throw std::invalid_argument("Output 'pointsB' cannot be NULL.");
-    qd_check_alias(pointsA, "pointsA", points);
-    qd_check_alias(pointsB, "pointsB", points);
-    qd_check_alias_outputs(pointsA, "pointsA", pointsB, "pointsB");
+    qd_check_alias_list({&pointsA, &pointsB}, {"pointsA", "pointsB"}, &points);
 
     // Calculate bounding box
     arma::Mat<dtype> aabb;
-    quadriga_lib::point_cloud_aabb(*points, aabb);
+    quadriga_lib::point_cloud_aabb(points, aabb);
 
-    size_t n_points_t = (size_t)points->n_rows;
-    size_t n_values_t = (size_t)points->n_elem;
-    const dtype *p_points = points->memptr();
+    size_t n_points_t = (size_t)points.n_rows;
+    size_t n_values_t = (size_t)points.n_elem;
+    const dtype *p_points = points.memptr();
 
     // Find longest axis
     dtype x = aabb.at(0, 1) - aabb.at(0, 0);
@@ -126,19 +118,19 @@ int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points,
         return -axis;
 
     // Adjust output size
-    pointsA->set_size(n_pointsA, 3);
-    pointsB->set_size(n_pointsB, 3);
+    pointsA.set_size(n_pointsA, 3);
+    pointsB.set_size(n_pointsB, 3);
 
-    dtype *p_pointsA = pointsA->memptr();
-    dtype *p_pointsB = pointsB->memptr();
+    dtype *p_pointsA = pointsA.memptr();
+    dtype *p_pointsB = pointsB.memptr();
 
     bool write_split_ind = false;
     int *p_split_ind = nullptr;
     if (split_ind != nullptr)
     {
         write_split_ind = true;
-        if (split_ind->n_elem != points->n_rows)
-            split_ind->zeros(points->n_rows);
+        if (split_ind->n_elem != points.n_rows)
+            split_ind->zeros(points.n_rows);
         else
             split_ind->zeros();
         p_split_ind = split_ind->memptr();
@@ -168,6 +160,6 @@ int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points,
     return axis;
 }
 
-template int quadriga_lib::point_cloud_split(const arma::Mat<float> *points, arma::Mat<float> *pointsA, arma::Mat<float> *pointsB, int axis, arma::Col<int> *split_ind);
+template int quadriga_lib::point_cloud_split(const arma::Mat<float> &points, arma::Mat<float> &pointsA, arma::Mat<float> &pointsB, int axis, arma::Col<int> *split_ind);
 
-template int quadriga_lib::point_cloud_split(const arma::Mat<double> *points, arma::Mat<double> *pointsA, arma::Mat<double> *pointsB, int axis, arma::Col<int> *split_ind);
+template int quadriga_lib::point_cloud_split(const arma::Mat<double> &points, arma::Mat<double> &pointsA, arma::Mat<double> &pointsB, int axis, arma::Col<int> *split_ind);

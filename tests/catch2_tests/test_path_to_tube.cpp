@@ -33,13 +33,13 @@ TEST_CASE("path_to_tube - straight, nearly straight and reversed paths give fini
 
     // 3 collinear points along x: same vertices as the two 2-point segments
     arma::mat pc = {{0.0, 10.0, 20.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
-    quadriga_lib::path_to_tube<double>(&pc, &vert, &faces, radius, n_edges);
+    quadriga_lib::path_to_tube<double>(pc, vert, faces, radius, n_edges);
     REQUIRE(vert.n_cols == 3 * n_edges);
     REQUIRE(faces.n_cols == 2 * n_edges);
     CHECK(vert.is_finite());
     arma::mat pA = pc.cols(0, 1), pB = pc.cols(1, 2);
-    quadriga_lib::path_to_tube<double>(&pA, &vA, &fA, radius, n_edges);
-    quadriga_lib::path_to_tube<double>(&pB, &vB, &fB, radius, n_edges);
+    quadriga_lib::path_to_tube<double>(pA, vA, fA, radius, n_edges);
+    quadriga_lib::path_to_tube<double>(pB, vB, fB, radius, n_edges);
     CHECK(arma::approx_equal(vert.cols(0, 2 * n_edges - 1), vA, "absdiff", 1e-12));
     CHECK(arma::approx_equal(vert.cols(2 * n_edges, 3 * n_edges - 1), vB.cols(n_edges, 2 * n_edges - 1), "absdiff", 1e-12));
 
@@ -48,26 +48,26 @@ TEST_CASE("path_to_tube - straight, nearly straight and reversed paths give fini
     arma::mat po(3, 5);
     for (arma::uword i = 0; i < 5; ++i)
         po.col(i) = arma::vec({1.0, -2.0, 0.5}) + (double)i * 3.0 * d;
-    quadriga_lib::path_to_tube<double>(&po, &vert, &faces, radius, n_edges);
+    quadriga_lib::path_to_tube<double>(po, vert, faces, radius, n_edges);
     REQUIRE(vert.n_cols == 5 * n_edges);
     CHECK(vert.is_finite());
     for (arma::uword r = 0; r < 5; ++r)
         check_ring(vert, r, n_edges, po.col(r), d, radius);
     arma::fmat pof = arma::conv_to<arma::fmat>::from(po), vf;
-    quadriga_lib::path_to_tube<float>(&pof, &vf, &faces, (float)radius, n_edges);
+    quadriga_lib::path_to_tube<float>(pof, vf, faces, (float)radius, n_edges);
     CHECK(vf.is_finite());
 
     // A bend of 1e-9 rad at the middle point (the ring there is projected onto the bisecting plane by
     // ray_triangle_intersect, which computes in single precision)
     arma::mat pn = {{0.0, 10.0, 20.0}, {0.0, 0.0, 10.0 * std::sin(1e-9)}, {0.0, 0.0, 0.0}};
-    quadriga_lib::path_to_tube<double>(&pn, &vert, &faces, radius, n_edges);
+    quadriga_lib::path_to_tube<double>(pn, vert, faces, radius, n_edges);
     CHECK(vert.is_finite());
     for (arma::uword r = 0; r < 3; ++r)
         check_ring(vert, r, n_edges, pn.col(r), arma::vec({1.0, 0.0, 0.0}), radius, 1e-6);
 
     // Reversed path (180 deg turn): the split inserts an extra ring at the turning point
     arma::mat pr = {{0.0, 10.0, 0.0}, {1.0, 1.0, 1.0}, {2.0, 2.0, 2.0}};
-    quadriga_lib::path_to_tube<double>(&pr, &vert, &faces, radius, n_edges);
+    quadriga_lib::path_to_tube<double>(pr, vert, faces, radius, n_edges);
     REQUIRE(vert.n_cols == 4 * n_edges);
     CHECK(vert.is_finite());
     check_ring(vert, 0, n_edges, pr.col(0), arma::vec({1.0, 0.0, 0.0}), radius);
@@ -77,7 +77,7 @@ TEST_CASE("path_to_tube - straight, nearly straight and reversed paths give fini
 
     // Reversal followed by a straight continuation and a normal bend
     arma::mat pm = {{0.0, 10.0, 5.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 8.0}, {0.0, 0.0, 0.0, 0.0, 0.0}};
-    quadriga_lib::path_to_tube<double>(&pm, &vert, &faces, radius, n_edges);
+    quadriga_lib::path_to_tube<double>(pm, vert, faces, radius, n_edges);
     CHECK(vert.is_finite());
 }
 
@@ -89,33 +89,33 @@ TEST_CASE("path_to_tube - non-finite coordinates or radius throw")
 
     // NaN point after 5 long segments (the merged path no longer fits into in-object storage)
     arma::mat p1 = {{0.0, 1.0, 2.0, 3.0, 4.0, 5.0, nan, 6.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
-    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p1, &vert, &faces, 0.1, 4), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(p1, vert, faces, 0.1, 4), std::invalid_argument);
 
     // Short path, merged path stored inside the matrix object
     arma::mat p2 = {{0.0, 1.0, 2.0, 3.0, 4.0, nan, 5.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
-    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p2, &vert, &faces, 0.1, 4), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(p2, vert, faces, 0.1, 4), std::invalid_argument);
 
     // Two neighbouring points at +inf in the same coordinate (inf - inf = NaN)
     arma::fmat p3 = {{0.0f, 1.0f, (float)inf, (float)inf, 2.0f}, {0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 0.0f, 0.0f}};
     arma::fmat vf;
-    CHECK_THROWS_AS(quadriga_lib::path_to_tube<float>(&p3, &vf, &faces, 0.1f, 4), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<float>(p3, vf, faces, 0.1f, 4), std::invalid_argument);
 
     // Non-finite radius
     arma::mat p4 = {{0.0, 1.0, 2.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
-    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p4, &vert, &faces, nan, 4), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(&p4, &vert, &faces, inf, 4), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(p4, vert, faces, nan, 4), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube<double>(p4, vert, faces, inf, 4), std::invalid_argument);
 }
 
 TEST_CASE("path_to_tube - outputs that alias inputs")
 {
     arma::mat path = {{0.0, 1.0, 2.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}}, vert;
     arma::umat faces;
-    CHECK_NOTHROW(quadriga_lib::path_to_tube(&path, &vert, &faces, 0.1));
+    CHECK_NOTHROW(quadriga_lib::path_to_tube(path, vert, faces, 0.1));
 
     arma::mat p = path;
-    CHECK_THROWS_AS(quadriga_lib::path_to_tube(&p, &p, &faces, 0.1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube(p, p, faces, 0.1), std::invalid_argument);
     CHECK(arma::approx_equal(p, path, "absdiff", 0.0));
 
     arma::mat view(p.memptr(), 3, 1, false, true);
-    CHECK_THROWS_AS(quadriga_lib::path_to_tube(&p, &view, &faces, 0.1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::path_to_tube(p, view, faces, 0.1), std::invalid_argument);
 }

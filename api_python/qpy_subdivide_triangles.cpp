@@ -46,7 +46,7 @@ py::tuple subdivide_triangles(arma::uword n_div,
     arma::uvec mtl_ind_out;
     auto triangles_out_py = qd_python_init_output(triangles_in_a.n_rows * n_div * n_div, (arma::uword)9, &triangles_out);
 
-    quadriga_lib::subdivide_triangles<double>(n_div, &triangles_in_a, &triangles_out, &mtl_ind_a, &mtl_ind_out);
+    quadriga_lib::subdivide_triangles<double>(n_div, triangles_in_a, triangles_out, &mtl_ind_a, &mtl_ind_out);
 
     // Copied to int64, the dtype of the material indices from obj_file_read
     return py::make_tuple(triangles_out_py, qd_python_copy2numpy<arma::uword, py::ssize_t>(&mtl_ind_out));
