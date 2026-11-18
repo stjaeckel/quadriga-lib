@@ -107,6 +107,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 | [any_type_id](#any_type_id) | Channel functions | Get the type ID and the shape of the value in a `std::any` object |
 | [baseband_freq_response](#baseband_freq_response) | Channel functions | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
+| [baseband_freq_response_multi_vec](#baseband_freq_response_multi_vec) | Channel functions | Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | Compute the baseband frequency response of multiple MIMO channels |
 | [hdf5_create_file](#hdf5_create_file) | Channel functions | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Channel functions | Read a channel object from an HDF5 file at a specified 4D index |
@@ -1789,7 +1790,7 @@ void quadriga_lib::baseband_freq_response(
 - **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
 
 ### See also:
-- [baseband_freq_response_vec](#baseband_freq_response_vec) (vectorized version)
+- [baseband_freq_response_vec](#baseband_freq_response_vec) (batched version)
 - [baseband_freq_response_multi](#baseband_freq_response_multi) (multi-freq counterpart)
 - [get_channels_planar](#get_channels_planar) (for generating coeff and delay)
 - [get_channels_spherical](#get_channels_spherical) (for generating coeff and delay)
@@ -1848,7 +1849,56 @@ void quadriga_lib::baseband_freq_response_multi(
 
 ### See also:
 - [baseband_freq_response](#baseband_freq_response) (single-snapshot narrowband version)
-- [baseband_freq_response_vec](#baseband_freq_response_vec) (batched narrowband version)
+- [baseband_freq_response_multi_vec](#baseband_freq_response_multi_vec) (batched version)
+- [get_channels_multifreq](#get_channels_multifreq) (produces the multi-frequency input coefficients)
+
+---
+<a id="baseband_freq_response_multi_vec"></a>
+## baseband_freq_response_multi_vec
+Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients
+
+Not in: MATLAB, Python
+
+- Batch wrapper around [baseband_freq_response_multi](#baseband_freq_response_multi), applying it across snapshots in parallel via OpenMP
+- Inputs are indexed `[snapshot][input frequency]`: `coeff_re[s][f]` is the cube of snapshot `s` at `freq[f]`
+- `freq` and `freq_new` are shared by all snapshots; only `delay[s][0]` is used, the other entries may be empty
+- Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
+- The snapshots are checked by [baseband_freq_response_multi](#baseband_freq_response_multi); an error names the lowest failing snapshot (`"Snapshot <i>: "`), and the outputs may then be partly written
+
+### Declaration:
+```cpp
+void quadriga_lib::baseband_freq_response_multi_vec(
+    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
+    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
+    const std::vector<std::vector<arma::Cube<dtype>>> &delay,
+    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &freq_new,
+    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
+    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
+    bool remove_delay_phase = true,
+    const arma::uvec *i_snap = nullptr,
+    int use_kernel = 0);
+```
+
+### Inputs:
+- **`coeff_re`** — Real part of channel coefficients, `n_snap` vectors of `n_freq` cubes `[n_rx, n_tx, n_path]`
+- **`coeff_im`** — Imaginary part of channel coefficients, same structure as `coeff_re`
+- **`delay`** — Path delays in seconds, `n_snap` vectors of `n_freq` cubes; entry `0` of each has shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
+- **`freq`** — Input sample frequencies, sorted ascending; `[n_freq]`
+- **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
+- **`remove_delay_phase`** *(optional)* — As in [baseband_freq_response_multi](#baseband_freq_response_multi); default `true`
+- **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
+- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+
+### Outputs:
+- **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carrier]`
+- **`hmat_im`** *(optional)* — Imaginary part, same structure as `hmat_re`
+- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrices, same structure as `hmat_re`
+
+### See also:
+- [baseband_freq_response_multi](#baseband_freq_response_multi) (single-snapshot variant)
+- [baseband_freq_response_vec](#baseband_freq_response_vec) (single-freq counterpart)
 - [get_channels_multifreq](#get_channels_multifreq) (produces the multi-frequency input coefficients)
 
 ---
@@ -1861,6 +1911,7 @@ Not in: MATLAB, Python
 - Batch wrapper around [baseband_freq_response](#baseband_freq_response), applying it across snapshots in parallel via OpenMP
 - Each element of the input vectors is a cube of shape `[n_rx, n_tx, n_path]`; `delay` supports broadcasting to `[1, 1, n_path]`
 - Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
+- The snapshots are checked by [baseband_freq_response](#baseband_freq_response); an error names the lowest failing snapshot (`"Snapshot <i>: "`), and the outputs may then be partly written
 - Same arithmetic as [baseband_freq_response](#baseband_freq_response): phase in double precision, sin / cos and sums in single precision
 
 ### Declaration:
@@ -1873,6 +1924,7 @@ void quadriga_lib::baseband_freq_response_vec(
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
     const arma::uvec *i_snap = nullptr,
     int use_kernel = 0);
 ```
@@ -1883,16 +1935,17 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`delay`** — Path delays in seconds, same structure as `coeff_re`; each cube broadcastable to `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
-- **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
+- **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
 - **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ### Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
 - **`hmat_im`** *(optional)* — Imaginary part of frequency-domain channel matrices, same structure as `hmat_re`
+- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrices, same structure as `hmat_re`
 
 ### See also:
 - [baseband_freq_response](#baseband_freq_response) (single-snapshot variant)
-- [baseband_freq_response_multi](#baseband_freq_response_multi) (multi-freq counterpart)
+- [baseband_freq_response_multi_vec](#baseband_freq_response_multi_vec) (multi-freq counterpart)
 
 ---
 <a id="hdf5_create_file"></a>

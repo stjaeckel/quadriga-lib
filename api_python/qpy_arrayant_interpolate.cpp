@@ -40,7 +40,6 @@ V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolat
 
 # Multi-frequency mode
 V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
-
 ```
 
 ## Inputs:

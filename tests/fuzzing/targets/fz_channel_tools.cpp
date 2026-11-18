@@ -3,8 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Channel coefficient tools on fuzzed coefficient and delay cubes (consistent or mismatched sizes): quantize_delays
-// (also with outputs that alias inputs), baseband_freq_response, baseband_freq_response_vec and
-// baseband_freq_response_multi, with the available kernels
+// (also with outputs that alias inputs), baseband_freq_response, baseband_freq_response_vec,
+// baseband_freq_response_multi and baseband_freq_response_multi_vec, with the available kernels
 
 #include "fuzz_target.hpp"
 
@@ -68,11 +68,13 @@ static void run(fz::input &in)
         for (auto &i : i_snap)
             i = in.index(n_snap);
         std::vector<arma::Cube<T>> h_re, h_im;
+        std::vector<arma::Cube<std::complex<T>>> h;
         if (out_mask & 8)
-            h_re.resize(in.size(3));
+            h_re.resize(in.size(3)), h.resize(in.size(3));
         fz::clean([&] { quadriga_lib::baseband_freq_response_vec(cre, cim, dl, pilot, bandwidth,
                                                                  (out_mask & 1) ? &h_re : nullptr, (out_mask & 2) ? &h_im : nullptr,
-                                                                 (out_mask & 32) ? &i_snap : nullptr, use_kernel); });
+                                                                 (out_mask & 4) ? &h : nullptr, (out_mask & 32) ? &i_snap : nullptr,
+                                                                 use_kernel); });
     }
 
     // baseband_freq_response_multi with the snapshots as input frequencies
@@ -88,6 +90,22 @@ static void run(fz::input &in)
         fz::clean([&] { quadriga_lib::baseband_freq_response_multi(cre, cim, dl, freq, freq_new, (out_mask & 1) ? &h_re : nullptr,
                                                                    (out_mask & 2) ? &h_im : nullptr, (out_mask & 4) ? &h : nullptr,
                                                                    remove_phase, use_kernel); });
+
+        // baseband_freq_response_multi_vec on copies of this input as snapshots, one of them sometimes truncated
+        const arma::uword n_batch = in.size(3);
+        std::vector<std::vector<arma::Cube<T>>> b_re(n_batch, cre), b_im(n_batch, cim), b_dl(n_batch, dl);
+        if (n_batch != 0 && in.ConsumeBool())
+            b_re[in.ConsumeIntegralInRange<arma::uword>(0, n_batch - 1)].resize(in.size(5));
+        arma::uvec i_snap(in.size(5));
+        for (auto &i : i_snap)
+            i = in.index(n_batch);
+        std::vector<arma::Cube<T>> v_re, v_im;
+        std::vector<arma::Cube<std::complex<T>>> v;
+        if (out_mask & 8)
+            v_re.resize(in.size(3)), v.resize(in.size(3));
+        fz::clean([&] { quadriga_lib::baseband_freq_response_multi_vec(b_re, b_im, b_dl, freq, freq_new, (out_mask & 1) ? &v_re : nullptr,
+                                                                       (out_mask & 2) ? &v_im : nullptr, (out_mask & 4) ? &v : nullptr,
+                                                                       remove_phase, (out_mask & 32) ? &i_snap : nullptr, use_kernel); });
     }
 }
 

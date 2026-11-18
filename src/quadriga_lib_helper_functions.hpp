@@ -47,6 +47,36 @@
         }                                                         \
     }
 
+// Runs f(i) for the items i = 0 ... n - 1 of a batch, in parallel if 'parallel' is set. An error of an item is
+// rethrown after the loop with the prefix "<prefix> <id>: " of the lowest failing item (id = i, or id[i] if given),
+// as std::invalid_argument if it was one, else as std::runtime_error. std::exception_ptr is not used: it needs a libstdc++
+// symbol version that the libstdc++ bundled with older MATLAB releases lacks, so the MEX files would not load there.
+template <typename F>
+inline void qd_batch_loop(size_t n, bool parallel, const char *prefix, F &&f, const arma::uvec *id = nullptr)
+{
+    long long n_i = (long long)n, i_err = n_i;
+    bool invalid_arg = false;
+    std::string msg;
+#pragma omp parallel for if (parallel)
+    for (long long i = 0; i < n_i; ++i)
+        try
+        {
+            f((size_t)i);
+        }
+        catch (const std::exception &e)
+        {
+#pragma omp critical
+            if (i < i_err)
+                i_err = i, invalid_arg = dynamic_cast<const std::invalid_argument *>(&e) != nullptr, msg = e.what();
+        }
+    if (i_err == n_i)
+        return;
+    msg = std::string(prefix) + " " + std::to_string(id ? (*id)[(arma::uword)i_err] : (arma::uword)i_err) + ": " + msg;
+    if (invalid_arg)
+        throw std::invalid_argument(msg);
+    throw std::runtime_error(msg);
+}
+
 // Calculate length
 template <typename dtype>
 static inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)

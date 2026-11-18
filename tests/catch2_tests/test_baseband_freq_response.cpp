@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_channel.hpp"
 #include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <iostream>
@@ -145,7 +146,7 @@ TEST_CASE("Baseband Frequency Response - Multi")
     // Change the snapshot order
     arma::uvec i_snap = {1, 2, 1, 0};
 
-    quadriga_lib::baseband_freq_response_vec(coeff_re_vec, coeff_im_vec, delay_vec, pilots, fc, &hmat_re, &hmat_im, &i_snap);
+    quadriga_lib::baseband_freq_response_vec<float>(coeff_re_vec, coeff_im_vec, delay_vec, pilots, fc, &hmat_re, &hmat_im, nullptr, &i_snap);
 
     CHECK(hmat_re.size() == 4);
     CHECK(hmat_im.size() == 4);
@@ -400,11 +401,11 @@ TEST_CASE("baseband_freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 
         if (k == 2 && !avx2)
         {
             CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, 1e8, &hr, &hi, nullptr, k), std::invalid_argument);
-            CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, k), std::invalid_argument);
+            CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, nullptr, k), std::invalid_argument);
             continue;
         }
         quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, 1e8, &hr, &hi, nullptr, k);
-        quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, k);
+        quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, &vhi, nullptr, nullptr, k);
         CHECK(arma::approx_equal(hr, hr_auto, "absdiff", 1e-5));
         CHECK(arma::approx_equal(hi, hi_auto, "absdiff", 1e-5));
         CHECK(arma::approx_equal(vhr[1], hr, "absdiff", 0.0));
@@ -415,5 +416,52 @@ TEST_CASE("baseband_freq_response / _vec - GENERIC and AVX2 agree, auto is AVX2 
     arma::cube hr;
     std::vector<arma::cube> vhr;
     CHECK_THROWS_AS(quadriga_lib::baseband_freq_response<double>(cr, ci, dl, pg, 1e8, &hr, nullptr, nullptr, 3), std::invalid_argument);
-    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, nullptr, nullptr, -1), std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(vcr, vci, vdl, pg, 1e8, &vhr, nullptr, nullptr, nullptr, -1), std::invalid_argument);
+}
+
+TEST_CASE("baseband_freq_response_vec - Complex output equals the split outputs")
+{
+    // Snapshots with different path counts, one without paths; spherical and planar delays; with and without i_snap
+    std::vector<arma::cube> cre, cim, dl;
+    for (arma::uword n_path : {5, 0, 3})
+    {
+        cre.push_back(arma::cube(2, 3, n_path, arma::fill::randn));
+        cim.push_back(arma::cube(2, 3, n_path, arma::fill::randn));
+        dl.push_back(arma::cube(n_path == 3 ? 1 : 2, n_path == 3 ? 1 : 3, n_path, arma::fill::randu) * 1.0e-6);
+    }
+    arma::vec pilot = arma::linspace<arma::vec>(0.0, 1.0, 11);
+    for (const arma::uvec &i_snap : {arma::uvec{}, arma::uvec{2, 0, 2, 1}})
+    {
+        std::vector<arma::cube> Hr, Hi;
+        std::vector<arma::cx_cube> H(1, arma::cx_cube(1, 1, 1)); // Stale size, resized by the call
+        quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, &Hr, &Hi, &H, &i_snap);
+        const size_t n_out = i_snap.is_empty() ? 3 : 4;
+        REQUIRE(H.size() == n_out);
+        for (size_t i = 0; i < n_out; ++i)
+        {
+            CHECK(arma::approx_equal(arma::real(H[i]), Hr[i], "absdiff", 0.0));
+            CHECK(arma::approx_equal(arma::imag(H[i]), Hi[i], "absdiff", 0.0));
+        }
+
+        // Complex output alone gives the same values
+        std::vector<arma::cx_cube> H2;
+        quadriga_lib::baseband_freq_response_vec<double>(cre, cim, dl, pilot, 1.0e8, nullptr, nullptr, &H2, &i_snap);
+        for (size_t i = 0; i < n_out; ++i)
+            CHECK(arma::approx_equal(H2[i], H[i], "absdiff", 0.0));
+    }
+
+    // A snapshot error names the input snapshot and keeps its type
+    auto bad = dl;
+    bad[2] = arma::cube(1, 1, 2);
+    std::vector<arma::cx_cube> H;
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, bad, pilot, 1.0e8, nullptr, nullptr, &H), std::invalid_argument);
+    CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_vec<double>(cre, cim, bad, pilot, 1.0e8, nullptr, nullptr, &H), Catch::Matchers::StartsWith("Snapshot 2: "));
+
+    // Single precision: the complex output equals the split outputs
+    std::vector<arma::fcube> cre_f = {arma::conv_to<arma::fcube>::from(cre[0])}, cim_f = {arma::conv_to<arma::fcube>::from(cim[0])},
+                             dl_f = {arma::conv_to<arma::fcube>::from(dl[0])}, Hr_f, Hi_f;
+    std::vector<arma::cx_fcube> H_f;
+    quadriga_lib::baseband_freq_response_vec<float>(cre_f, cim_f, dl_f, arma::conv_to<arma::fvec>::from(pilot), 1.0e8, &Hr_f, &Hi_f, &H_f);
+    CHECK(arma::approx_equal(arma::real(H_f[0]), Hr_f[0], "absdiff", 0.0f));
+    CHECK(arma::approx_equal(arma::imag(H_f[0]), Hi_f[0], "absdiff", 0.0f));
 }

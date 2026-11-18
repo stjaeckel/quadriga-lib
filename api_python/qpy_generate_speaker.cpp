@@ -37,21 +37,9 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 
 ## Usage:
 ```
-# Default piston driver (4-inch, 80 Hz – 12 kHz)
-speaker = quadriga_lib.arrayant.generate_speaker()
-
-# Horn tweeter with custom coverage
-speaker = quadriga_lib.arrayant.generate_speaker(driver_type='horn', radius=0.025, \
-    lower_cutoff=1500.0, upper_cutoff=20000.0, hor_coverage_deg=90.0, ver_coverage_deg=60.0)
-
-# Omnidirectional subwoofer with steep rolloff
-speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.165, \
-    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope_dB=24.0, upper_rolloff_slope_dB=24.0, \
-    sensitivity_dB=90.0, radiation_type='monopole')
-
-# Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, \
-    10000.0]), angular_resolution_deg=5.0)
+speaker = quadriga_lib.arrayant.generate_speaker( driver_type, *, radius, lower_cutoff, upper_cutoff, \
+    lower_rolloff_slope_dB, upper_rolloff_slope_dB, sensitivity_dB, radiation_type, hor_coverage_deg, \
+    ver_coverage_deg, horn_control_freq, baffle_width, baffle_height, center_freq, angular_resolution_deg )
 ```
 
 ## Inputs:

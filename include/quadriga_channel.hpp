@@ -381,15 +381,33 @@ namespace quadriga_lib
     // - Output vectors have length n_out: either n_snap (all snapshots) or length(i_snap) (subset)
     // - Internal arithmetic is single-precision
     template <typename dtype>
-    void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> &coeff_re,    // Real part of time-domain channel coefficients, vector of n_snap cubes [n_rx, n_tx, n_path]
-                                    const std::vector<arma::Cube<dtype>> &coeff_im,    // Imaginary part of time-domain channel coefficients, same structure as coeff_re
-                                    const std::vector<arma::Cube<dtype>> &delay,       // Path delays in seconds, same structure as coeff_re; each cube broadcastable to [1, 1, n_path]
-                                    const arma::Col<dtype> &pilot_grid,                // Normalized sub-carrier positions in range [0.0, 1.0]; [n_carriers]
-                                    const double bandwidth,                            // Total baseband bandwidth
-                                    std::vector<arma::Cube<dtype>> *hmat_re = nullptr, // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carriers]
-                                    std::vector<arma::Cube<dtype>> *hmat_im = nullptr, // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
-                                    const arma::uvec *i_snap = nullptr,                // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
-                                    int use_kernel = 0);                               // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
+    void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> &coeff_re,               // Real part of time-domain channel coefficients, vector of n_snap cubes [n_rx, n_tx, n_path]
+                                    const std::vector<arma::Cube<dtype>> &coeff_im,               // Imaginary part of time-domain channel coefficients, same structure as coeff_re
+                                    const std::vector<arma::Cube<dtype>> &delay,                  // Path delays in seconds, same structure as coeff_re; each cube broadcastable to [1, 1, n_path]
+                                    const arma::Col<dtype> &pilot_grid,                           // Normalized sub-carrier positions in range [0.0, 1.0]; [n_carriers]
+                                    const double bandwidth,                                       // Total baseband bandwidth
+                                    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,            // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carriers]
+                                    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,            // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
+                                    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr, // Complex-valued frequency-domain channel matrices, same structure as hmat_re
+                                    const arma::uvec *i_snap = nullptr,                           // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
+                                    int use_kernel = 0);                                          // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
+
+    // Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients
+    // - Batch wrapper around [[baseband_freq_response_multi]], applying it across snapshots in parallel via OpenMP
+    // - Inputs are indexed [snapshot][input frequency]; freq and freq_new are shared by all snapshots
+    // - Output vectors have length n_out: either n_snap (all snapshots) or length(i_snap) (subset)
+    template <typename dtype>
+    void baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re, // Real part, n_snap vectors of n_freq cubes [n_rx, n_tx, n_path]
+                                          const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im, // Imaginary part, same structure as coeff_re
+                                          const std::vector<std::vector<arma::Cube<dtype>>> &delay,    // Delays [s], n_snap vectors of n_freq cubes; only entry 0 of each snapshot is used
+                                          const arma::Col<dtype> &freq,                                // Input sample frequencies [Hz], length [n_freq]
+                                          const arma::Col<dtype> &freq_new,                            // Output carrier frequencies [Hz], length [n_carrier]
+                                          std::vector<arma::Cube<dtype>> *hmat_re = nullptr,           // Output: real part, vector of n_out cubes [n_rx, n_tx, n_carrier]
+                                          std::vector<arma::Cube<dtype>> *hmat_im = nullptr,           // Output: imaginary part, same structure as hmat_re
+                                          std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr, // Output: complex-valued, same structure as hmat_re
+                                          bool remove_delay_phase = true,                              // Remove baked-in delay phase before SLERP interpolation
+                                          const arma::uvec *i_snap = nullptr,                          // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
+                                          int use_kernel = 0);                                         // Kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2
 
     // Fixes the path delays to a grid of delay bins
     template <typename dtype>

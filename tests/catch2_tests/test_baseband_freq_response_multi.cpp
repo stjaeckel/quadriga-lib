@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include "quadriga_channel.hpp"
 #include "quadriga_lib.hpp" // get_channels_multifreq, quadriga_lib_has_AVX2
 
@@ -1152,4 +1153,84 @@ TEST_CASE("baseband_freq_response_multi - GENERIC and AVX2 agree, auto is AVX2 i
         CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi<double>(cre, cim, dl, freq, freq_new, nullptr, nullptr, &h_gen, true, 2), std::invalid_argument);
     }
     CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi<double>(cre, cim, dl, freq, freq_new, nullptr, nullptr, &h_gen, true, 3), std::invalid_argument);
+}
+
+TEST_CASE("baseband_freq_response_multi_vec - Equals a loop of baseband_freq_response_multi")
+{
+    // Three snapshots at three input frequencies: different path counts (one without paths), planar and spherical
+    // delays, delay entries other than 0 empty; with and without i_snap and remove_delay_phase
+    const arma::vec freq = {3.0e9, 3.1e9, 3.3e9}, freq_new = arma::linspace<arma::vec>(2.9e9, 3.4e9, 9);
+    std::vector<std::vector<arma::cube>> cre(3), cim(3), dl(3);
+    const arma::uword n_paths[] = {4, 0, 2};
+    for (size_t s = 0; s < 3; ++s)
+    {
+        const arma::uword n_path = n_paths[s], d_rows = s == 2 ? 1 : 2, d_cols = s == 2 ? 1 : 3;
+        for (size_t f = 0; f < 3; ++f)
+        {
+            cre[s].push_back(arma::cube(2, 3, n_path, arma::fill::randn));
+            cim[s].push_back(arma::cube(2, 3, n_path, arma::fill::randn));
+        }
+        dl[s].resize(3);
+        dl[s][0] = arma::cube(d_rows, d_cols, n_path, arma::fill::randu) * 1.0e-6;
+    }
+
+    for (bool remove_phase : {true, false})
+        for (const arma::uvec &i_snap : {arma::uvec{}, arma::uvec{2, 0, 2, 1}})
+        {
+            std::vector<arma::cube> Hr, Hi;
+            std::vector<arma::cx_cube> H(1, arma::cx_cube(1, 1, 1)); // Stale size, resized by the call
+            quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, &Hi, &H, remove_phase, &i_snap);
+            const arma::uvec snap = i_snap.is_empty() ? arma::uvec{0, 1, 2} : i_snap;
+            REQUIRE(H.size() == snap.n_elem);
+            REQUIRE(Hr.size() == snap.n_elem);
+            REQUIRE(Hi.size() == snap.n_elem);
+            for (arma::uword i = 0; i < snap.n_elem; ++i)
+            {
+                arma::cube hr, hi;
+                arma::cx_cube h;
+                quadriga_lib::baseband_freq_response_multi<double>(cre[snap[i]], cim[snap[i]], dl[snap[i]], freq, freq_new, &hr, &hi, &h, remove_phase);
+                CHECK(arma::approx_equal(Hr[i], hr, "absdiff", 0.0));
+                CHECK(arma::approx_equal(Hi[i], hi, "absdiff", 0.0));
+                CHECK(arma::approx_equal(H[i], h, "absdiff", 0.0));
+            }
+        }
+
+    // A snapshot error names the input snapshot (also with i_snap) and keeps its type; shared inputs have no prefix
+    using Catch::Matchers::StartsWith;
+    std::vector<arma::cube> Hr;
+    auto bad = cre;
+    bad[1].pop_back();
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(bad, cim, dl, freq, freq_new, &Hr), std::invalid_argument);
+    const arma::uvec i_21 = {2, 1};
+    CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_multi_vec<double>(bad, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, &i_21),
+                      StartsWith("Snapshot 1: "));
+    bad = cre;
+    bad[2][1] = arma::cube(2, 2, 2);
+    CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_multi_vec<double>(bad, cim, dl, freq, freq_new, &Hr), StartsWith("Snapshot 2: "));
+    const arma::uvec past_end = {3};
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, &past_end),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, arma::vec{3.1e9, 3.0e9, 3.3e9}, freq_new, &Hr),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &Hr, nullptr, nullptr, true, nullptr, 3),
+                    std::invalid_argument);
+
+    CHECK_THROWS_WITH(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, arma::vec{3.1e9, 3.0e9, 3.3e9}, freq_new, &Hr),
+                      StartsWith("Input 'freq'"));
+
+    // Single precision gives the values of a loop as well
+    std::vector<std::vector<arma::fcube>> cre_f(1), cim_f(1), dl_f(1);
+    for (size_t f = 0; f < 3; ++f)
+        cre_f[0].push_back(arma::conv_to<arma::fcube>::from(cre[0][f])), cim_f[0].push_back(arma::conv_to<arma::fcube>::from(cim[0][f]));
+    dl_f[0] = {arma::conv_to<arma::fcube>::from(dl[0][0]), arma::fcube(), arma::fcube()};
+    const arma::fvec freq_f = arma::conv_to<arma::fvec>::from(freq), freq_new_f = arma::conv_to<arma::fvec>::from(freq_new);
+    std::vector<arma::cx_fcube> H_f;
+    arma::cx_fcube h_f;
+    quadriga_lib::baseband_freq_response_multi_vec<float>(cre_f, cim_f, dl_f, freq_f, freq_new_f, nullptr, nullptr, &H_f);
+    quadriga_lib::baseband_freq_response_multi<float>(cre_f[0], cim_f[0], dl_f[0], freq_f, freq_new_f, nullptr, nullptr, &h_f);
+    REQUIRE(H_f.size() == 1);
+    CHECK(arma::approx_equal(H_f[0], h_f, "absdiff", 0.0f));
+
+    // An output is an input of a processed snapshot
+    CHECK_THROWS_AS(quadriga_lib::baseband_freq_response_multi_vec<double>(cre, cim, dl, freq, freq_new, &cre[1]), std::invalid_argument);
 }

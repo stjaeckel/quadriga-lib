@@ -481,21 +481,9 @@ Also in: [C++](quadriga_lib_api_cpp.md#generate_speaker) · [MATLAB](quadriga_li
 
 ### Usage:
 ```python
-# Default piston driver (4-inch, 80 Hz – 12 kHz)
-speaker = quadriga_lib.arrayant.generate_speaker()
-
-# Horn tweeter with custom coverage
-speaker = quadriga_lib.arrayant.generate_speaker(driver_type='horn', radius=0.025, \
-    lower_cutoff=1500.0, upper_cutoff=20000.0, hor_coverage_deg=90.0, ver_coverage_deg=60.0)
-
-# Omnidirectional subwoofer with steep rolloff
-speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.165, \
-    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope_dB=24.0, upper_rolloff_slope_dB=24.0, \
-    sensitivity_dB=90.0, radiation_type='monopole')
-
-# Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker( center_freq=np.array([100.0, 500.0, 1000.0, 5000.0, \
-    10000.0]), angular_resolution_deg=5.0)
+speaker = quadriga_lib.arrayant.generate_speaker( driver_type, *, radius, lower_cutoff, upper_cutoff, \
+    lower_rolloff_slope_dB, upper_rolloff_slope_dB, sensitivity_dB, radiation_type, hor_coverage_deg, \
+    ver_coverage_deg, horn_control_freq, baffle_width, baffle_height, center_freq, angular_resolution_deg )
 ```
 
 ### Inputs:
@@ -575,7 +563,6 @@ V, H, dist, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolat
 
 # Multi-frequency mode
 V, H = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, ..., freq_new=freqs )
-
 ```
 
 ### Inputs:
@@ -732,11 +719,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#arrayant_rotate_pattern) · [MATLAB](quad
 
 ### Usage:
 ```python
-# 10 degree mechanical downtilt (0.1745 rad) of all elements
-arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.1745, 0.0])
-
-# Elements 0 and 1 only, 90 degree heading (1.5708 rad)
-arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.0, 1.5708], i_element=[0, 1])
+arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, orientation, *, usage, i_element )
 ```
 
 ### Inputs:
@@ -773,14 +756,12 @@ Compute the baseband frequency response of a MIMO channel
 Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [MATLAB](quadriga_lib_api_mex.md#baseband_freq_response)
 
 - Transforms time-domain channel coefficients into the frequency-domain transfer function H(f)
-- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel via OpenMP
+- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel via OpenMP in C++
 - Two per-snapshot modes, selected by the ndim of the coefficient arrays:
   - single-freq: 3D items `(n_rx, n_tx, n_path)`; DFT over path delays at the requested carriers (AVX2)
   - multi-freq: 4D items `(n_rx, n_tx, n_path, n_freq)`; SLERP interpolation across `freq`,
     then delay-induced phase applied per output carrier
 - All list items must share ndim, `n_rx`, `n_tx` (and `n_freq` for 4D); `n_path` may vary per snapshot
-- Coefficients are given either as one complex array `coeff`, or as split `coeff_re` + `coeff_im`;
-  supplying both forms is an error
 - Output carriers are defined one of two mutually exclusive ways:
   - `bandwidth` paired with `pilot_grid` (or `carriers` for an evenly spaced grid) — single-freq only
   - `freq` + `freq_new` as absolute frequencies — required for multi-freq, optional for single-freq
@@ -788,30 +769,19 @@ Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [MATLAB](quadr
   referenced to `freq[0]` when given, else to `min(freq_new)`
 - `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair;
   for multi-freq a 3D delay item is reused for all input frequencies
-- `snap` selects a 0-based subset of snapshots; omitted processes all snapshots
 - single-freq: the phase `bandwidth · pilot_grid · delay` (in cycles) is computed in double precision and reduced to
   one period before sin / cos are evaluated in single precision; coefficients and sums are single precision, double
   inputs are narrowed to float, results widened back; multi-freq computes in double precision
 
 ### Usage:
 ```python
-# Single-freq, bandwidth + evenly spaced carriers
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, \
-    carriers=128 )
-
-# Single-freq, absolute frequencies
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq=freq, \
-    freq_new=freq_new )
-
-# Multi-freq, split real / imaginary parts
-hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, \
-    freq=freq, freq_new=freq_new )
+hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, *, bandwidth, carriers, pilot_grid, \
+    snap, freq, freq_new, remove_delay_phase, use_kernel )
 ```
 
 ### Inputs:
 - **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
-  (single-freq) or `(n_rx, n_tx, n_path, n_freq)` (multi-freq); mutually exclusive with
-  `coeff_re` / `coeff_im`; default: `None`
+  (single-freq) or `(n_rx, n_tx, n_path, n_freq)` (multi-freq)
 - **`delay`** — Path delays in seconds; list of length `n_snap`; each item shaped like the matching
   `coeff` item or broadcast as `(1, 1, n_path)` (with an optional 4th dimension `n_freq`)
 - **`bandwidth`** — Baseband bandwidth in Hz; paired with `pilot_grid` or `carriers`; single-freq only;
@@ -820,11 +790,7 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, 
   `freq_new` are omitted; default: 128
 - **`pilot_grid`** — Normalized sub-carrier positions, `0.0` = center, `1.0` = center + `bandwidth`;
   1D array of length `n_carrier`; default: `None`
-- **`snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; omitted processes
-  all snapshots; default: `None`
-- **`coeff_re`** — Real part of channel coefficients; same list/shape layout as `coeff`; must be
-  paired with `coeff_im`; mutually exclusive with `coeff`; default: `None`
-- **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
+- **`snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; default: `None` (all snapshots)
 - **`freq`** — Input sample frequencies in Hz; 1D array; required for multi-freq input; for
   single-freq input used together with `freq_new` as the phase reference; default: `None`
 - **`freq_new`** — Absolute output carrier frequencies in Hz; 1D array of length `n_carrier`;

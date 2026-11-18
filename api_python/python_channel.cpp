@@ -30,15 +30,13 @@ namespace py = pybind11;
 void quadriga_lib_channel(py::module_ &m)
 {
     m.def("baseband_freq_response", &baseband_freq_response,
-          py::arg("coeff") = py::none(),
-          py::arg("delay") = py::none(),
+          py::arg("coeff").none(false),
+          py::arg("delay").none(false),
           py::kw_only(),
           py::arg("bandwidth") = 0.0,
           py::arg("carriers") = 128,
           py::arg("pilot_grid") = py::none(),
           py::arg("snap") = py::none(),
-          py::arg("coeff_re") = py::none(),
-          py::arg("coeff_im") = py::none(),
           py::arg("freq") = py::none(),
           py::arg("freq_new") = py::none(),
           py::arg("remove_delay_phase") = true,

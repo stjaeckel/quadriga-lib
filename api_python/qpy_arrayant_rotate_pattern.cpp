@@ -24,11 +24,7 @@ Rotate antenna radiation patterns using Euler rotations
 
 ## Usage:
 ```
-# 10 degree mechanical downtilt (0.1745 rad) of all elements
-arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.1745, 0.0])
-
-# Elements 0 and 1 only, 90 degree heading (1.5708 rad)
-arrayant_out = quadriga_lib.arrayant.rotate_pattern(arrayant, [0.0, 0.0, 1.5708], i_element=[0, 1])
+arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, orientation, *, usage, i_element )
 ```
 
 ## Inputs:

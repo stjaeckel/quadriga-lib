@@ -150,7 +150,7 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 - Implementation details (algorithm steps, formulas, derivations, numerical choices) are written as comments next to the code that implements them, not in the documentation block.
 
 ## Input validation
-- Validate first, compute second: all checks run before any output is resized or written, so that a failed call leaves the outputs untouched.
+- Validate first, compute second: all checks run before any output is resized or written, so that a failed call leaves the outputs untouched. A batch form (`_vec`) checks only its shared inputs and leaves the item checks to the single call in its loop; its outputs may then be partly written.
 - Throw `std::invalid_argument` for invalid input (null, empty, wrong shape, out-of-range value or index, inconsistent sizes), also for an index outside the layout of a file or a name the file does not contain. Throw `std::runtime_error` for a problem with a file's access or content (missing, cannot be opened or written, already exists where that is refused, truncated, malformed, unsupported version; also a value in a file that fails a check) and for other runtime failures. An empty file name is a file that cannot be opened; it needs no separate check.
 - Message style: a full sentence naming the argument in single quotes, without the function name as a prefix, e.g.
   - `"Input 'orig' cannot be NULL."`
@@ -191,19 +191,7 @@ if (out != nullptr && (out->n_rows != n_ray || out->n_cols != 3))
 - Parallelize only loops that dominate the run time and are independent per iteration. Guard nothing with `#ifdef _OPENMP` unless OpenMP runtime functions are called; a plain `#pragma omp parallel for` is ignored by a compiler without OpenMP.
 - Every parallel region has an `if (...)` clause with a measured size limit, so that small calls run serially. Starting a thread team costs a few microseconds on an idle machine and up to a scheduler time slice (milliseconds) when other processes compete for the cores. The limit is the smallest size at which the default thread count is at least 2× faster than serial on an idle machine; where the tests do not reach that size, it is the size at which the serial work reaches about 20 µs at the measured cost per item. Express the limit in the quantity the work scales with (e.g. `n_ray * n_point`), and also require at least 2 iterations when the count of the parallel loop can be 1.
 - The loop variable of a parallel `for` must be a signed integer type (`int` or `long long`) for MSVC; cast to `arma::uword` inside the loop.
-- Exceptions must not leave a parallel region. Wrap throwing calls with the `OMP_SAFE_CALL` macro from `src/quadriga_lib_helper_functions.hpp` and rethrow after the region:
-```
-bool omp_failed = false;
-std::string omp_error;
-#pragma omp parallel for if (n_iter >= 64)
-for (long long i = 0; i < n_iter; ++i)
-{
-    OMP_SAFE_CALL(omp_failed, omp_error, do_work((arma::uword)i));
-}
-if (omp_failed)
-    throw std::runtime_error(omp_error);
-```
-- Where the exception type must survive the region, keep the type and the message and rethrow that type (see `gbsm_single_link_channel.cpp`). Do not use `std::exception_ptr`: it needs a libstdc++ symbol version (`CXXABI_1.3.13`) that the libstdc++ bundled with MATLAB R2024a lacks, so the MEX files would not load there. `make test` runs `tests/check_mex_symbol_versions.sh`, which fails when a MEX file needs a symbol version newer than that release provides.
+- Exceptions must not leave a parallel region. Run the items of a batch with `qd_batch_loop`, which rethrows the error of the lowest failing item with its type and the `"Snapshot <i>: "` prefix; wrap other throwing calls in `OMP_SAFE_CALL` and throw `std::runtime_error` after the region (both in `src/quadriga_lib_helper_functions.hpp`). Do not use `std::exception_ptr`: it needs a libstdc++ symbol version (`CXXABI_1.3.13`) that the libstdc++ bundled with MATLAB R2024a lacks, so the MEX files would not load there. `make test` runs `tests/check_mex_symbol_versions.sh`, which fails when a MEX file needs a symbol version newer than that release provides.
 - The result must not depend on the number of threads (same values, same order). If a parallel and a serial path exist, a test compares them.
 
 ## AVX2 and CUDA kernels

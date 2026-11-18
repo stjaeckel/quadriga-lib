@@ -35,7 +35,6 @@ POSITIONAL_OPTIONAL = {
     "arrayant.generate_speaker": ("driver_type",),
     "arrayant.qdant_read": ("id",),
     "arrayant.qdant_write": ("id",),
-    "channel.baseband_freq_response": ("coeff", "delay"),
     "channel.hdf5_create_file": ("nx", "ny", "nz", "nw"),
     "channel.hdf5_read_channel": ("ix", "iy", "iz", "iw"),
     "channel.hdf5_read_dset": ("ix", "iy", "iz", "iw"),

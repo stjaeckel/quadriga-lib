@@ -308,7 +308,7 @@ SECTION!*/
 - The layout and the lean rules of the C++ block apply (`md/SPEC_CPP_API.md`, "Documentation block"): same one-line summary, description as bullets without a heading, singular `## Input:` / `## Output:` for one entry, `## See also:`. Do not expand what is brief in the C++ block. The differences:
 - The heading is the name exposed to Python, without case conversion (names without their prefix: see "Submodules").
 - Omit dtype specifications (except for integer and complex arguments). Use Python types and syntax: tuples `(n, m)` for shapes, `list`, `dict`, `str`, `None`.
-- A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements; split long calls (line length: `docs_builder/README.md`, "Writing pitfalls") with continuation lines indented by 4 and ending in ` \`. The keyword-only arguments follow a `*` ("Keyword-only arguments"). If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
+- A `## Usage:` section replaces the Declaration. It shows the call with its full path and no import statements, and the arguments by name only (no `name=value`, except the flag value of a variant below; defaults are in `## Inputs:`); split long calls (line length: `docs_builder/README.md`, "Writing pitfalls") with continuation lines indented by 4 and ending in ` \`. The keyword-only arguments follow a `*` ("Keyword-only arguments"). If flags change the returned tuple (see "Standard flags"), show one usage line per variant, each preceded by a `#` comment line; later variants may abbreviate unchanged arguments as `...`.
 ```
 ## Usage:
 ```
@@ -359,7 +359,7 @@ const auto bins_in_a = qd_python_numpy2arma_Col<double>(bins, true);
 ```
 - The handle overloads of `qd_python_numpy2arma_*` return an empty Armadillo object when the handle is `None`, which can then be checked via `.empty()`.
 - In the registration: `py::arg("bins") = py::none()`.
-- Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object`. The same holds for optional containers (`list`, `dict`): `py::handle` with default `py::none()`, not `py::list()` / `py::dict()`. Exceptions remain only in `channel.baseband_freq_response` and `channel.ieee_indoor`, whose interfaces are being reworked.
+- Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object`. The same holds for optional containers (`list`, `dict`): `py::handle` with default `py::none()`, not `py::list()` / `py::dict()`. An exception remains only in `channel.ieee_indoor`, whose interface is being reworked.
 
 ### Optional inputs and `nullptr`
 - If the C++ function takes an optional input by pointer and distinguishes `nullptr` from an empty object, pass `nullptr` when the user did not provide the input:

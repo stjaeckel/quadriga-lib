@@ -951,6 +951,39 @@ static std::vector<std::array<size_t, 9>> qd_python_get_list_shape(const py::lis
     return output;
 }
 
+// -------------------------------- qd_python_get_item --------------------------------
+
+// One numpy array (e.g. a list item) as typed array with element strides, its data pointer and shape (see
+// qd_python_get_shape; a 4th dimension gives n_frames frames, stride_frames elements apart). Reading it needs the GIL;
+// copying from 'data' with qd_python_copy2arma does not, so the copies of many items can run in parallel.
+namespace // Internal linkage, like the pybind11 types it holds
+{
+    template <typename dtype>
+    struct qd_python_item
+    {
+        py::array_t<dtype> array; // Keeps the data alive
+        const dtype *data = nullptr;
+        std::array<size_t, 9> shape{};
+        size_t n_frames = 1, stride_frames = 0;
+        int ndim = 0;
+    };
+}
+
+template <typename dtype>
+static qd_python_item<dtype> qd_python_get_item(const py::handle &obj)
+{
+    qd_python_item<dtype> item;
+    const py::array array = py::cast<py::array>(obj);
+    if (py::detail::npy_format_descriptor<dtype>::dtype().is(array.dtype()))
+        item.array = qd_python_element_strided(array.cast<py::array_t<dtype>>());
+    else
+        item.array = qd_python_element_strided(py::array_t<dtype>(array)); // Converting copy
+    item.ndim = (int)item.array.ndim();
+    item.shape = qd_python_get_shape(item.array, false, &item.n_frames, &item.stride_frames);
+    item.data = item.array.data();
+    return item;
+}
+
 // -------------------------------- qd_python_copy2arma --------------------------------
 
 template <typename dtype>

@@ -106,24 +106,6 @@ class test_case(unittest.TestCase):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(delay=[np.zeros((1, 1, 1))], bandwidth=1e6)
 
-    def test_error_coeff_and_coeff_re(self):
-        c = [np.zeros((1, 1, 1), dtype=complex)]
-        cr = [np.zeros((1, 1, 1))]
-        ci = [np.zeros((1, 1, 1))]
-        dl = [np.zeros((1, 1, 1))]
-        with self.assertRaises(Exception):
-            channel.baseband_freq_response(coeff=c, delay=dl, bandwidth=1e6, coeff_re=cr, coeff_im=ci)
-
-    def test_error_coeff_re_without_im(self):
-        with self.assertRaises(Exception):
-            channel.baseband_freq_response(delay=[np.zeros((1, 1, 1))], bandwidth=1e6,
-                                           coeff_re=[np.zeros((1, 1, 1))])
-
-    def test_error_coeff_im_without_re(self):
-        with self.assertRaises(Exception):
-            channel.baseband_freq_response(delay=[np.zeros((1, 1, 1))], bandwidth=1e6,
-                                           coeff_im=[np.zeros((1, 1, 1))])
-
     def test_error_no_delay(self):
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=[np.zeros((1, 1, 1), dtype=complex)], bandwidth=1e6)
@@ -142,13 +124,6 @@ class test_case(unittest.TestCase):
         c = [np.zeros((1, 1, 1), dtype=complex)] * 2
         with self.assertRaises(Exception):
             channel.baseband_freq_response(coeff=c, delay=[np.zeros((1, 1, 1))], bandwidth=1e6)
-
-    def test_error_cim_length_mismatch(self):
-        cr = [np.zeros((1, 1, 1))] * 2
-        ci = [np.zeros((1, 1, 1))]
-        dl = [np.zeros((1, 1, 1))] * 2
-        with self.assertRaises(Exception):
-            channel.baseband_freq_response(coeff_re=cr, coeff_im=ci, delay=dl, bandwidth=1e6)
 
     def test_error_2d_coeff(self):
         with self.assertRaises(Exception):
@@ -221,30 +196,9 @@ class test_case(unittest.TestCase):
                                            freq=np.array([1e9, 2e9]),
                                            freq_new=np.array([1e9]))
 
-    def test_error_re_im_shape_mismatch(self):
-        with self.assertRaises(Exception):
-            channel.baseband_freq_response(coeff_re=[np.zeros((1, 1, 2))],
-                                           coeff_im=[np.zeros((1, 1, 3))],
-                                           delay=[np.zeros((1, 1, 2))], bandwidth=1e6)
-
     def test_empty_list(self):
         hmat = channel.baseband_freq_response(coeff=[], delay=[], bandwidth=1e6)
         self.assertEqual(hmat.size, 0)
-
-    # ==================================================================================
-    # Single-freq: coeff_re + coeff_im
-    # ==================================================================================
-
-    def test_single_freq_re_im(self):
-        coeff = np.array([[[1.0 + 0.5j, 0.5], [0.3 - 0.2j, -0.7j]]])  # (1,2,2)
-        delay = np.zeros((1, 1, 2)); delay[0, 0, 0] = 5e-9; delay[0, 0, 1] = 15e-9
-        cl = [coeff, 2.0 * coeff]; dl = [delay, delay]
-
-        hmat_cx = channel.baseband_freq_response(coeff=cl, delay=dl, bandwidth=100e6)
-        hmat_ri = channel.baseband_freq_response(coeff_re=[np.real(c) for c in cl],
-                                                  coeff_im=[np.imag(c) for c in cl],
-                                                  delay=dl, bandwidth=100e6)
-        npt.assert_allclose(hmat_cx, hmat_ri, atol=1e-6, rtol=0)
 
     # ==================================================================================
     # Single-freq: freq_new instead of bandwidth
@@ -367,20 +321,6 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(np.abs(hmat_test) ** 2, np.abs(hmat_ref) ** 2, atol=1e-6, rtol=0)
         npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
-    def test_mf_re_im(self):
-        fin = np.array([1e9, 2e9]); fout = np.linspace(1e9, 2e9, 8)
-        c = np.zeros((1, 1, 2, 2), dtype=complex)
-        c[0, 0, 0, 0] = 1.0 + 0.2j; c[0, 0, 1, 0] = 0.5 - 0.3j
-        c[0, 0, 0, 1] = 0.8 + 0.4j; c[0, 0, 1, 1] = 0.6 - 0.1j
-        dl = np.zeros((1, 1, 2)); dl[0, 0, 0] = 10e-9; dl[0, 0, 1] = 30e-9
-
-        hmat_cx = channel.baseband_freq_response(coeff=[c], delay=[dl], freq=fin, freq_new=fout,
-                                                  remove_delay_phase=False)
-        hmat_ri = channel.baseband_freq_response(coeff_re=[np.real(c)], coeff_im=[np.imag(c)],
-                                                  delay=[dl], freq=fin, freq_new=fout,
-                                                  remove_delay_phase=False)
-        npt.assert_allclose(hmat_cx, hmat_ri, atol=1e-6, rtol=0)
-
     def test_mf_mimo(self):
         c = np.zeros((2, 2, 1, 1), dtype=complex)
         c[0, 0, 0, 0] = 1.0; c[1, 0, 0, 0] = 2.0; c[0, 1, 0, 0] = 3.0; c[1, 1, 0, 0] = 4.0
@@ -490,8 +430,8 @@ class test_case(unittest.TestCase):
 
 
     # ==================================================================================
-    # An exception inside the parallel region must reach Python; run in a
-    # subprocess, since before the fix the interpreter aborted (std::terminate)
+    # An invalid multi-frequency input raises ValueError with one and with several threads; run in a subprocess,
+    # since an exception that left an OpenMP region aborted the interpreter (std::terminate)
     # ==================================================================================
 
     def test_exception_in_parallel_region_raises(self):
@@ -500,12 +440,11 @@ class test_case(unittest.TestCase):
             "rng = np.random.default_rng(0)\n"
             "coeff = [rng.normal(size=(2, 2, 3, 2)) + 1j * rng.normal(size=(2, 2, 3, 2)) for _ in range(5)]\n"
             "delay = [rng.random((2, 2, 3)) * 1e-7 for _ in range(5)]\n"
-            "for kw in ({'coeff': coeff}, {'coeff_re': [c.real.copy() for c in coeff], 'coeff_im': [c.imag.copy() for c in coeff]}):\n"
-            "    try:\n"
-            "        q.channel.baseband_freq_response(delay=delay, freq=np.array([2e9, 1e9]), freq_new=np.array([1.5e9]), **kw)\n"
-            "        print('no exception')\n"
-            "    except ValueError as e:\n"
-            "        print('ValueError:', e)\n"
+            "try:\n"
+            "    q.channel.baseband_freq_response(coeff, delay, freq=np.array([2e9, 1e9]), freq_new=np.array([1.5e9]))\n"
+            "    print('no exception')\n"
+            "except ValueError as e:\n"
+            "    print('ValueError:', e)\n"
             "print('alive')\n")
         env = dict(os.environ)
         env['PYTHONPATH'] = module_dir()
@@ -514,10 +453,9 @@ class test_case(unittest.TestCase):
             r = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, env=env, timeout=300)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             lines = r.stdout.splitlines()
-            self.assertEqual(len(lines), 3, r.stdout)
-            for line in lines[:2]:
-                self.assertIn("ValueError: Input 'freq' must be sorted in strictly ascending order.", line)
-            self.assertEqual(lines[2], 'alive')
+            self.assertEqual(len(lines), 2, r.stdout)
+            self.assertIn("ValueError: Input 'freq' must be sorted in strictly ascending order.", lines[0])
+            self.assertEqual(lines[1], 'alive')
 
 
 class test_carrier_frequencies(unittest.TestCase):
@@ -564,6 +502,22 @@ class test_use_kernel(unittest.TestCase):
                 call()
             self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))
 
+
+
+class test_remove_delay_phase_flag(unittest.TestCase):
+    # remove_delay_phase: None equals the default (True), a non-bool raises TypeError naming the argument
+    def test(self):
+        rng = np.random.default_rng(0)
+        coeff = [rng.normal(size=(1, 1, 2, 2)) + 1j * rng.normal(size=(1, 1, 2, 2))]
+        delay = [rng.random((1, 1, 2)) * 1e-7]
+        f, f_new = np.array([3e9, 3.2e9]), np.array([3e9, 3.1e9])
+        h_def = channel.baseband_freq_response(coeff, delay, freq=f, freq_new=f_new)
+        h_none = channel.baseband_freq_response(coeff, delay, freq=f, freq_new=f_new, remove_delay_phase=None)
+        h_true = channel.baseband_freq_response(coeff, delay, freq=f, freq_new=f_new, remove_delay_phase=True)
+        npt.assert_array_equal(h_none, h_def)
+        npt.assert_array_equal(h_true, h_def)
+        with self.assertRaisesRegex(TypeError, 'remove_delay_phase'):
+            channel.baseband_freq_response(coeff, delay, freq=f, freq_new=f_new, remove_delay_phase=2.5)
 
 if __name__ == '__main__':
     unittest.main()

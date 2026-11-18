@@ -58,7 +58,7 @@ void quadriga_lib::baseband_freq_response(
 - **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
 
 ## See also:
-- [[baseband_freq_response_vec]] (vectorized version)
+- [[baseband_freq_response_vec]] (batched version)
 - [[baseband_freq_response_multi]] (multi-freq counterpart)
 - [[get_channels_planar]] (for generating coeff and delay)
 - [[get_channels_spherical]] (for generating coeff and delay)
@@ -188,6 +188,26 @@ template void quadriga_lib::baseband_freq_response(const arma::Cube<double> &coe
                                                    const arma::Col<double> &pilot_grid, const double bandwidth,
                                                    arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im, arma::Cube<std::complex<double>> *hmat, int use_kernel);
 
+// Snapshot list of the batch forms (n_snap > 0): all n_snap snapshots when 'i_snap' is omitted or empty, else a checked copy
+static arma::uvec qd_snapshot_list(const arma::uvec *i_snap, size_t n_snap)
+{
+    if (i_snap == nullptr || i_snap->n_elem == 0)
+        return arma::regspace<arma::uvec>(0, (arma::uword)n_snap - 1);
+    for (arma::uword i : *i_snap)
+        if (i >= n_snap)
+            throw std::invalid_argument("Snapshot indices cannot exceed number of snapshots.");
+    return *i_snap;
+}
+
+// Sets an optional output of the batch forms to n_out cubes; each cube is sized by the single-snapshot call, which
+// resizes it only if needed and so keeps externally borrowed memory
+template <typename T>
+static void qd_size_batch_output(std::vector<arma::Cube<T>> *out, size_t n_out)
+{
+    if (out != nullptr && out->size() != n_out)
+        out->resize(n_out);
+}
+
 /*!MD
 # baseband_freq_response_vec
 Compute the baseband frequency response of multiple MIMO channels
@@ -195,6 +215,7 @@ Compute the baseband frequency response of multiple MIMO channels
 - Batch wrapper around [[baseband_freq_response]], applying it across snapshots in parallel via OpenMP
 - Each element of the input vectors is a cube of shape `[n_rx, n_tx, n_path]`; `delay` supports broadcasting to `[1, 1, n_path]`
 - Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
+- The snapshots are checked by [[baseband_freq_response]]; an error names the lowest failing snapshot (`"Snapshot <i>: "`), and the outputs may then be partly written
 - Same arithmetic as [[baseband_freq_response]]: phase in double precision, sin / cos and sums in single precision
 
 ## Declaration:
@@ -207,6 +228,7 @@ void quadriga_lib::baseband_freq_response_vec(
     const double bandwidth,
     std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
     std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
     const arma::uvec *i_snap = nullptr,
     int use_kernel = 0);
 ```
@@ -217,138 +239,64 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`delay`** — Path delays in seconds, same structure as `coeff_re`; each cube broadcastable to `[1, 1, n_path]`
 - **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
 - **`bandwidth`** — Total baseband bandwidth
-- **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
+- **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
 - **`use_kernel`** — Kernel: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
 
 ## Outputs:
 - **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
 - **`hmat_im`** *(optional)* — Imaginary part of frequency-domain channel matrices, same structure as `hmat_re`
+- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrices, same structure as `hmat_re`
 
 ## See also:
 - [[baseband_freq_response]] (single-snapshot variant)
-- [[baseband_freq_response_multi]] (multi-freq counterpart)
+- [[baseband_freq_response_multi_vec]] (multi-freq counterpart)
 MD!*/
 
 // Compute the baseband frequency response of multiple MIMO channel
 template <typename dtype>
 void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> &coeff_re, const std::vector<arma::Cube<dtype>> &coeff_im,
                                               const std::vector<arma::Cube<dtype>> &delay, const arma::Col<dtype> &pilot_grid, const double bandwidth,
-                                              std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im, const arma::uvec *i_snap,
-                                              int use_kernel)
+                                              std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
+                                              std::vector<arma::Cube<std::complex<dtype>>> *hmat, const arma::uvec *i_snap, int use_kernel)
 {
-    qd_kernel_auto_avx2(use_kernel); // Checked here, before the parallel loop
-
+    // Shared inputs are checked here, once; the snapshots by the single-snapshot call
+    qd_kernel_auto_avx2(use_kernel);
     if (coeff_re.size() == 0 || pilot_grid.n_elem == 0)
         throw std::invalid_argument("Inputs cannot be empty");
-
     if (!pilot_grid.is_finite())
         throw std::invalid_argument("Pilot grid must contain finite values only.");
-
     if (!(bandwidth >= 0.0) || !std::isfinite(bandwidth))
         throw std::invalid_argument("Bandwidth must be finite and cannot be negative");
+    if (coeff_im.size() != coeff_re.size() || delay.size() != coeff_re.size())
+        throw std::invalid_argument("Coefficients and delays must have the same number of snapshots.");
 
-    size_t n_snap_t = coeff_re.size();
-    arma::uword n_carrier = pilot_grid.n_elem;
-
-    if (coeff_im.size() != n_snap_t || delay.size() != n_snap_t)
-        throw std::invalid_argument("Coefficients and delays must have the same number of snapshots");
-
-    // Process the snapshot indices
-    size_t n_snap_o;
-    arma::uvec snap;
-    const arma::uword *p_snap = nullptr;
-
-    if (i_snap == nullptr || i_snap->n_elem == 0)
-        n_snap_o = n_snap_t;
-    else
-    {
-        n_snap_o = i_snap->n_elem;
-        snap.set_size(n_snap_o);
-        arma::uword *p = snap.memptr();
-        const arma::uword *q = i_snap->memptr();
-        for (size_t i = 0; i < n_snap_o; ++i)
-        {
-            if (q[i] >= n_snap_t)
-                throw std::invalid_argument("Snapshot indices cannot exceed number of snapshots.");
-            p[i] = q[i];
-        }
-        p_snap = snap.memptr();
-    }
-
-    // Determine reference dims from the first snapshot we'll actually process
-    size_t first = (p_snap == nullptr) ? 0 : (size_t)p_snap[0];
-    arma::uword n_rx = coeff_re.at(first).n_rows;
-    arma::uword n_tx = coeff_re.at(first).n_cols;
-
-    for (size_t i = 0; i < n_snap_o; ++i)
-    {
-        size_t js = (p_snap == nullptr) ? i : (size_t)p_snap[i];
-        const auto &Cr = coeff_re.at(js);
-        const auto &Ci = coeff_im.at(js);
-        const auto &D = delay.at(js);
-        arma::uword n_path = Cr.n_slices;
-
-        if (Cr.n_rows != n_rx || Cr.n_cols != n_tx)
-            throw std::invalid_argument("All coeff_re cubes must share [n_rx, n_tx].");
-        if (Ci.n_rows != n_rx || Ci.n_cols != n_tx || Ci.n_slices != n_path)
-            throw std::invalid_argument("coeff_im dimensions must match coeff_re for each snapshot.");
-        if (D.n_slices != n_path ||
-            !((D.n_rows == n_rx && D.n_cols == n_tx) || (D.n_rows == 1 && D.n_cols == 1)))
-            throw std::invalid_argument("delay must be [n_rx, n_tx, n_path] or [1, 1, n_path] per snapshot.");
-    }
-
+    const arma::uvec snap = qd_snapshot_list(i_snap, coeff_re.size());
     qd_check_alias(hmat_re, "hmat_re", &coeff_re, &coeff_im, &delay);
     qd_check_alias(hmat_im, "hmat_im", &coeff_re, &coeff_im, &delay);
+    qd_check_alias(hmat, "hmat", &coeff_re, &coeff_im, &delay);
     qd_check_alias_outputs(hmat_re, "hmat_re", hmat_im, "hmat_im");
+    qd_size_batch_output(hmat_re, snap.n_elem);
+    qd_size_batch_output(hmat_im, snap.n_elem);
+    qd_size_batch_output(hmat, snap.n_elem);
 
-    // Resize outputs (only if needed, preserves externally borrowed memory)
-    if (hmat_re != nullptr && hmat_re->size() != n_snap_o)
-        hmat_re->resize(n_snap_o);
-    if (hmat_im != nullptr && hmat_im->size() != n_snap_o)
-        hmat_im->resize(n_snap_o);
-
-    for (size_t f = 0; f < n_snap_o; ++f)
-    {
-        if (hmat_re != nullptr)
-        {
-            auto &Hr = (*hmat_re)[f];
-            if (Hr.n_rows != n_rx || Hr.n_cols != n_tx || Hr.n_slices != n_carrier)
-                Hr.set_size(n_rx, n_tx, n_carrier);
-        }
-        if (hmat_im != nullptr)
-        {
-            auto &Hi = (*hmat_im)[f];
-            if (Hi.n_rows != n_rx || Hi.n_cols != n_tx || Hi.n_slices != n_carrier)
-                Hi.set_size(n_rx, n_tx, n_carrier);
-        }
-    }
-
-    long long n_iter = (long long)n_snap_o;
-    bool omp_failed = false;
-    std::string omp_error;
-
-#pragma omp parallel for if (n_iter > 1 && (arma::uword)n_iter * n_rx * n_tx * n_carrier >= 1024)
-    for (long long i = 0; i < n_iter; ++i)
-    {
-        arma::uword js = (p_snap == nullptr) ? (arma::uword)i : p_snap[i];
-        OMP_SAFE_CALL(omp_failed, omp_error,
-                      quadriga_lib::baseband_freq_response<dtype>(
-                          coeff_re.at(js), coeff_im.at(js), delay.at(js),
-                          pilot_grid, bandwidth,
-                          hmat_re != nullptr ? &(*hmat_re)[i] : nullptr,
-                          hmat_im != nullptr ? &(*hmat_im)[i] : nullptr, nullptr, use_kernel));
-    }
-    if (omp_failed)
-        throw std::runtime_error(omp_error);
+    // Parallel from 1024 output elements, estimated from the first snapshot
+    const arma::uword n_elem = snap.n_elem * coeff_re[snap[0]].n_rows * coeff_re[snap[0]].n_cols * pilot_grid.n_elem;
+    qd_batch_loop(snap.n_elem, snap.n_elem > 1 && n_elem >= 1024, "Snapshot", [&](size_t i)
+                  { const arma::uword s = snap[i];
+                    quadriga_lib::baseband_freq_response<dtype>(coeff_re[s], coeff_im[s], delay[s], pilot_grid, bandwidth,
+                                                                hmat_re ? &(*hmat_re)[i] : nullptr, hmat_im ? &(*hmat_im)[i] : nullptr,
+                                                                hmat ? &(*hmat)[i] : nullptr, use_kernel); }, &snap);
 }
 
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
                                                        const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &pilot_grid, const double bandwidth,
-                                                       std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im, const arma::uvec *i_snap, int use_kernel);
+                                                       std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
+                                                       std::vector<arma::Cube<std::complex<float>>> *hmat, const arma::uvec *i_snap, int use_kernel);
 
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
                                                        const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &pilot_grid, const double bandwidth,
-                                                       std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im, const arma::uvec *i_snap, int use_kernel);
+                                                       std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
+                                                       std::vector<arma::Cube<std::complex<double>>> *hmat, const arma::uvec *i_snap, int use_kernel);
 
 /*!MD
 # baseband_freq_response_multi
@@ -401,7 +349,7 @@ void quadriga_lib::baseband_freq_response_multi(
 
 ## See also:
 - [[baseband_freq_response]] (single-snapshot narrowband version)
-- [[baseband_freq_response_vec]] (batched narrowband version)
+- [[baseband_freq_response_multi_vec]] (batched version)
 - [[get_channels_multifreq]] (produces the multi-frequency input coefficients)
 MD!*/
 
@@ -751,3 +699,109 @@ template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma:
                                                          const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq,
                                                          const arma::Col<double> &freq_new, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
                                                          arma::Cube<std::complex<double>> *hmat, bool remove_delay_phase, int use_kernel);
+/*!MD
+# baseband_freq_response_multi_vec
+Compute the wideband frequency response of multiple MIMO channels with frequency-dependent coefficients
+
+- Batch wrapper around [[baseband_freq_response_multi]], applying it across snapshots in parallel via OpenMP
+- Inputs are indexed `[snapshot][input frequency]`: `coeff_re[s][f]` is the cube of snapshot `s` at `freq[f]`
+- `freq` and `freq_new` are shared by all snapshots; only `delay[s][0]` is used, the other entries may be empty
+- Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
+- The snapshots are checked by [[baseband_freq_response_multi]]; an error names the lowest failing snapshot (`"Snapshot <i>: "`), and the outputs may then be partly written
+
+## Declaration:
+```
+void quadriga_lib::baseband_freq_response_multi_vec(
+    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
+    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
+    const std::vector<std::vector<arma::Cube<dtype>>> &delay,
+    const arma::Col<dtype> &freq,
+    const arma::Col<dtype> &freq_new,
+    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
+    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
+    std::vector<arma::Cube<std::complex<dtype>>> *hmat = nullptr,
+    bool remove_delay_phase = true,
+    const arma::uvec *i_snap = nullptr,
+    int use_kernel = 0);
+```
+
+## Inputs:
+- **`coeff_re`** — Real part of channel coefficients, `n_snap` vectors of `n_freq` cubes `[n_rx, n_tx, n_path]`
+- **`coeff_im`** — Imaginary part of channel coefficients, same structure as `coeff_re`
+- **`delay`** — Path delays in seconds, `n_snap` vectors of `n_freq` cubes; entry `0` of each has shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
+- **`freq`** — Input sample frequencies, sorted ascending; `[n_freq]`
+- **`freq_new`** — Output carrier frequencies (absolute); `[n_carrier]`
+- **`remove_delay_phase`** *(optional)* — As in [[baseband_freq_response_multi]]; default `true`
+- **`i_snap`** *(optional)* — 0-based snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
+- **`use_kernel`** — Kernel of the sin / cos and SLERP evaluation: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2; throws if unavailable; default `0`
+
+## Outputs:
+- **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carrier]`
+- **`hmat_im`** *(optional)* — Imaginary part, same structure as `hmat_re`
+- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrices, same structure as `hmat_re`
+
+## See also:
+- [[baseband_freq_response_multi]] (single-snapshot variant)
+- [[baseband_freq_response_vec]] (single-freq counterpart)
+- [[get_channels_multifreq]] (produces the multi-frequency input coefficients)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<dtype>>> &coeff_re,
+                                                    const std::vector<std::vector<arma::Cube<dtype>>> &coeff_im,
+                                                    const std::vector<std::vector<arma::Cube<dtype>>> &delay,
+                                                    const arma::Col<dtype> &freq, const arma::Col<dtype> &freq_new,
+                                                    std::vector<arma::Cube<dtype>> *hmat_re, std::vector<arma::Cube<dtype>> *hmat_im,
+                                                    std::vector<arma::Cube<std::complex<dtype>>> *hmat,
+                                                    bool remove_delay_phase, const arma::uvec *i_snap, int use_kernel)
+{
+    // Shared inputs are checked here, once; the snapshots by the single-snapshot call
+    qd_kernel_auto_avx2(use_kernel);
+    if (coeff_re.size() == 0)
+        throw std::invalid_argument("Input 'coeff_re' must contain at least one snapshot.");
+    if (coeff_im.size() != coeff_re.size() || delay.size() != coeff_re.size())
+        throw std::invalid_argument("Coefficients and delays must have the same number of snapshots.");
+    if (freq.n_elem == 0 || freq_new.n_elem == 0)
+        throw std::invalid_argument("Inputs 'freq' and 'freq_new' must have at least one element.");
+    if (!freq.is_finite() || !freq_new.is_finite())
+        throw std::invalid_argument("Inputs 'freq' and 'freq_new' must contain finite values only.");
+    if (freq.n_elem > 1 && arma::any(arma::diff(freq) <= dtype(0)))
+        throw std::invalid_argument("Input 'freq' must be sorted in strictly ascending order.");
+
+    const arma::uvec snap = qd_snapshot_list(i_snap, coeff_re.size());
+    for (arma::uword s : snap)
+    {
+        qd_check_alias(hmat_re, "hmat_re", &coeff_re[s], &coeff_im[s], &delay[s]);
+        qd_check_alias(hmat_im, "hmat_im", &coeff_re[s], &coeff_im[s], &delay[s]);
+        qd_check_alias(hmat, "hmat", &coeff_re[s], &coeff_im[s], &delay[s]);
+    }
+    qd_check_alias_outputs(hmat_re, "hmat_re", hmat_im, "hmat_im");
+    qd_size_batch_output(hmat_re, snap.n_elem);
+    qd_size_batch_output(hmat_im, snap.n_elem);
+    qd_size_batch_output(hmat, snap.n_elem);
+
+    // Parallel from 1024 output elements, estimated from the first snapshot
+    const std::vector<arma::Cube<dtype>> &first = coeff_re[snap[0]];
+    const arma::uword n_elem = first.empty() ? 0 : snap.n_elem * first[0].n_rows * first[0].n_cols * freq_new.n_elem;
+    qd_batch_loop(snap.n_elem, snap.n_elem > 1 && n_elem >= 1024, "Snapshot", [&](size_t i)
+                  { const arma::uword s = snap[i];
+                    quadriga_lib::baseband_freq_response_multi<dtype>(coeff_re[s], coeff_im[s], delay[s], freq, freq_new,
+                                                                      hmat_re ? &(*hmat_re)[i] : nullptr, hmat_im ? &(*hmat_im)[i] : nullptr,
+                                                                      hmat ? &(*hmat)[i] : nullptr, remove_delay_phase, use_kernel); }, &snap);
+}
+
+template void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<float>>> &coeff_re,
+                                                             const std::vector<std::vector<arma::Cube<float>>> &coeff_im,
+                                                             const std::vector<std::vector<arma::Cube<float>>> &delay,
+                                                             const arma::Col<float> &freq, const arma::Col<float> &freq_new,
+                                                             std::vector<arma::Cube<float>> *hmat_re, std::vector<arma::Cube<float>> *hmat_im,
+                                                             std::vector<arma::Cube<std::complex<float>>> *hmat,
+                                                             bool remove_delay_phase, const arma::uvec *i_snap, int use_kernel);
+
+template void quadriga_lib::baseband_freq_response_multi_vec(const std::vector<std::vector<arma::Cube<double>>> &coeff_re,
+                                                             const std::vector<std::vector<arma::Cube<double>>> &coeff_im,
+                                                             const std::vector<std::vector<arma::Cube<double>>> &delay,
+                                                             const arma::Col<double> &freq, const arma::Col<double> &freq_new,
+                                                             std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im,
+                                                             std::vector<arma::Cube<std::complex<double>>> *hmat,
+                                                             bool remove_delay_phase, const arma::uvec *i_snap, int use_kernel);
