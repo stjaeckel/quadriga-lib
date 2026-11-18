@@ -30,7 +30,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Units: SI units, angles in radians, powers and gains linear. A value in dB, dBi or degrees carries the unit in its name (`threshold_dB`, `directivity_dBi`, `quantize_deg`); a value in the default unit carries no suffix. Other non-SI units keep their suffix, e.g. `speed_station_kmh`.
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx, each a right-handed rotation as in 3GPP TR 38.901 (bearing, downtilt, slant), so that orientations from TR 38.901 are entered as published: a positive heading turns the x-axis (boresight) toward y, a positive tilt turns it down, a positive bank turns the y-axis toward z.
 - Complex data: separate real and imaginary arrays (`_re` / `_im`), or interleaved along the rows where documented (e.g. `M`), for compatibility with older Octave versions, whose MEX interface has no interleaved complex arrays. Some functions also offer an optional `std::complex` output, which replaces the split pair (then left empty).
-- Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
+- Speed of light/sound: `299792458.0` m/s (EM), `343.0` m/s (acoustic; the one value the library uses for sound: the acoustic frequency mapping, acoustic wavelengths and `generate_speaker`).
 - Counts: `n_<thing>`, e.g. `n_path`, `n_snap`, `n_interact` (interaction points per path; mesh intersections per ray in the ray-tracing functions).
 - Limits: `max_<things>` / `min_<things>` limit a count, e.g. `max_interactions`, `max_paths`, `min_segments`; a limit on a value names the quantity, e.g. `max_path_length`.
 - Selectors: `i_<dimension>`, the index or indices of the items to use along one dimension, e.g. `i_element`, `i_snap`, `i_freq`, `i_cir`; for a copy, `i_source` and `i_target`.
@@ -46,6 +46,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 
 - `center_freq`: carrier frequency in Hz; scalar, or one value per snapshot or per frequency entry `[n_freq]`. Stored in HDF5 and QDANT files as `CenterFrequency`.
 - `freq`: short name for a frequency in Hz; a value that must stay in GHz is named `freq_GHz`. For a frequency grid, `freq` holds the sample frequencies and `freq_new` the target frequencies.
+- Acoustic frequency: in scalar (acoustic) mode every function takes the acoustic frequency in Hz. The ray-tracing core and the material model work with the EM-equivalent frequency `f · 299792458 / 343`, which has the same wavelength; the frequency columns of a material table (`fRef`, `resF`, `coiF`, `tfF`) are in EM-equivalent GHz (1 kHz = 0.87403 GHz).
 - `spatial_freq`: spatial frequencies of a sum-of-sinusoids generator in 1/m, `[n_coeff, n_dim]`; limits `spatial_freq_min`, `spatial_freq_max`.
 
 **Positions and orientations**
@@ -1330,7 +1331,7 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#generate_speaker) · [Python](quadriga
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
 - If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
-- Speed of sound assumed to be 344 m/s.
+- Speed of sound assumed to be 343 m/s.
 - **Driver models** (`driver_type`):
   - `piston` — circular piston in baffle, `D(θ) = 2·J1(ka·sinθ)/(ka·sinθ)`, rotationally symmetric, narrows with increasing `ka`
   - `horn` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`
@@ -5324,12 +5325,7 @@ void calc_diffraction_gain(
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
-- **`center_freq`** — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic)
-  mode the EM-equivalent frequency `f_eq = f_acoustic · c_light / c_sound` (c_light = 299 792 458 m/s,
-  c_sound = 342.76271 m/s), so that `c_light / f_eq` is the acoustic wavelength; this is the frequency unit of
-  [ray_mesh_interact](#ray_mesh_interact), [ray_progress](#ray_progress) and [generate_diffraction_paths](#generate_diffraction_paths) in scalar mode. Passing the acoustic
-  frequency itself gives a wavelength 874 636 times too long. The MATLAB and Python wrappers take the acoustic
-  frequency and convert it.
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths)
 - **`verbose`** — Verbosity level
@@ -5344,12 +5340,11 @@ void calc_diffraction_gain(
   absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
   the direct TX-RX distance, matching the `path_length` definition used by [qrt_file_read](#qrt_file_read) for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
-  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at the
-  acoustic frequency `f = center_freq · c_sound / c_light`.
+  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at
+  `center_freq`.
 - **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
-  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c_light / center_freq` in both
-  modes; in scalar mode this is the acoustic wavelength because `center_freq` is the EM-equivalent
-  frequency (see above). Since the term has unit
+  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c / center_freq` with the speed
+  of light (EM) or the speed of sound, 343 m/s (scalar mode). Since the term has unit
   magnitude, `xprmat` stays normalized. This is the phase contribution that
   [get_channels_spherical](#get_channels_spherical) would otherwise add from `path_length`; enabling it here gives the complete
   omni-radiator coefficient without running the channel generator.
@@ -5547,13 +5542,14 @@ void generate_diffraction_paths(
     arma::Cube<dtype> &ray_x,
     arma::Cube<dtype> &ray_y,
     arma::Cube<dtype> &ray_z,
-    arma::Cube<dtype> &weight);
+    arma::Cube<dtype> &weight,
+    bool scalar_mode = false);
 ```
 
 ### Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_freq`** — Center frequency
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:
    | `lod` | `n_path` | `n_seg` | Note  |
    | ----- | -------- | ------- | ----- |
@@ -5564,6 +5560,8 @@ void generate_diffraction_paths(
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
    | 7     | 1        | 10      | direct line in 10 segments |
+
+- **`scalar_mode`** *(optional)* — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`; default `false` (EM, `299792458 / center_freq`)
 
 ### Outputs:
 - **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`
@@ -5630,13 +5628,15 @@ Not in: MATLAB, Python
 dtype quadriga_lib::interface_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq);
+    dtype center_freq,
+    bool scalar_mode = false);
 ```
 
 ### Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
+- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ### Returns:
 - Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
@@ -5674,14 +5674,16 @@ dtype quadriga_lib::medium_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
     dtype dist,
-    dtype center_freq);
+    dtype center_freq,
+    bool scalar_mode = false);
 ```
 
 ### Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** —  1-based material index (0 = no material / air)
 - **`dist`** — Path length of the ray inside the medium in [m]
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
+- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ### Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
@@ -6215,8 +6217,8 @@ arma::uword quadriga_lib::ray_commit(
   faces named by `fbs_ind` are read, for the shading plane
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read));
   each value has length `n_mtl` (max 16383)
-- **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries, must match the layout of
-  `paths`. `center_freq[0]` is the reference frequency for the gain gate
+- **`center_freq`** — Center frequencies in [Hz], in scalar mode the acoustic frequencies; `[n_freq]`, 1 to 127
+  entries, must match the layout of `paths`. `center_freq[0]` is the reference frequency for the gain gate
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from
   [ray_triangle_intersect](#ray_triangle_intersect) for the same launch configuration
@@ -6423,7 +6425,7 @@ void quadriga_lib::ray_mesh_interact(
 
 ### Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; for types 3–5 the acoustic frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`.
@@ -6643,7 +6645,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`. 0 = air
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl` (max 16383)
-- **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
+- **`center_freq`** — Center frequencies in [Hz], in scalar mode the acoustic frequencies; `[n_freq]`, 1 to 127 entries. `center_freq[0]` is the reference frequency that defines the traced geometry
 - **`orig_pos`** — Point-source (transmitter) position in GCS [m]; `[3, 1]` or `[1, 3]`; used to recompute path length at new sub-beam origins
 - **`sub_mesh_ind`** *(optional)* — Sub-mesh partition offsets for the accelerated intersect; 0-based, strictly increasing,
   first entry 0; passed to [ray_triangle_intersect](#ray_triangle_intersect); `[n_sub]`. NULL → no partitioning
@@ -6777,7 +6779,7 @@ void quadriga_lib::ray_state_update(
 
 ### Inputs:
 - **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission, 5 scalar refraction
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; for types 3–5 the acoustic frequency
 - **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
 - **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
 - **`n_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
@@ -7061,13 +7063,15 @@ Not in: MATLAB, Python
 dtype quadriga_lib::refractive_index(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq);
+    dtype center_freq,
+    bool scalar_mode = false);
 ```
 
 ### Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
+- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ### Returns:
 - Real refractive index of the medium relative to air

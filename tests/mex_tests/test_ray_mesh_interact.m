@@ -166,14 +166,14 @@ assertElementsAlmostEqual( dNa, dNb, 'absolute', 1e-12 );
 % Scalar interactions (types 3/4/5): scalar xprmat is now [2, n_rayN] = [Re; Im]
 % Air: reflection -> zero, transmission -> unity
 [ origN, ~, ~, ~, gainN, xprmatN ] = ...
-    quadriga_lib.ray_mesh_interact( 3, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
+    quadriga_lib.ray_mesh_interact( 3, 1e4, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
 assertElementsAlmostEqual( origN, [-1.0, 0, 0.5; 1.0, 0, -0.5], 'absolute', 1e-6 );
 assertElementsAlmostEqual( gainN, [0;0], 'absolute', 1e-6 );
 assertEqual( size(xprmatN), [2 2] );
 assertElementsAlmostEqual( xprmatN, zeros(2,2), 'absolute', 1e-6 );
 
 [ ~, destN, ~, ~, gainN, xprmatN ] = ...
-    quadriga_lib.ray_mesh_interact( 4, 10e9, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
+    quadriga_lib.ray_mesh_interact( 4, 1e4, orig, dest, mesh, mtl_ind, mtl_st, fbs_ind, sbs_ind );
 assertElementsAlmostEqual( destN, dest, 'absolute', 5e-6 );
 assertElementsAlmostEqual( gainN, [1;1], 'absolute', 1e-6 );
 assertEqual( size(xprmatN), [2 2] );
@@ -188,19 +188,19 @@ cos_th2s = sqrt(1 - 1.5*cos_th*cos_th);   % 0.5
 R = (sqrt(1.5)*cos_th - cos_th2s) / (sqrt(1.5)*cos_th + cos_th2s);
 
 [ ~, ~, ~, ~, gainN, xprmatN ] = ...
-    quadriga_lib.ray_mesh_interact( 3, 10e9, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
+    quadriga_lib.ray_mesh_interact( 3, 1e4, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
 assertElementsAlmostEqual( gainN, R^2, 'absolute', 1e-6 );
 assertEqual( size(xprmatN), [2 1] );
 
 [ ~, ~, ~, ~, gainN ] = ...
-    quadriga_lib.ray_mesh_interact( 4, 10e9, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
+    quadriga_lib.ray_mesh_interact( 4, 1e4, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
 assertElementsAlmostEqual( gainN, 1 - R^2, 'absolute', 1e-6 );
 
 % Type 5 (scalar refraction): Snell-bent path, gain = transmitted power, |1+R|^2 times the ratio of
 % normal power flux cos(th2) / (sqrt(1.5)*cos(th1)); the same power as type 4, 1 - R^2
 obl_s = cos_th2s / (sqrt(1.5)*cos_th);
 [ ~, ~, ~, ~, gainN, xprmatN ] = ...
-    quadriga_lib.ray_mesh_interact( 5, 10e9, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
+    quadriga_lib.ray_mesh_interact( 5, 1e4, orig_s, dest_s, mesh, mtl_s_ind, mtl_s_st, fbs_ind_s, sbs_ind_s );
 assertEqual( size(xprmatN), [2 1] );
 assertElementsAlmostEqual( gainN, obl_s * (1+R)^2, 'absolute', 1e-6 );
 assertElementsAlmostEqual( gainN, 1 - R^2, 'absolute', 1e-9 );

@@ -89,6 +89,7 @@
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include "qd_atmospheric_absorption.hpp"
 
 #include <complex>
 #include <unordered_map>
@@ -2476,14 +2477,16 @@ dtype quadriga_lib::medium_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
     dtype dist,
-    dtype center_freq);
+    dtype center_freq,
+    bool scalar_mode = false);
 ```
 
 ## Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
 - **`iM`** —  1-based material index (0 = no material / air)
 - **`dist`** — Path length of the ray inside the medium in [m]
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
+- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ## Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
@@ -2496,18 +2499,18 @@ MD!*/
 
 template <typename dtype>
 dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                                arma::uword iM, dtype dist, dtype center_freq)
+                                arma::uword iM, dtype dist, dtype center_freq, bool scalar_mode)
 {
     if (!std::isfinite((double)center_freq) || center_freq <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
     MaterialCols<dtype> cols(mtl_prop); // validates column lengths and physical sanity
     if (iM > cols.n_mtl)
         throw std::invalid_argument("Material index out of bound.");
-    return (dtype)Material(cols, iM).medium_gain((double)dist, (double)center_freq * 1e-9);
+    return (dtype)Material(cols, iM).medium_gain((double)dist, qd_material_fGHz((double)center_freq, scalar_mode));
 }
 
-template float quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float dist, float center_freq);
-template double quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double dist, double center_freq);
+template float quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float dist, float center_freq, bool scalar_mode);
+template double quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double dist, double center_freq, bool scalar_mode);
 
 /*!MD
 # interface_gain
@@ -2525,13 +2528,15 @@ Linear gain of the lumped penetration loss of entering a material
 dtype quadriga_lib::interface_gain(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq);
+    dtype center_freq,
+    bool scalar_mode = false);
 ```
 
 ## Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
+- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ## Returns:
 - Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
@@ -2545,18 +2550,18 @@ MD!*/
 
 template <typename dtype>
 dtype quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                                   arma::uword iM, dtype center_freq)
+                                   arma::uword iM, dtype center_freq, bool scalar_mode)
 {
     if (center_freq <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
     MaterialCols<dtype> cols(mtl_prop);
     if (iM > cols.n_mtl)
         throw std::invalid_argument("Material index out of bound.");
-    return (dtype)Material(cols, iM).interface_gain((double)center_freq * 1e-9);
+    return (dtype)Material(cols, iM).interface_gain(qd_material_fGHz((double)center_freq, scalar_mode));
 }
 
-template float quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_freq);
-template double quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_freq);
+template float quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_freq, bool scalar_mode);
+template double quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_freq, bool scalar_mode);
 
 /*!MD
 # refractive_index
@@ -2573,13 +2578,15 @@ Real refractive index of a homogeneous medium
 dtype quadriga_lib::refractive_index(
     const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
-    dtype center_freq);
+    dtype center_freq,
+    bool scalar_mode = false);
 ```
 
 ## Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
 - **`iM`** — 1-based material index (0 = no material / air)
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
+- **`scalar_mode`** — `true` = acoustic: `center_freq` is mapped to the EM-equivalent frequency of the material table; default `false`
 
 ## Returns:
 - Real refractive index of the medium relative to air
@@ -2593,7 +2600,7 @@ MD!*/
 
 template <typename dtype>
 dtype quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                                     arma::uword iM, dtype center_freq)
+                                     arma::uword iM, dtype center_freq, bool scalar_mode)
 {
     if (!std::isfinite((double)center_freq) || center_freq <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
@@ -2601,12 +2608,12 @@ dtype quadriga_lib::refractive_index(const std::unordered_map<std::string, std::
     if (iM > cols.n_mtl)
         throw std::invalid_argument("Material index out of bound.");
     Material M(cols, iM);
-    double fGHz = (double)center_freq * 1e-9;
+    double fGHz = qd_material_fGHz((double)center_freq, scalar_mode);
     return (dtype)std::real(std::sqrt(M.eta(fGHz) * M.mu(fGHz)));
 }
 
-template float quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_freq);
-template double quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_freq);
+template float quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_freq, bool scalar_mode);
+template double quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_freq, bool scalar_mode);
 
 /*!MD
 # ray_mesh_interact
@@ -2669,7 +2676,7 @@ void quadriga_lib::ray_mesh_interact(
 
 ## Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; for types 3–5 the acoustic frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`.
@@ -2793,7 +2800,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
     if (center_freq <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
-    double fGHz = (double)center_freq * 1.0e-9;
+    double fGHz = qd_material_fGHz((double)center_freq, is_scalar);
 
     if (orig == nullptr)
         throw std::invalid_argument("Input 'orig' cannot be NULL.");
@@ -3298,7 +3305,7 @@ void quadriga_lib::ray_state_update(
 
 ## Inputs:
 - **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission, 5 scalar refraction
-- **`center_freq`** — Center frequency in [Hz]
+- **`center_freq`** — Center frequency in [Hz]; for types 3–5 the acoustic frequency
 - **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
 - **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
 - **`n_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
@@ -3662,7 +3669,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
         verdict_outN->resize(n_rayN, 0);
     uint8_t *p_verdict_outN = verdict_outN ? verdict_outN->data() : nullptr;
 
-    const double fGHz = (double)center_freq * 1e-9;
+    const double fGHz = qd_material_fGHz((double)center_freq, is_scalar);
 
 #pragma omp parallel for schedule(static) if (n_rayN >= 64)
     for (long long i_ev = 0; i_ev < (long long)n_rayN; ++i_ev) // Interaction loop (compact set)

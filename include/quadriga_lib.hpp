@@ -86,7 +86,7 @@ namespace quadriga_lib
         const arma::fmat &mesh,                                              // Faces of the triangular mesh, [n_mesh, 9]
         const arma::uvec &mtl_ind,                                           // 1-based material index per face, [n_mesh]
         const std::unordered_map<std::string, std::vector<float>> &mtl_prop, // Material properties
-        const arma::fvec &center_freq,                                       // Center frequencies in Hz, [n_freq]
+        const arma::fvec &center_freq,                                       // Center frequencies in Hz (acoustic Hz in scalar mode), [n_freq]
         const arma::fmat &orig_pos,                                          // Global origin position in [m], [3, 1] or [1, 3]
         arma::fmat &orig,                                                    // Ray origins in GCS, updated in-place, [n_ray, 3]
         arma::fmat &dest,                                                    // Ray destinations in GCS, updated in-place, [n_ray, 3]
@@ -124,7 +124,7 @@ namespace quadriga_lib
         std::vector<quadriga_lib::path> &paths_commit,                       // Committed data storage, extended by [n_ray_commit]
         const arma::fmat &mesh,                                              // Faces of the triangular mesh, [n_mesh, 9]
         const std::unordered_map<std::string, std::vector<float>> &mtl_prop, // Material properties
-        const arma::fvec &center_freq,                                       // Center frequencies in Hz, [n_freq]
+        const arma::fvec &center_freq,                                       // Center frequencies in Hz (acoustic Hz in scalar mode), [n_freq]
         const arma::fmat &orig,                                              // Ray origins in GCS, [n_ray, 3]
         const arma::u32_vec &fbs_ind,                                        // 1-based FBS face index, 0 = no hit, [n_ray]
         const arma::fmat &trivec,                                            // Beam wavefront vertices relative to ray origin, [n_ray, 9]

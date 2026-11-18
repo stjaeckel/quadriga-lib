@@ -17,7 +17,7 @@
 namespace lw
 {
     typedef std::complex<double> cd;
-    static const double GHZ = C0 / 343.0 * 1.0e-9; // GHz per acoustic Hz, the acoustic mapping
+    static const double GHZ = qd_acoustic_freq_scale * 1.0e-9; // GHz per acoustic Hz, the acoustic mapping
     static double dB(double g) { return (g > 0.0) ? 10.0 * std::log10(g) : -999.0; }
     static double deg(cd x) { return std::arg(x) * 180.0 / QPI; }
 

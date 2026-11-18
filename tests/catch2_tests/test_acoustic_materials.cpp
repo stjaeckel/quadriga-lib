@@ -299,7 +299,7 @@ TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing 
     rp::Pal pal;
     for (const char *k : mt::COLS)
         pal[k] = {(float)mt::col(wall(0.0), k), (float)mt::col(wall(0.1), k)};
-    const arma::fvec cf = {(float)(1000.0 * mt::FS)};
+    const arma::fvec cf = {1000.0f};
     const double nd = std::sqrt(0.2223 * 0.2223 + 45.5788 * 45.5788 + 31.6455 * 31.6455);
     const arma::frowvec dir = {(float)(0.2223 / nd), (float)(45.5788 / nd), (float)(-31.6455 / nd)}, hit = {-0.5f, 0.0313f, 1.5332f};
     arma::fmat orig = hit - dir, dest = hit + 50.0f * dir, acc(1, 2, arma::fill::zeros);

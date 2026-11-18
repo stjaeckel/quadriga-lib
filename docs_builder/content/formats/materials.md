@@ -50,7 +50,7 @@ itu_glass,6.31,0,0.0036,1.3394,0.006
 
 ### Columns
 
-Every column is optional apart from `name`; an absent column takes its default for every material. Frequencies are in GHz (the API takes frequencies in Hz); a value "at `fRef`" is scaled by its exponent as `(f/fRef)^exponent`. Wave media are the materials without the mass column (`m` = 0); `m > 0` switches a material to a mass-law material, a lumped plate with the mass law. The last column says which of the two a column acts on.
+Every column is optional apart from `name`; an absent column takes its default for every material. Frequencies are in GHz; acoustic rows use the EM-equivalent frequency `f · 299792458 / 343` of the same wavelength (1 kHz = 0.87403 GHz), while the API takes Hz (acoustic Hz in scalar mode); a value "at `fRef`" is scaled by its exponent as `(f/fRef)^exponent`. Wave media are the materials without the mass column (`m` = 0); `m > 0` switches a material to a mass-law material, a lumped plate with the mass law. The last column says which of the two a column acts on.
 
 | Key    | Unit | Default | Meaning                                                                                   | Acts on   |
 | :----: | :--: | :-----: | ----------------------------------------------------------------------------------------- | --------- |

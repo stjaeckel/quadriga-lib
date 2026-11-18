@@ -14,10 +14,10 @@ drafter's own proposal are marked **(proposed)**.
   frequencies equals its single frequencies. At `ray_progress`'s default 0.15 a band near grazing can take the wrong
   bounce decision (stage-2b issue 2: reflection up to 1.073 for a board on a box of air; 8.3e-4 in octave absorption).
   `calc_diffraction_gain` already defaults to 0.
-- **Frequencies at the library's sound speed.** Acoustic frequencies map to the library's frequency unit with
-  342.76271 m/s (`qd_acoustic_freq_scale` in `src/qd_atmospheric_absorption.hpp`): 1 kHz is 0.87464 GHz,
-  125 Hz is 0.10933 GHz. The wrappers and `qrt_ray_trace` convert with it. The material page and the starting rows
-  of its section 11.4 use 343 m/s; the difference is at most 0.017 dB in transmission and 4e-4 in absorption.
+- **Frequencies at the library's sound speed.** The API takes acoustic Hz; the material columns are in the
+  EM-equivalent GHz of 343 m/s (`qd_acoustic_freq_scale` in `src/qd_atmospheric_absorption.hpp`): 1 kHz is
+  0.87403 GHz, 125 Hz is 0.10925 GHz. The material page and the starting rows of its section 11.4 use the same
+  343 m/s.
 - **`min_gain_dB` with a margin** near walls: inside a plate the running gain lies up to −10·log₁₀(`tf`) below the
   level the path will reach (10 dB for `tf` 0.1; rule 15).
 - **Local coordinates.** Build the scene near the origin, never in georeferenced coordinates; a body thinner than the

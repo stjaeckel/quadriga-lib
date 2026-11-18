@@ -36,6 +36,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
+#include "qd_atmospheric_absorption.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -144,7 +145,9 @@ namespace
         arma::uword commit(const Scene &S, const arma::fmat &points,
                            std::vector<quadriga_lib::path> &out, const Opt &o = Opt()) const
         {
-            return quadriga_lib::ray_commit(paths, out, S.mesh, S.mtl_prop, freq,
+            // freq is the material-model frequency; scalar mode takes the acoustic frequency
+            const arma::fvec f_api = scalar ? arma::fvec(freq / (float)qd_acoustic_freq_scale) : freq;
+            return quadriga_lib::ray_commit(paths, out, S.mesh, S.mtl_prop, f_api,
                                             orig, fbs_ind, trivec, tridir, cur, points,
                                             o.sci, o.pt_ind, o.sf_in,
                                             o.max_len, o.min_gain_dB, o.min_seg, o.ignore_direct);

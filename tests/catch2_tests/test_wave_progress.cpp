@@ -2891,7 +2891,7 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
         for (int g = 0; g < n_gen; ++g)
         {
             std::vector<bool> ff(orig.n_rows, g == force_gen);
-            quadriga_lib::ray_progress(W.mesh, W.mi, pal, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
+            quadriga_lib::ray_progress(W.mesh, W.mi, pal, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
                                        beam ? &trivec : nullptr, beam ? &tridir : nullptr, nullptr, nullptr,
                                        20, (uint8_t)max_ref, 10, (uint8_t)(force_gen >= 0 ? 2 : 0), -300.0f, 3.0f, 0.15f, refr, true,
                                        nullptr, nullptr, nullptr, force_gen >= 0 ? &ff : nullptr);
@@ -3100,7 +3100,7 @@ TEST_CASE("ray_progress - a coherent sheet with tf that is rarer than the invari
         Out O;
         for (int g = 0; g < 5; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
                                        20, (uint8_t)0, 10, (uint8_t)0, -300.0f, 3.0f, 0.15f, refr, scalar);
             if (orig.n_rows == 0)
                 break;
@@ -3209,7 +3209,7 @@ TEST_CASE("ray_progress - a coherent sheet rarer than the invariant without tf t
         Out O;
         for (int g = 0; g < 5; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
                                        20, (uint8_t)0, 10, (uint8_t)0, -300.0f, 3.0f, 0.15f, refr, scalar);
             if (orig.n_rows == 0)
                 break;
@@ -3589,7 +3589,7 @@ TEST_CASE("ray_progress - a wall with a stack inside it is on its matrix with th
                     long rays = 0;
                     for (int g = 0; g < 30; ++g)
                     {
-                        quadriga_lib::ray_progress(mesh, mi, pal, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
+                        quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr, nullptr,
                                                    (uint8_t)20, 100, 100, 0, -140.0f, 3.0f, thr, refr != 0, true, nullptr, nullptr, nullptr, nullptr);
                         if (orig.n_rows == 0)
                             break;
@@ -3837,7 +3837,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
         for (int g = 0; g < n_gen; ++g)
         {
             std::vector<bool> ff(orig.n_rows, g == force_gen);
-            quadriga_lib::ray_progress(W.mesh, W.mi, P, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
+            quadriga_lib::ray_progress(W.mesh, W.mi, P, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
                                        beam ? &trivec : nullptr, beam ? &tridir : nullptr, nullptr, nullptr,
                                        20, (uint8_t)max_ref, 10, (uint8_t)(force_gen >= 0 ? 2 : 0), -300.0f, 3.0f, slab, refr, true,
                                        nullptr, nullptr, nullptr, force_gen >= 0 ? &ff : nullptr);

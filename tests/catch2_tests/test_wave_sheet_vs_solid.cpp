@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_lib.hpp"
+#include "qd_atmospheric_absorption.hpp"
 #include "qd_test_diag.hpp"
 
 #include <algorithm>
@@ -210,7 +211,8 @@ namespace
                         double fc, bool scalar_mode, int lod = 0)
     {
         Trace t;
-        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, prop, fc, lod,
+        const double f_api = scalar_mode ? fc / qd_acoustic_freq_scale : fc; // fc is the material-model frequency
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, prop, f_api, lod,
                                                     &t.gain, &t.xprmat, nullptr, 0, nullptr,
                                                     1, 0, scalar_mode, 0.0, false, false);
         return t;

@@ -1040,7 +1040,7 @@ Also in: [MATLAB](../mex/array-antenna-functions.md#generate_speaker) · [Python
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity_dB − 85) / 20)`.
 - If `center_freq` is nullptr or empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
-- Speed of sound assumed to be 344 m/s.
+- Speed of sound assumed to be 343 m/s.
 - **Driver models** (`driver_type`):
   - `piston` — circular piston in baffle, `D(θ) = 2·J1(ka·sinθ)/(ka·sinθ)`, rotationally symmetric, narrows with increasing `ka`
   - `horn` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`

@@ -304,7 +304,7 @@ Every value lies within 0.001 dB (T) and 1e-5 (R) of the closed-form single slab
 
 ### 10.1 The mapping
 
-A radio tracer traces sound when frequencies are scaled to keep wavelengths, $f_\text{radio} = f_\text{acoustic}\,c_0/c_\text{sound}$: with $c_\text{sound}$ = 343 m/s, 1 kHz is 0.874 GHz and 100 Hz is 0.0874 GHz (`resF`, `coiF`, `tfF` and `fRef` scale the same way). Every acoustic material is mapped with two parameters: a medium of impedance $Z$ and sound speed $c$ has
+A radio tracer traces sound when frequencies are scaled to keep wavelengths, $f_\text{radio} = f_\text{acoustic}\,c_0/c_\text{sound}$: with $c_\text{sound}$ = 343 m/s, 1 kHz is 0.874 GHz and 100 Hz is 0.0874 GHz (`resF`, `coiF`, `tfF` and `fRef` scale the same way). The material table holds these EM-equivalent values; the API functions take the acoustic frequency in Hz and apply the mapping themselves in scalar mode. Every acoustic material is mapped with two parameters: a medium of impedance $Z$ and sound speed $c$ has
 
 $$
 \varepsilon = n\,z,\qquad \mu = n/z,\qquad z = Z_\text{air}/Z,\qquad n = c_\text{air}/c,

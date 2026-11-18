@@ -251,7 +251,7 @@ In the decided order (concrete first, then absorption tier, impact, transmission
 - `tf` 0 behind a fill (page 10.4): the wall keeps its own row (1.7.6).
 - Miki or Komatsu for porous columns (page 10.5): ground rows are Miki fits to the class impedance (2.6); for products,
   whichever model meets the reference (glass wool takes JCA, rock wool Miki).
-- 343 m/s (page 10.1 and the examples): the library's 342.76271 m/s.
+- 343 m/s (page 10.1 and the examples): the library's sound speed since 2026-11-17 (342.76271 m/s before).
 - The two-face limit (page section 2): two sheets form a stack only with air behind; never two sheets on a solid.
 
 ## 2. The materials per class

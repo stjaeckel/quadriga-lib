@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Path geometry: coord2path (both directions, all outputs), combine_irs_coord (reversed segments, path subsets),
-// path_to_tube (radius, edge count, turns) and generate_diffraction_paths (all levels of detail)
+// path_to_tube (radius, edge count, turns) and generate_diffraction_paths (all levels of detail, EM and scalar mode)
 
 #include "fuzz_target.hpp"
 
@@ -113,8 +113,9 @@ static void run(fz::input &in)
         arma::Mat<T> orig = geo<T>(in, n_pos, near(in, 3)), dest = geo<T>(in, near(in, n_pos), near(in, 3));
         const T frequency = in.ConsumeBool() ? T(3.5e9) : in.value<T>();
         const int lod = in.ConsumeIntegralInRange<int>(-1, 8);
+        const bool scalar_mode = in.ConsumeBool();
         arma::Cube<T> ray_x, ray_y(in.size(2), in.size(2), in.size(2)), ray_z, weight;
-        fz::clean([&] { quadriga_lib::generate_diffraction_paths<T>(orig, dest, frequency, lod, ray_x, ray_y, ray_z, weight); });
+        fz::clean([&] { quadriga_lib::generate_diffraction_paths<T>(orig, dest, frequency, lod, ray_x, ray_y, ray_z, weight, scalar_mode); });
     }
 }
 

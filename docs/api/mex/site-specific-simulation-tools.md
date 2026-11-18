@@ -51,8 +51,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#calc_diffraction_gain) �
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output of
   [obj_file_read](#obj_file_read)); each field holds a vector of length `n_mtl`
-- **`center_freq`** — Center frequency in Hz. In scalar mode this is the true acoustic frequency;
-  it is converted internally to the EM-equivalent frequency used by the core
+- **`center_freq`** — Center frequency in Hz; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [generate_diffraction_paths](#generate_diffraction_paths); default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
@@ -146,13 +145,13 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#generate_diffraction_pat
 
 ### Usage:
 ```matlab
-[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_freq, lod );
+[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_freq, lod, scalar_mode );
 ```
 
 ### Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_freq`** — Center frequency in Hz
+- **`center_freq`** — Center frequency in Hz; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:
    | `lod` | `n_path` | `n_seg` | Note  |
    | :---: | -------: | ------: | ----: |
@@ -163,6 +162,8 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#generate_diffraction_pat
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
    | 7     | 1        | 10      | direct line in 10 segments |
+- **`scalar_mode`** *(optional)* — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
+  default: `false` (EM, `299792458 / center_freq`)
 
 ### Outputs:
 - **`rays`** — Coordinates of path waypoints (x, y, z stacked along the 4th dimension, endpoints
@@ -485,7 +486,7 @@ Also in: [C++](../cpp/site-specific-simulation-tools.md#ray_mesh_interact) · No
 ### Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction,
   3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_freq`** — Center frequency
+- **`center_freq`** — Center frequency in Hz; for types 3–5 the acoustic frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of

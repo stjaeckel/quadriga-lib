@@ -44,8 +44,8 @@ tools/acoustic/build_band_probe.sh /tmp/band_probe          # after cmake --buil
 
 The input format is in the head of `band_probe.cpp`: 26 columns per material (`coiA` removed on 2026-10-17; the peak
 `tfP`, `tfF`, `tfQ` added 2026-10-16; the panel size `side` added 2026-10-19; `attB` and `alphaB` last, added
-2026-10-23), the faces as `x material flipped`. Frequencies are acoustic Hz, mapped with the library's sound speed
-(`qd_acoustic_freq_scale`, 342.76271 m/s; 343 m/s before 2026-10-23). The example is the board on a box of air on a
+2026-10-23), the faces as `x material flipped`. Frequencies are acoustic Hz, passed to `ray_progress` as they are
+(the library maps them with its sound speed, 343 m/s). The example is the board on a box of air on a
 mass-law wall at `thin_slab_threshold` 0; its expected values are in the file. The fixture that guards the same
 statement is *ray_progress - a leaf on a box of air at every frequency of a band*
 (`tests/catch2_tests/test_acoustic_leaf.cpp`), which also holds the fluid-layer transfer matrix (`lw::stack`) and a

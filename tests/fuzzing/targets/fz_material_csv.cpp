@@ -3,7 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 // Material tables (CSV) for the EM and acoustic material models: obj_file_read of a fixed OBJ file with the fuzz
-// input as the material table, in the lenient and in the strict mode
+// input as the material table, in the lenient and in the strict mode; every material of a table that reads is then
+// evaluated by medium_gain, interface_gain and refractive_index, in EM and in scalar mode
 
 #include "fuzz_target.hpp"
 
@@ -34,5 +35,13 @@ void fuzz_one(const uint8_t *data, size_t size)
             std::vector<std::string> csv_names;
             std::unordered_map<std::string, std::vector<double>> csv_prop;
             quadriga_lib::obj_file_read<double>(fn, &mesh, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                nullptr, fn_csv, &csv_ind, &csv_names, &csv_prop, strict); });
+                                                nullptr, fn_csv, &csv_ind, &csv_names, &csv_prop, strict);
+            for (arma::uword iM = 1; iM <= (arma::uword)csv_names.size(); ++iM)
+                for (bool scalar_mode : {false, true})
+                {
+                    const double f = scalar_mode ? 1000.0 : 3.5e9; // 1 kHz acoustic, 3.5 GHz EM
+                    quadriga_lib::medium_gain<double>(csv_prop, iM, 0.1, f, scalar_mode);
+                    quadriga_lib::interface_gain<double>(csv_prop, iM, f, scalar_mode);
+                    quadriga_lib::refractive_index<double>(csv_prop, iM, f, scalar_mode);
+                } });
 }

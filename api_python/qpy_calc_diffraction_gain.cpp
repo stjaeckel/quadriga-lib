@@ -40,7 +40,7 @@ gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, me
 - **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]`; `(n_mesh, 9)`
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [[obj_file_read]]); `(n_mesh,)`
 - **`mtl_prop`** — Material properties as a `dict`; each key is one column (the `csv_prop` output of [[obj_file_read]]) mapping to a 1D array of length `n_mtl`
-- **`center_freq`** — Center frequency
+- **`center_freq`** — Center frequency in Hz; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`: 0 = direct ray only (1 path, 1 segment);
   1 / 2 = 7 / 19 paths with 3 segments; 3 = 37 paths, 4 segments; 4 = 61 paths, 5 segments; 5 / 6 = 1 / 2 paths
   with 2 segments (debug); 7 = direct line in 10 segments; default: 2
@@ -123,12 +123,8 @@ py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
     // Resolve optional pointer
     const arma::u32_vec *p_sub_mesh_index = sub_mesh_index_a.empty() ? nullptr : &sub_mesh_index_a;
 
-    // Scalar mode: the public API takes true acoustic Hz, the core works in EM-equivalent Hz
-    // (c_light / f_eq == acoustic wavelength). Must match qd_atmospheric_absorption.hpp.
-    const double center_freq_core = scalar_mode_b ? center_freq * (3.0e8 / 343.0) : center_freq;
-
     quadriga_lib::calc_diffraction_gain<double>(orig_a, dest_a, mesh_a, mtl_ind_a, mtl_prop_map,
-                                                center_freq_core, lod, &gain, &xprmat, &coord, verbose,
+                                                center_freq, lod, &gain, &xprmat, &coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id, scalar_mode_b,
                                                 thin_slab_threshold, apply_fspl_b, apply_phase_b);
 

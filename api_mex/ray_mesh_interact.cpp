@@ -40,7 +40,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 ## Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction,
   3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
-- **`center_freq`** — Center frequency
+- **`center_freq`** — Center frequency in Hz; for types 3–5 the acoustic frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of

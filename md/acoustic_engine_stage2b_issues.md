@@ -311,6 +311,6 @@ step 3 where they are not there already.
   never a free air space between two objects: the box's bounce series is summed in one event, a free gap is followed
   bounce by bounce and runs out of interactions (page 12, rules 9 and 16).
 - **`thin_slab_threshold` 0** for acoustic runs (issue 2).
-- **Frequencies in the library's unit:** acoustic frequencies map to the library's frequency unit with the sound
-  speed 342.76271 m/s (`src/qd_atmospheric_absorption.hpp`; the wrappers convert with it). Material columns in GHz
-  are made with the same constant.
+- **Frequencies in the library's unit:** the API takes acoustic Hz; material columns are in the EM-equivalent GHz of
+  the sound speed 343 m/s (`qd_acoustic_freq_scale` in `src/qd_atmospheric_absorption.hpp`), which the library
+  applies in scalar mode.

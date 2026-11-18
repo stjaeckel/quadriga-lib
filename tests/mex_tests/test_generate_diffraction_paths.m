@@ -48,6 +48,13 @@ assertTrue( all( abs(norm_check(:) - 1) < 1e-6 ) );
 rays_only = quadriga_lib.generate_diffraction_paths(orig, dest, fc, 1);
 assertTrue( isequal( size(rays_only), [1, 7, 2, 3] ) );
 
+% Scalar mode takes the acoustic frequency: same ellipsoids as EM at the frequency of the same wavelength
+f_ac = 1000;
+[rays_s, weights_s] = quadriga_lib.generate_diffraction_paths(orig, dest, f_ac, 2, true);
+[rays_e, weights_e] = quadriga_lib.generate_diffraction_paths(orig, dest, f_ac * 299792458 / 343, 2);
+assertElementsAlmostEqual( rays_s, rays_e, 'absolute', 1e-9 );
+assertElementsAlmostEqual( weights_s, weights_e, 'absolute', 1e-12 );
+
 % --- Error tests ---
 
 try % 3 inputs
@@ -60,8 +67,8 @@ catch ME
     end
 end
 
-try % 5 inputs
-    quadriga_lib.generate_diffraction_paths(orig, dest, fc, 1, 99);
+try % 6 inputs
+    quadriga_lib.generate_diffraction_paths(orig, dest, fc, 1, false, 99);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';

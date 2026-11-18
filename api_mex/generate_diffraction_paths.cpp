@@ -23,13 +23,13 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 
 ## Usage:
 ```
-[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_freq, lod );
+[ rays, weights ] = quadriga_lib.generate_diffraction_paths( orig, dest, center_freq, lod, scalar_mode );
 ```
 
 ## Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_freq`** — Center frequency in Hz
+- **`center_freq`** — Center frequency in Hz; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
    | `lod` | `n_path` | `n_seg` | Note  |
    | :---: | -------: | ------: | ----: |
@@ -40,6 +40,8 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
    | 7     | 1        | 10      | direct line in 10 segments |
+- **`scalar_mode`** *(optional)* — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
+  default: `false` (EM, `299792458 / center_freq`)
 
 ## Outputs:
 - **`rays`** — Coordinates of path waypoints (x, y, z stacked along the 4th dimension, endpoints
@@ -53,7 +55,7 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs != 4)
+    if (nrhs < 4 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -65,11 +67,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (mxGetNumberOfElements(prhs[3]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'lod' cannot be empty.");
     const int lod = qd_mex_get_scalar<int>(prhs[3], "lod", 1);
+    const bool scalar_mode = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "scalar_mode", false);
 
     // Output sizes depend on lod and are set by C++
     arma::cube ray_x, ray_y, ray_z, weight;
     CALL_QD(quadriga_lib::generate_diffraction_paths<double>(orig, dest, center_freq, lod,
-                                                             ray_x, ray_y, ray_z, weight));
+                                                             ray_x, ray_y, ray_z, weight, scalar_mode));
 
     // Rays output as a 4D MATLAB array [n_pos, n_path, n_seg-1, 3], x, y, z stacked along the 4th dimension
     mwSize dims[4] = {(mwSize)ray_x.n_rows, (mwSize)ray_x.n_cols, (mwSize)ray_x.n_slices, 3};

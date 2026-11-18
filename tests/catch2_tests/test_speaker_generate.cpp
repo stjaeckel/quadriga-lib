@@ -175,8 +175,8 @@ TEST_CASE("Speaker - Omni + Hemisphere: frequency-dependent front/back ratio")
 {
     // Baffle params: width=0.15, height=0.25
     // baffle_mean = sqrt(0.15*0.25) = sqrt(0.0375) = 0.19365 m
-    // f_baffle = 344 / (pi * 0.19365) = 565.5 Hz
-    double f_baffle = 344.0 / (arma::datum::pi * std::sqrt(0.15 * 0.25));
+    // f_baffle = 343 / (pi * 0.19365) = 563.8 Hz
+    double f_baffle = 343.0 / (arma::datum::pi * std::sqrt(0.15 * 0.25));
 
     arma::vec freqs = {50.0, 1000.0, 10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("omni", 0.05, 20.0, 20000.0, 12.0, 12.0, 85.0,
@@ -215,7 +215,7 @@ TEST_CASE("Speaker - Omni + Hemisphere: frequency-dependent front/back ratio")
 
 TEST_CASE("Speaker - Piston + Monopole: low freq near-omni")
 {
-    // At 200 Hz, radius=0.05: ka = 2*pi*200/344 * 0.05 = 0.183
+    // At 200 Hz, radius=0.05: ka = 2*pi*200/343 * 0.05 = 0.183
     // Very small ka → pattern is nearly omnidirectional
     arma::vec freqs = {200.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0,
@@ -233,7 +233,7 @@ TEST_CASE("Speaker - Piston + Monopole: low freq near-omni")
 
 TEST_CASE("Speaker - Piston + Monopole: high freq directional")
 {
-    // At 10000 Hz, radius=0.05: ka = 2*pi*10000/344 * 0.05 = 9.13
+    // At 10000 Hz, radius=0.05: ka = 2*pi*10000/343 * 0.05 = 9.16
     // Large ka → strongly directional
     arma::vec freqs = {10000.0};
     auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
@@ -281,9 +281,9 @@ TEST_CASE("Speaker - Piston directivity increases with frequency")
 
 TEST_CASE("Speaker - Horn + Monopole: controlled directivity")
 {
-    // Horn with radius=0.05 → auto horn_control_freq ≈ 1094.7 Hz
+    // Horn with radius=0.05 → auto horn_control_freq ≈ 1091.8 Hz
     // Auto coverage: 90° horizontal, 60° vertical
-    double f_ctrl = 344.0 / (2.0 * arma::datum::pi * 0.05);
+    double f_ctrl = 343.0 / (2.0 * arma::datum::pi * 0.05);
 
     arma::vec freqs = {100.0, 5000.0};
     auto spk = quadriga_lib::generate_speaker<double>("horn", 0.05, 80.0, 20000.0, 12.0, 12.0, 85.0,
@@ -343,13 +343,13 @@ TEST_CASE("Speaker - Horn coverage angles check")
 TEST_CASE("Speaker - Horn auto-derivation of parameters")
 {
     // NaN (the default) or a value <= 0 selects the default of each horn parameter:
-    // horn_control_freq = c / (2*pi*radius) = 344 / (2*pi*0.1) = 547.4 Hz
+    // horn_control_freq = c / (2*pi*radius) = 343 / (2*pi*0.1) = 545.9 Hz
     // hor_coverage_deg = 90°, ver_coverage_deg = 60°
 
     arma::vec freqs = {300.0, 5000.0}; // below and above horn_control_freq
 
     // Call with explicit values that match the auto-derived ones
-    double expected_ctrl = 344.0 / (2.0 * arma::datum::pi * 0.1);
+    double expected_ctrl = 343.0 / (2.0 * arma::datum::pi * 0.1);
     auto spk_explicit = quadriga_lib::generate_speaker<double>("horn", 0.1, 80.0, 20000.0, 12.0, 12.0, 85.0,
                                                                "monopole", 90.0, 60.0, expected_ctrl, 0.15, 0.25, &freqs, 10.0);
     REQUIRE(spk_explicit.size() == 2);

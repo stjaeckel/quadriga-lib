@@ -68,12 +68,7 @@ void calc_diffraction_gain(
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
-- **`center_freq`** — Center frequency in [Hz]. In EM mode the electromagnetic frequency. In scalar (acoustic)
-  mode the EM-equivalent frequency `f_eq = f_acoustic · c_light / c_sound` (c_light = 299 792 458 m/s,
-  c_sound = 342.76271 m/s), so that `c_light / f_eq` is the acoustic wavelength; this is the frequency unit of
-  [[ray_mesh_interact]], [[ray_progress]] and [[generate_diffraction_paths]] in scalar mode. Passing the acoustic
-  frequency itself gives a wavelength 874 636 times too long. The MATLAB and Python wrappers take the acoustic
-  frequency and convert it.
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`; 0 = direct ray only (`n_path = 1`, `n_seg = 1`);
   1–7 as in the table of [[generate_diffraction_paths]]
 - **`verbose`** — Verbosity level
@@ -88,12 +83,11 @@ void calc_diffraction_gain(
   absolute propagation gain instead of a value relative to FSPL. Default `false`. The reference distance is
   the direct TX-RX distance, matching the `path_length` definition used by [[qrt_file_read]] for a transmission-only 
   path. In EM mode the loss is `32.45 + 20·log10(f_GHz) + 20·log10(d_m)` [dB]; in scalar mode it is 
-  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at the
-  acoustic frequency `f = center_freq · c_sound / c_light`.
+  `20·log10(d_m) + α(f)·d_m` [dB], with `α` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm, evaluated at
+  `center_freq`.
 - **`apply_phase`** — If `true`, multiplies `xprmat` by the propagation phase term `exp(-j·2π·d/λ)`, using the
-  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c_light / center_freq` in both
-  modes; in scalar mode this is the acoustic wavelength because `center_freq` is the EM-equivalent
-  frequency (see above). Since the term has unit
+  same direct TX-RX distance `d`. Default `false`. The wavelength is `λ = c / center_freq` with the speed
+  of light (EM) or the speed of sound, 343 m/s (scalar mode). Since the term has unit
   magnitude, `xprmat` stays normalized. This is the phase contribution that
   [[get_channels_spherical]] would otherwise add from `path_length`; enabling it here gives the complete
   omni-radiator coefficient without running the channel generator.
@@ -189,7 +183,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
     if (lod == 0)
         weight.ones(n_pos, 1, 1);
     else
-        quadriga_lib::generate_diffraction_paths<dtype>(orig, dest, center_freq, lod, ray_x, ray_y, ray_z, weight);
+        quadriga_lib::generate_diffraction_paths<dtype>(orig, dest, center_freq, lod, ray_x, ray_y, ray_z, weight, scalar_mode);
 
     // Dimensions of the diffraction ellipsoid
     const arma::uword n_path = weight.n_cols;  // Number of diffraction arcs
@@ -302,7 +296,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                         double alpha = std::acos(dot);           // air-referenced bend
                         if (axis_len > 1.0e-6 && alpha > 1.0e-6) // co-linear gate
                         {
-                            double n = (double)quadriga_lib::refractive_index<dtype>(mtl_prop, (arma::uword)mtl_cur, center_freq);
+                            double n = (double)quadriga_lib::refractive_index<dtype>(mtl_prop, (arma::uword)mtl_cur, center_freq, scalar_mode);
                             double c = (double)g_cosair[iG]; // cos(theta_air) at entry
                             double s2 = 1.0 - (1.0 - c * c) / (n * n);
                             double C = (s2 > 1.0e-12) ? c / (n * std::sqrt(s2)) : 0.0; // s2<=0 => exit-side TIR
@@ -464,7 +458,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
                 // Account for in-medium gain if the last segment ends inside an object
                 // Note: the in-medium gain for intermediate segments is resolved by ray_state_update
                 if (last_segment && !ray_continues)
-                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_ref_out[iR], center_freq) : 1.0;
+                    seg_weight *= new_cur ? quadriga_lib::medium_gain<dtype>(mtl_prop, (arma::uword)new_cur, acc_ref_out[iR], center_freq, scalar_mode) : 1.0;
 
                 // Capture cos(theta_air)
                 if (old_cur == 0 && new_cur != 0)                     // air -> medium: capture cos(theta_air)
@@ -647,13 +641,13 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> &orig,
         // Path-loss reference at 1 m and air absorption, shared with the QRT reader
         const double gain_at_1m = qd_gain_at_1m(freq, scalar_mode);
 
-       // Air absorption is defined against the true acoustic frequency, so undo the mapping
-        const double alpha_dB_per_m = scalar_mode ? qd_iso9613_alpha(freq / qd_acoustic_freq_scale) : 0.0;
+        // Air absorption (ISO 9613-1) in scalar mode
+        const double alpha_dB_per_m = scalar_mode ? qd_iso9613_alpha(freq) : 0.0;
 
-        // In scalar mode the frequency is already EM-equivalent, so c_light / f is the acoustic
-        // wavelength and the phase term is identical in both modes
-        const double wave_number = 6.283185307179586 * freq / qd_speed_of_light;
-        const double wavelength = qd_speed_of_light / freq;
+        // Wave speed of the medium: light (EM) or sound (scalar mode)
+        const double wave_speed = scalar_mode ? qd_speed_of_sound : qd_speed_of_light;
+        const double wave_number = 6.283185307179586 * freq / wave_speed;
+        const double wavelength = wave_speed / freq;
 
         dtype *p_xprmat = xprmat ? xprmat->memptr() : nullptr;
 

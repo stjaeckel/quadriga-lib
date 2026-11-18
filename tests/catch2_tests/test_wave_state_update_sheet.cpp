@@ -964,7 +964,7 @@ TEST_CASE("Traced solid - air | slab | air chain against the analytic slab", "[w
 
             arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
             arma::vec gainN;
-            quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+            quadriga_lib::ray_mesh_interact(4, api_freq(f_hz, true), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                             &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -1116,7 +1116,7 @@ TEST_CASE("Permeability - the traced solid and a magnetic layer in a stack", "[w
 
             arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
             arma::vec gainN;
-            quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+            quadriga_lib::ray_mesh_interact(4, api_freq(f_hz, true), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                             &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -3463,7 +3463,7 @@ TEST_CASE("Layered wall - a glued exit behind a bare-entered second layer exits 
         quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
         arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+        quadriga_lib::ray_mesh_interact(4, api_freq(f_hz, true), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -3865,7 +3865,7 @@ TEST_CASE("Measurement - a host entered from a lossy solid across a bare face", 
             quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
             arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
             arma::vec gainN;
-            quadriga_lib::ray_mesh_interact(4, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+            quadriga_lib::ray_mesh_interact(4, api_freq(f_hz, true), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                             &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -3971,7 +3971,7 @@ TEST_CASE("Recovery behind a lossy solid - EM, a second transition and a sheet i
         quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         arma::mat origN, destN, xprmatN, path_dirN, normal_vecN;
         arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr,

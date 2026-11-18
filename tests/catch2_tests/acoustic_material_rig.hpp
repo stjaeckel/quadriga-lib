@@ -17,8 +17,8 @@
 //     threshold 0) until no ray is left; the paths back in air summed coherently per angle at their polyline's point;
 //   - bands: absorption (Paris) and transmission averaged over 0-90 deg with the weight cos sin; a third the mean of its
 //     tones, an octave the mean of its thirds (absorption arithmetic, transmission in energy), as the research data;
-//   - frequencies: acoustic Hz times qd_acoustic_freq_scale (342.76271 m/s). The rows of page 11.4 were fitted at
-//     343 m/s and are used unchanged (their octaves move by at most 0.017 dB).
+//   - frequencies: the library takes acoustic Hz; the material columns are in EM-equivalent GHz, acoustic Hz times
+//     qd_acoustic_freq_scale (343 m/s), the mapping the rows of page 11.4 were fitted with.
 
 #include "ray_test_helpers.hpp"
 #include "qd_atmospheric_absorption.hpp"
@@ -177,7 +177,7 @@ namespace mt
         {
             arma::fvec g;
             arma::fmat x; // [2, n]: the normalized coefficient; the power is in g
-            quadriga_lib::calc_diffraction_gain<float>(o, d, S.mesh, S.mi, S.pal, (float)(G.f[q] * FS), 0, &g, &x, nullptr, 0, nullptr, 0, 0, true, 0.0);
+            quadriga_lib::calc_diffraction_gain<float>(o, d, S.mesh, S.mi, S.pal, (float)G.f[q], 0, &g, &x, nullptr, 0, nullptr, 0, 0, true, 0.0);
             for (size_t i = 0; i < n; ++i)
                 T[i][q] = std::polar(std::sqrt((double)g(i)), std::arg(cd(x(0, i), x(1, i))));
         }
@@ -203,7 +203,7 @@ namespace mt
             arma::fvec cf(m);
             std::vector<quadriga_lib::path> paths(n);
             for (size_t q = 0; q < m; ++q)
-                cf(q) = (float)(G.f[c0 + q] * FS);
+                cf(q) = (float)G.f[c0 + q];
             for (size_t i = 0; i < n; ++i)
             {
                 const float c = (float)std::cos(rad(G.th[i])), s = (float)std::sin(rad(G.th[i]));
@@ -229,7 +229,7 @@ namespace mt
                     const double x = back ? std::cos(rad(G.th[k])) * ((double)b[0] - a[0]) : 0.0;
                     for (size_t q = 0; q < m; ++q)
                         (back ? (*T)[k][c0 + q] : R[k][c0 + q]) += cd(p.xpr_coeff(q)[0], p.xpr_coeff(q)[1]) *
-                                        std::exp(cd(0.0, 2.0 * QPI * cf(q) / C0 * (x + std::sin(rad(G.th[k])) * ((double)b[1] - a[1]) - L)));
+                                        std::exp(cd(0.0, 2.0 * QPI * cf(q) / CS * (x + std::sin(rad(G.th[k])) * ((double)b[1] - a[1]) - L)));
                 }
             }
         }
@@ -630,7 +630,7 @@ namespace mt
             pal[k] = {(float)col(floor, k), (float)col(body, k)};
         arma::fvec cf(nf);
         for (size_t q = 0; q < nf; ++q)
-            cf(q) = (float)(fa[q] * FS);
+            cf(q) = (float)fa[q];
         const arma::vec3 hi = {h(0), h(1), 2.0 * h(2)}; // body and image: |x| < hi
         const double Rb = std::sqrt(arma::dot(hi, hi)), dx = std::sqrt(2.0 * (hi(0) * hi(1) + hi(0) * hi(2) + hi(1) * hi(2)) / n_ray); // mean projection S / 4
         const int nx = (int)(Rb / dx) + 1;

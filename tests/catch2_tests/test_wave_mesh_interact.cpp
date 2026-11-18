@@ -838,9 +838,9 @@ TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)"
 
     for (int it : {0, 1, 2}) // reflection, transmission, refraction
     {
-        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &cube, &ind0, &map0, &fbs_ind, &sbs_ind,
+        quadriga_lib::ray_mesh_interact(it, api_freq(10.0e9, it >= 3), &orig, &dest, &cube, &ind0, &map0, &fbs_ind, &sbs_ind,
                                         &trivec, &tridir, &o0, &d0, (arma::mat *)nullptr, (arma::mat *)nullptr, &g0, &x0, &tv0, &td0);
-        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
+        quadriga_lib::ray_mesh_interact(it, api_freq(10.0e9, it >= 3), &orig, &dest, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
                                         &trivec, &tridir, &o1, &d1, (arma::mat *)nullptr, (arma::mat *)nullptr, &g1, &x1, &tv1, &td1);
         CHECK(arma::approx_equal(g0, g1, "absdiff", 1e-12));
         CHECK(arma::approx_equal(x0, x1, "absdiff", 1e-12)); // xprmat must be bit-stable too
@@ -1054,7 +1054,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-
     auto run = [&](int type)
     {
         quadriga_lib::ray_mesh_interact(
-            type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+            type, api_freq(10.0e9, type >= 3), &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
             (arma::mat *)nullptr, (arma::mat *)nullptr,
             &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
             (arma::vec *)nullptr, (arma::mat *)nullptr,
@@ -1190,7 +1190,7 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
 
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, api_freq(10.0e9, type >= 3), &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr);
@@ -1238,7 +1238,7 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     {
         arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, att, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
         mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig_in, &dest_in, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, api_freq(10.0e9, type >= 3), &orig_in, &dest_in, &cube, &mtl_ind, &mtl_map,
                                         &fbs_in_ind, &sbs_in_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr);
@@ -1284,7 +1284,7 @@ TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmissio
     { mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map); set_tf<double>(mtl_map, tf, 0.0); };
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, api_freq(10.0e9, type >= 3), &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr);
@@ -1396,7 +1396,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR
     arma::u32_vec ray_indN;
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, api_freq(10.0e9, type >= 3), &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -1447,7 +1447,7 @@ TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on
 
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, api_freq(10.0e9, type >= 3), &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, &trivec, &tridir,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
     };
@@ -1740,7 +1740,7 @@ TEST_CASE("Diagnostic - Interface energy split per polarization", "[wave]")
 
             arma::mat origN, destN, xprmatN;
             arma::vec gainN;
-            quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+            quadriga_lib::ray_mesh_interact(type, api_freq(f_hz, type >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                             &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                             &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
@@ -1868,7 +1868,7 @@ TEST_CASE("Diagnostic - Transmission convention baseline, single interface", "[w
                     arma::mat origN, destN, xprmatN;
                     arma::vec gainN;
                     std::vector<uint8_t> otype;
-                    quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+                    quadriga_lib::ray_mesh_interact(type, api_freq(f_hz, type >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                                     &fbs_ind, &sbs_ind,
                                                     (arma::mat *)nullptr, (arma::mat *)nullptr,
                                                     &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
@@ -2116,7 +2116,7 @@ TEST_CASE("Thin sheet - permeability and the lumped columns through ray_mesh_int
 
         arma::mat origN, destN, xprmatN;
         arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl,
+        quadriga_lib::ray_mesh_interact(type, api_freq(f_hz, type >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
@@ -2484,9 +2484,9 @@ TEST_CASE("Acoustic - convergence with acoustic terms absent", "[wave]")
     arma::vec g1, g2;
     arma::mat x1, x2;
     arma::cube c1, c2;
-    quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind, mtl, f, 3,
+    quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind, mtl, api_freq(f, true), 3,
                                                 &g1, &x1, &c1, 0, nullptr, 0, 0, true, 1.0);
-    quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind2, mtl2, f, 3,
+    quadriga_lib::calc_diffraction_gain<double>(dorig, ddest, cube_mesh, mtl_ind2, mtl2, api_freq(f, true), 3,
                                                 &g2, &x2, &c2, 0, nullptr, 0, 0, true, 1.0);
     CHECK(arma::approx_equal(g1, g2, "absdiff", 1e-12));
     CHECK(arma::approx_equal(x1, x2, "absdiff", 1e-12));
@@ -2581,7 +2581,7 @@ TEST_CASE("Acoustic - pass-through calibration", "[wave]")
         single_material({{"a", a}, {"att", att}, {"alpha", alpha}, {"fRef", fRef_GHz}}, mtl_ind, mtl);
         arma::mat orig = {{-d, 0.0, 0.0}}, dest = {{d, 0.0, 0.0}};
         arma::vec gain;
-        quadriga_lib::calc_diffraction_gain<double>(orig, dest, slab, mtl_ind, mtl, f, 0,
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, slab, mtl_ind, mtl, api_freq(f, true), 0,
                                                     &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 1.0);
         return gain(0);
     };
@@ -2643,7 +2643,7 @@ TEST_CASE("Acoustic - embedded material counted once", "[wave]")
         mtl["att"] = {0.0, att_B}; // only the embedded cube attenuates
         mtl["fRef"] = {fRef_GHz, fRef_GHz};
         arma::vec gain;
-        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, mtl, f, 0,
+        quadriga_lib::calc_diffraction_gain<double>(orig, dest, mesh, mtl_ind, mtl, api_freq(f, true), 0,
                                                     &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 1.0);
         return gain(0);
     };

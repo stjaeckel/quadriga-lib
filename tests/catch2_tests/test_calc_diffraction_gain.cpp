@@ -302,7 +302,7 @@ TEST_CASE("Calc Diffraction Gain - Scalar mode")
     arma::mat dest = {{0.5, 0.0, 0.5}};
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 10.0e9, 0,
                                                 &g_em_n, nullptr, nullptr, 0, nullptr, 0, 0, false);
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 10.0e9, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e4, 0,
                                                 &g_sc_n, nullptr, nullptr, 0, nullptr, 0, 0, true);
 
     // Oblique incidence (~39 deg off normal at the west wall): dest still INSIDE -> single crossing
@@ -310,7 +310,7 @@ TEST_CASE("Calc Diffraction Gain - Scalar mode")
     dest = {{0.5, 0.5, 0.5}};
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 10.0e9, 0,
                                                 &g_em_o, nullptr, nullptr, 0, nullptr, 0, 0, false);
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 10.0e9, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e4, 0,
                                                 &g_sc_o, nullptr, nullptr, 0, nullptr, 0, 0, true);
 
     // Scalar transmission conserves energy on light->dense: gain = att_lin*(1 - |R_TE(theta)|^2),
@@ -375,7 +375,7 @@ TEST_CASE("Calc Diffraction Gain - xprmat identity on clear path")
     // Scalar mode: xprmat is [2,1], value (1,0)
     arma::vec gain_s;
     arma::mat xpr_s;
-    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 10.0e9, 0,
+    quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map, 1.0e4, 0,
                                                 &gain_s, &xpr_s, nullptr, 0, nullptr, 0, 0, true);
     CHECK(xpr_s.n_rows == 2);
     CHECK(xpr_s.n_cols == 1);
@@ -545,7 +545,7 @@ TEST_CASE("Calc Diffraction Gain - Fabry-Perot thin-slab resolution")
 // (threshold=1) the result is a clean single pass. Scalar mode keeps a single coefficient.
 TEST_CASE("Calc Diffraction Gain - Refraction in-medium path length")
 {
-    const double f = 10.0e9;
+    const double f = 1.0e4; // scalar mode: acoustic Hz
     const double eps_r = 2.25;
     const double alpha = 40.0; // dB/m -> ~20 dB one-way over t
     const double t = 0.5;      // slab thickness along x (m)
@@ -778,12 +778,8 @@ static inline double ref_spreading_gain(double f_Hz, double dist, bool scalar_mo
     return std::pow(10.0, 0.1 * (gain_at_1m - 20.0 * std::log10(dist) - alpha * dist));
 }
 
-// Scalar mode takes an EM-equivalent frequency at the library API: c_light / f_eq is the
-// acoustic wavelength. These two must match qd_atmospheric_absorption.hpp. Note the effective
-// acoustic wave speed is NOT 343: the scale is formed with c = 3e8 while the phase uses the
-// exact speed of light, so the two differ by 0.07 %.
-static constexpr double ACOUSTIC_FREQ_SCALE = 3.0e8 / 343.0;                     // 874635.59
-static constexpr double ACOUSTIC_WAVE_SPEED = 299792458.0 / ACOUSTIC_FREQ_SCALE; // 342.76276
+// Scalar mode takes the acoustic frequency; the acoustic wavelength uses the speed of sound.
+static constexpr double ACOUSTIC_WAVE_SPEED = 343.0;
 
 // Reference propagation phase exp(-j*2*pi*d/lambda), unit magnitude. The wave speed selects
 // EM (speed of light) vs. acoustic (speed of sound at 20 C, ISO 9613-1 reference conditions).
@@ -911,7 +907,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
     {
         arma::vec gain;
         quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
-                                                    freq * ACOUSTIC_FREQ_SCALE, 0,
+                                                    freq, 0,
                                                     &gain, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
         CHECK(std::abs(gain(0) / ref_spreading_gain(freq, dist, true) - 1.0) < 1e-8);
     }
@@ -919,7 +915,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
     // 1 kHz: absorption is only ~0.047 dB over 10 m, so spreading dominates
     arma::vec g_low;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
-                                                1.0e3 * ACOUSTIC_FREQ_SCALE, 0,
+                                                1.0e3, 0,
                                                 &g_low, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
     CHECK(ref_iso9613_alpha(1.0e3) * dist < 0.1);                   // absorption stays minor
     CHECK(std::abs(g_low(0) / (1.0 / (dist * dist)) - 1.0) < 0.02); // within 2 % of 1/d^2
@@ -927,7 +923,7 @@ TEST_CASE("Calc Diffraction Gain - FSPL scalar mode with air absorption")
     // 20 kHz: absorption adds real loss on top of spreading
     arma::vec g_high;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
-                                                20.0e3 * ACOUSTIC_FREQ_SCALE, 0,
+                                                20.0e3, 0,
                                                 &g_high, nullptr, nullptr, 0, nullptr, 0, 0, true, 0.0, true, false);
     CHECK(g_high(0) < g_low(0));
     // The ratio isolates the absorption difference; both endpoints carry their own alpha
@@ -979,7 +975,7 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase on clear path")
     // Scalar mode: single coefficient, wavelength from the speed of sound
     arma::mat Xs;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest, cube, mtl_ind, mtl_map,
-                                                1.0e3 * ACOUSTIC_FREQ_SCALE, 0,
+                                                1.0e3, 0,
                                                 nullptr, &Xs, nullptr, 0, nullptr, 0, 0, true, 0.0, false, true);
     REQUIRE(Xs.n_rows == 2);
     CHECK(std::abs(xpr_cx(Xs, 0, 0) - ref_prop_phase(1.0e3, dist, true)) < 1e-9);
@@ -1022,7 +1018,7 @@ TEST_CASE("Calc Diffraction Gain - Propagation phase wraps at one wavelength")
     arma::mat dest_ac = {{-30.0, 0.0, 0.5}, {-30.0 + lambda_ac, 0.0, 0.5}};
     arma::mat Xa;
     quadriga_lib::calc_diffraction_gain<double>(orig, dest_ac, cube, mtl_ind, mtl_map,
-                                                f_ac * ACOUSTIC_FREQ_SCALE, 0,
+                                                f_ac, 0,
                                                 nullptr, &Xa, nullptr, 0, nullptr, 0, 0, true, 0.0, false, true);
     CHECK(std::abs(xpr_cx(Xa, 0, 0) - xpr_cx(Xa, 0, 1)) < 1e-9);
 }

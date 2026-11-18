@@ -379,12 +379,10 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(xpr[2:6, 0], np.zeros(4), atol=1e-12, rtol=0)
 
     def test_phase_scalar_mode(self):
-        # Scalar mode: (2, n_pos) output, wavelength from the acoustic wave speed, so the
-        # phasor differs from the EM one at the same frequency and distance. The effective
-        # speed follows from the EM-equivalent frequency conversion in the wrapper, so it is
-        # computed from the same two constants rather than typed as a rounded literal.
+        # Scalar mode: (2, n_pos) output, wavelength from the speed of sound, so the
+        # phasor differs from the EM one at the same frequency and distance.
         d, f = 5.0, 1000.0
-        c_ac = 299792458.0 / (3e8 / 343.0)
+        c_ac = 343.0
         _, xpr_ac, _ = quadriga_lib.RTtools.calc_diffraction_gain(
             self.orig_clear, self.dest_clear, self.cube, self.mtl_ind, self.mtl_prop, f, 0,
             scalar_mode=True, apply_phase=True)

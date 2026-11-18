@@ -7,17 +7,23 @@
 
 #include <cmath>
 
-// Speed of sound in air at 20 degrees Celsius, ISO 9613-1 reference conditions [m/s]
-static constexpr double qd_speed_of_sound = 342.76271;
+// Speed of sound in air [m/s], the one value used for acoustics throughout the library
+static constexpr double qd_speed_of_sound = 343.0;
 
 // Speed of light in vacuum [m/s]
 static constexpr double qd_speed_of_light = 299792458.0;
 
 // Scalar (acoustic) mode maps an acoustic frequency onto an EM-equivalent frequency such that
-// c_light / f_eq equals the acoustic wavelength. Wrappers convert at the API boundary; the core
-// and the material model in ray_mesh_interact always work in EM-equivalent units.
+// c_light / f_eq equals the acoustic wavelength. The public functions take the acoustic frequency
+// and convert once at their entry; the material model works in EM-equivalent units.
 //   f_eq = f_acoustic * qd_acoustic_freq_scale
 static constexpr double qd_acoustic_freq_scale = qd_speed_of_light / qd_speed_of_sound;
+
+// Material-model frequency in GHz of a public frequency argument in Hz (acoustic Hz in scalar mode)
+static inline double qd_material_fGHz(double f_Hz, bool scalar_mode)
+{
+    return (scalar_mode ? f_Hz * qd_acoustic_freq_scale : f_Hz) * 1.0e-9;
+}
 
 // Atmospheric absorption coefficient alpha(f) in dB/m according to ISO 9613-1.
 // Defaults: T = 20 degrees Celsius, RH = 50 %, p = 1 atm (indoor sea-level).

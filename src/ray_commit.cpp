@@ -74,8 +74,8 @@ arma::uword quadriga_lib::ray_commit(
   faces named by `fbs_ind` are read, for the shading plane
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]);
   each value has length `n_mtl` (max 16383)
-- **`center_freq`** — Center frequencies in [Hz]; `[n_freq]`, 1 to 127 entries, must match the layout of
-  `paths`. `center_freq[0]` is the reference frequency for the gain gate
+- **`center_freq`** — Center frequencies in [Hz], in scalar mode the acoustic frequencies; `[n_freq]`, 1 to 127
+  entries, must match the layout of `paths`. `center_freq[0]` is the reference frequency for the gain gate
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`. Defines `n_ray`; must be non-empty
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from
   [[ray_triangle_intersect]] for the same launch configuration
@@ -370,7 +370,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             if (g[GATE_IN_MEDIUM])
             {
                 const unsigned material = unsigned(p_current[iR] & 0x3FFFu);
-                medium_g = quadriga_lib::medium_gain(mtl_prop, material, seg_length, fRef_Hz);
+                medium_g = quadriga_lib::medium_gain(mtl_prop, material, seg_length, fRef_Hz, scalar_mode);
             }
             if (medium_g * paths[iR].calc_gain(fRef_GHz, 0, len) <= min_gain_linear)
                 continue;
@@ -465,7 +465,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             // One coefficient update per frequency: mirror and medium loss in a single call
             for (size_t i_freq = 0; i_freq < n_freq; ++i_freq)
             {
-                float medium_g = material ? quadriga_lib::medium_gain(mtl_prop, material, seg_length, center_freq[i_freq]) : 1.0f;
+                float medium_g = material ? quadriga_lib::medium_gain(mtl_prop, material, seg_length, center_freq[i_freq], scalar_mode) : 1.0f;
                 C.xpr_update(p_mirror, medium_g, i_freq);
             }
         }

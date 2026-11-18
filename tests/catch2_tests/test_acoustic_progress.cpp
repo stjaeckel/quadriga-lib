@@ -409,7 +409,7 @@ TEST_CASE("ray_progress - refracting tracer: the segment out of a lossy medium i
         int n_gen = 0;
         for (int g = 0; g < 2; ++g, ++n_gen)
         {
-            quadriga_lib::ray_progress(mesh, mi, rig, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
+            quadriga_lib::ray_progress(mesh, mi, rig, api_freq(cf, true), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths,
                                        nullptr, nullptr, nullptr, nullptr,
                                        20, (uint8_t)0, 10, (uint8_t)0, -300.0f, 3.0f, 0.15f, refr, true,
                                        nullptr, nullptr, nullptr, nullptr);
@@ -437,7 +437,7 @@ TEST_CASE("ray_progress - the plate rule and the absorption peak at every freque
     // 1), reflecting (zeta c - 1)/(zeta c + 1) behind the matched pad of tf, so it absorbs a = 1 - (1 - tf)|r_zeta|^2
     // at the cosine c; the plate passes a tau / (a + tau - a tau); and the band equals each frequency run alone.
     ub::OneThread one_thread;
-    const double PI = 3.14159265358979323846, FMAP = 299792458.0 / 343.0 * 1.0e-9;
+    const double PI = 3.14159265358979323846, FMAP = qd_acoustic_freq_scale * 1.0e-9;
     const double a = 8.1817e-08, thk = 0.0125, fRef = 1.6644e-04, tf0 = 0.05, tfP = 0.25, tfF_hz = 150.0, tfQ = 0.75;
     typedef std::unordered_map<std::string, std::vector<float>> Pal;
     auto mass_TL = [](double X0, double c)
@@ -527,7 +527,7 @@ TEST_CASE("ray_progress - the random-incidence absorption of a peaked lining is 
     //   P = (8 r/|z|^2) (1 - (r/|z|^2) ln(1 + 2 r + |z|^2) + ((r^2 - x^2)/(x |z|^2)) atan(x/(1 + r))),
     // behind the pad: alpha = tf + (1 - tf) P. The lining's measured octave values are printed beside it.
     ub::OneThread one_thread;
-    const double PI = 3.14159265358979323846, FMAP = 299792458.0 / 343.0 * 1.0e-9;
+    const double PI = 3.14159265358979323846, FMAP = qd_acoustic_freq_scale * 1.0e-9;
     const double a = 3.850e-6, mu = 1901.0, fRef = 5.0212e-5, t1k = 0.09332, tB = 0.1423, tfP = 0.2869, tfF_hz = 181.6, tfQ = 1.319, H = 0.2;
     const double tfR = t1k * std::pow(fRef / (1000.0 * FMAP), tB);
     typedef std::unordered_map<std::string, std::vector<float>> Pal;

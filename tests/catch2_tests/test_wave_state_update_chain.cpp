@@ -47,7 +47,7 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
         arma::u32_vec fbs_ind, sbs_ind;
         quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         std::vector<uint8_t> ot;
-        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
@@ -216,13 +216,13 @@ TEST_CASE("Recovery gate - the hit code a traced run carries", "[wave]")
             Ev E;
             arma::vec gain, fang;
             std::vector<uint8_t> ot, rt;
-            quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fi, &si, (arma::mat *)nullptr,
+            quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl, &fi, &si, (arma::mat *)nullptr,
                                             (arma::mat *)nullptr, &E.origN, &E.destN, &fbsN, &sbsN, &gain, &E.xpr,
                                             (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                             (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
             arma::Col<short> mf(1), ms(1);
             mf(0) = fi(0) ? (short)m : (short)0, ms(0) = si(0) ? (short)m : (short)0;
-            quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &fbsN, &sbsN, &nh, &fang, &nv, &ot, &mtl, &mf, &ms,
+            quadriga_lib::ray_state_update(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &fbsN, &sbsN, &nh, &fang, &nv, &ot, &mtl, &mf, &ms,
                                            in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                            in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                            &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -297,13 +297,13 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
         Ev E;
         arma::vec fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &E.gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &mtl, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &mtl, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &E.gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -540,7 +540,7 @@ TEST_CASE("Exits and verdicts - every exit at the cosine the wave has there", "[
         arma::u32_vec fbs_ind, sbs_ind;
         quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
         std::vector<uint8_t> ot;
-        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl, &fbs_ind, &sbs_ind,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
@@ -759,13 +759,13 @@ TEST_CASE("Sheet reflection - a declined series is followed and not dropped", "[
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -1037,13 +1037,13 @@ TEST_CASE("Measurement - the mirror behind the ray after a back reflection", "[w
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -1517,7 +1517,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
@@ -1526,7 +1526,7 @@ TEST_CASE("Sheet reflect port - where the layer lies and what the echo pays", "[
             return E;
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -2114,13 +2114,13 @@ TEST_CASE("Direction - a ray leaves a parallel slab parallel to how it arrived",
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &fbsN, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &fbsN, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &fbsN, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -2235,13 +2235,13 @@ TEST_CASE("Refracting tracer - a traced bend is known from the state and the leg
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in_state->prev : nullptr, in ? &in_state->cur : nullptr, in ? &in_state->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in_state->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -2651,13 +2651,13 @@ TEST_CASE("Phase reference - a traversal carries the phase at the point the poly
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in_state->prev : nullptr, in ? &in_state->cur : nullptr, in ? &in_state->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in_state->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -3017,13 +3017,13 @@ TEST_CASE("Leak direction - the direction a closed face writes for a wave launch
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f_hz, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f_hz, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f_hz, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -3155,13 +3155,13 @@ TEST_CASE("Measurement - the mirror behind a second solid and behind a sheet ins
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -3524,14 +3524,14 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
         Ev E;
         arma::vec gain, fang;
         std::vector<uint8_t> ot, rt;
-        quadriga_lib::ray_mesh_interact(itype, f, &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
+        quadriga_lib::ray_mesh_interact(itype, api_freq(f, itype >= 3), &orig, &dest, &mesh, &mtl_ind, &pal, &fi, &si, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, &E.origN, &E.destN, &E.fbs, &sbsN, &gain, &E.xpr,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr, &fang, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, &nv, &ot, &E.path_dirN, false, (arma::u32_vec *)nullptr);
         E.xpr0 = E.xpr, E.dir0 = E.path_dirN, E.ot = ot[0], E.nh = nh(0);
         arma::Col<short> mf(1), ms(1);
         mf(0) = fi(0) ? (short)mtl_ind(fi(0) - 1) : (short)0, ms(0) = si(0) ? (short)mtl_ind(si(0) - 1) : (short)0;
-        quadriga_lib::ray_state_update(itype, f, &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
+        quadriga_lib::ray_state_update(itype, api_freq(f, itype >= 3), &orig, &dest, &E.fbs, &sbsN, &nh, &fang, &nv, &ot, &pal, &mf, &ms,
                                        in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                        in ? &in->path_dirN : nullptr, in ? &in->accg : nullptr, in ? &in->accr : nullptr,
                                        &E.prev, &E.cur, &E.buf, &gain, &E.xpr, &E.path_dirN, &E.accg, &E.accr, &rt,
@@ -3903,10 +3903,10 @@ TEST_CASE("Lossy verdict - a lossy second medium has no critical angle", "[wave]
         arma::mat oN, dN, fN, sN, xp, tvN, tdN, pd, oN2, dN2, fN2, sN2, xp2, pd2;
         arma::vec gn, gn2;
         std::vector<uint8_t> ot, ot2;
-        quadriga_lib::ray_mesh_interact(5, f_hz, &orig, &dest, &mesh, &mi, &mtl, &fi, &si, &trivec, &tridir, &oN, &dN, &fN, &sN, &gn, &xp, &tvN, &tdN,
+        quadriga_lib::ray_mesh_interact(5, api_freq(f_hz, true), &orig, &dest, &mesh, &mi, &mtl, &fi, &si, &trivec, &tridir, &oN, &dN, &fN, &sN, &gn, &xp, &tvN, &tdN,
                                         (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::mat *)nullptr, &ot, &pd, false,
                                         (arma::u32_vec *)nullptr);
-        quadriga_lib::ray_mesh_interact(5, f_hz, &orig, &dest, &mesh, &mi, &mtl, &fi, &si, (arma::mat *)nullptr, (arma::mat *)nullptr, &oN2, &dN2, &fN2,
+        quadriga_lib::ray_mesh_interact(5, api_freq(f_hz, true), &orig, &dest, &mesh, &mi, &mtl, &fi, &si, (arma::mat *)nullptr, (arma::mat *)nullptr, &oN2, &dN2, &fN2,
                                         &sN2, &gn2, &xp2, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
                                         (arma::vec *)nullptr, (arma::mat *)nullptr, &ot2, &pd2, false, (arma::u32_vec *)nullptr);
         arma::mat w1 = tdN.cols(0, 2), w2 = tdN.cols(3, 5), w3 = tdN.cols(6, 8);

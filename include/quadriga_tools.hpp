@@ -113,7 +113,7 @@ namespace quadriga_lib
                                const arma::Mat<dtype> &mesh,                                        // Triangle vertices; Size: [ n_mesh, 9 ]
                                const arma::uvec &mtl_ind,                                           // 1-based material index, 0 = no material; Size: [n_mesh]
                                const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
-                               dtype center_freq,                                                   // Center frequency in [Hz]
+                               dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz in scalar mode
                                int lod = 2,                                                         // Level of detail, 0-7 (0 = direct ray only)
                                arma::Col<dtype> *gain = nullptr,                                    // Diffraction gain, linear scale; Size: [ n_pos ]
                                arma::Mat<dtype> *xprmat = nullptr,                                  // Polarization transfer matrix; Size [n_pos, 8] for EM or [n_pos, 8] for scalar
@@ -177,12 +177,13 @@ namespace quadriga_lib
     template <typename dtype>                                     // float or double
     void generate_diffraction_paths(const arma::Mat<dtype> &orig, // Origin points of the ellipsoid, Size [ n_pos, 3 ]
                                     const arma::Mat<dtype> &dest, // Destination points of the ellipsoid [ n_pos, 3 ]
-                                    dtype center_freq,            // Frequency in [Hz]
+                                    dtype center_freq,            // Frequency in [Hz]; acoustic Hz in scalar mode
                                     int lod,                      // Level of detail: Scalar 1-7
                                     arma::Cube<dtype> &ray_x,     // X-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
                                     arma::Cube<dtype> &ray_y,     // Y-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
                                     arma::Cube<dtype> &ray_z,     // Z-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
-                                    arma::Cube<dtype> &weight);   // Weights, Size [ n_pos, n_path, n_seg ]
+                                    arma::Cube<dtype> &weight,    // Weights, Size [ n_pos, n_path, n_seg ]
+                                    bool scalar_mode = false);    // Scalar (acoustic) mode: center_freq in acoustic Hz
 
     // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
     // - Returns the number of faces
@@ -324,7 +325,7 @@ namespace quadriga_lib
     // Calculate the interaction of rays (beams) with a triangle mesh
     template <typename dtype>
     void ray_mesh_interact(int interaction_type,                                                // 0 = EM reflect, 1 = EM transmit 2 = EM refract 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
-                           dtype center_freq,                                                   // Center frequency in [Hz]
+                           dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz for types 3-5
                            const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, [n_ray, 3]
                            const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, [n_ray, 3]
                            const arma::Mat<dtype> *mesh,                                        // Triangle mesh faces, [n_mesh, 9]
@@ -354,7 +355,7 @@ namespace quadriga_lib
     // Update inside/outside ray state and correct gainN / xprmatN
     template <typename dtype>
     void ray_state_update(int interaction_type,                                                // 0 = EM reflect, 1 = EM transmit 2 = EM refract 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
-                          dtype center_freq,                                                   // Center frequency in [Hz]
+                          dtype center_freq,                                                   // Center frequency in [Hz]; acoustic Hz for types 3-5
                           const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, [n_ray, 3]
                           const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, [n_ray, 3]
                           const arma::Mat<dtype> *fbsN,                                        // First interaction points in GCS, [n_rayN, 3]
@@ -395,19 +396,22 @@ namespace quadriga_lib
     dtype medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
                       arma::uword iM,                                                      // 1-based material index
                       dtype dist,                                                          // Length of the ray inside the medium
-                      dtype center_freq);                                                  // Frequency in Hz
+                      dtype center_freq,                                                   // Frequency in Hz; acoustic Hz in scalar mode
+                      bool scalar_mode = false);                                           // Scalar (acoustic) mode
 
     // Calculate lumped interface transmission gain (att + coincidence)
     template <typename dtype>
     dtype interface_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
                          arma::uword iM,                                                      // 1-based material index of the entered material
-                         dtype center_freq);                                                  // Frequency in Hz
+                         dtype center_freq,                                                   // Frequency in Hz; acoustic Hz in scalar mode
+                         bool scalar_mode = false);                                           // Scalar (acoustic) mode
 
     // Real refractive index n = Re(sqrt(eta*mu)) of a medium; iM is 1-based (0 = air -> 1.0)
     template <typename dtype>
     dtype refractive_index(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
                            arma::uword iM,                                                      // 1-based material index of the entered material
-                           dtype center_freq);                                                  // Frequency in Hz
+                           dtype center_freq,                                                   // Frequency in Hz; acoustic Hz in scalar mode
+                           bool scalar_mode = false);                                           // Scalar (acoustic) mode
 
     // Calculate the intersections of ray tubes with point clouds
     template <typename dtype>

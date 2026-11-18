@@ -109,7 +109,7 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 | `fz_qdant` | QDANT file | `qdant_read` (with layout, a second ID), `qdant_read_multi` |
 | `fz_obj` | OBJ file | `obj_file_read` with all outputs |
 | `fz_mtl` | MTL file | `obj_file_read` of a fixed OBJ file that uses the fuzzed MTL file |
-| `fz_material_csv` | Material table (CSV) | `obj_file_read` of a fixed OBJ file with the fuzzed table, lenient and strict |
+| `fz_material_csv` | Material table (CSV) | `obj_file_read` of a fixed OBJ file with the fuzzed table, lenient and strict; `medium_gain`, `interface_gain`, `refractive_index` of each material it reads, EM and scalar mode |
 | `fz_conf` | Scenario parameter file | `conf_file_read` with all outputs, with and without the value checks |
 | `fz_qrt` | QRT file | `qrt_file_parse`, `qrt_read_cache_init`, `qrt_file_read` for several origins and CIRs in both directions, `qrt_file_read_raw` |
 | `fz_hdf5` | HDF5 channel file | `hdf5_read_layout`, `hdf5_read_channel`, `hdf5_read_dset_names`, `hdf5_read_dset` for the first slots |
@@ -124,7 +124,7 @@ Known undefined behaviour is also skipped while fuzzing: the runner turns its en
 | `fz_mesh_tools` | Triangle mesh | `point_inside_mesh`, `obj_overlap_test`, `subdivide_triangles`, the `triangle_mesh_*` functions, the mesh generators |
 | `fz_point_cloud` | Points | The `point_cloud_*` functions |
 | `fz_spreads` | Delays, angles, powers | `acdf`, `calc_delay_spread`, `calc_angular_spread`, `calc_rician_k_factor`, `calc_cross_polarization_ratio` |
-| `fz_path_tools` | Path coordinates | `coord2path`, `combine_irs_coord`, `path_to_tube`, `generate_diffraction_paths` |
+| `fz_path_tools` | Path coordinates | `coord2path`, `combine_irs_coord`, `path_to_tube`, `generate_diffraction_paths` (EM and scalar mode) |
 
 The file targets write the fuzz input to a file and call the reader. The API targets turn the fuzz input into sizes, indices and values, with sizes that mostly fit together and sometimes do not, and call the functions with them; the comment at the top of each target lists in detail what it calls. Each API target picks `float` or `double` per input. Where the API allows an output argument to be the same object as an input, the targets also call it that way. Not fuzzed: the CUDA code, the MATLAB and Python interfaces, the correctness of results (the job of the unit tests) and thread safety.
 

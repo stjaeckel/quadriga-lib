@@ -271,7 +271,7 @@ assertTrue(max(abs(data(1).e_theta_re(:))) > 0);
 
 % Auto parameters: NaN (the default), [] or <= 0 select 90 deg, 60 deg and c / (2 pi radius)
 ref = quadriga_lib.generate_speaker('horn', 0.025, 1500.0, 20000.0, [], [], [], [], ...
-                                     90.0, 60.0, 344.0 / (2*pi*0.025), [], [], [500.0, 4000.0], 10.0);
+                                     90.0, 60.0, 343.0 / (2*pi*0.025), [], [], [500.0, 4000.0], 10.0);
 for v = { NaN, [], 0.0, -1.0 }
     data = quadriga_lib.generate_speaker('horn', 0.025, 1500.0, 20000.0, [], [], [], [], ...
                                           v{1}, v{1}, v{1}, [], [], [500.0, 4000.0], 10.0);

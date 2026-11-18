@@ -339,7 +339,7 @@ class TestSpeakerGenerate(unittest.TestCase):
         kw = dict(driver_type='horn', radius=0.025, lower_cutoff=1500.0, upper_cutoff=20000.0,
                   center_freq=np.array([500.0, 4000.0]), angular_resolution_deg=10.0)
         ref = arrayant.generate_speaker(**kw, hor_coverage_deg=90.0, ver_coverage_deg=60.0,
-                                        horn_control_freq=344.0 / (2.0 * np.pi * 0.025))
+                                        horn_control_freq=343.0 / (2.0 * np.pi * 0.025))
         for v in (None, np.nan, 0.0, -1.0):
             arg = {} if v is None else dict(hor_coverage_deg=v, ver_coverage_deg=v, horn_control_freq=v)
             data = arrayant.generate_speaker(**kw, **arg)

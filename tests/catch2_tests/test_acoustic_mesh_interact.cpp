@@ -86,7 +86,7 @@ struct QdMassSheet
 
         arma::mat origN, destN, xprmatN;
         arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mp,
+        quadriga_lib::ray_mesh_interact(type, api_freq(f_hz, type >= 3), &orig, &dest, &mesh, &mtl_ind, &mp,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);

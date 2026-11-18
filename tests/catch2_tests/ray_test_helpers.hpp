@@ -14,6 +14,7 @@
 #include "quadriga_lib.hpp"
 #include "quadriga_tools.hpp"
 #include "bits.hpp"
+#include "qd_atmospheric_absorption.hpp"
 
 #include <algorithm>
 #include <array>
@@ -32,6 +33,17 @@
 // way. qd_diag() and QD_DIAG(...) come from qd_test_diag.hpp.
 #include <cstdio>
 #include <cstdlib>
+
+// The library takes acoustic Hz in scalar mode. The engine tests state every frequency as the EM-equivalent frequency
+// of the material model (c_light / f is the wavelength); api_freq gives the argument for the library call.
+static inline double api_freq(double f, bool scalar) { return scalar ? f / qd_acoustic_freq_scale : f; }
+static inline arma::fvec api_freq(const arma::fvec &f, bool scalar)
+{
+    arma::fvec a(f.n_elem);
+    for (arma::uword q = 0; q < f.n_elem; ++q)
+        a[q] = (float)api_freq((double)f[q], scalar);
+    return a;
+}
 #include "qd_test_diag.hpp"
 QD_TEST_DIAG_SWITCH("QD_DIAG_RAY")
 
@@ -444,7 +456,7 @@ struct Rsu
         g_in = gain;
         x_in = xprmat;
         quadriga_lib::ray_state_update<dtype>(
-            itype, freq,
+            itype, (dtype)api_freq(freq, itype >= 3),
             has_orig ? &orig : nullptr,
             has_dest ? &dest : nullptr,
             has_fbs ? &fbs : nullptr,
@@ -2019,7 +2031,7 @@ namespace ub
         const bool tube = opt.trivec && opt.tridir;
         if (tube)
             tv = arma::conv_to<M>::from(*opt.trivec), td = arma::conv_to<M>::from(*opt.tridir);
-        quadriga_lib::ray_mesh_interact<T>(itype, (T)f, &o, &d, &ms, &mtl_ind, &p, &fi, &si, tube ? &tv : nullptr, tube ? &td : nullptr,
+        quadriga_lib::ray_mesh_interact<T>(itype, (T)api_freq(f, itype >= 3), &o, &d, &ms, &mtl_ind, &p, &fi, &si, tube ? &tv : nullptr, tube ? &td : nullptr,
                                            &oN, &dN, &fN, &sN, &gain, &xp, tube ? &tvN : nullptr, tube ? &tdN : nullptr, &fang, nullptr,
                                            nullptr, &nv, &ot, &pd, false, nullptr);
         Ev E;
@@ -2030,7 +2042,7 @@ namespace ub
         V ag, ar, ago, aro;
         if (in)
             pin = arma::conv_to<M>::from(in->path_dirN), ag = arma::conv_to<V>::from(in->accg), ar = arma::conv_to<V>::from(in->accr);
-        quadriga_lib::ray_state_update<T>(itype, (T)f, &o, &d, &fN, &sN, &nh, &fang, &nv, &ot, &p, &mf, &m2,
+        quadriga_lib::ray_state_update<T>(itype, (T)api_freq(f, itype >= 3), &o, &d, &fN, &sN, &nh, &fang, &nv, &ot, &p, &mf, &m2,
                                           in ? &in->prev : nullptr, in ? &in->cur : nullptr, in ? &in->buf : nullptr,
                                           in ? &pin : nullptr, in ? &ag : nullptr, in ? &ar : nullptr,
                                           &E.prev, &E.cur, &E.buf, &gain, &xp, &pd, &ago, &aro, &rt, nullptr, opt.eps,
@@ -2598,7 +2610,7 @@ struct QdSheetFace
 
         arma::mat origN, destN, xprmatN;
         arma::vec gainN;
-        quadriga_lib::ray_mesh_interact(type, f_hz, &orig, &dest, &mesh, &mtl_ind, &mp,
+        quadriga_lib::ray_mesh_interact(type, api_freq(f_hz, type >= 3), &orig, &dest, &mesh, &mtl_ind, &mp,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         &gainN, &xprmatN, (arma::mat *)nullptr, (arma::mat *)nullptr);
@@ -2743,7 +2755,7 @@ namespace
 
         std::array<unsigned, 4> step(const Scene &S, const Opt &o = Opt())
         {
-            return quadriga_lib::ray_progress(S.mesh, S.mtl_ind, S.mtl_prop, freq,
+            return quadriga_lib::ray_progress(S.mesh, S.mtl_ind, S.mtl_prop, api_freq(freq, scalar),
                                               {Ox, Oy, Oz},
                                               orig, dest, prev, cur, buf, path_dir, acc_dist, paths,
                                               beam ? &trivec : nullptr,
@@ -3147,7 +3159,7 @@ namespace rp
         int n = 0;
         for (int g = 0; g < o.calls; ++g)
         {
-            quadriga_lib::ray_progress(mesh, mi, pal, cf, {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr,
+            quadriga_lib::ray_progress(mesh, mi, pal, api_freq(cf, o.scalar), {Ox, Oy, Oz}, orig, dest, prev, cur, buf, pd, acc, paths, nullptr, nullptr, nullptr,
                                        nullptr, o.max_int, o.max_refl, o.max_trans, 0, o.min_gain, 3.0f, o.slab, o.refr, o.scalar);
             if (orig.n_rows == 0)
                 break;
@@ -3171,10 +3183,8 @@ namespace rp
 #include <catch2/catch_approx.hpp>
 using Catch::Approx;
 
-// Frequency mapping constants: acoustic Hz -> mapped radio Hz.
-static constexpr double C_LIGHT = 299792458.0;
-static constexpr double C_SOUND = 342.77;
-static constexpr double AC2RF = C_LIGHT / C_SOUND; // acoustic Hz -> radio Hz
+// Frequency mapping: acoustic Hz -> mapped radio Hz (the library's mapping).
+static constexpr double AC2RF = qd_acoustic_freq_scale;
 
 static inline double ac2rf(double f_acoustic_Hz) { return f_acoustic_Hz * AC2RF; }
 
@@ -3221,7 +3231,7 @@ static double rmi_gain(int interaction_type, double freq,
     quadriga_lib::ray_triangle_intersect(&orig, &dest, &mesh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
 
     arma::vec gainN;
-    quadriga_lib::ray_mesh_interact<double>(interaction_type, freq, &orig, &dest, &mesh, &mtl_ind, &mtl,
+    quadriga_lib::ray_mesh_interact<double>(interaction_type, api_freq(freq, interaction_type >= 3), &orig, &dest, &mesh, &mtl_ind, &mtl,
                                             &fbs_ind, &sbs_ind,
                                             nullptr, nullptr, // trivec, tridir,
                                             nullptr, nullptr, // origN, destN
@@ -3232,8 +3242,10 @@ static double rmi_gain(int interaction_type, double freq,
 
 // ==== Twins with every digit, asserted against stored values ====
 // The wave tables that print a coefficient with every digit also assert it against the value stored in
-// tests/data/wave_twins.tsv, one row per table row: table, key, values, tab-separated. A value passes within a relative
-// 1e-12, so a change that moves a twin fails an assertion instead of only showing in a diff of the output. With the
+// tests/data/wave_twins.tsv, one row per table row: table, key, values, tab-separated. A value passes within 1e-9
+// relative plus 1e-12 absolute, so a change that moves a twin fails an assertion instead of only showing in a diff of
+// the output, while other code paths of the same arithmetic do not: a build with fused multiply-add moves the twins
+// by at most 1.5e-11 relative and 4.3e-15 absolute. With the
 // environment variable QD_TWIN_WRITE set to a file name the values are appended to that file instead and nothing is
 // asserted; that is how the stored file is regenerated after a change that is meant to move them. The suite runs from
 // the repository root.
@@ -3294,6 +3306,6 @@ static inline void twin(const char *table, const std::string &key, const std::ve
     INFO("twin " << table << ", " << key);
     bool ok = it != S.end() && it->second.size() == v.size();
     for (size_t i = 0; ok && i < v.size(); ++i)
-        ok = std::abs(v[i] - it->second[i]) <= 1.0e-12 * std::max(std::abs(v[i]), std::abs(it->second[i]));
+        ok = std::abs(v[i] - it->second[i]) <= 1.0e-9 * std::max(std::abs(v[i]), std::abs(it->second[i])) + 1.0e-12;
     CHECK(ok);
 }

@@ -1,6 +1,6 @@
 # the board of the leaf-on-a-box cases (12.5 mm gypsum leaf, m = 0, loss ratio 0.2 on mu) glued on a 25 mm box of near-air
 # material glued on a mass-law wall (two-parameter concrete, m 20, tf 0.02, 200 mm); 0 deg, tracer 4, band 80-160 Hz.
-# Expected (fluid-layer reference, pad on the half-space, at the library's sound speed 342.76271 m/s): |R|^2 0.924972 /
-# 0.648002 / 0.444103 / 0.779643, the probe within 3.2e-7 (2026-10-23; 26 columns per material, attB and alphaB last,
+# Expected (fluid-layer reference, pad on the half-space, at the library's sound speed 343 m/s): |R|^2 0.9251345 /
+# 0.6493581 / 0.4447595 / 0.7788241, the probe within 1.0e-7 (2026-11-17; 26 columns per material, attB and alphaB last,
 # thin_slab_threshold 0). The wall carries side 3.29 m.
 board 4 0 0 0 0 3 4.691e-5 0 0 0 573 0 6.373749 1 0.0125 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 3.850e-6 0 0 0 1901 0 0 0 0 0.02 0 20 5.0212e-5 0 0 0 0 0 0 0 0 0 0 3.29 0 0 1 0 0 0 1.000001 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 5 0 1 0 0 3 0 0.025 3 1 0.025 2 0 0.225 2 1 0 255 -250 4 80 112 125 160

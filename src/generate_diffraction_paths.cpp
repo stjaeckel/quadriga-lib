@@ -4,6 +4,7 @@
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include "qd_atmospheric_absorption.hpp"
 
 // Make sure size_t and arma::uword are synonyms
 static_assert(sizeof(size_t) == sizeof(arma::uword), "size_t and arma::uword have different sizes");
@@ -30,13 +31,14 @@ void generate_diffraction_paths(
     arma::Cube<dtype> &ray_x,
     arma::Cube<dtype> &ray_y,
     arma::Cube<dtype> &ray_z,
-    arma::Cube<dtype> &weight);
+    arma::Cube<dtype> &weight,
+    bool scalar_mode = false);
 ```
 
 ## Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`center_freq`** — Center frequency
+- **`center_freq`** — Center frequency in [Hz]; in scalar mode the acoustic frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
    | `lod` | `n_path` | `n_seg` | Note  |
    | ----- | -------- | ------- | ----- |
@@ -47,6 +49,8 @@ void generate_diffraction_paths(
    | 5     | 1        | 2       | debug |
    | 6     | 2        | 2       | debug |
    | 7     | 1        | 10      | direct line in 10 segments |
+
+- **`scalar_mode`** *(optional)* — `true` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`; default `false` (EM, `299792458 / center_freq`)
 
 ## Outputs:
 - **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`
@@ -66,7 +70,8 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
                                               arma::Cube<dtype> &ray_x,
                                               arma::Cube<dtype> &ray_y,
                                               arma::Cube<dtype> &ray_z,
-                                              arma::Cube<dtype> &weight)
+                                              arma::Cube<dtype> &weight,
+                                              bool scalar_mode)
 {
     // Check data validity
     if (orig.n_rows == 0)
@@ -214,7 +219,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
     auto p_rx = ray_x.memptr(), p_ry = ray_y.memptr(), p_rz = ray_z.memptr(); // Output: scaled and rotated ellipsoid coordinates
 
     // Constants
-    double lambda_div_8 = 0.125 * 299792458.0 / (double)center_freq; // lambda / 8
+    double lambda_div_8 = 0.125 * (scalar_mode ? qd_speed_of_sound : qd_speed_of_light) / (double)center_freq; // lambda / 8
 
 // Iterate through positions
 #pragma omp parallel for schedule(static) if (n_pos >= 64)
@@ -275,7 +280,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
 }
 
 template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> &orig, const arma::Mat<float> &dest, float center_freq, int lod,
-                                                       arma::Cube<float> &ray_x, arma::Cube<float> &ray_y, arma::Cube<float> &ray_z, arma::Cube<float> &weight);
+                                                       arma::Cube<float> &ray_x, arma::Cube<float> &ray_y, arma::Cube<float> &ray_z, arma::Cube<float> &weight, bool scalar_mode);
 
 template void quadriga_lib::generate_diffraction_paths(const arma::Mat<double> &orig, const arma::Mat<double> &dest, double center_freq, int lod,
-                                                       arma::Cube<double> &ray_x, arma::Cube<double> &ray_y, arma::Cube<double> &ray_z, arma::Cube<double> &weight);
+                                                       arma::Cube<double> &ray_x, arma::Cube<double> &ray_y, arma::Cube<double> &ray_z, arma::Cube<double> &weight, bool scalar_mode);
