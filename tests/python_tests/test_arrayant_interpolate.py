@@ -160,10 +160,11 @@ class test_case(unittest.TestCase):
 
     def test_use_kernel(self):
         ref = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, complex=False)
-        for k in (0, 1):
-            res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=k, complex=False)
-            for a, b in zip(res, ref):
-                npt.assert_array_equal(a, b)
+        for a, b in zip(quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=0, complex=False), ref):
+            npt.assert_array_equal(a, b)  # 0 is the default
+        res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=1, complex=False)
+        for a, b in zip(res, ref):
+            npt.assert_allclose(a, b, atol=1e-5, rtol=0)  # GENERIC: within single precision, values up to 6
         try:
             res = quadriga_lib.arrayant.interpolate(self.ant, self.az, self.el, use_kernel=2, complex=False)
             for a, b in zip(res, ref):

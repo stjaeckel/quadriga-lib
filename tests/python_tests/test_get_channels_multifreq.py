@@ -1032,7 +1032,7 @@ class test_zero_paths_fake_los(unittest.TestCase):
 
 
 class test_use_kernel(unittest.TestCase):
-    # use_kernel (before complex) reaches C++: 0 and 1 give the default result (auto = GENERIC), 3 raises from C++
+    # use_kernel (before complex) reaches C++: 0 gives the default result, 1 agrees within single precision, 3 raises from C++
     def test(self):
         fbs = np.array([[20.0], [5.0], [3.0]])
         M = np.zeros((8, 1, 2))
@@ -1040,9 +1040,10 @@ class test_use_kernel(unittest.TestCase):
         args = (gen_xpol(), gen_xpol(), [0, 0, 10], [0, 0, 0], [50, 0, 1.5], [0, 0, 0], fbs, fbs, np.ones((1, 2)),
                 np.zeros(1), M, np.array([3e9, 3.6e9]), np.array([3e9, 3.3e9]))
         ref = quadriga_lib.channel.multifreq(*args, complex=False)
-        for k in (0, 1):
-            for a, b in zip(quadriga_lib.channel.multifreq(*args, complex=False, use_kernel=k), ref):
-                npt.assert_array_equal(a, b)
+        for a, b in zip(quadriga_lib.channel.multifreq(*args, complex=False, use_kernel=0), ref):
+            npt.assert_array_equal(a, b)  # 0 is the default
+        for a, b in zip(quadriga_lib.channel.multifreq(*args, complex=False, use_kernel=1), ref):
+            npt.assert_allclose(a, b, rtol=0, atol=1e-5 * np.abs(b).max())  # GENERIC: within single precision
         with self.assertRaises(ValueError) as ctx:
             quadriga_lib.channel.multifreq(*args, use_kernel=3)
         self.assertIn("'use_kernel' must be 0, 1 or 2", str(ctx.exception))

@@ -61,14 +61,14 @@ e3 = (sqrt(11.0 * 11.0 + 10.0 * 10.0) + sqrt(11.0 * 11.0 + 20.0 * 20.0 + 10.0 * 
 assertElementsAlmostEqual( delay(:,:,1), [d0,d1;d1,d0]/C, 'absolute', 1e-13 );
 assertElementsAlmostEqual( delay(:,:,2), [e0,e2;e1,e3]/C, 'absolute', 1e-13 );
 
-% Kernel selection (input 15): 0 = auto and 1 = GENERIC give the default result, 2 = AVX2 where available
+% Kernel selection (input 15): 0 = auto is the default; 1 = GENERIC and 2 = AVX2 agree within single precision
 args = { ant, ant, [0;0;1], [0,0,0], [20;0;1], [0,0,0], fbs_pos, fbs_pos, path_gain, path_length, M, 2997924580.0, 1, 0 };
 [cr_1, ci_1] = quadriga_lib.get_channels_spherical( args{:}, 1 );
-assertEqual( cr_1, coeff_re );
-assertEqual( ci_1, coeff_im );
+assertElementsAlmostEqual( cr_1, coeff_re, 'absolute', 1e-5 );
+assertElementsAlmostEqual( ci_1, coeff_im, 'absolute', 1e-5 );
 assertEqual( quadriga_lib.get_channels_spherical( args{:}, 0 ), coeff_re );
 assertEqual( quadriga_lib.get_channels_spherical( args{:}, [] ), coeff_re );
-assertEqual( quadriga_lib.get_channels_spherical( args{:}, true ), coeff_re );   % Logical true = 1 (GENERIC)
+assertElementsAlmostEqual( quadriga_lib.get_channels_spherical( args{:}, true ), coeff_re, 'absolute', 1e-5 );   % Logical true = 1
 try
     cr_2 = quadriga_lib.get_channels_spherical( args{:}, 2 );
     assertElementsAlmostEqual( cr_2, coeff_re, 'absolute', 1e-5 );              % Single precision

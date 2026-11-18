@@ -911,10 +911,14 @@ class TestGetChannelsSpherical(unittest.TestCase):
         args = (ant, xpol(), [0, 0, 10], [0.1, 0.2, 0.3], [40, 5, 1.5], [0, 0, 0], fbs_pos, fbs_pos, np.ones(5),
                 np.zeros(5), make_M(5), 3.5e9)
         ref = channel.spherical(*args, angles=True, complex=False)
-        for k in (0, 1):
-            res = channel.spherical(*args, angles=True, use_kernel=k, complex=False)
-            for a, b in zip(res, ref):
-                npt.assert_array_equal(a, b)
+        for a, b in zip(channel.spherical(*args, angles=True, use_kernel=0, complex=False), ref):
+            npt.assert_array_equal(a, b)  # 0 is the default
+        res = channel.spherical(*args, angles=True, use_kernel=1, complex=False)
+        scale = np.abs(ref[0]).max()
+        for k in (0, 1):  # GENERIC: within single precision of the default kernel
+            npt.assert_allclose(res[k], ref[k], atol=1e-5 * scale, rtol=0)
+        for k in range(2, 7):
+            npt.assert_allclose(res[k], ref[k], atol=1e-12, rtol=0)
         try:
             res = channel.spherical(*args, angles=True, use_kernel=2, complex=False)
             scale = np.abs(ref[0]).max()
