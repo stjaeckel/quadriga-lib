@@ -130,11 +130,11 @@ All three examples create a 2 × 2 3GPP antenna array at 3.7 GHz and print the d
 ### Python
 
 ```python
-import quadriga_lib
+import quadriga_lib as qd
 
-ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)
-print(quadriga_lib.version())
-print(quadriga_lib.arrayant.calc_directivity(ant, i_element=0))
+ant = qd.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9)
+print(qd.version())
+print(qd.arrayant.calc_directivity(ant, i_element=0))
 ```
 
 <a id="matlab-octave"></a>

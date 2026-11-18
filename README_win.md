@@ -49,8 +49,8 @@ Replace `cp312` with your Python version (`cp310`, `cp311`, `cp312`, `cp313`, or
 
 Verify the installation:
 ```python
-import quadriga_lib
-print(quadriga_lib.components())
+import quadriga_lib as qd
+print(qd.components())
 ```
 
 Alternatively, install directly from PyPI (requires internet access):

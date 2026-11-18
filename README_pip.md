@@ -25,8 +25,8 @@ python hdf5_convert_v2.py old.hdf5 new.hdf5
 ## Quick Start
 
 ```python
-import quadriga_lib
-print(quadriga_lib.components())
+import quadriga_lib as qd
+print(qd.components())
 ```
 
 ## Documentation
