@@ -757,28 +757,28 @@ namespace quadriga_lib
     std::vector<channel<double>> get_channels_ieee_indoor(
         const arrayant<double> &ap_array,  // Access point array antenna with 'n_tx' elements (= ports after element coupling)
         const arrayant<double> &sta_array, // Mobile station array antenna with 'n_rx' elements (= ports after element coupling)
-        std::string ChannelType,           // Channel Model Type (A, B, C, D, E, F) as defined by TGn
-        double CarrierFreq_Hz = 5.25e9,    // Carrier frequency in Hz
-        double tap_spacing_s = 10.0e-9,    // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
-        arma::uword n_users = 1,           // Number of user (only for TGac, TGah)
-        double observation_time = 0.0,     // Channel observation time in seconds (0.0 = static channel)
-        double update_rate = 1.0e-3,       // Channel update interval in seconds
-        double speed_station_kmh = 0.0,    // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
-        double speed_env_kmh = 1.2,        // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
-        arma::vec Dist_m = {4.99},         // Distance between TX and RX in meters, length n_users or length 1 (if same for all users)
-        arma::uvec n_floors = {0},         // Number of floors for the TGah model, adjusted for each user, up to 4 floors, length n_users or length 1 (if same for all users); attenuation only, no delay
-        bool uplink = false,               // Default channel direction is downlink, set uplink to true to get reverse direction (transpose, same Doppler shift)
-        arma::mat offset_angles = {},      // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
-        arma::uword n_subpath = 20,        // Number of sub-paths per path and cluster for Laplacian AS mapping
-        double Doppler_effect = 50.0,      // Special Doppler effects in models D, E (fluorescent lights, value = mains freq.) and F (moving vehicle speed in kmh), use 0.0 to disable
-        arma::sword seed = -1,             // Numeric seed, optional, value -1 disabled seed and uses system random device
-        double KF_linear = NAN,            // Overwrites the default KF (linear scale)
-        double XPR_NLOS_linear = NAN,      // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths; NAN = default, else finite and > 0
-        double SF_std_dB_LOS = NAN,        // Overwrites the default Shadow Fading STD for LOS channels in dB
-        double SF_std_dB_NLOS = NAN,       // Overwrites the default Shadow Fading STD for NLOS channels in dB
-        double dBP_m = NAN,                // Overwrites the default breakpoint distance in meters
-        arma::uvec n_walls = {0},          // Number of walls per user TGax models; [n_users] or [1]
-        double wall_loss = 5.0);           // Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
+        const std::string &channel_type,             // Channel Model Type (A, B, C, D, E, F) as defined by TGn
+        double center_freq = 5.25e9,                 // Carrier frequency in Hz
+        double tap_spacing = 10.0e-9,                // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
+        arma::uword n_users = 1,                     // Number of user (only for TGac, TGah)
+        double observation_time = 0.0,               // Channel observation time in seconds (0.0 = static channel)
+        double update_interval = 1.0e-3,             // Channel update interval in seconds
+        double speed_station_kmh = 0.0,              // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
+        double speed_env_kmh = 1.2,                  // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
+        const arma::vec &dist = arma::vec(),         // Distance between TX and RX in meters, [n_users] or [1]; empty = 4.99 m
+        const arma::uvec &n_floors = arma::uvec(),   // Number of floors per user (TGah / TGax), up to 4, [n_users] or [1]; empty = 0; attenuation only, no delay
+        bool uplink = false,                         // Default channel direction is downlink, set uplink to true to get reverse direction (transpose, same Doppler shift)
+        const arma::mat &offset_angles_deg = arma::mat(), // Offset angles in degree for MU-MIMO channels, [4, n_users], rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty = TGac auto
+        arma::uword n_subpath = 20,                  // Number of sub-paths per path and cluster for Laplacian AS mapping
+        double doppler_effect = 50.0,                // Special Doppler effects in models D, E (fluorescent lights, value = mains freq. in Hz) and F (moving vehicle speed in km/h), >= 0, 0 = off
+        arma::sword seed = -1,                       // Numeric seed, optional, value -1 disabled seed and uses system random device
+        double kf = NAN,                             // Overrides the default KF (linear scale); NAN = default, else finite and >= 0
+        double xpr_nlos = NAN,                       // Overrides the default cross-polarization ratio (linear scale) for NLOS paths; NAN = default, else finite and > 0
+        double sf_std_los_dB = NAN,                  // Overrides the default shadow fading STD for LOS channels in dB; NAN = default, else finite and >= 0
+        double sf_std_nlos_dB = NAN,                 // Overrides the default shadow fading STD for NLOS channels in dB; NAN = default, else finite and >= 0
+        double dist_breakpoint = NAN,                // Overrides the default breakpoint distance in meters; NAN = default, else finite and > 0
+        const arma::uvec &n_walls = arma::uvec(),    // Number of walls per user (TGax), [n_users] or [1]; empty = 0
+        double wall_loss_dB = 5.0);                  // Penetration loss for a single wall in dB; TGax defines 5.0 (default) or 7.0
 
 }
 

@@ -74,8 +74,8 @@ assertElementsAlmostEqual(p00, p11, 'absolute', 0);
 % ---------------------------------------------------------------------
 ant = quadriga_lib.arrayant_generate('omni', 30.0);
 chan = call_ieee(ant, ant, 'A', ...
-    'CarrierFreq_Hz', 2.4e9, ...
-    'tap_spacing_s', 1e-8, ...
+    'center_freq', 2.4e9, ...
+    'tap_spacing', 1e-8, ...
     'n_users', 2);
 
 assertEqual(numel(chan), 2);
@@ -104,11 +104,11 @@ assertElementsAlmostEqual(chan(2).rx_orientation(3, 1) * 180/pi, ori_deg, 'absol
 % ---------------------------------------------------------------------
 offset_angles = 100 * ones(4, 2);
 chan = call_ieee(ant, ant, 'A', ...
-    'CarrierFreq_Hz', 2.4e9, ...
-    'tap_spacing_s', 1e-8, ...
+    'center_freq', 2.4e9, ...
+    'tap_spacing', 1e-8, ...
     'n_users', 2, ...
-    'Dist_m', 1.99, ...
-    'offset_angles', offset_angles, ...
+    'dist', 1.99, ...
+    'offset_angles_deg', offset_angles, ...
     'n_subpath', 100, ...
     'seed', 11);
 
@@ -130,10 +130,10 @@ end
 % 4) Type B, three users, mixed distances and floors
 % ---------------------------------------------------------------------
 chan = call_ieee(ant, ant, 'B', ...
-    'CarrierFreq_Hz', 2.4e9, ...
-    'tap_spacing_s', 10e-9, ...
+    'center_freq', 2.4e9, ...
+    'tap_spacing', 10e-9, ...
     'n_users', 3, ...
-    'Dist_m', [4.0, 8.0, 2.0], ...
+    'dist', [4.0, 8.0, 2.0], ...
     'n_floors', uint64([0, 0, 1]));
 
 assertEqual(numel(chan), 3);
@@ -181,10 +181,10 @@ assertElementsAlmostEqual(d_per_path(:), expected_ns, 'absolute', 1.5);
 % ---------------------------------------------------------------------
 % 5) Seed consistency: identical seed → identical channel
 % ---------------------------------------------------------------------
-chan_a = call_ieee(ant, ant, 'B', 'CarrierFreq_Hz', 2.4e9, ...
-                   'Dist_m', 3, 'seed', 1234);
-chan_b = call_ieee(ant, ant, 'B', 'CarrierFreq_Hz', 2.4e9, ...
-                   'Dist_m', 3, 'seed', 1234);
+chan_a = call_ieee(ant, ant, 'B', 'center_freq', 2.4e9, ...
+                   'dist', 3, 'seed', 1234);
+chan_b = call_ieee(ant, ant, 'B', 'center_freq', 2.4e9, ...
+                   'dist', 3, 'seed', 1234);
 
 assertElementsAlmostEqual(chan_a(1).coeff_re,  chan_b(1).coeff_re,  'absolute', 0);
 assertElementsAlmostEqual(chan_a(1).coeff_im,  chan_b(1).coeff_im,  'absolute', 0);
@@ -201,24 +201,24 @@ end
 
 
 % ---------------------------------------------------------------------
-% 6) Wall penetration loss (NEW: n_walls / wall_loss)
+% 6) Wall penetration loss (NEW: n_walls / wall_loss_dB)
 %
 % Wall loss is a deterministic additive term in the path loss. With a
 % fixed seed and otherwise identical inputs, walls don't change path
 % structure or RNG draws, so the SF realisation is identical and the
-% total path power in dB must differ by exactly -n_walls * wall_loss.
+% total path power in dB must differ by exactly -n_walls * wall_loss_dB.
 % ---------------------------------------------------------------------
 seed = 42;
 
 % Reference: no walls
 chan_ref = call_ieee(ant, ant, 'B', ...
-    'CarrierFreq_Hz', 5.25e9, 'Dist_m', 3, 'seed', seed, ...
-    'n_walls', uint64(0), 'wall_loss', 5.0);
+    'center_freq', 5.25e9, 'dist', 3, 'seed', seed, ...
+    'n_walls', uint64(0), 'wall_loss_dB', 5.0);
 
 % 3 walls @ default 5 dB → -15 dB
 chan_w3 = call_ieee(ant, ant, 'B', ...
-    'CarrierFreq_Hz', 5.25e9, 'Dist_m', 3, 'seed', seed, ...
-    'n_walls', uint64(3), 'wall_loss', 5.0);
+    'center_freq', 5.25e9, 'dist', 3, 'seed', seed, ...
+    'n_walls', uint64(3), 'wall_loss_dB', 5.0);
 
 assertEqual(size(chan_ref(1).coeff_re, 3), size(chan_w3(1).coeff_re, 3));
 P_ref = sum(chan_ref(1).path_gain(:));
@@ -227,8 +227,8 @@ assertElementsAlmostEqual(10*log10(P_w3 / P_ref), -15.0, 'absolute', 1e-9);
 
 % 2 walls @ custom 7 dB → -14 dB
 chan_w2_7 = call_ieee(ant, ant, 'B', ...
-    'CarrierFreq_Hz', 5.25e9, 'Dist_m', 3, 'seed', seed, ...
-    'n_walls', uint64(2), 'wall_loss', 7.0);
+    'center_freq', 5.25e9, 'dist', 3, 'seed', seed, ...
+    'n_walls', uint64(2), 'wall_loss_dB', 7.0);
 
 assertEqual(size(chan_ref(1).coeff_re, 3), size(chan_w2_7(1).coeff_re, 3));
 P_w2_7 = sum(chan_w2_7(1).path_gain(:));
@@ -236,14 +236,14 @@ assertElementsAlmostEqual(10*log10(P_w2_7 / P_ref), -14.0, 'absolute', 1e-9);
 
 % Per-user n_walls vector — each user's ratio set by its own wall count
 chan3_ref = call_ieee(ant, ant, 'B', ...
-    'CarrierFreq_Hz', 5.25e9, 'n_users', 3, ...
-    'Dist_m', [3, 3, 3], 'seed', seed, ...
-    'n_walls', uint64([0, 0, 0]), 'wall_loss', 5.0);
+    'center_freq', 5.25e9, 'n_users', 3, ...
+    'dist', [3, 3, 3], 'seed', seed, ...
+    'n_walls', uint64([0, 0, 0]), 'wall_loss_dB', 5.0);
 
 chan3_w = call_ieee(ant, ant, 'B', ...
-    'CarrierFreq_Hz', 5.25e9, 'n_users', 3, ...
-    'Dist_m', [3, 3, 3], 'seed', seed, ...
-    'n_walls', uint64([1, 2, 3]), 'wall_loss', 5.0);
+    'center_freq', 5.25e9, 'n_users', 3, ...
+    'dist', [3, 3, 3], 'seed', seed, ...
+    'n_walls', uint64([1, 2, 3]), 'wall_loss_dB', 5.0);
 
 assertEqual(numel(chan3_ref), 3);
 assertEqual(numel(chan3_w),   3);
@@ -268,13 +268,13 @@ seed = 7;
 FL = @(n) 18.3 .* n.^((n + 2) ./ (n + 1) - 0.46);
 
 chan1 = call_ieee(ant, ant, 'B', ...
-    'CarrierFreq_Hz', 5.25e9, 'Dist_m', 3, ...
+    'center_freq', 5.25e9, 'dist', 3, ...
     'n_floors', uint64(1), 'seed', seed);
 P1 = sum(chan1(1).path_gain(:));
 
 for nf = [2, 3, 4]
     chan_n = call_ieee(ant, ant, 'B', ...
-        'CarrierFreq_Hz', 5.25e9, 'Dist_m', 3, ...
+        'center_freq', 5.25e9, 'dist', 3, ...
         'n_floors', uint64(nf), 'seed', seed);
     assertEqual(size(chan_n(1).coeff_re, 3), size(chan1(1).coeff_re, 3));
     Pn = sum(chan_n(1).path_gain(:));
@@ -287,14 +287,14 @@ end
 % 8) Doppler shift on the LOS path (moving station)
 % ---------------------------------------------------------------------
 fGHz                = 2.4;
-update_rate_s       = 0.0025;
+update_interval_s       = 0.0025;
 observation_time_s  = 10.0;
 speed_station_kmh   = 50.0;
 
 chan = call_ieee(ant, ant, 'A', ...
-    'CarrierFreq_Hz', fGHz * 1e9, 'tap_spacing_s', 10e-9, ...
+    'center_freq', fGHz * 1e9, 'tap_spacing', 10e-9, ...
     'observation_time', observation_time_s, ...
-    'update_rate', update_rate_s, ...
+    'update_interval', update_interval_s, ...
     'speed_station_kmh', speed_station_kmh, ...
     'speed_env_kmh', 0.0, ...
     'seed', 1234);
@@ -313,7 +313,7 @@ h_los_im = squeeze(chan(1).coeff_im(1, 1, 1, :));
 h_los    = h_los_re(:) + 1i * h_los_im(:);
 
 H  = fftshift(fft(h_los));
-df = 1 / (n_snap * update_rate_s);
+df = 1 / (n_snap * update_interval_s);
 freqs = (-floor(n_snap/2) : floor((n_snap-1)/2)) * df;
 
 [~, idx_peak] = max(abs(H));
@@ -336,9 +336,9 @@ assertElementsAlmostEqual(f_peak, fD_expected, 'absolute', 5.0);
 % ---------------------------------------------------------------------
 ant = quadriga_lib.arrayant_generate('xpol');   % 2 elements at each end
 
-common = {'CarrierFreq_Hz', 2.4e9, 'tap_spacing_s', 5e-9, ...
-          'n_users', 2, 'Doppler_effect', 40.0, 'seed', 1234, ...
-          'observation_time', 0.02, 'update_rate', 0.004, 'speed_station_kmh', 5.0};
+common = {'center_freq', 2.4e9, 'tap_spacing', 5e-9, ...
+          'n_users', 2, 'doppler_effect', 40.0, 'seed', 1234, ...
+          'observation_time', 0.02, 'update_interval', 0.004, 'speed_station_kmh', 5.0};
 
 chan_dl = call_ieee(ant, ant, 'F', 'uplink', false, common{:});
 chan_ul = call_ieee(ant, ant, 'F', 'uplink', true,  common{:});
@@ -377,6 +377,22 @@ for s = 1:6
 end
 assertElementsAlmostEqual(max_err, 0, 'absolute', 1e-10);
 
+% Override rules: NaN selects the default; out-of-range values throw; errors name the argument
+ant = quadriga_lib.arrayant_generate('omni');
+assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'kf', -1), 'quadriga_lib:CPPerror');
+assertExceptionThrown(@() call_ieee(ant, ant, 'B', 'xpr_nlos', 0), 'quadriga_lib:CPPerror');
+c0 = call_ieee(ant, ant, 'B', 'dist', 8, 'seed', 4);
+c1 = call_ieee(ant, ant, 'B', 'dist', 8, 'seed', 4, 'xpr_nlos', 2, 'dist_breakpoint', 5);
+assertEqual(c1.coeff_re, c0.coeff_re);
+assertEqual(c1.path_gain, c0.path_gain);
+msg = '';
+try
+    call_ieee(ant, ant, 'B', 'dist_breakpoint', 0);
+catch err
+    msg = err.message;
+end
+assertFalse(isempty(strfind(msg, 'dist_breakpoint')));
+
 end
 
 
@@ -385,28 +401,28 @@ end
 % =====================================================================
 function chan = call_ieee(ant_ap, ant_sta, model, varargin)
 
-% Documented defaults (match the C++ / Python signatures)
-p.CarrierFreq_Hz     = 5.25e9;
-p.tap_spacing_s      = 10e-9;
-p.n_users            = 1;
-p.observation_time   = 0.0;
-p.update_rate        = 1e-3;
-p.speed_station_kmh  = 0.0;
-p.speed_env_kmh      = 1.2;
-p.Dist_m             = 4.99;
-p.n_floors           = uint64(0);
-p.uplink             = false;
-p.offset_angles      = [];
-p.n_subpath          = 20;
-p.Doppler_effect     = 50.0;
-p.seed               = -1;
-p.KF_linear          = NaN;
-p.XPR_NLOS_linear    = NaN;
-p.SF_std_dB_LOS      = NaN;
-p.SF_std_dB_NLOS     = NaN;
-p.dBP_m              = NaN;
-p.n_walls            = uint64(0);
-p.wall_loss          = 5.0;
+% All optional inputs default to [], which selects the documented default
+p.center_freq = [];
+p.tap_spacing = [];
+p.n_users = [];
+p.observation_time = [];
+p.update_interval = [];
+p.speed_station_kmh = [];
+p.speed_env_kmh = [];
+p.dist = [];
+p.n_floors = [];
+p.uplink = [];
+p.offset_angles_deg = [];
+p.n_subpath = [];
+p.doppler_effect = [];
+p.seed = [];
+p.kf = [];
+p.xpr_nlos = [];
+p.sf_std_los_dB = [];
+p.sf_std_nlos_dB = [];
+p.dist_breakpoint = [];
+p.n_walls = [];
+p.wall_loss_dB = [];
 
 % Apply name-value overrides
 if mod(numel(varargin), 2) ~= 0
@@ -422,13 +438,13 @@ end
 
 chan = quadriga_lib.get_channels_ieee_indoor( ...
     ant_ap, ant_sta, model, ...
-    p.CarrierFreq_Hz, p.tap_spacing_s, p.n_users, ...
-    p.observation_time, p.update_rate, ...
+    p.center_freq, p.tap_spacing, p.n_users, ...
+    p.observation_time, p.update_interval, ...
     p.speed_station_kmh, p.speed_env_kmh, ...
-    p.Dist_m, p.n_floors, p.uplink, ...
-    p.offset_angles, p.n_subpath, p.Doppler_effect, p.seed, ...
-    p.KF_linear, p.XPR_NLOS_linear, ...
-    p.SF_std_dB_LOS, p.SF_std_dB_NLOS, p.dBP_m, ...
-    p.n_walls, p.wall_loss);
+    p.dist, p.n_floors, p.uplink, ...
+    p.offset_angles_deg, p.n_subpath, p.doppler_effect, p.seed, ...
+    p.kf, p.xpr_nlos, ...
+    p.sf_std_los_dB, p.sf_std_nlos_dB, p.dist_breakpoint, ...
+    p.n_walls, p.wall_loss_dB);
 
 end

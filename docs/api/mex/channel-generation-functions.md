@@ -21,52 +21,53 @@ Also in: [C++](../cpp/channel-generation-functions.md#get_channels_ieee_indoor) 
 - 2D model: azimuth angles and planar motion only, no elevation
 - Supported channel types: `A, B, C, D, E, F` (TGn definitions)
 - MU-MIMO supported (`n_users > 1`) with per-user distances/floors and optional angle offsets per TGac
-- Time-evolving channels via `observation_time`, `update_rate`, and mobility parameters; `observation_time = 0.0` yields a static channel
-- Floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz; floors add attenuation
+- Time-evolving channels via `observation_time`, `update_interval`, and mobility parameters; `observation_time = 0.0` yields a static channel
+- Floor penetration loss according to TGah for `center_freq` < 1 GHz and TGax for above 1 GHz; floors add attenuation
   (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP
 - Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls
 - Time evolution: each sub-path is rotated by `exp(+j 2 pi f_D t)`, i.e. a station moving towards the AP or a scatterer
   sees a positive Doppler shift `f_D`, as the channel of [get_channels_spherical](#get_channels_spherical) along the returned station positions
 - Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation),
   so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)
-- NAN or negative value for any override parameter restores the model default, except `XPR_NLOS_linear` (see below)
+- Override parameters (`kf`, `xpr_nlos`, `sf_std_los_dB`, `sf_std_nlos_dB`, `dist_breakpoint`): `NaN` or `[]` selects the model default
 
 ### Usage:
 ```matlab
 chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type, center_freq, ...
-   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, ...
-   dist_m, n_floors, uplink, offset_angles, n_subpath, doppler_effect, seed, ...
-   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss );
+   tap_spacing, n_users, observation_time, update_interval, speed_station_kmh, speed_env_kmh, ...
+   dist, n_floors, uplink, offset_angles_deg, n_subpath, doppler_effect, seed, ...
+   kf, xpr_nlos, sf_std_los_dB, sf_std_nlos_dB, dist_breakpoint, n_walls, wall_loss_dB );
 ```
 
 ### Inputs:
 - **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling; see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
 - **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling; see [arrayant_generate](array-antenna-functions.md#arrayant_generate)
 - **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`center_freq`** — Carrier frequency (finite); default: 5.25e9
-- **`tap_spacing_s`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9
+- **`center_freq`** — Carrier frequency in Hz (finite, above 100 MHz); default: 5.25e9
+- **`tap_spacing`** — Tap spacing in seconds; must equal `10 ns / 2^k`; default: 10e-9
 - **`n_users`** — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`; default: 1
 - **`observation_time`** — Channel observation time in seconds; must be finite; default: 0
-- **`update_rate`** — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`; default: 1e-3
+- **`update_interval`** — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`; default: 1e-3
 - **`speed_station_kmh`** — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`; default: 0
 - **`speed_env_kmh`** — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`; default: 1.2 (TGn)
-- **`dist_m`** — TX-to-RX distance(s) (finite); `[n_users]` or `[1]`; default: 4.99
+- **`dist`** — TX-to-RX distance(s) in meters (finite, > 0); `[n_users]` or `[1]`; default: 4.99
 - **`n_floors`** — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`; default: 0
 - **`uplink`** — Set `true` to generate uplink (reverse) direction; coefficients are the transpose of the downlink; default: false
-- **`offset_angles`** — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS;
-  empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`; default: [] (auto-generate)
+- **`offset_angles_deg`** — Azimuth offset angles in degrees (finite); rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; `[4, n_users]`;
+  default: `[]` (TGac auto-defaults for `n_users > 1`)
 - **`n_subpath`** — Sub-paths per cluster for Laplacian angular spread mapping; default: 20
-- **`doppler_effect`** — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); 0 disables; default: 50
+- **`doppler_effect`** — Special Doppler: models D/E use the mains frequency in Hz, model F the vehicle speed in km/h (finite, >= 0); 0 disables; default: 50
 - **`seed`** — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device; default: -1
-- **`KF_linear`** — Overrides model KF (linear scale); default:  A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; 
-  applied to first tap only; breakpoint ignored when `KF_linear >= 0`; Inf throws
-- **`XPR_NLOS_linear`** — Overrides NLOS cross-polarization ratio (linear scale); NAN or `[]` restores the default; must otherwise
-  be finite and > 0 (0, negative and Inf throw); default: XPR NLOS: 2 (3 dB)
-- **`SF_std_dB_LOS`** — Overrides LOS shadow fading std in dB (applied when d < dBP); Inf throws; default: 3 dB
-- **`SF_std_dB_NLOS`** — Overrides NLOS shadow fading std in dB (applied when d >= dBP); Inf throws; default: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
-- **`dBP_m`** — Overrides breakpoint distance; default: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
+- **`kf`** — Overrides the model KF (linear scale), finite and >= 0; default: A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0;
+  applied to first tap only; with `kf` given, the LOS path is kept also beyond the breakpoint and on other floors
+- **`xpr_nlos`** — Overrides the NLOS cross-polarization ratio (linear scale), finite and > 0;
+  default: 2 (3 dB)
+- **`sf_std_los_dB`** — Overrides the LOS shadow fading std in dB (applied when d < breakpoint), finite and >= 0; default: 3 dB, 2 dB below 1 GHz (TGah)
+- **`sf_std_nlos_dB`** — Overrides the NLOS shadow fading std in dB (applied when d >= breakpoint), finite and >= 0;
+  default: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB, each 1 dB lower below 1 GHz (TGah)
+- **`dist_breakpoint`** — Overrides the breakpoint distance in meters, finite and > 0; default: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
 - **`n_walls`** — Number of walls per user TGax models; `[n_users]` or `[1]`; default: 0
-- **`wall_loss`** — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
+- **`wall_loss_dB`** — Penetration loss for a single wall in dB (finite); TGax defines 5 or 7; default: 5
 
 ### Output:
 - **`chan`**\

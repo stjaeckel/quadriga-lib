@@ -60,52 +60,6 @@ def _total_power(ch, snap=0):
     return float(np.sum(_path_gain_at(ch, snap)))
 
 
-def _ieee_call(ant_ap, ant_sta, model, *,
-               CarrierFreq_Hz=5.25e9,
-               tap_spacing_s=10e-9,
-               n_users=1,
-               observation_time=0.0,
-               update_rate=1e-3,
-               speed_station_kmh=0.0,
-               speed_env_kmh=1.2,
-               Dist_m=None,
-               n_floors=None,
-               uplink=False,
-               offset_angles=None,
-               n_subpath=20,
-               Doppler_effect=50.0,
-               seed=-1,
-               KF_linear=np.nan,
-               XPR_NLOS_linear=np.nan,
-               SF_std_dB_LOS=np.nan,
-               SF_std_dB_NLOS=np.nan,
-               dBP_m=np.nan,
-               n_walls=None,
-               wall_loss=5.0,
-               stack=False):
-    """Wrapper around channel.ieee_indoor that supplies the 25 positional
-    arguments by name with the documented defaults."""
-    if Dist_m is None:
-        Dist_m = np.array([4.99])
-    if n_floors is None:
-        n_floors = np.array([0], dtype=np.uint64)
-    if offset_angles is None:
-        offset_angles = np.empty((0, 0))
-    if n_walls is None:
-        n_walls = np.array([0], dtype=np.uint64)
-
-    return channel.ieee_indoor(
-        ant_ap, ant_sta, model,
-        CarrierFreq_Hz=CarrierFreq_Hz, tap_spacing_s=tap_spacing_s, n_users=n_users,
-        observation_time=observation_time, update_rate=update_rate,
-        speed_station_kmh=speed_station_kmh, speed_env_kmh=speed_env_kmh,
-        Dist_m=Dist_m, n_floors=n_floors, uplink=uplink,
-        offset_angles=offset_angles, n_subpath=n_subpath, Doppler_effect=Doppler_effect, seed=seed,
-        KF_linear=KF_linear, XPR_NLOS_linear=XPR_NLOS_linear,
-        SF_std_dB_LOS=SF_std_dB_LOS, SF_std_dB_NLOS=SF_std_dB_NLOS, dBP_m=dBP_m,
-        n_walls=n_walls, wall_loss=wall_loss, stack=stack)
-
-
 # ============================================================================
 # Tests
 # ============================================================================
@@ -183,10 +137,10 @@ class test_case(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_ieee_chan_a_2user_default_offsets(self):
         ant = arrayant.generate("omni", 30.0)
-        chan = _ieee_call(ant, ant, "A",
-                          CarrierFreq_Hz=2.4e9,
-                          tap_spacing_s=1e-8,
-                          n_users=2)
+        chan = channel.ieee_indoor(ant, ant, "A",
+                                   center_freq=2.4e9,
+                                   tap_spacing=1e-8,
+                                   n_users=2)
 
         self.assertEqual(len(chan), 2)
 
@@ -221,14 +175,14 @@ class test_case(unittest.TestCase):
         ant = arrayant.generate("omni", 30.0)
         offset_angles = np.full((4, 2), 100.0)
 
-        chan = _ieee_call(ant, ant, "A",
-                          CarrierFreq_Hz=2.4e9,
-                          tap_spacing_s=1e-8,
-                          n_users=2,
-                          Dist_m=np.array([1.99]),
-                          offset_angles=offset_angles,
-                          n_subpath=100,
-                          seed=11)
+        chan = channel.ieee_indoor(ant, ant, "A",
+                                   center_freq=2.4e9,
+                                   tap_spacing=1e-8,
+                                   n_users=2,
+                                   dist=np.array([1.99]),
+                                   offset_angles_deg=offset_angles,
+                                   n_subpath=100,
+                                   seed=11)
 
         self.assertEqual(len(chan), 2)
 
@@ -250,12 +204,12 @@ class test_case(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_ieee_chan_b_3user_floors_distances(self):
         ant = arrayant.generate("omni", 30.0)
-        chan = _ieee_call(ant, ant, "B",
-                          CarrierFreq_Hz=2.4e9,
-                          tap_spacing_s=10e-9,
-                          n_users=3,
-                          Dist_m=np.array([4.0, 8.0, 2.0]),
-                          n_floors=np.array([0, 0, 1], dtype=np.uint64))
+        chan = channel.ieee_indoor(ant, ant, "B",
+                                   center_freq=2.4e9,
+                                   tap_spacing=10e-9,
+                                   n_users=3,
+                                   dist=np.array([4.0, 8.0, 2.0]),
+                                   n_floors=np.array([0, 0, 1], dtype=np.uint64))
 
         self.assertEqual(len(chan), 3)
 
@@ -313,13 +267,13 @@ class test_case(unittest.TestCase):
     def test_ieee_chan_seed_consistency(self):
         ant = arrayant.generate("omni", 30.0)
 
-        kw = dict(CarrierFreq_Hz=2.4e9,
-                  tap_spacing_s=10e-9,
-                  Dist_m=np.array([3.0]),
+        kw = dict(center_freq=2.4e9,
+                  tap_spacing=10e-9,
+                  dist=np.array([3.0]),
                   seed=1234)
 
-        chan_a = _ieee_call(ant, ant, "B", **kw)
-        chan_b = _ieee_call(ant, ant, "B", **kw)
+        chan_a = channel.ieee_indoor(ant, ant, "B", **kw)
+        chan_b = channel.ieee_indoor(ant, ant, "B", **kw)
 
         npt.assert_array_equal(_coeff_at(chan_a[0], 0), _coeff_at(chan_b[0], 0))
         npt.assert_array_equal(_delay_at(chan_a[0], 0), _delay_at(chan_b[0], 0))
@@ -333,27 +287,27 @@ class test_case(unittest.TestCase):
         fixed seed and otherwise identical inputs (Dist, n_floors, model,
         frequency), adding walls neither changes the path structure nor the SF
         realisation, so the total path power in dB must differ from the
-        reference by exactly -n_walls * wall_loss for every user."""
+        reference by exactly -n_walls * wall_loss_dB for every user."""
         ant = arrayant.generate("omni", 30.0)
         seed = 42
 
-        common = dict(CarrierFreq_Hz=5.25e9,
-                      tap_spacing_s=10e-9,
-                      Dist_m=np.array([3.0]),
+        common = dict(center_freq=5.25e9,
+                      tap_spacing=10e-9,
+                      dist=np.array([3.0]),
                       n_floors=np.array([0], dtype=np.uint64),
                       seed=seed)
 
         # Reference: no walls
-        chan_ref = _ieee_call(ant, ant, "B",
-                              n_walls=np.array([0], dtype=np.uint64),
-                              wall_loss=5.0,
-                              **common)
+        chan_ref = channel.ieee_indoor(ant, ant, "B",
+                                       n_walls=np.array([0], dtype=np.uint64),
+                                       wall_loss_dB=5.0,
+                                       **common)
 
         # 3 walls @ default 5 dB → -15 dB
-        chan_w3 = _ieee_call(ant, ant, "B",
-                             n_walls=np.array([3], dtype=np.uint64),
-                             wall_loss=5.0,
-                             **common)
+        chan_w3 = channel.ieee_indoor(ant, ant, "B",
+                                      n_walls=np.array([3], dtype=np.uint64),
+                                      wall_loss_dB=5.0,
+                                      **common)
 
         self.assertEqual(_n_path(chan_ref[0]), _n_path(chan_w3[0]))
         P_ref = _total_power(chan_ref[0])
@@ -361,10 +315,10 @@ class test_case(unittest.TestCase):
         self.assertLess(abs(10.0 * np.log10(P_w3 / P_ref) + 15.0), 1e-9)
 
         # 2 walls @ custom 7 dB → -14 dB
-        chan_w2_7 = _ieee_call(ant, ant, "B",
-                               n_walls=np.array([2], dtype=np.uint64),
-                               wall_loss=7.0,
-                               **common)
+        chan_w2_7 = channel.ieee_indoor(ant, ant, "B",
+                                        n_walls=np.array([2], dtype=np.uint64),
+                                        wall_loss_dB=7.0,
+                                        **common)
 
         self.assertEqual(_n_path(chan_ref[0]), _n_path(chan_w2_7[0]))
         P_w2_7 = _total_power(chan_w2_7[0])
@@ -372,22 +326,22 @@ class test_case(unittest.TestCase):
 
         # Per-user n_walls vector with same seed — each user's ratio is
         # determined purely by its own wall count.
-        common3 = dict(CarrierFreq_Hz=5.25e9,
-                       tap_spacing_s=10e-9,
+        common3 = dict(center_freq=5.25e9,
+                       tap_spacing=10e-9,
                        n_users=3,
-                       Dist_m=np.array([3.0, 3.0, 3.0]),
+                       dist=np.array([3.0, 3.0, 3.0]),
                        n_floors=np.array([0, 0, 0], dtype=np.uint64),
                        seed=seed)
 
-        chan3_ref = _ieee_call(ant, ant, "B",
-                               n_walls=np.array([0, 0, 0], dtype=np.uint64),
-                               wall_loss=5.0,
-                               **common3)
+        chan3_ref = channel.ieee_indoor(ant, ant, "B",
+                                        n_walls=np.array([0, 0, 0], dtype=np.uint64),
+                                        wall_loss_dB=5.0,
+                                        **common3)
 
-        chan3_w = _ieee_call(ant, ant, "B",
-                             n_walls=np.array([1, 2, 3], dtype=np.uint64),
-                             wall_loss=5.0,
-                             **common3)
+        chan3_w = channel.ieee_indoor(ant, ant, "B",
+                                      n_walls=np.array([1, 2, 3], dtype=np.uint64),
+                                      wall_loss_dB=5.0,
+                                      **common3)
 
         self.assertEqual(len(chan3_ref), 3)
         self.assertEqual(len(chan3_w), 3)
@@ -415,12 +369,12 @@ class test_case(unittest.TestCase):
             return 18.3 * (n ** ((n + 2.0) / (n + 1.0) - 0.46))
 
         def run(nf):
-            return _ieee_call(ant, ant, "B",
-                              CarrierFreq_Hz=5.25e9,
-                              tap_spacing_s=10e-9,
-                              Dist_m=np.array([3.0]),
-                              n_floors=np.array([nf], dtype=np.uint64),
-                              seed=seed)
+            return channel.ieee_indoor(ant, ant, "B",
+                                       center_freq=5.25e9,
+                                       tap_spacing=10e-9,
+                                       dist=np.array([3.0]),
+                                       n_floors=np.array([nf], dtype=np.uint64),
+                                       seed=seed)
 
         chan1 = run(1)
         P1 = _total_power(chan1[0])
@@ -440,20 +394,20 @@ class test_case(unittest.TestCase):
         the LOS axis the LOS path coefficient evolves as exp(+j 2π f_D t), so an
         FFT of coeff[s][0,0,0] over the snapshots peaks at +f_D = v * fc / c."""
         fGHz = 2.4
-        update_rate_s = 0.0025
+        update_interval_s = 0.0025
         observation_time_s = 10.0
         speed_station_kmh = 50.0
 
         ant = arrayant.generate("omni", 30.0)
 
-        chan = _ieee_call(ant, ant, "A",
-                          CarrierFreq_Hz=fGHz * 1e9,
-                          tap_spacing_s=10e-9,
-                          observation_time=observation_time_s,
-                          update_rate=update_rate_s,
-                          speed_station_kmh=speed_station_kmh,
-                          speed_env_kmh=0.0,
-                          seed=1234)
+        chan = channel.ieee_indoor(ant, ant, "A",
+                                   center_freq=fGHz * 1e9,
+                                   tap_spacing=10e-9,
+                                   observation_time=observation_time_s,
+                                   update_interval=update_interval_s,
+                                   speed_station_kmh=speed_station_kmh,
+                                   speed_env_kmh=0.0,
+                                   seed=1234)
 
         ch = chan[0]
         n_snap = _n_snap(ch)
@@ -464,7 +418,7 @@ class test_case(unittest.TestCase):
                          dtype=np.complex128)
 
         H = np.fft.fftshift(np.fft.fft(h_los))
-        f = np.fft.fftshift(np.fft.fftfreq(n_snap, d=update_rate_s))
+        f = np.fft.fftshift(np.fft.fftfreq(n_snap, d=update_interval_s))
 
         f_peak = f[int(np.argmax(np.abs(H)))]
 
@@ -483,17 +437,17 @@ class test_case(unittest.TestCase):
         for a moving station."""
         ant = arrayant.generate("xpol", 30.0)  # 2 elements at each end
 
-        common = dict(CarrierFreq_Hz=2.4e9,
-                      tap_spacing_s=5e-9,
+        common = dict(center_freq=2.4e9,
+                      tap_spacing=5e-9,
                       n_users=2,
-                      Doppler_effect=40.0,
+                      doppler_effect=40.0,
                       observation_time=0.02,
-                      update_rate=0.004,
+                      update_interval=0.004,
                       speed_station_kmh=5.0,
                       seed=1234)
 
-        chan_dl = _ieee_call(ant, ant, "F", uplink=False, **common)
-        chan_ul = _ieee_call(ant, ant, "F", uplink=True,  **common)
+        chan_dl = channel.ieee_indoor(ant, ant, "F", uplink=False, **common)
+        chan_ul = channel.ieee_indoor(ant, ant, "F", uplink=True,  **common)
 
         self.assertEqual(len(chan_dl), 2)
         self.assertEqual(len(chan_ul), 2)
@@ -533,12 +487,12 @@ class test_case(unittest.TestCase):
         a single array with the snapshot as the trailing axis. Tested on a
         time-evolving channel so n_snap > 1."""
         ant = arrayant.generate("xpol", 30.0)  # 2x2
-        common = dict(CarrierFreq_Hz=2.4e9, tap_spacing_s=10e-9,
-                      observation_time=0.1, update_rate=1e-3,
+        common = dict(center_freq=2.4e9, tap_spacing=10e-9,
+                      observation_time=0.1, update_interval=1e-3,
                       speed_station_kmh=30.0, seed=2024)
 
-        chan_list = _ieee_call(ant, ant, "B", stack=False, **common)
-        chan_stk = _ieee_call(ant, ant, "B", stack=True, **common)
+        chan_list = channel.ieee_indoor(ant, ant, "B", stack=False, **common)
+        chan_stk = channel.ieee_indoor(ant, ant, "B", stack=True, **common)
 
         self.assertEqual(len(chan_list), 1)
         self.assertEqual(len(chan_stk), 1)
@@ -600,14 +554,14 @@ class test_case(unittest.TestCase):
         is stacked independently. Static channel here, so n_snap = 1 and the
         trailing axis has length 1."""
         ant = arrayant.generate("omni", 30.0)
-        common = dict(CarrierFreq_Hz=2.4e9, tap_spacing_s=10e-9,
+        common = dict(center_freq=2.4e9, tap_spacing=10e-9,
                       n_users=3,
-                      Dist_m=np.array([3.0, 5.0, 7.0]),
+                      dist=np.array([3.0, 5.0, 7.0]),
                       n_floors=np.array([0, 0, 0], dtype=np.uint64),
                       seed=321)
 
-        chan_list = _ieee_call(ant, ant, "B", stack=False, **common)
-        chan_stk = _ieee_call(ant, ant, "B", stack=True, **common)
+        chan_list = channel.ieee_indoor(ant, ant, "B", stack=False, **common)
+        chan_stk = channel.ieee_indoor(ant, ant, "B", stack=True, **common)
 
         self.assertEqual(len(chan_list), 3)
         self.assertEqual(len(chan_stk), 3)
@@ -643,6 +597,40 @@ class test_case(unittest.TestCase):
         self.assertEqual(set(c.keys()), {'name', 'tx_pos', 'rx_pos', 'tx_orientation', 'rx_orientation',
                                          'coeff', 'delay', 'path_gain', 'center_freq', 'initial_position'})
 
+
+    def test_argument_passing(self):
+        """Antennas and channel_type are mandatory; flags take a bool or None; containers None or arrays."""
+        ant = arrayant.generate('omni')
+        with self.assertRaises(TypeError):
+            channel.ieee_indoor(channel_type='B')
+        with self.assertRaises(TypeError):
+            channel.ieee_indoor(ant, ant)
+
+        ref = channel.ieee_indoor(ant, ant, 'B', seed=3)[0]
+        c = channel.ieee_indoor(ant, ant, 'B', 5.25e9, seed=3)[0]  # center_freq by position
+        npt.assert_array_equal(c['coeff'][0], ref['coeff'][0])
+        for kw in (dict(uplink=None, stack=None), dict(dist=np.array([4.99]), n_floors=np.array([0]), n_walls=[0]),
+                   dict(dist=None, n_floors=None, offset_angles_deg=None, n_walls=None)):
+            c = channel.ieee_indoor(ant, ant, 'B', seed=3, **kw)[0]
+            npt.assert_array_equal(c['coeff'][0], ref['coeff'][0])
+        for name in ('uplink', 'stack'):
+            with self.assertRaisesRegex(TypeError, name):
+                channel.ieee_indoor(ant, ant, 'B', **{name: 2.5})
+
+    def test_override_default_rules(self):
+        """NaN selects the default; kf and the SF spreads must be >= 0, xpr_nlos and dist_breakpoint > 0."""
+        ant = arrayant.generate('omni')
+        for name in ('kf', 'sf_std_los_dB', 'sf_std_nlos_dB', 'xpr_nlos', 'dist_breakpoint'):
+            for v in (-1.0, np.inf):
+                with self.assertRaisesRegex(ValueError, name):
+                    channel.ieee_indoor(ant, ant, 'B', **{name: v})
+        for name in ('xpr_nlos', 'dist_breakpoint'):
+            with self.assertRaisesRegex(ValueError, name):
+                channel.ieee_indoor(ant, ant, 'B', **{name: 0.0})
+        ref = channel.ieee_indoor(ant, ant, 'B', dist=np.array([8.0]), seed=4)[0]
+        c = channel.ieee_indoor(ant, ant, 'B', dist=np.array([8.0]), seed=4, xpr_nlos=2.0, dist_breakpoint=5.0)[0]
+        npt.assert_array_equal(c['coeff'][0], ref['coeff'][0])
+        npt.assert_array_equal(c['path_gain'][0], ref['path_gain'][0])
 
 if __name__ == '__main__':
     unittest.main()

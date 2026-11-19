@@ -46,54 +46,58 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
 {
     // Input validation
     if (n_users == 0)
-        throw std::invalid_argument("Number of users cannot be 0.");
+        throw std::invalid_argument("Input 'n_users' cannot be 0.");
 
     if (n_subpath == 0)
-        throw std::invalid_argument("Number of sub-paths cannot be 0.");
+        throw std::invalid_argument("Input 'n_subpath' cannot be 0.");
 
     if (Dist_m.n_elem == 0)
         Dist_m = {4.99};
     if (Dist_m.n_elem != 1 && Dist_m.n_elem != n_users)
-        throw std::invalid_argument("Dist_m must be a vector of length 1 or length n_users.");
+        throw std::invalid_argument("Input 'dist' must have length 1 or n_users.");
     if (!Dist_m.is_finite())
-        throw std::invalid_argument("TX-RX distance must be finite.");
+        throw std::invalid_argument("Input 'dist' must be finite.");
     if (arma::any(Dist_m <= 0.0))
-        throw std::invalid_argument("TX-RX distance cannot be 0 or negative.");
+        throw std::invalid_argument("Input 'dist' must be larger than 0.");
     if (Dist_m.n_elem == 1 && n_users != 1)
         Dist_m = arma::vec(n_users, arma::fill::value(Dist_m[0]));
 
     if (n_floors.n_elem == 0)
         n_floors = {0};
     if (n_floors.n_elem != 1 && n_floors.n_elem != n_users)
-        throw std::invalid_argument("Number of floors must be a vector of length 1 or length n_users.");
+        throw std::invalid_argument("Input 'n_floors' must have length 1 or n_users.");
     if (arma::any(n_floors > 4))
-        throw std::invalid_argument("Number of floors cannot exceed 4.");
+        throw std::invalid_argument("Input 'n_floors' cannot exceed 4.");
     if (n_floors.n_elem == 1 && n_users != 1)
         n_floors = arma::uvec(n_users, arma::fill::value(n_floors[0]));
 
     if (n_walls.n_elem == 0)
         n_walls = {0};
     if (n_walls.n_elem != 1 && n_walls.n_elem != n_users)
-        throw std::invalid_argument("Number of walls must be a vector of length 1 or length n_users.");
+        throw std::invalid_argument("Input 'n_walls' must have length 1 or n_users.");
     if (n_walls.n_elem == 1 && n_users != 1)
         n_walls = arma::uvec(n_users, arma::fill::value(n_walls[0]));
 
     if (!std::isfinite(CarrierFreq_Hz))
-        throw std::invalid_argument("Carrier frequency must be finite.");
+        throw std::invalid_argument("Input 'center_freq' must be finite.");
     if (CarrierFreq_Hz <= 0.1e9)
-        throw std::invalid_argument("Invalid carrier frequency, mut be at least 100 MHz.");
+        throw std::invalid_argument("Input 'center_freq' must be above 100 MHz.");
 
     // Tap spacing 10 ns / 2^k (k >= 0), relative tolerance 1e-9
     double tap_spacing_ns = tap_spacing_s * 1e9;
     double bw_factor_d = (std::isfinite(tap_spacing_ns) && tap_spacing_ns > 0.0) ? std::round(10.0 / tap_spacing_ns) : 0.0;
     if (!(bw_factor_d >= 1.0 && bw_factor_d <= 9007199254740992.0)) // 1 to 2^53
-        throw std::invalid_argument("Tap spacing must be equal to 10 ns divided by a power of 2.");
+        throw std::invalid_argument("Input 'tap_spacing' must be equal to 10 ns divided by a power of 2.");
     arma::uword bw_factor = (arma::uword)bw_factor_d; // bandwidth expansion factor
     if ((bw_factor & (bw_factor - 1)) != 0 || std::abs(tap_spacing_ns * bw_factor_d - 10.0) > 1.0e-8)
-        throw std::invalid_argument("Tap spacing must be equal to 10 ns divided by a power of 2.");
+        throw std::invalid_argument("Input 'tap_spacing' must be equal to 10 ns divided by a power of 2.");
 
     if (offset_angles.n_elem != 0 && (offset_angles.n_rows != 4 || offset_angles.n_cols != n_users))
-        throw std::invalid_argument("Offset angles must be empty or have size [4, n_users].");
+        throw std::invalid_argument("Input 'offset_angles_deg' must be empty or have size [4, n_users].");
+    if (!offset_angles.is_finite())
+        throw std::invalid_argument("Input 'offset_angles_deg' must be finite.");
+    if (!std::isfinite(wall_loss))
+        throw std::invalid_argument("Input 'wall_loss_dB' must be finite.");
 
     // ---------- SCENARIO PARAMETERS ----------
 
@@ -268,30 +272,30 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         KF_linear = 4.0; // 6 dB
     }
     else
-        throw std::invalid_argument("Invalid ChannelType: " + ChannelType);
+        throw std::invalid_argument("Input 'channel_type' must be one of A, B, C, D, E, F.");
 
     // Lower SF by 1 dB for frequencies below 1 GHz
     // See: IEEE 802.11-968r4 TGah Channel Model, Table 2
     if (CarrierFreq_Hz < 1.0e9)
         SF_std_dB_LOS -= 1.0, SF_std_dB_NLOS -= 1.0;
 
-    // XPR = 0 (no co-polar power) and XPR = Inf (no cross-polar power) have no Jones matrix; NAN selects the default
-    if (!std::isnan(XPR_NLOS_linear_overwrite) && !(XPR_NLOS_linear_overwrite > 0.0 && std::isfinite(XPR_NLOS_linear_overwrite)))
-        throw std::invalid_argument("XPR_NLOS_linear must be NAN (model default) or a finite value larger than 0.");
-
-    // An infinite KF removes all NLOS paths and an infinite SF spread gives NaN path powers; NAN selects the default
-    if (std::isinf(KF_linear_overwrite) || std::isinf(SF_std_dB_LOS_overwrite) || std::isinf(SF_std_dB_NLOS_overwrite))
-        throw std::invalid_argument("KF_linear, SF_std_dB_LOS and SF_std_dB_NLOS must be NAN (model default) or finite.");
-
-    // Apply parameter overwrites
-    KF_linear_overwrite = (KF_linear_overwrite < 0.0) ? NAN : KF_linear_overwrite;
-    dBP_m_overwrite = (dBP_m_overwrite < 0.0) ? NAN : dBP_m_overwrite;
-
-    KF_linear = std::isnan(KF_linear_overwrite) ? KF_linear : KF_linear_overwrite;
-    XPR_NLOS_linear = std::isnan(XPR_NLOS_linear_overwrite) ? XPR_NLOS_linear : XPR_NLOS_linear_overwrite;
-    SF_std_dB_LOS = std::isnan(SF_std_dB_LOS_overwrite) ? SF_std_dB_LOS : SF_std_dB_LOS_overwrite;
-    SF_std_dB_NLOS = std::isnan(SF_std_dB_NLOS_overwrite) ? SF_std_dB_NLOS : SF_std_dB_NLOS_overwrite;
-    dBP_m = std::isnan(dBP_m_overwrite) ? dBP_m : dBP_m_overwrite;
+    // Override rules: NAN selects the model default; any other value must be finite and >= 0 (KF, SF spreads) or > 0
+    // (XPR, breakpoint distance). An infinite KF removes all NLOS paths, an infinite SF spread gives NaN path powers,
+    // XPR = 0 or Inf has no Jones matrix and a zero breakpoint gives log10(0).
+    auto apply_override = [](double value, double model_default, bool positive, const char *name)
+    {
+        if (std::isnan(value))
+            return model_default;
+        if (!std::isfinite(value) || value < 0.0 || (positive && value == 0.0))
+            throw std::invalid_argument(std::string("Input '") + name + "' must be NaN (model default) or finite and " +
+                                        (positive ? "> 0." : ">= 0."));
+        return value;
+    };
+    KF_linear = apply_override(KF_linear_overwrite, KF_linear, false, "kf");
+    SF_std_dB_LOS = apply_override(SF_std_dB_LOS_overwrite, SF_std_dB_LOS, false, "sf_std_los_dB");
+    SF_std_dB_NLOS = apply_override(SF_std_dB_NLOS_overwrite, SF_std_dB_NLOS, false, "sf_std_nlos_dB");
+    XPR_NLOS_linear = apply_override(XPR_NLOS_linear_overwrite, XPR_NLOS_linear, true, "xpr_nlos");
+    dBP_m = apply_override(dBP_m_overwrite, dBP_m, true, "dist_breakpoint");
 
     // Get the number of paths and clusters
     arma::uword n_cluster = power_clst_dB.n_rows;

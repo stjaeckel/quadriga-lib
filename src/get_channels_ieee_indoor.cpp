@@ -18,73 +18,73 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 - 2D model: azimuth angles and planar motion only, no elevation
 - Supported channel types: `A, B, C, D, E, F` (TGn definitions)
 - MU-MIMO supported (`n_users > 1`) with per-user distances/floors and optional angle offsets per TGac
-- Time-evolving channels via `observation_time`, `update_rate`, and mobility parameters; `observation_time = 0.0` yields a static channel
-- Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when `KF_linear >= 0`
-- Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
+- Time-evolving channels via `observation_time`, `update_interval`, and mobility parameters; `observation_time = 0.0` yields a static channel
+- Override parameters (`kf`, `xpr_nlos`, `sf_std_los_dB`, `sf_std_nlos_dB`, `dist_breakpoint`): `NAN` selects the model default
+- Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; with `kf` given, the LOS path is kept also beyond the breakpoint and on other floors
+- Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB; both SF defaults 1 dB lower below 1 GHz (TGah)
 - Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
-- Floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz; floors add attenuation
+- Floor penetration loss according to TGah for `center_freq` < 1 GHz and TGax for above 1 GHz; floors add attenuation
   (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP
 - Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls
 - Time evolution: each sub-path is rotated by `exp(+j 2 pi f_D t)`, i.e. a station moving towards the AP or a scatterer
   sees a positive Doppler shift `f_D`, as the channel of [[get_channels_spherical]] along the returned station positions
 - Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation),
   so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)
-- NAN or negative value for any override parameter restores the model default, except `XPR_NLOS_linear` (see below)
 
 ## Declaration:
 ```
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoor(
     const quadriga_lib::arrayant<double> &ap_array,
     const quadriga_lib::arrayant<double> &sta_array,
-    std::string ChannelType,
-    double CarrierFreq_Hz = 5.25e9,
-    double tap_spacing_s = 10.0e-9,
+    const std::string &channel_type,
+    double center_freq = 5.25e9,
+    double tap_spacing = 10.0e-9,
     arma::uword n_users = 1,
     double observation_time = 0.0,
-    double update_rate = 1.0e-3,
+    double update_interval = 1.0e-3,
     double speed_station_kmh = 0.0,
     double speed_env_kmh = 1.2,
-    arma::vec Dist_m = {4.99},
-    arma::uvec n_floors = {0},
+    const arma::vec &dist = arma::vec(),
+    const arma::uvec &n_floors = arma::uvec(),
     bool uplink = false,
-    arma::mat offset_angles = {},
+    const arma::mat &offset_angles_deg = arma::mat(),
     arma::uword n_subpath = 20,
-    double Doppler_effect = 50.0,
+    double doppler_effect = 50.0,
     arma::sword seed = -1,
-    double KF_linear = NAN,
-    double XPR_NLOS_linear = NAN,
-    double SF_std_dB_LOS = NAN,
-    double SF_std_dB_NLOS = NAN,
-    double dBP_m = NAN,
-    arma::uvec n_walls = {0},
-    double wall_loss = 5.0);
+    double kf = NAN,
+    double xpr_nlos = NAN,
+    double sf_std_los_dB = NAN,
+    double sf_std_nlos_dB = NAN,
+    double dist_breakpoint = NAN,
+    const arma::uvec &n_walls = arma::uvec(),
+    double wall_loss_dB = 5.0);
 ```
 
 ## Inputs:
 - **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [[arrayant]]
 - **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [[arrayant]]
-- **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency (finite)
-- **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
+- **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
+- **`center_freq`** *(optional)* — Carrier frequency in Hz (finite, above 100 MHz)
+- **`tap_spacing`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
 - **`n_users`** *(optional)* — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`
 - **`observation_time`** *(optional)* — Channel observation time in seconds; must be finite
-- **`update_rate`** *(optional)* — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`
+- **`update_interval`** *(optional)* — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`
 - **`speed_station_kmh`** *(optional)* — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`
 - **`speed_env_kmh`** *(optional)* — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`
-- **`Dist_m`** *(optional)* — TX-to-RX distance(s) (finite); `[n_users]` or `[1]`
-- **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`
+- **`dist`** *(optional)* — TX-to-RX distance(s) in meters (finite, > 0); `[n_users]` or `[1]`; empty: 4.99 m
+- **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`; empty: 0
 - **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction; coefficients are the transpose of the downlink
-- **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
+- **`offset_angles_deg`** *(optional)* — Azimuth offset angles in degrees (finite); rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; `[4, n_users]`; empty uses TGac auto-defaults for `n_users > 1`
 - **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
-- **`Doppler_effect`** *(optional)* — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); `0.0` disables
+- **`doppler_effect`** *(optional)* — Special Doppler: models D/E use the mains frequency in Hz, model F the vehicle speed in km/h (finite, >= 0); 0 disables
 - **`seed`** *(optional)* — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device
-- **`KF_linear`** *(optional)* — Overrides model KF (linear scale); NAN or negative restores model default; Inf throws
-- **`XPR_NLOS_linear`** *(optional)* — Overrides NLOS cross-polarization ratio (linear scale); NAN restores model default; must otherwise be finite and > 0 (0, negative and Inf throw)
-- **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default; Inf throws
-- **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default; Inf throws
-- **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default
-- **`n_walls`** *(optional)* — Number of walls per user TGax models; `[n_users]` or `[1]`
-- **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
+- **`kf`** *(optional)* — Overrides the model KF (linear scale); otherwise finite and >= 0
+- **`xpr_nlos`** *(optional)* — Overrides the NLOS cross-polarization ratio (linear scale), finite and > 0
+- **`sf_std_los_dB`** *(optional)* — Overrides the LOS shadow fading std in dB (applied when d < breakpoint); otherwise finite and >= 0
+- **`sf_std_nlos_dB`** *(optional)* — Overrides the NLOS shadow fading std in dB (applied when d >= breakpoint); otherwise finite and >= 0
+- **`dist_breakpoint`** *(optional)* — Overrides the breakpoint distance in meters, finite and > 0
+- **`n_walls`** *(optional)* — Number of walls per user TGax models; `[n_users]` or `[1]`; empty: 0
+- **`wall_loss_dB`** *(optional)* — Penetration loss for a single wall in dB (finite); TGax defines 5.0 (default) or 7.0
 
 ## Returns:
 - `std::vector<quadriga_lib::channel<double>>` of length `n_users`; each entry is one user's channel realization with direction set by `uplink`
@@ -101,59 +101,61 @@ MD!*/
 std::vector<quadriga_lib::channel<double>>
 quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_array,
                                        const quadriga_lib::arrayant<double> &sta_array,
-                                       std::string ChannelType,
-                                       double CarrierFreq_Hz,
-                                       double tap_spacing_s,
+                                       const std::string &channel_type,
+                                       double center_freq,
+                                       double tap_spacing,
                                        arma::uword n_users,
                                        double observation_time,
-                                       double update_rate,
+                                       double update_interval,
                                        double speed_station_kmh,
                                        double speed_env_kmh,
-                                       arma::vec Dist_m,
-                                       arma::uvec n_floors,
+                                       const arma::vec &dist,
+                                       const arma::uvec &n_floors,
                                        bool uplink,
-                                       arma::mat offset_angles,
+                                       const arma::mat &offset_angles_deg,
                                        arma::uword n_subpath,
-                                       double Doppler_effect,
+                                       double doppler_effect,
                                        arma::sword seed,
-                                       double KF_linear,
-                                       double XPR_NLOS_linear,
-                                       double SF_std_dB_LOS,
-                                       double SF_std_dB_NLOS,
-                                       double dBP_m,
-                                       arma::uvec n_walls,
-                                       double wall_loss)
+                                       double kf,
+                                       double xpr_nlos,
+                                       double sf_std_los_dB,
+                                       double sf_std_nlos_dB,
+                                       double dist_breakpoint,
+                                       const arma::uvec &n_walls,
+                                       double wall_loss_dB)
 
 {
     // Check if the antennas are valid
     auto error_message = qd_arrayant_is_valid_quick(ap_array);
     if (error_message.length() != 0)
     {
-        error_message = "Transmit antenna: " + error_message;
+        error_message = "Input 'ap_array' is not valid: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
     error_message = qd_arrayant_is_valid_quick(sta_array);
     if (error_message.length() != 0)
     {
-        error_message = "Receive antenna: " + error_message;
+        error_message = "Input 'sta_array' is not valid: " + error_message;
         throw std::invalid_argument(error_message.c_str());
     }
 
     if (!std::isfinite(observation_time) || observation_time < 0.0)
-        throw std::invalid_argument("Observation time must be finite and cannot be negative.");
+        throw std::invalid_argument("Input 'observation_time' must be finite and >= 0.");
 
-    if (!std::isfinite(update_rate) || update_rate <= 0.0)
-        throw std::invalid_argument("Update rate must be finite and larger than 0.");
+    if (!std::isfinite(update_interval) || update_interval <= 0.0)
+        throw std::invalid_argument("Input 'update_interval' must be finite and larger than 0.");
 
     if (!std::isfinite(speed_station_kmh))
-        throw std::invalid_argument("Station speed must be finite.");
+        throw std::invalid_argument("Input 'speed_station_kmh' must be finite.");
     if (!std::isfinite(speed_env_kmh))
-        throw std::invalid_argument("Environment speed must be finite.");
+        throw std::invalid_argument("Input 'speed_env_kmh' must be finite.");
+    if (!std::isfinite(doppler_effect) || doppler_effect < 0.0)
+        throw std::invalid_argument("Input 'doppler_effect' must be finite and >= 0.");
 
     // Get the number of snapshots
-    double n_snap_d = std::floor(observation_time / update_rate);
+    double n_snap_d = std::floor(observation_time / update_interval);
     if (!(n_snap_d < 4294967295.0))
-        throw std::invalid_argument("Too many snapshots: observation_time / update_rate must be below 2^32 - 1.");
+        throw std::invalid_argument("Too many snapshots: observation_time / update_interval must be below 2^32 - 1.");
     arma::uword n_snap = 1 + (arma::uword)n_snap_d;
     long long n_snap_ll = (long long)n_snap;
 
@@ -169,14 +171,13 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     std::vector<arma::cube> M;            // Size: Size: [8, n_subpath, n_path_out]
 
     qd_ieee_indoor_param(rx_pos, rx_orientation, aod, aoa, pow, delay, M,
-                         ChannelType, CarrierFreq_Hz, tap_spacing_s, n_users, Dist_m, n_floors,
-                         offset_angles, n_subpath, seed,
-                         KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss);
+                         channel_type, center_freq, tap_spacing, n_users, dist, n_floors, offset_angles_deg, n_subpath, seed,
+                         kf, xpr_nlos, sf_std_los_dB, sf_std_nlos_dB, dist_breakpoint, n_walls, wall_loss_dB);
 
     arma::uword n_tx = ap_array.n_ports();
     arma::uword n_rx = sta_array.n_ports();
 
-    arma::uword bw_factor = (arma::uword)std::round(10.0e-9 / tap_spacing_s); // bandwidth expansion factor
+    arma::uword bw_factor = (arma::uword)std::round(10.0e-9 / tap_spacing); // bandwidth expansion factor
 
     // ---------- HELPER FUNCTIONS ----------
 
@@ -228,22 +229,22 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     // Constants for Doppler calculation
     const double v_station = speed_station_kmh / 3.6;      // Speed of the station
     const double v_env = speed_env_kmh / 3.6;              // Speed of the environment
-    const double v_spike = Doppler_effect / 3.6;           // Moving vehicle reflection in model F
-    const double lambda = V_C / CarrierFreq_Hz;            // Wavelength [m]
+    const double v_spike = doppler_effect / 3.6;           // Moving vehicle reflection in model F
+    const double lambda = V_C / center_freq;               // Wavelength [m]
     const double f_d_env = v_env / lambda;                 // Max env Doppler (≈3 Hz at 2.4 GHz)
     const double f_spike = v_spike / lambda;               // Spike center frequency (model F)
     const double gamma_bell = f_d_env / 3.0;               // scale parameter (A=9 → 3*gamma = f_d)
     const double gamma_spike = f_spike / std::sqrt(90000); // Narrow spike bandwidth
 
     // Switches for Doppler effects
-    bool use_fluor = Doppler_effect > 0.0 && (ChannelType == "D" || ChannelType == "E");
-    bool use_vehicle = Doppler_effect > 0.0 && (ChannelType == "F");
+    bool use_fluor = doppler_effect > 0.0 && (channel_type == "D" || channel_type == "E");
+    bool use_vehicle = doppler_effect > 0.0 && (channel_type == "F");
 
     // Doppler components due to fluorescent lights
     arma::vec g(n_snap);
     if (use_fluor)
     {
-        const double f_m = Doppler_effect; // Mains frequency, e.g. 50 Hz
+        const double f_m = doppler_effect; // Mains frequency, e.g. 50 Hz
         const double f0 = 2.0 * f_m;       // 100 Hz
         const double f1 = 6.0 * f_m;       // 300 Hz
         const double f2 = 10.0 * f_m;      // 500 Hz
@@ -258,7 +259,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         // Small frequency jitter (Hz) around each harmonic
         const double sigma_f = 0.3; // tweak 0.2–0.5 Hz as you like
 
-        double dt = update_rate;
+        double dt = update_interval;
 
         for (int n = 0; n < N_lamp; ++n)
         {
@@ -313,7 +314,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         {
             // Determine the the path indices that should be modulated baes on IEEE 802.11-03/940r4
             // For TGac interpolation, assume that all interpolated taps are effected as well (maintains total interference power)
-            if (ChannelType == "D")
+            if (channel_type == "D")
             {
                 mod_paths.zeros(3 * bw_factor);
                 mod_paths[0] = find_index(delay[i_user].n_elem, delay[i_user].memptr(), 139.999e-9) + 1;             // Tap 2 of cluster 2 @ 140 ns
@@ -326,7 +327,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                     mod_paths[2 * bw_factor + i_path_interpol] = mod_paths[2 * bw_factor + i_path_interpol - 1] + 2; // 2 clusters @ 290 ns
                 }
             }
-            else if (ChannelType == "E")
+            else if (channel_type == "E")
             {
                 mod_paths.zeros(3 * bw_factor);
                 mod_paths[0] = find_index(delay[i_user].n_elem, delay[i_user].memptr(), 19.999e-9);              // Tap 3 of cluster 1 @ 20 ns
@@ -341,7 +342,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
             }
         }
 
-        if (use_vehicle && ChannelType == "F")
+        if (use_vehicle && channel_type == "F")
         {
             mod_paths.zeros(bw_factor);
             mod_paths[0] = find_index(delay[i_user].n_elem, delay[i_user].memptr(), 19.999e-9); // Tap 3 of cluster 1 @ 20 ns
@@ -485,7 +486,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         quadriga_lib::get_channels_planar(probe_antenna, probe_antenna, arma::vec{Tx, Ty, Tz}, arma::vec{Tb, Tt, Th},
                                           arma::vec{Rx, Ry, Rz}, arma::vec{Rb, Rt, Rh},
                                           aod_user, eox, aoa_user, eox, path_gain_user, path_length, M_user,
-                                          coeff_re, coeff_im, coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
+                                          coeff_re, coeff_im, coeff_delay, center_freq, false, false, &Doppler_Jakes);
 
         // Combine and restructure coefficients
         arma::cx_cube coeff_cplx(
@@ -516,7 +517,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                         double f_stat_j = (v_station / lambda) * mu_j; // Jakes
                         double f_env_j = f_env[j_sub];                 // TGn bell/Cauchy
                         double f_tot_j = f_stat_j + f_env_j;
-                        double t_snap = double(i_snap) * update_rate;
+                        double t_snap = double(i_snap) * update_interval;
 
                         // Positive Doppler (approaching) = exp(+j 2 pi f t), as the coefficients are proportional to exp(-j k d)
                         double phase = V_2PI * f_tot_j * t_snap;
@@ -576,7 +577,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         quadriga_lib::get_channels_planar(ap_array, sta_array, arma::vec{Tx, Ty, Tz}, arma::vec{Tb, Tt, Th},
                                           arma::vec{Rx, Ry, Rz}, arma::vec{Rb, Rt, Rh},
                                           aod_user, eox, aoa_user, eox, path_gain_user, path_length, M_user,
-                                          coeff_re, coeff_im, coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
+                                          coeff_re, coeff_im, coeff_delay, center_freq, false, false, &Doppler_Jakes);
 
         // Combine and restructure coefficients
         coeff_cplx = arma::cx_cube(
@@ -586,14 +587,14 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
         // Build channel object for the current user
         quadriga_lib::channel<double> chan_user;
         chan_user.name = "user_" + std::to_string(i_user);
-        chan_user.center_freq = {CarrierFreq_Hz};
+        chan_user.center_freq = {center_freq};
 
         // Calculate virtual RX positions based on the direction and distance vector
         double cx = std::cos(Rh), cy = std::sin(Rh);
         chan_user.rx_pos = arma::mat(3, n_snap);
         for (arma::uword i_snap = 0; i_snap < n_snap; ++i_snap)
         {
-            double d = v_station * update_rate * (double)i_snap;
+            double d = v_station * update_interval * (double)i_snap;
             double *p = chan_user.rx_pos.colptr(i_snap);
 
             p[0] = Rx + cx * d;
@@ -695,7 +696,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                             double f_stat_j = (v_station / lambda) * mu_j; // Jakes
                             double f_env_j = f_env[j_sub];                 // TGn bell/Cauchy
                             double f_tot_j = f_stat_j + f_env_j;
-                            double t_snap = double(i_snap) * update_rate;
+                            double t_snap = double(i_snap) * update_interval;
 
                             double phase = V_2PI * f_tot_j * t_snap; // exp(+j 2 pi f t), see above
                             std::complex<double> phasor{std::cos(phase), std::sin(phase)};

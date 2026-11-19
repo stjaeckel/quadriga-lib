@@ -28,11 +28,11 @@
 // - Wall penetration loss (default 5 dB, custom 7 dB, per-user vector)
 // - TGax floor penetration loss formula (n=2,3,4 vs n=1 reference)
 
-static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double update_rate_s, double BW = 100e6)
+static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double update_interval, double BW = 100e6)
 {
     // ----- Doppler axis ------------------------------------------------------
     arma::uword w = chan.n_snap();
-    double Delta_t = update_rate_s;
+    double Delta_t = update_interval;
 
     arma::vec Doppler_axis_Hz(w);
     for (arma::uword i = 0; i < w; ++i)
@@ -188,7 +188,7 @@ TEST_CASE("IEEE Chan - A + 2user + Steering")
     // Generate deterministic LOS and NLOS offsets of 100°
     arma::mat offset_angles(4, 2, arma::fill::value(100.0));
     chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "A", 2.4e9, 1e-8, 2, 0.0,
-                                                  0.001, 0.0, 1.2, {1.99}, {0}, false, offset_angles, 100, true, 11);
+                                                  0.001, 0.0, 1.2, {1.99}, {0}, false, offset_angles, 100, 50.0, 11);
 
     aod_deg = 100.0; // From TGac doc.: IEEE 802.11-09/0308r12
     aoa_deg = 100.0; // From TGac MATLAB code
@@ -228,19 +228,19 @@ TEST_CASE("IEEE Chan - A + 2user + Steering")
 
 TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
 {
-    double tap_spacing_s = 10e-9;
+    double tap_spacing = 10e-9;
     arma::uword n_users = 3;
     double observation_time = 0.0;
-    double update_rate = 0.001;
+    double update_interval = 0.001;
     double speed_station_kmh = 0.0;
     double speed_env_kmh = 1.2;
-    arma::vec Dist_m = {4.0, 8.0, 2.0};
+    arma::vec dist = {4.0, 8.0, 2.0};
     arma::uvec n_floors = {0, 0, 1};
 
     auto ant = quadriga_lib::generate_arrayant_ula<double>(4, 2.4e9, 0.5, nullptr, 30.0);
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", ant.center_freq,
-                                                       tap_spacing_s, n_users, observation_time, update_rate,
-                                                       speed_station_kmh, speed_env_kmh, Dist_m, n_floors);
+                                                       tap_spacing, n_users, observation_time, update_interval,
+                                                       speed_station_kmh, speed_env_kmh, dist, n_floors);
 
     // Transform function
     auto linear_2_dB = [](double x)
@@ -351,18 +351,18 @@ TEST_CASE("IEEE Chan - A + Doppler Shift")
     double fGHz = 2.4;
     double tap_spacing_ns = 10.0;
     double observation_time_s = 10.0;
-    double update_rate_s = 0.0025;
+    double update_interval = 0.0025;
     double speed_station_kmh = 50.0;
     double speed_env_kmh = 0.0;
 
     auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
 
     auto chan = quadriga_lib::get_channels_ieee_indoor(ant, ant, "A", fGHz * 1e9,
-                                                       tap_spacing_ns / 1e9, 1, observation_time_s, update_rate_s,
+                                                       tap_spacing_ns / 1e9, 1, observation_time_s, update_interval,
                                                        speed_station_kmh, speed_env_kmh);
 
     arma::uword w = chan[0].n_snap();
-    double Delta_t = update_rate_s; // snapshot spacing
+    double Delta_t = update_interval; // snapshot spacing
 
     arma::vec Doppler_axis_Hz(w);
     for (arma::uword i = 0; i < w; ++i)
@@ -421,7 +421,7 @@ TEST_CASE("IEEE Chan - C + TGn Bell Doppler integrated shape")
     double fGHz = 2.4;
     double tap_spacing_ns = 10.0;
     double observation_time_s = 20.0;
-    double update_rate_s = 0.01;    // 100 Hz sampling -> 0.05 Hz resolution
+    double update_interval = 0.01;    // 100 Hz sampling -> 0.05 Hz resolution
     double speed_station_kmh = 0.0; // TGn: stations static
     double speed_env_kmh = 1.2;     // TGn environmental speed
 
@@ -433,14 +433,14 @@ TEST_CASE("IEEE Chan - C + TGn Bell Doppler integrated shape")
         tap_spacing_ns / 1e9,
         1,
         observation_time_s,
-        update_rate_s,
+        update_interval,
         speed_station_kmh,
         speed_env_kmh,
         {}, {}, false, {}, 100, 50.0, 1234);
 
     // ----- Doppler axis ------------------------------------------------------
     arma::uword w = chan[0].n_snap();
-    double Delta_t = update_rate_s;
+    double Delta_t = update_interval;
 
     arma::vec Doppler_axis_Hz(w);
     for (arma::uword i = 0; i < w; ++i)
@@ -751,7 +751,7 @@ TEST_CASE("IEEE Chan - Doppler from moving vehicle")
     double fGHz = 2.4;
     double tap_spacing_ns = 10;
     double observation_time_s = 2.0;
-    double update_rate_s = 0.004;    // 100 Hz sampling -> 0.05 Hz resolution
+    double update_interval = 0.004;    // 100 Hz sampling -> 0.05 Hz resolution
     double speed_station_kmh = 0.0;  // TGn: stations static
     double speed_env_kmh = 0.0;      // TGn environmental speed
     double speed_vehicle_kmh = 40.0; // TGn environmental speed
@@ -764,12 +764,12 @@ TEST_CASE("IEEE Chan - Doppler from moving vehicle")
         tap_spacing_ns / 1e9,
         1,
         observation_time_s,
-        update_rate_s,
+        update_interval,
         speed_station_kmh,
         speed_env_kmh,
         {}, {}, false, {}, 100, speed_vehicle_kmh, 1234);
 
-    auto P = calc_Doppler_profile(chan[0], update_rate_s);
+    auto P = calc_Doppler_profile(chan[0], update_interval);
 
     arma::rowvec DS_lin_row = arma::sum(P, 0); // sum over delay
     arma::vec DS_lin = DS_lin_row.t();
@@ -871,12 +871,12 @@ TEST_CASE("IEEE Chan - B + Wall loss")
     // Wall loss is a deterministic additive term in the path loss. With a fixed
     // seed and otherwise identical inputs, walls don't change path structure or
     // RNG draws, so the SF realisation is identical and the total power ratio
-    // in dB equals -n_walls * wall_loss exactly (per user).
+    // in dB equals -n_walls * wall_loss_dB exactly (per user).
 
     auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
     arma::sword seed = 42;
 
-    // ---- Single user, default wall_loss = 5.0 dB ----------------------------
+    // ---- Single user, default wall_loss_dB = 5.0 ----------------------------
     auto chan_ref = quadriga_lib::get_channels_ieee_indoor(
         ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2,
         {3.0}, {0}, false, {}, 20, 50.0, seed,
@@ -893,7 +893,7 @@ TEST_CASE("IEEE Chan - B + Wall loss")
     double P_w3 = arma::accu(chan_w3[0].path_gain[0]);
     CHECK(std::abs(10.0 * std::log10(P_w3 / P_ref) + 15.0) < 1e-10); // -3 * 5 dB
 
-    // ---- Single user, custom wall_loss = 7.0 dB (alternative TGax value) ----
+    // ---- Single user, custom wall_loss_dB = 7.0 (alternative TGax value) ----
     auto chan_w2_7 = quadriga_lib::get_channels_ieee_indoor(
         ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2,
         {3.0}, {0}, false, {}, 20, 50.0, seed,
@@ -1090,39 +1090,50 @@ TEST_CASE("IEEE Chan - Number of paths does not depend on distance, floors and w
                 }
 }
 
-TEST_CASE("IEEE Chan - Invalid XPR_NLOS_linear")
+TEST_CASE("IEEE Chan - Override rules")
 {
-    // XPR = 0 (no co-polar power) and XPR = Inf (no cross-polar power) give NaN coefficients; they and negative
-    // values are rejected. NaN selects the model default (2, i.e. 3 dB).
+    // NaN selects the model default. kf and the SF spreads must otherwise be finite and >= 0, xpr_nlos and
+    // dist_breakpoint finite and > 0 (XPR = 0 or Inf has no Jones matrix, a zero breakpoint gives log10(0)).
     auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    auto run = [&](double xpr)
+    const double nan = arma::datum::nan, inf = arma::datum::inf;
+    auto run = [&](double kf, double xpr, double sf_los, double sf_nlos, double dbp)
     {
-        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {3.0}, {0},
-                                                      false, {}, 20, 50.0, 7, NAN, xpr);
+        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {8.0}, {0},
+                                                      false, {}, 20, 50.0, 7, kf, xpr, sf_los, sf_nlos, dbp);
     };
 
-    for (double xpr : {0.0, -1.0, -arma::datum::inf, arma::datum::inf})
-        CHECK_THROWS_AS(run(xpr), std::invalid_argument);
-
-    for (double xpr : {1.0e-6, 2.0, 1.0e6})
+    for (double v : {-1.0, inf, -inf})
     {
-        auto ch = run(xpr);
+        INFO("v " << v);
+        CHECK_THROWS_AS(run(v, nan, nan, nan, nan), std::invalid_argument);
+        CHECK_THROWS_AS(run(nan, v, nan, nan, nan), std::invalid_argument);
+        CHECK_THROWS_AS(run(nan, nan, v, nan, nan), std::invalid_argument);
+        CHECK_THROWS_AS(run(nan, nan, nan, v, nan), std::invalid_argument);
+        CHECK_THROWS_AS(run(nan, nan, nan, nan, v), std::invalid_argument);
+    }
+    CHECK_THROWS_AS(run(nan, 0.0, nan, nan, nan), std::invalid_argument);
+    CHECK_THROWS_AS(run(nan, nan, nan, nan, 0.0), std::invalid_argument);
+    CHECK_NOTHROW(run(0.0, nan, 0.0, 0.0, nan));
+
+    for (double xpr : {1.0e-6, 1.0e6})
+    {
+        auto ch = run(nan, xpr, nan, nan, nan);
         CHECK(ch[0].coeff_re[0].is_finite());
         CHECK(ch[0].coeff_im[0].is_finite());
-        CHECK(std::isfinite(arma::accu(ch[0].path_gain[0])));
     }
 
-    auto ch_nan = run(NAN), ch_2 = run(2.0);
-    CHECK(arma::approx_equal(ch_nan[0].coeff_re[0], ch_2[0].coeff_re[0], "absdiff", 0.0));
-    CHECK(arma::approx_equal(ch_nan[0].coeff_im[0], ch_2[0].coeff_im[0], "absdiff", 0.0));
+    // NaN equals the model default (model B: XPR 2, breakpoint 5 m)
+    auto ch_nan = run(nan, nan, nan, nan, nan), ch_def = run(nan, 2.0, nan, nan, 5.0);
+    CHECK(arma::approx_equal(ch_nan[0].coeff_re[0], ch_def[0].coeff_re[0], "absdiff", 0.0));
+    CHECK(arma::approx_equal(ch_nan[0].coeff_im[0], ch_def[0].coeff_im[0], "absdiff", 0.0));
 }
 
-TEST_CASE("IEEE Chan - Non-finite observation time and update rate")
+TEST_CASE("IEEE Chan - Non-finite observation time and update interval")
 {
     auto omni = quadriga_lib::generate_arrayant_omni<double>(10.0);
-    auto run = [&](double observation_time, double update_rate)
+    auto run = [&](double observation_time, double update_interval)
     {
-        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "A", 5.25e9, 10e-9, 1, observation_time, update_rate);
+        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "A", 5.25e9, 10e-9, 1, observation_time, update_interval);
     };
 
     CHECK_THROWS_AS(run(INFINITY, 1e-3), std::invalid_argument);
@@ -1170,31 +1181,32 @@ TEST_CASE("IEEE Chan - Tap spacing 10 ns / 2^k and non-finite carrier frequency,
         CHECK_THROWS_AS(run(fc, 10e-9, d, bad, 1.2), std::invalid_argument);
         CHECK_THROWS_AS(run(fc, 10e-9, d, 0.0, bad), std::invalid_argument);
     }
+
+    // Non-finite doppler_effect, wall_loss_dB and offset_angles_deg throw, so does a negative doppler_effect
+    auto run2 = [&](double doppler, double wall_loss_dB, double offset)
+    {
+        return quadriga_lib::get_channels_ieee_indoor(omni, omni, "D", fc, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {}, {}, false,
+                                                      arma::mat(4, 1, arma::fill::value(offset)), 20, doppler, 7,
+                                                      NAN, NAN, NAN, NAN, NAN, {}, wall_loss_dB);
+    };
+    CHECK_NOTHROW(run2(50.0, 5.0, 0.0));
+    CHECK_NOTHROW(run2(0.0, 5.0, 0.0));
+    CHECK_THROWS_AS(run2(-1.0, 5.0, 0.0), std::invalid_argument);
+    for (double bad : {(double)NAN, (double)INFINITY})
+    {
+        INFO("bad " << bad);
+        CHECK_THROWS_AS(run2(bad, 5.0, 0.0), std::invalid_argument);
+        CHECK_THROWS_AS(run2(50.0, bad, 0.0), std::invalid_argument);
+        CHECK_THROWS_AS(run2(50.0, 5.0, bad), std::invalid_argument);
+    }
 }
 
-TEST_CASE("IEEE Chan - Infinite overrides throw, NaN selects the default")
+TEST_CASE("IEEE Chan - The largest seed is valid and reproducible")
 {
     auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
-    const double inf = arma::datum::inf, nan = arma::datum::nan;
-    auto run = [&](double kf, double sf_los, double sf_nlos, double dbp, arma::sword seed = 1)
-    {
-        return quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {4.99}, {0}, false, {},
-                                                      20, 50.0, seed, kf, nan, sf_los, sf_nlos, dbp);
-    };
-    for (double v : {inf, -inf})
-    {
-        CHECK_THROWS_AS(run(v, nan, nan, nan), std::invalid_argument);
-        CHECK_THROWS_AS(run(nan, v, nan, nan), std::invalid_argument);
-        CHECK_THROWS_AS(run(nan, nan, v, nan), std::invalid_argument);
-    }
-
-    // An infinite breakpoint distance means "no breakpoint" and is valid
-    auto c = run(nan, nan, nan, inf);
-    REQUIRE(c.size() == 1);
-    CHECK(c[0].coeff_re[0].is_finite());
-
-    // The largest seed is valid and reproducible
     const arma::sword s_max = std::numeric_limits<arma::sword>::max();
-    auto a = run(nan, nan, nan, nan, s_max), b = run(nan, nan, nan, nan, s_max);
+    auto run = [&]()
+    { return quadriga_lib::get_channels_ieee_indoor(ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2, {}, {}, false, {}, 20, 50.0, s_max); };
+    auto a = run(), b = run();
     CHECK(arma::approx_equal(a[0].coeff_re[0], b[0].coeff_re[0], "absdiff", 0.0));
 }

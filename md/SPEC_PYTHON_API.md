@@ -359,7 +359,7 @@ const auto bins_in_a = qd_python_numpy2arma_Col<double>(bins, true);
 ```
 - The handle overloads of `qd_python_numpy2arma_*` return an empty Armadillo object when the handle is `None`, which can then be checked via `.empty()`.
 - In the registration: `py::arg("bins") = py::none()`.
-- Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object`. The same holds for optional containers (`list`, `dict`): `py::handle` with default `py::none()`, not `py::list()` / `py::dict()`. An exception remains only in `channel.ieee_indoor`, whose interface is being reworked.
+- Do not use `py::array_t<...>` with an empty-array default (`= py::array_t<double>()`) or `py::object`. The same holds for optional containers (`list`, `dict`): `py::handle` with default `py::none()`, not `py::list()` / `py::dict()`.
 
 ### Optional inputs and `nullptr`
 - If the C++ function takes an optional input by pointer and distinguishes `nullptr` from an empty object, pass `nullptr` when the user did not provide the input:
@@ -386,7 +386,6 @@ const arma::uvec *p_obj_ind = obj_ind_a.is_empty() ? nullptr : &obj_ind_a;
 - The default stays in the registration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
 - The `## Inputs:` line states the default. The rule itself is stated once for all functions in `docs_builder/content/api_intro_python.md`; the doc blocks do not repeat it.
 - Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError` whose message names the argument (match the name, not the full sentence).
-- Plain `bool` flags remain only in `channel.ieee_indoor`, whose interface is being reworked; they predate this rule.
 
 ### Complex arrays
 - The C++ library represents complex data as separate `arma::Mat<dtype>` (or `arma::Cube<dtype>`) for the real and imaginary parts; `std::complex` appears only as an optional extra output of a few functions. The reason is compatibility with older Octave versions (see "Complex data" in the C++ glossary).

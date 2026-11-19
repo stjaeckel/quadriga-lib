@@ -38,7 +38,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
 - Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
 - Not given / all: an omitted optional input (C++ `nullptr` or an empty container, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
-- Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity cannot be <= 0 (a size, an angle range, a frequency limit), values <= 0 select it too. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
+- Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity is a setting for which <= 0 means "not set" (a size, an angle range, a frequency limit), values <= 0 select it too. A physical model parameter (a ratio, a distance, a spread) throws for values outside its range instead. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
 - Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_polmat`, `fix_taps`, `axis`) or strings, each documented by its function.
 - Results (C++): a computed array goes into an output argument, so that the wrappers can write into MATLAB / numpy memory without a copy. Returned are objects from readers, generators and factories (`arrayant`, `channel`, meshes, colormaps, path lists), a count, status or read object (also next to output arguments, e.g. `obj_file_read`, `qdant_read`, `hdf5_read_layout`), and a single computed scalar (e.g. `sos_calc_mse`).
 
@@ -48,6 +48,10 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - `freq`: short name for a frequency in Hz; a value that must stay in GHz is named `freq_GHz`. For a frequency grid, `freq` holds the sample frequencies and `freq_new` the target frequencies.
 - Acoustic frequency: in scalar (acoustic) mode every function takes the acoustic frequency in Hz. The ray-tracing core and the material model work with the EM-equivalent frequency `f · 299792458 / 343`, which has the same wavelength; the frequency columns of a material table (`fRef`, `resF`, `coiF`, `tfF`) are in EM-equivalent GHz (1 kHz = 0.87403 GHz).
 - `spatial_freq`: spatial frequencies of a sum-of-sinusoids generator in 1/m, `[n_coeff, n_dim]`; limits `spatial_freq_min`, `spatial_freq_max`.
+
+**Delays**
+
+- `tap_spacing`: spacing of the delay taps in seconds; scalar.
 
 **Positions and orientations**
 
@@ -2947,73 +2951,73 @@ Also in: [MATLAB](quadriga_lib_api_mex.md#get_channels_ieee_indoor) · [Python](
 - 2D model: azimuth angles and planar motion only, no elevation
 - Supported channel types: `A, B, C, D, E, F` (TGn definitions)
 - MU-MIMO supported (`n_users > 1`) with per-user distances/floors and optional angle offsets per TGac
-- Time-evolving channels via `observation_time`, `update_rate`, and mobility parameters; `observation_time = 0.0` yields a static channel
-- Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when `KF_linear >= 0`
-- Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
+- Time-evolving channels via `observation_time`, `update_interval`, and mobility parameters; `observation_time = 0.0` yields a static channel
+- Override parameters (`kf`, `xpr_nlos`, `sf_std_los_dB`, `sf_std_nlos_dB`, `dist_breakpoint`): `NAN` selects the model default
+- Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; with `kf` given, the LOS path is kept also beyond the breakpoint and on other floors
+- Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB; both SF defaults 1 dB lower below 1 GHz (TGah)
 - Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
-- Floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz; floors add attenuation
+- Floor penetration loss according to TGah for `center_freq` < 1 GHz and TGax for above 1 GHz; floors add attenuation
   (and the TGah shadow fading below 1 GHz) but no delay; the station is placed 3 m per floor above the AP
 - Taps with zero power in the model tables are removed; the number of paths does not depend on distance, floors or walls
 - Time evolution: each sub-path is rotated by `exp(+j 2 pi f_D t)`, i.e. a station moving towards the AP or a scatterer
   sees a positive Doppler shift `f_D`, as the channel of [get_channels_spherical](#get_channels_spherical) along the returned station positions
 - Uplink: the coefficient and delay matrices are the transposes of the downlink ones (reciprocal channel, no conjugation),
   so both directions have the same Doppler shift; positions and orientations are swapped (the moving station is the transmitter)
-- NAN or negative value for any override parameter restores the model default, except `XPR_NLOS_linear` (see below)
 
 ### Declaration:
 ```cpp
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoor(
     const quadriga_lib::arrayant<double> &ap_array,
     const quadriga_lib::arrayant<double> &sta_array,
-    std::string ChannelType,
-    double CarrierFreq_Hz = 5.25e9,
-    double tap_spacing_s = 10.0e-9,
+    const std::string &channel_type,
+    double center_freq = 5.25e9,
+    double tap_spacing = 10.0e-9,
     arma::uword n_users = 1,
     double observation_time = 0.0,
-    double update_rate = 1.0e-3,
+    double update_interval = 1.0e-3,
     double speed_station_kmh = 0.0,
     double speed_env_kmh = 1.2,
-    arma::vec Dist_m = {4.99},
-    arma::uvec n_floors = {0},
+    const arma::vec &dist = arma::vec(),
+    const arma::uvec &n_floors = arma::uvec(),
     bool uplink = false,
-    arma::mat offset_angles = {},
+    const arma::mat &offset_angles_deg = arma::mat(),
     arma::uword n_subpath = 20,
-    double Doppler_effect = 50.0,
+    double doppler_effect = 50.0,
     arma::sword seed = -1,
-    double KF_linear = NAN,
-    double XPR_NLOS_linear = NAN,
-    double SF_std_dB_LOS = NAN,
-    double SF_std_dB_NLOS = NAN,
-    double dBP_m = NAN,
-    arma::uvec n_walls = {0},
-    double wall_loss = 5.0);
+    double kf = NAN,
+    double xpr_nlos = NAN,
+    double sf_std_los_dB = NAN,
+    double sf_std_nlos_dB = NAN,
+    double dist_breakpoint = NAN,
+    const arma::uvec &n_walls = arma::uvec(),
+    double wall_loss_dB = 5.0);
 ```
 
 ### Inputs:
 - **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [arrayant](#arrayant)
 - **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [arrayant](#arrayant)
-- **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency (finite)
-- **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
+- **`channel_type`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
+- **`center_freq`** *(optional)* — Carrier frequency in Hz (finite, above 100 MHz)
+- **`tap_spacing`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
 - **`n_users`** *(optional)* — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`
 - **`observation_time`** *(optional)* — Channel observation time in seconds; must be finite
-- **`update_rate`** *(optional)* — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`
+- **`update_interval`** *(optional)* — Channel update interval in seconds (finite, > 0); relevant only when `observation_time > 0`
 - **`speed_station_kmh`** *(optional)* — Station speed in km/h (finite); movement direction is `AoA_offset`; relevant only when `observation_time > 0`
 - **`speed_env_kmh`** *(optional)* — Environment speed in km/h (finite); use `0.089` for TGac; relevant only when `observation_time > 0`
-- **`Dist_m`** *(optional)* — TX-to-RX distance(s) (finite); `[n_users]` or `[1]`
-- **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`
+- **`dist`** *(optional)* — TX-to-RX distance(s) in meters (finite, > 0); `[n_users]` or `[1]`; empty: 4.99 m
+- **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models (0 to 4, attenuation only, no delay); `[n_users]` or `[1]`; empty: 0
 - **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction; coefficients are the transpose of the downlink
-- **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
+- **`offset_angles_deg`** *(optional)* — Azimuth offset angles in degrees (finite); rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; `[4, n_users]`; empty uses TGac auto-defaults for `n_users > 1`
 - **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
-- **`Doppler_effect`** *(optional)* — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); `0.0` disables
+- **`doppler_effect`** *(optional)* — Special Doppler: models D/E use the mains frequency in Hz, model F the vehicle speed in km/h (finite, >= 0); 0 disables
 - **`seed`** *(optional)* — RNG seed; any other value than `-1` gives the same channels on all platforms; `-1` uses the system random device
-- **`KF_linear`** *(optional)* — Overrides model KF (linear scale); NAN or negative restores model default; Inf throws
-- **`XPR_NLOS_linear`** *(optional)* — Overrides NLOS cross-polarization ratio (linear scale); NAN restores model default; must otherwise be finite and > 0 (0, negative and Inf throw)
-- **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default; Inf throws
-- **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default; Inf throws
-- **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default
-- **`n_walls`** *(optional)* — Number of walls per user TGax models; `[n_users]` or `[1]`
-- **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
+- **`kf`** *(optional)* — Overrides the model KF (linear scale); otherwise finite and >= 0
+- **`xpr_nlos`** *(optional)* — Overrides the NLOS cross-polarization ratio (linear scale), finite and > 0
+- **`sf_std_los_dB`** *(optional)* — Overrides the LOS shadow fading std in dB (applied when d < breakpoint); otherwise finite and >= 0
+- **`sf_std_nlos_dB`** *(optional)* — Overrides the NLOS shadow fading std in dB (applied when d >= breakpoint); otherwise finite and >= 0
+- **`dist_breakpoint`** *(optional)* — Overrides the breakpoint distance in meters, finite and > 0
+- **`n_walls`** *(optional)* — Number of walls per user TGax models; `[n_users]` or `[1]`; empty: 0
+- **`wall_loss_dB`** *(optional)* — Penetration loss for a single wall in dB (finite); TGax defines 5.0 (default) or 7.0
 
 ### Returns:
 - `std::vector<quadriga_lib::channel<double>>` of length `n_users`; each entry is one user's channel realization with direction set by `uplink`

@@ -34,7 +34,7 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - Identifiers: `<thing>_id`, e.g. `channel_id`, `gpu_id`.
 - Flags: a `bool` is named for what `true` does, never negated, and one concept has one name, e.g. `wrapping`, `uplink` (`true` = reverse link, e.g. in `qrt_file_read` the origin is the receiver).
 - Not given / all: an omitted optional input (C++ `nullptr` or an empty container, MATLAB / Octave `[]`, Python `None`), never a value inside an index or ID range. Special values kept: `seed = -1` (system random device), `set_id = -1` (shared set; MATLAB / Octave `0`, the 1-based form of -1), `qdant_write` `id = 0` (append with a new ID), and `0` = unlimited for count limits.
-- Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity cannot be <= 0 (a size, an angle range, a frequency limit), values <= 0 select it too. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
+- Non-finite inputs: NaN and Inf throw. The only exception: a scalar whose default depends on other inputs defaults to `NaN`, which selects that default; where the quantity is a setting for which <= 0 means "not set" (a size, an angle range, a frequency limit), values <= 0 select it too. A physical model parameter (a ratio, a distance, a spread) throws for values outside its range instead. Each such input documents the rule and the default, e.g. "NaN or <= 0: default 90°".
 - Modes: integer codes (e.g. `usage`, `pol`, `interaction_type`, `normalize_polmat`, `fix_taps`, `axis`) or strings, each documented by its function.
 - Results (C++): a computed array goes into an output argument, so that the wrappers can write into MATLAB / numpy memory without a copy. Returned are objects from readers, generators and factories (`arrayant`, `channel`, meshes, colormaps, path lists), a count, status or read object (also next to output arguments, e.g. `obj_file_read`, `qdant_read`, `hdf5_read_layout`), and a single computed scalar (e.g. `sos_calc_mse`).
 
@@ -44,6 +44,10 @@ The conventions and shared quantities of all three APIs; the MATLAB / Octave and
 - `freq`: short name for a frequency in Hz; a value that must stay in GHz is named `freq_GHz`. For a frequency grid, `freq` holds the sample frequencies and `freq_new` the target frequencies.
 - Acoustic frequency: in scalar (acoustic) mode every function takes the acoustic frequency in Hz. The ray-tracing core and the material model work with the EM-equivalent frequency `f · 299792458 / 343`, which has the same wavelength; the frequency columns of a material table (`fRef`, `resF`, `coiF`, `tfF`) are in EM-equivalent GHz (1 kHz = 0.87403 GHz).
 - `spatial_freq`: spatial frequencies of a sum-of-sinusoids generator in 1/m, `[n_coeff, n_dim]`; limits `spatial_freq_min`, `spatial_freq_max`.
+
+**Delays**
+
+- `tap_spacing`: spacing of the delay taps in seconds; scalar.
 
 **Positions and orientations**
 
