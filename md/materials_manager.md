@@ -366,7 +366,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
   - **Phase 2b done 2026-10-23** (`md/materials/rig_report.md` "Phase 2b"): test file 1028 → 677 lines (rig 481,
     self-checks 89, concrete 17); `mt::check_material` runs a row as a traced solid on the full grid and as a sheet on
     the report angles and asserts the twin, tier 1, R + T ≤ 1, diagnostics, tier 2; geometry from
-    `quadriga_lib::plane` / `cube` (a solid is a closed box), path length from `path::length()`, R / T from `nREF`.
+    `quadriga_lib::plane` / `cube` (a solid is a closed box), path length from `path::length()`, R / T from `n_ref`.
     Manager check (load 2.3–3.2): `[wave]` 141128 and `[acoustic]~[materials]` 112451 numbers identical; whole suite
     1347054 / 1308; `[materials]` 197 assertions in 6 cases, concrete 0.006 s at 12 threads and 0.011 s on one
     thread, all six 0.137 s / 0.459 s; `check_docs.py` passes. Side finding: the API page lists `length` of `path` as

@@ -178,9 +178,9 @@ TEST_CASE("QRT Reader - v4 file without origins")
 
     auto cache = quadriga_lib::qrt_read_cache_init(fn);
     CHECK(cache.version == 4);
-    CHECK(cache.no_orig == 0);
-    CHECK(cache.no_freq == 1);
-    REQUIRE(cache.freq.n_elem == cache.no_freq);
+    CHECK(cache.n_orig == 0);
+    CHECK(cache.n_freq == 1);
+    REQUIRE(cache.freq.n_elem == cache.n_freq);
     CHECK(cache.freq(0) == 0.0f);
 
     std::remove(fn.c_str());

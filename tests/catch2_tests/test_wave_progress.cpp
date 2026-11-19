@@ -42,10 +42,10 @@ TEST_CASE("ray_progress - single reflection", "[wave]")
     // Path bookkeeping
     REQUIRE(C.paths.size() == 1);
     CHECK(C.paths[0].n_seg() == 1);
-    CHECK((int)C.paths[0].nREF == 1);
-    CHECK((int)C.paths[0].nTRA == 0);
-    CHECK((int)C.paths[0].nSUB == 0);
-    CHECK(C.paths[0].iC == 0u);
+    CHECK((int)C.paths[0].n_ref == 1);
+    CHECK((int)C.paths[0].n_tra == 0);
+    CHECK((int)C.paths[0].n_sub == 0);
+    CHECK(C.paths[0].i_cir == 0u);
 
     const float *crd = C.paths[0].coord(0);
     CHECK(std::abs(crd[0] - 4.0f) < 1e-3f);
@@ -76,8 +76,8 @@ TEST_CASE("ray_progress - single transmission", "[wave]")
     CHECK(C.path_dir(0, 0, 0) > 0.99f); // normal incidence: no bending
 
     CHECK(C.paths[0].n_seg() == 1);
-    CHECK((int)C.paths[0].nREF == 0);
-    CHECK((int)C.paths[0].nTRA == 1);
+    CHECK((int)C.paths[0].n_ref == 0);
+    CHECK((int)C.paths[0].n_tra == 1);
 
     // The state machine reports the ray as inside material 1, on a leg the refracting tracer bent
     CHECK((int)C.cur(0) == (1 | 0x4000));
@@ -99,14 +99,14 @@ TEST_CASE("ray_progress - reflection and transmission in one call", "[wave]")
     REQUIRE(C.n() == 2);
 
     // Documented layout: sub-beams, then reflections, then transmissions
-    CHECK((int)C.paths[0].nREF == 1);
-    CHECK((int)C.paths[0].nTRA == 0);
-    CHECK((int)C.paths[1].nREF == 0);
-    CHECK((int)C.paths[1].nTRA == 1);
+    CHECK((int)C.paths[0].n_ref == 1);
+    CHECK((int)C.paths[0].n_tra == 0);
+    CHECK((int)C.paths[1].n_ref == 0);
+    CHECK((int)C.paths[1].n_tra == 1);
 
     // Both continuations descend from the same input ray
-    CHECK(C.paths[0].iC == 0u);
-    CHECK(C.paths[1].iC == 0u);
+    CHECK(C.paths[0].i_cir == 0u);
+    CHECK(C.paths[1].i_cir == 0u);
 
     // Reflection stays outside, transmission enters the medium
     CHECK((int)C.cur(0) == 0);
@@ -235,12 +235,12 @@ TEST_CASE("ray_progress - per-ray counters gate the next generation", "[wave]")
         auto s1 = C.step(S, o);
         REQUIRE(s1[2] == 1);
         REQUIRE(C.paths.size() == 1);
-        CHECK((int)C.paths[0].nREF == 1);
+        CHECK((int)C.paths[0].n_ref == 1);
 
         // The reflected ray is aimed back at the source and misses, so drive a second
-        // generation from a fresh configuration whose path already carries nREF = 1.
+        // generation from a fresh configuration whose path already carries n_ref = 1.
         Cfg D = one_ray(20.0f);
-        D.paths[0].nREF = 1;
+        D.paths[0].n_ref = 1;
         auto s2 = D.step(S, o);
         CHECK(s2[0] == 1); // it still hits
         CHECK(s2[2] == 0); // but no reflection is launched
@@ -248,7 +248,7 @@ TEST_CASE("ray_progress - per-ray counters gate the next generation", "[wave]")
     SECTION("the transmission counter stops at max_transmissions")
     {
         Cfg C = one_ray(20.0f);
-        C.paths[0].nTRA = 3;
+        C.paths[0].n_tra = 3;
         Opt o;
         o.max_ref = 0;
         o.max_tra = 3;
@@ -308,11 +308,11 @@ TEST_CASE("ray_progress - beam subdivision", "[wave]")
     for (arma::uword i = 0; i < 4; ++i)
     {
         // The sub-beam carries the parent's history and one more subdivision
-        CHECK(C.paths[i].iC == 0u);
+        CHECK(C.paths[i].i_cir == 0u);
         CHECK(C.paths[i].n_seg() == 0); // no interaction was consumed
-        CHECK((int)C.paths[i].nSUB == 1);
-        CHECK((int)C.paths[i].nREF == 0);
-        CHECK((int)C.paths[i].nTRA == 0);
+        CHECK((int)C.paths[i].n_sub == 1);
+        CHECK((int)C.paths[i].n_ref == 0);
+        CHECK((int)C.paths[i].n_tra == 0);
 
         // The new origin sits on the parent wavefront, i.e. within the tube at the old origin
         const float dx = C.orig(i, 0) - orig_in(0, 0);
@@ -378,7 +378,7 @@ TEST_CASE("ray_progress - subdivision requires beam data and a positive limit", 
     SECTION("the subdivision counter stops at max_subdivisions")
     {
         Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
-        C.paths[0].nSUB = 2;
+        C.paths[0].n_sub = 2;
         Opt o;
         o.sub_tol = SUB_TOL;
         o.max_sub = 2;
@@ -414,7 +414,7 @@ TEST_CASE("ray_progress - every ray subdivided", "[wave]")
     CHECK(arma::accu(arma::abs(C.trivec)) > 0.0f);
 
     for (const auto &p : C.paths)
-        CHECK((int)p.nSUB == 1);
+        CHECK((int)p.n_sub == 1);
 }
 
 TEST_CASE("ray_progress - beam buffers survive the assembly", "[wave]")
@@ -471,7 +471,7 @@ TEST_CASE("ray_progress - compaction preserves per-ray results", "[wave]")
 
     Opt sub;
     sub.sub_tol = SUB_TOL;
-    sub.max_tra = 0; // reflections only, so path::iC is unique in the output
+    sub.max_tra = 0; // reflections only, so path::i_cir is unique in the output
 
     Opt nosub = sub;
     nosub.max_sub = 0;
@@ -520,8 +520,8 @@ TEST_CASE("ray_progress - compaction preserves per-ray results", "[wave]")
     {
         auto it = mh.find(id);
         REQUIRE(it != mh.end());
-        CHECK((int)HIGH.paths[it->second].nSUB == 1);
-        CHECK((int)HIGH.paths[it->second].nREF == 0);
+        CHECK((int)HIGH.paths[it->second].n_sub == 1);
+        CHECK((int)HIGH.paths[it->second].n_ref == 0);
     }
 }
 
@@ -674,7 +674,7 @@ TEST_CASE("ray_progress - medium state across a slab", "[wave]")
     CHECK((int)C.cur(0) == 0); // back outside
     CHECK((int)C.prev(0) == 1);
     CHECK(C.paths[0].n_seg() == 2);
-    CHECK((int)C.paths[0].nTRA == 2);
+    CHECK((int)C.paths[0].n_tra == 2);
 
     // The exit point is the far face
     const float *crd = C.paths[0].coord(1);
@@ -720,7 +720,7 @@ TEST_CASE("ray_progress - sub-mesh partitioning does not change the result", "[w
     CHECK(arma::all(PLAIN.prev == PART.prev));
     for (arma::uword i = 0; i < PLAIN.paths.size(); ++i)
     {
-        CHECK(PLAIN.paths[i].iC == PART.paths[i].iC);
+        CHECK(PLAIN.paths[i].i_cir == PART.paths[i].i_cir);
         CHECK(PLAIN.paths[i].n_seg() == PART.paths[i].n_seg());
     }
 }
@@ -752,9 +752,9 @@ TEST_CASE("ray_progress - a trace terminates and respects its limits", "[wave]")
         for (const auto &p : C.paths)
         {
             CHECK(p.n_seg() <= (size_t)o.max_int);
-            CHECK((int)p.nREF <= (int)o.max_ref);
-            CHECK((int)p.nTRA <= (int)o.max_tra);
-            CHECK((size_t)((int)p.nREF + (int)p.nTRA) <= p.n_seg());
+            CHECK((int)p.n_ref <= (int)o.max_ref);
+            CHECK((int)p.n_tra <= (int)o.max_tra);
+            CHECK((size_t)((int)p.n_ref + (int)p.n_tra) <= p.n_seg());
         }
 
         if (n_out == 0)
@@ -802,7 +802,7 @@ TEST_CASE("ray_progress - repeated calls are deterministic", "[wave]")
 
     for (arma::uword i = 0; i < A.paths.size(); ++i)
     {
-        CHECK(A.paths[i].iC == B.paths[i].iC);
+        CHECK(A.paths[i].i_cir == B.paths[i].i_cir);
         CHECK(A.paths[i].n_seg() == B.paths[i].n_seg());
         CHECK(A.paths[i].length() == B.paths[i].length());
         for (arma::uword f = 0; f < 2; ++f)
@@ -1254,7 +1254,7 @@ TEST_CASE("ray_progress - the delegated flag count is the reported n_subdiv", "[
     // Every sub-beam carries one more subdivision and no interaction
     arma::uword n_sub_out = 0;
     for (const auto &p : C.paths)
-        if (p.nSUB == 1)
+        if (p.n_sub == 1)
         {
             ++n_sub_out;
             CHECK(p.n_seg() == 0);
@@ -1286,7 +1286,7 @@ TEST_CASE("ray_progress - the delegated flag overrides the geometry", "[wave]")
         CHECK(s[2] == 0); // a subdivided ray does not also reflect
         check_shapes(C, 4);
         for (const auto &p : C.paths)
-            CHECK((int)p.nSUB == 1);
+            CHECK((int)p.n_sub == 1);
     }
     SECTION("a wide beam continues when the flag says so")
     {
@@ -1301,7 +1301,7 @@ TEST_CASE("ray_progress - the delegated flag overrides the geometry", "[wave]")
         CHECK(s[1] == 0);
         CHECK(s[2] == 1); // reflects instead
         check_shapes(C, 1);
-        CHECK((int)C.paths[0].nSUB == 0);
+        CHECK((int)C.paths[0].n_sub == 0);
         CHECK(C.paths[0].n_seg() == 1);
     }
 }
@@ -1434,9 +1434,9 @@ TEST_CASE("ray_progress - a flagged ray that misses the mesh is still subdivided
     REQUIRE(C.n() == 4);
     for (const auto &p : C.paths)
     {
-        CHECK((int)p.nSUB == 1);
+        CHECK((int)p.n_sub == 1);
         CHECK(p.n_seg() == 0); // no interaction was consumed
-        CHECK(p.iC == 0u);
+        CHECK(p.i_cir == 0u);
     }
     CHECK(arma::accu(arma::abs(C.trivec)) > 0.0f);
 }
@@ -1473,7 +1473,7 @@ TEST_CASE("ray_progress - the end-of-trace signal accounts for subdivision", "[w
         CHECK(s[1] == 1);
         check_shapes(C, 4);
         for (const auto &p : C.paths)
-            CHECK(p.iC == 1u); // the sub-beams descend from the flagged ray, not its neighbour
+            CHECK(p.i_cir == 1u); // the sub-beams descend from the flagged ray, not its neighbour
     }
 }
 
@@ -1488,7 +1488,7 @@ TEST_CASE("ray_progress - a flagged ray past its subdivision limit is still subd
     SECTION("the limit is overridden and the counter advances past it")
     {
         Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
-        C.paths[0].nSUB = 2;
+        C.paths[0].n_sub = 2;
 
         Hits H = intersect(C, S);
         auto f_auto = subdiv_flags(C, S, H, o);
@@ -1500,21 +1500,21 @@ TEST_CASE("ray_progress - a flagged ray past its subdivision limit is still subd
         CHECK(s[2] == 0); // a subdivided ray does not also reflect
         REQUIRE(C.n() == 4);
         for (const auto &p : C.paths)
-            CHECK((int)p.nSUB == 3);
+            CHECK((int)p.n_sub == 3);
     }
     SECTION("the counter saturates instead of wrapping")
     {
-        // nSUB is a uint8_t. A wrapped counter reads as 0, which would let ray_subdivide_flag
+        // n_sub is a uint8_t. A wrapped counter reads as 0, which would let ray_subdivide_flag
         // re-arm the same beam and split it without bound.
         Cfg C = one_ray(10.0f, 1, false, WIDE_DEG);
-        C.paths[0].nSUB = 255;
+        C.paths[0].n_sub = 255;
 
         std::vector<bool> f(1, true);
         auto s = C.step(S, with_flag(o, f));
         CHECK(s[1] == 1);
         REQUIRE(C.n() == 4);
         for (const auto &p : C.paths)
-            CHECK((int)p.nSUB == 255);
+            CHECK((int)p.n_sub == 255);
     }
 }
 
@@ -1645,7 +1645,7 @@ TEST_CASE("ray_progress - hit and subdivision counts are independent", "[wave]")
     // Every flagged ray produced four sub-beams and consumed no interaction
     arma::uword n_sub_out = 0;
     for (const auto &p : C.paths)
-        if (p.nSUB == 1)
+        if (p.n_sub == 1)
         {
             ++n_sub_out;
             CHECK(p.n_seg() == 0);
@@ -2914,7 +2914,7 @@ TEST_CASE("ray_progress - an ordered stack leaves the ray on the line it arrived
                 std::vector<double> p;
                 for (size_t q = 0; q < nf; ++q)
                 {
-                    const float *xc = paths[i].xpr_coeff(q);
+                    const float *xc = paths[i].polmat(q);
                     p.push_back(10.0 * std::log10((double)xc[0] * xc[0] + (double)xc[1] * xc[1] + 1.0e-300));
                 }
                 G.pw.push_back(p);
@@ -3109,7 +3109,7 @@ TEST_CASE("ray_progress - a coherent sheet with tf that is rarer than the invari
                 O.found = true;
                 for (size_t q = 0; q < nf; ++q)
                 {
-                    const float *xc = paths[0].xpr_coeff(q);
+                    const float *xc = paths[0].polmat(q);
                     O.p[q] = 10.0 * std::log10((double)xc[0] * xc[0] + (double)xc[1] * xc[1] + 1.0e-300);
                     if (!scalar)
                         O.h[q] = 10.0 * std::log10((double)xc[6] * xc[6] + (double)xc[7] * xc[7] + 1.0e-300);
@@ -3218,7 +3218,7 @@ TEST_CASE("ray_progress - a coherent sheet rarer than the invariant without tf t
                 O.found = true;
                 for (size_t q = 0; q < nf; ++q)
                 {
-                    const float *xc = paths[0].xpr_coeff(q);
+                    const float *xc = paths[0].polmat(q);
                     O.p[q] = 10.0 * std::log10((double)xc[0] * xc[0] + (double)xc[1] * xc[1] + 1.0e-300);
                     if (!scalar)
                         O.h[q] = 10.0 * std::log10((double)xc[6] * xc[6] + (double)xc[7] * xc[7] + 1.0e-300);
@@ -3606,7 +3606,7 @@ TEST_CASE("ray_progress - a wall with a stack inside it is on its matrix with th
                                 Lin += std::sqrt(((double)q[0] - p[0]) * ((double)q[0] - p[0]) + ((double)q[1] - p[1]) * ((double)q[1] - p[1]) +
                                                  ((double)q[2] - p[2]) * ((double)q[2] - p[2]));
                             }
-                            const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1), *xc = paths[i].xpr_coeff(0);
+                            const float *first = paths[i].coord(0), *last = paths[i].coord(ns - 1), *xc = paths[i].polmat(0);
                             const bool fwd = dest(i, 0) > orig(i, 0);
                             std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k0 * Lin) *
                                                      std::exp(J * k0 * st * ((double)last[1] - (double)first[1]));

@@ -44,11 +44,11 @@ TEST_CASE("path - default construction")
     CHECK(p.n_freq() == 1);
     CHECK_FALSE(p.is_scalar());
     CHECK(p.length() == 0.0f);
-    CHECK(p.iC == 0);
-    CHECK(p.nREF == 0);
-    CHECK(p.nTRA == 0);
-    CHECK(p.nSUB == 0);
-    CHECK(p.nSCT == 0);
+    CHECK(p.i_cir == 0);
+    CHECK(p.n_ref == 0);
+    CHECK(p.n_tra == 0);
+    CHECK(p.n_sub == 0);
+    CHECK(p.n_sct == 0);
 
     // Default xprmat is the identity Jones matrix; freq-0 gain (no path loss) is 1.
     CHECK(std::abs(p.calc_gain() - 1.0f) < 1e-6f);
@@ -79,7 +79,7 @@ TEST_CASE("path - init EM layout and seeding")
     CHECK_FALSE(p.is_scalar());
 
     // Freq 0 seeded to identity in xprmat.
-    const float *f0 = p.xpr_coeff(0);
+    const float *f0 = p.polmat(0);
     CHECK(f0[0] == 1.0f); // ReVV
     CHECK(f0[6] == 1.0f); // ReHH
     CHECK(f0[1] == 0.0f);
@@ -87,7 +87,7 @@ TEST_CASE("path - init EM layout and seeding")
     // Freqs 1..3 seeded to identity in the buffer (ReVV=ReHH=1, rest 0).
     for (size_t f = 1; f < 4; ++f)
     {
-        const float *jf = p.xpr_coeff(f);
+        const float *jf = p.polmat(f);
         INFO("frequency " << f);
         CHECK(jf[0] == 1.0f); // ReVV
         CHECK(jf[6] == 1.0f); // ReHH
@@ -96,9 +96,9 @@ TEST_CASE("path - init EM layout and seeding")
     }
 
     // Buffer freq offsets follow data + 3*nSEG + (f-1)*8.
-    const float *base = p.xpr_coeff(1);
-    CHECK(p.xpr_coeff(2) == base + 8);
-    CHECK(p.xpr_coeff(3) == base + 16);
+    const float *base = p.polmat(1);
+    CHECK(p.polmat(2) == base + 8);
+    CHECK(p.polmat(3) == base + 16);
 }
 
 TEST_CASE("path - init scalar layout and seeding")
@@ -109,32 +109,32 @@ TEST_CASE("path - init scalar layout and seeding")
     CHECK(p.is_scalar());
 
     // xprmat seeded so all four in-header pressure coeffs have Re=1.
-    const float *x = p.xpr_coeff(0);
+    const float *x = p.polmat(0);
     CHECK(x[0] == 1.0f); // Re(F0)
     CHECK(x[2] == 1.0f); // Re(F1)
     CHECK(x[4] == 1.0f); // Re(F2)
     CHECK(x[6] == 1.0f); // Re(F3)
 
     // Freqs 1..3 alias into xprmat at stride 2.
-    CHECK(p.xpr_coeff(1) == x + 2);
-    CHECK(p.xpr_coeff(2) == x + 4);
-    CHECK(p.xpr_coeff(3) == x + 6);
+    CHECK(p.polmat(1) == x + 2);
+    CHECK(p.polmat(2) == x + 4);
+    CHECK(p.polmat(3) == x + 6);
 
     // Freqs 4,5 seeded to Re=1 in the buffer at data + 3*nSEG + (f-4)*2.
-    const float *f4 = p.xpr_coeff(4);
-    const float *f5 = p.xpr_coeff(5);
+    const float *f4 = p.polmat(4);
+    const float *f5 = p.polmat(5);
     CHECK(f4[0] == 1.0f);
     CHECK(f5[0] == 1.0f);
     CHECK(f5 == f4 + 2);
 }
 
-TEST_CASE("path - xpr_coeff bounds")
+TEST_CASE("path - polmat bounds")
 {
     path p(2, 3, false);
-    CHECK_THROWS_AS(p.xpr_coeff(3), std::invalid_argument); // freq == n_freq
-    CHECK_THROWS_AS(p.xpr_coeff(99), std::invalid_argument);
-    CHECK_NOTHROW(p.xpr_coeff(0));
-    CHECK_NOTHROW(p.xpr_coeff(2));
+    CHECK_THROWS_AS(p.polmat(3), std::invalid_argument); // freq == n_freq
+    CHECK_THROWS_AS(p.polmat(99), std::invalid_argument);
+    CHECK_NOTHROW(p.polmat(0));
+    CHECK_NOTHROW(p.polmat(2));
 }
 
 TEST_CASE("path - coord access and bounds")
@@ -221,7 +221,7 @@ TEST_CASE("path - calc_gain polarization power without path loss")
     CHECK(std::abs(p.calc_gain() - 1.0f) < 1e-6f);
 
     // Scale VV column so |col0|^2 = 4, |col1|^2 = 1; gain = max = 4.
-    float *m = p.xpr_coeff(0);
+    float *m = p.polmat(0);
     set_jones(m, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     CHECK(std::abs(p.calc_gain() - 4.0f) < 1e-6f);
 }
@@ -229,7 +229,7 @@ TEST_CASE("path - calc_gain polarization power without path loss")
 TEST_CASE("path - calc_gain degenerate matrix returns zero")
 {
     path p(0, 1, false);
-    float *m = p.xpr_coeff(0);
+    float *m = p.polmat(0);
     set_jones(m, 0, 0, 0, 0, 0, 0, 0, 0); // all zero
     CHECK(p.calc_gain() == 0.0f);
 
@@ -242,98 +242,106 @@ TEST_CASE("path - calc_gain EM free-space path loss")
     path p(0, 1, false);
     p.set_length(100.0f);
 
-    // FSPL linear power = (c / (4 pi f d))^2 with f in GHz, d in m, c = 0.299792458 m*GHz.
-    float fGHz = 2.4f;
-    float k = 0.299792458f / (12.566370614f * fGHz * p.length());
+    // FSPL linear power = (c / (4 pi f d))^2 with f in Hz, d in m, c = 299792458 m/s.
+    float freq = 2.4e9f;
+    float k = 299792458.0f / (12.566370614f * freq * p.length());
     float expected = k * k; // identity matrix gain == 1
 
-    CHECK(std::abs(p.calc_gain(fGHz) - expected) < 1e-12f);
+    CHECK(std::abs(p.calc_gain(freq) - expected) < 1.0e-6f * expected);
 
-    // fGHz == 0 disables path loss.
+    // Same value as the GHz form used before the frequency was taken in Hz: lambda = 0.299792458 / f_GHz
+    for (float f_Hz : {1.0e6f, 2.4e9f, 28.0e9f, 300.0e9f})
+    {
+        float k_GHz = 0.299792458f / (12.566370614f * (f_Hz * 1.0e-9f) * p.length());
+        CHECK(std::abs(p.calc_gain(f_Hz) / (k_GHz * k_GHz) - 1.0f) < 1.0e-6f);
+    }
+
+    // freq <= 0 disables path loss.
     CHECK(std::abs(p.calc_gain(0.0f) - 1.0f) < 1e-6f);
+    CHECK(std::abs(p.calc_gain(-1.0f) - 1.0f) < 1e-6f);
 }
 
 TEST_CASE("path - calc_gain scalar spherical spreading")
 {
     path p(0, 2, true);
     p.set_length(10.0f);
-    float *c = p.xpr_coeff(0); // scalar coeff [Re, Im]
+    float *c = p.polmat(0); // scalar coeff [Re, Im]
     c[0] = 1.0f, c[1] = 0.0f;
 
-    // Scalar: any fGHz > 0 applies 1/d^2, magnitude ignored.
-    CHECK(std::abs(p.calc_gain(1.0f) - (1.0f / 100.0f)) < 1e-8f);
+    // Scalar: any freq > 0 (Hz) applies 1/d^2, magnitude ignored.
+    CHECK(std::abs(p.calc_gain(1000.0f) - (1.0f / 100.0f)) < 1e-8f);
     CHECK(std::abs(p.calc_gain(50.0f) - (1.0f / 100.0f)) < 1e-8f); // magnitude irrelevant
 
-    // No path loss when fGHz == 0.
+    // No path loss when freq == 0.
     CHECK(std::abs(p.calc_gain(0.0f) - 1.0f) < 1e-6f);
 }
 
-TEST_CASE("path - xpr_update pure gain, EM")
+TEST_CASE("path - polmat_update pure gain, EM")
 {
     path p(0, 1, false);
     // Identity matrix, apply power gain 4 -> amplitude 2 on each stored value.
-    float g = p.xpr_update(nullptr, 4.0f);
+    float g = p.polmat_update(nullptr, 4.0f);
     // Resulting matrix diag(2,2): |col0|^2 = 4, |col1|^2 = 4, gain = 4.
     CHECK(std::abs(g - 4.0f) < 1e-5f);
 
-    const float *m = p.xpr_coeff(0);
+    const float *m = p.polmat(0);
     CHECK(std::abs(m[0] - 2.0f) < 1e-5f);
     CHECK(std::abs(m[6] - 2.0f) < 1e-5f);
 }
 
-TEST_CASE("path - xpr_update left-multiply, EM")
+TEST_CASE("path - polmat_update left-multiply, EM")
 {
     path p(0, 1, false);
     // Start from identity. Left-multiply by U = diag(2, 3) (real).
     float U[8];
     set_jones(U, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f);
-    float g = p.xpr_update(U, 1.0f);
+    float g = p.polmat_update(U, 1.0f);
 
     // Result diag(2,3): |col0|^2 = 4, |col1|^2 = 9, gain = max = 9.
     CHECK(std::abs(g - 9.0f) < 1e-5f);
-    const float *m = p.xpr_coeff(0);
+    const float *m = p.polmat(0);
     CHECK(std::abs(m[0] - 2.0f) < 1e-5f);
     CHECK(std::abs(m[6] - 3.0f) < 1e-5f);
     CHECK(m[2] == 0.0f);
     CHECK(m[4] == 0.0f);
 }
 
-TEST_CASE("path - xpr_update complex multiply matches hand calc")
+TEST_CASE("path - polmat_update complex multiply matches hand calc")
 {
     path p(0, 1, false);
     // Set state to a known matrix, multiply by a rotation-like update, verify one entry.
-    float *m = p.xpr_coeff(0);
+    float *m = p.polmat(0);
     set_jones(m, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f); // VV = 1+i
 
     float U[8];
     set_jones(U, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f); // U_VV = i
-    p.xpr_update(U, 1.0f);
+    p.polmat_update(U, 1.0f);
 
     // New VV = i * (1+i) = -1 + i  -> Re = -1, Im = 1.
-    const float *r = p.xpr_coeff(0);
+    const float *r = p.polmat(0);
     CHECK(std::abs(r[0] - (-1.0f)) < 1e-5f);
     CHECK(std::abs(r[1] - 1.0f) < 1e-5f);
 }
 
-TEST_CASE("path - xpr_update with an update that overlaps the coefficients")
+TEST_CASE("path - polmat_update with an update that overlaps the coefficients")
 {
     path p(1, 2, false);
     const float u[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-    CHECK_NOTHROW(p.xpr_update(u, 1.0f, 1));
+    CHECK_NOTHROW(p.polmat_update(u, 1.0f, 1));
 
     // The update is the slot that is written
-    CHECK_THROWS_AS(p.xpr_update(p.xpr_coeff(0), 1.0f), std::invalid_argument);
-    CHECK_THROWS_AS(p.xpr_update(p.xpr_coeff(1), 1.0f, 1), std::invalid_argument);
+    CHECK_THROWS_AS(p.polmat_update(p.polmat(0), 1.0f), std::invalid_argument);
+    CHECK_THROWS_AS(p.polmat_update(p.polmat(1), 1.0f, 1), std::invalid_argument);
 
     // The update starts inside the slot
-    CHECK_THROWS_AS(p.xpr_update(p.xpr_coeff(0) + 3, 1.0f), std::invalid_argument);
+    CHECK_THROWS_AS(p.polmat_update(p.polmat(0) + 3, 1.0f), std::invalid_argument);
 
     // The update is another slot of the same path
-    CHECK_NOTHROW(p.xpr_update(p.xpr_coeff(1), 1.0f, 0));
+    CHECK_NOTHROW(p.polmat_update(p.polmat(1), 1.0f, 0));
 
     // Scalar mode: 2 values per slot
     path s(0, 1, true);
-    CHECK_THROWS_AS(s.xpr_update(s.xpr_coeff(0) + 1, 1.0f), std::invalid_argument);
+    CHECK_THROWS_AS(s.polmat_update(s.polmat(0) + 1, 1.0f), std::invalid_argument);
 }
 
 TEST_CASE("path - duplicate and extend into the source path")
@@ -347,34 +355,34 @@ TEST_CASE("path - duplicate and extend into the source path")
     CHECK(p.n_seg() == 2);
 }
 
-TEST_CASE("path - xpr_update scalar mode")
+TEST_CASE("path - polmat_update scalar mode")
 {
     path p(0, 2, true);
-    float *c = p.xpr_coeff(0);
+    float *c = p.polmat(0);
     c[0] = 1.0f, c[1] = 0.0f;
 
     // Multiply by (0 + i): result i, |.|^2 = 1.
     float U[2] = {0.0f, 1.0f};
-    float g = p.xpr_update(U, 1.0f);
+    float g = p.polmat_update(U, 1.0f);
     CHECK(std::abs(g - 1.0f) < 1e-5f);
     CHECK(std::abs(c[0] - 0.0f) < 1e-5f);
     CHECK(std::abs(c[1] - 1.0f) < 1e-5f);
 
     // Pure power gain 9 -> amplitude 3, |.|^2 = 9.
-    g = p.xpr_update(nullptr, 9.0f);
+    g = p.polmat_update(nullptr, 9.0f);
     CHECK(std::abs(g - 9.0f) < 1e-5f);
 }
 
-TEST_CASE("path - xpr_update applies path loss when fGHz given")
+TEST_CASE("path - polmat_update applies path loss when freq given")
 {
     path p(0, 1, false);
     p.set_length(100.0f);
-    float fGHz = 2.4f;
-    float k = 0.299792458f / (12.566370614f * fGHz * p.length());
+    float freq = 2.4e9f;
+    float k = 299792458.0f / (12.566370614f * freq * p.length());
     float expected = k * k; // identity gain 1, scaled by FSPL
 
-    float g = p.xpr_update(nullptr, 1.0f, 0, fGHz);
-    CHECK(std::abs(g - expected) < 1e-12f);
+    float g = p.polmat_update(nullptr, 1.0f, 0, freq);
+    CHECK(std::abs(g - expected) < 1.0e-6f * expected);
 }
 
 TEST_CASE("path - duplicate produces independent deep copy")
@@ -382,10 +390,10 @@ TEST_CASE("path - duplicate produces independent deep copy")
     path src(3, 2, false);
     float *c = src.coord(1);
     c[0] = 5.0f, c[1] = 6.0f, c[2] = 7.0f;
-    src.iC = 11;
-    src.nREF = 2, src.nTRA = 3, src.nSUB = 1, src.nSCT = 4;
+    src.i_cir = 11;
+    src.n_ref = 2, src.n_tra = 3, src.n_sub = 1, src.n_sct = 4;
     src.set_length(99.0f);
-    float *m = src.xpr_coeff(1);
+    float *m = src.polmat(1);
     m[0] = 3.0f;
 
     path dst;
@@ -393,14 +401,14 @@ TEST_CASE("path - duplicate produces independent deep copy")
     CHECK(ret == 99.0f);
 
     // Metadata copied.
-    CHECK(dst.iC == 11);
-    CHECK(dst.nREF == 2);
-    CHECK(dst.nTRA == 3);
-    CHECK(dst.nSUB == 1);
-    CHECK(dst.nSCT == 4);
+    CHECK(dst.i_cir == 11);
+    CHECK(dst.n_ref == 2);
+    CHECK(dst.n_tra == 3);
+    CHECK(dst.n_sub == 1);
+    CHECK(dst.n_sct == 4);
     CHECK(dst.n_freq() == 2);
     CHECK(dst.coord(1)[1] == 6.0f);
-    CHECK(dst.xpr_coeff(1)[0] == 3.0f);
+    CHECK(dst.polmat(1)[0] == 3.0f);
 
     // Deep copy: buffers are distinct allocations.
     CHECK(dst.coord(0) != src.coord(0));
@@ -415,17 +423,17 @@ TEST_CASE("path - extend appends segment, distance, counters")
     float *c = src.coord(0);
     c[0] = 0.0f, c[1] = 0.0f, c[2] = 0.0f;
     src.set_length(0.0f);
-    src.nREF = 0, src.nTRA = 0, src.nSCT = 7;
+    src.n_ref = 0, src.n_tra = 0, src.n_sct = 7;
 
-    // Extend to (3,4,0): new segment 3-4-5 triangle -> +5 length. type 100 -> nTRA++.
+    // Extend to (3,4,0): new segment 3-4-5 triangle -> +5 length. type 100 -> n_tra++.
     path t1;
     float L = src.extend(t1, 3.0f, 4.0f, 0.0f, 100);
     CHECK(std::abs(L - 5.0f) < 1e-5f);
     CHECK(std::abs(t1.length() - 5.0f) < 1e-5f);
     CHECK(t1.n_seg() == 2);
-    CHECK(t1.nTRA == 0);
-    CHECK(t1.nREF == 0);
-    CHECK(t1.nSCT == 7); // propagated unchanged
+    CHECK(t1.n_tra == 0);
+    CHECK(t1.n_ref == 0);
+    CHECK(t1.n_sct == 7); // propagated unchanged
 
     // New coordinate landed in the appended slot.
     CHECK(t1(0) == 3.0f);
@@ -503,13 +511,13 @@ TEST_CASE("path - move constructor transfers ownership")
 {
     path src(4, 2, false);
     src.coord(0)[0] = 42.0f;
-    src.iC = 5;
+    src.i_cir = 5;
     const float *buf = src.coord(0);
 
     path dst(std::move(src));
     CHECK(dst.coord(0)[0] == 42.0f);
     CHECK(dst.coord(0) == buf); // same buffer, no reallocation
-    CHECK(dst.iC == 5);
+    CHECK(dst.i_cir == 5);
 
     // Moved-from path is left in the valid empty state (nSEG == 0, nFRQ == 1, no buffer).
     CHECK(src.n_seg() == 0);
@@ -537,12 +545,12 @@ TEST_CASE("path - copy assignment is deep and self-safe")
 {
     path a(3, 2, false);
     a.coord(1)[0] = 9.0f;
-    a.iC = 7;
+    a.i_cir = 7;
 
     path b;
     b = a;
     CHECK(b.coord(1)[0] == 9.0f);
-    CHECK(b.iC == 7);
+    CHECK(b.i_cir == 7);
     CHECK(b.coord(1) != a.coord(1)); // distinct buffers
     b.coord(1)[0] = -5.0f;
     CHECK(a.coord(1)[0] == 9.0f); // a unaffected
@@ -550,7 +558,7 @@ TEST_CASE("path - copy assignment is deep and self-safe")
     // Self-assignment must not corrupt or free-then-read.
     a = a;
     CHECK(a.coord(1)[0] == 9.0f);
-    CHECK(a.iC == 7);
+    CHECK(a.i_cir == 7);
 }
 
 TEST_CASE("path - free resets to a valid empty state")
@@ -566,8 +574,8 @@ TEST_CASE("path - free resets to a valid empty state")
     // Accessors must be safe on a freed object, not segfault.
     CHECK(std::isnan(p(0)));                                // nSEG == 0 -> NaN
     CHECK_THROWS_AS(p.coord(0), std::invalid_argument);     // seg >= nSEG(0)
-    CHECK_NOTHROW(p.xpr_coeff(0));                          // freq 0 always valid (xprmat)
-    CHECK_THROWS_AS(p.xpr_coeff(1), std::invalid_argument); // freq >= n_freq(1)
+    CHECK_NOTHROW(p.polmat(0));                          // freq 0 always valid (xprmat)
+    CHECK_THROWS_AS(p.polmat(1), std::invalid_argument); // freq >= n_freq(1)
 
     // Idempotent: freeing again is safe.
     CHECK_NOTHROW(p.free());

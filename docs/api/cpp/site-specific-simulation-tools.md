@@ -1037,7 +1037,7 @@ Not in: MATLAB, Python
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
   its coefficients, per frequency, via [medium_gain](#medium_gain) on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
-- The receiver index is written to the committed path's `iC`, 0-based. Without `point_ind` it indexes
+- The receiver index is written to the committed path's `i_cir`, 0-based. Without `point_ind` it indexes
   `points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
   cloud reordered by [point_cloud_segmentation](#point_cloud_segmentation) needs no remapping afterwards.
 - Padding points inserted by [point_cloud_segmentation](#point_cloud_segmentation) for SIMD alignment sit at the center of their
@@ -1093,8 +1093,8 @@ arma::uword quadriga_lib::ray_commit(
 - **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_ind`, which runs the other way and has
-  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `iC` is written in the original
-  indexing. NULL → `points` is used as passed in and `iC` indexes it directly
+  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
+  indexing. NULL → `points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [ray_subdivide_flag](#ray_subdivide_flag) for the
   same launch configuration. NULL / empty → no ray is excluded on these grounds
@@ -1105,13 +1105,13 @@ arma::uword quadriga_lib::ray_commit(
   before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
   generation, including the sub-beams they spawn, which keep `nSEG = 0` until their first interaction
 - **`ignore_direct_path`** *(optional)* — Drop every path that arrives by transmission only
-  (`nREF == 0 && nSCT == 0`, which includes pure LOS); these are covered by [calc_diffraction_gain](#calc_diffraction_gain).
+  (`n_ref == 0 && n_sct == 0`, which includes pure LOS); these are covered by [calc_diffraction_gain](#calc_diffraction_gain).
   The test is unconditional: under refraction the traced path is longer than the straight line, so a
   length-based test would let it through and double-count against the diffraction model
 
 ### Output:
 - **`paths_commit`** — Committed paths, appended to whatever the vector already holds; extended by
-  `n_commit` entries. Each carries the 0-based receiver index in `iC`, the interaction history of its ray, and the
+  `n_commit` entries. Each carries the 0-based receiver index in `i_cir`, the interaction history of its ray, and the
   transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are
   not modified; if the vector is non-empty its layout must match `paths`
 
@@ -1517,7 +1517,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
 - **`max_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
-  counter `nSUB` saturates at 255 instead of wrapping
+  counter `n_sub` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
 - **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
@@ -1827,7 +1827,7 @@ void quadriga_lib::ray_subdivide_flag(
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from [ray_triangle_intersect](#ray_triangle_intersect) for the same `orig` / `dest` pair
 - **`trivec`** — Beam wavefront triangle vertices relative to the ray origin; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
-- **`paths`** — Per-ray [path](channel-functions.md#path) objects; `n_ray` entries. Only the subdivision counter `nSUB` and the segment count are read
+- **`paths`** — Per-ray [path](channel-functions.md#path) objects; `n_ray` entries. Only the subdivision counter `n_sub` and the segment count are read
 - **`mtl_ind_current`** — Current medium state word, 0 = outside; `[n_ray]`. A ray inside a medium is
   never split: the sub-beams restart their in-layer accumulator and recompute their direction
   geometrically, which is only valid outside

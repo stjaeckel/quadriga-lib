@@ -33,7 +33,7 @@ Commit the paths of a launch configuration that reach a receiver
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
   its coefficients, per frequency, via [[medium_gain]] on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
-- The receiver index is written to the committed path's `iC`, 0-based. Without `point_ind` it indexes
+- The receiver index is written to the committed path's `i_cir`, 0-based. Without `point_ind` it indexes
   `points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
   cloud reordered by [[point_cloud_segmentation]] needs no remapping afterwards.
 - Padding points inserted by [[point_cloud_segmentation]] for SIMD alignment sit at the center of their
@@ -89,8 +89,8 @@ arma::uword quadriga_lib::ray_commit(
 - **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [[point_cloud_segmentation]] for the same cloud — not `reverse_ind`, which runs the other way and has
-  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `iC` is written in the original
-  indexing. NULL → `points` is used as passed in and `iC` indexes it directly
+  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
+  indexing. NULL → `points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [[ray_subdivide_flag]] for the
   same launch configuration. NULL / empty → no ray is excluded on these grounds
@@ -101,13 +101,13 @@ arma::uword quadriga_lib::ray_commit(
   before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
   generation, including the sub-beams they spawn, which keep `nSEG = 0` until their first interaction
 - **`ignore_direct_path`** *(optional)* — Drop every path that arrives by transmission only
-  (`nREF == 0 && nSCT == 0`, which includes pure LOS); these are covered by [[calc_diffraction_gain]].
+  (`n_ref == 0 && n_sct == 0`, which includes pure LOS); these are covered by [[calc_diffraction_gain]].
   The test is unconditional: under refraction the traced path is longer than the straight line, so a
   length-based test would let it through and double-count against the diffraction model
 
 ## Output:
 - **`paths_commit`** — Committed paths, appended to whatever the vector already holds; extended by
-  `n_commit` entries. Each carries the 0-based receiver index in `iC`, the interaction history of its ray, and the
+  `n_commit` entries. Each carries the 0-based receiver index in `i_cir`, the interaction history of its ray, and the
   transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are
   not modified; if the vector is non-empty its layout must match `paths`
 
@@ -169,7 +169,6 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
     if (center_freq.min() <= 0.0f)
         throw std::invalid_argument("Input 'center_freq' must be > 0.");
     float fRef_Hz = center_freq[0];
-    float fRef_GHz = fRef_Hz * 1e-9f;
 
     // Ray count is defined by 'orig'; all other per-ray inputs must match it
     const arma::uword n_ray = orig.n_rows;
@@ -293,12 +292,12 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
         if (P.length() >= max_path_length) // already too long without the final leg
             continue;
 
-        if (ignore_direct_path && P.nREF == 0 && P.nSCT == 0) // covered by the diffraction model
+        if (ignore_direct_path && P.n_ref == 0 && P.n_sct == 0) // covered by the diffraction model
             continue;
 
         // Optimistic pre-check: the stored length is shorter than the committed one,
         // so this can only over-admit. The exact test happens per pair.
-        if (P.calc_gain(fRef_GHz) <= min_gain_linear)
+        if (P.calc_gain(fRef_Hz) <= min_gain_linear)
             continue;
 
         qd::bits<uint8_t> g;
@@ -372,7 +371,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
                 const unsigned material = unsigned(p_current[iR] & 0x3FFFu);
                 medium_g = quadriga_lib::medium_gain(mtl_prop, material, seg_length, fRef_Hz, scalar_mode);
             }
-            if (medium_g * paths[iR].calc_gain(fRef_GHz, 0, len) <= min_gain_linear)
+            if (medium_g * paths[iR].calc_gain(fRef_Hz, 0, len) <= min_gain_linear)
                 continue;
 
             // Shading: the receiver must lie on the same side of the FBS plane as the ray origin.
@@ -453,7 +452,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
 
             // Receiver index, 0-based. point_ind is 1-based over the segmented cloud, so
             // subtracting one lands in the caller's original point ordering.
-            C.iC = p_pt_index ? (p_pt_index[i_point] - 1u) : (unsigned)i_point;
+            C.i_cir = p_pt_index ? (p_pt_index[i_point] - 1u) : (unsigned)i_point;
             ++i_out;
 
             // Length of the final leg, needed for the in-medium attenuation
@@ -466,7 +465,7 @@ arma::uword quadriga_lib::ray_commit(const std::vector<quadriga_lib::path> &path
             for (size_t i_freq = 0; i_freq < n_freq; ++i_freq)
             {
                 float medium_g = material ? quadriga_lib::medium_gain(mtl_prop, material, seg_length, center_freq[i_freq], scalar_mode) : 1.0f;
-                C.xpr_update(p_mirror, medium_g, i_freq);
+                C.polmat_update(p_mirror, medium_g, i_freq);
             }
         }
     }

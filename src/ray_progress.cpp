@@ -252,7 +252,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
 - **`max_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
-  counter `nSUB` saturates at 255 instead of wrapping
+  counter `n_sub` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
 - **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [[ray_state_update]] as its `eps`; see there. Default 0.15
@@ -385,7 +385,6 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
     if (center_freq.min() <= 0.0f)
         throw std::invalid_argument("Input 'center_freq' must be > 0.");
     float fRef_Hz = center_freq[0];
-    float fRef_GHz = fRef_Hz * 1e-9f;
 
     // Ray count is defined by 'orig'; all other per-ray inputs must match it
     const arma::uword n_ray = orig.n_rows;
@@ -716,10 +715,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                 L.paths[i_out] = paths[i_ray]; // Deep copy (copy assignment)
 
                 // Increase subdivision counter. A delegated subdiv_flag_in is authoritative and does
-                // not apply max_subdivisions, so saturate rather than wrap: a wrapped nSUB reads
+                // not apply max_subdivisions, so saturate rather than wrap: a wrapped n_sub reads
                 // as 0 and would let the same beam be split without bound.
-                if (L.paths[i_out].nSUB != 255)
-                    ++L.paths[i_out].nSUB;
+                if (L.paths[i_out].n_sub != 255)
+                    ++L.paths[i_out].n_sub;
 
                 // New origin at subdivision point
                 float Sx = p_orig[i_out3];
@@ -910,7 +909,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
                                    ? calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz)
                                    : calc_length(p_fbs[i_int], p_fbs[iY], p_fbs[iZ], p_orig[i_int], p_orig[iY], p_orig[iZ]) + paths[i_int].length();
 
-                p_gain[i_int] = paths[i_int].calc_gain(fRef_GHz, 0, length);
+                p_gain[i_int] = paths[i_int].calc_gain(fRef_Hz, 0, length);
             }
         }
     };
@@ -934,10 +933,10 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             {
                 if (reflect_pass)
                 {
-                    if (paths[i_int].nREF < max_reflections)
+                    if (paths[i_int].n_ref < max_reflections)
                         p_keep_ind[cnt++] = i_int;
                 }
-                else if (paths[i_int].nTRA < max_transmissions)
+                else if (paths[i_int].n_tra < max_transmissions)
                     p_keep_ind[cnt++] = i_int;
             }
         }
@@ -1043,11 +1042,11 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             if (paths[iX].n_seg() == 0) // source -> new interaction point: derive the first leg (no previous coordinate)
                 p_path[i_out].set_length(calc_length(p_fbs[iX], p_fbs[iY], p_fbs[iZ], Ox, Oy, Oz));
 
-            p_path[i_out].xpr_update(&p_xpr[nXPR * iX]);
+            p_path[i_out].polmat_update(&p_xpr[nXPR * iX]);
             if (reflect_pass)
-                ++p_path[i_out].nREF;
+                ++p_path[i_out].n_ref;
             else
-                ++p_path[i_out].nTRA;
+                ++p_path[i_out].n_tra;
         }
 
         // Base frequency. Must run before the loop below overwrites path_dirN / acc_refN.
@@ -1099,7 +1098,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(const arma::fmat &mesh,
             for (long long i_ray = 0; i_ray < (long long)n_rays; ++i_ray)
             {
                 const size_t iX = (size_t)p_keep_ind[i_ray];
-                p_path[i_ray].xpr_update(&p_xpr_freq[nXPR * iX], 1.0, i_freq);
+                p_path[i_ray].polmat_update(&p_xpr_freq[nXPR * iX], 1.0, i_freq);
             }
         }
     };

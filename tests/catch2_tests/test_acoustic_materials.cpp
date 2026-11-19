@@ -316,7 +316,7 @@ TEST_CASE("Materials rig - objects: absorption area of a hard box, an absorbing 
                                    pd, acc, paths, nullptr, nullptr, nullptr, nullptr, 10, 255, 255, 0, -60.0f, 3.0f, 0.0f, false, true);
         double p = 0.0;
         for (arma::uword i = 0; i < orig.n_rows; ++i)
-            p += std::norm(mt::cd(paths[i].xpr_coeff(0)[0], paths[i].xpr_coeff(0)[1]));
+            p += std::norm(mt::cd(paths[i].polmat(0)[0], paths[i].polmat(0)[1]));
         QD_DIAG("%d,%llu,%.6f\n", g, (unsigned long long)orig.n_rows, p);
     }
 }

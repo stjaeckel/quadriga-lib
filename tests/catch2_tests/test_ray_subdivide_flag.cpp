@@ -507,11 +507,11 @@ TEST_CASE("ray_subdivide_flag - state gates")
         Beams B = one_beam(1.0f);
         intersect(B, S);
 
-        B.paths[0].nSUB = 1;
+        B.paths[0].n_sub = 1;
         CHECK(B.flag(S, tol, 20, 2)[0] == true);
-        B.paths[0].nSUB = 2;
+        B.paths[0].n_sub = 2;
         CHECK(B.flag(S, tol, 20, 2)[0] == false);
-        B.paths[0].nSUB = 3;
+        B.paths[0].n_sub = 3;
         CHECK(B.flag(S, tol, 20, 2)[0] == false);
     }
     SECTION("the segment count stops at max_interactions")
@@ -561,7 +561,7 @@ TEST_CASE("ray_subdivide_flag - gates are applied per ray")
         if (i % 4 == 1)
             B.cur(i) = 1;
         else if (i % 4 == 2)
-            B.paths[i].nSUB = 2;
+            B.paths[i].n_sub = 2;
         else if (i % 4 == 3)
             B.paths[i].init(20, 1, false);
 

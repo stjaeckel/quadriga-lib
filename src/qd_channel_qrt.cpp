@@ -124,17 +124,17 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
   | Member             | Type         | Description                                                                                     |
   | ------------------ | ------------ | ----------------------------------------------------------------------------------------------- |
   | `version`          | `int`        | QRT file version                                                                                |
-  | `no_orig`          | `unsigned`   | Number of origin (TX) positions                                                                 |
-  | `no_cir`           | `unsigned`   | Number of CIRs per origin                                                                       |
-  | `no_dest`          | `unsigned`   | Number of destinations (RX)                                                                     |
-  | `no_freq`          | `unsigned`   | Number of frequency bands                                                                       |
-  | `freq`             | `arma::fvec` | Frequencies as stored: GHz in v4 and in v5 when all are below 1000, else Hz; `[no_freq]`        |
-  | `cir_pos`          | `arma::fmat` | CIR positions; `[no_cir, 3]`                                                                    |
-  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[no_cir, 3]`                                                         |
-  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[no_orig, 3]`                                                                |
-  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[no_orig, 3]`                                                     |
-  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[no_orig]`                                    |
-  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; 0 if the TX slot is unwritten; `[no_orig]` |
+  | `n_orig`           | `unsigned`   | Number of origin (TX) positions                                                                 |
+  | `n_cir`            | `unsigned`   | Number of CIRs per origin                                                                       |
+  | `n_dest`           | `unsigned`   | Number of destinations (RX)                                                                     |
+  | `n_freq`           | `unsigned`   | Number of frequency bands                                                                       |
+  | `freq`             | `arma::fvec` | Frequencies in Hz (converted from GHz for v4 files and older v5 files); `[n_freq]`              |
+  | `cir_pos`          | `arma::fmat` | CIR positions; `[n_cir, 3]`                                                                     |
+  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[n_cir, 3]`                                                          |
+  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[n_orig, 3]`                                                                 |
+  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[n_orig, 3]`                                                      |
+  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[n_orig]`                                     |
+  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; 0 if the TX slot is unwritten; `[n_orig]`  |
 MD!*/
 
 quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string &fn,
@@ -161,48 +161,48 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
     cache.version = qrt_read_header(fileR);
 
     // Global counters
-    fileR.read((char *)&cache.no_orig, sizeof(unsigned));
-    fileR.read((char *)&cache.no_cir, sizeof(unsigned));
-    fileR.read((char *)&cache.no_dest, sizeof(unsigned));
+    fileR.read((char *)&cache.n_orig, sizeof(unsigned));
+    fileR.read((char *)&cache.n_cir, sizeof(unsigned));
+    fileR.read((char *)&cache.n_dest, sizeof(unsigned));
 
     size_t pos = 11 + 3 * sizeof(unsigned); // read position (ID, version, 3 counters)
 
     // Version 4 has one frequency, read from the first origin below; 0 Hz if there is no origin
-    cache.no_freq = 1;
+    cache.n_freq = 1;
     cache.freq.zeros(1);
     if (cache.version > 4)
-        qrt_read_freq_list(fileR, file_size, pos, cache.no_freq, cache.freq);
+        qrt_read_freq_list(fileR, file_size, pos, cache.n_freq, cache.freq);
 
     // CIR metadata (read all)
-    if (cache.no_cir != 0)
+    if (cache.n_cir != 0)
     {
         uint8_t cir_fmt = 0;
         fileR.read((char *)&cir_fmt, sizeof(uint8_t));
         pos += 1;
         size_t cir_bytes = (3 + qrt_orientation_columns(cir_fmt)) * sizeof(float);
-        qrt_check_fits(fileR, file_size, pos, cache.no_cir, cir_bytes, "n_cir");
-        pos += (size_t)cache.no_cir * cir_bytes;
+        qrt_check_fits(fileR, file_size, pos, cache.n_cir, cir_bytes, "n_cir");
+        pos += (size_t)cache.n_cir * cir_bytes;
 
-        cache.cir_pos.set_size(cache.no_cir, 3);
-        fileR.read((char *)cache.cir_pos.memptr(), cache.no_cir * 3 * sizeof(float));
+        cache.cir_pos.set_size(cache.n_cir, 3);
+        fileR.read((char *)cache.cir_pos.memptr(), cache.n_cir * 3 * sizeof(float));
 
-        cache.cir_orientation.zeros(cache.no_cir, 3);
+        cache.cir_orientation.zeros(cache.n_cir, 3);
         if (cir_fmt > 3)
-            fileR.read((char *)cache.cir_orientation.colptr(0), cache.no_cir * sizeof(float));
+            fileR.read((char *)cache.cir_orientation.colptr(0), cache.n_cir * sizeof(float));
         if (cir_fmt == 2 || cir_fmt == 3 || cir_fmt == 6 || cir_fmt == 7)
-            fileR.read((char *)cache.cir_orientation.colptr(1), cache.no_cir * sizeof(float));
+            fileR.read((char *)cache.cir_orientation.colptr(1), cache.n_cir * sizeof(float));
         if (cir_fmt == 1 || cir_fmt == 3 || cir_fmt == 5 || cir_fmt == 7)
-            fileR.read((char *)cache.cir_orientation.colptr(2), cache.no_cir * sizeof(float));
+            fileR.read((char *)cache.cir_orientation.colptr(2), cache.n_cir * sizeof(float));
         qrt_check_stream(fileR);
     }
 
     // Skip destination metadata (per destination: CIR offset and name length, at least 5 bytes)
-    if (cache.no_dest != 0)
+    if (cache.n_dest != 0)
     {
-        qrt_check_fits(fileR, file_size, pos, cache.no_dest, sizeof(unsigned) + 1, "n_dest");
-        fileR.seekg((std::streamoff)(cache.no_dest * sizeof(unsigned)), std::ios::cur);
-        pos += (size_t)cache.no_dest * sizeof(unsigned);
-        for (unsigned i = 0; i < cache.no_dest; ++i)
+        qrt_check_fits(fileR, file_size, pos, cache.n_dest, sizeof(unsigned) + 1, "n_dest");
+        fileR.seekg((std::streamoff)(cache.n_dest * sizeof(unsigned)), std::ios::cur);
+        pos += (size_t)cache.n_dest * sizeof(unsigned);
+        for (unsigned i = 0; i < cache.n_dest; ++i)
         {
             uint8_t mt_name_length = 0;
             fileR.read((char *)&mt_name_length, sizeof(uint8_t));
@@ -213,31 +213,31 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
     }
 
     // Origin metadata (read all)
-    if (cache.no_orig != 0)
+    if (cache.n_orig != 0)
     {
         uint8_t orig_fmt = 0;
         fileR.read((char *)&orig_fmt, sizeof(uint8_t));
         pos += 1;
-        qrt_check_fits(fileR, file_size, pos, cache.no_orig, (3 + qrt_orientation_columns(orig_fmt)) * sizeof(float) + sizeof(size_t), "n_orig");
+        qrt_check_fits(fileR, file_size, pos, cache.n_orig, (3 + qrt_orientation_columns(orig_fmt)) * sizeof(float) + sizeof(size_t), "n_orig");
 
-        cache.orig_pos_all.set_size(cache.no_orig, 3);
-        fileR.read((char *)cache.orig_pos_all.memptr(), cache.no_orig * 3 * sizeof(float));
+        cache.orig_pos_all.set_size(cache.n_orig, 3);
+        fileR.read((char *)cache.orig_pos_all.memptr(), cache.n_orig * 3 * sizeof(float));
 
-        cache.orig_orientation.zeros(cache.no_orig, 3);
+        cache.orig_orientation.zeros(cache.n_orig, 3);
         if (orig_fmt > 3)
-            fileR.read((char *)cache.orig_orientation.colptr(0), cache.no_orig * sizeof(float));
+            fileR.read((char *)cache.orig_orientation.colptr(0), cache.n_orig * sizeof(float));
         if (orig_fmt == 2 || orig_fmt == 3 || orig_fmt == 6 || orig_fmt == 7)
-            fileR.read((char *)cache.orig_orientation.colptr(1), cache.no_orig * sizeof(float));
+            fileR.read((char *)cache.orig_orientation.colptr(1), cache.n_orig * sizeof(float));
         if (orig_fmt == 1 || orig_fmt == 3 || orig_fmt == 5 || orig_fmt == 7)
-            fileR.read((char *)cache.orig_orientation.colptr(2), cache.no_orig * sizeof(float));
+            fileR.read((char *)cache.orig_orientation.colptr(2), cache.n_orig * sizeof(float));
 
-        cache.orig_index.set_size(cache.no_orig);
-        fileR.read((char *)cache.orig_index.memptr(), cache.no_orig * sizeof(size_t));
+        cache.orig_index.set_size(cache.n_orig);
+        fileR.read((char *)cache.orig_index.memptr(), cache.n_orig * sizeof(size_t));
         qrt_check_stream(fileR);
     }
 
     // Version 4: frequency stored per-origin, read from first origin
-    if (cache.version == 4 && cache.no_orig != 0)
+    if (cache.version == 4 && cache.n_orig != 0)
     {
         qrt_check_offset(file_size, cache.orig_index(0), "orig_index");
         fileR.seekg((std::streampos)cache.orig_index(0));
@@ -248,18 +248,19 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
         fileR.read((char *)cache.freq.memptr(), sizeof(float));
         qrt_check_stream(fileR);
     }
+    cache.freq *= (float)qd_qrt_freq_scale(cache.freq.memptr(), cache.freq.n_elem, cache.version); // Stored frequency to Hz
 
     // Pre-compute path_data_offset for each origin
     // For each origin, this is the absolute byte offset to the start of the
     // path_data_index[] array within that origin's data block.
     // Layout: [tx_name_length(1)] [tx_name(N)] [freq(4, v4 only)] [max_paths(4)] [path_data_index[n_cir]]
     // So: path_data_offset = orig_index + 1 + tx_name_length + (v4 ? 4 : 0) + 4
-    if (cache.no_orig != 0)
+    if (cache.n_orig != 0)
     {
-        cache.path_data_offset.set_size(cache.no_orig);
+        cache.path_data_offset.set_size(cache.n_orig);
         unsigned extra = (cache.version == 4) ? (unsigned)sizeof(float) : 0;
 
-        for (unsigned i = 0; i < cache.no_orig; ++i)
+        for (unsigned i = 0; i < cache.n_orig; ++i)
         {
             if (cache.orig_index(i) == 0) // TX not yet written by append
             {
@@ -277,7 +278,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
                                         + sizeof(unsigned);      // max_paths
 
             // The path_data_index of the origin must lie inside the file
-            qrt_check_fits(file_size, cache.path_data_offset(i), cache.no_cir, sizeof(size_t), "n_cir");
+            qrt_check_fits(file_size, cache.path_data_offset(i), cache.n_cir, sizeof(size_t), "n_cir");
         }
     }
 
@@ -461,8 +462,8 @@ template void quadriga_lib::qrt_file_init<double>(const std::string &fn, const a
 Append one transmitter's path data to an existing QRT file
 
 - Writes the path data for a single TX into the next free slot reserved by [[qrt_file_init]], and records the TX name, position, and orientation.
-- Paths are grouped by their CIR index (`path::iC`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
-- Validates every path before writing: `iC` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
+- Paths are grouped by their CIR index (`path::i_cir`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
+- Validates every path before writing: `i_cir` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
 - Throws when all TX slots are already filled — the file holds at most the `n_orig` slots reserved at init.
 - Only v5/6 files can be appended to. Positional data is converted to `float` on write.
 - Returns the total number of paths written.
@@ -480,7 +481,7 @@ size_t quadriga_lib::qrt_file_append(
 
 ## Inputs:
 - **`fn`** — Path to an existing QRT file created by [[qrt_file_init]]
-- **`path_data`** — Paths to write; each carries its CIR index in `iC` and must match the file's frequency count and layout mode
+- **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
 - **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; `nullptr` = zeros
 - **`orig_name`** — Transmitter name; at most 255 characters
@@ -522,9 +523,9 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     if (cache.version != 5 && cache.version != 6)
         throw std::runtime_error("Only QRT versions 5 and 6 can be appended to.");
 
-    unsigned n_cir = cache.no_cir;
-    unsigned n_freq = cache.no_freq;
-    unsigned n_orig = cache.no_orig;
+    unsigned n_cir = cache.n_cir;
+    unsigned n_freq = cache.n_freq;
+    unsigned n_orig = cache.n_orig;
     bool scalar = (cache.version == 6);
     size_t pol_stride = scalar ? 2 : 8;
 
@@ -548,8 +549,8 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     // MT index + names (variable-length names): walk them from the file.
     {
         f.seekg((std::streamoff)off, std::ios::beg);
-        f.seekg((std::streamoff)(cache.no_dest * sizeof(unsigned)), std::ios::cur);
-        for (unsigned i = 0; i < cache.no_dest; ++i)
+        f.seekg((std::streamoff)(cache.n_dest * sizeof(unsigned)), std::ios::cur);
+        for (unsigned i = 0; i < cache.n_dest; ++i)
         {
             uint8_t len = 0;
             f.read((char *)&len, sizeof(uint8_t));
@@ -566,13 +567,13 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     std::vector<unsigned> no_hit(n_cir, 0);
     for (const auto &p : path_data)
     {
-        if ((unsigned)p.iC >= n_cir)
-            throw std::invalid_argument("Entries of 'path_data' must have a CIR index 'iC' below the number of CIRs in the file.");
+        if ((unsigned)p.i_cir >= n_cir)
+            throw std::invalid_argument("Entries of 'path_data' must have a CIR index 'i_cir' below the number of CIRs in the file.");
         if ((unsigned)p.n_freq() != n_freq)
             throw std::invalid_argument("Entries of 'path_data' must have as many frequencies as the file.");
         if (p.is_scalar() != scalar)
             throw std::invalid_argument("Entries of 'path_data' must match the scalar or polarimetric mode of the file.");
-        ++no_hit[p.iC];
+        ++no_hit[p.i_cir];
     }
     unsigned max_paths = 0;
     for (unsigned c = 0; c < n_cir; ++c)
@@ -583,7 +584,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
     for (unsigned c = 0; c < n_cir; ++c)
         by_cir[c].reserve(no_hit[c]);
     for (const auto &p : path_data)
-        by_cir[p.iC].push_back(&p);
+        by_cir[p.i_cir].push_back(&p);
 
     // First free BS slot (0 = free); throw if full.
     unsigned slot = n_orig;
@@ -656,7 +657,7 @@ size_t quadriga_lib::qrt_file_append(const std::string &fn,
             for (unsigned i_freq = 0; i_freq < n_freq; ++i_freq)
                 for (unsigned iP = 0; iP < nP; ++iP)
                 {
-                    const float *cf = paths[iP]->xpr_coeff(i_freq);
+                    const float *cf = paths[iP]->polmat(i_freq);
                     float *dst = pol.data() + size_t(i_freq * nP + iP) * pol_stride;
                     for (size_t k = 0; k < pol_stride; ++k)
                         dst[k] = cf[k];
@@ -1074,8 +1075,8 @@ std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
 auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
 arma::vec center_freq, tx_pos, rx_pos, path_length;
 arma::mat path_gain; arma::cube polmat;
-for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
-    for (arma::uword io = 0; io < cache.no_orig; ++io)
+for (arma::uword ic = 0; ic < cache.n_cir; ++ic)
+    for (arma::uword io = 0; io < cache.n_orig; ++io)
         quadriga_lib::qrt_file_read<double>("", ic, io, false,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
             nullptr, nullptr, &path_gain, &path_length, &polmat,
@@ -1145,13 +1146,13 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     if (cache) // FAST PATH: metadata from cache (zero I/O)
     {
         ver = cache->version;
-        l_no_cir = cache->no_cir;
-        l_no_freq = cache->no_freq;
+        l_no_cir = cache->n_cir;
+        l_no_freq = cache->n_freq;
         p_freq = cache->freq.memptr();
 
         if (i_cir >= (arma::uword)l_no_cir)
             throw std::invalid_argument("CIR index exceeds number of CIRs in file.");
-        if (i_orig >= (arma::uword)cache->no_orig)
+        if (i_orig >= (arma::uword)cache->n_orig)
             throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
 
         // CIR position / orientation (column-major: [n_cir, 3])
@@ -1354,12 +1355,12 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
             l_freq_buf(0) = 0.0f; // unfilled v4 slot: no per-origin freq available
         }
 
+        l_freq_buf *= (float)qd_qrt_freq_scale(l_freq_buf.memptr(), l_freq_buf.n_elem, ver); // Stored frequency to Hz
         p_freq = l_freq_buf.memptr();
     }
 
     arma::uword n_freq = (arma::uword)l_no_freq;
     bool v6 = (ver == 6);
-    const double freq_scale = qd_qrt_freq_scale(p_freq, n_freq, ver); // Stored frequency to Hz
 
     // TX slot reserved but not yet appended
     if (l_path_data_offset == 0)
@@ -1369,7 +1370,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         {
             center_freq->set_size(n_freq);
             for (arma::uword k = 0; k < n_freq; ++k)
-                center_freq->at(k) = (dtype)p_freq[k] * (dtype)freq_scale;
+                center_freq->at(k) = (dtype)p_freq[k];
         }
         if (tx_pos)
             tx_pos->zeros(3, 1);
@@ -1484,7 +1485,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     // EM: FSPL reference. Scalar: 1/r spreading, frequency-independent.
     arma::vec gain_at_1m(n_freq);
     for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
-        gain_at_1m[i_freq] = qd_gain_at_1m((double)p_freq[i_freq] * freq_scale, v6);
+        gain_at_1m[i_freq] = qd_gain_at_1m((double)p_freq[i_freq], v6);
 
     // Air absorption in dB/m (ISO 9613-1, T = 20 C, RH = 50 %, p = 1 atm).
     // Zero for v4/v5 (EM) so the per-path loop works uniformly.
@@ -1498,7 +1499,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     {
         center_freq->set_size(n_freq);
         for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
-            center_freq->at(i_freq) = (dtype)p_freq[i_freq] * (dtype)freq_scale;
+            center_freq->at(i_freq) = (dtype)p_freq[i_freq];
     }
 
     // Output: positions
@@ -1752,8 +1753,8 @@ Read raw ray-tracing path data from a QRT file into path objects
 - Reassembles the stored path data for a single origin (TX) into a vector of [[path]] objects — the inverse of [[qrt_file_append]].
 - Unlike [[qrt_file_read]], which returns processed CIR data (channel matrices, angles, path loss), this returns the raw per-path storage:
   coordinates, polarization coefficients, and interaction type codes.
-- Each returned path has `iC` set to its CIR index. Counters not stored in the file
-  (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
+- Each returned path has `i_cir` set to its CIR index. Counters not stored in the file
+  (`n_ref`, `n_tra`, `n_sub`, `n_sct`) and `length` are left at their defaults.
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [[qrt_file_init]] but never written by [[qrt_file_append]] returns an empty vector.
 - Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
@@ -1816,11 +1817,11 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
 
     if (c->version != 5 && c->version != 6)
         throw std::runtime_error("Only QRT versions 5 and 6 can be read as raw paths.");
-    if (i_orig >= (arma::uword)c->no_orig)
+    if (i_orig >= (arma::uword)c->n_orig)
         throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
 
-    unsigned n_cir = c->no_cir;
-    unsigned n_freq = c->no_freq;
+    unsigned n_cir = c->n_cir;
+    unsigned n_freq = c->n_freq;
     bool scalar = (c->version == 6);
     size_t stride = scalar ? 2 : 8;
 
@@ -1897,7 +1898,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
             unsigned ns = nmi[iP];
 
             quadriga_lib::path p(ns, n_freq, scalar); // allocates buffer, seeds identity
-            p.iC = ci;
+            p.i_cir = ci;
 
             // Coordinates -> coord buffer (3 * ns floats)
             if (ns != 0)
@@ -1906,11 +1907,11 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_file_read_raw(const std::strin
                 coord_cursor += ns;
             }
 
-            // Polarization -> xpr_coeff slots, undoing the freq-major interleave
+            // Polarization -> polmat slots, undoing the freq-major interleave
             for (unsigned i_freq = 0; i_freq < n_freq; ++i_freq)
             {
                 const float *src = pol.data() + ((size_t)i_freq * nP + iP) * stride;
-                std::memcpy(p.xpr_coeff(i_freq), src, stride * sizeof(float));
+                std::memcpy(p.polmat(i_freq), src, stride * sizeof(float));
             }
 
             // Interaction type codes -> inline array + history buffer
@@ -1935,8 +1936,8 @@ Path objects of one CIR from spherical path data, for qrt_file_append
 
 - Converts the paths of one Tx-Rx pair (e.g. of [[ssf_paths]] with `drift` mobility) into [[path]] objects for
   [[qrt_file_append]]; one call per CIR, the objects of all CIRs of one origin appended together
-- Interactions: LOS none; GR one reflection at `lbs_pos` (code 129, `nREF` = 1); NLOS two point scatterers at
-  `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
+- Interactions: LOS none; GR one reflection at `lbs_pos` (code 129, `n_ref` = 1); NLOS two point scatterers at
+  `fbs_pos`, `lbs_pos` (code 193, `n_sct` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only ([[qrt_file_read_raw]] returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
   [[qrt_file_read]] (`uplink = false`, `normalize_polmat` 0 or 1) returns sqrt(`path_gain`)·`polmat` per complex entry
@@ -1970,7 +1971,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`polmat`** — Polarization transfer matrices, row order of [[get_channels_spherical]]; `[8, n_path, n_freq]`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
-- **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
+- **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::i_cir`, < 2^32
 
 ## Returns:
 - Path objects in input order, EM layout with `n_freq` frequencies; `[n_path]`
@@ -2041,20 +2042,20 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
         quadriga_lib::path &q = out[p];
         const arma::uword type = path_type(p);
         q.init(type == 0 ? 0 : type == 1 ? 1 : 2, n_freq);
-        q.iC = (unsigned)i_cir;
+        q.i_cir = (unsigned)i_cir;
         if (type == 1) // GR: one front reflection at its point
         {
             for (int i = 0; i < 3; ++i)
                 q.coord(0)[i] = (float)lbs_pos(i, p);
             q.set_interaction_type_codes({129});
-            q.nREF = 1;
+            q.n_ref = 1;
         }
         else if (type == 2) // NLOS: two point scatterers
         {
             for (int i = 0; i < 3; ++i)
                 q.coord(0)[i] = (float)fbs_pos(i, p), q.coord(1)[i] = (float)lbs_pos(i, p);
             q.set_interaction_type_codes({193, 193});
-            q.nSCT = 2;
+            q.n_sct = 2;
         }
         // The stored float32 values must give qrt_file_read a length > 0 and finite Jones matrices
         const float len = q.calc_length(Rf, Tf);
@@ -2069,7 +2070,7 @@ std::vector<quadriga_lib::path> quadriga_lib::qrt_paths_from_scatterers(const ar
         {
             const double s = std::sqrt(path_gain(p, f)) * L(p) * a_1m(f);
             const double *m = polmat.slice_colptr(f, p);
-            float *J = q.xpr_coeff(f);
+            float *J = q.polmat(f);
             for (int e = 0; e < 8; ++e)
             {
                 J[e] = (float)(m[e] * s);

@@ -53,7 +53,7 @@ void quadriga_lib::ray_subdivide_flag(
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from [[ray_triangle_intersect]] for the same `orig` / `dest` pair
 - **`trivec`** — Beam wavefront triangle vertices relative to the ray origin; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
-- **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Only the subdivision counter `nSUB` and the segment count are read
+- **`paths`** — Per-ray [[path]] objects; `n_ray` entries. Only the subdivision counter `n_sub` and the segment count are read
 - **`mtl_ind_current`** — Current medium state word, 0 = outside; `[n_ray]`. A ray inside a medium is
   never split: the sub-beams restart their in-layer accumulator and recompute their direction
   geometrically, which is only valid outside
@@ -187,7 +187,7 @@ void quadriga_lib::ray_subdivide_flag(const arma::fmat &mesh,
         // bit is left alone as well.
         if (p_current[iRx] != 0) // Currently inside a medium
             continue;
-        if (paths[iRx].nSUB >= max_subdivisions) // Max. subdiv reached
+        if (paths[iRx].n_sub >= max_subdivisions) // Max. subdiv reached
             continue;
         if (paths[iRx].n_seg() >= max_seg) // Max. interactions reached
             continue;

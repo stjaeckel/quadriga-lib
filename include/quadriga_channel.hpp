@@ -124,11 +124,11 @@ namespace quadriga_lib
         // └─────────────────────────────────────────────────────┘
 
     public:
-        unsigned iC = 0;  // Channel ID (= the channel to which the path belongs to)
-        uint8_t nREF = 0; // Number of reflections
-        uint8_t nTRA = 0; // Number of transmissions / refractions
-        uint8_t nSUB = 0; // Number of subdivisions
-        uint8_t nSCT = 0; // Number of scallering events
+        unsigned i_cir = 0; // CIR index (= the CIR to which the path belongs)
+        uint8_t n_ref = 0;  // Number of reflections
+        uint8_t n_tra = 0;  // Number of transmissions / refractions
+        uint8_t n_sub = 0;  // Number of subdivisions
+        uint8_t n_sct = 0;  // Number of scattering events
 
         path() = default;                       // Default constructor: 0 segments, 1 frequency, EM mode
         path(path &&other) noexcept;            // Move constructor
@@ -161,22 +161,22 @@ namespace quadriga_lib
         float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length
         float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
 
-        // Access xprmat coefficients for a specific frequency
-        const float *xpr_coeff(size_t freq = 0) const; // Read only
-        float *xpr_coeff(size_t freq = 0);             // Read + write
+        // Access the polarization transfer matrix (EM) or pressure coefficient (scalar) of frequency index i_freq
+        const float *polmat(size_t i_freq = 0) const; // Read only
+        float *polmat(size_t i_freq = 0);             // Read + write
 
-        // Left-multiply ray's Jones matrix; coeff_update must have length 8 (EM) or 2 (scalar)
-        // + calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
-        float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
+        // Left-multiply ray's polarization transfer matrix; coeff_update must have length 8 (EM) or 2 (scalar)
+        // + calculate gain from the coefficients; freq in Hz, freq > 0 applies the free-space loss
+        float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
 
-        // Calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
-        float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
+        // Calculate gain from the coefficients; freq in Hz, freq > 0 applies the free-space loss
+        float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
 
         // Duplicate path, writing to "target"; return length
         float duplicate(path &target) const;
 
-        // Duplicate path and append segment; nREF and nTRA are not changed; return length
-        // - Must be called before xpr_update/gain to use the correct path length in gain calculation
+        // Duplicate path and append segment; n_ref and n_tra are not changed; return length
+        // - Must be called before polmat_update/gain to use the correct path length in gain calculation
         float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
 
         // Get/set the interaction type sequence
@@ -431,17 +431,17 @@ namespace quadriga_lib
     struct qrt_read_cache
     {
         int version = 0;                // QRT file version
-        unsigned no_orig = 0;           // Number of origin (TX) positions
-        unsigned no_cir = 0;            // Number of CIRs per origin
-        unsigned no_dest = 0;           // Number of destinations (RX)
-        unsigned no_freq = 1;           // Number of frequency bands
-        arma::fvec freq;                // Frequencies as stored (GHz in v4 and in v5 when all < 1000, else Hz), [no_freq]
-        arma::fmat cir_pos;             // CIR positions, size [no_cir, 3]
-        arma::fmat cir_orientation;     // CIR orientations (Euler), size [no_cir, 3]
-        arma::fmat orig_pos_all;        // Origin positions, size [no_orig, 3]
-        arma::fmat orig_orientation;    // Origin orientations (Euler), size [no_orig, 3]
-        arma::u64_vec orig_index;       // Byte offsets from BOF to each origin data block, length [no_orig]
-        arma::u64_vec path_data_offset; // Pre-computed absolute offset to path_data_index array per origin, length [no_orig]
+        unsigned n_orig = 0;            // Number of origin (TX) positions
+        unsigned n_cir = 0;             // Number of CIRs per origin
+        unsigned n_dest = 0;            // Number of destinations (RX)
+        unsigned n_freq = 1;            // Number of frequency bands
+        arma::fvec freq;                // Frequencies in Hz (converted from the stored unit), [n_freq]
+        arma::fmat cir_pos;             // CIR positions, size [n_cir, 3]
+        arma::fmat cir_orientation;     // CIR orientations (Euler), size [n_cir, 3]
+        arma::fmat orig_pos_all;        // Origin positions, size [n_orig, 3]
+        arma::fmat orig_orientation;    // Origin orientations (Euler), size [n_orig, 3]
+        arma::u64_vec orig_index;       // Byte offsets from BOF to each origin data block, length [n_orig]
+        arma::u64_vec path_data_offset; // Pre-computed absolute offset to path_data_index array per origin, length [n_orig]
     };
 
     // Initialize a QRT read cache from a file
@@ -533,7 +533,7 @@ namespace quadriga_lib
                                                 const arma::mat &path_gain,        // Path gains (linear), [n_path, n_freq]
                                                 const arma::cube &polmat,          // Polarization transfer matrices, [8, n_path, n_freq]
                                                 const arma::u32_vec &path_type,    // Path type, 0 = LOS, 1 = GR, 2 = NLOS, [n_path]
-                                                arma::uword i_cir = 0);            // CIR index, stored in path::iC, < 2^32
+                                                arma::uword i_cir = 0);            // CIR index, stored in path::i_cir, < 2^32
 
     // ---- Channel generation functions ----
 

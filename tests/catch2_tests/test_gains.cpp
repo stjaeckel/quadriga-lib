@@ -68,7 +68,7 @@ static inline void write_los_qrt(const std::string &fn, const arma::vec &freq,
     for (unsigned c = 0; c < n_cir; ++c)
     {
         quadriga_lib::path p(0, n_freq, scalar_mode);
-        p.iC = c;
+        p.i_cir = c;
         paths.push_back(std::move(p));
     }
 

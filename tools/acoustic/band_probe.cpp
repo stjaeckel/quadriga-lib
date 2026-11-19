@@ -127,7 +127,7 @@ int main()
                 for (int q = 0; q < nf; ++q)
                 {
                     const double k = 2.0 * PI * fq[q] / CS;
-                    const float *xc = paths[i].xpr_coeff(q);
+                    const float *xc = paths[i].polmat(q);
                     std::complex<double> F = std::complex<double>((double)xc[0], (double)xc[1]) * std::exp(-J * k * Lin) * std::exp(J * k * st * ((double)last[1] - (double)first[1]));
                     if (isT)
                         T[q] += F;

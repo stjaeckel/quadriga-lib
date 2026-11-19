@@ -51,11 +51,11 @@ SECTION!*/
         // └─────────────────────────────────────────────────────┘
 
     public:
-        unsigned iC = 0;  // Channel ID (= the channel to which the path belongs to)
-        uint8_t nREF = 0; // Number of reflections
-        uint8_t nTRA = 0; // Number of transmissions / refractions
-        uint8_t nSUB = 0; // Number of subdivisions
-        uint8_t nSCT = 0; // Number of scallering events
+        unsigned i_cir = 0; // CIR index (= the CIR to which the path belongs)
+        uint8_t n_ref = 0;  // Number of reflections
+        uint8_t n_tra = 0;  // Number of transmissions / refractions
+        uint8_t n_sub = 0;  // Number of subdivisions
+        uint8_t n_sct = 0;  // Number of scattering events
 
         path() = default;                       // Default constructor: 0 segments, 1 frequency, EM mode
         path(path &&other) noexcept;            // Move constructor
@@ -88,22 +88,22 @@ SECTION!*/
         float calc_length(float Dx, float Dy, float Dz, float Ox, float Oy, float Oz); // calculate full path length
         float calc_length(const float *D, const float *O = nullptr);                   // 3-element overload
 
-        // Access xprmat coefficients for a specific frequency
-        const float *xpr_coeff(size_t freq = 0) const; // Read only
-        float *xpr_coeff(size_t freq = 0);             // Read + write
+        // Access the polarization transfer matrix (EM) or pressure coefficient (scalar) of frequency index i_freq
+        const float *polmat(size_t i_freq = 0) const; // Read only
+        float *polmat(size_t i_freq = 0);             // Read + write
 
-        // Left-multiply ray's Jones matrix; coeff_update must have length 8 (EM) or 2 (scalar)
-        // + calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
-        float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
+        // Left-multiply ray's polarization transfer matrix; coeff_update must have length 8 (EM) or 2 (scalar)
+        // + calculate gain from the coefficients; freq in Hz, freq > 0 applies the free-space loss
+        float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
 
-        // Calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
-        float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
+        // Calculate gain from the coefficients; freq in Hz, freq > 0 applies the free-space loss
+        float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
 
         // Duplicate path, writing to "target"; return length
         float duplicate(path &target) const;
 
-        // Duplicate path and append segment; nREF and nTRA are not changed; return length
-        // - Must be called before xpr_update/gain to use the correct path length in gain calculation
+        // Duplicate path and append segment; n_ref and n_tra are not changed; return length
+        // - Must be called before polmat_update/gain to use the correct path length in gain calculation
         float extend(path &target, float x, float y, float z, uint8_t type = 0) const;
 
         // Get/set the interaction type sequence
@@ -129,11 +129,11 @@ Class for storing and managing a single propagation path with a compact fixed-si
 ## Attributes:<br>
 | Attribute            | Size   | Description                                                       |
 | -------------------- | ------ | ----------------------------------------------------------------- |
-| `unsigned iC`        | scalar | Channel ID: the channel to which the path belongs                 |
-| `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255 except 193) |
-| `uint8_t nTRA`       | scalar | Number of transmissions / refractions (type codes 1-127)          |
-| `uint8_t nSUB`       | scalar | Number of subdivisions                                            |
-| `uint8_t nSCT`       | scalar | Number of scattering events (interaction type code 193, set by [[qrt_paths_from_scatterers]]; QRT files store the codes, not the counter) |
+| `unsigned i_cir`     | scalar | CIR index: the CIR to which the path belongs                      |
+| `uint8_t n_ref`      | scalar | Number of reflections (interaction type codes 128-255 except 193) |
+| `uint8_t n_tra`      | scalar | Number of transmissions / refractions (type codes 1-127)          |
+| `uint8_t n_sub`      | scalar | Number of subdivisions                                            |
+| `uint8_t n_sct`      | scalar | Number of scattering events (interaction type code 193, set by [[qrt_paths_from_scatterers]]; QRT files store the codes, not the counter) |
 | `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
 
 ## Data buffer layout (EM mode):<br>
@@ -159,7 +159,7 @@ Class for storing and managing a single propagation path with a compact fixed-si
 | `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
 | `.free()`         | Releases the data buffer and resets to the valid empty state                    |
 | `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
-| `.xpr_coeff()`    | Returns a pointer to a frequency's transfer coefficients                        |
+| `.polmat()`       | Returns a pointer to a frequency's transfer coefficients                        |
 | `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
 | `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
 | `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
@@ -183,18 +183,18 @@ Calculates the path gain (linear power) from the transfer coefficients at one fr
 
 - EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
 - A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
-- With `fGHz > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
+- With `freq > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` with `lambda = c / freq` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
 - The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
   read-only `calc_length` before the member is updated
 ```
-float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
+float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
 ```
-- **`fGHz`** — Frequency in GHz; `> 0` applies path loss, `0` returns polarization power only. In SCALAR mode any
-  positive value applies spherical spreading; the magnitude is ignored
-- **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
+- **`freq`** — Frequency in Hz; `> 0` applies path loss, `<= 0` returns polarization power only. In SCALAR mode any
+  positive value applies spherical spreading; the value itself is not used, so no speed of sound is needed
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
-## Function 'xpr_update':
+## Function 'polmat_update':
 Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain
 
 - Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
@@ -202,12 +202,12 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 - The return value uses the same gain definition as `calc_gain`
 - Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
 ```
-float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
+float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
 ```
 - **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
 - **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
-- **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
-- **`fGHz`** — Frequency in GHz for the returned gain; `> 0` applies path loss as in `calc_gain`, `0` returns polarization power only
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
+- **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
 ## Function 'duplicate';
@@ -224,7 +224,7 @@ float duplicate(path &target) const;
 Copies the path into a target and appends one new segment, returning the new total length
 
 - The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
-- The interaction `type` is recorded for the new segment, counters nREF, nTRA, nSUB, nSCT are not updated (left to the caller)
+- The interaction `type` is recorded for the new segment, counters n_ref, n_tra, n_sub, n_sct are not updated (left to the caller)
 - The target receives an independent buffer sized for the extra segment; the source is left unchanged
 - Throws if the source already holds the maximum of 255 segments
 ```
@@ -251,11 +251,11 @@ constexpr static size_t data_size(size_t segments, size_t frequencies, bool scal
     return history_offset(segments, frequencies, scalar) + history_length;
 }
 
-// Helper: Calculate gain (linear power) from Jones matrix values; fGHz > 0 applies path loss
+// Helper: Calculate gain (linear power) from Jones matrix values; freq (Hz) > 0 applies path loss
 // Scalar mode passes the pressure coefficient as [ReVV, ImVV] and zeros for the rest
 static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float ImHV,
                                     float ReVH, float ImVH, float ReHH, float ImHH,
-                                    bool scalar, float path_length, float fGHz)
+                                    bool scalar, float path_length, float freq)
 {
     float A = ReVV * ReVV + ImVV * ImVV + ReHV * ReHV + ImHV * ImHV; // |col 0|^2
     float B = ReVH * ReVH + ImVH * ImVH + ReHH * ReHH + ImHH * ImHH; // |col 1|^2
@@ -267,13 +267,13 @@ static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float Im
         return 0.0f;
 
     // Path loss (linear power): EM = (lambda / (4 pi d))^2, lambda = c / f; scalar = 1 / d^2
-    if (fGHz > 0.0f && path_length > 0.0f)
+    if (freq > 0.0f && path_length > 0.0f)
     {
         if (scalar)
             P /= path_length * path_length;
         else
         {
-            float k = 0.299792458f / (12.566370614f * fGHz * path_length);
+            float k = 299792458.0f / (12.566370614f * freq * path_length);
             P *= k * k;
         }
     }
@@ -283,7 +283,7 @@ static inline float gain_from_coeff(float ReVV, float ImVV, float ReHV, float Im
 // Move constructor
 quadriga_lib::path::path(path &&other) noexcept
     : nFRQ(other.nFRQ), nSEG(other.nSEG), len_acc(other.len_acc), data(other.data),
-      iC(other.iC), nREF(other.nREF), nTRA(other.nTRA), nSUB(other.nSUB), nSCT(other.nSCT)
+      i_cir(other.i_cir), n_ref(other.n_ref), n_tra(other.n_tra), n_sub(other.n_sub), n_sct(other.n_sct)
 
 {
     std::memcpy(interact_type, other.interact_type, sizeof(interact_type));
@@ -296,7 +296,7 @@ quadriga_lib::path::path(path &&other) noexcept
 // Copy constructor
 quadriga_lib::path::path(const path &other)
     : nFRQ(other.nFRQ), nSEG(other.nSEG), len_acc(other.len_acc),
-      iC(other.iC), nREF(other.nREF), nTRA(other.nTRA), nSUB(other.nSUB), nSCT(other.nSCT)
+      i_cir(other.i_cir), n_ref(other.n_ref), n_tra(other.n_tra), n_sub(other.n_sub), n_sct(other.n_sct)
 
 {
     std::memcpy(interact_type, other.interact_type, sizeof(interact_type));
@@ -323,8 +323,8 @@ quadriga_lib::path &quadriga_lib::path::operator=(path &&other) noexcept
 
     data = other.data;
 
-    iC = other.iC;
-    nREF = other.nREF, nTRA = other.nTRA, nSUB = other.nSUB, nSCT = other.nSCT;
+    i_cir = other.i_cir;
+    n_ref = other.n_ref, n_tra = other.n_tra, n_sub = other.n_sub, n_sct = other.n_sct;
     len_acc = other.len_acc;
 
     other.data = nullptr;
@@ -354,8 +354,8 @@ quadriga_lib::path &quadriga_lib::path::operator=(const path &other)
     delete[] data;
     data = buf;
 
-    iC = other.iC;
-    nREF = other.nREF, nTRA = other.nTRA, nSUB = other.nSUB, nSCT = other.nSCT;
+    i_cir = other.i_cir;
+    n_ref = other.n_ref, n_tra = other.n_tra, n_sub = other.n_sub, n_sct = other.n_sct;
     len_acc = other.len_acc;
 
     return *this;
@@ -410,11 +410,11 @@ void quadriga_lib::path::init(size_t segments, size_t frequencies, bool scalar)
             }
     }
 
-    iC = 0;
-    nREF = 0;
-    nTRA = 0;
-    nSUB = 0;
-    nSCT = 0;
+    i_cir = 0;
+    n_ref = 0;
+    n_tra = 0;
+    n_sub = 0;
+    n_sct = 0;
 
     len_acc = 0.0f;
 }
@@ -475,36 +475,36 @@ float quadriga_lib::path::calc_length(const float *D, const float *O)
     return calc_length(D[0], D[1], D[2]);
 }
 
-// Access xprmat for a specific frequency
-const float *quadriga_lib::path::xpr_coeff(size_t freq) const
+// Access the coefficients of frequency index i_freq
+const float *quadriga_lib::path::polmat(size_t i_freq) const
 {
-    if (freq >= n_freq())
+    if (i_freq >= n_freq())
         throw std::invalid_argument("Requested frequency out-of-bound.");
 
-    if (freq == 0)
+    if (i_freq == 0)
         return xprmat;
 
     size_t offset = size_t(nSEG) * 3;
     if (is_scalar())
     {
-        if (freq < 4)
-            return &xprmat[2 * freq];
+        if (i_freq < 4)
+            return &xprmat[2 * i_freq];
         else
-            return data + offset + (freq - 4) * 2;
+            return data + offset + (i_freq - 4) * 2;
     }
     else // EM mode
-        return data + offset + (freq - 1) * 8;
+        return data + offset + (i_freq - 1) * 8;
 }
-float *quadriga_lib::path::xpr_coeff(size_t freq)
+float *quadriga_lib::path::polmat(size_t i_freq)
 {
-    return const_cast<float *>(std::as_const(*this).xpr_coeff(freq));
+    return const_cast<float *>(std::as_const(*this).polmat(i_freq));
 }
 
-// Left-multiply ray's Jones matrix; coeff_update must have length 8 (EM) or 2 (scalar)
-// + calculate gain from xprmat coefficients; fGHz > 0 applies FSPL
-float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_update, size_t freq, float fGHz, float len)
+// Left-multiply ray's polarization transfer matrix; coeff_update must have length 8 (EM) or 2 (scalar)
+// + calculate gain from the coefficients; freq (Hz) > 0 applies the free-space loss
+float quadriga_lib::path::polmat_update(const float *coeff_update, float gain_update, size_t i_freq, float freq, float len)
 {
-    float *oX = xpr_coeff(freq); // Bounds-checked; resolves to xprmat or into the data buffer
+    float *oX = polmat(i_freq); // Bounds-checked; resolves to xprmat or into the data buffer
     const size_t n_coeff = is_scalar() ? 2 : 8;
     if (coeff_update && (std::uintptr_t)coeff_update < (std::uintptr_t)(oX + n_coeff) &&
         (std::uintptr_t)oX < (std::uintptr_t)(coeff_update + n_coeff))
@@ -526,7 +526,7 @@ float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_updat
 
         oRe *= amplitude_update, oIm *= amplitude_update;
         oX[0] = oRe, oX[1] = oIm;
-        return gain_from_coeff(oRe, oIm, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, d, fGHz);
+        return gain_from_coeff(oRe, oIm, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, d, freq);
     }
 
     // EM mode, 8 values: [ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH], column-major, labels <out><in> (HV = H out, V in)
@@ -561,19 +561,19 @@ float quadriga_lib::path::xpr_update(const float *coeff_update, float gain_updat
     oX[0] = oReVV, oX[1] = oImVV, oX[2] = oReHV, oX[3] = oImHV;
     oX[4] = oReVH, oX[5] = oImVH, oX[6] = oReHH, oX[7] = oImHH;
 
-    return gain_from_coeff(oReVV, oImVV, oReHV, oImHV, oReVH, oImVH, oReHH, oImHH, false, d, fGHz);
+    return gain_from_coeff(oReVV, oImVV, oReHV, oImHV, oReVH, oImVH, oReHH, oImHH, false, d, freq);
 }
 
-// Calculate gain from xprmat coefficients; fGHz > 0 applies FSPL; len > 0 overrides stored length
-float quadriga_lib::path::calc_gain(float fGHz, size_t freq, float len) const
+// Calculate gain from the coefficients; freq (Hz) > 0 applies the free-space loss; len > 0 overrides stored length
+float quadriga_lib::path::calc_gain(float freq, size_t i_freq, float len) const
 {
-    const float *cf = xpr_coeff(freq); // Bounds-checked; resolves to xprmat or into the data buffer
+    const float *cf = polmat(i_freq); // Bounds-checked; resolves to xprmat or into the data buffer
     float d = len > 0.0f ? len : len_acc;
 
     if (is_scalar()) // Only 2 values in the slot; reading cf[2..7] would overrun
-        return gain_from_coeff(cf[0], cf[1], 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, d, fGHz);
+        return gain_from_coeff(cf[0], cf[1], 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, true, d, freq);
 
-    return gain_from_coeff(cf[0], cf[1], cf[2], cf[3], cf[4], cf[5], cf[6], cf[7], false, d, fGHz);
+    return gain_from_coeff(cf[0], cf[1], cf[2], cf[3], cf[4], cf[5], cf[6], cf[7], false, d, freq);
 }
 
 // Duplicate path, writing to "target", returns length
@@ -631,13 +631,13 @@ float quadriga_lib::path::extend(path &target, float x, float y, float z, uint8_
     delete[] target.data;
     target.data = buf;
 
-    target.iC = iC;
+    target.i_cir = i_cir;
     target.nFRQ = nFRQ;
     target.nSEG = (uint8_t)nS_new;
-    target.nREF = nREF;
-    target.nTRA = nTRA;
-    target.nSUB = nSUB;
-    target.nSCT = nSCT;
+    target.n_ref = n_ref;
+    target.n_tra = n_tra;
+    target.n_sub = n_sub;
+    target.n_sct = n_sct;
 
     std::memcpy(target.interact_type, interact_type, sizeof(interact_type));
 

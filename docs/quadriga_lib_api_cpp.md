@@ -2371,11 +2371,11 @@ Not in: MATLAB, Python
 ### Attributes:
 | Attribute            | Size   | Description                                                       |
 | -------------------- | ------ | ----------------------------------------------------------------- |
-| `unsigned iC`        | scalar | Channel ID: the channel to which the path belongs                 |
-| `uint8_t nREF`       | scalar | Number of reflections (interaction type codes 128-255 except 193) |
-| `uint8_t nTRA`       | scalar | Number of transmissions / refractions (type codes 1-127)          |
-| `uint8_t nSUB`       | scalar | Number of subdivisions                                            |
-| `uint8_t nSCT`       | scalar | Number of scattering events (interaction type code 193, set by [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); QRT files store the codes, not the counter) |
+| `unsigned i_cir`     | scalar | CIR index: the CIR to which the path belongs                      |
+| `uint8_t n_ref`      | scalar | Number of reflections (interaction type codes 128-255 except 193) |
+| `uint8_t n_tra`      | scalar | Number of transmissions / refractions (type codes 1-127)          |
+| `uint8_t n_sub`      | scalar | Number of subdivisions                                            |
+| `uint8_t n_sct`      | scalar | Number of scattering events (interaction type code 193, set by [qrt_paths_from_scatterers](#qrt_paths_from_scatterers); QRT files store the codes, not the counter) |
 | `float length`       | scalar | Accumulated path length, origin through the last interaction (m)  |
 
 ### Data buffer layout (EM mode):
@@ -2401,7 +2401,7 @@ Not in: MATLAB, Python
 | `.init()`         | (Re)initializes storage to a given segment / frequency layout                   |
 | `.free()`         | Releases the data buffer and resets to the valid empty state                    |
 | `.coord()`        | Returns a pointer to a segment's `[x, y, z]` coordinates                        |
-| `.xpr_coeff()`    | Returns a pointer to a frequency's transfer coefficients                        |
+| `.polmat()`       | Returns a pointer to a frequency's transfer coefficients                        |
 | `.operator()`     | Returns a last-segment coordinate by index (0=x, 1=y, 2=z)                      |
 | `.interaction_type_codes()` | Returns the full interaction type sequence as a vector                |
 | `.set_interaction_type_codes()` | Sets the interaction type sequence; requires one code per segment |
@@ -2425,18 +2425,18 @@ Calculates the path gain (linear power) from the transfer coefficients at one fr
 
 - EM mode returns the maximum column power of the 2x2 Jones matrix; SCALAR mode returns the squared magnitude of the pressure coefficient
 - A degenerate coefficient set (all-zero, underflowed, or containing NaN) returns 0, flagging the path for pruning
-- With `fGHz > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
+- With `freq > 0`, free-space path loss is folded in: `(lambda / (4 pi d))^2` with `lambda = c / freq` in EM mode, `1 / d^2` (frequency-independent) in SCALAR mode
 - The distance `d` is the stored `length` by default; pass `len > 0` to override it, e.g. to match a total length from the
   read-only `calc_length` before the member is updated
 ```cpp
-float calc_gain(float fGHz = 0.0f, size_t freq = 0, float len = 0.0f) const;
+float calc_gain(float freq = 0.0f, size_t i_freq = 0, float len = 0.0f) const;
 ```
-- **`fGHz`** — Frequency in GHz; `> 0` applies path loss, `0` returns polarization power only. In SCALAR mode any
-  positive value applies spherical spreading; the magnitude is ignored
-- **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
+- **`freq`** — Frequency in Hz; `> 0` applies path loss, `<= 0` returns polarization power only. In SCALAR mode any
+  positive value applies spherical spreading; the value itself is not used, so no speed of sound is needed
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
-### Function 'xpr_update':
+### Function 'polmat_update':
 Left-multiplies the ray's transfer matrix by an interaction matrix, applies a power gain, and returns the resulting gain
 
 - Updates the coefficient slot for one frequency in place: `M := coeff_update * M`, then scales by `sqrt(gain_update)` in amplitude
@@ -2444,12 +2444,12 @@ Left-multiplies the ray's transfer matrix by an interaction matrix, applies a po
 - The return value uses the same gain definition as `calc_gain`
 - Must be called after `extend` closes the path, so the stored `length` is final when path loss is requested
 ```cpp
-float xpr_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t freq = 0, float fGHz = 0.0f, float len = 0.0f);
+float polmat_update(const float *coeff_update = nullptr, float gain_update = 1.0f, size_t i_freq = 0, float freq = 0.0f, float len = 0.0f);
 ```
 - **`coeff_update`** — Interaction matrix, length 8 (EM) or 2 (SCALAR); `nullptr` skips the multiply
 - **`gain_update`** — Power gain applied to the slot (converted to an amplitude factor internally); `1.0` skips the scaling
-- **`freq`** — Frequency index into the coefficient store, valid range `0` to `nFRQ - 1`
-- **`fGHz`** — Frequency in GHz for the returned gain; `> 0` applies path loss as in `calc_gain`, `0` returns polarization power only
+- **`i_freq`** — Frequency index into the coefficient store, valid range `0` to `n_freq() - 1`
+- **`freq`** — Frequency in Hz for the returned gain; `> 0` applies path loss as in `calc_gain`, `<= 0` returns polarization power only
 - **`len`** — Path length override in meters; `> 0` replaces the stored `length` for the path-loss term, `<= 0` uses the stored value
 
 ### Function 'duplicate';
@@ -2466,7 +2466,7 @@ float duplicate(path &target) const;
 Copies the path into a target and appends one new segment, returning the new total length
 
 - The new coordinate is appended after the existing segments; the stored `length` grows by the origin-to-new-point distance of the appended leg
-- The interaction `type` is recorded for the new segment, counters nREF, nTRA, nSUB, nSCT are not updated (left to the caller)
+- The interaction `type` is recorded for the new segment, counters n_ref, n_tra, n_sub, n_sct are not updated (left to the caller)
 - The target receives an independent buffer sized for the extra segment; the source is left unchanged
 - Throws if the source already holds the maximum of 255 segments
 ```cpp
@@ -2484,8 +2484,8 @@ Append one transmitter's path data to an existing QRT file
 Not in: MATLAB, Python
 
 - Writes the path data for a single TX into the next free slot reserved by [qrt_file_init](#qrt_file_init), and records the TX name, position, and orientation.
-- Paths are grouped by their CIR index (`path::iC`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
-- Validates every path before writing: `iC` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
+- Paths are grouped by their CIR index (`path::i_cir`) and stored per CIR as: interaction counts, polarization coefficients, interaction coordinates, and interaction type codes.
+- Validates every path before writing: `i_cir` must be within the file's CIR count, and each path's frequency count and layout mode (EM/scalar) must match the file exactly.
 - Throws when all TX slots are already filled — the file holds at most the `n_orig` slots reserved at init.
 - Only v5/6 files can be appended to. Positional data is converted to `float` on write.
 - Returns the total number of paths written.
@@ -2503,7 +2503,7 @@ size_t quadriga_lib::qrt_file_append(
 
 ### Inputs:
 - **`fn`** — Path to an existing QRT file created by [qrt_file_init](#qrt_file_init)
-- **`path_data`** — Paths to write; each carries its CIR index in `iC` and must match the file's frequency count and layout mode
+- **`path_data`** — Paths to write; each carries its CIR index in `i_cir` and must match the file's frequency count and layout mode
 - **`orig_pos`** — Transmitter position; `[3, 1]` or `[1, 3]`
 - **`orig_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in rad; `[3, 1]` or `[1, 3]`; `nullptr` = zeros
 - **`orig_name`** — Transmitter name; at most 255 characters
@@ -2707,8 +2707,8 @@ std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
 auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
 arma::vec center_freq, tx_pos, rx_pos, path_length;
 arma::mat path_gain; arma::cube polmat;
-for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
-    for (arma::uword io = 0; io < cache.no_orig; ++io)
+for (arma::uword ic = 0; ic < cache.n_cir; ++ic)
+    for (arma::uword io = 0; io < cache.n_orig; ++io)
         quadriga_lib::qrt_file_read<double>("", ic, io, false,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
             nullptr, nullptr, &path_gain, &path_length, &polmat,
@@ -2730,8 +2730,8 @@ Not in: MATLAB, Python
 - Reassembles the stored path data for a single origin (TX) into a vector of [path](#path) objects — the inverse of [qrt_file_append](#qrt_file_append).
 - Unlike [qrt_file_read](#qrt_file_read), which returns processed CIR data (channel matrices, angles, path loss), this returns the raw per-path storage:
   coordinates, polarization coefficients, and interaction type codes.
-- Each returned path has `iC` set to its CIR index. Counters not stored in the file
-  (`nREF`, `nTRA`, `nSUB`, `nSCT`) and `length` are left at their defaults.
+- Each returned path has `i_cir` set to its CIR index. Counters not stored in the file
+  (`n_ref`, `n_tra`, `n_sub`, `n_sct`) and `length` are left at their defaults.
 - Only v05/v06 files can be read as raw paths; v4 legacy files are rejected.
 - An origin slot that was reserved by [qrt_file_init](#qrt_file_init) but never written by [qrt_file_append](#qrt_file_append) returns an empty vector.
 - Throws `std::runtime_error` if the file cannot be opened, is not a QRT file of a supported version, is truncated,
@@ -2771,8 +2771,8 @@ Not in: MATLAB, Python
 
 - Converts the paths of one Tx-Rx pair (e.g. of [ssf_paths](#ssf_paths) with `drift` mobility) into [path](#path) objects for
   [qrt_file_append](#qrt_file_append); one call per CIR, the objects of all CIRs of one origin appended together
-- Interactions: LOS none; GR one reflection at `lbs_pos` (code 129, `nREF` = 1); NLOS two point scatterers at
-  `fbs_pos`, `lbs_pos` (code 193, `nSCT` = 2); `length` = polyline from the Tx to the last interaction. Counters
+- Interactions: LOS none; GR one reflection at `lbs_pos` (code 129, `n_ref` = 1); NLOS two point scatterers at
+  `fbs_pos`, `lbs_pos` (code 193, `n_sct` = 2); `length` = polyline from the Tx to the last interaction. Counters
   and `length` exist on the returned objects only ([qrt_file_read_raw](#qrt_file_read_raw) returns 0): files store the codes
 - The path gain and the inverse free-space loss of the polyline are folded into the stored Jones matrices, so that
   [qrt_file_read](#qrt_file_read) (`uplink = false`, `normalize_polmat` 0 or 1) returns sqrt(`path_gain`)·`polmat` per complex entry
@@ -2806,7 +2806,7 @@ std::vector<path> quadriga_lib::qrt_paths_from_scatterers(
 - **`path_gain`** — Path gains (linear); `[n_path, n_freq]`
 - **`polmat`** — Polarization transfer matrices, row order of [get_channels_spherical](#get_channels_spherical); `[8, n_path, n_freq]`
 - **`path_type`** — Path type, 0 = LOS, 1 = GR, 2 = NLOS, at most one LOS and one GR; `[n_path]`
-- **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::iC`, < 2^32
+- **`i_cir`** *(optional)* — CIR index, 0-based, stored in `path::i_cir`, < 2^32
 
 ### Returns:
 - Path objects in input order, EM layout with `n_freq` frequencies; `[n_path]`
@@ -2847,17 +2847,17 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
   | Member             | Type         | Description                                                                                     |
   | ------------------ | ------------ | ----------------------------------------------------------------------------------------------- |
   | `version`          | `int`        | QRT file version                                                                                |
-  | `no_orig`          | `unsigned`   | Number of origin (TX) positions                                                                 |
-  | `no_cir`           | `unsigned`   | Number of CIRs per origin                                                                       |
-  | `no_dest`          | `unsigned`   | Number of destinations (RX)                                                                     |
-  | `no_freq`          | `unsigned`   | Number of frequency bands                                                                       |
-  | `freq`             | `arma::fvec` | Frequencies as stored: GHz in v4 and in v5 when all are below 1000, else Hz; `[no_freq]`        |
-  | `cir_pos`          | `arma::fmat` | CIR positions; `[no_cir, 3]`                                                                    |
-  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[no_cir, 3]`                                                         |
-  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[no_orig, 3]`                                                                |
-  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[no_orig, 3]`                                                     |
-  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[no_orig]`                                    |
-  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; 0 if the TX slot is unwritten; `[no_orig]` |
+  | `n_orig`           | `unsigned`   | Number of origin (TX) positions                                                                 |
+  | `n_cir`            | `unsigned`   | Number of CIRs per origin                                                                       |
+  | `n_dest`           | `unsigned`   | Number of destinations (RX)                                                                     |
+  | `n_freq`           | `unsigned`   | Number of frequency bands                                                                       |
+  | `freq`             | `arma::fvec` | Frequencies in Hz (converted from GHz for v4 files and older v5 files); `[n_freq]`              |
+  | `cir_pos`          | `arma::fmat` | CIR positions; `[n_cir, 3]`                                                                     |
+  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[n_cir, 3]`                                                          |
+  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[n_orig, 3]`                                                                 |
+  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[n_orig, 3]`                                                      |
+  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[n_orig]`                                     |
+  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; 0 if the TX slot is unwritten; `[n_orig]`  |
 
 ---
 <a id="quantize_delays"></a>
@@ -6495,7 +6495,7 @@ Not in: MATLAB, Python
 - A ray travelling inside a medium is committed with the in-layer attenuation of the final leg folded into
   its coefficients, per frequency, via [medium_gain](#medium_gain) on `mtl_ind_current & 0x3FFF`.
 - In EM mode a receive-side mirror (`VV = 1`, `HH = -1`) is applied per frequency; in SCALAR mode only the gain is applied.
-- The receiver index is written to the committed path's `iC`, 0-based. Without `point_ind` it indexes
+- The receiver index is written to the committed path's `i_cir`, 0-based. Without `point_ind` it indexes
   `points` as passed in; with `point_ind` it indexes the caller's original, unsegmented point list, so a
   cloud reordered by [point_cloud_segmentation](#point_cloud_segmentation) needs no remapping afterwards.
 - Padding points inserted by [point_cloud_segmentation](#point_cloud_segmentation) for SIMD alignment sit at the center of their
@@ -6551,8 +6551,8 @@ arma::uword quadriga_lib::ray_commit(
 - **`point_ind`** *(optional)* — 1-based map from each row of `points` back to the caller's original point
   list, 0 = padding inserted for SIMD alignment; `[n_point]`. Pass the `forward_ind` output of
   [point_cloud_segmentation](#point_cloud_segmentation) for the same cloud — not `reverse_ind`, which runs the other way and has
-  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `iC` is written in the original
-  indexing. NULL → `points` is used as passed in and `iC` indexes it directly
+  length `n_point` of the *unsegmented* cloud. Padded rows are skipped and `i_cir` is written in the original
+  indexing. NULL → `points` is used as passed in and `i_cir` indexes it directly
 - **`subdiv_flag_in`** *(optional)* — Rays that will be split in the next generation and must not be
   committed now; `[n_ray]`, indexed in the full ray set. Pass the output of [ray_subdivide_flag](#ray_subdivide_flag) for the
   same launch configuration. NULL / empty → no ray is excluded on these grounds
@@ -6563,13 +6563,13 @@ arma::uword quadriga_lib::ray_commit(
   before it can commit, 0 to 255. 0 = no restriction. 1 excludes the launch-sphere beams of the first
   generation, including the sub-beams they spawn, which keep `nSEG = 0` until their first interaction
 - **`ignore_direct_path`** *(optional)* — Drop every path that arrives by transmission only
-  (`nREF == 0 && nSCT == 0`, which includes pure LOS); these are covered by [calc_diffraction_gain](#calc_diffraction_gain).
+  (`n_ref == 0 && n_sct == 0`, which includes pure LOS); these are covered by [calc_diffraction_gain](#calc_diffraction_gain).
   The test is unconditional: under refraction the traced path is longer than the straight line, so a
   length-based test would let it through and double-count against the diffraction model
 
 ### Output:
 - **`paths_commit`** — Committed paths, appended to whatever the vector already holds; extended by
-  `n_commit` entries. Each carries the 0-based receiver index in `iC`, the interaction history of its ray, and the
+  `n_commit` entries. Each carries the 0-based receiver index in `i_cir`, the interaction history of its ray, and the
   transfer coefficients with the receive-side mirror and any in-medium loss applied. Existing entries are
   not modified; if the vector is non-empty its layout must match `paths`
 
@@ -6975,7 +6975,7 @@ std::array<unsigned, 4> quadriga_lib::ray_progress(
 - **`max_transmissions`** — Transmissions / refractions per ray, 0 to 255. 0 skips the transmission pass
 - **`max_subdivisions`** — Beam subdivisions per ray, 0 to 255. 0 (or no beam mode) disables subdivision.
   Not applied when `subdiv_flag_in` is given — the caller owns termination in that case, and the per-path
-  counter `nSUB` saturates at 255 instead of wrapping
+  counter `n_sub` saturates at 255 instead of wrapping
 - **`min_gain_dB`** — Path gain below which a continuation is not launched, in dB (linear-power threshold applied to the accumulated per-path gain × interaction gain)
 - **`subdivision_tolerance`** — Maximum beam-tube edge length before a ray is subdivided, in [m]; must be > 0
 - **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold forwarded to [ray_state_update](#ray_state_update) as its `eps`; see there. Default 0.15
@@ -7285,7 +7285,7 @@ void quadriga_lib::ray_subdivide_flag(
 - **`fbs_ind`** — 1-based index of the first intersected mesh element, 0 = no hit; `[n_ray]`. Obtained from [ray_triangle_intersect](#ray_triangle_intersect) for the same `orig` / `dest` pair
 - **`trivec`** — Beam wavefront triangle vertices relative to the ray origin; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, Cartesian; `[n_ray, 9]`. Need not be unit length
-- **`paths`** — Per-ray [path](#path) objects; `n_ray` entries. Only the subdivision counter `nSUB` and the segment count are read
+- **`paths`** — Per-ray [path](#path) objects; `n_ray` entries. Only the subdivision counter `n_sub` and the segment count are read
 - **`mtl_ind_current`** — Current medium state word, 0 = outside; `[n_ray]`. A ray inside a medium is
   never split: the sub-beams restart their in-layer accumulator and recompute their direction
   geometrically, which is only valid outside

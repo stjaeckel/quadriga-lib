@@ -136,20 +136,19 @@ py::tuple qrt_file_read(const py::handle &fn,
     arma::uvec i_cir_a = qd_python_numpy2arma_Col<arma::uword>(i_cir, true, false, "i_cir");
     if (i_cir_a.empty()) // None for a file without CIRs: empty outputs
     {
-        if (cache.no_cir != 0)
-            i_cir_a = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir) - 1);
+        if (cache.n_cir != 0)
+            i_cir_a = arma::regspace<arma::uvec>(0, arma::uword(cache.n_cir) - 1);
     }
-    else if (arma::any(i_cir_a >= arma::uword(cache.no_cir)))
+    else if (arma::any(i_cir_a >= arma::uword(cache.n_cir)))
         throw std::out_of_range("CIR index exceeds number of CIRs in file.");
     arma::uword no_out = i_cir_a.n_elem;
 
     // Center frequencies in Hz (taken from the cache, identical for all snapshots)
-    arma::uword n_freq = (arma::uword)cache.no_freq;
+    arma::uword n_freq = (arma::uword)cache.n_freq;
     arma::vec center_freq;
     auto center_freq_py = qd_python_init_output(n_freq, &center_freq);
-    const double freq_scale = qd_qrt_freq_scale(cache.freq.memptr(), cache.freq.n_elem, cache.version);
     for (arma::uword i_freq = 0; i_freq < n_freq; ++i_freq)
-        center_freq[i_freq] = (double)cache.freq[i_freq] * freq_scale;
+        center_freq[i_freq] = (double)cache.freq[i_freq];
 
     // Fixed-size outputs, one column per requested snapshot
     arma::mat tx_pos, tx_orientation, rx_pos, rx_orientation;

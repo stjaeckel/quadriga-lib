@@ -98,12 +98,12 @@ TEST_CASE("QRT Reader")
     auto cache = quadriga_lib::qrt_read_cache_init("", &stream);
 
     REQUIRE(cache.version == 4);
-    REQUIRE(cache.no_orig == 3);
-    REQUIRE(cache.no_dest == 2);
-    REQUIRE(cache.no_cir == 7);
-    REQUIRE(cache.no_freq == 1);
+    REQUIRE(cache.n_orig == 3);
+    REQUIRE(cache.n_dest == 2);
+    REQUIRE(cache.n_cir == 7);
+    REQUIRE(cache.n_freq == 1);
 
-    CHECK(arma::approx_equal(cache.freq * 1.0e9f, center_freq_f, "reldiff", 1.0e-7)); // The cache holds the stored GHz
+    CHECK(arma::approx_equal(cache.freq, center_freq_f, "reldiff", 1.0e-7)); // v4 file stores GHz, the cache holds Hz
     CHECK(arma::approx_equal(cache.cir_pos, cir_pos, "absdiff", 1.5e-10));
     CHECK(arma::approx_equal(cache.cir_orientation, cir_orientation, "absdiff", 1.5e-10));
     CHECK(arma::approx_equal(cache.orig_pos_all, orig_pos, "absdiff", 1.5e-10));
@@ -136,7 +136,7 @@ TEST_CASE("QRT Reader")
                                                 &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord, 0,
                                                 nullptr, nullptr, nullptr, &stream, &cache);
 
-        CHECK(center_freq[0] == 3.75e9);
+        CHECK(std::abs(center_freq[0] - 3.75e9) < 1.0e-7 * 3.75e9); // v4 stores GHz, converted to Hz in float
         arma::vec O = {-12.9607, 59.6906, 2.0};
         CHECK(arma::approx_equal(tx_pos, O, "absdiff", 1.5e-4));
         arma::vec T = {0.0, 0.0, 0.0};
@@ -379,6 +379,7 @@ TEST_CASE("QRT Reader v5")
     REQUIRE(center_freq.n_elem == 2);
     CHECK(center_freq[0] == 1.0e9);
     CHECK(center_freq[1] == 1.5e9);
+    CHECK(arma::approx_equal(quadriga_lib::qrt_read_cache_init(fn).freq, arma::fvec({1.0e9f, 1.5e9f}), "reldiff", 1.0e-7f)); // Hz in the cache
 
     CHECK(M.n_rows == 8);
     CHECK(M.n_slices == 2);
@@ -442,10 +443,10 @@ TEST_CASE("QRT Reader - angles with 0 paths")
 
     // One path in CIR 1, none in CIR 0
     quadriga_lib::path p(1, 1, false);
-    p.iC = 1;
+    p.i_cir = 1;
     float *c = p.coord(0);
     c[0] = 5.0f, c[1] = 5.0f, c[2] = 0.0f;
-    float *m = p.xpr_coeff(0);
+    float *m = p.polmat(0);
     for (unsigned k = 0; k < 8; ++k)
         m[k] = (k == 0 || k == 6) ? 0.5f : 0.0f;
     p.set_interaction_type_codes({10});
@@ -483,7 +484,7 @@ TEST_CASE("QRT Reader - index of 2^32 or more")
         std::ifstream f(fn, std::ios::binary);
         auto cache = quadriga_lib::qrt_read_cache_init(fn, &f);
         const arma::uword big = 1ULL << 32;
-        for (arma::uword i_cir : {big, big + 1ULL, (arma::uword)cache.no_cir})
+        for (arma::uword i_cir : {big, big + 1ULL, (arma::uword)cache.n_cir})
         {
             arma::vec rx_pos;
             CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, i_cir, 0, false, nullptr, nullptr, nullptr, &rx_pos),
@@ -493,7 +494,7 @@ TEST_CASE("QRT Reader - index of 2^32 or more")
                                                                 nullptr, nullptr, nullptr, nullptr, 1, nullptr, nullptr, nullptr, &f, &cache),
                             std::invalid_argument);
         }
-        for (arma::uword i_orig : {big, (arma::uword)cache.no_orig})
+        for (arma::uword i_orig : {big, (arma::uword)cache.n_orig})
         {
             arma::vec rx_pos;
             CHECK_THROWS_AS(quadriga_lib::qrt_file_read<double>(fn, 0, i_orig, false, nullptr, nullptr, nullptr, &rx_pos),

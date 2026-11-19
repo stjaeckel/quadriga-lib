@@ -2642,7 +2642,7 @@ struct QdSheetFace
 // physics kernels, the assertion is an invariant instead (finiteness, monotonicity, cross-branch
 // agreement, energy <= 1) so this file does not duplicate — or drift from — the kernel suites.
 //
-// Ray identity: the tests borrow quadriga_lib::path::iC as a stable per-ray handle. ray_progress
+// Ray identity: the tests borrow quadriga_lib::path::i_cir as a stable per-ray handle. ray_progress
 // never writes it (only the downstream commit stage assigns real channel IDs), and both
 // path::extend and path copy-assignment preserve it, so seeding it in the builder gives a stable
 // handle from an output row back to the input ray it came from. That is what makes the
@@ -2808,7 +2808,7 @@ namespace
         {
             C.paths[i].init(0, n_freq, scalar);
             C.paths[i].set_length(R0);   // source -> ray origin
-            C.paths[i].iC = (unsigned)i; // stable identity, preserved by copy and extend
+            C.paths[i].i_cir = (unsigned)i; // stable identity, preserved by copy and extend
         }
 
         if (C.beam)
@@ -2982,13 +2982,13 @@ namespace
         return 4ull * s[1] + s[2] + s[3];
     }
 
-    // Map input ray id (path::iC) -> output row. Requires the ids to be unique, which holds when
+    // Map input ray id (path::i_cir) -> output row. Requires the ids to be unique, which holds when
     // only one continuation class is launched (e.g. reflections with max_transmissions = 0).
     std::map<unsigned, arma::uword> id_map(const Cfg &C)
     {
         std::map<unsigned, arma::uword> m;
         for (arma::uword i = 0; i < C.paths.size(); ++i)
-            m.emplace(C.paths[i].iC, i);
+            m.emplace(C.paths[i].i_cir, i);
         return m;
     }
 
@@ -3022,8 +3022,8 @@ namespace
             CHECK((int)A.cur(ia) == (int)B.cur(ib));
             CHECK((int)A.buf(ia) == (int)B.buf(ib));
             CHECK(A.paths[ia].n_seg() == B.paths[ib].n_seg());
-            CHECK((int)A.paths[ia].nREF == (int)B.paths[ib].nREF);
-            CHECK((int)A.paths[ia].nTRA == (int)B.paths[ib].nTRA);
+            CHECK((int)A.paths[ia].n_ref == (int)B.paths[ib].n_ref);
+            CHECK((int)A.paths[ia].n_tra == (int)B.paths[ib].n_tra);
             CHECK(std::abs(A.paths[ia].calc_gain(0.0f, 0) - B.paths[ib].calc_gain(0.0f, 0)) < tol);
 
             if (A.beam && B.beam)
@@ -3060,11 +3060,11 @@ namespace
 
         for (size_t i = 0; i < A.paths.size(); ++i)
         {
-            CHECK(A.paths[i].iC == B.paths[i].iC);
+            CHECK(A.paths[i].i_cir == B.paths[i].i_cir);
             CHECK(A.paths[i].n_seg() == B.paths[i].n_seg());
-            CHECK((int)A.paths[i].nREF == (int)B.paths[i].nREF);
-            CHECK((int)A.paths[i].nTRA == (int)B.paths[i].nTRA);
-            CHECK((int)A.paths[i].nSUB == (int)B.paths[i].nSUB);
+            CHECK((int)A.paths[i].n_ref == (int)B.paths[i].n_ref);
+            CHECK((int)A.paths[i].n_tra == (int)B.paths[i].n_tra);
+            CHECK((int)A.paths[i].n_sub == (int)B.paths[i].n_sub);
             CHECK(A.paths[i].length() == B.paths[i].length());
             CHECK(A.paths[i].calc_gain(0.0f, 0) == B.paths[i].calc_gain(0.0f, 0));
         }
@@ -3121,7 +3121,7 @@ namespace rp
         bool fwd() const { return dest(i, 0) > orig(i, 0); }
         const float *first() const { return paths[i].coord(0); }
         const float *last() const { return paths[i].coord(ns - 1); }
-        const float *xc(size_t q) const { return paths[i].xpr_coeff(q); }
+        const float *xc(size_t q) const { return paths[i].polmat(q); }
         double poly() const // the length of the polyline from its first to its last point
         {
             double L = 0.0;

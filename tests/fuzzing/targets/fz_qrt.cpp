@@ -14,7 +14,7 @@ static std::vector<quadriga_lib::path> two_paths(unsigned i_cir, unsigned n_freq
     for (unsigned n_seg : {0u, 2u})
     {
         quadriga_lib::path p(n_seg, n_freq, scalar);
-        p.iC = i_cir;
+        p.i_cir = i_cir;
         for (unsigned s = 0; s < n_seg; ++s)
         {
             float *c = p.coord(s);
@@ -22,7 +22,7 @@ static std::vector<quadriga_lib::path> two_paths(unsigned i_cir, unsigned n_freq
         }
         for (unsigned f = 0; f < n_freq; ++f)
         {
-            float *m = p.xpr_coeff(f);
+            float *m = p.polmat(f);
             for (unsigned k = 0; k < (scalar ? 2u : 8u); ++k)
                 m[k] = 0.1f * (float)(k + 1);
         }

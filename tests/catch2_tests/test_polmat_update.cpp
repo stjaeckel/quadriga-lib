@@ -18,7 +18,7 @@ inline void omp_set_num_threads(int) {}
 
 // Reference: the same updates applied in chunks of 1000 (below the OpenMP threshold of polmat_update, so each chunk runs
 // serially), i.e. one after the other in update-index order
-static void xpr_update_chunked(arma::mat &X, const arma::mat &U, arma::vec *gain, bool normalize, bool apply_gain,
+static void polmat_update_chunked(arma::mat &X, const arma::mat &U, arma::vec *gain, bool normalize, bool apply_gain,
                                const arma::uvec &idx)
 {
     const arma::uword n = idx.n_elem, chunk = 1000;
@@ -52,7 +52,7 @@ TEST_CASE("polmat_update - duplicate ray_ind entries give the single-thread resu
 
     arma::mat Xref(8, 4);
     quadriga_lib::polmat_update<double>(Xref, nullptr, nullptr, true);
-    xpr_update_chunked(Xref, U, nullptr, false, false, idx);
+    polmat_update_chunked(Xref, U, nullptr, false, false, idx);
     CHECK(std::abs(Xref(0, 0) - std::cos(2.0)) < 1e-9);
     CHECK(std::abs(Xref(2, 0) - std::sin(2.0)) < 1e-9);
 
@@ -85,8 +85,8 @@ TEST_CASE("polmat_update - duplicate ray_ind entries give the single-thread resu
 
     arma::mat Xr1 = X0, Xr2 = X0;
     arma::vec gr1, gr2 = gin;
-    xpr_update_chunked(Xr1, RU, &gr1, true, false, ridx);
-    xpr_update_chunked(Xr2, B, &gr2, true, true, ridx);
+    polmat_update_chunked(Xr1, RU, &gr1, true, false, ridx);
+    polmat_update_chunked(Xr2, B, &gr2, true, true, ridx);
 
     for (int nt : {1, 4, 12})
     {
@@ -104,7 +104,7 @@ TEST_CASE("polmat_update - duplicate ray_ind entries give the single-thread resu
     // Unique indices in scattered order (parallel loop): the same values as the serial reference
     arma::uvec uidx = arma::randperm<arma::uvec>(3000);
     arma::mat UU = RU.cols(0, 2999), Xu_ref = X0;
-    xpr_update_chunked(Xu_ref, UU, nullptr, false, false, uidx);
+    polmat_update_chunked(Xu_ref, UU, nullptr, false, false, uidx);
     for (int nt : {1, 12})
     {
         omp_set_num_threads(nt);

@@ -66,7 +66,7 @@ assertElementsAlmostEqual(orig_orientation(2, :), T, 'absolute', 1.5e-4);
     path_gain, path_length, M, aod, eod, aoa, eoa, path_coord] = ...
     quadriga_lib.qrt_file_read(fn, 1, 1, false, 1);
 
-assertElementsAlmostEqual(center_freq(1), 3.75e9, 'absolute', 1e-4);
+assertElementsAlmostEqual(center_freq(1), 3.75e9, 'relative', 1e-7); % v4 stores GHz, converted to Hz in float
 
 T = [-12.9607; 59.6906; 2.0];
 assertElementsAlmostEqual(tx_pos, T, 'absolute', 1.5e-4);

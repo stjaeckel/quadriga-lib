@@ -221,14 +221,14 @@ namespace mt
                     const quadriga_lib::path &p = paths[i];
                     const size_t ns = p.n_seg(), k = (size_t)std::lround((-p.coord(0)[2] - 0.005f) / 0.01f);
                     const float *a = p.coord(0), *b = p.coord(ns - 1);
-                    const bool back = p.nREF % 2 == 0, on = !back || (T && g < 10 && b[0] > S.x_end - 1e-3f && dest(i, 0) > b[0]);
+                    const bool back = p.n_ref % 2 == 0, on = !back || (T && g < 10 && b[0] > S.x_end - 1e-3f && dest(i, 0) > b[0]);
                     if ((cur(i) & (short)0x3FFF) != 0 || ns != (size_t)(g + 1) || !on || k >= n)
                         continue; // in air, extended by this call, turned back (or gone on behind)
                     // the polyline from the first interaction on: the path's length less its launch leg from the origin
                     const double L = (double)p.length() - std::sqrt(std::pow(a[0] + 1.0, 2) + std::pow(a[1] - 0.37, 2) + std::pow((double)a[2], 2));
                     const double x = back ? std::cos(rad(G.th[k])) * ((double)b[0] - a[0]) : 0.0;
                     for (size_t q = 0; q < m; ++q)
-                        (back ? (*T)[k][c0 + q] : R[k][c0 + q]) += cd(p.xpr_coeff(q)[0], p.xpr_coeff(q)[1]) *
+                        (back ? (*T)[k][c0 + q] : R[k][c0 + q]) += cd(p.polmat(q)[0], p.polmat(q)[1]) *
                                         std::exp(cd(0.0, 2.0 * QPI * cf(q) / CS * (x + std::sin(rad(G.th[k])) * ((double)b[1] - a[1]) - L)));
                 }
             }
@@ -663,7 +663,7 @@ namespace mt
             {
                 double p = 0.0;
                 for (arma::uword i = 0; i < orig.n_rows; ++i)
-                    p += (!missed || fbs(i) == 0) ? std::norm(cd(paths[i].xpr_coeff(q)[0], paths[i].xpr_coeff(q)[1])) : 0.0;
+                    p += (!missed || fbs(i) == 0) ? std::norm(cd(paths[i].polmat(q)[0], paths[i].polmat(q)[1])) : 0.0;
                 return p;
             };
             std::vector<double> pin(nf, (double)n), miss(nf);

@@ -97,7 +97,7 @@ class test_case(unittest.TestCase):
             channel.qrt_file_read(FN_V4, [0], 0, uplink=False, normalize_polmat=1)
 
         # qrt_file_read returns center_freq in Hz
-        npt.assert_allclose(center_freq[0], 3.75e9, atol=1e-4, rtol=0)
+        npt.assert_allclose(center_freq[0], 3.75e9, rtol=1e-7)  # v4 stores GHz, converted to Hz in float
 
         # Scalar-per-snapshot outputs are (3, n_out) -> here (3, 1)
         self.assertEqual(tx_pos.shape, (3, 1))

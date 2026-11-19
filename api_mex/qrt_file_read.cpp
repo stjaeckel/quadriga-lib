@@ -100,12 +100,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (i_cir.empty()) // Default: read all CIRs (none for a file without CIRs: empty outputs)
     {
-        if (cache.no_cir != 0)
-            i_cir = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir) - 1);
+        if (cache.n_cir != 0)
+            i_cir = arma::regspace<arma::uvec>(0, arma::uword(cache.n_cir) - 1);
     }
     else
     {
-        if (arma::any(i_cir >= (arma::uword)cache.no_cir))
+        if (arma::any(i_cir >= (arma::uword)cache.n_cir))
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "CIR index exceeds number of CIRs in file.");
     }
 
@@ -114,10 +114,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Return frequencies in Hz
     arma::vec center_freq;
-    plhs[0] = qd_mex_init_output(&center_freq, cache.no_freq);
-    const double freq_scale = qd_qrt_freq_scale(cache.freq.memptr(), cache.freq.n_elem, cache.version);
-    for (unsigned i_freq = 0; i_freq < cache.no_freq; ++i_freq)
-        center_freq[i_freq] = (double)cache.freq[i_freq] * freq_scale;
+    plhs[0] = qd_mex_init_output(&center_freq, cache.n_freq);
+    for (unsigned i_freq = 0; i_freq < cache.n_freq; ++i_freq)
+        center_freq[i_freq] = (double)cache.freq[i_freq];
 
     // Initialize output data structures
     arma::mat tx_pos, tx_orientation, rx_pos, rx_orientation;

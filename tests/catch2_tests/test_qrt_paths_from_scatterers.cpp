@@ -65,7 +65,7 @@ namespace
         d = 0.0, ref = 0.0;
         for (arma::uword e = 0; e < 8; ++e)
             ref = std::max(ref, std::abs(M(e, p, f) * s)),
-            d = std::max(d, std::abs((double)q.xpr_coeff(f)[e] - M(e, p, f) * s));
+            d = std::max(d, std::abs((double)q.polmat(f)[e] - M(e, p, f) * s));
     }
 }
 
@@ -85,12 +85,12 @@ TEST_CASE("qrt_paths_from_scatterers - path objects carry the geometry, the code
         INFO("path " << p << ", type " << t);
         CHECK(q.n_freq() == n_freq);
         CHECK(!q.is_scalar());
-        CHECK(q.iC == 7);
+        CHECK(q.i_cir == 7);
         REQUIRE(q.n_seg() == (t == 0 ? 0 : t == 1 ? 1 : 2));
-        CHECK(q.nREF == (t == 1 ? 1 : 0));
-        CHECK(q.nSCT == (t == 2 ? 2 : 0));
-        CHECK(q.nTRA == 0);
-        CHECK(q.nSUB == 0);
+        CHECK(q.n_ref == (t == 1 ? 1 : 0));
+        CHECK(q.n_sct == (t == 2 ? 2 : 0));
+        CHECK(q.n_tra == 0);
+        CHECK(q.n_sub == 0);
         const std::vector<uint8_t> codes = q.interaction_type_codes();
         if (t == 1)
         {

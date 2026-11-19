@@ -10,20 +10,20 @@
 //
 //   the gates      length, gain, shading, subdivision, direct-path, segment count
 //   the count      the survivor mask and the block prefix sum agree with what is written
-//   the payload    iC, the receive-side mirror, the in-medium loss, per frequency
+//   the payload    i_cir, the receive-side mirror, the in-medium loss, per frequency
 //   the append     existing entries untouched, return value equals the number added
-//   the index map  padding rows dropped, iC reported in the caller's original ordering
+//   the index map  padding rows dropped, i_cir reported in the caller's original ordering
 //
 // Oracles: geometry is exact by construction (a single ray along +x, receivers placed on its axis),
 // so the shading decision has a known answer. The coefficient assertions are relative — committed
-// against source — so this file does not restate what path::xpr_update already guarantees. The
+// against source — so this file does not restate what path::polmat_update already guarantees. The
 // in-medium case is the exception: medium_gain is called directly to build an exact oracle.
 //
 // Block boundary: pass B and pass C walk the pair list in blocks of 65536. One test drives the pair
 // count past that so the prefix sum over more than one block is exercised; a single-block suite
 // would never touch it.
 //
-// Index map: most point_ind cases use a hand-built map so the expected iC is exact. One case runs
+// Index map: most point_ind cases use a hand-built map so the expected i_cir is exact. One case runs
 // the real point_cloud_segmentation and compares against the unsegmented result, which is the only
 // oracle that catches a change in the padding convention.
 //
@@ -238,8 +238,8 @@ namespace
     }
 
     // Every committed path is well formed and its receiver index is in range.
-    // "n_index" bounds iC: the point count without point_ind, the original cloud size with it.
-    // Point-major output means iC never decreases within one call, but only while iC and the
+    // "n_index" bounds i_cir: the point count without point_ind, the original cloud size with it.
+    // Point-major output means i_cir never decreases within one call, but only while i_cir and the
     // storage order agree; a point_ind permutes them, so that check is opt-out.
     void check_commit_shape(const std::vector<quadriga_lib::path> &out, size_t from,
                             arma::uword n_index, arma::uword n_freq, bool scalar,
@@ -250,14 +250,14 @@ namespace
         {
             CHECK(out[i].n_freq() == n_freq);
             CHECK(out[i].is_scalar() == scalar);
-            CHECK(out[i].iC < (unsigned)n_index);
+            CHECK(out[i].i_cir < (unsigned)n_index);
             CHECK(std::isfinite(out[i].length()));
             CHECK(out[i].calc_gain(0.0f, 0) > 0.0f);
 
             // Output is point-major, so the receiver index never decreases within one call
             if (monotonic_iC && i > from)
-                CHECK(out[i].iC >= last_iC);
-            last_iC = out[i].iC;
+                CHECK(out[i].i_cir >= last_iC);
+            last_iC = out[i].i_cir;
         }
     }
 
@@ -278,7 +278,7 @@ namespace
         std::vector<unsigned> v;
         v.reserve(out.size());
         for (const auto &p : out)
-            v.push_back(p.iC);
+            v.push_back(p.i_cir);
         std::sort(v.begin(), v.end());
         return v;
     }
@@ -294,7 +294,7 @@ TEST_CASE("ray_commit - a receiver on the beam axis is committed")
     Cfg C = one_ray();
 
     // Guard: a degenerate source path would make every gate below vacuous
-    REQUIRE(C.paths[0].calc_gain(FRQ * 1e-9f, 0) > 0.0f);
+    REQUIRE(C.paths[0].calc_gain(FRQ, 0) > 0.0f);
 
     arma::fmat P = pts({{5.0f, 0.0f, 0.0f}});
     std::vector<quadriga_lib::path> out;
@@ -302,14 +302,14 @@ TEST_CASE("ray_commit - a receiver on the beam axis is committed")
     REQUIRE(C.commit(S, P, out) == 1);
     REQUIRE(out.size() == 1);
 
-    CHECK(out[0].iC == 0u);                        // receiver index
+    CHECK(out[0].i_cir == 0u);                        // receiver index
     CHECK(out[0].n_seg() == C.paths[0].n_seg());   // the receiver is not an interaction point
     CHECK(out[0].length() == C.paths[0].length()); // length still ends at the last interaction
 
     // The committed path descends from the source path rather than being freshly built
-    CHECK((int)out[0].nREF == (int)C.paths[0].nREF);
-    CHECK((int)out[0].nTRA == (int)C.paths[0].nTRA);
-    CHECK((int)out[0].nSUB == (int)C.paths[0].nSUB);
+    CHECK((int)out[0].n_ref == (int)C.paths[0].n_ref);
+    CHECK((int)out[0].n_tra == (int)C.paths[0].n_tra);
+    CHECK((int)out[0].n_sub == (int)C.paths[0].n_sub);
 
     // A zero-segment path has no last interaction, so the read-only overload cannot form the leg
     CHECK(std::isnan(out[0].calc_length(5.0f, 0.0f, 0.0f)));
@@ -356,9 +356,9 @@ TEST_CASE("ray_commit - several receivers on one ray")
     REQUIRE(C.commit(S, P, out) == 3); // point 2 is outside the tube
     REQUIRE(out.size() == 3);
 
-    CHECK(out[0].iC == 0u);
-    CHECK(out[1].iC == 1u);
-    CHECK(out[2].iC == 3u);
+    CHECK(out[0].i_cir == 0u);
+    CHECK(out[1].i_cir == 1u);
+    CHECK(out[2].i_cir == 3u);
 
     check_commit_shape(out, 0, P.n_rows, 1, false);
 }
@@ -411,7 +411,7 @@ TEST_CASE("ray_commit - max_path_length gate")
     out.clear();
 
     REQUIRE(C.commit(S, P, out, o) == 1); // only the near one survives
-    CHECK(out[0].iC == 0u);
+    CHECK(out[0].i_cir == 0u);
 
     // The gate is on the total including the final leg, not on the stored length
     o.max_len = 1.0f;
@@ -453,7 +453,7 @@ TEST_CASE("ray_commit - subdiv_flag_in excludes flagged rays")
     Opt o;
     o.sf_in = &f;
     REQUIRE(C.commit(S, P, out, o) == 1);
-    CHECK(out[0].iC == 1u); // the ray along +y, hitting the second receiver
+    CHECK(out[0].i_cir == 1u); // the ray along +y, hitting the second receiver
 
     out.clear();
     std::vector<bool> all = {true, true};
@@ -478,16 +478,16 @@ TEST_CASE("ray_commit - ignore_direct_path drops transmission-only arrivals")
     Opt o;
     o.ignore_direct = true;
 
-    // nREF = 0 and nSCT = 0, so this is a direct arrival regardless of geometry
+    // n_ref = 0 and n_sct = 0, so this is a direct arrival regardless of geometry
     CHECK(C.commit(S, P, out, o) == 0);
 
     // One reflection in the history makes it a traced path again
-    C.paths[0].nREF = 1;
+    C.paths[0].n_ref = 1;
     CHECK(C.commit(S, P, out, o) == 1);
 
     // Scattering counts the same way
-    C.paths[0].nREF = 0;
-    C.paths[0].nSCT = 1;
+    C.paths[0].n_ref = 0;
+    C.paths[0].n_sct = 1;
     out.clear();
     CHECK(C.commit(S, P, out, o) == 1);
 }
@@ -505,8 +505,8 @@ TEST_CASE("ray_commit - the receive-side mirror is applied in EM mode")
     std::vector<quadriga_lib::path> out;
     REQUIRE(C.commit(S, P, out) == 1);
 
-    const float *src = C.paths[0].xpr_coeff(0);
-    const float *dst = out[0].xpr_coeff(0);
+    const float *src = C.paths[0].polmat(0);
+    const float *dst = out[0].polmat(0);
 
     // VV and the cross terms pass through, HH changes sign
     CHECK(std::abs(dst[0] - src[0]) < 1e-6f);
@@ -530,8 +530,8 @@ TEST_CASE("ray_commit - scalar layout carries no mirror")
     REQUIRE(C.commit(S, P, out) == 1);
 
     REQUIRE(out[0].is_scalar());
-    const float *src = C.paths[0].xpr_coeff(0);
-    const float *dst = out[0].xpr_coeff(0);
+    const float *src = C.paths[0].polmat(0);
+    const float *dst = out[0].polmat(0);
     CHECK(std::abs(dst[0] - src[0]) < 1e-6f);
     CHECK(std::abs(dst[1] - src[1]) < 1e-6f);
 }
@@ -592,8 +592,8 @@ TEST_CASE("ray_commit - every frequency slot is updated")
     const float seg = 5.0f - R0;
     for (size_t f = 0; f < 3; ++f)
     {
-        const float *src = C.paths[0].xpr_coeff(f);
-        const float *dst = out[0].xpr_coeff(f);
+        const float *src = C.paths[0].polmat(f);
+        const float *dst = out[0].polmat(f);
         const float g = quadriga_lib::medium_gain(S.mtl_prop, 1u, seg, C.freq(f));
         const float amp = std::sqrt(g);
 
@@ -617,13 +617,13 @@ TEST_CASE("ray_commit - results are appended, not overwritten")
 
     std::vector<quadriga_lib::path> out;
     REQUIRE(C.commit(S, P, out) == 1);
-    out[0].iC = 12345u; // a marker the second call must not touch
+    out[0].i_cir = 12345u; // a marker the second call must not touch
 
     const arma::uword n2 = C.commit(S, P, out);
     CHECK(n2 == 1);
     CHECK(out.size() == 2);
-    CHECK(out[0].iC == 12345u);
-    CHECK(out[1].iC == 0u);
+    CHECK(out[0].i_cir == 12345u);
+    CHECK(out[1].i_cir == 0u);
 }
 
 TEST_CASE("ray_commit - nothing is appended when no pair survives")
@@ -635,12 +635,12 @@ TEST_CASE("ray_commit - nothing is appended when no pair survives")
     std::vector<quadriga_lib::path> out;
     out.resize(3);
     for (size_t i = 0; i < 3; ++i)
-        out[i].init(0, 1, false), out[i].iC = (unsigned)(100 + i);
+        out[i].init(0, 1, false), out[i].i_cir = (unsigned)(100 + i);
 
     CHECK(C.commit(S, P, out) == 0);
     REQUIRE(out.size() == 3);
     for (size_t i = 0; i < 3; ++i)
-        CHECK(out[i].iC == (unsigned)(100 + i));
+        CHECK(out[i].i_cir == (unsigned)(100 + i));
 }
 
 TEST_CASE("ray_commit - repeated calls are deterministic")
@@ -663,11 +663,11 @@ TEST_CASE("ray_commit - repeated calls are deterministic")
     REQUIRE(na > 0); // a vacuous comparison is a failed comparison
     for (size_t i = 0; i < a.size(); ++i)
     {
-        CHECK(a[i].iC == b[i].iC);
+        CHECK(a[i].i_cir == b[i].i_cir);
         CHECK(a[i].n_seg() == b[i].n_seg());
-        CHECK((int)a[i].nREF == (int)b[i].nREF);
-        CHECK((int)a[i].nTRA == (int)b[i].nTRA);
-        CHECK((int)a[i].nSUB == (int)b[i].nSUB);
+        CHECK((int)a[i].n_ref == (int)b[i].n_ref);
+        CHECK((int)a[i].n_tra == (int)b[i].n_tra);
+        CHECK((int)a[i].n_sub == (int)b[i].n_sub);
         CHECK(a[i].length() == b[i].length());
         CHECK(a[i].calc_gain(0.0f, 0) == b[i].calc_gain(0.0f, 0));
     }
@@ -703,11 +703,11 @@ TEST_CASE("ray_commit - the pair list spans more than one block")
 
     // Every committed receiver is one of the on-axis points
     for (size_t i = 0; i < out.size(); ++i)
-        CHECK(out[i].iC % 3 != 2);
+        CHECK(out[i].i_cir % 3 != 2);
 
     // Committed receiver indices are strictly increasing here: one ray, one hit per point
     for (size_t i = 1; i < out.size(); ++i)
-        CHECK(out[i].iC > out[i - 1].iC);
+        CHECK(out[i].i_cir > out[i - 1].i_cir);
 }
 
 TEST_CASE("ray_commit - sub-cloud partitioning does not change the result")
@@ -733,7 +733,7 @@ TEST_CASE("ray_commit - sub-cloud partitioning does not change the result")
     REQUIRE(na > 0);
     for (size_t i = 0; i < a.size(); ++i)
     {
-        CHECK(a[i].iC == b[i].iC);
+        CHECK(a[i].i_cir == b[i].i_cir);
         CHECK(a[i].calc_gain(0.0f, 0) == b[i].calc_gain(0.0f, 0));
     }
 }
@@ -761,8 +761,8 @@ TEST_CASE("ray_commit - point_ind drops padding rows")
     o.pt_ind = &fwd;
 
     REQUIRE(C.commit(S, P, out, o) == 2);
-    CHECK(out[0].iC == 0u); // row 0 maps to original point 0
-    CHECK(out[1].iC == 1u); // row 2 maps to original point 1, row 1 was padding
+    CHECK(out[0].i_cir == 0u); // row 0 maps to original point 0
+    CHECK(out[1].i_cir == 1u); // row 2 maps to original point 1, row 1 was padding
 
     // An empty map is treated as absent
     out.clear();
@@ -771,10 +771,10 @@ TEST_CASE("ray_commit - point_ind drops padding rows")
     CHECK(C.commit(S, P, out, o) == 3);
 }
 
-TEST_CASE("ray_commit - point_ind remaps iC into the original ordering")
+TEST_CASE("ray_commit - point_ind remaps i_cir into the original ordering")
 {
     // A reversing map: the segmented row order is the opposite of the caller's, so a correct
-    // implementation returns descending iC while the storage order stays point-major
+    // implementation returns descending i_cir while the storage order stays point-major
     Scene S = one_cube(50.0f, 0.0f, 0.0f);
     Cfg C = one_ray();
 
@@ -786,9 +786,9 @@ TEST_CASE("ray_commit - point_ind remaps iC into the original ordering")
     std::vector<quadriga_lib::path> out;
     REQUIRE(C.commit(S, P, out, o) == 3);
 
-    CHECK(out[0].iC == 2u);
-    CHECK(out[1].iC == 1u);
-    CHECK(out[2].iC == 0u);
+    CHECK(out[0].i_cir == 2u);
+    CHECK(out[1].i_cir == 1u);
+    CHECK(out[2].i_cir == 0u);
 
     // The leg is still measured to the row that was actually hit, not to the mapped index
     check_commit_shape(out, 0, P.n_rows, 1, false, false);
@@ -902,7 +902,7 @@ TEST_CASE("ray_commit - min_segments and ignore_direct_path are independent gate
     {
         Cfg C = one_ray();
         add_segment(C, 0);
-        C.paths[0].nREF = 1;
+        C.paths[0].n_ref = 1;
 
         Opt o;
         o.ignore_direct = true;
@@ -917,7 +917,7 @@ TEST_CASE("ray_commit - min_segments and ignore_direct_path are independent gate
         Cfg C = one_ray();
         add_segment(C, 0);
         add_segment(C, 0);
-        C.paths[0].nTRA = 2; // transmissions only, so it is still a direct arrival
+        C.paths[0].n_tra = 2; // transmissions only, so it is still a direct arrival
 
         Opt o;
         o.min_seg = 2;

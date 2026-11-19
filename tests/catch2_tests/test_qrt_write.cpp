@@ -19,23 +19,23 @@ using quadriga_lib::path;
 namespace
 {
     // Build one EM path: nSEG segments at deterministic coordinates, identity-plus-offset
-    // Jones per frequency, and per-segment type codes. iC selects the target CIR.
-    static path make_em_path(unsigned iC, unsigned nSEG, unsigned nFreq,
+    // Jones per frequency, and per-segment type codes. i_cir selects the target CIR.
+    static path make_em_path(unsigned i_cir, unsigned nSEG, unsigned nFreq,
                              const std::vector<uint8_t> &types)
     {
         path p(nSEG, nFreq, false);
-        p.iC = iC;
+        p.i_cir = i_cir;
         for (unsigned s = 0; s < nSEG; ++s)
         {
             float *c = p.coord(s);
-            c[0] = (float)(iC * 100 + s);
+            c[0] = (float)(i_cir * 100 + s);
             c[1] = (float)(s * 2);
             c[2] = (float)(s * 3);
         }
         // Distinct value per (freq, entry) so an interleave bug is visible.
         for (unsigned f = 0; f < nFreq; ++f)
         {
-            float *m = p.xpr_coeff(f);
+            float *m = p.polmat(f);
             for (unsigned k = 0; k < 8; ++k)
                 m[k] = (float)(f * 10 + k) + 0.5f;
         }
@@ -44,21 +44,21 @@ namespace
         return p;
     }
 
-    static path make_scalar_path(unsigned iC, unsigned nSEG, unsigned nFreq,
+    static path make_scalar_path(unsigned i_cir, unsigned nSEG, unsigned nFreq,
                                  const std::vector<uint8_t> &types)
     {
         path p(nSEG, nFreq, true);
-        p.iC = iC;
+        p.i_cir = i_cir;
         for (unsigned s = 0; s < nSEG; ++s)
         {
             float *c = p.coord(s);
-            c[0] = (float)(iC * 100 + s);
+            c[0] = (float)(i_cir * 100 + s);
             c[1] = (float)(s * 2);
             c[2] = (float)(s * 3);
         }
         for (unsigned f = 0; f < nFreq; ++f)
         {
-            float *m = p.xpr_coeff(f);
+            float *m = p.polmat(f);
             m[0] = (float)(f * 10) + 0.25f;
             m[1] = (float)(f * 10) + 0.75f;
         }
@@ -140,6 +140,7 @@ TEST_CASE("QRT Write - scalar init selects v6")
     CHECK(version == 6);
     CHECK(n_freq == 3ULL);
     CHECK(arma::approx_equal(center_freq, freq, "reldiff", 1.0e-6)); // Scalar files store Hz, no conversion
+    CHECK(arma::approx_equal(quadriga_lib::qrt_read_cache_init(fn).freq, freq, "reldiff", 1.0e-7f)); // Hz in the cache
 
     std::remove(fn.c_str());
 }
@@ -175,7 +176,7 @@ TEST_CASE("QRT Write - v5 files store Hz, older v5 files store GHz")
 
     // Reads the frequencies through qrt_file_parse, the cache and qrt_file_read (with and without the cache);
     // returns the path gain
-    auto check_read = [&](const arma::vec &expected_Hz, const arma::fvec &expected_cache)
+    auto check_read = [&](const arma::vec &expected_Hz)
     {
         arma::fvec parse_freq;
         quadriga_lib::qrt_file_parse(fn, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &parse_freq);
@@ -183,7 +184,7 @@ TEST_CASE("QRT Write - v5 files store Hz, older v5 files store GHz")
 
         std::ifstream stream(fn, std::ios::binary);
         auto cache = quadriga_lib::qrt_read_cache_init(fn, &stream);
-        CHECK(arma::approx_equal(cache.freq, expected_cache, "absdiff", 0.0f));
+        CHECK(arma::approx_equal(cache.freq, arma::conv_to<arma::fvec>::from(expected_Hz), "reldiff", 1.0e-7f)); // Hz in the cache
 
         arma::vec read_freq, read_freq_cached;
         arma::mat path_gain, path_gain_cached;
@@ -199,18 +200,18 @@ TEST_CASE("QRT Write - v5 files store Hz, older v5 files store GHz")
     };
 
     CHECK(arma::approx_equal(stored(), freq, "absdiff", 0.0f));
-    arma::mat gain_Hz = check_read(arma::conv_to<arma::vec>::from(freq), freq);
+    arma::mat gain_Hz = check_read(arma::conv_to<arma::vec>::from(freq));
 
     // The same file as written before the library stored Hz: same frequencies and path gains
     patch(3.75f, 28.0f);
-    arma::mat gain_GHz = check_read({3.75e9, 28.0e9}, {3.75f, 28.0f});
+    arma::mat gain_GHz = check_read({3.75e9, 28.0e9});
     CHECK(arma::approx_equal(gain_GHz, gain_Hz, "reldiff", 1.0e-6));
 
     // A v5 list is GHz when all values are below 1000, else Hz
     patch(999.0f, 1.5f);
-    check_read({999.0e9, 1.5e9}, {999.0f, 1.5f});
+    check_read({999.0e9, 1.5e9});
     patch(1.5f, 1000.0f);
-    check_read({1.5, 1000.0}, {1.5f, 1000.0f});
+    check_read({1.5, 1000.0});
 
     std::remove(fn.c_str());
 }
@@ -323,12 +324,12 @@ TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
     unsigned cir0 = 0, cir2 = 0;
     for (const auto &p : rd)
     {
-        if (p.iC == 0)
+        if (p.i_cir == 0)
             ++cir0;
-        else if (p.iC == 2)
+        else if (p.i_cir == 2)
             ++cir2;
         else
-            FAIL("unexpected CIR index " << p.iC);
+            FAIL("unexpected CIR index " << p.i_cir);
     }
     CHECK(cir0 == 2);
     CHECK(cir2 == 1);
@@ -339,7 +340,7 @@ TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
         if (p.n_seg() == 8)
             pl = &p;
     REQUIRE(pl != nullptr);
-    CHECK(pl->iC == 2);
+    CHECK(pl->i_cir == 2);
     CHECK(pl->n_freq() == nFreq);
     CHECK_FALSE(pl->is_scalar());
 
@@ -361,7 +362,7 @@ TEST_CASE("QRT Write - append then read_raw round-trip (EM)")
     // Polarization preserved for every frequency, no interleave swap.
     for (unsigned f = 0; f < nFreq; ++f)
     {
-        const float *m = pl->xpr_coeff(f);
+        const float *m = pl->polmat(f);
         for (unsigned k = 0; k < 8; ++k)
             CHECK(std::abs(m[k] - ((float)(f * 10 + k) + 0.5f)) < 1e-4f);
     }
@@ -399,7 +400,7 @@ TEST_CASE("QRT Write - scalar append then read_raw round-trip (v6)")
     // Scalar coefficients: 2 floats per frequency, correct per-band values.
     for (unsigned f = 0; f < nFreq; ++f)
     {
-        const float *m = p.xpr_coeff(f);
+        const float *m = p.polmat(f);
         CHECK(std::abs(m[0] - ((float)(f * 10) + 0.25f)) < 1e-4f);
         CHECK(std::abs(m[1] - ((float)(f * 10) + 0.75f)) < 1e-4f);
     }
@@ -437,7 +438,7 @@ TEST_CASE("QRT Write - read reserved-but-unwritten origin")
     // read_raw on written origin 0 returns the one path.
     std::vector<path> got = quadriga_lib::qrt_file_read_raw(fn, 0);
     REQUIRE(got.size() == 1);
-    CHECK(got[0].iC == 0);
+    CHECK(got[0].i_cir == 0);
 
     // qrt_file_read on the unwritten origin returns empty outputs (no throw).
     arma::Col<double> tx_pos_out, path_length;
@@ -493,7 +494,7 @@ TEST_CASE("QRT Write - append validates path against file")
     quadriga_lib::qrt_file_init<float>(fn, freq, cir_pos, cir_orient, dest_names, cir_offset, 2, false);
     arma::fvec tx_pos = {0.0f, 0.0f, 0.0f};
 
-    // iC out of range (file has 2 CIRs).
+    // i_cir out of range (file has 2 CIRs).
     {
         std::vector<path> bad = {make_em_path(5, 1, 2, {1})};
         CHECK_THROWS_AS(quadriga_lib::qrt_file_append<float>(fn, bad, tx_pos), std::invalid_argument);
@@ -539,7 +540,7 @@ TEST_CASE("QRT Write - read_raw with shared stream and cache")
 
     CHECK(r0.size() == 2);
     CHECK(r1.size() == 1);
-    CHECK(r1[0].iC == 0);
+    CHECK(r1[0].i_cir == 0);
     std::vector<uint8_t> t = r1[0].interaction_type_codes();
     REQUIRE(t.size() == 1);
     CHECK(t[0] == 9);
@@ -560,8 +561,8 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
         cir_ori(1, 2) = 0.25;       // heading of CIR 1 is stored
         quadriga_lib::qrt_file_init<double>(fn, freq, cir_pos, cir_ori, {"RX"}, {0}, 3, scalar);
 
-        auto mk = [&](unsigned iC, unsigned nSEG, std::vector<uint8_t> t)
-        { return scalar ? make_scalar_path(iC, nSEG, 2, t) : make_em_path(iC, nSEG, 2, t); };
+        auto mk = [&](unsigned i_cir, unsigned nSEG, std::vector<uint8_t> t)
+        { return scalar ? make_scalar_path(i_cir, nSEG, 2, t) : make_em_path(i_cir, nSEG, 2, t); };
         std::vector<std::vector<path>> tx(3);
         tx[0] = {mk(0, 0, {}), mk(2, 3, {1, 2, 3}), mk(0, 1, {4})};
         tx[2] = {mk(1, 2, {5, 6})}; // tx[1] has no paths
@@ -573,7 +574,7 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
         }
 
         auto cache = quadriga_lib::qrt_read_cache_init(fn);
-        REQUIRE(cache.no_orig == 3);
+        REQUIRE(cache.n_orig == 3);
         for (unsigned t = 0; t < 3; ++t)
         {
             CHECK(cache.orig_pos_all(t, 0) == float(100.0 + t));
@@ -591,12 +592,12 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
             std::vector<const path *> exp;
             for (unsigned c = 0; c < 3; ++c)
                 for (auto &p : tx[t])
-                    if (p.iC == c)
+                    if (p.i_cir == c)
                         exp.push_back(&p);
             REQUIRE(raw.size() == exp.size());
             for (size_t i = 0; i < raw.size(); ++i)
             {
-                CHECK(raw[i].iC == exp[i]->iC);
+                CHECK(raw[i].i_cir == exp[i]->i_cir);
                 REQUIRE(raw[i].n_seg() == exp[i]->n_seg());
                 CHECK(raw[i].interaction_type_codes() == exp[i]->interaction_type_codes());
                 for (size_t s = 0; s < raw[i].n_seg(); ++s)
@@ -604,7 +605,7 @@ TEST_CASE("QRT Write - append after an orientation that rounds to 0 in float")
                         CHECK(raw[i].coord(s)[k] == exp[i]->coord(s)[k]);
                 for (size_t f = 0; f < 2; ++f)
                     for (size_t k = 0; k < (scalar ? 2u : 8u); ++k)
-                        CHECK(raw[i].xpr_coeff(f)[k] == exp[i]->xpr_coeff(f)[k]);
+                        CHECK(raw[i].polmat(f)[k] == exp[i]->polmat(f)[k]);
             }
         }
 
