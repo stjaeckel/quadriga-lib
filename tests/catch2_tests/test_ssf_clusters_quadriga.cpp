@@ -470,7 +470,7 @@ TEST_CASE("ssf_clusters - quadriga applies the LOS direction additively")
         fix_t f = make_fix(N, 4, 1, 351, true);
         f.use_eps = f.use_toa = true;
         // Link 0 nearly below the BS: EoD -80 deg, EoA +80 deg; the NLOS elevations fold at the poles
-        f.rx(0, 0) = f.tx(0, 0) + 3.0, f.rx(0, 1) = f.tx(0, 1) - 2.6, f.rx(0, 2) = 1.5;
+        f.rx(0, 0) = f.tx(0, 0) + 3.0, f.rx(1, 0) = f.tx(1, 0) - 2.6, f.rx(2, 0) = 1.5;
         f.lsp(0, 0, 5) = f.lsp(0, 0, 6) = 25.0;
         out_t o = run(sp, f, "quadriga");
         double err[3] = {0, 0, 0};
@@ -486,10 +486,10 @@ TEST_CASE("ssf_clusters - quadriga applies the LOS direction additively")
         fix_t f2 = f;
         const double al = 0.7, ca = std::cos(al), sa = std::sin(al);
         for (arma::mat *m : {&f2.tx, &f2.rx})
-            for (arma::uword i = 0; i < m->n_rows; ++i)
+            for (arma::uword i = 0; i < m->n_cols; ++i)
             {
-                const double x = (*m)(i, 0), y = (*m)(i, 1);
-                (*m)(i, 0) = ca * x - sa * y, (*m)(i, 1) = sa * x + ca * y;
+                const double x = (*m)(0, i), y = (*m)(1, i);
+                (*m)(0, i) = ca * x - sa * y, (*m)(1, i) = sa * x + ca * y;
             }
         out_t o2 = run(sp, f2, "quadriga");
         CHECK(arma::approx_equal(o2.power, o.power, "reldiff", 1e-12));
@@ -662,10 +662,10 @@ TEST_CASE("ssf_clusters - quadriga is continuous along tracks")
         int ev[4] = {0, 0, 0, 0};
         for (int tr = 0; tr < 5; ++tr)
         {
-            arma::mat tx = {{0.0, 0.0, 10.0}}, rx(n_pt, 3);
+            arma::mat tx = arma::vec{0.0, 0.0, 10.0}, rx(3, n_pt);
             const double a0 = 1.3 * tr - 2.0, x0 = 30.0 + 25.0 * tr, y0 = 15.0 - 9.0 * tr;
             for (arma::uword i = 0; i < n_pt; ++i)
-                rx(i, 0) = x0 + 0.01 * i * std::cos(a0), rx(i, 1) = y0 + 0.01 * i * std::sin(a0), rx(i, 2) = 1.5;
+                rx(0, i) = x0 + 0.01 * i * std::cos(a0), rx(1, i) = y0 + 0.01 * i * std::sin(a0), rx(2, i) = 1.5;
             const lib_t in = lib_inputs(sp, tx, rx, 11 + tr);
             out_t o;
             quadriga_lib::ssf_clusters(sp, tx, rx, in.lsp, in.rnd, o.delay, o.power, o.aod, o.eod, o.aoa, o.eoa,
@@ -693,7 +693,7 @@ TEST_CASE("ssf_clusters - quadriga is swap-reciprocal with dual-mobility fields"
             sp["GR_enabled"] = 1.0;
             fix_t f = make_fix(N, 6, 2, 401, true);
             f.use_eps = f.use_toa = true;
-            f.tx.col(2).fill(h), f.rx.col(2).fill(1.5);
+            f.tx.row(2).fill(h), f.rx.row(2).fill(1.5);
             arma::cube ph;
             quadriga_lib::gbsm_init_phases(sp, "cluster", ph, 23);
             quadriga_lib::gbsm_draw(sp, "cluster", ph, f.tx, f.rx, f.rnd, -1, "Comb256", nullptr, nullptr, true);

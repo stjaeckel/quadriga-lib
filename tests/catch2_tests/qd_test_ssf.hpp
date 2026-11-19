@@ -76,16 +76,16 @@ namespace
         { return a + (b - a) * ((double)g() + 0.5) / 4294967296.0; };
         const arma::uword si[5] = {0, 3, 4, 5, 6}; // DS, ASD, ASA, ESD, ESA
         fix_t f;
-        f.tx.set_size(tx_per_link ? n_link : 1, 3), f.rx.set_size(n_link, 3);
+        f.tx.set_size(3, tx_per_link ? n_link : 1), f.rx.set_size(3, n_link);
         f.lsp.zeros(n_link, F, 8), f.anchor.zeros(n_link, 1, 8);
-        for (arma::uword t = 0; t < f.tx.n_rows; ++t)
-            f.tx(t, 0) = U(-40.0, 40.0), f.tx(t, 1) = U(-40.0, 40.0), f.tx(t, 2) = 25.0;
+        for (arma::uword t = 0; t < f.tx.n_cols; ++t)
+            f.tx(0, t) = U(-40.0, 40.0), f.tx(1, t) = U(-40.0, 40.0), f.tx(2, t) = 25.0;
         for (arma::uword l = 0; l < n_link; ++l)
         {
             const arma::uword t = tx_per_link ? l : 0;
             const double d = U(35.0, 300.0), a = U(-pi, pi);
-            f.rx(l, 0) = f.tx(t, 0) + d * std::cos(a), f.rx(l, 1) = f.tx(t, 1) + d * std::sin(a);
-            f.rx(l, 2) = U(1.5, 22.5);
+            f.rx(0, l) = f.tx(0, t) + d * std::cos(a), f.rx(1, l) = f.tx(1, t) + d * std::sin(a);
+            f.rx(2, l) = U(1.5, 22.5);
             const double s0[5] = {U(40e-9, 400e-9), U(as_lo, as_hi), U(as_lo, as_hi), U(es_lo, es_hi), U(es_lo, es_hi)};
             for (arma::uword i = 0; i < 5; ++i)
                 f.anchor(l, 0, si[i]) = s0[i];
@@ -166,13 +166,13 @@ namespace
     geo_t geometry(const fix_t &f, arma::uword l)
     {
         geo_t g;
-        const arma::uword t = (f.tx.n_rows == 1) ? 0 : l;
-        const double dx = f.rx(l, 0) - f.tx(t, 0), dy = f.rx(l, 1) - f.tx(t, 1), dz = f.rx(l, 2) - f.tx(t, 2);
+        const arma::uword t = (f.tx.n_cols == 1) ? 0 : l;
+        const double dx = f.rx(0, l) - f.tx(0, t), dy = f.rx(1, l) - f.tx(1, t), dz = f.rx(2, l) - f.tx(2, t);
         g.d2D = std::sqrt(dx * dx + dy * dy), g.d3D = std::sqrt(dx * dx + dy * dy + dz * dz);
         g.ang[0] = std::atan2(dy, dx), g.ang[1] = wrap_rad(g.ang[0] + pi);
         g.ang[2] = std::atan(dz / g.d2D), g.ang[3] = -g.ang[2];
         g.phi_d = g.ang[0] * 180.0 / pi, g.theta_d = std::acos(dz / g.d3D) * 180.0 / pi;
-        g.h_t = f.tx(t, 2), g.h_r = f.rx(l, 2);
+        g.h_t = f.tx(2, t), g.h_r = f.rx(2, l);
         g.d_gr = std::sqrt(g.d2D * g.d2D + (g.h_t + g.h_r) * (g.h_t + g.h_r));
         g.tau_gr = (g.d_gr - g.d3D) / c0;
         g.e_gr = -std::atan((g.h_t + g.h_r) / g.d2D);
@@ -246,7 +246,7 @@ namespace
         quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd);
         quadriga_lib::gbsm_init_phases(sp, "cluster", ph, seed, 0);
-        r.rnd_freq.set_size(rx.n_rows, (arma::uword)sp.at("NumClusters") - 1, 1);
+        r.rnd_freq.set_size(rx.n_cols, (arma::uword)sp.at("NumClusters") - 1, 1);
         quadriga_lib::gbsm_draw(sp, "cluster", ph, tx, rx, r.rnd_freq.slice(0), 0);
         return r;
     }
@@ -255,12 +255,12 @@ namespace
     arma::mat drop_rx(unsigned seed, arma::uword n_ut)
     {
         std::mt19937 g(seed);
-        arma::mat rx(n_ut, 3);
+        arma::mat rx(3, n_ut);
         for (arma::uword i = 0; i < n_ut; ++i)
         {
             const double d = 35.0 + 265.0 * ((double)g() + 0.5) / 4294967296.0;
             const double a = 2.0 * pi * ((double)g() + 0.5) / 4294967296.0;
-            rx(i, 0) = d * std::cos(a), rx(i, 1) = d * std::sin(a), rx(i, 2) = 1.5;
+            rx(0, i) = d * std::cos(a), rx(1, i) = d * std::sin(a), rx(2, i) = 1.5;
         }
         return rx;
     }

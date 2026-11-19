@@ -5,6 +5,7 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "mex_quadriga_lib_functions.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -61,8 +62,8 @@ Cluster delays, powers and angles of a set of links (TR 38.901 clause 7.5 steps 
 ## Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`, `KF_mu`, `absTOA_mu`, `r_DS`, `LNS_ksi`,
   `GR_enabled`
-- **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[3, n_link]`
 - **`lsp`** — LSPs from [[lsp_generate]], slices and units as there; DS, ASD, ASA, ESD, ESA (slices 1, 4 to 7) > 0,
   KF (slice 2) >= 0; `'38.901'`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [[gbsm_draw]] (`'cluster'`, `set_id = 0`), columns 1 to N in [0, 1];
@@ -129,7 +130,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nrhs <= i)
             return false;
         const bool shaped = mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0; // not [] (0 x 0)
-        return !mxIsEmpty(prhs[i]) || (rx_pos.n_rows == 0 && shaped);
+        return !mxIsEmpty(prhs[i]) || (rx_pos.n_elem == 0 && shaped);
     };
     const arma::cube *p_rnd_freq = given(6) ? &rnd_freq : nullptr;
     const arma::cube *p_lsp_anchor = given(7) ? &lsp_anchor : nullptr;
@@ -156,7 +157,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     if (known)
     {
-        const arma::uword n_link = rx_pos.n_rows, n_freq = lsp.n_cols;
+        const arma::uword n_link = qd_gbsm_n_link(rx_pos), n_freq = lsp.n_cols;
         const arma::uword n_slot = (arma::uword)sp.at("NumClusters") + (sp.at("GR_enabled") > 0.0 ? 1 : 0);
         const arma::uword n_fd = (method == "38.901_MF") ? n_freq : 1;
         arma::cube *out[6] = {&delay, &power, &aod, &eod, &aoa, &eoa};

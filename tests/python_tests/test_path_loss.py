@@ -29,8 +29,8 @@ class test_case(unittest.TestCase):
         # A hand-made logdist model, 3 links with d3D = 100, 1000 and 50 m, 2 frequencies
         self.plpar = {"model": "logdist", "A": 20.0, "B": 30.0, "C": 20.0}
         self.scenpar = {"SF_sigma": 3.0}
-        self.tx_pos = np.array([[0.0, 0.0, 10.0]])
-        self.rx_pos = np.array([[100.0, 0.0, 10.0], [0.0, 1000.0, 10.0], [30.0, 40.0, 10.0]])
+        self.tx_pos = np.array([0.0, 0.0, 10.0])
+        self.rx_pos = np.array([[100.0, 0.0, 10.0], [0.0, 1000.0, 10.0], [30.0, 40.0, 10.0]]).T
         self.fc = np.array([1e9, 10e9])
         self.ref = 20 * np.log10([[100.0], [1000.0], [50.0]]) + 30 + 20 * np.log10(self.fc / 1e9)
         self.pl_dB, self.sf = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
@@ -40,8 +40,8 @@ class test_case(unittest.TestCase):
         self.sp_los, self.pl_los = out[0], out[1]
         out = quadriga_lib.gbsm.conf_file_read(os.path.join(config_dir, "3GPP_38.901_v19_UMa_NLOS.conf"))
         self.sp_nlos, self.pl_nlos = out[0], out[1]
-        self.tx_u = np.array([[0.0, 0.0, 25.0]])
-        self.rx_u = np.array([[300.0, 0.0, 20.0]])
+        self.tx_u = np.array([0.0, 0.0, 25.0])
+        self.rx_u = np.array([300.0, 0.0, 20.0])
 
     def test_basic_call(self):
         out = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, self.rx_pos)
@@ -123,13 +123,15 @@ class test_case(unittest.TestCase):
                  self.rx_pos.astype(np.float32))[0]
         npt.assert_allclose(pl_t, self.pl_dB, atol=1e-12, rtol=0)  # values exact in float32
         npt.assert_array_equal(f(self.plpar, self.scenpar, self.fc.tolist(), self.tx_pos, self.rx_pos)[0], self.pl_dB)
-        npt.assert_array_equal(f(self.plpar, self.scenpar, self.fc, np.tile(self.tx_pos, (3, 1)), self.rx_pos)[0],
-                               self.pl_dB)  # (n_link, 3)
+        npt.assert_array_equal(f(self.plpar, self.scenpar, self.fc, np.tile(self.tx_pos, (3, 1)).T, self.rx_pos)[0],
+                               self.pl_dB)  # (3, n_link)
 
     def test_zero_links(self):
-        pl_dB, sf = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, np.zeros((0, 3)))
+        pl_dB, sf = quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos, np.zeros((3, 0)))
         self.assertEqual(pl_dB.shape, (0, 2))
         self.assertEqual(sf.shape, (0, 2))
+        npt.assert_array_equal(quadriga_lib.gbsm.path_loss(self.plpar, self.scenpar, self.fc, self.tx_pos,
+                                                           np.empty(0))[0], pl_dB)
 
     def test_inputs_not_modified(self):
         rx, fc, pp = self.rx_pos.copy(), self.fc.copy(), dict(self.plpar)
@@ -154,7 +156,7 @@ class test_case(unittest.TestCase):
         self.assertIn("Input 'rnd_he' must be in the range from 0 to 1.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.plpar, *args, d2d_in=[0.0, 1.0])
-        self.assertIn("Number of elements in 'd2d_in' does not match number of rows in 'rx_pos'.",
+        self.assertIn("Number of elements in 'd2d_in' does not match number of columns in 'rx_pos'.",
                       str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.plpar, {"Foo": 1.0}, self.fc, self.tx_pos, self.rx_pos)

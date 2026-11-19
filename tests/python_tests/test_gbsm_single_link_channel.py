@@ -22,8 +22,8 @@ import quadriga_lib
 
 gbsm = quadriga_lib.gbsm
 CONF_DIR = os.path.join(current_dir, "../../data/config")
-TX = np.array([[0.0, 0.0, 10.0]])
-RX = np.array([[60.0, 10.0, 1.5]])
+TX = np.array([[0.0, 0.0, 10.0]]).T
+RX = np.array([[60.0, 10.0, 1.5]]).T
 FC = np.array([3.5e9, 28e9])
 PAR = ["tap", "n_ray_tap", "fbs_pos", "lbs_pos", "gr_pos", "link_gain_dB", "b_med", "b_eff", "limit", "ratio",
        "ratio_total"]
@@ -66,7 +66,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(chan["coeff"][0].dtype, np.complex128)
         self.assertEqual(chan["delay"][0].shape, (2, 1, n_tap))
         npt.assert_array_equal(chan["center_freq"], FC[0])
-        npt.assert_array_equal(chan["rx_pos"], RX.T)
+        npt.assert_array_equal(chan["rx_pos"], RX)
         self.assertIsInstance(par, dict)
         self.assertEqual(list(par.keys()), PAR)
         self.assertEqual(par["tap"].dtype, np.uint32)
@@ -102,14 +102,14 @@ class test_case(unittest.TestCase):
         chan = self.call(i_freq=1)[0]
         npt.assert_array_equal(chan["center_freq"], FC[1])
         self.assertGreater(np.max(np.abs(chan["coeff"][0] - c0)), 1e-9)
-        rx2 = np.vstack([RX, RX + [1.0, 0.0, 0.0]])
+        rx2 = np.hstack([RX, RX + [[1.0], [0.0], [0.0]]])
         chan = self.call(tx_pos=TX, rx_pos=rx2)[0]
         self.assertEqual(len(chan["coeff"]), 2)
         npt.assert_allclose(chan["coeff"][0], c0, atol=1e-12, rtol=0)
         par = gbsm.single_link_channel(self.tx, self.rx, self.rays, [-90.0, -80.0], rx_pos=rx2)[1]
         npt.assert_array_equal(par["link_gain_dB"], [-90.0, -80.0])
         self.assertTrue(par["ratio"][1] > 0 and par["ratio"][0] == 0)
-        chan = self.call(tx_orientation=np.array([[0.0, 0.0, 1.0]]), rx_orientation=[[0.0, 0.5, 0.0]])[0]
+        chan = self.call(tx_orientation=np.array([[0.0], [0.0], [1.0]]), rx_orientation=[[0.0], [0.5], [0.0]])[0]
         npt.assert_array_equal(chan["tx_orientation"], [[0.0], [0.0], [1.0]])
         self.assertGreater(np.max(np.abs(chan["coeff"][0] - c0)), 1e-9)
         chan = self.call(kf_ratio=[0.0])[0]
@@ -123,7 +123,7 @@ class test_case(unittest.TestCase):
         self.assertTrue(np.all(g1["path_gain"][0] < g0))
 
     def test_stack(self):
-        rx2 = np.vstack([RX, RX + [1.0, 0.0, 0.0]])
+        rx2 = np.hstack([RX, RX + [[1.0], [0.0], [0.0]]])
         c0 = self.call(rx_pos=rx2)[0]
         c1 = self.call(rx_pos=rx2, stack=True)[0]
         with self.assertRaises(TypeError):  # optional arguments are keyword-only
@@ -144,8 +144,9 @@ class test_case(unittest.TestCase):
             self.call(i_freq=2)
         self.assertIn("Input 'i_freq' is out of range for 2 frequencies.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            self.call(rx_pos=RX[0])
-        self.assertIn("Input 'rx_pos' must have 3 columns.", str(ctx.exception))
+            self.call(rx_pos=RX[:2])
+        self.assertIn("Input 'rx_pos' must have 3 rows.", str(ctx.exception))
+        npt.assert_array_equal(self.call(rx_pos=np.empty(0))[0]["coeff"][0], self.out[0]["coeff"][0])  # empty: omitted
         with self.assertRaises(ValueError) as ctx:
             self.call(output="foo")
         self.assertIn("Input 'output' must be 'taps' or 'rays'.", str(ctx.exception))

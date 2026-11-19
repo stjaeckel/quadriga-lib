@@ -22,8 +22,8 @@ import quadriga_lib
 
 gbsm = quadriga_lib.gbsm
 CONF_DIR = os.path.join(current_dir, "../../data/config")
-TX = np.array([[0.0, 0.0, 10.0]])
-RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5], [120.0, -40.0, 7.5]])
+TX = np.array([[0.0, 0.0, 10.0]]).T
+RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5], [120.0, -40.0, 7.5]]).T
 FC = np.array([6e9, 30e9])
 KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "polmat",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
@@ -75,8 +75,8 @@ class test_case(unittest.TestCase):
             self.assertIsInstance(r, dict)
             self.assertEqual(list(r.keys()), KEYS)
             self.assertEqual(r["method"], "quadriga")
-            npt.assert_array_equal(r["tx_pos"], TX[0])
-            npt.assert_array_equal(r["rx_pos"], RX[l])
+            npt.assert_array_equal(r["tx_pos"], TX[:, 0])
+            npt.assert_array_equal(r["rx_pos"], RX[:, l])
             npt.assert_array_equal(r["center_freq"], FC)
             self.assertEqual(r["delay"].shape, (n_ray,))
             self.assertEqual(r["power"].shape, (n_ray, 2))

@@ -143,8 +143,8 @@ void quadriga_lib::lsp_generate(
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
 - **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`rnd`** — Random values from [[gbsm_draw]] (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
   is requested; column 10 is not used; `[n_link, 11]`
 - **`sf_sigma_dB`** *(optional)* — SF standard deviation in [dB] (e.g. from [[path_loss]]), finite and >= 0; replaces
@@ -190,9 +190,10 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                                 bool clip_spreads)
 {
     // Validation, before any output is touched
-    qd_gbsm_check_links(&tx_pos, &rx_pos);
+    const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
+    qd_gbsm_check_links(&tx, &rx);
     qd_gbsm_check_fc(center_freq);
-    const arma::uword n_link = rx_pos.n_rows, n_freq = center_freq.n_elem;
+    const arma::uword n_link = rx.n_cols, n_freq = center_freq.n_elem;
 
     if (rnd.n_rows != n_link || rnd.n_cols != 11)
         throw std::invalid_argument("Input 'rnd' must have size [n_link, 11].");
@@ -292,12 +293,12 @@ void quadriga_lib::lsp_generate(const std::unordered_map<std::string, double> &s
                  a_g = sp.at("EoD_offset_a_gamma"), b = sp.at("EoD_offset_b"), c0 = sp.at("EoD_offset_c"),
                  c_g = sp.at("EoD_offset_c_gamma"), c_h = sp.at("EoD_offset_c_hUT"), hcl = sp.at("EoD_offset_hcl"),
                  fc_min = sp.at("LSP_fc_min");
-    const bool tx_single = tx_pos.n_rows != n_link;
+    const bool tx_single = tx.n_cols != n_link;
     for (arma::uword l = 0; l < n_link; ++l)
     {
         const arma::uword t = tx_single ? 0 : l;
-        const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1);
-        const double d2D = std::sqrt(dx * dx + dy * dy), hBS = tx_pos(t, 2), h_ut = rx_pos(l, 2);
+        const double dx = rx(0, l) - tx(0, t), dy = rx(1, l) - tx(1, t);
+        const double d2D = std::sqrt(dx * dx + dy * dy), hBS = tx(2, t), h_ut = rx(2, l);
         stats.set_link(d2D, hBS, h_ut);
 
         double x[8];

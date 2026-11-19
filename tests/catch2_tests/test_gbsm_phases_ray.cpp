@@ -121,9 +121,9 @@ namespace
         const arma::mat F = qd_preset("Comb256", d).F;
         double m = 0.0;
         for (arma::uword g = g0; g < g1; ++g)
-            for (arma::uword l = 0; l < rx.n_rows; ++l)
+            for (arma::uword l = 0; l < rx.n_cols; ++l)
             {
-                double v = qd_ref_sos(F, phase.slice(0).colptr(g), rx(l, 0), rx(l, 1), 0.0);
+                double v = qd_ref_sos(F, phase.slice(0).colptr(g), rx(0, l), rx(1, l), 0.0);
                 m = std::max(m, std::abs(rnd(l, g) - (uniform ? qd_unif(v) : v)));
             }
         return m;
@@ -131,7 +131,7 @@ namespace
 
     arma::mat rx5()
     {
-        return {{12.5, -40.0, 1.5}, {-120.0, 33.0, 4.5}, {250.0, 300.0, 22.0}, {-7.25, -299.0, 1.8}, {88.0, 0.5, 10.0}};
+        return arma::mat({{12.5, -40.0, 1.5}, {-120.0, 33.0, 4.5}, {250.0, 300.0, 22.0}, {-7.25, -299.0, 1.8}, {88.0, 0.5, 10.0}}).t();
     }
 }
 
@@ -241,7 +241,7 @@ TEST_CASE("gbsm_init_phases - ray sets are distinct from each other and from the
 TEST_CASE("gbsm_init_phases - ray: input validation")
 {
     const auto sp = scen(2.0, 3.0, 10.0);
-    const arma::mat pos = {{1.0, 2.0, 1.5}};
+    const arma::mat pos = arma::vec{1.0, 2.0, 1.5};
     arma::cube phase;
     CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, 4, "Exp512"));
     CHECK_NOTHROW(quadriga_lib::gbsm_init_phases({}, "ray", phase, 1)); // empty scenpar: all defaults
@@ -253,6 +253,8 @@ TEST_CASE("gbsm_init_phases - ray: input validation")
                          Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", nullptr, &pos), std::invalid_argument,
                          Message("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only."));
+    const arma::mat empty_pos; // empty = omitted
+    CHECK_NOTHROW(quadriga_lib::gbsm_init_phases(sp, "ray", phase, 1, -1, "Comb256", &empty_pos, &empty_pos));
     auto bad = sp;
     bad["NumSubPaths"] = 0.0;
     CHECK_THROWS_AS(quadriga_lib::gbsm_init_phases(bad, "ray", phase, 1), std::invalid_argument);
@@ -271,7 +273,7 @@ TEST_CASE("gbsm_draw - ray: single mobility values equal the sum of sinusoids")
 {
     const arma::uword N = 2, M = 3, NM = 6, n_gen = 86;
     const auto sp = scen(2.0, 3.0, 15.0);
-    const arma::mat rx = rx5(), tx = {{10.0, 20.0, 25.0}};
+    const arma::mat rx = rx5(), tx = arma::vec{10.0, 20.0, 25.0};
     const arma::vec fc = {3.5e9};
     const double lt = lambda_tau(sp, fc);
 
@@ -299,7 +301,7 @@ TEST_CASE("gbsm_draw - ray: single mobility values equal the sum of sinusoids")
 
 TEST_CASE("gbsm_draw - ray: block 14 of the shared set uses lambda_tau")
 {
-    const arma::mat rx = rx5(), tx = {{10.0, 20.0, 25.0}};
+    const arma::mat rx = rx5(), tx = arma::vec{10.0, 20.0, 25.0};
     const arma::uword N = 2, M = 2, NM = 4, b14 = 13 * NM + N, n_gen = 58;
 
     // Shared block 14 at lambda_tau and blocks 0 to 13 at SC_lambda; per-frequency block 14 at SC_lambda
@@ -369,7 +371,7 @@ TEST_CASE("gbsm_draw - ray: swapping Tx and Rx exchanges the mirror blocks")
     const arma::vec fc = {3.5e9};
     const arma::mat A = rx5();
     arma::mat B = rx5() * 0.7 + 20.0;
-    B.col(2).fill(25.0);
+    B.row(2).fill(25.0);
     const arma::u32_vec fl = {0, 2, 2, 300, 0};
 
     for (arma::sword set : {-1, 2})
@@ -397,7 +399,7 @@ TEST_CASE("gbsm_draw - ray: marginal distributions")
     const auto sp = scen(2.0, 3.0, 15.0);
     const arma::vec fc = {3.5e9};
     REQUIRE(std::abs(lambda_tau(sp, fc) - 13.7415) < 5e-5);
-    const arma::mat rx = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1), tx = {{0.0, 0.0, 25.0}};
+    const arma::mat rx = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1), tx = arma::vec{0.0, 0.0, 25.0};
 
     // 5 standard errors with n = 10^4: Normal mean 0.05, std 0.05; Uniform mean 0.015, fraction below 0.1 0.015
     QD_DIAG("\n# diag: gbsm_draw ray marginal statistics, 10^4 links\nset,column,mean,std,frac_below_0.1\n");
@@ -435,7 +437,7 @@ TEST_CASE("gbsm_draw - ray: center_freq is required by the shared set and ignore
     const arma::uword N = 2, M = 3, b14 = 13 * N * M + N;
     auto sp = scen(2.0, 3.0, 12.0);
     sp["PerClusterDS_gamma"] = -2.0; // cluster DS depends on the frequency
-    const arma::mat rx = rx5(), tx = {{10.0, 20.0, 25.0}};
+    const arma::mat rx = rx5(), tx = arma::vec{10.0, 20.0, 25.0};
     const arma::cube phase = make_phase(N, M, 91);
 
     arma::mat a, b;
@@ -466,7 +468,7 @@ TEST_CASE("gbsm_draw - ray: n_link = 0 and N = 0")
 {
     const auto sp = scen(2.0, 3.0, 12.0);
     const arma::cube phase = make_phase(2, 3, 93);
-    const arma::mat rx0(0, 3), tx1 = {{0.0, 0.0, 25.0}}, rx = rx5();
+    const arma::mat rx0(3, 0), tx1 = arma::vec{0.0, 0.0, 25.0}, rx = rx5();
     const arma::vec fc = {3.5e9};
     arma::mat rnd(4, 4, arma::fill::ones);
 
@@ -501,7 +503,7 @@ TEST_CASE("gbsm_draw - ray: input validation")
 {
     const auto sp = scen(2.0, 3.0, 12.0);
     const arma::cube phase = make_phase(2, 3, 95);
-    const arma::mat rx = rx5().rows(0, 2), tx = {{0.0, 0.0, 25.0}};
+    const arma::mat rx = rx5().cols(0, 2), tx = arma::vec{0.0, 0.0, 25.0};
     const arma::vec fc = {3.5e9};
     const arma::u32_vec fl = {0, 1, 2}, fl_bad = {0, 1};
     arma::mat rnd;
@@ -519,7 +521,7 @@ TEST_CASE("gbsm_draw - ray: input validation")
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", bad, tx, rx, rnd), std::invalid_argument,
                          Message("Input 'phase' must be finite."));
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", &fl_bad), std::invalid_argument,
-                         Message("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'."));
+                         Message("Number of elements in 'floor_id' does not match number of columns in 'rx_pos'."));
     CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "ray", phase, tx, rx, rnd, -1, "Comb256", &fl, nullptr, false, false),
                          std::invalid_argument,
                          Message("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors."));

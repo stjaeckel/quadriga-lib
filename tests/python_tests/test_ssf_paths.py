@@ -22,8 +22,8 @@ import quadriga_lib
 
 gbsm = quadriga_lib.gbsm
 CONF_DIR = os.path.join(current_dir, "../../data/config")
-TX = np.array([[0.0, 0.0, 10.0]])
-RX = np.array([[60.0, 10.0, 1.5]])
+TX = np.array([[0.0, 0.0, 10.0]]).T
+RX = np.array([[60.0, 10.0, 1.5]]).T
 FC = np.array([60e9])
 
 
@@ -85,8 +85,8 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(out[7], r["fbs_pos"][:, out[10]])
         npt.assert_array_equal(out[8], r["lbs_pos"][:, out[10]])
         self.assertGreater(np.max(np.abs(out[1] - pl)), 1e-6)  # fallback rays: longer polyline
-        rx = RX[0] + [0.01, 0.0, 0.0]
-        out = gbsm.ssf_paths(r, [-90.0], mobility="phase", tx_pos=TX[0], rx_pos=rx)
+        rx = RX[:, 0] + [0.01, 0.0, 0.0]
+        out = gbsm.ssf_paths(r, [-90.0], mobility="phase", tx_pos=TX[:, 0], rx_pos=rx)
         npt.assert_array_equal(out[0], pg)
         self.assertGreater(np.max(np.abs(out[2] - M)), 1e-3)  # displacement phase
         out2 = gbsm.ssf_paths(r, [-90.0], mobility="phase", rx_pos=list(rx))
@@ -107,7 +107,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(out[0], self.out[0])
         npt.assert_array_equal(out[9], self.out[9])
         m0 = self.rays["polmat"].copy()
-        gbsm.ssf_paths(self.rays, [-90.0], mobility="phase", rx_pos=RX[0] + 1.0)
+        gbsm.ssf_paths(self.rays, [-90.0], mobility="phase", rx_pos=RX[:, 0] + 1.0)
         npt.assert_array_equal(self.rays["polmat"], m0)  # input not modified
 
     def test_errors(self):

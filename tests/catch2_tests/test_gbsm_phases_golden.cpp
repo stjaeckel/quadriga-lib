@@ -17,7 +17,7 @@
 // sums that depend on libm and FP contraction: up to 1.95e-14 rad between an FMA and a non-FMA build); draws 2e-5
 // (the AVX2 kernel of sos_val is within 4e-7·sqrt(2·256) = 9.05e-6 of the double evaluation, so values recorded on
 // one kernel and checked on the other differ by at most 9.05e-6 in single and 1.28e-5 in dual mobility).
-// Conventions: positions are rows {x, y, z} in meters; the 3 links are the first 3 of the 5 bias-removal positions.
+// Conventions: positions are columns {x, y, z} in meters; the 3 links are the first 3 of the 5 bias-removal positions.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -42,9 +42,9 @@ namespace
         return sp;
     }
 
-    const arma::mat RX5 = {{10.0, 20.0, 1.5}, {50.0, -30.0, 1.5}, {-40.0, 70.0, 4.5}, {120.0, 15.0, 1.5}, {-80.0, -60.0, 7.5}};
-    const arma::mat TX5 = {{5.0, -8.0, 1.5}, {60.0, 40.0, 1.5}, {-30.0, 90.0, 1.5}, {100.0, -20.0, 1.5}, {-70.0, -90.0, 1.5}};
-    const arma::mat TX1 = {{0.0, 0.0, 25.0}};
+    const arma::mat RX5 = arma::mat({{10.0, 20.0, 1.5}, {50.0, -30.0, 1.5}, {-40.0, 70.0, 4.5}, {120.0, 15.0, 1.5}, {-80.0, -60.0, 7.5}}).t();
+    const arma::mat TX5 = arma::mat({{5.0, -8.0, 1.5}, {60.0, 40.0, 1.5}, {-30.0, 90.0, 1.5}, {100.0, -20.0, 1.5}, {-70.0, -90.0, 1.5}}).t();
+    const arma::mat TX1 = arma::vec{0.0, 0.0, 25.0};
 
     // One recorded set: set type, set id, bias removal over RX5 (with TX5 as tx_pos, single mobility)
     struct golden_set
@@ -168,7 +168,7 @@ namespace
     void check_draws(bool lsf)
     {
         const spmap sp = umi_nlos();
-        const arma::mat rx3 = RX5.rows(0, 2), tx3 = TX5.rows(0, 2);
+        const arma::mat rx3 = RX5.cols(0, 2), tx3 = TX5.cols(0, 2);
         const arma::u32_vec fl = {0, 2, 0};
         QD_DIAG("\n# diag: gbsm_draw against the previous version, max abs difference\nset,mode,max_diff\n");
         for (const auto &g : GOLDEN)

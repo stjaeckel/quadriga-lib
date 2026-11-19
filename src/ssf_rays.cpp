@@ -149,8 +149,8 @@ void quadriga_lib::ssf_rays(
 ## Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumSubPaths`, the `PerCluster*` keys, `GR_enabled`,
   `PolVar_sigma`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
 - **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]], slices and units as
   there; used: the ESD mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`
@@ -217,9 +217,10 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
     arma::uword N, M, G, n_ray, n_gen;
     qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
-    qd_gbsm_check_links(&tx_pos, &rx_pos);
+    const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
+    qd_gbsm_check_links(&tx, &rx);
     qd_gbsm_check_fc(center_freq);
-    const arma::uword n_link = rx_pos.n_rows, F = center_freq.n_elem, n_slot = 1 + G + N;
+    const arma::uword n_link = rx.n_cols, F = center_freq.n_elem, n_slot = 1 + G + N;
     if (m_tr && F > 1)
         throw std::invalid_argument(
             "Method '38.901' supports one frequency only; use '38.901_MF' or 'quadriga' for several frequencies.");
@@ -259,7 +260,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
             throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must be finite.");
         if (arma::any(arma::vectorise(*gr_eps_re) < 1.0) || arma::any(arma::vectorise(*gr_eps_im) < 0.0))
             throw std::invalid_argument("Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
-        if (n_link > 0 && (arma::any(rx_pos.col(2) < 0.0) || arma::any(tx_pos.col(2) < 0.0)))
+        if (n_link > 0 && (arma::any(rx.row(2) < 0.0) || arma::any(tx.row(2) < 0.0)))
             throw std::invalid_argument("Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
     }
 
@@ -337,7 +338,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
     for (arma::uword k = k0; k <= k1; ++k)
         c_ds += qd_gbsm_cds(sp, center_freq(k));
     c_ds /= (double)(k1 - k0 + 1);
-    const bool tx_single = tx_pos.n_rows != n_link, rotation = angle_model == "rotation";
+    const bool tx_single = tx.n_cols != n_link, rotation = angle_model == "rotation";
     const arma::uword Fo = k1 - k0 + 1, r_slice = m_qd ? 0 : i_freq; // output frequencies, slice of rnd_ray
 
     // Azimuth wrapped to [-pi, pi); elevation in [rad] of the zenith angle 90 deg - el_c + off (in [deg]), wrapped
@@ -395,14 +396,14 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         if (!r.fallback.empty())
             r.fallback.reset();
         for (arma::uword i = 0; i < 3; ++i)
-            r.tx_pos(i) = tx_pos(t, i), r.rx_pos(i) = rx_pos(l, i);
+            r.tx_pos(i) = tx(i, t), r.rx_pos(i) = rx(i, l);
         for (arma::uword k = k0; k <= k1; ++k)
             r.center_freq(k - k0) = center_freq(k);
         r.polmat.zeros();
 
         // LOS and GR rays: the slot values; Jones matrices diag(1, -1) (TR 38.901 eq. (7.5-29)) and
         // diag(R_par, -R_perp) / R with R² = (abs(R_par)² + abs(R_perp)²) / 2 (eqs. (7.6-38) to (7.6-40); R = 0 gives 0)
-        const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1);
+        const double dx = rx(0, l) - tx(0, t), dy = rx(1, l) - tx(1, t);
         for (arma::uword s = 0; s < 1 + G; ++s)
         {
             r.delay(s) = delay(l, s, g);
@@ -417,7 +418,7 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
                 continue;
             r.power(1, o) = power(l, 1, k);
             std::complex<double> R_par, R_perp;
-            qd_gbsm_fresnel((*gr_eps_re)(l, k), (*gr_eps_im)(l, k), tx_pos(t, 2), rx_pos(l, 2),
+            qd_gbsm_fresnel((*gr_eps_re)(l, k), (*gr_eps_im)(l, k), tx(2, t), rx(2, l),
                             std::sqrt(dx * dx + dy * dy), R_par, R_perp);
             const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
             if (R > 0.0)
@@ -445,9 +446,9 @@ void quadriga_lib::ssf_rays(const std::unordered_map<std::string, double> &scenp
         // by more than 1 mm; the Tx if all three tie. The Rx as owner transposes the matrix (swap reciprocity)
         bool rx_owner = false;
         for (arma::uword i : {2, 0, 1})
-            if (std::abs(rx_pos(l, i) - tx_pos(t, i)) > 1e-3)
+            if (std::abs(rx(i, l) - tx(i, t)) > 1e-3)
             {
-                rx_owner = rx_pos(l, i) > tx_pos(t, i);
+                rx_owner = rx(i, l) > tx(i, t);
                 break;
             }
 

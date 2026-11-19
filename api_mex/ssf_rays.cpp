@@ -84,8 +84,8 @@ rays = quadriga_lib.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu,
 ## Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumSubPaths`, the `PerCluster*` fields, `GR_enabled`,
   `PolVar_sigma`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
 - **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]], slices and units as
   there; used: the ESD mean and the XPR mean and std, the XPR LSP for `pol_model = 'quadriga'`; `[n_link, n_freq, 8]`
@@ -151,7 +151,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nrhs <= i)
             return false;
         const bool shaped = mxGetM(prhs[i]) != 0 || mxGetN(prhs[i]) != 0; // not [] (0 x 0)
-        return !mxIsEmpty(prhs[i]) || (rx_pos.n_rows == 0 && shaped);
+        return !mxIsEmpty(prhs[i]) || (rx_pos.n_elem == 0 && shaped);
     };
     const arma::mat *p_gr_eps_re = given(18) ? &gr_eps_re : nullptr;
     const arma::mat *p_gr_eps_im = given(19) ? &gr_eps_im : nullptr;
@@ -174,7 +174,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         arma::uword N, M, G, n_ray, n_gen;
         qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
         const arma::uword n_freq_out = (method == "quadriga") ? center_freq.n_elem : 1;
-        plhs[0] = qd_mex_init_gbsm_rays(rx_pos.n_rows, n_ray, n_freq_out, G == 1, false, rays);
+        plhs[0] = qd_mex_init_gbsm_rays(qd_gbsm_n_link(rx_pos), n_ray, n_freq_out, G == 1, false, rays);
     }
 
     CALL_QD(quadriga_lib::ssf_rays(scenpar, tx_pos, rx_pos, center_freq, lsp, lsp_mu, lsp_sigma, delay, power, aod,

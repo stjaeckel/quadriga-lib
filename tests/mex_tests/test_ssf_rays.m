@@ -7,8 +7,8 @@ function test_ssf_rays
 conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'config' );
 sp = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMi_LOS.conf' ) );
 sp.GR_enabled = 1;
-tx_pos = [ 0, 0, 10 ];
-rx_pos = [ 60, 10, 1.5; -30, 80, 1.5; 120, -40, 7.5 ];
+tx_pos = [ 0; 0; 10 ];
+rx_pos = [ 60, 10, 1.5; -30, 80, 1.5; 120, -40, 7.5 ]';
 fc = [ 6e9; 30e9 ];
 [ lsp, mu, sig, gre, gim ] = lsps( sp, fc, tx_pos, rx_pos );
 rnd = quadriga_lib.gbsm_draw( sp, 'cluster', quadriga_lib.gbsm_init_phases( sp, 'cluster', 7 ), tx_pos, rx_pos );
@@ -41,8 +41,8 @@ assertEqual( fieldnames(rays)', fields );
 for l = 1 : 3
     r = rays(l);
     assertEqual( r.method, 'quadriga' );
-    assertEqual( r.tx_pos, tx_pos' );
-    assertEqual( r.rx_pos, rx_pos(l, :)' );
+    assertEqual( r.tx_pos, tx_pos );
+    assertEqual( r.rx_pos, rx_pos(:, l) );
     assertEqual( r.center_freq, fc );
     assertEqual( size(r.delay), [n_ray, 1] );
     assertEqual( size(r.power), [n_ray, 2] );

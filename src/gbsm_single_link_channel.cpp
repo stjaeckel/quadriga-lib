@@ -5,6 +5,7 @@
 #include "quadriga_lib.hpp"
 #include "quadriga_gbsm.hpp"
 #include "qd_arrayant_functions.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 #include <algorithm>
@@ -41,14 +42,14 @@ Channel coefficients of one link at one frequency over one segment
   at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `"rays"` for
   wide bands. `"rays"`: one path per kept ray in ray order, exact at any bandwidth, the form of the QRT route; the
   path data are those of `ssf_paths` at the snapshot for these rays
-- `n_snap` is the largest row count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
-  rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
-  per frequency); one row or entry applies to all snapshots. A static link with a gain per snapshot repeats its
+- `n_snap` is the largest column count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
+  columns, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
+  per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `initial_position` of the result stays 0. Validity limits: see `ssf_paths`
 - Throws `std::invalid_argument` for an invalid array (message after `Transmit antenna: ` or `Receive antenna: `),
   invalid `rays` (the `is_valid()` message), `"drift"` without scatterers or with a GR ray at moved ends without
-  permittivity or below z = 0, and a row or entry count other than 1 or `n_snap`
+  permittivity or below z = 0, and a column or entry count other than 1 or `n_snap`
 
 ## Declaration:
 ```
@@ -78,9 +79,9 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - **`i_freq`** *(optional)* — Frequency index in `rays.center_freq`, 0-based; ray data of the TR methods hold
   one frequency: 0
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in [m]; omitted: the positions of `rays`;
-  `[n_snap, 3]` or `[1, 3]` (a `[3]` vector is rejected)
+  `[3, n_snap]` or `[3, 1]`
 - **`tx_orientation`**, **`rx_orientation`** *(optional)* — Euler angles (bank, tilt, heading) in [rad]; omitted: 0;
-  `[n_snap, 3]` or `[1, 3]`
+  `[3, n_snap]` or `[3, 1]`
 - **`kf_ratio`** *(optional)* — KF(snapshot) / KF(drop) at `i_freq`, >= 0; omitted: 1; `[n_snap]` or `[1]`
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays (`"phase"`: of the ray-data positions)
@@ -149,25 +150,27 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
         throw std::invalid_argument("Input 'link_gain_dB' cannot be empty.");
     if (!link_gain_dB.is_finite())
         throw std::invalid_argument("Input 'link_gain_dB' must be finite.");
-    const std::pair<std::string, const arma::mat *> pm[4] = {
-        {"tx_pos", tx_pos}, {"rx_pos", rx_pos}, {"tx_orientation", tx_orientation}, {"rx_orientation", rx_orientation}};
+    // Positions and orientations as [3, n] (qd_gbsm_cols: [1, 3] is one snapshot); empty = omitted
+    const char *pn[4] = {"tx_pos", "rx_pos", "tx_orientation", "rx_orientation"};
+    const arma::mat *pp[4] = {tx_pos, rx_pos, tx_orientation, rx_orientation};
+    arma::mat pc[4];
     arma::uword n_snap = 1;
-    for (const auto &p : pm)
-        if (p.second != nullptr)
+    for (int j = 0; j < 4; ++j)
+        if (pp[j] != nullptr && !pp[j]->empty())
         {
-            if (p.second->n_cols != 3)
-                throw std::invalid_argument("Input '" + p.first + "' must have 3 columns.");
-            if (!p.second->is_finite())
-                throw std::invalid_argument("Input '" + p.first + "' must be finite.");
-            n_snap = std::max(n_snap, p.second->n_rows);
+            pc[j] = qd_gbsm_cols(*pp[j]);
+            if (pc[j].n_rows != 3)
+                throw std::invalid_argument("Input '" + std::string(pn[j]) + "' must have 3 rows.");
+            if (!pc[j].is_finite())
+                throw std::invalid_argument("Input '" + std::string(pn[j]) + "' must be finite.");
+            n_snap = std::max(n_snap, pc[j].n_cols);
         }
     if (kf_ratio != nullptr && (!kf_ratio->is_finite() || arma::any(*kf_ratio < 0.0)))
         throw std::invalid_argument("Input 'kf_ratio' must be finite and >= 0.");
     const std::pair<std::string, arma::uword> cnt[6] = {
-        {"tx_pos", tx_pos ? tx_pos->n_rows : 1}, {"rx_pos", rx_pos ? rx_pos->n_rows : 1},
-        {"tx_orientation", tx_orientation ? tx_orientation->n_rows : 1},
-        {"rx_orientation", rx_orientation ? rx_orientation->n_rows : 1}, {"link_gain_dB", link_gain_dB.n_elem},
-        {"kf_ratio", kf_ratio ? kf_ratio->n_elem : 1}};
+        {"tx_pos", pc[0].empty() ? 1 : pc[0].n_cols}, {"rx_pos", pc[1].empty() ? 1 : pc[1].n_cols},
+        {"tx_orientation", pc[2].empty() ? 1 : pc[2].n_cols}, {"rx_orientation", pc[3].empty() ? 1 : pc[3].n_cols},
+        {"link_gain_dB", link_gain_dB.n_elem}, {"kf_ratio", kf_ratio ? kf_ratio->n_elem : 1}};
     for (const auto &c : cnt)
         if (c.second != 1 && c.second != n_snap)
             throw std::invalid_argument("Number of snapshots in '" + c.first + "' must be 1 or " +
@@ -205,17 +208,14 @@ quadriga_lib::channel<double> quadriga_lib::gbsm_single_link_channel(const array
     // Output object: positions and orientations as columns [3, n_snap]
     channel<double> c;
     c.center_freq = {fc};
-    const std::pair<arma::mat *, const arma::mat *> col[4] = {{&c.tx_pos, tx_pos},
-                                                              {&c.rx_pos, rx_pos},
-                                                              {&c.tx_orientation, tx_orientation},
-                                                              {&c.rx_orientation, rx_orientation}};
+    arma::mat *col[4] = {&c.tx_pos, &c.rx_pos, &c.tx_orientation, &c.rx_orientation};
     for (int j = 0; j < 4; ++j)
     {
         const arma::vec d = (j < 2) ? arma::vec((j == 0 ? rays.tx_pos : rays.rx_pos).memptr(), 3) // [3, 1] or [1, 3]
                                     : arma::vec(3, arma::fill::zeros);
-        *col[j].first = (col[j].second == nullptr)       ? arma::repmat(d, 1, n_snap)
-                        : (col[j].second->n_rows == 1) ? arma::repmat(col[j].second->t(), 1, n_snap)
-                                                       : arma::mat(col[j].second->t());
+        *col[j] = pc[j].empty()         ? arma::repmat(d, 1, n_snap)
+                  : (pc[j].n_cols == 1) ? arma::repmat(pc[j], 1, n_snap)
+                                        : pc[j];
     }
     arma::vec lg(n_snap), kf(n_snap);
     for (arma::uword t = 0; t < n_snap; ++t)

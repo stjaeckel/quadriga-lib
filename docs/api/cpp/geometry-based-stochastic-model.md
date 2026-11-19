@@ -76,7 +76,7 @@ KF(drop) from slice 1 of `lsp`. Ray data can also come from path data, with [gbs
 | Term | Meaning |
 | --- | --- |
 | scenario | type of environment with its statistics: numeric keys `scenpar`, path-loss model, short names (one conf file) |
-| link | one Tx-Rx pair of a batch (row `l` of `rx_pos`) |
+| link | one Tx-Rx pair of a batch (column `l` of `rx_pos`) |
 | drop | one realization of LSPs, clusters and rays at the link positions; the positions the ray data refer to |
 | cluster | one of the N NLOS clusters of a link: delay, power, angles (TR 38.901 clause 7.5 steps 5 to 7) |
 | slot | index in the [ssf_clusters](#ssf_clusters) outputs: 0 LOS, 1 GR (if enabled), then the N clusters |
@@ -110,14 +110,14 @@ the TR methods draw coupling, XPR and phases per frequency, so it is independent
 the delays and angles.
 
 **Conventions.** `N = NumClusters - 1` is the number of NLOS clusters: `NumClusters` counts the LOS slot, as in
-QuaDRiGa. Positions are in m; in the batch functions one row (x, y, z) per link: `rx_pos` is `[n_link, 3]`, `tx_pos` is
-`[1, 3]` (one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. The one-link functions take a position
-as a `[3]` vector, except [gbsm_single_link_channel](#gbsm_single_link_channel), which takes one row per snapshot; scatterer positions are
-`[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the conf-file keys): in
-rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR 38.901 except two
-deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm_init_phases](#gbsm_init_phases), [gbsm_draw](#gbsm_draw)) and
-`method = "quadriga"` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Units: frequencies in Hz, path loss in dB, DS in s, KF, SF and XPR as
-linear power ratios, spreads and `_deg` offsets in degrees.
+QuaDRiGa. Positions are in m; in the batch functions one column (x, y, z) per link: `rx_pos` is `[3, n_link]` (empty: no
+links), `tx_pos` is `[3, 1]` (one Tx for all links) or `[3, n_link]`; heights are the z coordinates. The one-link
+functions take a position as a `[3]` vector, and [gbsm_single_link_channel](#gbsm_single_link_channel) one column per snapshot; scatterer
+positions are `[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the
+conf-file keys): in rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR
+38.901 except two deliberate library choices: the SOS preset `Comb256` with bias removal ([gbsm_init_phases](#gbsm_init_phases),
+[gbsm_draw](#gbsm_draw)) and `method = "quadriga"` of [gbsm_rays_from_paths](#gbsm_rays_from_paths); QuaDRiGa variants are options. Units: frequencies
+in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees.
 
 ---
 <a id="conf_file_list"></a>
@@ -350,8 +350,8 @@ void quadriga_lib::gbsm_draw(
   `PerClusterAS_A`
 - **`set_type`** — Set type of [gbsm_init_phases](#gbsm_init_phases)
 - **`phase`** — SOS phases from [gbsm_init_phases](#gbsm_init_phases), finite; `[n_coeff, n_gen, 2]`
-- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
+- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`; empty = no links
 - **`set_id`** *(optional)* — Set of [gbsm_init_phases](#gbsm_init_phases); ignored for `"lsf"`
 - **`preset`** *(optional)* — Preset of [gbsm_init_phases](#gbsm_init_phases); another preset with the same `n_coeff` is not detected
 - **`floor_id`** *(optional)* — Floor number of the UT per link, ground floor 0 (`n_fl - 1` for the UT heights of
@@ -415,7 +415,7 @@ void quadriga_lib::gbsm_init_phases(
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Bias-removal positions in [m] as in [gbsm_draw](#gbsm_draw); `"lsf"` only, else throws
 - **`dual_mobility`** *(optional)* — `"lsf"` with bias removal: Tx and Rx both move; as in [gbsm_draw](#gbsm_draw)
 - **`remove_bias`** *(optional)* — `"lsf"` only: remove the sample mean over the positions; needs `rx_pos` with at
-  least 3 rows, else no effect
+  least 3 columns, else no effect
 - **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D, `false` 3D mode; as in [gbsm_draw](#gbsm_draw)
 
 ### Output:
@@ -560,14 +560,14 @@ Also in: [MATLAB](../mex/geometry-based-stochastic-model.md#gbsm_single_link_cha
   at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `"rays"` for
   wide bands. `"rays"`: one path per kept ray in ray order, exact at any bandwidth, the form of the QRT route; the
   path data are those of `ssf_paths` at the snapshot for these rays
-- `n_snap` is the largest row count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
-  rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
-  per frequency); one row or entry applies to all snapshots. A static link with a gain per snapshot repeats its
+- `n_snap` is the largest column count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
+  columns, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
+  per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `initial_position` of the result stays 0. Validity limits: see `ssf_paths`
 - Throws `std::invalid_argument` for an invalid array (message after `Transmit antenna: ` or `Receive antenna: `),
   invalid `rays` (the `is_valid()` message), `"drift"` without scatterers or with a GR ray at moved ends without
-  permittivity or below z = 0, and a row or entry count other than 1 or `n_snap`
+  permittivity or below z = 0, and a column or entry count other than 1 or `n_snap`
 
 ### Declaration:
 ```cpp
@@ -597,9 +597,9 @@ channel<double> quadriga_lib::gbsm_single_link_channel(
 - **`i_freq`** *(optional)* — Frequency index in `rays.center_freq`, 0-based; ray data of the TR methods hold
   one frequency: 0
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Tx and Rx positions in [m]; omitted: the positions of `rays`;
-  `[n_snap, 3]` or `[1, 3]` (a `[3]` vector is rejected)
+  `[3, n_snap]` or `[3, 1]`
 - **`tx_orientation`**, **`rx_orientation`** *(optional)* — Euler angles (bank, tilt, heading) in [rad]; omitted: 0;
-  `[n_snap, 3]` or `[1, 3]`
+  `[3, n_snap]` or `[3, 1]`
 - **`kf_ratio`** *(optional)* — KF(snapshot) / KF(drop) at `i_freq`, >= 0; omitted: 1; `[n_snap]` or `[1]`
 - **`oxygen`** *(optional)* — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`
 - **`use_absolute_delays`** *(optional)* — Include the LOS delay in all delays (`"phase"`: of the ray-data positions)
@@ -751,8 +751,8 @@ void quadriga_lib::lsp_generate(
 ### Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
 - **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`rnd`** — Random values from [gbsm_draw](#gbsm_draw) (`"lsf"`), finite; column 9 in [0, 1] when the ground permittivity
   is requested; column 10 is not used; `[n_link, 11]`
 - **`sf_sigma_dB`** *(optional)* — SF standard deviation in [dB] (e.g. from [path_loss](#path_loss)), finite and >= 0; replaces
@@ -905,8 +905,8 @@ void quadriga_lib::path_loss(
 - **`plpar`** — Path-loss parameters, keys without "PL_", from [conf_file_read](#conf_file_read); keys not read are ignored
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
 - **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [o2i_loss](#o2i_loss)), finite
   and >= 0; given = legacy outdoor distance; 0 = outdoor link; `[n_link]`
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
@@ -1051,8 +1051,8 @@ void quadriga_lib::ssf_clusters(
 ### Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`, `KF_mu`, `absTOA_mu`, `r_DS`,
   `LNS_ksi`, `GR_enabled`
-- **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[3, n_link]`
 - **`lsp`** — LSPs from [lsp_generate](#lsp_generate), slices and units as there; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0,
   KF (slice 1) >= 0; `"38.901"`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [gbsm_draw](#gbsm_draw) (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
@@ -1245,8 +1245,8 @@ void quadriga_lib::ssf_rays(
 ### Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumSubPaths`, the `PerCluster*` keys, `GR_enabled`,
   `PolVar_sigma`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`center_freq`** — Carrier frequencies in [Hz]; `[n_freq]`
 - **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [lsp_generate](#lsp_generate), slices and units as
   there; used: the ESD mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `[n_link, n_freq, 8]`

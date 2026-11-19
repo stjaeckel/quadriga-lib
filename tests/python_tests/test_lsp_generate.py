@@ -35,8 +35,8 @@ class test_case(unittest.TestCase):
         self.sp = read_conf("3GPP_38.901_v19_UMa_LOS.conf")
         self.sp_nlos = read_conf("3GPP_38.901_v19_UMa_NLOS.conf")
         self.sp_inf = read_conf("3GPP_38.901_v19_InF_NLOS_SL.conf")
-        self.tx_pos = np.array([[0.0, 0.0, 25.0]])
-        self.rx_pos = np.array([[100.0, 0.0, 1.5], [0.0, 200.0, 1.5], [-50.0, 50.0, 22.5]])
+        self.tx_pos = np.array([0.0, 0.0, 25.0])
+        self.rx_pos = np.array([[100.0, 0.0, 1.5], [0.0, 200.0, 1.5], [-50.0, 50.0, 22.5]]).T
         self.fc = np.array([2e9, 28e9])
         self.rnd = np.zeros((3, 11))
         self.rnd[:, 9] = 0.5  # medium ground
@@ -167,12 +167,14 @@ class test_case(unittest.TestCase):
         lsp_t = self.call(self.sp, self.fc.astype(np.float32), self.tx_pos.astype(np.float32),
                           self.rx_pos.astype(np.float32), self.rnd.astype(np.float32))[0]
         npt.assert_allclose(lsp_t, lsp, rtol=1e-12, atol=0)  # inputs exact in float32
-        npt.assert_array_equal(self.call(self.sp, self.fc, np.tile(self.tx_pos, (3, 1)), self.rx_pos, self.rnd)[0],
+        npt.assert_array_equal(self.call(self.sp, self.fc, np.tile(self.tx_pos, (3, 1)).T, self.rx_pos, self.rnd)[0],
                                lsp)
 
     def test_zero_links(self):
-        out = self.call(self.sp, self.fc, self.tx_pos, np.zeros((0, 3)), np.zeros((0, 11)))
+        out = self.call(self.sp, self.fc, self.tx_pos, np.zeros((3, 0)), np.zeros((0, 11)))
         self.assertEqual([x.shape for x in out], [(0, 2, 8), (0,), (0, 2), (0, 2), (0, 2, 8), (0, 2, 8)])
+        for a, b in zip(self.call(self.sp, self.fc, self.tx_pos, np.empty(0), np.zeros((0, 11))), out):
+            npt.assert_array_equal(a, b)
 
     def test_inputs_not_modified(self):
         rnd, rx = self.rnd.copy(), self.rx_pos.copy()

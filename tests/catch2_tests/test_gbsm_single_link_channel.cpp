@@ -78,12 +78,12 @@ namespace
         }
         arma::uword n_snap() const
         {
-            return std::max({(arma::uword)1, T.n_rows, R.n_rows, To.n_rows, Ro.n_rows});
+            return std::max({(arma::uword)1, T.n_cols, R.n_cols, To.n_cols, Ro.n_cols});
         }
         bool drift() const { return mob == "drift" || (mob == "auto" && r->method == "quadriga"); }
-        arma::vec row(const arma::mat &m, arma::uword t, const arma::vec &d) const
+        arma::vec col(const arma::mat &m, arma::uword t, const arma::vec &d) const
         {
-            return m.empty() ? d : arma::vec(m.row(m.n_rows == 1 ? 0 : t).t());
+            return m.empty() ? d : arma::vec(m.col(m.n_cols == 1 ? 0 : t));
         }
     };
 
@@ -103,8 +103,8 @@ namespace
         std::vector<snap_t> out;
         for (arma::uword t = 0; t < a.n_snap(); ++t)
         {
-            const arma::vec T = a.row(a.T, t, r.tx_pos), R = a.row(a.R, t, r.rx_pos);
-            const arma::vec To = a.row(a.To, t, z3), Ro = a.row(a.Ro, t, z3);
+            const arma::vec T = a.col(a.T, t, r.tx_pos), R = a.col(a.R, t, r.rx_pos);
+            const arma::vec To = a.col(a.To, t, z3), Ro = a.col(a.Ro, t, z3);
             arma::vec lgv(n_freq, arma::fill::zeros), kfv(n_freq, arma::fill::ones);
             lgv(f) = a.lg(a.lg.n_elem == 1 ? 0 : t);
             if (!a.kf.empty())
@@ -306,10 +306,10 @@ TEST_CASE("gbsm_single_link_channel - rays output equals get_channels with the p
     rays_t r = make_rays(51, true, true, 6, 1, "38.901", true);
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &r};
-    a.T = arma::mat{{3.0, -4.0, 25.0}, {3.2, -4.1, 25.0}, {3.4, -4.3, 25.1}, {3.5, -4.6, 25.1}};
-    a.R = arma::mat{{120.0, 45.0, 1.5}, {120.3, 45.2, 1.5}, {120.6, 45.3, 1.6}, {120.9, 45.5, 1.4}};
-    a.To = arma::mat{{0.1, -0.2, 0.7}};
-    a.Ro = arma::mat{{0.0, 0.3, -2.0}};
+    a.T = arma::mat{{3.0, -4.0, 25.0}, {3.2, -4.1, 25.0}, {3.4, -4.3, 25.1}, {3.5, -4.6, 25.1}}.t();
+    a.R = arma::mat{{120.0, 45.0, 1.5}, {120.3, 45.2, 1.5}, {120.6, 45.3, 1.6}, {120.9, 45.5, 1.4}}.t();
+    a.To = arma::vec{0.1, -0.2, 0.7};
+    a.Ro = arma::vec{0.0, 0.3, -2.0};
     a.lg = {-87.5};
 
     SECTION("static link gain") {}
@@ -338,7 +338,7 @@ TEST_CASE("gbsm_single_link_channel - taps sum the rays per tap with power-weigh
     rays_t r = make_rays(52, true, true, 6, 1, "38.901");
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &r};
-    a.out = "taps", a.R = arma::mat{{120.4, 45.1, 1.5}};
+    a.out = "taps", a.R = arma::vec{120.4, 45.1, 1.5};
     const arma::uword i0 = 2, i1 = 3, q6 = 2; // the rays of tap 6 (powers 1 : 4) and its output index
     REQUIRE((r.tap(i0) == 6 && r.tap(i1) == 6 && std::abs(r.power(i1, 0) - 4.0 * r.power(i0, 0)) < 1e-15));
 
@@ -389,7 +389,7 @@ TEST_CASE("gbsm_single_link_channel - taps of data from paths use the default ta
                                        &type, nullptr, &s.gr_eps_re, &s.gr_eps_im);
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &d};
-    a.R = arma::mat{{120.2, 45.1, 1.5}, {120.4, 45.2, 1.5}};
+    a.R = arma::mat{{120.2, 45.1, 1.5}, {120.4, 45.2, 1.5}}.t();
     a.out = "taps";
     const chan_t c = a.run();
     REQUIRE(c.n_snap() == 2);
@@ -410,11 +410,11 @@ TEST_CASE("gbsm_single_link_channel - the phase speed-up equals per-snapshot pla
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &r};
     a.mob = "phase";
-    a.T = arma::mat{{3.0, -4.0, 25.0}, {3.1, -4.2, 25.0}, {3.3, -4.4, 25.2}, {3.5, -4.5, 25.2}, {3.6, -4.7, 25.3}};
-    a.R = arma::mat{{120.1, 45.0, 1.5}, {120.3, 45.4, 1.5}, {120.5, 45.6, 1.7}, {120.7, 45.7, 1.5}, {120.9, 45.9, 1.5}};
-    a.To = arma::mat{{0.0, 0.1, 0.5}, {0.0, 0.1, 0.5}, {0.0, 0.1, 0.9}, {0.0, 0.1, 0.9}, {0.2, 0.1, 0.9}};
+    a.T = arma::mat{{3.0, -4.0, 25.0}, {3.1, -4.2, 25.0}, {3.3, -4.4, 25.2}, {3.5, -4.5, 25.2}, {3.6, -4.7, 25.3}}.t();
+    a.R = arma::mat{{120.1, 45.0, 1.5}, {120.3, 45.4, 1.5}, {120.5, 45.6, 1.7}, {120.7, 45.7, 1.5}, {120.9, 45.9, 1.5}}.t();
+    a.To = arma::mat{{0.0, 0.1, 0.5}, {0.0, 0.1, 0.5}, {0.0, 0.1, 0.9}, {0.0, 0.1, 0.9}, {0.2, 0.1, 0.9}}.t();
     // Orientation changes: snapshot 1 Rx only, 2 Tx only, 4 both
-    a.Ro = arma::mat{{0.0, 0.0, 1.0}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, -2.5}};
+    a.Ro = arma::mat{{0.0, 0.0, 1.0}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, 1.4}, {0.0, 0.0, -2.5}}.t();
     a.lg = {-70.0, -71.0, -71.0, -72.0, -72.0};
     a.kf = {1.0, 1.0, 2.0, 2.0, 2.0}; // snapshot 2: the K ratio changes alone
     const std::vector<snap_t> e = ref(a);
@@ -432,7 +432,7 @@ TEST_CASE("gbsm_single_link_channel - i_freq selects powers, M, kept rays, weigh
     const arr_t tx = panel(8e9), rx = panel(8e9);
     args_t a{&tx, &rx, &r};
     a.i_freq = 1, a.lg = {-75.0}, a.kf = {0.7};
-    a.R = arma::mat{{120.2, 45.3, 1.5}, {120.5, 45.4, 1.6}};
+    a.R = arma::mat{{120.2, 45.3, 1.5}, {120.5, 45.4, 1.6}}.t();
     for (const char *mob : {"auto", "phase"})
     {
         INFO("mobility " << mob);
@@ -452,7 +452,7 @@ TEST_CASE("gbsm_single_link_channel - use_absolute_delays in phase and drift")
     const rays_t r = make_rays(56, true, true, 6, 1, "38.901", true);
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &r};
-    a.R = arma::mat{{120.5, 45.2, 1.5}, {121.0, 45.4, 1.5}};
+    a.R = arma::mat{{120.5, 45.2, 1.5}, {121.0, 45.4, 1.5}}.t();
     for (const char *mob : {"phase", "drift"})
     {
         INFO("mobility " << mob);
@@ -478,7 +478,7 @@ TEST_CASE("gbsm_single_link_channel - n_ray = 0 and a single kept ray")
         {
             INFO(mob << ", " << out);
             args_t a{&tx, &rx, &e0};
-            a.mob = mob, a.out = out, a.R = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}};
+            a.mob = mob, a.out = out, a.R = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}.t();
             const chan_t c = a.run();
             REQUIRE(c.n_snap() == 2);
             CHECK(arma::size(c.coeff_re[1]) == arma::size(2, 8, 0));
@@ -535,12 +535,12 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
 
     // Positions of the snapshots: none at the ray-data positions
     args_t a{&omni, &omni, &s};
-    a.T = arma::mat{{3.3, -4.0, 25.0}, {3.2, -4.4, 25.0}};
-    a.R = arma::mat{{120.5, 45.0, 1.5}, {120.1, 45.0, 1.5}, {119.0, 45.0, 2.5}}; // snapshot 2 also moves in z
-    a.T = arma::join_cols(a.T, a.T.row(1));
+    a.T = arma::mat{{3.3, -4.0, 25.0}, {3.2, -4.4, 25.0}}.t();
+    a.R = arma::mat{{120.5, 45.0, 1.5}, {120.1, 45.0, 1.5}, {119.0, 45.0, 2.5}}.t(); // snapshot 2 also moves in z
+    a.T = arma::join_rows(a.T, a.T.col(1));
     a.lg = {-80.0, -81.0, -82.0};
-    const double d_tx = len3(arma::vec(a.T.row(1).t()) - s.tx_pos), d_rx = len3(arma::vec(a.R.row(2).t()) - s.rx_pos);
-    REQUIRE(std::abs(d_rx - len3(arma::vec(a.R.row(2).t() - a.R.row(0).t()))) > 0.1); // relative to snapshot 0 differs
+    const double d_tx = len3(arma::vec(a.T.col(1)) - s.tx_pos), d_rx = len3(arma::vec(a.R.col(2)) - s.rx_pos);
+    REQUIRE(std::abs(d_rx - len3(arma::vec(a.R.col(2) - a.R.col(0)))) > 0.1); // relative to snapshot 0 differs
 
     auto check = [&](const chan_t &c, const double b_med[2], const double b_eff[2], bool drift)
     {
@@ -599,7 +599,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
 
                 args_t b = a; // snapshot positions moved with the end, so that the displacements stay
                 b.r = &u, b.mob = "phase";
-                (e == 0 ? b.T : b.R).col(2) += dz;
+                (e == 0 ? b.T : b.R).row(2) += dz;
                 check(b.run(), bm, be, false);
             }
     }
@@ -610,7 +610,7 @@ TEST_CASE("gbsm_single_link_channel - par holds the validity report")
         l.fbs_pos.col(0) = l.tx_pos + arma::vec{30.0, 40.0, 0.0}, l.lbs_pos.col(0) = l.fbs_pos.col(0);
         l.center_freq(1) = 28e9;
         args_t b{&omni, &omni, &l};
-        b.mob = "phase", b.R = arma::mat{{l.rx_pos(0) + 0.5, l.rx_pos(1), l.rx_pos(2)}};
+        b.mob = "phase", b.R = arma::vec{l.rx_pos(0) + 0.5, l.rx_pos(1), l.rx_pos(2)};
         const double expect[2] = {1.0347, 0.3658};
         for (arma::uword f = 0; f < 2; ++f)
         {
@@ -640,7 +640,7 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                 const bool drift = std::string(mob) == "drift", taps = std::string(out) == "taps", gr = r == &g;
                 INFO(mob << ", " << out << ", GR " << gr);
                 args_t a{&omni, &omni, r};
-                a.mob = mob, a.out = out, a.R = arma::mat{{120.0, 45.0, 1.5}, {120.2, 45.0, 1.5}, {120.4, 45.0, 1.5}};
+                a.mob = mob, a.out = out, a.R = arma::mat{{120.0, 45.0, 1.5}, {120.2, 45.0, 1.5}, {120.4, 45.0, 1.5}}.t();
                 const chan_t c = a.run();
                 const arma::uword n_kept = r->n_ray() - 1, n_tap = gr ? 6 : 5;
                 std::vector<std::string> names = {"tap"};
@@ -670,7 +670,7 @@ TEST_CASE("gbsm_single_link_channel - par entries are present by mode and output
                     const arma::mat G = arma::conv_to<arma::mat>::from(par<arma::fmat>(c, "gr_pos"));
                     REQUIRE(arma::size(G) == arma::size(3, 3));
                     for (arma::uword t = 0; t < 3; ++t) // float32 rounding: relative 2^-24
-                        CHECK(arma::approx_equal(G.col(t), specular_point(r->tx_pos, a.R.row(t).t()), "both", 1e-12,
+                        CHECK(arma::approx_equal(G.col(t), specular_point(r->tx_pos, a.R.col(t)), "both", 1e-12,
                                                  std::ldexp(1.0, -24)));
                 }
                 CHECK(par<arma::vec>(c, "link_gain_dB").n_elem == 3);
@@ -683,8 +683,8 @@ TEST_CASE("gbsm_single_link_channel - the snapshot count follows the positions a
 {
     const auto omni = quadriga_lib::generate_arrayant_omni<double>();
     const rays_t r = make_rays(61, true, true, 6, 1, "38.901");
-    const arma::mat one = {{120.0, 45.0, 1.5}}, four = arma::repmat(one, 4, 1), ori4(4, 3, arma::fill::zeros);
-    const arma::mat ori3(3, 3, arma::fill::zeros), two = arma::repmat(one, 2, 1);
+    const arma::mat one = arma::vec{120.0, 45.0, 1.5}, four = arma::repmat(one, 1, 4), ori4(3, 4, arma::fill::zeros);
+    const arma::mat ori3(3, 3, arma::fill::zeros), two = arma::repmat(one, 1, 2);
     const arma::vec lg1 = {-80.0}, lg2 = {-80.0, -81.0}, lg4 = {-80.0, -81.0, -82.0, -83.0}, kf2 = {1.0, 2.0};
     const arma::vec kf4 = {1.0, 2.0, 0.5, 0.0};
     auto call = [&](const arma::mat *T, const arma::mat *R, const arma::mat *To, const arma::mat *Ro,
@@ -695,7 +695,7 @@ TEST_CASE("gbsm_single_link_channel - the snapshot count follows the positions a
     CHECK(call(nullptr, nullptr, nullptr, &ori4, lg4).n_snap() == 4);
     CHECK(call(&one, nullptr, &ori4, nullptr, lg1, &kf4).n_snap() == 4);
     const chan_t c = call(&one, &four, nullptr, nullptr, lg4);
-    CHECK(arma::approx_equal(c.tx_pos, arma::repmat(one.t(), 1, 4), "absdiff", 0.0));
+    CHECK(arma::approx_equal(c.tx_pos, arma::repmat(one, 1, 4), "absdiff", 0.0));
     CHECK_THROWS_MATCHES(call(&two, &four, nullptr, nullptr, lg1), std::invalid_argument,
                          Message("Number of snapshots in 'tx_pos' must be 1 or 4."));
     CHECK_THROWS_MATCHES(call(nullptr, &four, &ori3, nullptr, lg1), std::invalid_argument,
@@ -704,9 +704,9 @@ TEST_CASE("gbsm_single_link_channel - the snapshot count follows the positions a
                          Message("Number of snapshots in 'link_gain_dB' must be 1 or 1."));
     CHECK_THROWS_MATCHES(call(nullptr, &four, nullptr, nullptr, lg1, &kf2), std::invalid_argument,
                          Message("Number of snapshots in 'kf_ratio' must be 1 or 4."));
-    const arma::vec v3 = r.tx_pos; // a [3] vector binds to const arma::mat *
-    CHECK_THROWS_MATCHES(call(&v3, nullptr, nullptr, nullptr, lg1), std::invalid_argument,
-                         Message("Input 'tx_pos' must have 3 columns."));
+    const arma::vec v2 = {3.0, -4.0}; // a vector binds to const arma::mat *
+    CHECK_THROWS_MATCHES(call(&v2, nullptr, nullptr, nullptr, lg1), std::invalid_argument,
+                         Message("Input 'tx_pos' must have 3 rows."));
 }
 
 TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in drift")
@@ -716,18 +716,18 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
     const arr_t a2 = panel(3.5e9);
     args_t a{&a2, &a2, &r};
     a.mob = "drift", a.out = "rays", a.lg = {-3.0};
-    a.R = arma::mat{{120.0, 45.0, 1.5}, {120.4, 44.7, 1.6}, {120.8, 44.4, 1.7}};
+    a.R = arma::mat{{120.0, 45.0, 1.5}, {120.4, 44.7, 1.6}, {120.8, 44.4, 1.7}}.t();
     const chan_t cd = a.run();
     REQUIRE(cd.n_snap() == 3);
     const std::vector<snap_t> e = ref(a);
     REQUIRE(e[0].ind.n_elem == 7);
 
     const std::string fn = "test_gbsm_single_link_channel_qrt_route.qrt";
-    quadriga_lib::qrt_file_init<double>(fn, r.center_freq, a.R, arma::mat(3, 3, arma::fill::zeros));
+    quadriga_lib::qrt_file_init<double>(fn, r.center_freq, a.R.t(), arma::mat(3, 3, arma::fill::zeros));
     std::vector<quadriga_lib::path> all;
     for (arma::uword t = 0; t < 3; ++t)
     {
-        const arma::vec R = a.R.row(t).t();
+        const arma::vec R = a.R.col(t);
         arma::mat pg = e[t].gain;
         arma::cube M(8, e[t].ind.n_elem, 1);
         M.slice(0) = e[t].M;
@@ -757,7 +757,7 @@ TEST_CASE("gbsm_single_link_channel - the QRT route equals the direct route in d
         for (arma::uword p = 0; p < e[t].ind.n_elem; ++p)
         {
             INFO("path " << p);
-            const arma::vec F = e[t].fbs.col(p), L = e[t].lbs.col(p), Tt = r.tx_pos, Rt = a.R.row(t).t();
+            const arma::vec F = e[t].fbs.col(p), L = e[t].lbs.col(p), Tt = r.tx_pos, Rt = a.R.col(t);
             const double dL = 1e-7 * (arma::accu(arma::abs(Tt)) + arma::accu(arma::abs(F)) +
                                       arma::accu(arma::abs(L)) + arma::accu(arma::abs(Rt)));
             const arma::cx_mat cx_d(cd.coeff_re[t].slice(p), cd.coeff_im[t].slice(p));
@@ -777,11 +777,11 @@ TEST_CASE("gbsm_single_link_channel - results do not depend on the thread count"
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &r};
     const arma::uword n_snap = 200; // n_snap · 9 kept rays · 64 element pairs = 115200
-    a.R.set_size(n_snap, 3), a.To.zeros(n_snap, 3);
+    a.R.set_size(3, n_snap), a.To.zeros(3, n_snap);
     for (arma::uword t = 0; t < n_snap; ++t)
     {
-        a.R.row(t) = arma::rowvec{120.0 + 0.01 * (double)t, 45.0, 1.5};
-        a.To(t, 2) = (t % 7 == 0) ? 0.01 * (double)t : 0.0; // orientation changes at every 7th snapshot
+        a.R.col(t) = arma::vec{120.0 + 0.01 * (double)t, 45.0, 1.5};
+        a.To(2, t) = (t % 7 == 0) ? 0.01 * (double)t : 0.0; // orientation changes at every 7th snapshot
     }
     const int n_thr = omp_get_max_threads();
     for (const char *mob : {"phase", "drift"})
@@ -807,7 +807,7 @@ TEST_CASE("gbsm_single_link_channel - the channel is valid and stores the positi
     const arr_t tx = panel(3.5e9), rx = quadriga_lib::generate_arrayant_xpol<double>(5.0);
     rays_t r = make_rays(64, true, true, 6, 1, "38.901", true);
     args_t a{&tx, &rx, &r};
-    a.R = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}, a.Ro = arma::mat{{0.1, 0.2, 0.3}};
+    a.R = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}.t(), a.Ro = arma::vec{0.1, 0.2, 0.3};
     for (const char *mob : {"phase", "drift"})
         for (const char *out : {"taps", "rays"})
         {
@@ -816,9 +816,9 @@ TEST_CASE("gbsm_single_link_channel - the channel is valid and stores the positi
             const chan_t c = a.run();
             CHECK(c.is_valid().empty());
             CHECK(arma::approx_equal(c.tx_pos, arma::repmat(r.tx_pos, 1, 2), "absdiff", 0.0));
-            CHECK(arma::approx_equal(c.rx_pos, arma::mat(a.R.t()), "absdiff", 0.0));
+            CHECK(arma::approx_equal(c.rx_pos, a.R, "absdiff", 0.0));
             CHECK(arma::approx_equal(c.tx_orientation, arma::mat(3, 2, arma::fill::zeros), "absdiff", 0.0));
-            CHECK(arma::approx_equal(c.rx_orientation, arma::repmat(a.Ro.t(), 1, 2), "absdiff", 0.0));
+            CHECK(arma::approx_equal(c.rx_orientation, arma::repmat(a.Ro, 1, 2), "absdiff", 0.0));
             CHECK((c.center_freq.n_elem == 1 && c.center_freq(0) == r.center_freq(0)));
             CHECK((c.n_rx() == 2 && c.n_tx() == 8 && c.initial_position == 0 && c.name == chan_t().name));
         }
@@ -862,13 +862,13 @@ TEST_CASE("gbsm_single_link_channel - input validation")
     {
         msg("Input 'link_gain_dB' cannot be empty.", omni, omni, r, arma::vec(), "auto", "taps", 0);
         msg("Input 'link_gain_dB' must be finite.", omni, omni, r, arma::vec{nan_v}, "auto", "taps", 0);
-        const arma::mat m2(1, 2, arma::fill::zeros), mn = {{0.0, nan_v, 0.0}};
+        const arma::mat m2(2, 1, arma::fill::zeros), mn = arma::vec{0.0, nan_v, 0.0};
         const char *names[4] = {"tx_pos", "rx_pos", "tx_orientation", "rx_orientation"};
         for (int i = 0; i < 4; ++i)
         {
             const arma::mat *p[4] = {nullptr, nullptr, nullptr, nullptr};
             p[i] = &m2;
-            msg("Input '" + std::string(names[i]) + "' must have 3 columns.", omni, omni, r, lg, "auto", "taps", 0,
+            msg("Input '" + std::string(names[i]) + "' must have 3 rows.", omni, omni, r, lg, "auto", "taps", 0,
                 p[0], p[1], p[2], p[3]);
             p[i] = &mn;
             msg("Input '" + std::string(names[i]) + "' must be finite.", omni, omni, r, lg, "auto", "taps", 0, p[0],
@@ -878,7 +878,7 @@ TEST_CASE("gbsm_single_link_channel - input validation")
         for (const arma::vec *k : {&kn, &ki})
             msg("Input 'kf_ratio' must be finite and >= 0.", omni, omni, r, lg, "auto", "taps", 0, nullptr, nullptr,
                 nullptr, nullptr, k);
-        const arma::mat R2 = {{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}, R3 = arma::join_cols(R2, R2.row(0));
+        const arma::mat R2 = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}.t(), R3 = arma::join_rows(R2, R2.col(0));
         msg("Number of snapshots in 'rx_pos' must be 1 or 3.", omni, omni, r, lg, "auto", "taps", 0, &R3, &R2);
         msg("Number of snapshots in 'rx_orientation' must be 1 or 3.", omni, omni, r, lg, "auto", "taps", 0, &R3,
             nullptr, nullptr, &R2);
@@ -888,7 +888,8 @@ TEST_CASE("gbsm_single_link_channel - input validation")
         msg("Mobility 'drift' needs 'rays.fbs_pos' and 'rays.lbs_pos'; solve the scatterers first.", omni, omni, u,
             lg, "auto", "taps", 0);
         CHECK_NOTHROW(call(omni, omni, u, lg, "phase", "taps", 0, nullptr, nullptr, nullptr, nullptr, nullptr));
-        const arma::mat R2 = {{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}, Rb = {{120.0, 45.0, 1.5}, {120.1, 45.0, -0.1}};
+        const arma::mat R2 = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, 1.5}}.t();
+        const arma::mat Rb = arma::mat{{120.0, 45.0, 1.5}, {120.1, 45.0, -0.1}}.t();
         rays_t x = r;
         x.gr_eps_re.reset(), x.gr_eps_im.reset();
         msg("Input 'rays.gr_eps_re' is required to recompute the ground reflection away from the positions of "
@@ -910,7 +911,7 @@ TEST_CASE("gbsm_single_link_channel - a positive tilt points down (3GPP TR 38.90
     args_t a{&beam, &omni, &r};
     auto power = [&](double tilt)
     {
-        a.To = arma::mat{{0.0, tilt, h}};
+        a.To = arma::vec{0.0, tilt, h};
         const chan_t c = a.run();
         return arma::accu(c.coeff_re[0] % c.coeff_re[0] + c.coeff_im[0] % c.coeff_im[0]);
     };
@@ -925,7 +926,7 @@ TEST_CASE("gbsm_single_link_channel - ray-data positions as [1, 3]")
     r_row.tx_pos = arma::mat(r.tx_pos.t()), r_row.rx_pos = arma::mat(r.rx_pos.t());
     const arr_t tx = panel(3.5e9), rx = panel(3.5e9);
     args_t a{&tx, &rx, &r}, b{&tx, &rx, &r_row};
-    a.R = b.R = arma::mat{{120.5, 45.2, 1.5}, {121.0, 45.4, 1.5}};
+    a.R = b.R = arma::mat{{120.5, 45.2, 1.5}, {121.0, 45.4, 1.5}}.t();
     for (const char *mob : {"phase", "drift"})
     {
         INFO("mobility " << mob);
@@ -939,4 +940,55 @@ TEST_CASE("gbsm_single_link_channel - ray-data positions as [1, 3]")
         }
         CHECK(arma::approx_equal(ca.tx_pos, cb.tx_pos, "absdiff", 0.0));
     }
+}
+
+TEST_CASE("gbsm_single_link_channel - [1, 3] positions and orientations equal the [3, 1] form")
+{
+    const rays_t r = make_rays(66, true, true, 6, 1, "38.901", true);
+    const arr_t tx = panel(3.5e9);
+    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const arma::vec lg = {-80.0};
+    const arma::mat T = arma::vec{3.2, -4.1, 25.0}, R = arma::vec{120.3, 45.2, 1.5};
+    const arma::mat To = arma::vec{0.1, -0.2, 0.7}, Ro = arma::vec{0.0, 0.3, -2.0};
+    const arma::mat Tr = T.t(), Rr = R.t(), Tor = To.t(), Ror = Ro.t();
+    for (const char *mob : {"phase", "drift"})
+    {
+        INFO("mobility " << mob);
+        const chan_t c = quadriga_lib::gbsm_single_link_channel(tx, omni, r, lg, mob, "rays", 0, &T, &R, &To, &Ro);
+        const chan_t d = quadriga_lib::gbsm_single_link_channel(tx, omni, r, lg, mob, "rays", 0, &Tr, &Rr, &Tor, &Ror);
+        REQUIRE((c.n_snap() == 1 && d.n_snap() == 1));
+        CHECK(arma::approx_equal(c.coeff_re[0], d.coeff_re[0], "absdiff", 0.0));
+        CHECK(arma::approx_equal(c.coeff_im[0], d.coeff_im[0], "absdiff", 0.0));
+        CHECK(arma::approx_equal(c.delay[0], d.delay[0], "absdiff", 0.0));
+        CHECK((arma::approx_equal(d.tx_pos, T, "absdiff", 0.0) && arma::approx_equal(d.rx_pos, R, "absdiff", 0.0)));
+        CHECK((arma::approx_equal(d.tx_orientation, To, "absdiff", 0.0) &&
+               arma::approx_equal(d.rx_orientation, Ro, "absdiff", 0.0)));
+    }
+}
+
+TEST_CASE("gbsm_single_link_channel - an empty position or orientation counts as omitted")
+{
+    const rays_t r = make_rays(67, true, true, 6, 1, "38.901", true);
+    const arr_t tx = panel(3.5e9);
+    const auto omni = quadriga_lib::generate_arrayant_omni<double>();
+    const arma::vec lg = {-80.0};
+    const arma::mat e, R = arma::mat{{120.3, 45.2, 1.5}, {120.6, 45.3, 1.6}}.t();
+    for (const char *mob : {"phase", "drift"})
+        for (const arma::mat *Rp : {(const arma::mat *)nullptr, &R})
+        {
+            INFO("mobility " << mob << ", rx_pos given " << (Rp != nullptr));
+            const chan_t c = quadriga_lib::gbsm_single_link_channel(tx, omni, r, lg, mob, "rays", 0, nullptr, Rp);
+            const chan_t d = quadriga_lib::gbsm_single_link_channel(tx, omni, r, lg, mob, "rays", 0, &e,
+                                                                    Rp ? Rp : &e, &e, &e);
+            REQUIRE(c.n_snap() == d.n_snap());
+            for (arma::uword t = 0; t < c.n_snap(); ++t)
+            {
+                CHECK(arma::approx_equal(c.coeff_re[t], d.coeff_re[t], "absdiff", 0.0));
+                CHECK(arma::approx_equal(c.coeff_im[t], d.coeff_im[t], "absdiff", 0.0));
+                CHECK(arma::approx_equal(c.delay[t], d.delay[t], "absdiff", 0.0));
+            }
+            CHECK((arma::approx_equal(c.tx_pos, d.tx_pos, "absdiff", 0.0) &&
+                   arma::approx_equal(c.rx_pos, d.rx_pos, "absdiff", 0.0) &&
+                   arma::approx_equal(c.rx_orientation, d.rx_orientation, "absdiff", 0.0)));
+        }
 }

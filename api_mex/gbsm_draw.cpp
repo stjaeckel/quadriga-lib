@@ -5,6 +5,7 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "mex_quadriga_lib_functions.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -54,8 +55,8 @@ rnd = quadriga_lib.gbsm_draw( scenpar, set_type, phase, tx_pos, rx_pos, set_id, 
   `PerClusterAS_A`
 - **`set_type`** — Set type of [[gbsm_init_phases]]; string
 - **`phase`** — SOS phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
-- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
+- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`; empty = no links
 - **`set_id`** — Set of [[gbsm_init_phases]]: `0` = shared set, `k >= 1` = set of frequency `k`; ignored for `'lsf'`;
   another set with the same `n_gen` is not detected; default: 0
 - **`preset`** — Preset of [[gbsm_init_phases]]; another preset with the same `n_coeff` is not detected; default:
@@ -112,7 +113,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation in MATLAB memory: [n_link, n_gen], n_gen = columns of 'phase' (checked by the library)
     arma::mat rnd;
-    plhs[0] = qd_mex_init_output(&rnd, rx_pos.n_rows, phase.n_cols);
+    plhs[0] = qd_mex_init_output(&rnd, qd_gbsm_n_link(rx_pos), phase.n_cols);
 
     // Call library function
     CALL_QD(quadriga_lib::gbsm_draw(scenpar, set_type, phase, tx_pos, rx_pos, rnd, set_id, preset, p_floor_id,

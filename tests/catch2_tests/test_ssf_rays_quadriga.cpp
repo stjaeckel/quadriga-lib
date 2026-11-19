@@ -315,8 +315,8 @@ TEST_CASE("ssf_rays - rotation polarisation model is QuaDRiGa-NG's matrix with t
     set_xpr(in, 242);
     for (arma::uword l = 0; l < 12; ++l)
     {
-        in.f.tx(l, 0) = 10.0, in.f.tx(l, 1) = 20.0, in.f.tx(l, 2) = 25.0;
-        in.f.rx(l, 0) = 10.0 + pos[l].dx, in.f.rx(l, 1) = 20.0 + pos[l].dy, in.f.rx(l, 2) = 25.0 + pos[l].dz;
+        in.f.tx(0, l) = 10.0, in.f.tx(1, l) = 20.0, in.f.tx(2, l) = 25.0;
+        in.f.rx(0, l) = 10.0 + pos[l].dx, in.f.rx(1, l) = 20.0 + pos[l].dy, in.f.rx(2, l) = 25.0 + pos[l].dz;
     }
     const auto rays = call(in);
     for (arma::uword l = 0; l < 12; ++l)
@@ -419,7 +419,7 @@ TEST_CASE("ssf_rays - both polarisation models are swap-reciprocal for mirrored 
         const bool qd = std::string(method) == "quadriga";
         fix_t a = make_fix(N_UMi_NLOS, 6, 1, 261, true);
         a.use_eps = true, a.use_toa = qd;
-        a.rx(0, 2) = a.tx(0, 2);
+        a.rx(2, 0) = a.tx(2, 0);
         fix_t b = swapped(a);
         arma::cube ph, ra, rb;
         arma::mat x;
@@ -514,7 +514,7 @@ TEST_CASE("Diagnostic - ssf_rays quadriga ray delay spread relative to the slot 
 {
     // Library drop: UMi NLOS at 3.5 GHz, 200 UTs; LSPs, clusters and the shared "ray" set from the library
     const spmap sp = read_v19("UMi_NLOS");
-    const arma::mat tx = {{0.0, 0.0, 10.0}}, rx = drop_rx(281, 200);
+    const arma::mat tx = arma::vec{0.0, 0.0, 10.0}, rx = drop_rx(281, 200);
     const arma::vec fc = {3.5e9};
     const lib_t in = lib_inputs(sp, tx, rx, 282, 3.5e9);
     out_t o;

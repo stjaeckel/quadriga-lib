@@ -6,8 +6,8 @@ function test_path_loss
 %% Setup: a hand-made logdist model, 3 links with d3D = 100, 1000 and 50 m, 2 frequencies
 plpar = struct( 'model', 'logdist', 'A', 20, 'B', 30, 'C', 20 );
 scenpar = struct( 'SF_sigma', 3 );
-tx_pos = [ 0, 0, 10 ];
-rx_pos = [ 100, 0, 10; 0, 1000, 10; 30, 40, 10 ];
+tx_pos = [ 0; 0; 10 ];
+rx_pos = [ 100, 0, 10; 0, 1000, 10; 30, 40, 10 ]';
 fc = [ 1e9, 10e9 ];
 ref = 20 * log10( [100; 1000; 50] ) + 30 + 20 * log10( fc / 1e9 );           % [3, 2]
 
@@ -36,8 +36,8 @@ assertEqual( quadriga_lib.path_loss( [], scenpar, fc, tx_pos, rx_pos ), zeros(3,
 assertEqual( quadriga_lib.path_loss( struct( 'A', 20 ), scenpar, fc, tx_pos, rx_pos ), zeros(3, 2) );
 
 % A v19 file read with conf_file_read: dual_slope (LOS) and nlos (NLOS) with the random hE
-tx_u = [ 0, 0, 25 ];
-rx_u = [ 300, 0, 20 ];
+tx_u = [ 0; 0; 25 ];
+rx_u = [ 300; 0; 20 ];
 [ pa, sfa ] = quadriga_lib.path_loss( pl_los, sp_los, 1e9, tx_u, rx_u );
 assertEqual( size(pa), [1, 1] );
 assertTrue( pa > 80 && pa < 120 );
@@ -71,7 +71,7 @@ plpar_t = struct( 'model', 'logdist', 'A', int32(20), 'B', single(30), 'C', uint
 assertTrue( isa(pl_t, 'double') && isa(sf_t, 'double') );
 assertElementsAlmostEqual( pl_t, pl_in, 'absolute', 1e-12 );
 assertEqual( sf_t, sf_sigma_dB );
-assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, repmat(tx_pos, 3, 1), rx_pos ), pl_dB );  % [n_link, 3]
+assertEqual( quadriga_lib.path_loss( plpar, scenpar, fc, repmat(tx_pos, 1, 3), rx_pos ), pl_dB );  % [3, n_link]
 
 %% Errors
 assert_throws( @() quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos ), 'Wrong number of input arguments.' );
@@ -85,7 +85,7 @@ assert_throws( @() quadriga_lib.path_loss( struct( 'model', 'logdist', 'A', 20 )
 assert_throws( @() quadriga_lib.path_loss( pl_los, sp_los, 1e9, tx_u, rx_u, [], 1.5 ), ...
     'Input ''rnd_he'' must be in the range from 0 to 1.' );                                         % C++
 assert_throws( @() quadriga_lib.path_loss( plpar, scenpar, fc, tx_pos, rx_pos, [ 0, 1 ] ), ...
-    'Number of elements in ''d2d_in'' does not match number of rows in ''rx_pos''.' );              % C++
+    'Number of elements in ''d2d_in'' does not match number of columns in ''rx_pos''.' );           % C++
 assert_throws( @() quadriga_lib.path_loss( plpar, struct( 'Foo', 1 ), fc, tx_pos, rx_pos ), ...
     'Unknown key ''Foo'' in ''scenpar''.' );                                                        % C++
 assert_throws( @() quadriga_lib.path_loss( 5, scenpar, fc, tx_pos, rx_pos ), 'Input ''plpar'' must be a 1x1 struct.' );

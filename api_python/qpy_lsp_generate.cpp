@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -48,8 +49,8 @@ lsp, abs_toa, gr_eps, eod_offset_deg, lsp_mu, lsp_sigma = quadriga_lib.gbsm.lsp_
 ## Inputs:
 - **`scenpar`** — Scenario parameters; the LSP cross-correlation matrix must be positive definite
 - **`center_freq`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
-- **`tx_pos`** — Tx positions in m; `(1, 3)` or `(n_link, 3)`
-- **`rx_pos`** — Rx positions in m; `(n_link, 3)`
+- **`tx_pos`** — Tx positions in m; `(3,)` or `(3, n_link)`
+- **`rx_pos`** — Rx positions in m; `(3, n_link)`
 - **`rnd`** — Random values from [[gbsm.draw]] (`"lsf"`), finite; column 9 in [0, 1] (the permittivity is always
   computed); column 10 is not used; `(n_link, 11)`
 - **`sf_sigma_dB`** — SF standard deviation in dB (e.g. from [[path_loss]]), finite and >= 0; replaces the value from
@@ -98,7 +99,7 @@ py::tuple lsp_generate(py::handle scenpar,
     const auto sf_sigma_a = qd_python_numpy2arma_Mat<double>(sf_sigma_dB, true);
 
     // Output allocation
-    const arma::uword n_link = rx_pos_a.n_rows, n_freq = center_freq_a.n_elem;
+    const arma::uword n_link = qd_gbsm_n_link(rx_pos_a), n_freq = center_freq_a.n_elem;
     arma::cube lsp, lsp_mu, lsp_sigma;
     arma::vec abs_toa;
     arma::mat gr_eps_re, gr_eps_im, eod_offset_deg;

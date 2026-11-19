@@ -6,8 +6,8 @@ function test_gbsm_init_phases
 % ---- Set type 'lsf' ----
 %% Setup: distinct decorrelation distances, 4 Rx positions, one Tx
 scenpar = struct( 'DS_lambda', 10, 'AS_D_lambda', 18, 'AS_A_lambda', 15 );
-rx_pos = [ 0, 0, 1.5; 20, 5, 1.5; 45, -10, 3; 80, 30, 1.5 ];
-tx_pos = [ 10, 10, 25 ];
+rx_pos = [ 0, 0, 1.5; 20, 5, 1.5; 45, -10, 3; 80, 30, 1.5 ]';
+tx_pos = [ 10; 10; 25 ];
 mirror = [ 1, 2, 3, 5, 4, 7, 6, 8, 9, 10, 11 ];                        % ASD <-> ASA, ESD <-> ESA
 
 %% Basic call and values
@@ -38,22 +38,22 @@ assertEqual( pb(:, 10:11, :), phase(:, 10:11, :) );                           % 
 rnd = quadriga_lib.gbsm_draw( scenpar, 'lsf', pb, tx_pos, rx_pos );
 assertElementsAlmostEqual( mean(rnd(:, 1:9)), zeros(1, 9), 'absolute', 1e-4 );
 
-assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos(1:2, :) ), phase );     % 2 positions: none
+assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos(:, 1:2) ), phase );     % 2 positions: none
 assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos, [], false ), phase );  % remove_bias = false
 assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos, [], [] ), pb );        % [] = true
 assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], tx_pos, rx_pos ), pb );            % tx_pos unused
 assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], 'Comb256', [], rx_pos, false, true, true ), pb );
 assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos, [], [], [] ), pb );
 
-% Dual mobility: bias removal over the Rx and Tx positions; one Tx row equals n_link equal rows
+% Dual mobility: bias removal over the Rx and Tx positions; one Tx column equals n_link equal columns
 pd = quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], tx_pos, rx_pos, true );
 assertTrue( max(abs(pd(:) - pb(:))) > 1e-6 );
 assertEqual( pd(:, :, 2), pd(:, mirror, 1) );
-assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], repmat(tx_pos, 4, 1), rx_pos, true ), pd );
+assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], repmat(tx_pos, 1, 4), rx_pos, true ), pd );
 
 % horizontal: z is not used in 2D, used in 3D
 rx_z = rx_pos;
-rx_z(:, 3) = [ 0; 7; 2; 11 ];
+rx_z(3, :) = [ 0, 7, 2, 11 ];
 assertEqual( quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_z ), pb );
 ph = quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos, [], [], false );
 assertTrue( max(abs(ph(:) - pb(:))) > 1e-6 );
@@ -91,8 +91,8 @@ assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], 'Comb99
     'Input ''preset'' is not a known preset.' );                                                    % C++
 assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos, true ), ...
     'Input ''tx_pos'' is required for the bias removal with dual mobility.' );                      % C++
-assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos(:, 1:2) ), ...
-    'Input ''rx_pos'' must have 3 columns.' );                                                      % C++
+assert_throws( @() quadriga_lib.gbsm_init_phases( scenpar, 'lsf', 7, [], [], [], rx_pos(1:2, :) ), ...
+    'Input ''rx_pos'' must have 3 rows.' );                                                      % C++
 assert_throws( @() quadriga_lib.gbsm_init_phases( struct( 'Foo', 1 ), 'lsf', 7 ), ...
     'Unknown key ''Foo'' in ''scenpar''.' );                                                        % C++
 assert_throws( @() quadriga_lib.gbsm_init_phases( struct( 'DS_lambda', -1 ), 'lsf', 7 ), 'DS_lambda' );     % C++

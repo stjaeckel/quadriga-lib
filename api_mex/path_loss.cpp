@@ -5,6 +5,7 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "mex_quadriga_lib_functions.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -75,8 +76,8 @@ Path loss and shadow-fading standard deviation of a set of links
   no model (loss 0)
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
 - **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`d2d_in`** — Indoor 2D distance in [m] of the UT of each link, legacy QuaDRiGa only (leave it empty
   for TR 38.901, which uses the geometric distance); finite and >= 0; 0 = outdoor link; `[n_link]`;
   default: the geometric distance
@@ -113,9 +114,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Output allocation
     arma::mat pl_dB, sf_sigma_dB;
-    plhs[0] = qd_mex_init_output(&pl_dB, rx_pos.n_rows, center_freq.n_elem);
+    plhs[0] = qd_mex_init_output(&pl_dB, qd_gbsm_n_link(rx_pos), center_freq.n_elem);
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&sf_sigma_dB, rx_pos.n_rows, center_freq.n_elem);
+        plhs[1] = qd_mex_init_output(&sf_sigma_dB, qd_gbsm_n_link(rx_pos), center_freq.n_elem);
 
     // Wrap optional pointers
     arma::mat *p_sf_sigma = (nlhs > 1) ? &sf_sigma_dB : nullptr;

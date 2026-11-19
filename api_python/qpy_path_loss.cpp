@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -68,8 +69,8 @@ pl_dB, sf_sigma_dB = quadriga_lib.gbsm.path_loss( plpar, scenpar, center_freq, t
   (loss 0)
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
 - **`center_freq`** — Carrier frequencies in Hz, finite and > 0; `(n_freq,)`
-- **`tx_pos`** — Tx positions in m; `(1, 3)` or `(n_link, 3)`
-- **`rx_pos`** — Rx positions in m; `(n_link, 3)`
+- **`tx_pos`** — Tx positions in m; `(3,)` or `(3, n_link)`
+- **`rx_pos`** — Rx positions in m; `(3, n_link)`
 - **`d2d_in`** — Indoor 2D distance in m of the UT of each link, legacy QuaDRiGa only (leave it `None` for TR 38.901,
   which uses the geometric distance); finite and >= 0; 0 = outdoor link; `(n_link,)`; default: None
 - **`rnd_he`** — Uniform(0,1) value per link for the random environment height, column 10 of [[gbsm.draw]] (`"lsf"`);
@@ -105,8 +106,8 @@ py::tuple path_loss(py::handle plpar,
 
     // Output allocation
     arma::mat pl_dB, sf_sigma_dB;
-    auto pl_py = qd_python_init_output(rx_pos_a.n_rows, center_freq_a.n_elem, &pl_dB);
-    auto sf_sigma_py = qd_python_init_output(rx_pos_a.n_rows, center_freq_a.n_elem, &sf_sigma_dB);
+    auto pl_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), center_freq_a.n_elem, &pl_dB);
+    auto sf_sigma_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), center_freq_a.n_elem, &sf_sigma_dB);
 
     // Wrap optional pointers
     const arma::vec *p_d2d_in = d2d_in_a.is_empty() ? nullptr : &d2d_in_a;

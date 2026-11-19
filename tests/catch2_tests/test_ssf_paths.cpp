@@ -825,7 +825,7 @@ TEST_CASE("Diagnostic - ssf_paths fallback share and b_med on a library drop")
     // Read against the solver numbers in the docs of solve_scatterers (fallback 5.5 to 9.6 % for the TR methods
     // without absolute TOA, at most 2.3 % otherwise) and 0.2·b_med as the drift validity scale.
     const spmap sp = read_v19("UMi_NLOS");
-    const arma::mat tx = {{0.0, 0.0, 10.0}}, rx = drop_rx(291, 200);
+    const arma::mat tx = arma::vec{0.0, 0.0, 10.0}, rx = drop_rx(291, 200);
     const arma::vec fc = {3.5e9};
     const lib_t in = lib_inputs(sp, tx, rx, 292, 3.5e9);
     arma::cube mu(200, 1, 8, arma::fill::value(1.0)), sigma(200, 1, 8, arma::fill::value(3.0));

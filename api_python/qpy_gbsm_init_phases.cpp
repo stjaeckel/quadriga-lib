@@ -40,8 +40,8 @@ phase = quadriga_lib.gbsm.init_phases( scenpar, set_type, *, seed, set_id, prese
 - **`tx_pos`**, **`rx_pos`** — Bias-removal positions in m as in [[gbsm.draw]]; `"lsf"` only, else `ValueError`;
   default: None
 - **`dual_mobility`** — `"lsf"` with bias removal: Tx and Rx both move; as in [[gbsm.draw]]; default: False
-- **`remove_bias`** — `"lsf"` only: remove the sample mean over the positions; needs `rx_pos` with at least 3 rows, else
-  no effect; default: True
+- **`remove_bias`** — `"lsf"` only: remove the sample mean over the positions; needs `rx_pos` with at least 3 columns,
+  else no effect; default: True
 - **`horizontal`** — `"lsf"` with bias removal: `True` 2D, `False` 3D mode; as in [[gbsm.draw]]; default: True
 
 ## Output:
@@ -72,10 +72,6 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
     const bool remove_bias_b = qd_python_flag(remove_bias, true, "remove_bias");
     const bool horizontal_b = qd_python_flag(horizontal, true, "horizontal");
 
-    // Wrap optional pointers
-    const arma::mat *p_tx_pos = tx_pos_a.is_empty() ? nullptr : &tx_pos_a;
-    const arma::mat *p_rx_pos = rx_pos_a.is_empty() ? nullptr : &rx_pos_a;
-
     // Output allocation in numpy memory: n_coeff of the preset, n_gen of the set from a completed copy of 'scenpar';
     // with an unknown preset or set type or an invalid 'scenpar' the call throws before any output is needed
     arma::cube phase;
@@ -98,8 +94,8 @@ py::array_t<double> gbsm_init_phases(py::handle scenpar,
                                          &phase);
 
     // Call library function
-    quadriga_lib::gbsm_init_phases(scenpar_a, set_type, phase, (arma::sword)seed, (arma::sword)set_id, preset, p_tx_pos,
-                                   p_rx_pos, dual_mobility_b, remove_bias_b, horizontal_b);
+    quadriga_lib::gbsm_init_phases(scenpar_a, set_type, phase, (arma::sword)seed, (arma::sword)set_id, preset, &tx_pos_a,
+                                   &rx_pos_a, dual_mobility_b, remove_bias_b, horizontal_b);
 
     return phase_py;
 }

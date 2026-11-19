@@ -8,8 +8,12 @@
 // qd_gbsm_phases.cpp.
 //
 // Helpers and their users:
+//   qd_gbsm_cols          tx_pos / rx_pos as [3, n], no copy       users of qd_gbsm_check_links,
+//                                                                  gbsm_single_link_channel.cpp
 //   qd_gbsm_check_links   common validation of tx_pos / rx_pos     qd_gbsm_phases.cpp, path_loss.cpp, lsp_generate.cpp,
 //                                                                  ssf_clusters.cpp, ssf_rays.cpp
+//   qd_gbsm_n_link        number of links of rx_pos                MEX and Python wrappers of gbsm_draw, path_loss,
+//                                                                  lsp_generate, ssf_clusters, ssf_rays
 //   qd_gbsm_check_fc      validation of the carrier frequencies    path_loss.cpp, lsp_generate.cpp, los_probability.cpp,
 //                                                                  o2i_loss.cpp, ssf_rays.cpp, qd_gbsm_phases.cpp
 //   qd_gbsm_n_coeff       number of sinusoids of a preset          qd_gbsm_phases.cpp, MEX and Python wrappers of
@@ -47,17 +51,35 @@
 #include <unordered_map>
 #include <vector>
 
-// Common validation of the link positions, in this order: 3 columns of rx_pos and tx_pos, rows of tx_pos 1 or
-// n_link (when both are given), finite rx_pos and tx_pos; throws std::invalid_argument
+// Positions as [3, n] on the memory of 'pos', without a copy: [1, 3] (one item) becomes [3, 1], a matrix without
+// elements [3, 0] (no items); any other size is kept and left to qd_gbsm_check_links
+static inline arma::mat qd_gbsm_cols(const arma::mat &pos)
+{
+    if (pos.n_elem == 0)
+        return arma::mat(3, 0);
+    const arma::uword n_rows = (pos.n_rows == 1 && pos.n_cols == 3) ? 3 : pos.n_rows;
+    return arma::mat(const_cast<double *>(pos.memptr()), n_rows, pos.n_elem / n_rows, false, true);
+}
+
+// Number of links of 'rx_pos' as the GBSM functions count them: the columns after qd_gbsm_cols; output sizes of
+// the wrappers
+static inline arma::uword qd_gbsm_n_link(const arma::mat &rx_pos)
+{
+    return qd_gbsm_cols(rx_pos).n_cols;
+}
+
+// Common validation of the link positions after qd_gbsm_cols, in this order: 3 rows of rx_pos and tx_pos, columns
+// of tx_pos 1 or n_link (when both are given), finite rx_pos and tx_pos; throws std::invalid_argument
 // - nullptr skips the checks of that argument
 static inline void qd_gbsm_check_links(const arma::mat *tx_pos, const arma::mat *rx_pos)
 {
-    if (rx_pos != nullptr && rx_pos->n_cols != 3)
-        throw std::invalid_argument("Input 'rx_pos' must have 3 columns.");
-    if (tx_pos != nullptr && tx_pos->n_cols != 3)
-        throw std::invalid_argument("Input 'tx_pos' must have 3 columns.");
-    if (rx_pos != nullptr && tx_pos != nullptr && tx_pos->n_rows != 1 && tx_pos->n_rows != rx_pos->n_rows)
-        throw std::invalid_argument("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'.");
+    if (rx_pos != nullptr && rx_pos->n_rows != 3)
+        throw std::invalid_argument("Input 'rx_pos' must have 3 rows.");
+    if (tx_pos != nullptr && tx_pos->n_rows != 3)
+        throw std::invalid_argument("Input 'tx_pos' must have 3 rows.");
+    if (rx_pos != nullptr && tx_pos != nullptr && tx_pos->n_cols != 1 && tx_pos->n_cols != rx_pos->n_cols)
+        throw std::invalid_argument("Number of columns in 'tx_pos' must be 1 or match the number of columns in "
+                                    "'rx_pos'.");
     if (rx_pos != nullptr && !rx_pos->is_finite())
         throw std::invalid_argument("Input 'rx_pos' must be finite.");
     if (tx_pos != nullptr && !tx_pos->is_finite())

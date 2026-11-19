@@ -208,8 +208,8 @@ namespace
     fix_t subset(const fix_t &f, const arma::uvec &idx)
     {
         fix_t s = f;
-        s.tx = (f.tx.n_rows == 1) ? f.tx : arma::mat(f.tx.rows(idx));
-        s.rx = f.rx.rows(idx), s.rnd = f.rnd.rows(idx), s.eod = f.eod.rows(idx);
+        s.tx = (f.tx.n_cols == 1) ? f.tx : arma::mat(f.tx.cols(idx));
+        s.rx = f.rx.cols(idx), s.rnd = f.rnd.rows(idx), s.eod = f.eod.rows(idx);
         s.eps_re = f.eps_re.rows(idx), s.eps_im = f.eps_im.rows(idx), s.toa = f.toa.elem(idx), s.ncl = f.ncl.elem(idx);
         s.lsp.set_size(idx.n_elem, f.lsp.n_cols, f.lsp.n_slices), s.anchor.set_size(idx.n_elem, 1, 8);
         s.rnd_freq.set_size(idx.n_elem, f.rnd_freq.n_cols, f.rnd_freq.n_slices);
@@ -559,7 +559,7 @@ TEST_CASE("ssf_clusters - 38.901 ground reflection: reflection coefficients and 
     // Both ends on the ground (grazing): eps = 1 gives R = 0, eps = 15 - 1j gives R_par = R_perp = -1
     fix_t h = make_fix(UMa_LOS.N, 2, 1, 103, true, 9.0, 9.0);
     h.use_eps = true;
-    h.tx.col(2).zeros(), h.rx.col(2).zeros();
+    h.tx.row(2).zeros(), h.rx.row(2).zeros();
     h.eps_re.fill(1.0), h.eps_im.fill(0.0);
     out_t og = run(sp, h);
     check_finite(og);
@@ -655,7 +655,7 @@ TEST_CASE("ssf_clusters - 38.901 spread statistics over a drop")
                           "ES_D_lambda", "ES_A_lambda", "XPR_lambda", "absTOA_lambda"})
         sp[k] = 0.0;
     std::vector<double> ratio[5];
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
     for (arma::sword seed = 1; seed <= 5; ++seed)
     {
         const arma::mat rx = drop_rx((unsigned)seed, 400);
@@ -863,8 +863,8 @@ TEST_CASE("ssf_clusters - input validation")
     std::vector<std::pair<mut_t, const char *>> bad = {
         {[](spmap &, fix_t &, std::string &m) { m = "QuaDRiGa"; },
          "Input 'method' must be '38.901', '38.901_MF' or 'quadriga'."},
-        {[](spmap &, fix_t &x, std::string &) { x.rx = arma::mat(3, 2, arma::fill::ones); },
-         "Input 'rx_pos' must have 3 columns."},
+        {[](spmap &, fix_t &x, std::string &) { x.rx = arma::mat(2, 3, arma::fill::ones); },
+         "Input 'rx_pos' must have 3 rows."},
         {[](spmap &s, fix_t &, std::string &) { s["NumClusters"] = 0.0; },
          "Value of 'NumClusters' must be an integer from 1 to 1000."},
         {[](spmap &, fix_t &x, std::string &) { x.lsp = arma::cube(3, 1, 7, arma::fill::ones); },
@@ -906,7 +906,7 @@ TEST_CASE("ssf_clusters - input validation")
         {[](spmap &, fix_t &x, std::string &) { x.use_eod = true, x.eod(1, 0) = NAN; },
          "Input 'eod_offset_deg' must be finite."},
         {[](spmap &, fix_t &x, std::string &) { x.use_toa = true, x.toa = arma::vec(2, arma::fill::zeros); },
-         "Number of elements in 'abs_toa' does not match number of rows in 'rx_pos'."},
+         "Number of elements in 'abs_toa' does not match number of columns in 'rx_pos'."},
         {[](spmap &, fix_t &x, std::string &) { x.use_toa = true, x.toa(1) = -1e-12; },
          "Input 'abs_toa' must be finite and >= 0."},
         {[](spmap &, fix_t &x, std::string &) { x.use_toa = true, x.toa(1) = NAN; },
@@ -926,12 +926,12 @@ TEST_CASE("ssf_clusters - input validation")
          "Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0."},
         {[gr](spmap &s, fix_t &x, std::string &) { gr(s, x), x.rx(2, 2) = -0.1; },
          "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
-        {[gr](spmap &s, fix_t &x, std::string &) { gr(s, x), x.tx(0, 2) = -3.0; },
+        {[gr](spmap &s, fix_t &x, std::string &) { gr(s, x), x.tx(2, 0) = -3.0; },
          "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
         {[](spmap &, fix_t &x, std::string &) { x.use_o2i = true, x.o2i = {true, false}; },
-         "Number of elements in 'o2i' does not match number of rows in 'rx_pos'."},
+         "Number of elements in 'o2i' does not match number of columns in 'rx_pos'."},
         {[](spmap &, fix_t &x, std::string &) { x.use_ncl = true, x.ncl = {12, 12}; },
-         "Number of elements in 'n_cluster' does not match number of rows in 'rx_pos'."},
+         "Number of elements in 'n_cluster' does not match number of columns in 'rx_pos'."},
         {[](spmap &, fix_t &x, std::string &) { x.use_ncl = true, x.ncl = {12, 9, 10}; },
          "Entries of 'n_cluster' must be in [10, 12]."},
         {[](spmap &, fix_t &x, std::string &) { x.use_ncl = true, x.ncl = {13, 10, 10}; },
@@ -952,7 +952,7 @@ TEST_CASE("ssf_clusters - input validation")
         [N](spmap &, fix_t &x, std::string &) { x.rnd(2, N - 1) = 0.0, x.rnd(1, 0) = 1.0, x.rnd(0, N) = 5.0; },
         [](spmap &, fix_t &x, std::string &) { x.lsp(0, 0, 2) = -1.0, x.lsp(1, 0, 7) = 0.0; },
         [gr](spmap &s, fix_t &x, std::string &) { gr(s, x), x.eps_re(1, 0) = 1.0, x.eps_im(2, 0) = 0.0; }, // vacuum
-        [](spmap &, fix_t &x, std::string &) { x.rx(2, 2) = -0.1, x.tx(0, 2) = -3.0; }, // z < 0 without the reflection
+        [](spmap &, fix_t &x, std::string &) { x.rx(2, 2) = -0.1, x.tx(2, 0) = -3.0; }, // z < 0 without the reflection
         [](spmap &, fix_t &x, std::string &) { x.use_ncl = true, x.ncl = {12, 10, 11}; },
         [](spmap &s, fix_t &x, std::string &) { s["NumClusters_min"] = 0.0, x.use_ncl = true, x.ncl = {1, 1, 12}; },
         [nlos_qd](spmap &s, fix_t &x, std::string &m) { nlos_qd(s, x, m), x.use_toa = true; },

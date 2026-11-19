@@ -8,8 +8,8 @@ conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'co
 sp = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMa_LOS.conf' ) );
 sp_nlos = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMa_NLOS.conf' ) );
 sp_inf = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_InF_NLOS_SL.conf' ) );
-tx_pos = [ 0, 0, 25 ];
-rx_pos = [ 100, 0, 1.5; 0, 200, 1.5; -50, 50, 22.5 ];
+tx_pos = [ 0; 0; 25 ];
+rx_pos = [ 100, 0, 1.5; 0, 200, 1.5; -50, 50, 22.5 ]';
 fc = [ 2e9, 28e9 ];
 rnd = zeros( 3, 11 );
 rnd(:, 10) = 0.5;                                                              % medium ground
@@ -109,7 +109,7 @@ assert_throws( @() out3( sp, fc, tx_pos, rx_pos, rnd_b ), 'Input ''rnd'' must be
 lsp_t = quadriga_lib.lsp_generate( sp, single(fc'), single(tx_pos), single(rx_pos), single(rnd), [], int32(1), uint32(1) );
 assertTrue( isa(lsp_t, 'double') );
 assertElementsAlmostEqual( lsp_t, lsp, 'relative', 1e-12 );                   % inputs exact in single
-assertEqual( quadriga_lib.lsp_generate( sp, fc, repmat(tx_pos, 3, 1), rx_pos, rnd ), lsp );
+assertEqual( quadriga_lib.lsp_generate( sp, fc, repmat(tx_pos, 1, 3), rx_pos, rnd ), lsp );
 
 %% Errors
 assert_throws( @() quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos ), 'Wrong number of input arguments.' );

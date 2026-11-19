@@ -66,7 +66,7 @@ or be filled directly (fields in [[ssf_rays]]); continue with step 6.<br><br>
 | Term | Meaning |
 | --- | --- |
 | scenario | type of environment with its statistics: numeric fields `scenpar`, path-loss model, short names (one conf file) |
-| link | one Tx-Rx pair of a batch (row `l` of `rx_pos`) |
+| link | one Tx-Rx pair of a batch (column `l` of `rx_pos`) |
 | drop | one realization of LSPs, clusters and rays at the link positions; the positions the ray data refer to |
 | cluster | one of the N NLOS clusters of a link: delay, power, angles (TR 38.901 clause 7.5 steps 5 to 7) |
 | slot | column of the [[ssf_clusters]] outputs: 1 LOS, 2 ground reflection (GR, if enabled), then the N clusters |
@@ -101,15 +101,15 @@ draw coupling, XPR and phases per frequency, so it is independent, also with `'3
 angles.<br><br>
 
 **Conventions.** `N = NumClusters - 1` is the number of NLOS clusters: `NumClusters` counts the LOS slot, as in
-QuaDRiGa. Positions are in m; in the batch functions one row (x, y, z) per link: `rx_pos` is `[n_link, 3]`, `tx_pos` is
-`[1, 3]` (one Tx for all links) or `[n_link, 3]`; heights are the z coordinates. The one-link functions take a position
-as a `[3]` vector, except [[gbsm_single_link_channel]], which takes one row per snapshot; scatterer positions are
-`[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the conf-file keys): in
-rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR 38.901 except
-two deliberate library choices: the SOS preset `Comb256` with bias removal ([[gbsm_init_phases]], [[gbsm_draw]]) and
-`method = 'quadriga'` of [[gbsm_rays_from_paths]]; QuaDRiGa variants are options. Units: frequencies in Hz, path loss
-in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file keys and
-`scenpar` fields have the units of the file comments (e.g. `PerClusterDS` in ns).
+QuaDRiGa. Positions are in m; in the batch functions one column (x, y, z) per link: `rx_pos` is `[3, n_link]` (empty: no
+links), `tx_pos` is `[3, 1]` (one Tx for all links) or `[3, n_link]`; heights are the z coordinates. The one-link
+functions take a position as a `[3]` vector, and [[gbsm_single_link_channel]] one column per snapshot; scatterer
+positions are `[3, n]`. Angles are elevations, not TR zenith angles (EOD, EOA, ESD for ZOD, ZOA, ZSD; also in the
+conf-file keys): in rad in the GCS, azimuth in [-pi, pi), elevation in [-pi/2, pi/2] with +pi/2 up. Defaults follow TR
+38.901 except two deliberate library choices: the SOS preset `Comb256` with bias removal ([[gbsm_init_phases]],
+[[gbsm_draw]]) and `method = 'quadriga'` of [[gbsm_rays_from_paths]]; QuaDRiGa variants are options. Units: frequencies
+in Hz, path loss in dB, DS in s, KF, SF and XPR as linear power ratios, spreads and `_deg` offsets in degrees; conf-file
+keys and `scenpar` fields have the units of the file comments (e.g. `PerClusterDS` in ns).
 SECTION_DESC!*/
 
 /*!MD

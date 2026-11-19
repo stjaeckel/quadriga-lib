@@ -28,14 +28,14 @@ Channel coefficients of one link at one frequency over one segment
   at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `'rays'` for
   wide bands. `'rays'`: one path per kept ray in ray order, exact at any bandwidth; the path data are those of
   `ssf_paths` at the snapshot for these rays
-- `n_snap` is the largest row count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
-  rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
-  per frequency); one row or entry applies to all snapshots. A static link with a gain per snapshot repeats its
+- `n_snap` is the largest column count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
+  columns, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
+  per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `chan` has no `initial_position`. Validity limits: see `ssf_paths`
 - An error is raised for an invalid array (message prefixed with `Transmit antenna: ` or `Receive antenna: `), invalid
-  `rays`, `'drift'` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a row or
-  entry count other than 1 or `n_snap`
+  `rays`, `'drift'` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a column
+  or entry count other than 1 or `n_snap`
 
 ## Usage:
 ```
@@ -54,9 +54,9 @@ Channel coefficients of one link at one frequency over one segment
 - **`output`** — `'taps'` or `'rays'`; default: `'taps'`
 - **`i_freq`** — Frequency index in `rays.center_freq`, 1-based; ray data of the TR methods hold one frequency: 1;
   default: 1
-- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in [m]; `[n_snap, 3]` or `[1, 3]` (a `[3, 1]` column is rejected);
-  default: the positions of `rays`
-- **`tx_orientation`**, **`rx_orientation`** — Euler angles (bank, tilt, heading) in [rad]; `[n_snap, 3]` or `[1, 3]`;
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in [m]; `[3, n_snap]` or `[3, 1]`; default: the positions of
+  `rays`
+- **`tx_orientation`**, **`rx_orientation`** — Euler angles (bank, tilt, heading) in [rad]; `[3, n_snap]` or `[3, 1]`;
   default: 0
 - **`kf_ratio`** — KF(snapshot) / KF(drop) at `i_freq`, >= 0; `[n_snap]` or `[1]`; default: 1
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `false`
@@ -121,10 +121,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // The result is returned by value and copied
     quadriga_lib::channel<double> chan;
     CALL_QD(chan = quadriga_lib::gbsm_single_link_channel(tx_array, rx_array, rays, link_gain_dB, mobility, output,
-                                                          i_freq, tx_pos.empty() ? nullptr : &tx_pos,
-                                                          rx_pos.empty() ? nullptr : &rx_pos,
-                                                          tx_ori.empty() ? nullptr : &tx_ori,
-                                                          rx_ori.empty() ? nullptr : &rx_ori,
+                                                          i_freq, &tx_pos, &rx_pos, &tx_ori, &rx_ori,
                                                           kf_ratio.empty() ? nullptr : &kf_ratio, oxygen,
                                                           use_absolute_delays));
 

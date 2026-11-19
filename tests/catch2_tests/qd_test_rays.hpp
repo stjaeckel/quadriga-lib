@@ -347,10 +347,10 @@ namespace
         r.J[0] = 1.0, r.J[3] = -1.0;
         if (G)
         {
-            const arma::uword t = (f.tx.n_rows == 1) ? 0 : l;
-            const double dx = f.rx(l, 0) - f.tx(t, 0), dy = f.rx(l, 1) - f.tx(t, 1);
+            const arma::uword t = (f.tx.n_cols == 1) ? 0 : l;
+            const double dx = f.rx(0, l) - f.tx(0, t), dy = f.rx(1, l) - f.tx(1, t);
             std::complex<double> R_par, R_perp;
-            fresnel(f.eps_re(l, k), f.eps_im(l, k), f.tx(t, 2), f.rx(l, 2), std::sqrt(dx * dx + dy * dy), R_par,
+            fresnel(f.eps_re(l, k), f.eps_im(l, k), f.tx(2, t), f.rx(2, l), std::sqrt(dx * dx + dy * dy), R_par,
                     R_perp);
             const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
             r.J[4] = R > 0.0 ? R_par / R : 0.0, r.J[7] = R > 0.0 ? -R_perp / R : 0.0;
@@ -489,7 +489,7 @@ namespace
         quadriga_lib::scenpar_validate(sp);
         const arma::uword N = (arma::uword)sp.at("NumClusters") - 1, M = (arma::uword)sp.at("NumSubPaths");
         const arma::uword G = sp.at("GR_enabled") > 0.0 ? 1 : 0, NM = N * M, n_ray = 1 + G + NM, F = fc.n_elem;
-        const arma::uword t = (f.tx.n_rows == 1) ? 0 : l;
+        const arma::uword t = (f.tx.n_cols == 1) ? 0 : l;
         const double d2r = pi / 180.0, s_pv = sp.at("PolVar_sigma");
         double c_ds = 0.0, c_zsd = 0.0;
         for (arma::uword k = 0; k < F; ++k)
@@ -508,9 +508,9 @@ namespace
         // Owner end: the first coordinate (z, x, y) whose difference exceeds 1 mm decides
         bool rx_owner = false;
         for (arma::uword i : {2, 0, 1})
-            if (std::abs(f.rx(l, i) - f.tx(t, i)) > 1e-3)
+            if (std::abs(f.rx(i, l) - f.tx(i, t)) > 1e-3)
             {
-                rx_owner = f.rx(l, i) > f.tx(t, i);
+                rx_owner = f.rx(i, l) > f.tx(i, t);
                 break;
             }
 
@@ -579,9 +579,9 @@ namespace
             o.J[0] = 1.0, o.J[3] = -1.0;
             if (G)
             {
-                const double dx = f.rx(l, 0) - f.tx(t, 0), dy = f.rx(l, 1) - f.tx(t, 1);
+                const double dx = f.rx(0, l) - f.tx(0, t), dy = f.rx(1, l) - f.tx(1, t);
                 std::complex<double> R_par, R_perp;
-                fresnel(f.eps_re(l, k), f.eps_im(l, k), f.tx(t, 2), f.rx(l, 2), std::sqrt(dx * dx + dy * dy), R_par,
+                fresnel(f.eps_re(l, k), f.eps_im(l, k), f.tx(2, t), f.rx(2, l), std::sqrt(dx * dx + dy * dy), R_par,
                         R_perp);
                 const double R = std::sqrt(0.5 * (std::norm(R_par) + std::norm(R_perp)));
                 o.J[4] = R > 0.0 ? R_par / R : 0.0, o.J[7] = R > 0.0 ? -R_perp / R : 0.0;

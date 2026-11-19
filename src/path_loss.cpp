@@ -161,8 +161,8 @@ void quadriga_lib::path_loss(
 - **`plpar`** — Path-loss parameters, keys without "PL_", from [[conf_file_read]]; keys not read are ignored
 - **`scenpar`** — Scenario parameters; the SF std terms and `LSP_fc_min` are used
 - **`center_freq`** — Carrier frequencies in [Hz], finite and > 0; `[n_freq]`
-- **`tx_pos`** — Tx positions in [m]; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`
 - **`d2d_in`** *(optional)* — Indoor 2D distance in [m] of the UT of each link (e.g. from [[o2i_loss]]), finite
   and >= 0; given = legacy outdoor distance; 0 = outdoor link; `[n_link]`
 - **`rnd_he`** *(optional)* — Uniform(0,1) value per link for the random environment height, column 10 of
@@ -189,13 +189,14 @@ void quadriga_lib::path_loss(const std::string &pl_model,
                              const arma::vec *rnd_he)
 {
     // Validation, before any output is touched
-    qd_gbsm_check_links(&tx_pos, &rx_pos);
+    const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
+    qd_gbsm_check_links(&tx, &rx);
     qd_gbsm_check_fc(center_freq);
-    const arma::uword n_link = rx_pos.n_rows, n_freq = center_freq.n_elem;
+    const arma::uword n_link = rx.n_cols, n_freq = center_freq.n_elem;
     if (d2d_in != nullptr && d2d_in->n_elem != n_link)
-        throw std::invalid_argument("Number of elements in 'd2d_in' does not match number of rows in 'rx_pos'.");
+        throw std::invalid_argument("Number of elements in 'd2d_in' does not match number of columns in 'rx_pos'.");
     if (rnd_he != nullptr && rnd_he->n_elem != n_link)
-        throw std::invalid_argument("Number of elements in 'rnd_he' does not match number of rows in 'rx_pos'.");
+        throw std::invalid_argument("Number of elements in 'rnd_he' does not match number of columns in 'rx_pos'.");
     if (d2d_in != nullptr && (!d2d_in->is_finite() || arma::any(*d2d_in < 0.0)))
         throw std::invalid_argument("Input 'd2d_in' must be finite and >= 0.");
     if (rnd_he != nullptr)
@@ -405,13 +406,13 @@ void quadriga_lib::path_loss(const std::string &pl_model,
     if (sf_sigma_dB != nullptr && (sf_sigma_dB->n_rows != n_link || sf_sigma_dB->n_cols != n_freq))
         sf_sigma_dB->set_size(n_link, n_freq);
 
-    const bool tx_single = tx_pos.n_rows != n_link;
+    const bool tx_single = tx.n_cols != n_link;
     for (arma::uword l = 0; l < n_link; ++l)
     {
         // Distances
         const arma::uword t = tx_single ? 0 : l;
-        const double hBS = tx_pos(t, 2), hUT = rx_pos(l, 2);
-        const double dx = rx_pos(l, 0) - tx_pos(t, 0), dy = rx_pos(l, 1) - tx_pos(t, 1), dz = hUT - hBS;
+        const double hBS = tx(2, t), hUT = rx(2, l);
+        const double dx = rx(0, l) - tx(0, t), dy = rx(1, l) - tx(1, t), dz = hUT - hBS;
         double d2 = std::sqrt(dx * dx + dy * dy), d3 = std::sqrt(dx * dx + dy * dy + dz * dz);
         if (sf_sigma_dB != nullptr)
             sf_stats.set_link(d2, hBS, hUT);

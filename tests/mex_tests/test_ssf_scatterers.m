@@ -6,8 +6,8 @@ function test_ssf_scatterers
 %% Setup: UMi LOS, 'quadriga' rays of 2 links at two frequencies
 conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'config' );
 sp = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMi_LOS.conf' ) );
-tx_pos = [ 0, 0, 10 ];
-rx_pos = [ 60, 10, 1.5; -30, 80, 1.5 ];
+tx_pos = [ 0; 0; 10 ];
+rx_pos = [ 60, 10, 1.5; -30, 80, 1.5 ]';
 fc = [ 3.5e9; 28e9 ];
 rays = make_rays( sp, tx_pos, rx_pos, fc );
 n_ray = numel( rays(1).delay );

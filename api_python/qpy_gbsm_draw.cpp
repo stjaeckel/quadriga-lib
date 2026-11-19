@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -51,8 +52,8 @@ rnd = quadriga_lib.gbsm.draw( scenpar, set_type, phase, tx_pos, rx_pos, *, set_i
   `PerClusterAS_A`
 - **`set_type`** — Set type of [[gbsm.init_phases]]; str
 - **`phase`** — SOS phases from [[gbsm.init_phases]], finite; `(n_coeff, n_gen, 2)`
-- **`tx_pos`** — Tx positions in m; used in dual mobility, always validated; `(1, 3)` or `(n_link, 3)`
-- **`rx_pos`** — Rx positions in m; `(n_link, 3)`, `n_link = 0` allowed
+- **`tx_pos`** — Tx positions in m; used in dual mobility, always validated; `(3,)` or `(3, n_link)`
+- **`rx_pos`** — Rx positions in m; `(3, n_link)`; empty = no links
 - **`set_id`** — Set of [[gbsm.init_phases]]: `-1` = shared set, `k >= 0` = set of frequency `k`; ignored for `"lsf"`;
   another set with the same `n_gen` is not detected; default: -1
 - **`preset`** — Preset of [[gbsm.init_phases]]; another preset with the same `n_coeff` is not detected; default:
@@ -105,7 +106,7 @@ py::array_t<double> gbsm_draw(py::handle scenpar,
 
     // Output allocation in numpy memory: (n_link, n_gen), n_gen = columns of 'phase' (checked by the library)
     arma::mat rnd;
-    auto rnd_py = qd_python_init_output(rx_pos_a.n_rows, phase_a.n_cols, &rnd);
+    auto rnd_py = qd_python_init_output(qd_gbsm_n_link(rx_pos_a), phase_a.n_cols, &rnd);
 
     // Call library function
     quadriga_lib::gbsm_draw(scenpar_a, set_type, phase_a, tx_pos_a, rx_pos_a, rnd, (arma::sword)set_id, preset,

@@ -28,8 +28,8 @@ class test_lsf(unittest.TestCase):
     def setUp(self):
         # Distinct decorrelation distances, 4 Rx positions, one Tx
         self.scenpar = {"DS_lambda": 10.0, "AS_D_lambda": 18.0, "AS_A_lambda": 15.0}
-        self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0], [80.0, 30.0, 1.5]])
-        self.tx_pos = np.array([[10.0, 10.0, 25.0]])
+        self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0], [80.0, 30.0, 1.5]]).T
+        self.tx_pos = np.array([10.0, 10.0, 25.0])
         self.phase = quadriga_lib.gbsm.init_phases(self.scenpar, "lsf", seed=7)
         self.pb = quadriga_lib.gbsm.init_phases(self.scenpar, "lsf", seed=7, tx_pos=None, rx_pos=self.rx_pos)
 
@@ -73,23 +73,24 @@ class test_lsf(unittest.TestCase):
         # Omitted, None and non-default values
         f = quadriga_lib.gbsm.init_phases
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, tx_pos=None, rx_pos=None), self.phase)
-        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos[:2]), self.phase)  # 2 positions: none
-        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=np.zeros((0, 3))), self.phase)  # empty: none
+        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos[:, :2]), self.phase)  # 2 positions: none
+        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=np.zeros((3, 0))), self.phase)  # empty: none
+        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=np.empty(0)), self.phase)
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos, remove_bias=False), self.phase)
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, tx_pos=self.tx_pos, rx_pos=self.rx_pos),
                                pb)  # tx_pos unused
 
-        # Dual mobility: over the Rx and Tx positions; one Tx row equals n_link equal rows
+        # Dual mobility: over the Rx and Tx positions; one Tx column equals n_link equal columns
         pd = f(self.scenpar, "lsf", seed=7, tx_pos=self.tx_pos, rx_pos=self.rx_pos, dual_mobility=True)
         self.assertGreater(np.max(np.abs(pd - pb)), 1e-6)
         npt.assert_array_equal(pd[:, :, 1], pd[:, MIRROR, 0])
-        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, tx_pos=np.tile(self.tx_pos, (4, 1)), rx_pos=self.rx_pos,
+        npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, tx_pos=np.tile(self.tx_pos, (4, 1)).T, rx_pos=self.rx_pos,
                                  dual_mobility=True), pd)
 
     def test_horizontal_and_preset(self):
         f = quadriga_lib.gbsm.init_phases
         rx_z = self.rx_pos.copy()
-        rx_z[:, 2] = [0.0, 7.0, 2.0, 11.0]
+        rx_z[2, :] = [0.0, 7.0, 2.0, 11.0]
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=rx_z), self.pb)  # 2D: z not used
         ph = f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos, horizontal=False)
         self.assertGreater(np.max(np.abs(ph - self.pb)), 1e-6)
@@ -129,7 +130,7 @@ class test_lsf(unittest.TestCase):
         f = quadriga_lib.gbsm.init_phases
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=np.ascontiguousarray(self.rx_pos)), self.pb)
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=np.asfortranarray(self.rx_pos)), self.pb)
-        big = np.zeros((8, 6))
+        big = np.zeros((6, 8))
         big[::2, ::2] = self.rx_pos
         npt.assert_array_equal(f(self.scenpar, "lsf", seed=7, rx_pos=big[::2, ::2]), self.pb)  # strided view
         npt.assert_allclose(f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos.astype(np.float32)), self.pb,
@@ -155,8 +156,8 @@ class test_lsf(unittest.TestCase):
             f(self.scenpar, "lsf", seed=7, tx_pos=None, rx_pos=self.rx_pos, dual_mobility=True)
         self.assertIn("Input 'tx_pos' is required for the bias removal with dual mobility.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos[:, :2])
-        self.assertIn("Input 'rx_pos' must have 3 columns.", str(ctx.exception))
+            f(self.scenpar, "lsf", seed=7, rx_pos=self.rx_pos[:2, :])
+        self.assertIn("Input 'rx_pos' must have 3 rows.", str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:  # C++
             f(self.scenpar, "lsf", seed=-2)
         self.assertIn("Input 'seed' must be >= -1.", str(ctx.exception))

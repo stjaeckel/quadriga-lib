@@ -84,8 +84,8 @@ namespace quadriga_lib
                           arma::sword seed = -1,                                  // Seed of the site and scenario, the same for all set types; -1 = system random device
                           arma::sword set_id = -1,                                // "cluster", "ray": -1 = shared set, k >= 0 = set of frequency k (0-based); ignored for "lsf"
                           const std::string &preset = "Comb256",                  // SOS preset, see sos_preset
-                          const arma::mat *tx_pos = nullptr,                      // Optional: Tx positions for the bias removal, [1, 3] or [n_link, 3]; "lsf" only
-                          const arma::mat *rx_pos = nullptr,                      // Optional: Rx positions for the bias removal (2D: one floor), [n_link, 3]; "lsf" only
+                          const arma::mat *tx_pos = nullptr,                      // Optional: Tx positions for the bias removal, [3, 1] or [3, n_link]; "lsf" only
+                          const arma::mat *rx_pos = nullptr,                      // Optional: Rx positions for the bias removal (2D: one floor), [3, n_link]; "lsf" only
                           bool dual_mobility = false,                             // "lsf": Tx and Rx both move, the Tx side is a second device
                           bool remove_bias = true,                                // "lsf": remove the sample mean over the positions
                           bool horizontal = true);                                // "lsf": 2D bias removal in the x-y plane (TR); false: 3D (legacy)
@@ -97,8 +97,8 @@ namespace quadriga_lib
     void gbsm_draw(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (decorrelation distances, NumClusters, NumSubPaths, PerCluster* for "ray")
                    const std::string &set_type,                             // "lsf", "cluster" or "ray"; must match gbsm_init_phases
                    const arma::cube &phase,                                 // SOS phases from gbsm_init_phases, [n_coeff, n_gen, 2]
-                   const arma::mat &tx_pos,                                 // Tx positions in [m], [1, 3] or [n_link, 3]
-                   const arma::mat &rx_pos,                                 // Rx positions in [m], [n_link, 3]
+                   const arma::mat &tx_pos,                                 // Tx positions in [m], [3, 1] or [3, n_link]
+                   const arma::mat &rx_pos,                                 // Rx positions in [m], [3, n_link]
                    arma::mat &rnd,                                          // Output: Random values, [n_link, n_gen]
                    arma::sword set_id = -1,                                 // As in gbsm_init_phases; ignored for "lsf"
                    const std::string &preset = "Comb256",                   // Must match gbsm_init_phases
@@ -118,8 +118,8 @@ namespace quadriga_lib
                    const std::unordered_map<std::string, std::vector<double>> &plpar,    // Path-loss parameters
                    const std::unordered_map<std::string, double> &scenpar,               // Scenario parameters (SF std, LSP_fc_min)
                    const arma::vec &center_freq,                                         // Carrier frequencies in [Hz], [n_freq]
-                   const arma::mat &tx_pos,                                              // Tx positions, [1, 3] or [n_link, 3]
-                   const arma::mat &rx_pos,                                              // Rx positions, [n_link, 3]
+                   const arma::mat &tx_pos,                                              // Tx positions, [3, 1] or [3, n_link]
+                   const arma::mat &rx_pos,                                              // Rx positions, [3, n_link]
                    arma::mat &pl_dB,                                                     // Output: Path loss in [dB], [n_link, n_freq]
                    arma::mat *sf_sigma_dB = nullptr,                                     // Optional output: SF standard deviation in [dB], [n_link, n_freq]
                    const arma::vec *d2d_in = nullptr,                                    // Optional: Indoor 2D distance in [m], [n_link]; given = outdoor distance only (legacy); 0 = outdoor link, geometric distance
@@ -131,8 +131,8 @@ namespace quadriga_lib
     // - Same random values for all frequencies (TR 7.6.5)
     void lsp_generate(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters
                       const arma::vec &center_freq,                           // Carrier frequencies in [Hz], [n_freq]
-                      const arma::mat &tx_pos,                                // Tx positions, [1, 3] or [n_link, 3]
-                      const arma::mat &rx_pos,                                // Rx positions, [n_link, 3]
+                      const arma::mat &tx_pos,                                // Tx positions, [3, 1] or [3, n_link]
+                      const arma::mat &rx_pos,                                // Rx positions, [3, n_link]
                       const arma::mat &rnd,                                   // Random values from gbsm_draw ("lsf"), [n_link, 11]
                       arma::cube &lsp,                                        // Output: [n_link, n_freq, 8]: DS [s], KF, SF [linear], ASD, ASA, ESD, ESA [deg], XPR [linear]
                       const arma::mat *sf_sigma_dB = nullptr,                 // Optional: SF std in [dB] from path_loss, replaces the scenpar value, [n_link, n_freq]
@@ -184,8 +184,8 @@ namespace quadriga_lib
     // - Methods "38.901", "38.901_MF" (clause 7.6.5.1), "quadriga"
     // - Slots: 0 = LOS path, 1 = ground reflection if GR_enabled, then the N NLOS clusters
     void ssf_clusters(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters
-                      const arma::mat &tx_pos,                                // Tx positions in [m], [1, 3] or [n_link, 3]
-                      const arma::mat &rx_pos,                                // Rx positions in [m], [n_link, 3]
+                      const arma::mat &tx_pos,                                // Tx positions in [m], [3, 1] or [3, n_link]
+                      const arma::mat &rx_pos,                                // Rx positions in [m], [3, n_link]
                       const arma::cube &lsp,                                  // LSPs from lsp_generate, [n_link, n_freq, 8]
                       const arma::mat &rnd,                                   // Shared cluster set from gbsm_draw ("cluster", set_id = -1), [n_link, 9·N]
                       arma::cube &delay,                                      // Output: Delays in [s], [n_link, n_slot, n_freq] for 38.901_MF, else [n_link, n_slot, 1]
@@ -246,8 +246,8 @@ namespace quadriga_lib
     //   "quadriga" all frequencies; all other inputs as ssf_clusters and lsp_generate return them
     // - A pure function of the clusters, the LSPs and the random values: no seed, batch-independent
     void ssf_rays(const std::unordered_map<std::string, double> &scenpar, // Scenario parameters (NumClusters, NumSubPaths, PerCluster*, GR_enabled, PolVar_sigma)
-                  const arma::mat &tx_pos,                                // Tx positions in [m], [1, 3] or [n_link, 3]
-                  const arma::mat &rx_pos,                                // Rx positions in [m], [n_link, 3]
+                  const arma::mat &tx_pos,                                // Tx positions in [m], [3, 1] or [3, n_link]
+                  const arma::mat &rx_pos,                                // Rx positions in [m], [3, n_link]
                   const arma::vec &center_freq,                           // Carrier frequencies in [Hz], [n_freq]
                   const arma::cube &lsp,                                  // LSPs from lsp_generate, [n_link, n_freq, 8]
                   const arma::cube &lsp_mu,                               // Log-domain means from lsp_generate, [n_link, n_freq, 8]
@@ -325,10 +325,10 @@ namespace quadriga_lib
                                              const std::string &mobility = "auto",      // "phase", "drift" or "auto" (phase for the TR methods, drift for quadriga)
                                              const std::string &output = "taps",        // "taps" or "rays"
                                              arma::uword i_freq = 0,                    // Frequency index in rays.center_freq, 0-based; TR methods: 0 (one entry)
-                                             const arma::mat *tx_pos = nullptr,         // Optional: Tx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.tx_pos
-                                             const arma::mat *rx_pos = nullptr,         // Optional: Rx positions in [m], [n_snap, 3] or [1, 3]; nullptr = rays.rx_pos
-                                             const arma::mat *tx_orientation = nullptr, // Optional: Tx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
-                                             const arma::mat *rx_orientation = nullptr, // Optional: Rx Euler angles (bank, tilt, heading) in [rad], [n_snap, 3] or [1, 3]; nullptr = 0
+                                             const arma::mat *tx_pos = nullptr,         // Optional: Tx positions in [m], [3, n_snap] or [3, 1]; nullptr = rays.tx_pos
+                                             const arma::mat *rx_pos = nullptr,         // Optional: Rx positions in [m], [3, n_snap] or [3, 1]; nullptr = rays.rx_pos
+                                             const arma::mat *tx_orientation = nullptr, // Optional: Tx Euler angles (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]; nullptr = 0
+                                             const arma::mat *rx_orientation = nullptr, // Optional: Rx Euler angles (bank, tilt, heading) in [rad], [3, n_snap] or [3, 1]; nullptr = 0
                                              const arma::vec *kf_ratio = nullptr,       // Optional: K(snapshot) / K(drop) at rays.center_freq(i_freq), [n_snap] or [1]; nullptr = 1
                                              bool oxygen = false,                       // TR 7.6.1 oxygen absorption from each path's own length
                                              bool use_absolute_delays = false);         // Include the LOS delay in all delays, as get_channels_*

@@ -81,8 +81,8 @@ rays = quadriga_lib.gbsm.ssf_rays( scenpar, tx_pos, rx_pos, center_freq, lsp, ls
 ## Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumSubPaths`, the `PerCluster*` keys, `GR_enabled`,
   `PolVar_sigma`
-- **`tx_pos`** — Tx positions in m; `(1, 3)` or `(n_link, 3)`
-- **`rx_pos`** — Rx positions in m; `(n_link, 3)`
+- **`tx_pos`** — Tx positions in m; `(3,)` or `(3, n_link)`
+- **`rx_pos`** — Rx positions in m; `(3, n_link)`
 - **`center_freq`** — Carrier frequencies in Hz; `(n_freq,)`
 - **`lsp`**, **`lsp_mu`**, **`lsp_sigma`** — LSPs, log-domain means and std from [[lsp_generate]], slices and units as
   there; used: the ESD mean and the XPR mean and std, the XPR LSP for `pol_model = "quadriga"`; `(n_link, n_freq, 8)`
@@ -186,7 +186,7 @@ py::list ssf_rays(py::handle scenpar,
         arma::uword N, M, n_ray, n_gen;
         qd_gbsm_ray_layout(sp, N, M, G, n_ray, n_gen);
         const arma::uword n_freq_out = (method == "quadriga") ? center_freq_a.n_elem : 1;
-        rays_py = qd_python_init_gbsm_rays(rx_pos_a.n_rows, n_ray, n_freq_out, G == 1, false, rays);
+        rays_py = qd_python_init_gbsm_rays(qd_gbsm_n_link(rx_pos_a), n_ray, n_freq_out, G == 1, false, rays);
     }
 
     quadriga_lib::ssf_rays(scenpar_a, tx_pos_a, rx_pos_a, center_freq_a, lsp_a, lsp_mu_a, lsp_sigma_a, delay_a,

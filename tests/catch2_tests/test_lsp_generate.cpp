@@ -27,7 +27,7 @@
 // Random inputs of the statistical case: std::mt19937_64 with a fixed seed and a Box-Muller transform written here.
 // Tolerances: 1e-12 for exact-by-construction double results (absolute for O(1) values, relative for linear LSPs);
 // TR checks of rounded file values take their tolerance from the rounding bound (stated at the check).
-// Conventions: positions are rows {x, y, z} in meters; TR reference geometry tx = (0, 0, hBS), rx = (d2D, 0, hUT);
+// Conventions: positions are columns {x, y, z} in meters; TR reference geometry tx = (0, 0, hBS), rx = (d2D, 0, hUT);
 // LSP order DS, KF, SF, ASD, ASA, ESD, ESA, XPR; x = lg(lsp) for DS, ASD, ASA, ESD, ESA, x = 10·lg(lsp) for KF,
 // SF, XPR.
 
@@ -301,8 +301,8 @@ TEST_CASE("lsp_generate - mean and std follow the formula with every term")
 
     // Links: hUT above hBS; hUT below hBS; the ESD floor applies; d2D 5000 m where the ASD std is negative before
     // the outer limit
-    const arma::mat tx = {{10.0, -5.0, 25.0}, {0.0, 0.0, 25.0}, {0.0, 0.0, 25.0}, {0.0, 0.0, 25.0}};
-    const arma::mat rx = {{40.0, 35.0, 31.5}, {120.0, -90.0, 1.5}, {600.0, 800.0, 1.5}, {3000.0, 4000.0, 1.5}};
+    const arma::mat tx = arma::mat({{10.0, -5.0, 25.0}, {0.0, 0.0, 25.0}, {0.0, 0.0, 25.0}, {0.0, 0.0, 25.0}}).t();
+    const arma::mat rx = arma::mat({{40.0, 35.0, 31.5}, {120.0, -90.0, 1.5}, {600.0, 800.0, 1.5}, {3000.0, 4000.0, 1.5}}).t();
     const arma::vec fc = {1.5e9, 3.5e9, 28.0e9};
     const arma::mat rnd = rnd_values(4, 11);
 
@@ -321,7 +321,7 @@ TEST_CASE("lsp_generate - mean and std follow the formula with every term")
         for (arma::uword k = 0; k < 3; ++k)
         {
             double m[8], s[8], esd_raw;
-            ref_mu_sigma(sp, fc(k), tx.row(l).eval().memptr(), rx.row(l).eval().memptr(), m, s, &esd_raw);
+            ref_mu_sigma(sp, fc(k), tx.colptr(l), rx.colptr(l), m, s, &esd_raw);
             for (int i = 0; i < 8; ++i)
             {
                 QD_DIAG("%llu,%.1f,%s,%.15f,%.15f,%.15f,%.15f\n", (unsigned long long)l, fc(k) / 1e9, lsp_name[i],
@@ -425,17 +425,17 @@ TEST_CASE("lsp_generate - TR spot checks of four v19 files")
         arma::vec fc(sc.fc.size());
         for (size_t k = 0; k < sc.fc.size(); ++k)
             fc(k) = sc.fc[k] * 1e9;
-        arma::mat rx(sc.hut.size(), 3, arma::fill::zeros);
+        arma::mat rx(3, sc.hut.size(), arma::fill::zeros);
         for (size_t l = 0; l < sc.hut.size(); ++l)
-            rx(l, 0) = sc.d, rx(l, 2) = sc.hut[l];
-        const arma::mat tx = {{0.0, 0.0, sc.hbs}};
-        const arma::mat rnd(rx.n_rows, 11, arma::fill::zeros);
+            rx(0, l) = sc.d, rx(2, l) = sc.hut[l];
+        const arma::mat tx = arma::vec{0.0, 0.0, sc.hbs};
+        const arma::mat rnd(rx.n_cols, 11, arma::fill::zeros);
 
         arma::cube lsp, mu, sg;
         quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, nullptr, &mu, &sg);
-        REQUIRE(mu.n_rows == rx.n_rows);
+        REQUIRE(mu.n_rows == rx.n_cols);
 
-        for (arma::uword l = 0; l < rx.n_rows; ++l)
+        for (arma::uword l = 0; l < rx.n_cols; ++l)
             for (arma::uword k = 0; k < fc.n_elem; ++k)
             {
                 double m[8], s[8];
@@ -456,7 +456,7 @@ TEST_CASE("lsp_generate - TR spot checks of four v19 files")
 
     // InF NLOS DL with DS_VS set in a scenpar copy: TR formula lg(30·V/S + 32) - 9.44 with that V/S
     scen_t sp = conf("InF_NLOS_DL");
-    const arma::mat tx = {{0.0, 0.0, 1.5}}, rx = {{30.0, 0.0, 1.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 1.5}, rx = arma::vec{30.0, 0.0, 1.5};
     const arma::vec fc = {3.5e9};
     const arma::mat rnd(1, 11, arma::fill::zeros);
     for (double vs : {4.0, 50.0 / 11.0})
@@ -497,13 +497,13 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
                  {"EoD_offset_hcl", 6.0}, {"LSP_fc_min", 4.0}};
     const double hbs = 20.0;
     const std::vector<double> dist = {5.0, 50.0, 500.0, 2000.0}, hut = {1.5, 9.0}; // hUT below and above hcl
-    arma::mat rx(dist.size() * hut.size(), 3, arma::fill::zeros);
+    arma::mat rx(3, dist.size() * hut.size(), arma::fill::zeros);
     for (size_t i = 0; i < dist.size(); ++i)
         for (size_t j = 0; j < hut.size(); ++j)
-            rx(i * hut.size() + j, 0) = 0.6 * dist[i], rx(i * hut.size() + j, 1) = 0.8 * dist[i], rx(i * hut.size() + j, 2) = hut[j];
-    const arma::mat tx = {{0.0, 0.0, hbs}};
+            rx(0, i * hut.size() + j) = 0.6 * dist[i], rx(1, i * hut.size() + j) = 0.8 * dist[i], rx(2, i * hut.size() + j) = hut[j];
+    const arma::mat tx = arma::vec{0.0, 0.0, hbs};
     const arma::vec fc = {2.0e9, 10.0e9};
-    const arma::mat rnd(rx.n_rows, 11, arma::fill::zeros);
+    const arma::mat rnd(rx.n_cols, 11, arma::fill::zeros);
 
     QD_DIAG("\n# diag: lsp_generate EoD offset with every term\n");
     QD_DIAG("b,d2D,hUT,fc_GHz,eod,eod_ref\n");
@@ -513,7 +513,7 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         arma::cube lsp;
         arma::mat eod;
         quadriga_lib::lsp_generate(sp, fc, tx, rx, rnd, lsp, nullptr, nullptr, nullptr, nullptr, &eod);
-        REQUIRE(eod.n_rows == rx.n_rows);
+        REQUIRE(eod.n_rows == rx.n_cols);
         REQUIRE(eod.n_cols == 2);
         for (size_t i = 0; i < dist.size(); ++i)
             for (size_t j = 0; j < hut.size(); ++j)
@@ -535,8 +535,8 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         //   mu_offset = e(fc) - 10^( a(fc)·lg(max(b(fc), d2D)) + c(fc) - 0.07·(hUT - 1.5) )
         //   a = 0.208·lg fc - 0.782, b = 25, c = -0.13·lg fc + 2.03, e = 7.66·lg fc - 5.96
         const scen_t uma = conf("UMa_NLOS");
-        const arma::mat tx1 = {{0.0, 0.0, 25.0}};
-        const arma::mat rx1 = {{10.0, 0.0, 1.5}, {200.0, 0.0, 1.5}, {10.0, 0.0, 12.0}, {200.0, 0.0, 12.0}};
+        const arma::mat tx1 = arma::vec{0.0, 0.0, 25.0};
+        const arma::mat rx1 = arma::mat({{10.0, 0.0, 1.5}, {200.0, 0.0, 1.5}, {10.0, 0.0, 12.0}, {200.0, 0.0, 12.0}}).t();
         const arma::vec fc1 = {3.5e9, 28.0e9};
         arma::cube lsp;
         arma::mat eod;
@@ -544,7 +544,7 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         for (arma::uword l = 0; l < 4; ++l)
             for (arma::uword k = 0; k < 2; ++k)
             {
-                const double f = std::max(fc1(k) / 1e9, 6.0), lf = std::log10(f), d = rx1(l, 0), hu = rx1(l, 2);
+                const double f = std::max(fc1(k) / 1e9, 6.0), lf = std::log10(f), d = rx1(0, l), hu = rx1(2, l);
                 const double a = 0.208 * lf - 0.782, c = -0.13 * lf + 2.03, e = 7.66 * lf - 5.96;
                 const double mu_off = e - std::pow(10.0, a * std::log10(std::max(25.0, d)) + c - 0.07 * (hu - 1.5));
                 QD_DIAG("UMa_NLOS,%.0f,%.1f,%.1f,%.12f,%.12f\n", d, hu, fc1(k) / 1e9, eod(l, k), -mu_off);
@@ -556,15 +556,15 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
         // SMa NLOS, Table 7.5-12: mu_offset = atan((hBS - hcl)/d2D) - atan((hBS - hUT)/d2D) for hUT < hcl, else 0;
         // hcl = 3.5 m, in degrees
         const scen_t sma = conf("SMa_NLOS");
-        const arma::mat tx1 = {{0.0, 0.0, 35.0}};
-        const arma::mat rx1 = {{50.0, 0.0, 1.5}, {200.0, 0.0, 1.5}, {50.0, 0.0, 4.5}, {200.0, 0.0, 4.5}};
+        const arma::mat tx1 = arma::vec{0.0, 0.0, 35.0};
+        const arma::mat rx1 = arma::mat({{50.0, 0.0, 1.5}, {200.0, 0.0, 1.5}, {50.0, 0.0, 4.5}, {200.0, 0.0, 4.5}}).t();
         const arma::vec fc1 = {3.5e9};
         arma::cube lsp;
         arma::mat eod;
         quadriga_lib::lsp_generate(sma, fc1, tx1, rx1, arma::mat(4, 11, arma::fill::zeros), lsp, nullptr, nullptr, nullptr, nullptr, &eod);
         for (arma::uword l = 0; l < 4; ++l)
         {
-            const double d = rx1(l, 0), hu = rx1(l, 2);
+            const double d = rx1(0, l), hu = rx1(2, l);
             const double mu_off = (hu < 3.5) ? (std::atan((35.0 - 3.5) / d) - std::atan((35.0 - hu) / d)) * 180.0 / pi : 0.0;
             QD_DIAG("SMa_NLOS,%.0f,%.1f,3.5,%.12f,%.12f\n", d, hu, eod(l, 0), -mu_off);
             INFO("SMa NLOS, d2D " << d << ", hUT " << hu);
@@ -575,7 +575,7 @@ TEST_CASE("lsp_generate - EoD offset formula and sign")
     {
         // UMa LOS, Table 7.5-7: mu_offset = 0
         const scen_t uma = conf("UMa_LOS");
-        const arma::mat tx1 = {{0.0, 0.0, 25.0}}, rx1 = {{10.0, 0.0, 1.5}, {200.0, 0.0, 22.5}};
+        const arma::mat tx1 = arma::vec{0.0, 0.0, 25.0}, rx1 = arma::mat({{10.0, 0.0, 1.5}, {200.0, 0.0, 22.5}}).t();
         arma::cube lsp;
         arma::mat eod;
         quadriga_lib::lsp_generate(uma, arma::vec({3.5e9, 28e9}), tx1, rx1, arma::mat(2, 11, arma::fill::zeros), lsp,
@@ -596,8 +596,8 @@ TEST_CASE("lsp_generate - values are 10^(mu + sigma x) with x from the correlati
             sp[std::string(lsp_prefix[i]) + "_mu"] = m[i];
         sp[std::string(lsp_prefix[i]) + "_sigma"] = s[i];
     }
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
-    const arma::mat rx = {{100.0, 0.0, 1.5}, {-30.0, 70.0, 1.5}, {5.0, -300.0, 10.0}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
+    const arma::mat rx = arma::mat({{100.0, 0.0, 1.5}, {-30.0, 70.0, 1.5}, {5.0, -300.0, 10.0}}).t();
     const arma::mat rnd = {{0.3, -1.2, 0.7, 1.1, -0.4, 0.9, -1.5, 0.2, 0.0, 0.5, 0.5},
                            {-0.8, 0.6, -1.9, 0.1, 1.3, -0.2, 0.4, -1.1, 0.0, 0.5, 0.5},
                            {1.7, 0.05, 0.4, -0.6, -1.0, 1.2, 0.8, 2.1, 0.0, 0.5, 0.5}};
@@ -646,9 +646,9 @@ TEST_CASE("lsp_generate - the Cholesky root follows the TR order")
         for (int b = 0; b < 8; ++b)
             Q_ref(p[a], p[b]) = L(a, b);
 
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
-    arma::mat rx(8, 3, arma::fill::zeros);
-    rx.col(0) = arma::linspace(10.0, 80.0, 8);
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
+    arma::mat rx(3, 8, arma::fill::zeros);
+    rx.row(0) = arma::linspace<arma::rowvec>(10.0, 80.0, 8);
     arma::cube lsp;
     quadriga_lib::lsp_generate(sp, arma::vec({3.5e9}), tx, rx, unit_rnd(), lsp);
     const arma::mat Q = root_from_lsp(lsp);
@@ -673,9 +673,9 @@ TEST_CASE("lsp_generate - the symmetric square root is the principal root of R")
     const std::vector<std::pair<std::string, arma::mat>> cases = {
         {"custom", custom_corr()}, {"one correlation 0.999999", R_near}, {"identity", arma::eye(8, 8)}};
 
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
-    arma::mat rx(8, 3, arma::fill::zeros);
-    rx.col(0) = arma::linspace(10.0, 80.0, 8);
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
+    arma::mat rx(3, 8, arma::fill::zeros);
+    rx.row(0) = arma::linspace<arma::rowvec>(10.0, 80.0, 8);
 
     QD_DIAG("\n# diag: lsp_generate symmetric square root\n");
     QD_DIAG("matrix,max_abs_XX_minus_R,max_abs_X_minus_Xt\n");
@@ -732,9 +732,9 @@ TEST_CASE("lsp_generate - sample covariance of the log values equals the correla
     const arma::mat R = corr_matrix(sp);
 
     const arma::mat rnd = box_muller(n, 11, 4711);
-    arma::mat rx(n, 3, arma::fill::zeros);
-    rx.col(0) = arma::linspace(1.0, 2000.0, n);
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
+    arma::mat rx(3, n, arma::fill::zeros);
+    rx.row(0) = arma::linspace<arma::rowvec>(1.0, 2000.0, n);
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
 
     QD_DIAG("\n# diag: lsp_generate sample covariance of the log values vs R (UMa NLOS correlations)\n");
     QD_DIAG("root,max_abs_cov_minus_R\n");
@@ -759,7 +759,7 @@ TEST_CASE("lsp_generate - sample covariance of the log values equals the correla
 TEST_CASE("lsp_generate - spreads are clipped at 104 and 52 degrees")
 {
     scen_t sp = {{"AS_D_mu", 2.5}, {"AS_A_mu", 2.5}, {"ES_D_mu", 2.0}, {"ES_A_mu", 2.0}};
-    const arma::mat tx = {{0.0, 0.0, 25.0}}, rx = {{100.0, 0.0, 1.5}, {200.0, 50.0, 1.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0}, rx = arma::mat({{100.0, 0.0, 1.5}, {200.0, 50.0, 1.5}}).t();
     const arma::mat rnd(2, 11, arma::fill::zeros);
     const arma::vec fc = {3.5e9};
     arma::cube lsp_c, lsp_n, mu_c, mu_n;
@@ -786,7 +786,7 @@ TEST_CASE("lsp_generate - the same random values apply to all frequencies")
 {
     // TR 38.901 clause 7.6.5: one realization x per link for all frequencies; (x_lsp - mu)/sigma is the same
     const scen_t sp = conf("UMa_LOS");
-    const arma::mat tx = {{0.0, 0.0, 25.0}}, rx = {{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0}, rx = arma::mat({{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}}).t();
     const arma::mat rnd = rnd_values(3, 99);
     const arma::vec fc = {7.0e9, 15.0e9, 28.0e9};
     arma::cube lsp, mu, sg;
@@ -811,7 +811,7 @@ TEST_CASE("lsp_generate - the same random values apply to all frequencies")
 TEST_CASE("lsp_generate - sf_sigma_dB from path_loss replaces the SF standard deviation")
 {
     const scen_t sp = conf("UMa_NLOS");
-    const arma::mat tx = {{0.0, 0.0, 25.0}}, rx = {{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0}, rx = arma::mat({{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}}).t();
     const arma::mat rnd = rnd_values(3, 5);
     const arma::vec fc = {3.5e9, 28.0e9};
     arma::mat sf(3, 2);
@@ -843,7 +843,7 @@ TEST_CASE("lsp_generate - LSP_fc_min clamps the frequency")
 {
     scen_t sp = conf("UMa_NLOS");
     sp["LSP_fc_min"] = 6.0;
-    const arma::mat tx = {{0.0, 0.0, 25.0}}, rx = {{100.0, 0.0, 1.5}, {300.0, 80.0, 1.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0}, rx = arma::mat({{100.0, 0.0, 1.5}, {300.0, 80.0, 1.5}}).t();
     const arma::vec fc = {2.0e9, 6.0e9, 10.0e9};
     const outputs o = run_all(sp, fc, tx, rx, rnd_values(2, 3));
     for (arma::uword l = 0; l < 2; ++l)
@@ -868,7 +868,7 @@ TEST_CASE("lsp_generate - InF delay spread uses V/S")
 {
     // TR 38.901 Table 7.5-6 Part-3, InF LOS: mu_lgDS = lg(26·(V/S) + 14) - 9.35
     scen_t sp = conf("InF_LOS");
-    const arma::mat tx = {{0.0, 0.0, 8.0}}, rx = {{30.0, 0.0, 1.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 8.0}, rx = arma::vec{30.0, 0.0, 1.5};
     const arma::vec fc = {3.5e9};
     const arma::mat rnd(1, 11, arma::fill::zeros);
     auto ds_mu = [&](const scen_t &s)
@@ -900,7 +900,7 @@ TEST_CASE("lsp_generate - InF delay spread uses V/S")
 TEST_CASE("lsp_generate - absolute TOA")
 {
     // TR 38.901 clause 7.6.9: 10^(absTOA_mu + absTOA_sigma·x), active for absTOA_mu > -30, bounded by 2·L/c
-    const arma::mat tx = {{0.0, 0.0, 10.0}}, rx = {{50.0, 0.0, 1.5}, {80.0, 20.0, 1.5}, {10.0, -60.0, 1.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 10.0}, rx = arma::mat({{50.0, 0.0, 1.5}, {80.0, 20.0, 1.5}, {10.0, -60.0, 1.5}}).t();
     arma::mat rnd(3, 11, arma::fill::zeros);
     rnd(0, 8) = 0.0, rnd(1, 8) = 4.0, rnd(2, 8) = -1.3;
     const arma::vec fc = {3.5e9};
@@ -946,9 +946,9 @@ TEST_CASE("lsp_generate - ground permittivity interpolates dry, medium and wet g
     arma::mat rnd(5, 11, arma::fill::zeros);
     for (arma::uword l = 0; l < 5; ++l)
         rnd(l, 9) = U[l];
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
-    arma::mat rx(5, 3, arma::fill::zeros);
-    rx.col(0) = arma::linspace(20.0, 100.0, 5);
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
+    arma::mat rx(3, 5, arma::fill::zeros);
+    rx.row(0) = arma::linspace<arma::rowvec>(20.0, 100.0, 5);
     const arma::vec fc = {1.0e9, 10.0e9, 28.0e9};
     arma::cube lsp;
     arma::mat re, im;
@@ -984,8 +984,8 @@ TEST_CASE("lsp_generate - ground permittivity interpolates dry, medium and wet g
 TEST_CASE("lsp_generate - optional outputs alone and together give the same values")
 {
     const scen_t sp = conf("UMa_NLOS");
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
-    const arma::mat rx = {{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}, {500.0, 500.0, 22.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
+    const arma::mat rx = arma::mat({{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}, {500.0, 500.0, 22.5}}).t();
     const arma::mat rnd = rnd_values(4, 21);
     const arma::vec fc = {2.0e9, 28.0e9};
     const outputs all = run_all(sp, fc, tx, rx, rnd);
@@ -1058,9 +1058,9 @@ TEST_CASE("lsp_generate - optional outputs alone and together give the same valu
         CHECK(arma::approx_equal(o.eod, all.eod, "absdiff", 0.0));
     }
 
-    // One tx_pos row equals the repeated rows
+    // One tx_pos column equals the repeated columns
     {
-        const arma::mat tx_rep = arma::repmat(tx, 4, 1);
+        const arma::mat tx_rep = arma::repmat(tx, 1, 4);
         const outputs rep = run_all(sp, fc, tx_rep, rx, rnd);
         CHECK(arma::approx_equal(rep.lsp, all.lsp, "absdiff", 0.0));
         CHECK(arma::approx_equal(rep.mu, all.mu, "absdiff", 0.0));
@@ -1071,11 +1071,11 @@ TEST_CASE("lsp_generate - optional outputs alone and together give the same valu
         CHECK(arma::approx_equal(rep.eod, all.eod, "absdiff", 0.0));
     }
 
-    // n_link = 0: outputs with 0 rows; tx_pos with 1 or 0 rows
+    // n_link = 0: outputs with 0 rows; tx_pos with 1 or 0 columns
     for (arma::uword n_tx : {1, 0})
     {
-        outputs o = run_all(sp, fc, arma::mat(n_tx, 3, arma::fill::zeros), arma::mat(0, 3), arma::mat(0, 11));
-        INFO("tx rows " << n_tx);
+        outputs o = run_all(sp, fc, arma::mat(3, n_tx, arma::fill::zeros), arma::mat(), arma::mat(0, 11));
+        INFO("tx columns " << n_tx);
         CHECK(o.lsp.n_rows == 0);
         CHECK(o.lsp.n_cols == 2);
         CHECK(o.lsp.n_slices == 8);
@@ -1097,7 +1097,7 @@ TEST_CASE("lsp_generate - optional outputs alone and together give the same valu
 TEST_CASE("lsp_generate - input validation")
 {
     const scen_t sp = conf("UMa_NLOS");
-    const arma::mat tx = {{0.0, 0.0, 25.0}}, rx = {{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0}, rx = arma::mat({{100.0, 0.0, 1.5}, {-150.0, 80.0, 1.5}, {30.0, -400.0, 7.5}}).t();
     const arma::mat rnd = rnd_values(3, 8);
     const arma::vec fc = {3.5e9, 28.0e9};
     arma::cube lsp;
@@ -1131,9 +1131,9 @@ TEST_CASE("lsp_generate - input validation")
     }
     SECTION("rx_pos")
     {
-        arma::mat bad(3, 2, arma::fill::zeros);
+        arma::mat bad(2, 3, arma::fill::zeros);
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, bad, rnd, lsp), std::invalid_argument,
-                             Message("Input 'rx_pos' must have 3 columns."));
+                             Message("Input 'rx_pos' must have 3 rows."));
         bad = rx;
         bad(1, 2) = NAN;
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, tx, bad, rnd, lsp), std::invalid_argument,
@@ -1143,10 +1143,10 @@ TEST_CASE("lsp_generate - input validation")
     {
         arma::mat bad(1, 2, arma::fill::zeros);
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp), std::invalid_argument,
-                             Message("Input 'tx_pos' must have 3 columns."));
-        bad.zeros(2, 3);
+                             Message("Input 'tx_pos' must have 3 rows."));
+        bad.zeros(3, 2);
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp), std::invalid_argument,
-                             Message("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."));
+                             Message("Number of columns in 'tx_pos' must be 1 or match the number of columns in 'rx_pos'."));
         bad = tx;
         bad(0, 0) = INFINITY;
         CHECK_THROWS_MATCHES(quadriga_lib::lsp_generate(sp, fc, bad, rx, rnd, lsp), std::invalid_argument,

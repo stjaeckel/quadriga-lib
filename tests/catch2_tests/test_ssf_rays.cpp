@@ -79,7 +79,7 @@ namespace
     rays_in_t subset(const rays_in_t &in, const arma::uvec &rows)
     {
         rays_in_t s = in;
-        s.f.tx = in.f.tx.rows(rows), s.f.rx = in.f.rx.rows(rows);
+        s.f.tx = in.f.tx.cols(rows), s.f.rx = in.f.rx.cols(rows);
         s.f.eps_re = in.f.eps_re.rows(rows), s.f.eps_im = in.f.eps_im.rows(rows);
         for (auto p : {std::make_pair(&s.f.lsp, &in.f.lsp), std::make_pair(&s.st.mu, &in.st.mu),
                        std::make_pair(&s.st.sigma, &in.st.sigma), std::make_pair(&s.cl.delay, &in.cl.delay),
@@ -136,8 +136,8 @@ TEST_CASE("ssf_rays - output layout: entries, sizes, path types, taps and empty 
                 const quadriga_lib::gbsm_rays &r = rays[l];
                 CHECK(r.is_valid() == "");
                 CHECK(r.method == method);
-                CHECK(arma::all(r.tx_pos == in.f.tx.row(l).t()));
-                CHECK(arma::all(r.rx_pos == in.f.rx.row(l).t()));
+                CHECK(arma::all(r.tx_pos == in.f.tx.col(l)));
+                CHECK(arma::all(r.rx_pos == in.f.rx.col(l)));
                 CHECK(arma::all(r.center_freq == (qd ? in.fc : arma::vec{in.fc(F - 1)})));
                 CHECK(r.n_ray() == n_ray);
                 CHECK(arma::size(r.power) == arma::size(n_ray, Fo));
@@ -755,9 +755,9 @@ TEST_CASE("ssf_rays - input validation")
              "Input 'pol_variability' needs pol_model '38.901'."},
             {[](rays_in_t &x) { x.sp["NumSubPaths"] = 0.0; },
              "Value of 'NumSubPaths' must be an integer from 1 to 1000."},
-            {[](rays_in_t &x) { x.f.rx = x.f.rx.cols(0, 1); }, "Input 'rx_pos' must have 3 columns."},
-            {[](rays_in_t &x) { x.f.tx = x.f.tx.rows(0, 1); },
-             "Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."},
+            {[](rays_in_t &x) { x.f.rx = x.f.rx.rows(0, 1); }, "Input 'rx_pos' must have 3 rows."},
+            {[](rays_in_t &x) { x.f.tx = x.f.tx.cols(0, 1); },
+             "Number of columns in 'tx_pos' must be 1 or match the number of columns in 'rx_pos'."},
             {[](rays_in_t &x) { x.fc.reset(); }, "Input 'center_freq' cannot be empty."},
             {[](rays_in_t &x) { x.fc(0) = 0.0; }, "Input 'center_freq' must be finite and > 0."},
             {[](rays_in_t &x) { x.i_freq = x.fc.n_elem; },
@@ -784,8 +784,8 @@ TEST_CASE("ssf_rays - input validation")
              "Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0."},
             {[](rays_in_t &x) { x.f.eps_im(2, 0) = -1e-9; },
              "Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0."},
-            {[](rays_in_t &x) { x.f.rx(1, 2) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
-            {[](rays_in_t &x) { x.f.tx(1, 2) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
+            {[](rays_in_t &x) { x.f.rx(2, 1) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
+            {[](rays_in_t &x) { x.f.tx(2, 1) = -0.1; }, "Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'."},
             {[](rays_in_t &x) { x.cl.power(1, 4, x.i_freq) = -1e-12; }, "Input 'power' must be finite and >= 0."},
             {[](rays_in_t &x) { x.st.mu(2, x.i_freq, 5) = NAN; }, "Input 'lsp_mu' must be finite."},
             {[](rays_in_t &x) { x.st.mu(0, x.i_freq, 7) = INFINITY; }, "Input 'lsp_mu' must be finite."},
@@ -848,7 +848,7 @@ TEST_CASE("ssf_rays - input validation")
             [](rays_in_t &x)
             { x.st.mu(0, x.i_freq, 0) = NAN, x.st.sigma(0, x.i_freq, 3) = NAN, x.f.lsp(1, 0, 7) = NAN; },
             [](rays_in_t &x) { x.rnd(0, 3371, x.i_freq) = (x.method == "quadriga") ? 1.0 : 1.5; },
-            [](rays_in_t &x) { x.sp["GR_enabled"] = 0.0, x.f.use_eps = false, x.f.rx(1, 2) = -0.1; },
+            [](rays_in_t &x) { x.sp["GR_enabled"] = 0.0, x.f.use_eps = false, x.f.rx(2, 1) = -0.1; },
             [](rays_in_t &x) { x.sp["GR_enabled"] = 0.0, x.f.eps_re = arma::mat(1, 1, arma::fill::zeros); }};
         for (size_t i = 0; i < bad.size() + good.size(); ++i)
         {

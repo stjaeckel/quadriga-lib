@@ -42,8 +42,8 @@ phase = quadriga_lib.gbsm_init_phases( scenpar, set_type, seed, set_id, preset, 
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Bias-removal positions in [m] as in [[gbsm_draw]]; `'lsf'` only, else an
   error
 - **`dual_mobility`** — `'lsf'` with bias removal: Tx and Rx both move; as in [[gbsm_draw]]; default: false
-- **`remove_bias`** — `'lsf'` only: remove the sample mean over the positions; needs `rx_pos` with at least 3 rows, else
-  no effect; default: true
+- **`remove_bias`** — `'lsf'` only: remove the sample mean over the positions; needs `rx_pos` with at least 3 columns,
+  else no effect; default: true
 - **`horizontal`** — `'lsf'` with bias removal: `true` 2D, `false` 3D mode; as in [[gbsm_draw]]; default: true
 
 ## Output:
@@ -81,10 +81,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'set_id' must be 0 (shared set) or a frequency index >= 1.");
     const arma::sword set_id = lsf ? -1 : (arma::sword)set_id_in - 1;
 
-    // Wrap optional pointers
-    const arma::mat *p_tx_pos = tx_pos.empty() ? nullptr : &tx_pos;
-    const arma::mat *p_rx_pos = rx_pos.empty() ? nullptr : &rx_pos;
-
     // Output allocation in MATLAB memory: n_coeff of the preset, n_gen of the set from a completed copy of
     // 'scenpar'; with an unknown preset or set type or an invalid 'scenpar' the call throws before any output
     arma::cube phase;
@@ -104,7 +100,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[0] = qd_mex_init_output(&phase, n_coeff, qd_gbsm_n_gen(sp, set_type, set_id), 2);
 
     // Call library function
-    CALL_QD(quadriga_lib::gbsm_init_phases(scenpar, set_type, phase, seed, set_id, preset, p_tx_pos, p_rx_pos,
+    CALL_QD(quadriga_lib::gbsm_init_phases(scenpar, set_type, phase, seed, set_id, preset, &tx_pos, &rx_pos,
                                            dual_mobility, remove_bias, horizontal));
 
 }

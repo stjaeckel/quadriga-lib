@@ -22,8 +22,8 @@ import quadriga_lib
 
 gbsm = quadriga_lib.gbsm
 CONF_DIR = os.path.join(current_dir, "../../data/config")
-TX = np.array([[0.0, 0.0, 10.0]])
-RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5]])
+TX = np.array([[0.0, 0.0, 10.0]]).T
+RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5]]).T
 FC = np.array([3.5e9, 28e9])
 KEYS = ["method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa", "eoa", "polmat",
         "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"]
@@ -59,7 +59,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(r["fallback"].shape, (n_ray,))
         self.assertEqual(r["fallback"].dtype, np.uint32)
         self.assertTrue(np.all(r["fallback"] <= 1))
-        npt.assert_allclose(r["fbs_pos"][:, 0], (TX[0] + RX[0]) / 2, atol=1e-12, rtol=0)  # LOS midpoint
+        npt.assert_allclose(r["fbs_pos"][:, 0], (TX[:, 0] + RX[:, 0]) / 2, atol=1e-12, rtol=0)  # LOS midpoint
         self.assertEqual(self.rays[0]["fbs_pos"].size, 0)  # input unchanged
         for k in KEYS[:14]:
             self.assertIs(r[k], self.rays[0][k])  # unchanged arrays shared, no copy

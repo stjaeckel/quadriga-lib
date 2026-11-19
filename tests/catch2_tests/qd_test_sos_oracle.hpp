@@ -66,14 +66,15 @@ static inline arma::vec qd_floor_offset(arma::uword N, arma::uword q)
     return d;
 }
 
-// Regular grid of nx · ny positions with the given spacing at height z, starting at (x0, y0)
+// Regular grid of nx · ny positions with the given spacing at height z, starting at (x0, y0); one column per
+// position, [3, nx · ny]
 static inline arma::mat qd_grid(arma::uword nx, arma::uword ny, double spacing, double z, double x0 = 0.0,
                                 double y0 = 0.0)
 {
-    arma::mat p(nx * ny, 3);
+    arma::mat p(3, nx * ny);
     for (arma::uword i = 0; i < nx; ++i)
         for (arma::uword j = 0; j < ny; ++j)
-            p(i * ny + j, 0) = x0 + spacing * (double)i, p(i * ny + j, 1) = y0 + spacing * (double)j, p(i * ny + j, 2) = z;
+            p(0, i * ny + j) = x0 + spacing * (double)i, p(1, i * ny + j) = y0 + spacing * (double)j, p(2, i * ny + j) = z;
     return p;
 }
 

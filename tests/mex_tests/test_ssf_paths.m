@@ -7,8 +7,8 @@ function test_ssf_paths
 conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'config' );
 sp = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMi_LOS.conf' ) );
 sp.GR_enabled = 1;
-tx_pos = [ 0, 0, 10 ];
-rx_pos = [ 60, 10, 1.5 ];
+tx_pos = [ 0; 0; 10 ];
+rx_pos = [ 60; 10; 1.5 ];
 fc = 60e9;
 phase = quadriga_lib.gbsm_init_phases( sp, 'lsf', 5 );
 [ lsp, ~, gre, gim, ~, mu, sig ] = quadriga_lib.lsp_generate( sp, fc, tx_pos, rx_pos, ...
@@ -54,13 +54,13 @@ assertEqual( size(f2), [3, n_path] );
 assertEqual( f2, rays.fbs_pos( :, r2 ) );
 assertEqual( b2, rays.lbs_pos( :, r2 ) );
 assertTrue( max( abs( l2 - pl ) ) > 1e-6 );                                   % fallback rays: longer polyline
-[ g3, l3, M3 ] = quadriga_lib.ssf_paths( rays, -90, 'phase', tx_pos, rx_pos + [ 0.01, 0, 0 ] );
+[ g3, l3, M3 ] = quadriga_lib.ssf_paths( rays, -90, 'phase', tx_pos, rx_pos + [ 0.01; 0; 0 ] );
 assertEqual( g3, pg );
 assertEqual( l3, pl );
 assertTrue( max( abs( M3(:) - M(:) ) ) > 1e-3 );                              % displacement phase
-[ ~, ~, M4 ] = quadriga_lib.ssf_paths( rays, -90, 'phase', tx_pos', ( rx_pos + [ 0.01, 0, 0 ] )' );
+[ ~, ~, M4 ] = quadriga_lib.ssf_paths( rays, -90, 'phase', tx_pos', ( rx_pos + [ 0.01; 0; 0 ] )' );
 assertEqual( M4, M3 );                                                        % row or column
-[ ~, ~, M4 ] = quadriga_lib.ssf_paths( rays, -90, 'phase', [], rx_pos + [ 0.01, 0, 0 ] );
+[ ~, ~, M4 ] = quadriga_lib.ssf_paths( rays, -90, 'phase', [], rx_pos + [ 0.01; 0; 0 ] );
 assertEqual( M4, M3 );
 g4 = quadriga_lib.ssf_paths( rays, -90, [], [], [], 0 );
 assertEqual( g4(1:2), [0; 0] );                                               % kf_ratio 0: no LOS and GR

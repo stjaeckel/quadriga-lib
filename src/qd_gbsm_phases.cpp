@@ -144,20 +144,21 @@ namespace
         }
     }
 
-    // Positions for the evaluation: R = rx_pos, T = tx_pos broadcast to n_link rows; z = 0 in 2D mode
-    // - 'rx_pos' [n_link, 3]; 'tx_pos' [1, 3] or [n_link, 3]; R and T [n_link, 3]
+    // Positions for the evaluation in the [n_link, 3] layout of sos_val: R = rx_pos, T = tx_pos broadcast to n_link
+    // rows; z = 0 in 2D mode
+    // - 'rx_pos' [3, n_link]; 'tx_pos' [3, 1] or [3, n_link] (both from qd_gbsm_cols); R and T [n_link, 3]
     void qd_gbsm_positions(const arma::mat &rx_pos, const arma::mat &tx_pos, bool horizontal,
                            arma::mat &R, arma::mat &T)
     {
-        const arma::uword n_link = rx_pos.n_rows;
-        R = rx_pos;
-        if (tx_pos.n_rows == n_link)
-            T = tx_pos;
+        const arma::uword n_link = rx_pos.n_cols;
+        R = rx_pos.t();
+        if (tx_pos.n_cols == n_link)
+            T = tx_pos.t();
         else
         {
             T.set_size(n_link, 3);
             for (arma::uword c = 0; c < 3; ++c)
-                T.col(c).fill(tx_pos(0, c));
+                T.col(c).fill(tx_pos(c, 0));
         }
         if (horizontal)
             R.col(2).zeros(), T.col(2).zeros();
@@ -391,7 +392,7 @@ void quadriga_lib::gbsm_init_phases(
 - **`tx_pos`**, **`rx_pos`** *(optional)* — Bias-removal positions in [m] as in [[gbsm_draw]]; `"lsf"` only, else throws
 - **`dual_mobility`** *(optional)* — `"lsf"` with bias removal: Tx and Rx both move; as in [[gbsm_draw]]
 - **`remove_bias`** *(optional)* — `"lsf"` only: remove the sample mean over the positions; needs `rx_pos` with at
-  least 3 rows, else no effect
+  least 3 columns, else no effect
 - **`horizontal`** *(optional)* — `"lsf"` with bias removal: `true` 2D, `false` 3D mode; as in [[gbsm_draw]]
 
 ## Output:
@@ -431,11 +432,17 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
 
+    if (tx_pos != nullptr && tx_pos->empty()) // empty = omitted
+        tx_pos = nullptr;
+    if (rx_pos != nullptr && rx_pos->empty())
+        rx_pos = nullptr;
     if (!lsf && (tx_pos != nullptr || rx_pos != nullptr))
         throw std::invalid_argument("Inputs 'tx_pos' and 'rx_pos' are used for set type 'lsf' only.");
 
-    qd_gbsm_check_links(tx_pos, rx_pos);
-    const arma::uword n_link = (rx_pos != nullptr) ? rx_pos->n_rows : 0;
+    const arma::mat tx = (tx_pos != nullptr) ? qd_gbsm_cols(*tx_pos) : arma::mat(),
+                    rx = (rx_pos != nullptr) ? qd_gbsm_cols(*rx_pos) : arma::mat();
+    qd_gbsm_check_links(tx_pos != nullptr ? &tx : nullptr, rx_pos != nullptr ? &rx : nullptr);
+    const arma::uword n_link = rx.n_cols;
     const bool do_bias = lsf && remove_bias && n_link > 2;
     if (do_bias && dual_mobility && tx_pos == nullptr)
         throw std::invalid_argument("Input 'tx_pos' is required for the bias removal with dual mobility.");
@@ -491,7 +498,7 @@ void quadriga_lib::gbsm_init_phases(const std::unordered_map<std::string, double
         qd_gbsm_freq(preset, gen, freq, acf, dist, tab);
 
         arma::mat R, T;
-        qd_gbsm_positions(*rx_pos, (tx_pos != nullptr) ? *tx_pos : *rx_pos, horizontal, R, T);
+        qd_gbsm_positions(rx, (tx_pos != nullptr) ? tx : rx, horizontal, R, T);
         qd_gbsm_remove_bias(gen, freq, tab, P0, dual_mobility ? arma::mat(arma::join_cols(R, T)) : R);
     }
 
@@ -557,8 +564,8 @@ void quadriga_lib::gbsm_draw(
   `PerClusterAS_A`
 - **`set_type`** — Set type of [[gbsm_init_phases]]
 - **`phase`** — SOS phases from [[gbsm_init_phases]], finite; `[n_coeff, n_gen, 2]`
-- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; `[n_link, 3]`, `n_link = 0` allowed
+- **`tx_pos`** — Tx positions in [m]; used in dual mobility, always validated; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; `[3, n_link]`; empty = no links
 - **`set_id`** *(optional)* — Set of [[gbsm_init_phases]]; ignored for `"lsf"`
 - **`preset`** *(optional)* — Preset of [[gbsm_init_phases]]; another preset with the same `n_coeff` is not detected
 - **`floor_id`** *(optional)* — Floor number of the UT per link, ground floor 0 (`n_fl - 1` for the UT heights of
@@ -597,8 +604,9 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
     const bool lsf = set_type == "lsf";
     if (!lsf && set_type != "cluster" && set_type != "ray")
         throw std::invalid_argument("Input 'set_type' must be 'lsf', 'cluster' or 'ray'.");
-    const arma::uword n_link = rx_pos.n_rows;
-    qd_gbsm_check_links(&tx_pos, &rx_pos);
+    const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
+    qd_gbsm_check_links(&tx, &rx);
+    const arma::uword n_link = rx.n_cols;
     if (!lsf && set_id < -1)
         throw std::invalid_argument("Input 'set_id' must be >= -1.");
     const arma::uword n_coeff = qd_gbsm_n_coeff(preset);
@@ -616,7 +624,7 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
     if (!phase.is_finite())
         throw std::invalid_argument("Input 'phase' must be finite.");
     if (floor_id != nullptr && floor_id->n_elem != n_link)
-        throw std::invalid_argument("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'.");
+        throw std::invalid_argument("Number of elements in 'floor_id' does not match number of columns in 'rx_pos'.");
     if (floor_id != nullptr && !horizontal)
         throw std::invalid_argument("Input 'floor_id' cannot be used with 'horizontal = false': in 3D mode the height separates the floors.");
     const bool shared_ray = set_type == "ray" && set_id == -1;
@@ -661,7 +669,7 @@ void quadriga_lib::gbsm_draw(const std::unordered_map<std::string, double> &scen
     qd_gbsm_freq(preset, gen, freq, acf, dist, tab);
 
     arma::mat R, T;
-    qd_gbsm_positions(rx_pos, tx_pos, horizontal, R, T);
+    qd_gbsm_positions(rx, tx, horizontal, R, T);
 
     qd_gbsm_eval(gen, freq, acf, dist, tab, phase, R, T, floor_id, dual_mobility, rnd);
 }

@@ -8,14 +8,14 @@ function test_ssf_clusters
 conf_dir = fullfile( fileparts( mfilename('fullpath') ), '..', '..', 'data', 'config' );
 sp = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMi_LOS.conf' ) );
 sn = quadriga_lib.conf_file_read( fullfile( conf_dir, '3GPP_38.901_v19_UMi_NLOS.conf' ) );
-tx_pos = [ 0, 0, 10 ];
-rx_pos = [ 60, 10, 1.5; -30, 80, 1.5; 120, -40, 7.5; 15, 25, 1.5 ];
+tx_pos = [ 0; 0; 10 ];
+rx_pos = [ 60, 10, 1.5; -30, 80, 1.5; 120, -40, 7.5; 15, 25, 1.5 ]';
 [ lsp, rnd, rnd_f ] = draw( sp, 6e9, tx_pos, rx_pos, 11 );
 [ lsp_n, rnd_n, rnd_fn, abs_toa_n, eod_n ] = draw( sn, 6e9, tx_pos, rx_pos, 12 );
 N = sp.NumClusters - 1;                                                       % 12 LOS, 19 NLOS
 
 % LOS geometry of slot 1
-v = rx_pos - tx_pos;
+v = ( rx_pos - tx_pos )';                                                   % [n_link, 3]
 aod_l = atan2( v(:, 2), v(:, 1) );
 eod_l = atan2( v(:, 3), hypot( v(:, 1), v(:, 2) ) );
 aoa_l = mod( aod_l + 2 * pi, 2 * pi ) - pi;                                   % aod + pi, wrapped
@@ -95,9 +95,9 @@ assertEqual( size(dg), [4, N + 2] );
 assertEqual( pg(:, [1, 3:end]), power );                                      % other slots unchanged
 assertTrue( all( pg(:, 2) > 0 ) );
 assertElementsAlmostEqual( ag(:, 2), aod_l, 'absolute', 1e-14 );
-e_gr = -atan2( tx_pos(3) + rx_pos(:, 3), hypot( v(:, 1), v(:, 2) ) );
+e_gr = -atan2( tx_pos(3) + rx_pos(3, :)', hypot( v(:, 1), v(:, 2) ) );
 assertElementsAlmostEqual( [ eg(:, 2), eag(:, 2) ], [ e_gr, e_gr ], 'absolute', 1e-14 );
-d_gr = sqrt( sum( v(:, 1:2).^2, 2 ) + ( tx_pos(3) + rx_pos(:, 3) ).^2 );
+d_gr = sqrt( sum( v(:, 1:2).^2, 2 ) + ( tx_pos(3) + rx_pos(3, :)' ).^2 );
 assertElementsAlmostEqual( dg(:, 2), ( d_gr - sqrt( sum( v.^2, 2 ) ) ) / 299792458, 'absolute', 1e-15 );
 [ ~, pg2 ] = quadriga_lib.ssf_clusters( sg, tx_pos, rx_pos, lsp, rnd, '38.901', rnd_f, [], [], [], eps_re, ...
     eps_im + 1 );
@@ -172,8 +172,9 @@ assert_throws( @() quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos, lsp2, rnd, '38
     'Method ''38.901'' supports one frequency only' );                                              % C++
 assert_throws( @() quadriga_lib.ssf_clusters( sg, tx_pos, rx_pos, lsp, rnd, 'quadriga' ), ...
     'Inputs ''gr_eps_re'' and ''gr_eps_im'' are required when ''GR_enabled'' is set.' );              % C++
-[ d0, p0, ~, ~, ~, ~, n0 ] = quadriga_lib.ssf_clusters( sp, tx_pos, zeros(0, 3), lsp(1:0, :, :), rnd(1:0, :), ...
+[ d0, p0, ~, ~, ~, ~, n0 ] = quadriga_lib.ssf_clusters( sp, tx_pos, [], lsp(1:0, :, :), rnd(1:0, :), ...
     'quadriga' );                                                                                   % zero links
+assertEqual( quadriga_lib.ssf_clusters( sp, tx_pos, zeros(3, 0), lsp(1:0, :, :), rnd(1:0, :), 'quadriga' ), d0 );
 assertEqual( size(d0), [ 0, size(delay, 2) ] );
 assertEqual( size(p0), [ 0, size(delay, 2) ] );
 assertTrue( isempty(n0) && isa(n0, 'uint32') );
@@ -182,19 +183,19 @@ assertTrue( isempty(n0) && isa(n0, 'uint32') );
 l3 = 1 : 3;
 c_ref = cell(2, 7);
 c_emp = cell(2, 7);
-[ c_ref{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), '38.901', ...
+[ c_ref{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(:, l3), lsp(l3, :, :), rnd(l3, :), '38.901', ...
     rnd_f(l3, :) );
-[ c_emp{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), '38.901', ...
+[ c_emp{1, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(:, l3), lsp(l3, :, :), rnd(l3, :), '38.901', ...
     rnd_f(l3, :), [], [], zeros(0, 1) );
-[ c_ref{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), 'quadriga' );
-[ c_emp{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(l3, :), lsp(l3, :, :), rnd(l3, :), 'quadriga', ...
+[ c_ref{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(:, l3), lsp(l3, :, :), rnd(l3, :), 'quadriga' );
+[ c_emp{2, :} ] = quadriga_lib.ssf_clusters( sp, tx_pos, rx_pos(:, l3), lsp(l3, :, :), rnd(l3, :), 'quadriga', ...
     zeros(0, 1), zeros(0, 1, 8), zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), false(0, 1), zeros(0, 1) );
 assertEqual( size( c_emp{1, 1} ), [ 3, N + 1 ] );
 assertEqual( c_emp, c_ref );
 
 %% Zero links: all methods, LOS with ground reflection and NLOS; empty inputs of the right shape count as given
 fc = [ 6e9; 30e9 ];
-r0 = zeros(0, 3);
+r0 = [];
 for s = { sg, sn }
     sc = s{1};
     G = double( sc.GR_enabled > 0 );

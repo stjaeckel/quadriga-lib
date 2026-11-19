@@ -32,8 +32,8 @@ class test_lsf(unittest.TestCase):
                         "ES_D_lambda": 12.0, "ES_A_lambda": 8.0}
         self.phase = quadriga_lib.gbsm.init_phases(self.scenpar, "lsf", seed=7)
         self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0], [80.0, 30.0, 1.5],
-                                [3.0, 4.0, 10.0]])
-        self.tx_pos = np.array([[10.0, 10.0, 25.0]])
+                                [3.0, 4.0, 10.0]]).T
+        self.tx_pos = np.array([[10.0, 10.0, 25.0]]).T
         self.rnd = quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos, self.rx_pos)
         self.fl = np.array([0, 1, 0, 2, 1])
         self.rf = quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos, self.rx_pos, floor_id=self.fl)
@@ -49,14 +49,16 @@ class test_lsf(unittest.TestCase):
         # Column 0 is the DS field (10 m) of slice 0 at the Rx positions projected on the x-y plane;
         # gbsm.draw may evaluate sin/cos in single precision (AVX2 kernel)
         freq = quadriga_lib.sos.preset("Comb256", 10.0)[0]
-        pos_xy = np.column_stack([self.rx_pos[:, :2], np.zeros(5)])
+        pos_xy = np.column_stack([self.rx_pos[:2, :].T, np.zeros(5)])
         ref = quadriga_lib.sos.val(freq, self.phase[:, 0, 0], pos_xy)
         npt.assert_allclose(rnd[:, 0], ref.ravel(), atol=1e-5, rtol=0)
 
         # Single mobility: the values do not depend on tx_pos; one link alone gives its row
-        npt.assert_array_equal(quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, np.zeros((1, 3)), self.rx_pos),
+        npt.assert_array_equal(quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, np.zeros((3, 1)), self.rx_pos),
                                rnd)
-        r3 = quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos, self.rx_pos[2:3])
+        npt.assert_array_equal(quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos.ravel(),
+                                                      self.rx_pos), rnd)  # (3,) Tx equals (3, 1)
+        r3 = quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos, self.rx_pos[:, 2:3])
         npt.assert_allclose(r3, rnd[2:3], atol=1e-12, rtol=0)
 
     def test_keyword_arguments(self):
@@ -80,7 +82,7 @@ class test_lsf(unittest.TestCase):
 
         # Floor IDs start at 0 (no index shift): floor 1 adds the offsets 2·pi·n/256 to the phases
         phase_1 = self.phase + (2 * np.pi * np.arange(256) / 256)[:, None, None]
-        r1 = f(self.scenpar, "lsf", phase_1, self.tx_pos, self.rx_pos[[1, 4]])
+        r1 = f(self.scenpar, "lsf", phase_1, self.tx_pos, self.rx_pos[:, [1, 4]])
         npt.assert_allclose(r1, rf[[1, 4]], atol=1e-10, rtol=0)
 
         # Integer and float types of floor_id
@@ -97,7 +99,7 @@ class test_lsf(unittest.TestCase):
 
     def test_dual_mobility(self):
         f = quadriga_lib.gbsm.draw
-        tx_d = np.array([[5.0, 5.0, 1.5], [30.0, 0.0, 1.5], [40.0, -20.0, 1.5], [60.0, 10.0, 1.5], [0.0, 9.0, 1.5]])
+        tx_d = np.array([[5.0, 5.0, 1.5], [30.0, 0.0, 1.5], [40.0, -20.0, 1.5], [60.0, 10.0, 1.5], [0.0, 9.0, 1.5]]).T
         rd = f(self.scenpar, "lsf", self.phase, tx_d, self.rx_pos, floor_id=None, dual_mobility=True)
         self.assertGreater(np.max(np.abs(rd - self.rnd)), 1e-3)
         rs = f(self.scenpar, "lsf", self.phase, self.rx_pos, tx_d, floor_id=None, dual_mobility=True)
@@ -119,7 +121,7 @@ class test_lsf(unittest.TestCase):
     def test_horizontal_and_preset(self):
         f = quadriga_lib.gbsm.draw
         rx_z = self.rx_pos.copy()
-        rx_z[:, 2] += [0.0, 5.0, 10.0, 2.0, 7.0]
+        rx_z[2, :] += [0.0, 5.0, 10.0, 2.0, 7.0]
         npt.assert_array_equal(f(self.scenpar, "lsf", self.phase, self.tx_pos, rx_z), self.rnd)  # 2D: z not used
         r3 = f(self.scenpar, "lsf", self.phase, self.tx_pos, self.rx_pos, horizontal=False)
         r3z = f(self.scenpar, "lsf", self.phase, self.tx_pos, rx_z, horizontal=False)
@@ -147,7 +149,7 @@ class test_lsf(unittest.TestCase):
                                self.rnd)
         npt.assert_array_equal(f(self.scenpar, "lsf", self.phase, self.tx_pos, np.ascontiguousarray(self.rx_pos)),
                                self.rnd)
-        big = np.zeros((10, 6))
+        big = np.zeros((6, 10))
         big[::2, ::2] = self.rx_pos
         npt.assert_array_equal(f(self.scenpar, "lsf", self.phase, self.tx_pos, big[::2, ::2]), self.rnd)
         npt.assert_array_equal(f(self.scenpar, "lsf", np.ascontiguousarray(self.phase), self.tx_pos, self.rx_pos),
@@ -158,8 +160,9 @@ class test_lsf(unittest.TestCase):
         npt.assert_allclose(rp, self.rnd, atol=1e-4, rtol=0)  # phases rounded to float32
 
     def test_zero_links(self):
-        r0 = quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos, np.zeros((0, 3)))
+        r0 = quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos, np.zeros((3, 0)))
         self.assertEqual(r0.shape, (0, 11))
+        npt.assert_array_equal(quadriga_lib.gbsm.draw(self.scenpar, "lsf", self.phase, self.tx_pos, np.empty(0)), r0)
         self.assertEqual(r0.dtype, np.float64)
 
     def test_inputs_not_modified(self):
@@ -194,8 +197,8 @@ class test_lsf(unittest.TestCase):
             self.assertIn(msg3d, str(ctx.exception))
         self.assertEqual(f(*args, floor_id=None, horizontal=False).shape, (5, 11))
         with self.assertRaises(ValueError) as ctx:  # C++
-            f(self.scenpar, "lsf", self.phase, self.tx_pos[:, :2], self.rx_pos)
-        self.assertIn("Input 'tx_pos' must have 3 columns.", str(ctx.exception))
+            f(self.scenpar, "lsf", self.phase, self.tx_pos[:2, :], self.rx_pos)
+        self.assertIn("Input 'tx_pos' must have 3 rows.", str(ctx.exception))
         with self.assertRaises(TypeError):
             f(self.scenpar, "lsf", self.phase, self.tx_pos)
         with self.assertRaises(TypeError):
@@ -213,8 +216,8 @@ class test_cluster(unittest.TestCase):
         self.phase = quadriga_lib.gbsm.init_phases(self.sp, "cluster", seed=7)
         self.phase_f = quadriga_lib.gbsm.init_phases(self.sp, "cluster", seed=7, set_id=0)
         self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0], [80.0, 30.0, 1.5],
-                                [3.0, 4.0, 10.0]])
-        self.tx_pos = np.array([[10.0, 10.0, 25.0]])
+                                [3.0, 4.0, 10.0]]).T
+        self.tx_pos = np.array([[10.0, 10.0, 25.0]]).T
         self.rnd = quadriga_lib.gbsm.draw(self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos)
         self.fl = np.array([0, 1, 0, 2, 1])
 
@@ -229,14 +232,14 @@ class test_cluster(unittest.TestCase):
         # Column N (sign of AOD, cluster 0) is the field of slice 0 at the Rx positions projected on the x-y plane,
         # column 0 its uniform map; gbsm.draw may evaluate sin/cos in single precision (AVX2 kernel)
         freq = quadriga_lib.sos.preset("Comb256", self.sp["SC_lambda"])[0]
-        pos_xy = np.column_stack([self.rx_pos[:, :2], np.zeros(5)])
+        pos_xy = np.column_stack([self.rx_pos[:2, :].T, np.zeros(5)])
         ref = quadriga_lib.sos.val(freq, self.phase[:, N, 0], pos_xy).ravel()
         npt.assert_allclose(rnd[:, N], ref, atol=1e-5, rtol=0)
         ref = quadriga_lib.sos.val(freq, self.phase[:, 0, 0], pos_xy).ravel()
         npt.assert_allclose(rnd[:, 0], [0.5 * erfc(-x / sqrt(2)) for x in ref], atol=1e-5, rtol=0)
 
         # Single mobility: the values do not depend on tx_pos
-        npt.assert_array_equal(quadriga_lib.gbsm.draw(self.sp, "cluster", self.phase, np.zeros((1, 3)), self.rx_pos),
+        npt.assert_array_equal(quadriga_lib.gbsm.draw(self.sp, "cluster", self.phase, np.zeros((3, 1)), self.rx_pos),
                                rnd)
 
     def test_keyword_arguments(self):
@@ -271,7 +274,7 @@ class test_cluster(unittest.TestCase):
 
     def test_flags(self):
         f = quadriga_lib.gbsm.draw
-        tx_d = np.array([[5.0, 5.0, 1.5], [30.0, 0.0, 1.5], [40.0, -20.0, 1.5], [60.0, 10.0, 1.5], [0.0, 9.0, 1.5]])
+        tx_d = np.array([[5.0, 5.0, 1.5], [30.0, 0.0, 1.5], [40.0, -20.0, 1.5], [60.0, 10.0, 1.5], [0.0, 9.0, 1.5]]).T
         rd = f(self.sp, "cluster", self.phase, tx_d, self.rx_pos, set_id=-1, floor_id=None, dual_mobility=True)
         self.assertTrue(np.max(np.abs(rd - self.rnd)) > 1e-3)
         blk = np.array([0, 2, 1, 4, 3, 6, 5, 8, 7])
@@ -281,7 +284,7 @@ class test_cluster(unittest.TestCase):
         npt.assert_array_equal(f(self.sp, "cluster", self.phase, tx_d, self.rx_pos, set_id=-1, floor_id=None,
                                  dual_mobility=None), self.rnd)
         rx_z = self.rx_pos.copy()
-        rx_z[:, 2] += np.array([0.0, 5.0, 10.0, 2.0, 7.0])
+        rx_z[2, :] += np.array([0.0, 5.0, 10.0, 2.0, 7.0])
         npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.tx_pos, rx_z), self.rnd)  # 2D: z not used
         r3 = f(self.sp, "cluster", self.phase, self.tx_pos, self.rx_pos, horizontal=False)
         r3z = f(self.sp, "cluster", self.phase, self.tx_pos, rx_z, horizontal=False)
@@ -303,14 +306,14 @@ class test_cluster(unittest.TestCase):
         self.assertEqual(f(sp0, "cluster", np.zeros((0, 0, 0)), self.tx_pos, self.rx_pos).shape, (5, 0))
 
     def test_zero_links(self):
-        r0 = quadriga_lib.gbsm.draw(self.sp, "cluster", self.phase, self.tx_pos, np.zeros((0, 3)))
+        r0 = quadriga_lib.gbsm.draw(self.sp, "cluster", self.phase, self.tx_pos, np.zeros((3, 0)))
         self.assertEqual(r0.shape, (0, 9 * self.N))
 
     def test_memory_layout_and_dtype(self):
         f = quadriga_lib.gbsm.draw
         npt.assert_array_equal(f(self.sp, "cluster", np.asfortranarray(self.phase), np.asfortranarray(self.tx_pos),
                                  np.asfortranarray(self.rx_pos)), self.rnd)
-        big = np.zeros((10, 6))
+        big = np.zeros((6, 10))
         big[::2, ::2] = self.rx_pos
         npt.assert_array_equal(f(self.sp, "cluster", self.phase, self.tx_pos, big[::2, ::2]), self.rnd)  # strided view
         npt.assert_allclose(f(self.sp, "cluster", self.phase, self.tx_pos.astype(np.float32),
@@ -334,8 +337,8 @@ class test_cluster(unittest.TestCase):
         self.assertIn("Input 'phase' must have size [256, 108, 2] for preset 'Comb256' and this set.",
                       str(ctx.exception))
         with self.assertRaises(ValueError) as ctx:
-            f(self.sp, "cluster", self.phase, self.tx_pos[:, :2], self.rx_pos)
-        self.assertIn("Input 'tx_pos' must have 3 columns.", str(ctx.exception))
+            f(self.sp, "cluster", self.phase, self.tx_pos[:2, :], self.rx_pos)
+        self.assertIn("Input 'tx_pos' must have 3 rows.", str(ctx.exception))
         with self.assertRaises(TypeError):
             f(self.sp, "cluster", self.phase, self.tx_pos)
         with self.assertRaises(TypeError):
@@ -348,8 +351,8 @@ class test_set_types(unittest.TestCase):
 
     def setUp(self):
         self.sp = {"DS_lambda": 10.0}
-        self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0]])
-        self.tx_pos = np.array([[10.0, 10.0, 25.0]])
+        self.rx_pos = np.array([[0.0, 0.0, 1.5], [20.0, 5.0, 1.5], [45.0, -10.0, 3.0]]).T
+        self.tx_pos = np.array([[10.0, 10.0, 25.0]]).T
 
     def test_set_type_set_id_and_center_freq(self):
         f = quadriga_lib.gbsm.draw
@@ -370,7 +373,7 @@ class test_set_types(unittest.TestCase):
         f = quadriga_lib.gbsm.draw
         sr = {"NumClusters": 3, "NumClusters_min": 1, "NumSubPaths": 4, "SC_lambda": 15.0, "PerClusterDS": 11.0,
               "PerClusterDS_gamma": -2.0, "PerClusterAS_A": 22.0}  # N = 2, M = 4
-        n_link = self.rx_pos.shape[0]
+        n_link = self.rx_pos.shape[1]
         pr = quadriga_lib.gbsm.init_phases(sr, "ray", seed=7)
         rr = f(sr, "ray", pr, self.tx_pos, self.rx_pos, center_freq=[3.5e9])
         self.assertEqual(rr.shape, (n_link, 114))

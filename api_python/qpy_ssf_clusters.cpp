@@ -3,6 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
+#include "quadriga_gbsm_helpers.hpp"
 
 /*!SECTION
 Geometry-based stochastic model
@@ -57,8 +58,8 @@ delay, power, aod, eod, aoa, eoa, n_active = quadriga_lib.gbsm.ssf_clusters( sce
 ## Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`, `KF_mu`, `absTOA_mu`, `r_DS`, `LNS_ksi`,
   `GR_enabled`
-- **`tx_pos`** — Tx positions in m; z >= 0 with ground reflection; `(1, 3)` or `(n_link, 3)`
-- **`rx_pos`** — Rx positions in m; z >= 0 with ground reflection; `(n_link, 3)`
+- **`tx_pos`** — Tx positions in m; z >= 0 with ground reflection; `(3,)` or `(3, n_link)`
+- **`rx_pos`** — Rx positions in m; z >= 0 with ground reflection; `(3, n_link)`
 - **`lsp`** — LSPs from [[lsp_generate]], slices and units as there; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0,
   KF (slice 1) >= 0; `"38.901"`: one frequency, call once per frequency; `(n_link, n_freq, 8)`
 - **`rnd`** — Shared cluster set of [[gbsm.draw]] (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
@@ -168,7 +169,7 @@ py::tuple ssf_clusters(py::handle scenpar,
     }
     if (known)
     {
-        const arma::uword n_link = rx_pos_a.n_rows, n_freq = lsp_a.n_cols;
+        const arma::uword n_link = qd_gbsm_n_link(rx_pos_a), n_freq = lsp_a.n_cols;
         const arma::uword n_slot = (arma::uword)sp.at("NumClusters") + (sp.at("GR_enabled") > 0.0 ? 1 : 0);
         const arma::uword n_fd = (method == "38.901_MF") ? n_freq : 1;
         delay_py = qd_python_init_output(n_link, n_slot, n_fd, &delay);

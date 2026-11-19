@@ -36,7 +36,7 @@
 //    correlation (6/pi)·asin(rho/2) of two Uniform values whose Normal values have the correlation rho
 // Tolerances of gbsm_draw ("cluster") values: the sinusoids are evaluated with the AVX2 kernel where available
 // (deviation below 4e-7·sqrt(2·n_coeff) = 9e-6 for 256 sinusoids): Normal columns 2e-5, Uniform columns 1e-5.
-// Conventions: positions are rows {x, y, z} in meters; the scenarios set the decorrelation distances of the
+// Conventions: positions are columns {x, y, z} in meters; the scenarios set the decorrelation distances of the
 // large-scale set to values different from SC_lambda, so that a use of the wrong distance changes the result; the
 // phase cubes of the gbsm_draw ("cluster") cases are raw phases of sos_init_phases with the typed mirror in slice 1.
 
@@ -116,7 +116,7 @@ namespace
     // 5 links with distinct coordinates, off the axes, z != 0
     arma::mat rx5()
     {
-        return {{12.5, -40.0, 1.5}, {-120.0, 33.0, 4.5}, {250.0, 300.0, 22.0}, {-7.25, -299.0, 1.8}, {88.0, 0.5, 10.0}};
+        return arma::mat({{12.5, -40.0, 1.5}, {-120.0, 33.0, 4.5}, {250.0, 300.0, 22.0}, {-7.25, -299.0, 1.8}, {88.0, 0.5, 10.0}}).t();
     }
 }
 
@@ -322,7 +322,7 @@ TEST_CASE("gbsm_draw - cluster: single mobility values equal the sum of sinusoid
 {
     const auto sp = scen(4.0, 15.0); // N = 3
     const arma::uword N = 3;
-    const arma::mat rx = rx5(), tx = {{10.0, 20.0, 25.0}};
+    const arma::mat rx = rx5(), tx = arma::vec{10.0, 20.0, 25.0};
     const arma::mat F = qd_preset("Comb256", 15.0).F;
 
     QD_DIAG("\n# diag: gbsm_draw cluster single mobility (2D) against ref_sos, max abs difference per column\n");
@@ -342,7 +342,7 @@ TEST_CASE("gbsm_draw - cluster: single mobility values equal the sum of sinusoid
             double max_d = 0.0;
             for (arma::uword l = 0; l < 5; ++l)
             {
-                double v = qd_ref_sos(F, phase.slice(0).colptr(c), rx(l, 0), rx(l, 1), 0.0);
+                double v = qd_ref_sos(F, phase.slice(0).colptr(c), rx(0, l), rx(1, l), 0.0);
                 if (u)
                     v = qd_unif(v);
                 max_d = std::max(max_d, std::abs(rnd(l, c) - v));
@@ -358,7 +358,7 @@ TEST_CASE("gbsm_draw - cluster: single mobility values equal the sum of sinusoid
 
 TEST_CASE("gbsm_draw - cluster: all generators use SC_lambda, 0 is used as 0.1 m")
 {
-    const arma::mat rx = rx5(), tx = {{10.0, 20.0, 25.0}};
+    const arma::mat rx = rx5(), tx = arma::vec{10.0, 20.0, 25.0};
     const arma::cube phase = make_phase(256, 3, true, 53);
     arma::mat a, b;
     quadriga_lib::gbsm_draw(scen(4.0, 0.0), "cluster", phase, tx, rx, a);
@@ -379,8 +379,8 @@ TEST_CASE("gbsm_draw - cluster: dual mobility values follow the two-device formu
     const arma::uword N = 2;
     const qd_preset_tab t = qd_preset("Comb256", 15.0);
     // 5 links, Tx per link; link 2 has Tx = Rx, link 4 a distance of more than 5 decorrelation distances
-    const arma::mat rx = {{10.0, -20.0, 1.5}, {-55.0, 30.0, 3.0}, {100.0, 100.0, 1.5}, {-5.0, -5.0, 12.0}, {0.3, 0.7, 1.5}};
-    const arma::mat tx = {{12.0, -15.0, 25.0}, {-40.0, 10.0, 30.0}, {100.0, 100.0, 1.5}, {-25.0, 3.0, 12.0}, {150.0, -80.0, 10.0}};
+    const arma::mat rx = arma::mat({{10.0, -20.0, 1.5}, {-55.0, 30.0, 3.0}, {100.0, 100.0, 1.5}, {-5.0, -5.0, 12.0}, {0.3, 0.7, 1.5}}).t();
+    const arma::mat tx = arma::mat({{12.0, -15.0, 25.0}, {-40.0, 10.0, 30.0}, {100.0, 100.0, 1.5}, {-25.0, 3.0, 12.0}, {150.0, -80.0, 10.0}}).t();
     const arma::u32_vec fl = {3, 0, 259, 3, 0};
     const arma::vec off3 = qd_floor_offset(256, 3), off259 = qd_floor_offset(256, 259);
 
@@ -406,9 +406,9 @@ TEST_CASE("gbsm_draw - cluster: dual mobility values follow the two-device formu
                     if (f && fl(l) == 259)
                         off = &off259;
                     const arma::uword m = mirror_col(c, N, shared);
-                    const double a = qd_ref_sos(t.F, phase.slice(0).colptr(c), rx(l, 0), rx(l, 1), 0.0, off);
-                    const double b = qd_ref_sos(t.F, phase.slice(0).colptr(m), tx(l, 0), tx(l, 1), 0.0, off);
-                    const double D = std::sqrt((rx(l, 0) - tx(l, 0)) * (rx(l, 0) - tx(l, 0)) + (rx(l, 1) - tx(l, 1)) * (rx(l, 1) - tx(l, 1)));
+                    const double a = qd_ref_sos(t.F, phase.slice(0).colptr(c), rx(0, l), rx(1, l), 0.0, off);
+                    const double b = qd_ref_sos(t.F, phase.slice(0).colptr(m), tx(0, l), tx(1, l), 0.0, off);
+                    const double D = std::sqrt((rx(0, l) - tx(0, l)) * (rx(0, l) - tx(0, l)) + (rx(1, l) - tx(1, l)) * (rx(1, l) - tx(1, l)));
                     double v = (m == c) ? (a + b) / std::sqrt(2.0 + 2.0 * qd_acf_at(t, D)) : (a + b) / std::sqrt(2.0);
                     const bool u = is_uniform(c, N, shared);
                     if (u)
@@ -427,7 +427,7 @@ TEST_CASE("gbsm_draw - cluster: swapping Tx and Rx exchanges the departure and a
     const arma::uword N = 3;
     const arma::mat A = rx5();
     arma::mat B = rx5() * 0.7 + 20.0;
-    B.col(2).fill(25.0);
+    B.row(2).fill(25.0);
     const arma::u32_vec fl = {0, 2, 2, 300, 0};
 
     for (int s = 0; s < 2; ++s)
@@ -456,7 +456,7 @@ TEST_CASE("gbsm_draw - cluster: a column does not depend on the phases of the ot
     const arma::uword N = 3, n_gen = 27;
     const arma::mat rx = rx5();
     arma::mat tx = rx5() + 7.0;
-    tx.col(2).fill(25.0);
+    tx.row(2).fill(25.0);
     const arma::cube phase = make_phase(256, N, true, 63);
     const arma::uword cols[3] = {1, 4, 20}; // delay block, sign AOA, offset ZOD
 
@@ -489,7 +489,7 @@ TEST_CASE("gbsm_draw - cluster: a column does not depend on the phases of the ot
 
 TEST_CASE("gbsm_draw - cluster: floors as in the lsf set")
 {
-    const arma::mat tx = {{0.0, 0.0, 25.0}};
+    const arma::mat tx = arma::vec{0.0, 0.0, 25.0};
     {
         const auto sp = scen(4.0, 12.0);
         const arma::cube phase = make_phase(256, 3, true, 65);
@@ -505,8 +505,8 @@ TEST_CASE("gbsm_draw - cluster: floors as in the lsf set")
     const auto sp = scen(3.0, 10.0); // N = 2, 18 columns
     const arma::cube phase = make_phase(256, 2, true, 66);
     const arma::mat g0 = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1);
-    const arma::uword n = g0.n_rows;
-    const arma::mat rx = arma::join_cols(g0, g0);
+    const arma::uword n = g0.n_cols;
+    const arma::mat rx = arma::join_rows(g0, g0);
     arma::u32_vec fl(2 * n, arma::fill::zeros);
     fl.subvec(n, 2 * n - 1).fill(1);
     arma::mat rnd;
@@ -528,7 +528,7 @@ TEST_CASE("gbsm_draw - cluster: 2D mode does not depend on z, 3D mode does")
     const arma::cube phase = make_phase(256, 3, true, 67);
     const arma::mat rx = rx5();
     arma::mat tx = rx5() + 9.0, rx_up = rx, tx_up = tx;
-    rx_up.col(2) += 3.0, tx_up.col(2) += 3.0;
+    rx_up.row(2) += 3.0, tx_up.row(2) += 3.0;
 
     for (int dual = 0; dual < 2; ++dual)
     {
@@ -554,7 +554,7 @@ TEST_CASE("gbsm_draw - cluster: marginal distributions")
     const auto sp = scen(13.0, 10.0); // N = 12, 108 columns
     const arma::uword N = 12;
     const arma::cube phase = make_phase(256, N, true, 68);
-    const arma::mat rx = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1), tx = {{0.0, 0.0, 25.0}};
+    const arma::mat rx = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1), tx = arma::vec{0.0, 0.0, 25.0};
     arma::mat rnd;
     quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, rx, rnd);
     REQUIRE(rnd.n_cols == 9 * N);
@@ -604,7 +604,7 @@ TEST_CASE("gbsm_draw - cluster: the correlation at the decorrelation distance fo
     const auto sp = scen(5.0, lambda); // N = 4, 36 columns
     const arma::uword N = 4;
     const arma::cube phase = make_phase(256, N, true, 70);
-    const arma::mat base = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1), tx = {{0.0, 0.0, 25.0}};
+    const arma::mat base = qd_grid(100, 100, 50.0, 1.5, 3.7, -2.1), tx = arma::vec{0.0, 0.0, 25.0};
     const double rho = qd_acf_at(qd_preset("Comb256", lambda), lambda);
     const double rho_u = 6.0 / pi * std::asin(0.5 * rho); // Pearson correlation of the Uniform map
     const double az[4] = {0.0, 0.25 * pi, 0.5 * pi, 0.75 * pi};
@@ -616,7 +616,7 @@ TEST_CASE("gbsm_draw - cluster: the correlation at the decorrelation distance fo
     for (double phi : az)
     {
         arma::mat moved = base, b;
-        moved.col(0) += lambda * std::cos(phi), moved.col(1) += lambda * std::sin(phi);
+        moved.row(0) += lambda * std::cos(phi), moved.row(1) += lambda * std::sin(phi);
         quadriga_lib::gbsm_draw(sp, "cluster", phase, tx, moved, b);
         QD_DIAG("%.0f,%.4f,%.4f,%.4f,%.4f\n", phi * 180.0 / pi, qd_corr(a.col(0), b.col(0)), rho_u, qd_corr(a.col(N), b.col(N)), rho);
         for (arma::uword c = 0; c < a.n_cols; ++c)
@@ -631,7 +631,7 @@ TEST_CASE("gbsm_draw - cluster: sizes, empty input and pre-sized output")
 {
     const auto sp = scen(4.0, 12.0);
     const arma::cube phase = make_phase(256, 3, true, 71);
-    const arma::mat rx0(0, 3), tx1 = {{0.0, 0.0, 25.0}};
+    const arma::mat rx0, tx1 = arma::vec{0.0, 0.0, 25.0};
     arma::mat rnd(4, 4, arma::fill::ones);
 
     CHECK_NOTHROW(quadriga_lib::gbsm_draw(sp, "cluster", phase, tx1, rx0, rnd));
@@ -687,7 +687,7 @@ TEST_CASE("gbsm_draw - input validation")
 {
     const auto sp = scen(4.0, 12.0); // N = 3
     const arma::cube shared = make_phase(256, 3, true, 72), perf = make_phase(256, 3, false, 73);
-    const arma::mat rx = rx5().rows(0, 2), tx = {{0.0, 0.0, 25.0}};
+    const arma::mat rx = rx5().cols(0, 2), tx = arma::vec{0.0, 0.0, 25.0};
     const arma::u32_vec fl = {0, 1, 2};
     arma::mat rnd;
 
@@ -698,16 +698,16 @@ TEST_CASE("gbsm_draw - input validation")
     }
     SECTION("positions")
     {
-        arma::mat bad(3, 2, arma::fill::zeros);
+        arma::mat bad(4, 2, arma::fill::zeros);
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, bad, rnd), std::invalid_argument,
-                             Message("Input 'rx_pos' must have 3 columns."));
+                             Message("Input 'rx_pos' must have 3 rows."));
         bad = tx;
-        bad(0, 1) = INFINITY;
+        bad(1, 0) = INFINITY;
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, bad, rx, rnd), std::invalid_argument,
                              Message("Input 'tx_pos' must be finite."));
-        bad.zeros(2, 3);
+        bad.zeros(3, 2);
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, bad, rx, rnd), std::invalid_argument,
-                             Message("Number of rows in 'tx_pos' must be 1 or match the number of rows in 'rx_pos'."));
+                             Message("Number of columns in 'tx_pos' must be 1 or match the number of columns in 'rx_pos'."));
     }
     SECTION("set_id")
     {
@@ -756,7 +756,7 @@ TEST_CASE("gbsm_draw - input validation")
     {
         const arma::u32_vec bad = {0, 1};
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, rnd, -1, "Comb256", &bad), std::invalid_argument,
-                             Message("Number of elements in 'floor_id' does not match number of rows in 'rx_pos'."));
+                             Message("Number of elements in 'floor_id' does not match number of columns in 'rx_pos'."));
         arma::mat keep(2, 2, arma::fill::ones);
         CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, "cluster", shared, tx, rx, keep, -1, "Comb256", &fl,
                                                      nullptr, false, false), std::invalid_argument,
@@ -769,7 +769,7 @@ TEST_CASE("gbsm_draw - input validation")
         for (const char *t : {"LSF", "", "clusters", "rays"})
         {
             INFO("set_type " << t);
-            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, t, shared, tx, arma::mat(3, 2), rnd, -2, "Comb999"),
+            CHECK_THROWS_MATCHES(quadriga_lib::gbsm_draw(sp, t, shared, tx, arma::mat(2, 3), rnd, -2, "Comb999"),
                                  std::invalid_argument, Message("Input 'set_type' must be 'lsf', 'cluster' or 'ray'."));
         }
     }

@@ -416,8 +416,8 @@ void quadriga_lib::ssf_clusters(
 ## Inputs:
 - **`scenpar`** — Scenario parameters; used: `NumClusters`, `NumClusters_min`, `KF_mu`, `absTOA_mu`, `r_DS`,
   `LNS_ksi`, `GR_enabled`
-- **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[1, 3]` or `[n_link, 3]`
-- **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[n_link, 3]`
+- **`tx_pos`** — Tx positions in [m]; z >= 0 with ground reflection; `[3, 1]` or `[3, n_link]`
+- **`rx_pos`** — Rx positions in [m]; z >= 0 with ground reflection; `[3, n_link]`
 - **`lsp`** — LSPs from [[lsp_generate]], slices and units as there; DS, ASD, ASA, ESD, ESA (slices 0, 3 to 6) > 0,
   KF (slice 1) >= 0; `"38.901"`: one frequency, call once per frequency; `[n_link, n_freq, 8]`
 - **`rnd`** — Shared cluster set of [[gbsm_draw]] (`"cluster"`, `set_id = -1`), columns 0 to N-1 in [0, 1];
@@ -478,8 +478,9 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
     const bool m_tr = method == "38.901", m_mf = method == "38.901_MF", m_qd = method == "quadriga";
     if (!m_tr && !m_mf && !m_qd)
         throw std::invalid_argument("Input 'method' must be '38.901', '38.901_MF' or 'quadriga'.");
-    qd_gbsm_check_links(&tx_pos, &rx_pos);
-    const arma::uword n_link = rx_pos.n_rows;
+    const arma::mat tx = qd_gbsm_cols(tx_pos), rx = qd_gbsm_cols(rx_pos);
+    qd_gbsm_check_links(&tx, &rx);
+    const arma::uword n_link = rx.n_cols;
 
     std::unordered_map<std::string, double> sp = scenpar;
     quadriga_lib::scenpar_validate(sp, nullptr, nullptr, true);
@@ -542,7 +543,8 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
     if (abs_toa != nullptr)
     {
         if (abs_toa->n_elem != n_link)
-            throw std::invalid_argument("Number of elements in 'abs_toa' does not match number of rows in 'rx_pos'.");
+            throw std::invalid_argument("Number of elements in 'abs_toa' does not match number of columns in "
+                                        "'rx_pos'.");
         if (!abs_toa->is_finite() || arma::any(*abs_toa < 0.0))
             throw std::invalid_argument("Input 'abs_toa' must be finite and >= 0.");
     }
@@ -564,15 +566,16 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
             throw std::invalid_argument("Inputs 'gr_eps_re' and 'gr_eps_im' must be finite.");
         if (arma::any(arma::vectorise(*gr_eps_re) < 1.0) || arma::any(arma::vectorise(*gr_eps_im) < 0.0))
             throw std::invalid_argument("Ground permittivity needs 'gr_eps_re' >= 1 and 'gr_eps_im' >= 0.");
-        if (n_link > 0 && (arma::any(rx_pos.col(2) < 0.0) || arma::any(tx_pos.col(2) < 0.0)))
+        if (n_link > 0 && (arma::any(rx.row(2) < 0.0) || arma::any(tx.row(2) < 0.0)))
             throw std::invalid_argument("Ground reflection requires z >= 0 in 'tx_pos' and 'rx_pos'.");
     }
     if (m_tr && o2i != nullptr && o2i->size() != n_link)
-        throw std::invalid_argument("Number of elements in 'o2i' does not match number of rows in 'rx_pos'.");
+        throw std::invalid_argument("Number of elements in 'o2i' does not match number of columns in 'rx_pos'.");
     if (n_cluster != nullptr)
     {
         if (n_cluster->n_elem != n_link)
-            throw std::invalid_argument("Number of elements in 'n_cluster' does not match number of rows in 'rx_pos'.");
+            throw std::invalid_argument("Number of elements in 'n_cluster' does not match number of columns in "
+                                        "'rx_pos'.");
         const double n_min = sp.at("NumClusters_min");
         const arma::uword N_lo = std::min(n_min > 2.0 ? (arma::uword)n_min - 1 : (arma::uword)1, N);
         if (arma::any(*n_cluster < (unsigned)N_lo) || arma::any(*n_cluster > (unsigned)N))
@@ -598,7 +601,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
 
     // Per link
     const double r_tau = sp.at("r_DS"), zeta = sp.at("LNS_ksi"), r2d = 180.0 / arma::datum::pi;
-    const bool tx_single = tx_pos.n_rows != n_link;
+    const bool tx_single = tx.n_cols != n_link;
     arma::cube *ang_out[4] = {&aod, &aoa, &eod, &eoa};
 
     auto one_link = [&](arma::uword l)
@@ -607,8 +610,8 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         const arma::uword N_l = n_cluster != nullptr ? (*n_cluster)(l) : N;
 
         // LOS geometry; the angles of slot 0 and of the inactive slots
-        const double vx = rx_pos(l, 0) - tx_pos(t, 0), vy = rx_pos(l, 1) - tx_pos(t, 1);
-        const double vz = rx_pos(l, 2) - tx_pos(t, 2);
+        const double vx = rx(0, l) - tx(0, t), vy = rx(1, l) - tx(1, t);
+        const double vz = rx(2, l) - tx(2, t);
         const double d2D = std::sqrt(vx * vx + vy * vy), d3D = std::sqrt(vx * vx + vy * vy + vz * vz);
         const double aod_l = std::atan2(vy, vx), eod_l = std::atan2(vz, d2D);
         const double los_ang[4] = {aod_l, qd_wrap(aod_l + arma::datum::pi), eod_l, -eod_l}; // AOD, AOA, EOD, EOA
@@ -622,7 +625,7 @@ void quadriga_lib::ssf_clusters(const std::unordered_map<std::string, double> &s
         std::vector<double> R2(G ? F : 0);
         if (G)
         {
-            const double ht = tx_pos(t, 2), hr = rx_pos(l, 2);
+            const double ht = tx(2, t), hr = rx(2, l);
             const double d_gr = std::sqrt(d2D * d2D + (ht + hr) * (ht + hr)), d_gr1 = std::max(d_gr, 1e-5);
             tau_gr = (d_gr + d3D > 0.0) ? 4.0 * ht * hr / ((d_gr + d3D) * 299792458.0) : 0.0;
             e_gr = -std::atan2(ht + hr, d2D);

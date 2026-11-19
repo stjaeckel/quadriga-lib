@@ -26,14 +26,14 @@ Channel coefficients of one link at one frequency over one segment
   at the carrier: a tap sums rays of different delays and is frequency-selective within the band, so use `"rays"` for
   wide bands. `"rays"`: one path per kept ray in ray order, exact at any bandwidth; the path data are those of
   `ssf_paths` at the snapshot for these rays
-- `n_snap` is the largest row count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
-  rows, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
-  per frequency); one row or entry applies to all snapshots. A static link with a gain per snapshot repeats its
+- `n_snap` is the largest column count of the positions and orientations (1 if all are omitted); each has 1 or `n_snap`
+  columns, `link_gain_dB` and `kf_ratio` 1 or `n_snap` entries (per snapshot at `i_freq`, while `ssf_paths` takes one
+  per frequency); one column or entry applies to all snapshots. A static link with a gain per snapshot repeats its
   position
 - Powers are not renormalized, and `initial_position` of `chan` stays 0. Validity limits: see `ssf_paths`
 - Raises `ValueError` for an invalid array (message prefixed with `Transmit antenna: ` or `Receive antenna: `), invalid
-  `rays`, `"drift"` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a row or
-  entry count other than 1 or `n_snap`
+  `rays`, `"drift"` without scatterers or with a GR ray at moved ends without permittivity or below z = 0, and a column
+  or entry count other than 1 or `n_snap`
 
 ## Usage:
 ```
@@ -52,10 +52,10 @@ chan, par = quadriga_lib.gbsm.single_link_channel( tx_array, rx_array, rays, lin
 - **`output`** — `"taps"` or `"rays"`; default: `"taps"`
 - **`i_freq`** — Frequency index in `rays["center_freq"]`, 0-based; ray data of the TR methods hold one frequency:
   0; default: 0
-- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `None`: the positions of `rays`; `(n_snap, 3)` or `(1, 3)`
-  (a `(3,)` array is rejected); default: None
-- **`tx_orientation`**, **`rx_orientation`** — Euler angles (bank, tilt, heading) in rad; `None`: 0; `(n_snap, 3)`
-  or `(1, 3)`; default: None
+- **`tx_pos`**, **`rx_pos`** — Tx and Rx positions in m; `None`: the positions of `rays`; `(3, n_snap)` or `(3,)`;
+  default: None
+- **`tx_orientation`**, **`rx_orientation`** — Euler angles (bank, tilt, heading) in rad; `None`: 0; `(3, n_snap)` or
+  `(3,)`; default: None
 - **`kf_ratio`** — KF(snapshot) / KF(drop) at `i_freq`, >= 0; `None`: 1; `(n_snap,)` or `(1,)`; default: None
 - **`oxygen`** — Oxygen absorption of TR 38.901 clause 7.6.1, see `ssf_paths`; default: `False`
 - **`use_absolute_delays`** — Include the LOS delay in all delays (`"phase"`: of the ray-data positions); default:
@@ -123,8 +123,7 @@ py::tuple gbsm_single_link_channel(const py::dict &tx_array,
     // The result is returned by value and copied
     const auto chan = quadriga_lib::gbsm_single_link_channel(
         tx_array_a, rx_array_a, rays_a, link_gain_dB_a, mobility, output, i_freq,
-        tx_pos.is_none() ? nullptr : &tx_pos_a, rx_pos.is_none() ? nullptr : &rx_pos_a,
-        tx_orientation.is_none() ? nullptr : &tx_orientation_a, rx_orientation.is_none() ? nullptr : &rx_orientation_a,
+        &tx_pos_a, &rx_pos_a, &tx_orientation_a, &rx_orientation_a, // None or empty = omitted
         kf_ratio.is_none() ? nullptr : &kf_ratio_a, oxygen_b, use_absolute_delays_b);
 
     py::dict par;

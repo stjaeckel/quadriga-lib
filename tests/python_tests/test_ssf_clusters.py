@@ -23,8 +23,8 @@ import quadriga_lib
 
 gbsm = quadriga_lib.gbsm
 CONF_DIR = os.path.join(current_dir, "../../data/config")
-TX = np.array([[0.0, 0.0, 10.0]])
-RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5], [120.0, -40.0, 7.5], [15.0, 25.0, 1.5]])
+TX = np.array([[0.0, 0.0, 10.0]]).T
+RX = np.array([[60.0, 10.0, 1.5], [-30.0, 80.0, 1.5], [120.0, -40.0, 7.5], [15.0, 25.0, 1.5]]).T
 
 
 def read(name):
@@ -50,8 +50,8 @@ class test_case(unittest.TestCase):
         self.lsp_n, self.rnd_n, self.rnd_fn, self.abs_toa_n, _, self.eod_n = draw(self.sn, [6e9], 12)
         self.out = gbsm.ssf_clusters(self.sp, TX, RX, self.lsp, self.rnd, method="38.901", rnd_freq=self.rnd_f)
         v = RX - TX
-        self.aod_l = np.arctan2(v[:, 1], v[:, 0])
-        self.eod_l = np.arctan2(v[:, 2], np.hypot(v[:, 0], v[:, 1]))
+        self.aod_l = np.arctan2(v[1, :], v[0, :])
+        self.eod_l = np.arctan2(v[2, :], np.hypot(v[0, :], v[1, :]))
 
     def test_basic_call(self):
         out, N = self.out, self.N
@@ -143,7 +143,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(pg[:, [0] + list(range(2, self.N + 2))], self.out[1])  # other slots unchanged
         self.assertTrue(np.all(pg[:, 1, 0] > 0))
         npt.assert_allclose(ag[:, 1, 0], self.aod_l, atol=1e-14, rtol=0)
-        e_gr = -np.arctan2(TX[0, 2] + RX[:, 2], np.hypot(RX[:, 0] - TX[0, 0], RX[:, 1] - TX[0, 1]))
+        e_gr = -np.arctan2(TX[2, 0] + RX[2, :], np.hypot(RX[0, :] - TX[0, 0], RX[1, :] - TX[1, 0]))
         npt.assert_allclose(eg[:, 1, 0], e_gr, atol=1e-14, rtol=0)
         npt.assert_allclose(eag[:, 1, 0], e_gr, atol=1e-14, rtol=0)
 
@@ -193,10 +193,14 @@ class test_case(unittest.TestCase):
     def test_special_sizes(self):
         f = gbsm.ssf_clusters
         # Zero links
-        out = f(self.sp, TX, np.zeros((0, 3)), np.zeros((0, 1, 8)), np.zeros((0, 9 * self.N)), method="38.901",
+        out = f(self.sp, TX, np.zeros((3, 0)), np.zeros((0, 1, 8)), np.zeros((0, 9 * self.N)), method="38.901",
                 rnd_freq=np.zeros((0, self.N, 1)))
         self.assertEqual(out[0].shape, (0, self.N + 1, 1))
         self.assertEqual(out[6].shape, (0,))
+        oe = f(self.sp, TX, np.empty(0), np.zeros((0, 1, 8)), np.zeros((0, 9 * self.N)), method="38.901",
+               rnd_freq=np.zeros((0, self.N, 1)))
+        for a, b in zip(oe, out):
+            npt.assert_array_equal(a, b)
         # NumClusters = 1: LOS path only
         s1 = dict(self.sp)
         s1["NumClusters"], s1["NumClusters_min"] = 1.0, 1.0
