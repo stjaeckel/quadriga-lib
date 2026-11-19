@@ -38,7 +38,7 @@ def _toml_line(text, key):
 
 
 def match_families(api, toml_path, diag, root):
-    """Set Function.counterparts of every function from the file stems, the names and api_matching.toml."""
+    """Set Function.counterparts of every function from the names and api_matching.toml."""
     rel = toml_path.relative_to(root).as_posix()
     text = toml_path.read_text(encoding="utf-8")
     try:
@@ -47,26 +47,33 @@ def match_families(api, toml_path, diag, root):
         diag.error(rel, None, "TOML: %s" % e)
         return
     families = data.get("families", {})
-    if set(data) - {"families"} or not isinstance(families, dict) or not all(
-            isinstance(v, list) and all(isinstance(n, str) for n in v) for v in families.values()):
-        diag.error(rel, None, "expected only a [families] table of stem = [C++ names]")
+    python_names = data.get("python_names", {})
+    if set(data) - {"families", "python_names"} or not isinstance(families, dict) or not all(
+            isinstance(v, list) and all(isinstance(n, str) for n in v) for v in families.values()) or not isinstance(
+            python_names, dict) or not all(isinstance(v, str) for v in python_names.values()):
+        diag.error(rel, None, "expected a [families] table of family = [C++ names] and a [python_names] table of "
+                              "Python name = MATLAB name")
         return
 
-    def by_stem(lang):
+    def by_family(lang):
         out = {}
         for sec in api[lang].sections:
             for f in sec.functions:
-                out.setdefault(f.stem, f)
+                key = python_names.get(f.name, _norm(f.name)) if lang == "python" else _norm(f.name)
+                out.setdefault(key, f)
         return out
 
-    mex, py = by_stem("mex"), by_stem("python")
+    mex, py = by_family("mex"), by_family("python")
+    py_all = {f.name for sec in api["python"].sections for f in sec.functions}
+    for name in sorted(set(python_names) - py_all):
+        diag.error(rel, _toml_line(text, name), "unknown Python function '%s' in [python_names]" % name)
     cpp = {f.name: f for sec in api["cpp"].sections for f in sec.functions}
     cpp_norm = {}
     for name in cpp:
         cpp_norm.setdefault(_norm(name), name)
     for stem in sorted(set(families) - set(mex) - set(py)):
-        diag.error(rel, _toml_line(text, stem), "unknown stem '%s' (no api_mex/%s.cpp or api_python/qpy_%s.cpp)"
-                   % (stem, stem, stem))
+        diag.error(rel, _toml_line(text, stem), "unknown family '%s' (no MATLAB or Python function of that name)"
+                   % stem)
     owner = {}
     for stem in sorted(set(mex) | set(py)):
         fam = {lang: f for lang, f in (("mex", mex.get(stem)), ("python", py.get(stem))) if f}

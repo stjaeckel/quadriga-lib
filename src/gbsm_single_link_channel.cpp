@@ -4,9 +4,8 @@
 
 #include "quadriga_lib.hpp"
 #include "quadriga_gbsm.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_gbsm_helpers.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_arrayant.hpp"
+#include "qd_helpers_gbsm.hpp"
 
 #include <algorithm>
 #include <any>

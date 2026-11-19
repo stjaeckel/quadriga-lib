@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
-#include "qd_any_type_id.hpp"
+#include "qd_helpers_channel.hpp"
 
 /*!SECTION
 Channel functions

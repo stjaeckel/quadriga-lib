@@ -2,7 +2,11 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_quadriga_adapter.hpp"
+#include "quadriga_lib.hpp"
+#include "qd_helpers_python_types.hpp"
+#include "qd_helpers_python.hpp"
+
+
 
 /*!SECTION
 Sum-of-sinusoids random number generator
@@ -257,4 +261,189 @@ py::array_t<double> sos_val(const py::array_t<double> &spatial_freq,
                                   spatial_freq_scale_b, uniform_b, use_kernel);
 
     return val_py;
+}
+
+/*!MD
+# sos.map
+Spatially correlated random values on a regular grid
+
+- Evaluates the generators of [[sos.val]] for one device at all combinations of the grid vectors
+- Output in meshgrid order: element `[iy, ix, iz, g]` belongs to the position
+  `(x[ix], y[iy], z[iz])` and to generator `g`, i.e. column `g` of `phase`
+- The number of grid vectors given must not exceed the number of columns of `spatial_freq`; a `y` or `z`
+  that is `None` or empty means a single sample at 0 on that axis
+- `z` can be given without `y` if `spatial_freq` has 3 columns
+- The values are those of [[sos.val]] at the grid points, bit for bit; kernels, accuracy and the
+  Uniform mapping are described there
+
+## Usage:
+```
+map = quadriga_lib.sos.map( spatial_freq, phase, x, y, z, *, uniform, use_kernel )
+```
+
+## Inputs:
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`phase`** — Phases; one column per generator; `(n_coeff, n_gen)`
+- **`x`** — Grid points on the x-axis; `(nx,)`
+- **`y`** — Grid points on the y-axis; requires `n_dim >= 2`; `None` = one sample at 0, `ny = 1`;
+  `(ny,)`; default: `None`
+- **`z`** — Grid points on the z-axis; requires `n_dim = 3`; `None` = one sample at 0, `nz = 1`;
+  `(nz,)`; default: `None`
+- **`uniform`** — Output distribution: `False` = Normal(0,1), `True` = Uniform between 0 and 1;
+  default: `False`
+- **`use_kernel`** — Compute kernel: 0 = auto (AVX2 if available), 1 = GENERIC, 2 = AVX2 (throws if
+  unavailable); `int`; default: 0
+
+## Output:
+- **`map`** — Values; `(ny, nx, nz, n_gen)`
+
+## See also:
+- [[sos.val]] (evaluation at arbitrary positions, two devices)
+MD!*/
+
+py::array_t<double> sos_map(const py::array_t<double> &spatial_freq,
+                            const py::array_t<double> &phase,
+                            const py::array_t<double> &x,
+                            py::handle y,
+                            py::handle z,
+                            py::handle uniform,
+                            int use_kernel)
+{
+    const bool uniform_b = qd_python_flag(uniform, false, "uniform");
+
+    // Read inputs
+    const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
+    const auto phase_a = qd_python_numpy2arma_Mat<double>(phase, true);
+    const auto x_a = qd_python_numpy2arma_Col<double>(x, true);
+    const auto y_a = qd_python_numpy2arma_Col<double>(y, true);
+    const auto z_a = qd_python_numpy2arma_Col<double>(z, true);
+
+    const arma::uword nx = x_a.n_elem, ny = y_a.is_empty() ? 1 : y_a.n_elem;
+    const arma::uword nz = z_a.is_empty() ? 1 : z_a.n_elem, n_gen = phase_a.n_cols;
+
+    // Output allocation
+    std::vector<arma::cube> map;
+    auto map_py = qd_python_init_output(ny, nx, nz, n_gen, &map);
+
+    // Call library function
+    quadriga_lib::sos_map<double>(freq_a, phase_a, x_a, map, y_a, z_a, uniform_b, use_kernel);
+
+    return map_py;
+}
+
+/*!MD
+# sos.remove_bias
+Remove the sample mean of sum-of-sinusoids generators over a set of positions
+
+- One realisation of a spatially correlated random field has a non-zero mean over a finite set of
+  positions. Its variance over the realisations is the mean of the autocorrelation function (ACF)
+  over all pairs of positions, which is much larger than `1 / n_pos` when the positions lie within
+  a few decorrelation distances of each other. This is a property of any correlated field, not an
+  error of the generator
+- This function adds one offset to all phases of a generator such that the mean of the Normal
+  distributed values of [[sos.val]] over the given positions becomes zero
+- Closed form, no iteration: with `z_n = mean over the positions of exp( j·2·pi · f_n·x )` and
+  `Z = sum_n z_n · exp( j·phi_n )`, the mean is `sqrt(2/n_coeff) · Re( exp( j·offset ) · Z )`,
+  which vanishes for `offset = pi/2 - arg(Z)` and for that value minus pi; the one with the
+  smaller magnitude is applied, so the offset lies between -pi/2 and pi/2
+- One device (`pos_b` omitted): one offset per generator
+- Two devices on the same map (`pos_b` given, `phase_b_in` omitted): one offset per generator that
+  zeroes the mean of the combined, normalised value; `acf` and `dist` are required
+- Two devices on different maps (`pos_b` and `phase_b_in` given): each device is treated on its
+  own, `phase_in` with `pos` and `phase_b_in` with `pos_b` and the frequencies
+  `spatial_freq · spatial_freq_scale_b`; two offsets per generator. The mean of the combined value is then zero
+  as well
+- Effect on the statistics: the result is the field conditioned on a zero mean over the positions.
+  The variance at a position drops from 1 to `1 - c^2 / v`, where `v` is the variance of the
+  sample mean and `c` the mean ACF between that position and all positions; on average over the
+  positions the loss is at least `v`. It is small only if the positions spread over many
+  decorrelation distances. For positions within about one decorrelation distance most of the
+  variance is removed
+- The zero mean holds for exactly these positions and frequencies. It is lost when the phases are
+  used with other frequencies (another decorrelation distance) or positions
+- Rule of thumb, measured for 200 positions in a square with the edge `L` and the decorrelation
+  distance `d` (`Comb256`): the variance drops by 74 % for `L = d`, 44 % for `L = 2·d`, 14 % for
+  `L = 5·d`, 5 % for `L = 10·d`, 2.5 % for `L = 20·d` and less than 1 % from `L = 50·d` on
+- Phases are returned in the interval from -pi (included) to pi (excluded). A generator whose
+  `abs(Z)` is below `1e-14 · n_coeff` already has a zero mean for every offset and is returned
+  unchanged, also if its phases lie outside that interval
+- Two devices on the same map need an ACF above -1 at all sample points, as in [[sos.val]]
+- The input arrays `phase_in` and `phase_b_in` are not modified; the corrected phases are new arrays
+- An optional array that is `None` or empty counts as not given
+
+## Usage:
+```
+phase_out, phase_b_out, offset, mean_before = quadriga_lib.sos.remove_bias( spatial_freq, phase_in, \
+    pos, pos_b, *, phase_b_in, acf, dist, spatial_freq_scale_b )
+```
+
+## Inputs:
+- **`spatial_freq`** — Spatial frequencies; `n_dim` = 1, 2 or 3; `(n_coeff, n_dim)`
+- **`phase_in`** — Phases; one column per generator; `(n_coeff, n_gen)`
+- **`pos`** — Positions of the first device; one row per position; the number of columns sets the
+  number of dimensions: `(n_pos, 1)` = `(x)`, `(n_pos, 2)` = `(x, y)` or `(n_pos, 3)` = `(x, y, z)`;
+  coordinates that are not given are 0; not more columns than `spatial_freq`; a 1-D array is one column,
+  i.e. one x-coordinate per position
+- **`pos_b`** — Positions of the second device; `None` = one device; `(n_pos_b, 1)`, `(n_pos_b, 2)`
+  or `(n_pos_b, 3)` as for `pos`; `n_pos_b = n_pos` for the same map, any number for different
+  maps; default: `None`
+- **`phase_b_in`** — Phases of the second device; requires `pos_b`; `None` = same map;
+  `(n_coeff, n_gen)`; default: `None`
+- **`acf`** — Target ACF; required for two devices on the same map, must then be > -1; `(n_acf,)`;
+  default: `None`
+- **`dist`** — Sample points of the ACF; must start at 0, increase strictly and be finite; `(n_acf,)`;
+  default: `None`
+- **`spatial_freq_scale_b`** — Spatial-frequency scale of the second device, i.e. decorrelation distance of the
+  first device divided by that of the second; must be > 0; other than 1 requires `phase_b_in`;
+  default: 1.0
+
+## Outputs:
+- **`phase_out`** — Corrected phases; `(n_coeff, n_gen)`
+- **`phase_b_out`** — Corrected phases of the second device; `(n_coeff, n_gen)`; `None` if
+  `phase_b_in` was not given
+- **`offset`** — Offsets added to the phases; `(n_gen, 1)`, or `(n_gen, 2)` with
+  `phase_b_in` (column 0: `phase_in`, column 1: `phase_b_in`)
+- **`mean_before`** — Sample mean before the correction; `(n_gen, 1)`: mean of the values of
+  [[sos.val]] for the given arguments; with `phase_b_in` `(n_gen, 2)`: mean of the field of each
+  device on its own positions, the mean of the combined value being their sum divided by `sqrt(2)`
+
+## See also:
+- [[sos.val]] (the values whose mean is removed)
+MD!*/
+
+py::tuple sos_remove_bias(const py::array_t<double> &spatial_freq,
+                          const py::array_t<double> &phase_in,
+                          const py::array_t<double> &pos,
+                          py::handle pos_b,
+                          py::handle phase_b_in,
+                          py::handle acf,
+                          py::handle dist,
+                          double spatial_freq_scale_b)
+{
+    // Read inputs; the phases are modified by the library and therefore copied
+    const auto freq_a = qd_python_numpy2arma_Mat<double>(spatial_freq, true);
+    arma::mat phase_out = qd_python_numpy2arma_Mat<double>(phase_in, false);
+    const auto pos_a = qd_python_numpy2arma_Mat<double>(pos, true);
+    const auto pos_b_a = qd_python_numpy2arma_Mat<double>(pos_b, true);
+    arma::mat phase_b_out = qd_python_numpy2arma_Mat<double>(phase_b_in, false);
+    const auto acf_a = qd_python_numpy2arma_Col<double>(acf, true);
+    const auto dist_a = qd_python_numpy2arma_Col<double>(dist, true);
+
+    // Wrap optional pointers
+    arma::mat offset, mean_before;
+    arma::mat *p_phase_b = phase_b_out.is_empty() ? nullptr : &phase_b_out;
+
+    // Call library function
+    quadriga_lib::sos_remove_bias<double>(freq_a, phase_out, pos_a, pos_b_a, p_phase_b, acf_a, dist_a,
+                                          &offset, &mean_before, spatial_freq_scale_b);
+
+    // Copy to python
+    auto phase_out_py = qd_python_copy2numpy(&phase_out);
+    py::object phase_b_out_py = py::none();
+    if (p_phase_b != nullptr)
+        phase_b_out_py = qd_python_copy2numpy(&phase_b_out);
+    auto offset_py = qd_python_copy2numpy(&offset);
+    auto mean_before_py = qd_python_copy2numpy(&mean_before);
+
+    return py::make_tuple(phase_out_py, phase_b_out_py, offset_py, mean_before_py);
 }

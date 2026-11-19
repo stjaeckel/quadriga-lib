@@ -12,8 +12,22 @@
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 #include "quadriga_math.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
+
+// Inverse of the largest absolute field value of n samples; scaling by it keeps the power of double patterns with
+// amplitudes above about 1e154 inside the double range (only called when the unscaled power overflowed)
+template <typename dtype>
+static inline double qd_inverse_max_field(const dtype *a, const dtype *b, const dtype *c, const dtype *d, size_t n)
+{
+    double m = 0.0;
+    for (size_t i = 0; i < n; ++i)
+    {
+        double x = std::max(std::max(std::abs((double)a[i]), std::abs((double)b[i])), std::max(std::abs((double)c[i]), std::abs((double)d[i])));
+        m = x > m ? x : m;
+    }
+    return 1.0 / m;
+}
 
 /*!SECTION
 Array antenna functions

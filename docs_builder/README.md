@@ -227,7 +227,6 @@ This section is the format of the doc blocks: what the builder parses and what i
 | Function names on the page | as written; member functions start with `.` | lower case | as written; may contain `.` (`sos.acf_2d`) |
 | Language of code fences without info string | `cpp` | `matlab` | `python` |
 | Required sub-block | `## Declaration:`, `## Declarations:` or `## Usage:`, not for class blocks | `## Usage:` | `## Usage:` |
-| File stem for cross-language matching | none | `<stem>.cpp` | `qpy_<stem>.cpp` |
 
 Only `.cpp` files directly in these folders are read (not subfolders), in file-name order, as UTF-8.
 
@@ -308,7 +307,7 @@ The id of a function is its name on the page, exactly: `arrayant_interpolate_mul
 
 Each function entry shows buttons "C++", "MATLAB", "Python" (on the website) and the line "Also in: ... · Not in: ..." (in the Markdown files). The counterparts are found like this:
 
-1. A MATLAB and a Python function form a family when their files have the same stem: `api_mex/<stem>.cpp` and `api_python/qpy_<stem>.cpp`.
+1. A MATLAB and a Python function form a family when their names match, compared in lower case with `.` read as `_` (`gbsm.draw` matches `gbsm_draw`). `[python_names]` in `docs_builder/content/api_matching.toml` gives the MATLAB name of the Python functions whose names differ (`"channel.planar" = "get_channels_planar"`, `generate = "arrayant_generate"`).
 2. The family's C++ counterpart is the C++ function with the same name, compared in lower case with `.` read as `_` (`sos.acf_2d` matches `sos_acf_2d`).
 3. `docs_builder/content/api_matching.toml` lists the C++ functions of families whose names do not match, and replaces rule 2 for the families it lists:
 
@@ -318,7 +317,7 @@ arrayant_combine_pattern = ["arrayant_combine_pattern", "arrayant_combine_patter
 interp = ["interp_2D"]
 ```
 
-Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the single-frequency function before the `_multi` variant. All listed C++ functions link back to the family. An unknown stem, an unknown C++ name or a C++ function in two families stops the build.
+Add an entry when a new MATLAB or Python wrapper calls a C++ function with a different name. List the C++ functions the wrappers call to carry out their operation, not helpers for validation, sizing or set-up. The first function listed is the target of the C++ button on the MATLAB and Python pages; put the single-frequency function before the `_multi` variant. All listed C++ functions link back to the family. An unknown family, an unknown C++ name, an unknown Python name in `[python_names]` or a C++ function in two families stops the build.
 
 ### Formulas
 
@@ -374,7 +373,7 @@ Errors without an id name the file and, where possible, the line or key:
 | `unknown build variable '{{ x }}'` | See [build variables](#file-format). |
 | `<key path>: missing`, `unknown key`, `empty list`, `not a string`, `not an integer`, `not true or false`, `not a table`, `not a list of tables` | `publications.toml` or notebook metadata does not match its keys. |
 | `no format files (*.md) found` | `docs_builder/content/formats/` is missing or holds no format file. |
-| `unknown stem`, `unknown C++ function`, `... is in two families`, `expected only a [families] table ...`, `TOML: ...` | `api_matching.toml` names a file or C++ function that does not exist or one function twice, is not valid TOML, or has another structure than one `[families]` table of `stem = ["C++ name", ...]`. |
+| `unknown family`, `unknown C++ function`, `unknown Python function`, `... is in two families`, `expected a [families] table ...`, `TOML: ...` | `api_matching.toml` names a MATLAB, Python or C++ function that does not exist or one C++ function twice, is not valid TOML, or has another structure than a `[families]` table of `family = ["C++ name", ...]` and a `[python_names]` table of `"Python name" = "MATLAB name"`. |
 | `link target missing`, `anchor missing`, `link leaves the site` | A link in the generated files points to a file or id that does not exist. The `docs` build checks only links inside `docs/`; the website build checks all of them. |
 | `differs from the build output`, `missing, the build writes it`, `extra, the build does not write it` | `docs --check` found `docs/` out of date: run `make docs` and commit. |
 

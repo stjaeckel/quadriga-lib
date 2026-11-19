@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
 #include "quadriga_lib_generic_functions.hpp"
 
 #if BUILD_WITH_AVX2

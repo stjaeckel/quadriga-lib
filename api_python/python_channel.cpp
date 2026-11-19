@@ -10,21 +10,9 @@ namespace py = pybind11;
 // Include parts
 #include "qpy_baseband_freq_response.cpp" // also baseband_freq_response_multi
 #include "qpy_channel_export_obj_file.cpp"
-#include "qpy_hdf5_create_file.cpp"
-#include "qpy_hdf5_read_channel.cpp"
-#include "qpy_hdf5_read_dset_names.cpp"
-#include "qpy_hdf5_read_dset.cpp"
-#include "qpy_hdf5_read_layout.cpp"
-#include "qpy_hdf5_reshape_layout.cpp"
-#include "qpy_hdf5_write_channel.cpp"
-#include "qpy_hdf5_write_dset.cpp"
-#include "qpy_get_channels_ieee_indoor.cpp"
-#include "qpy_get_channels_irs.cpp"
-#include "qpy_get_channels_planar.cpp"
-#include "qpy_get_channels_spherical.cpp"
-#include "qpy_get_channels_multifreq.cpp"
-#include "qpy_qrt_file_parse.cpp"
-#include "qpy_qrt_file_read.cpp"
+#include "qpy_hdf5.cpp"
+#include "qpy_get_channels.cpp"
+#include "qpy_qrt_file.cpp"
 #include "qpy_quantize_delays.cpp"
 
 void quadriga_lib_channel(py::module_ &m)

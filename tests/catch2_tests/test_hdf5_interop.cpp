@@ -34,7 +34,7 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "quadriga_lib.hpp"
-#include "qd_any_type_id.hpp"
+#include "qd_helpers_channel.hpp"
 
 #include <hdf5.h>
 

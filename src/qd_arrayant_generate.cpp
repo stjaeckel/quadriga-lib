@@ -10,8 +10,36 @@
 #include <limits>
 
 #include "quadriga_lib.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
+
+template <typename dtype>
+static inline void qd_geo2cart_interleaved(size_t N,                 // Number of values
+                                           dtype *cart_3xN,          // Interleaved Cartesian coordinates (output)
+                                           const dtype *az,          // Input azimuth angles, length N
+                                           const dtype *el,          // Input elevation angles, length N
+                                           const dtype *r = nullptr) // Input vector length (optional), length N
+{
+    bool has_length = (r != nullptr);
+
+    for (size_t i = 0; i < N; ++i)
+    {
+        double ca = (double)az[i];
+        double sa = std::sin(ca);
+        ca = std::cos(ca);
+
+        double ce = (double)el[i];
+        double se = std::sin(ce);
+        ce = std::cos(ce);
+
+        double le = has_length ? (double)r[i] : 1.0;
+
+        dtype *C = &cart_3xN[3 * i];
+        C[0] = dtype(le * ce * ca);
+        C[1] = dtype(le * ce * sa);
+        C[2] = dtype(le * se);
+    }
+}
 
 /*!SECTION
 Array antenna functions

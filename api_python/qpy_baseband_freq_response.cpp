@@ -2,9 +2,9 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_quadriga_adapter.hpp" // qd_python_flag
+#include "qd_helpers_python_types.hpp" // qd_python_flag
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp" // qd_batch_loop
+#include "qd_helpers_shared.hpp"
 
 /*!SECTION
 Channel functions

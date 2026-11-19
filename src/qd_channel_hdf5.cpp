@@ -4,7 +4,7 @@
 
 #include "quadriga_channel.hpp"
 #include "qd_hdf5.hpp"
-#include "qd_any_type_id.hpp"
+#include "qd_helpers_channel.hpp"
 
 #include <algorithm>
 #include <cctype>

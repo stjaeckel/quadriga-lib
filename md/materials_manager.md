@@ -326,7 +326,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
     - grids (first probe, `conv`, against 3072 × 12; glass 4 and 6 mm, gypsum, double glazing, concrete): 50 angles ×
       1 per third ≤ 0.34 dB to 2 kHz, 0.49 dB at 4 kHz, 6.7 dB at 8 kHz; 50 × 3 ≤ 0.07 / 0.73 / 2.75; 192 × 3
       ≤ 0.05 / 0.32. `calc_diffraction_gain` takes every angle in one call per frequency.
-    - the library's sound speed is 342.76271 m/s (`src/qd_atmospheric_absorption.hpp`, ISO 9613-1 at 20 °C; the
+    - the library's sound speed is 342.76271 m/s (`src/qd_helpers_shared.hpp`, ISO 9613-1 at 20 °C; the
       wrappers and `qrt_ray_trace` convert with it); only the page, `txlib.py` and `lw::GHZ` use 343.
     - wool 50 mm on concrete 152 mm (engine item below).
   - **Final rig decisions (Stephan, 2026-10-23):**
@@ -409,7 +409,7 @@ rug on a leaf floor). The table below is the first entry only; the issue file is
       `md/acoustic_modeling_guidelines.md`; a procedure for adding materials later; no CSV, no code in phase 2;
       then a research round on the gaps; phase 3 in a following session.
     - Engine findings are recorded, not fixed, until every material is in.
-    - `obj_file_read` names (reviewed 2026-10-26, `src/obj_file_read.cpp` `base_material_name`, `resolve_csv`): exact
+    - `obj_file_read` names (reviewed 2026-10-26, `src/obj_file.cpp` `base_material_name`, `resolve_csv`): exact
       name, then the part before the first dot; no fallback across suffixes; case-sensitive; a dot inside a row name
       breaks Blender duplicates; unmatched names become air unless `csv_strict`.
   - a02 done 2026-10-26: draft 0 of `md/acoustic_materials.md` (64 entries: 21 structural, 8 hard furnishing, 9

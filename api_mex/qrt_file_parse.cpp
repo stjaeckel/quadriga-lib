@@ -4,7 +4,7 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_helper_functions.hpp"
+#include "qd_helpers_mex.hpp"
 
 /*!SECTION
 Channel functions

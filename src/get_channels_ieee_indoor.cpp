@@ -4,7 +4,8 @@
 
 #include "quadriga_lib.hpp"
 #include "ieee_channel_model_functions.hpp"
-#include "qd_arrayant_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
 
 /*!SECTION
 Channel generation functions

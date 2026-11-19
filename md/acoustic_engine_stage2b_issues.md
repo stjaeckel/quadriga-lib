@@ -312,5 +312,5 @@ step 3 where they are not there already.
   bounce by bounce and runs out of interactions (page 12, rules 9 and 16).
 - **`thin_slab_threshold` 0** for acoustic runs (issue 2).
 - **Frequencies in the library's unit:** the API takes acoustic Hz; material columns are in the EM-equivalent GHz of
-  the sound speed 343 m/s (`qd_acoustic_freq_scale` in `src/qd_atmospheric_absorption.hpp`), which the library
+  the sound speed 343 m/s (`qd_acoustic_freq_scale` in `src/qd_helpers_shared.hpp`), which the library
   applies in scalar mode.

@@ -3,7 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 
 // Rotate a vector around an arbitrary axis
 static inline void rotate_vector_around_axis(double vx, double vy, double vz,    // The vector to rotate

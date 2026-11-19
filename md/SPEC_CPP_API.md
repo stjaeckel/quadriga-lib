@@ -134,10 +134,12 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 ## Includes
 - Include the narrowest public header that declares the function: usually `#include "quadriga_tools.hpp"`; `#include "quadriga_lib.hpp"` if the function is declared there or several public headers are needed.
 - Include every standard header whose names are used (`<stdexcept>`, `<cmath>`, `<algorithm>`, `<limits>`, `<vector>`, ...); do not rely on transitive includes.
-- Internal headers in `src/` (`*.hpp`, `*.h`) hold reusable helpers; read the ones near the topic before writing a helper of your own, e.g.:
-  - `quadriga_lib_helper_functions.hpp` — small numeric helpers (`qd_calc_length`, `crossp`, `dotp`, `qd_rotation_matrix`, `qd_in_range`, ...)
-  - `quadriga_gbsm_helpers.hpp` — helpers shared by the GBSM sources; `qd_arrayant_functions.hpp`, `qd_hdf5.hpp`, `qd_atmospheric_absorption.hpp`
-  - `quadriga_lib_generic_functions.hpp`, `quadriga_lib_avx2_functions.hpp`, `quadriga_lib_cuda_functions.hpp` — declarations of the compute kernels
+- Internal helpers are header-only, in `src/qd_helpers_*.hpp`; read the ones near the topic before writing a helper of your own:
+  - `qd_helpers_shared.hpp` — helpers used by several sections: `qd_batch_loop`, `OMP_SAFE_CALL`, the alias checks, `qd_xyz`, `qd_kernel_auto_avx2`, `qd_calc_length`, `qd_rotation_matrix`, portable random numbers, `qd_interp_linear`, `qd_slerp_complex`, physical constants and the ISO 9613-1 air absorption
+  - one header per section for helpers used only there: `qd_helpers_arrayant.hpp`, `qd_helpers_channel.hpp`, `qd_helpers_gbsm.hpp`, `qd_helpers_site.hpp`, `qd_helpers_sos.hpp`
+  - `qd_helpers_wrappers.hpp` — helpers shared by the MEX and Python wrappers; `qd_helpers_mex.hpp`, `qd_helpers_mex_types.hpp` (MEX only), `qd_helpers_python.hpp`, `qd_helpers_python_types.hpp` (Python only)
+  - headers of self-contained units: `qd_hdf5.hpp` (HDF5 file layer), `bits.hpp`, `ieee_channel_model_functions.hpp`, `fastmath_*.h`, `lodepng.h`, `cuda_common.hpp`
+  - `quadriga_lib_generic_functions.hpp`, `quadriga_lib_avx2_functions.hpp`, `quadriga_lib_cuda_functions.hpp` — declarations of the compute kernels only
 
 ## Function definition
 - Define with the qualified name, without reopening the namespace and without `using namespace`; no default arguments in the definition.
@@ -147,7 +149,7 @@ The glossary (section "Glossary" of `docs_builder/content/api_intro_cpp.md`, ren
 - Helpers used only in this file are `static` (or in an anonymous namespace) and placed before the section statement. Prefix them with `qd_` to avoid clashes with other headers.
 - A helper used once is a lambda inside the function that uses it. Exception: a self-contained algorithm of more than about 20 lines (e.g. a numerical kernel, or a function that calls itself) may be a named file-local function, placed directly above its single caller (for a public function: above its section statement).
 - A helper used several times within one source file is `static inline` or in the anonymous namespace.
-- A helper that is needed by more than one source file goes into one of the internal headers as `static inline`, with a comment that documents its purpose, arguments and sizes. A new internal header or a new public function is settled in the plan or spec.
+- A helper that is needed by more than one source file goes into the `qd_helpers_*.hpp` header of its section (or `qd_helpers_shared.hpp` when several sections use it) as `static inline`, with a comment that documents its purpose, arguments and sizes. A new internal header or a new public function is settled in the plan or spec.
 - Implementation details (algorithm steps, formulas, derivations, numerical choices) are written as comments next to the code that implements them, not in the documentation block.
 
 ## Input validation
@@ -176,7 +178,7 @@ if (out != nullptr && (out->n_rows != n_ray || out->n_cols != 3))
   - Reason: the MEX and Python wrappers pre-allocate outputs in MATLAB / numpy memory and map Armadillo objects onto that memory. An unconditional `set_size`, `zeros(n, m)`, or assignment of a differently sized object would detach the output from that memory or throw. With the size check, a correctly pre-sized output is written zero-copy.
   - Consequence: every element of an output must be written by the function (it may hold arbitrary data on entry), and the output size must be derivable from the inputs and documented.
 - Do not read from an output before writing it.
-- An output must not be the same object as an input or another output, nor share memory with one. Check this with `qd_check_alias`, `qd_check_alias_outputs` or `qd_check_alias_list` (`src/quadriga_lib_helper_functions.hpp`) after the null checks and before the first output is resized or written; such a call throws `std::invalid_argument`. The rule is stated once in the general C++ API documentation, not per function. A function that needs a different behaviour states it in its requirements and documentation.
+- An output must not be the same object as an input or another output, nor share memory with one. Check this with `qd_check_alias`, `qd_check_alias_outputs` or `qd_check_alias_list` (`src/qd_helpers_shared.hpp`) after the null checks and before the first output is resized or written; such a call throws `std::invalid_argument`. The rule is stated once in the general C++ API documentation, not per function. A function that needs a different behaviour states it in its requirements and documentation.
   - Reason: outputs are resized and written while inputs are still read. Supporting aliasing needs a copy of the input, which saves the caller no memory; a caller who wants the result in place uses a separate output and `swap()`.
 - In/out arguments (documented as "updated in-place") keep their size; validate it like an input.
 
@@ -192,7 +194,7 @@ if (out != nullptr && (out->n_rows != n_ray || out->n_cols != 3))
 - Parallelize only loops that dominate the run time and are independent per iteration. Guard nothing with `#ifdef _OPENMP` unless OpenMP runtime functions are called; a plain `#pragma omp parallel for` is ignored by a compiler without OpenMP.
 - Every parallel region has an `if (...)` clause with a measured size limit, so that small calls run serially. Starting a thread team costs a few microseconds on an idle machine and up to a scheduler time slice (milliseconds) when other processes compete for the cores. The limit is the smallest size at which the default thread count is at least 2× faster than serial on an idle machine; where the tests do not reach that size, it is the size at which the serial work reaches about 20 µs at the measured cost per item. Express the limit in the quantity the work scales with (e.g. `n_ray * n_point`), and also require at least 2 iterations when the count of the parallel loop can be 1.
 - The loop variable of a parallel `for` must be a signed integer type (`int` or `long long`) for MSVC; cast to `arma::uword` inside the loop.
-- Exceptions must not leave a parallel region. Run the items of a batch with `qd_batch_loop`, which rethrows the error of the lowest failing item with its type and the `"Snapshot <i>: "` prefix; wrap other throwing calls in `OMP_SAFE_CALL` and throw `std::runtime_error` after the region (both in `src/quadriga_lib_helper_functions.hpp`). Do not use `std::exception_ptr`: it needs a libstdc++ symbol version (`CXXABI_1.3.13`) that the libstdc++ bundled with MATLAB R2024a lacks, so the MEX files would not load there. `make test` runs `tests/check_mex_symbol_versions.sh`, which fails when a MEX file needs a symbol version newer than that release provides.
+- Exceptions must not leave a parallel region. Run the items of a batch with `qd_batch_loop`, which rethrows the error of the lowest failing item with its type and the `"Snapshot <i>: "` prefix; wrap other throwing calls in `OMP_SAFE_CALL` and throw `std::runtime_error` after the region (both in `src/qd_helpers_shared.hpp`). Do not use `std::exception_ptr`: it needs a libstdc++ symbol version (`CXXABI_1.3.13`) that the libstdc++ bundled with MATLAB R2024a lacks, so the MEX files would not load there. `make test` runs `tests/check_mex_symbol_versions.sh`, which fails when a MEX file needs a symbol version newer than that release provides.
 - The result must not depend on the number of threads (same values, same order). If a parallel and a serial path exist, a test compares them.
 
 ## AVX2 and CUDA kernels

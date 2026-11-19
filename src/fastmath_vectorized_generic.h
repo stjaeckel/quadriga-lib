@@ -8,7 +8,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <limits.h>
-#include "slerp.h"
+#include "qd_helpers_shared.hpp"
 
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
@@ -129,7 +129,7 @@ void qd_SLERP_GENERIC(const dtype * Ar, const dtype * Ai,
     for (long long i = 0; i < n_val_ll; ++i)
     {
         float xr, xi;
-        slerp_complex_mf<float>((float)Ar[i], (float)Ai[i],
+        qd_slerp_complex<float>((float)Ar[i], (float)Ai[i],
                                 (float)Br[i], (float)Bi[i],
                                 (float)w[i], xr, xi);
         Xr[i] = xr;

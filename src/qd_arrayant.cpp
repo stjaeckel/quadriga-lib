@@ -9,8 +9,7 @@
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 #include "quadriga_math.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_arrayant.hpp"
 
 /*!SECTION
 Array antenna class

@@ -3,7 +3,7 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
 
 // This is supposed to run on 64-bit only
 static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");

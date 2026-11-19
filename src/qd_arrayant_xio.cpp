@@ -3,9 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_arrayant.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_lib_helper_functions.hpp"
-#include "slerp.h"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
 
 #include <stdexcept>
 #include <filesystem>
@@ -988,7 +987,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_patter
             dtype *p_ro = cre.memptr(), *p_io = cim.memptr();
             const arma::uword nE = n_elements * n_ports_out;
             for (arma::uword k = 0; k < nE; ++k)
-                slerp_complex_mf(p_rlo[k], p_ilo[k], p_rhi[k], p_ihi[k], dtype(w), p_ro[k], p_io[k]);
+                qd_slerp_complex(p_rlo[k], p_ilo[k], p_rhi[k], p_ihi[k], dtype(w), p_ro[k], p_io[k]);
             coupling = arma::Mat<std::complex<dtype>>(cre, cim);
         }
 

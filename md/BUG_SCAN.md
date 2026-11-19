@@ -50,12 +50,12 @@ Everything in the library is in scope unless the maintainer excluded it in phase
 | A. Array antennas | `qd_arrayant*`, interpolation (generic and AVX2), generate, combine, rotate, qdant read/write, xio, speaker, beamwidth and directivity |
 | B. Channel object and file I/O | `qd_channel*`, HDF5, QRT, `quantize_delays`, OBJ read/write, Mitsuba XML, PNG, conf files |
 | C. Channel generation and tools | `get_channels_*` (planar, spherical, multifreq, IRS, IEEE indoor), `baseband_freq_response` (generic and AVX2), `qd_tools_*`, acdf, diffraction gain and paths, `qd_path`, `coord2path`, `path_to_tube`, `polmat_update`, `combine_irs_coord` |
-| D. Stochastic channel model | `qd_scenpar`, `lsp_generate`, `ssf_clusters`, `qd_gbsm_phases`, `path_loss`, `los_probability`, `o2i_loss`, `qd_atmospheric_absorption`, `quadriga_gbsm_helpers` |
+| D. Stochastic channel model | `qd_scenpar`, `lsp_generate`, `ssf_clusters`, `qd_gbsm_phases`, `path_loss`, `los_probability`, `o2i_loss`, `qd_helpers_gbsm` |
 | E. SOS | `sos_*` (generic and AVX2) |
 | F. Geometry and math | ray/triangle and ray/point intersect (generic and AVX2), `point_inside_mesh`, point-cloud and triangle-mesh tools, subdivide, icosphere / cube / plane, `obj_overlap_test`, fastmath, slerp, rotation matrix, interp |
 | G. Ray interaction and acoustics | `ray_mesh_interact`, `ray_progress`, `ray_commit`, `ray_init`, `ray_subdivide_flag`, `subdivide_rays`, the material tables in `data/` |
 | H. CUDA | `src/*.cu`, `cuda_common.hpp`, `quadriga_lib_cuda_functions.hpp`, and the GPU paths of the functions that dispatch to them |
-| I. Cross-API layer | the MEX helpers and every `api_mex` wrapper, the Python adapters and every `qpy_*` wrapper |
+| I. Cross-API layer | `qd_helpers_wrappers`, the MEX helpers and every `api_mex` wrapper, the Python adapters and every `qpy_*` wrapper |
 
 Notes on the areas:
 

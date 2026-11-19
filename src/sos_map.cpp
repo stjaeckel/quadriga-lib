@@ -4,7 +4,7 @@
 
 #include "quadriga_sos.hpp"
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
 
 #include <cstdint>
 #include <cstring>

@@ -83,7 +83,7 @@ def test_family_by_name(mini_repo):
 
 
 @pytest.mark.parametrize("toml, message", [
-    ('nosuch = ["quadriga_lib_version"]', "unknown stem 'nosuch'"),
+    ('nosuch = ["quadriga_lib_version"]', "unknown family 'nosuch'"),
     ('version = ["nosuch"]', "unknown C++ function 'nosuch' in family 'version'"),
     ('version = ["quadriga_lib_version"]\ncomponents = ["quadriga_lib_version"]',
      "C++ function 'quadriga_lib_version' is in two families"),

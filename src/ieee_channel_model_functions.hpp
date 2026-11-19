@@ -14,7 +14,7 @@
 #include <cstddef>
 #include <optional>
 
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
 
 // Generate channel parameters for the IEEE indoor channel models as defined by TGn, TGac, TGah and TGax
 // - Outputs non-zero paths and clusters where the max. n_path_out = n_cluster * n_path (+1) from the IEEE tables (+1 additional LOS cluster, if present)

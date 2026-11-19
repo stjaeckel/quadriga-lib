@@ -3,7 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 #include <atomic>
 #include <limits>
 

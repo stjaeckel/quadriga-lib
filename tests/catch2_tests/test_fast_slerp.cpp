@@ -7,7 +7,7 @@
 #include "quadriga_lib.hpp" // quadriga_lib_has_AVX2
 #include <cmath>
 
-// Helper: scalar double-precision SLERP reference (matches slerp_complex_mf logic)
+// Helper: scalar double-precision SLERP reference (matches qd_slerp_complex logic)
 static void slerp_ref(double Ar, double Ai, double Br, double Bi, double w,
                       double &Xr, double &Xi)
 {

@@ -88,8 +88,7 @@
 // parts of the state machine (ray_state_update). Then the public functions, each after its API block.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_helper_functions.hpp"
-#include "qd_atmospheric_absorption.hpp"
+#include "qd_helpers_shared.hpp"
 
 #include <complex>
 #include <unordered_map>

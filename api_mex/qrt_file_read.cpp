@@ -4,9 +4,8 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_helper_functions.hpp"
-#include "quadriga_lib_helper_functions.hpp"
-#include "qd_qrt_chunk_reader.hpp"
+#include "qd_helpers_mex.hpp"
+#include "qd_helpers_wrappers.hpp"
 
 /*!SECTION
 Channel functions

@@ -21,7 +21,7 @@
 //     qd_acoustic_freq_scale (343 m/s), the mapping the rows of page 11.4 were fitted with.
 
 #include "ray_test_helpers.hpp"
-#include "qd_atmospheric_absorption.hpp"
+#include "qd_helpers_shared.hpp"
 
 #include <cstring>
 #include <numeric>

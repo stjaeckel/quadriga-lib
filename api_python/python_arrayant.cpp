@@ -8,18 +8,10 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_arrayant_calc_beamwidth.cpp"
-#include "qpy_arrayant_calc_directivity.cpp"
-#include "qpy_arrayant_combine_pattern.cpp"
-#include "qpy_arrayant_concat.cpp"
-#include "qpy_arrayant_copy_element.cpp"
-#include "qpy_arrayant_export_obj_file.cpp"
+#include "qpy_arrayant_ops.cpp"
+#include "qpy_arrayant_io.cpp"
 #include "qpy_arrayant_generate.cpp"
 #include "qpy_arrayant_interpolate.cpp"
-#include "qpy_qdant_read.cpp"
-#include "qpy_qdant_write.cpp"
-#include "qpy_arrayant_rotate_pattern.cpp"
-#include "qpy_generate_speaker.cpp"
 
 void quadriga_lib_arrayant(py::module_ &m)
 {

@@ -8,16 +8,10 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_fast_cart2geo.cpp"
+#include "qpy_fastmath.cpp"
 #include "qpy_write_png.cpp"
-#include "qpy_calc_delay_spread.cpp"
-#include "qpy_acdf.cpp"
-#include "qpy_calc_angular_spread.cpp"
-#include "qpy_calc_rician_k_factor.cpp"
-#include "qpy_calc_cross_polarization_ratio.cpp"
-#include "qpy_fast_geo2cart.cpp"
+#include "qpy_channel_statistics.cpp"
 #include "qpy_calc_rotation_matrix.cpp"
-#include "qpy_fast_sincos.cpp"
 #include "qpy_interp.cpp"
 
 void quadriga_lib_tools(py::module_ &m)

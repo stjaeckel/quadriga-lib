@@ -16,7 +16,6 @@ void quadriga_lib_sos(py::module_ &m);
 void quadriga_lib_tools(py::module_ &m);
 
 // Include parts
-#include "qpy_components.cpp"
 #include "qpy_version.cpp"
 
 PYBIND11_MODULE(quadriga_lib, m)

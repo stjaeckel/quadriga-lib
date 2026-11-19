@@ -1,0 +1,1027 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
+#ifndef qd_helpers_python_types_hpp
+#define qd_helpers_python_types_hpp
+
+#include "quadriga_lib.hpp"
+#include "qd_helpers_python.hpp"
+
+#include <iterator>
+#include <type_traits>
+
+namespace py = pybind11;
+
+static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
+{
+    py::dict output;
+    output["e_theta_re"] = qd_python_copy2numpy(&ant.e_theta_re);
+    output["e_theta_im"] = qd_python_copy2numpy(&ant.e_theta_im);
+    output["e_phi_re"] = qd_python_copy2numpy(&ant.e_phi_re);
+    output["e_phi_im"] = qd_python_copy2numpy(&ant.e_phi_im);
+    output["azimuth_grid"] = qd_python_copy2numpy(&ant.azimuth_grid);
+    output["elevation_grid"] = qd_python_copy2numpy(&ant.elevation_grid);
+    output["element_pos"] = qd_python_copy2numpy(&ant.element_pos);
+    output["coupling_re"] = qd_python_copy2numpy(&ant.coupling_re);
+    output["coupling_im"] = qd_python_copy2numpy(&ant.coupling_im);
+    output["center_freq"] = ant.center_freq;
+    output["name"] = ant.name;
+    return output;
+}
+
+static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::arrayant<double>> &ant)
+{
+    if (ant.empty())
+        return py::dict();
+
+    if (ant.size() == 1)
+        return qd_python_arrayant2dict(ant[0]);
+
+    size_t n_freq = ant.size();
+    const auto &a0 = ant[0];
+
+    py::dict output;
+
+    // Pattern fields to 4D numpy arrays
+    std::vector<arma::Cube<double>> vec_etr(n_freq), vec_eti(n_freq), vec_epr(n_freq), vec_epi(n_freq);
+    for (size_t f = 0; f < n_freq; ++f)
+    {
+        vec_etr[f] = ant[f].e_theta_re;
+        vec_eti[f] = ant[f].e_theta_im;
+        vec_epr[f] = ant[f].e_phi_re;
+        vec_epi[f] = ant[f].e_phi_im;
+    }
+    output["e_theta_re"] = qd_python_stack2numpy(&vec_etr);
+    output["e_theta_im"] = qd_python_stack2numpy(&vec_eti);
+    output["e_phi_re"] = qd_python_stack2numpy(&vec_epr);
+    output["e_phi_im"] = qd_python_stack2numpy(&vec_epi);
+
+    // Shared fields from first entry
+    output["azimuth_grid"] = qd_python_copy2numpy(&a0.azimuth_grid);
+    output["elevation_grid"] = qd_python_copy2numpy(&a0.elevation_grid);
+    output["element_pos"] = qd_python_copy2numpy(&a0.element_pos);
+    output["name"] = a0.name;
+
+    // Center frequency as 1D array
+    arma::Col<double> center_freqs(n_freq);
+    for (size_t f = 0; f < n_freq; ++f)
+        center_freqs[f] = ant[f].center_freq;
+    output["center_freq"] = qd_python_copy2numpy(&center_freqs);
+
+    // Coupling: check if all entries are identical
+    bool coupling_varies = false;
+    for (size_t f = 1; f < n_freq && !coupling_varies; ++f)
+    {
+        if (ant[f].coupling_re.n_elem != a0.coupling_re.n_elem ||
+            ant[f].coupling_im.n_elem != a0.coupling_im.n_elem)
+            coupling_varies = true;
+        else
+        {
+            if (a0.coupling_re.n_elem > 0 && !arma::approx_equal(ant[f].coupling_re, a0.coupling_re, "absdiff", 1e-15))
+                coupling_varies = true;
+            if (a0.coupling_im.n_elem > 0 && !arma::approx_equal(ant[f].coupling_im, a0.coupling_im, "absdiff", 1e-15))
+                coupling_varies = true;
+        }
+    }
+
+    if (coupling_varies)
+    {
+        // Per-frequency: store as 3D (n_el × n_ports × n_freq)
+        if (a0.coupling_re.n_elem > 0)
+        {
+            arma::uword nr = a0.coupling_re.n_rows, nc = a0.coupling_re.n_cols;
+            arma::Cube<double> cpl_re(nr, nc, n_freq, arma::fill::none);
+            for (size_t f = 0; f < n_freq; ++f)
+                cpl_re.slice(f) = ant[f].coupling_re;
+            output["coupling_re"] = qd_python_copy2numpy(&cpl_re);
+        }
+        else
+            output["coupling_re"] = qd_python_copy2numpy(&a0.coupling_re);
+
+        if (a0.coupling_im.n_elem > 0)
+        {
+            arma::uword nr = a0.coupling_im.n_rows, nc = a0.coupling_im.n_cols;
+            arma::Cube<double> cpl_im(nr, nc, n_freq, arma::fill::none);
+            for (size_t f = 0; f < n_freq; ++f)
+                cpl_im.slice(f) = ant[f].coupling_im;
+            output["coupling_im"] = qd_python_copy2numpy(&cpl_im);
+        }
+        else
+            output["coupling_im"] = qd_python_copy2numpy(&a0.coupling_im);
+    }
+    else
+    {
+        // Shared: store as 2D
+        output["coupling_re"] = qd_python_copy2numpy(&a0.coupling_re);
+        output["coupling_im"] = qd_python_copy2numpy(&a0.coupling_im);
+    }
+
+    return output;
+}
+
+// Wrapper defaults of the optional arrayant fields, as in the MATLAB / Octave reader: an empty element_pos becomes
+// zeros, an empty coupling identity, an empty coupling_im zeros (the library treats empty members the same way;
+// filled members keep the arrays that the wrappers return unchanged)
+static void qd_python_fill_arrayant_defaults(quadriga_lib::arrayant<double> &ant)
+{
+    const arma::uword n_elements = ant.e_theta_re.n_slices;
+    if (ant.element_pos.is_empty())
+        ant.element_pos.zeros(3, n_elements);
+    if (ant.coupling_re.is_empty() && ant.coupling_im.is_empty())
+        ant.coupling_re.eye(n_elements, n_elements);
+    if (ant.coupling_im.is_empty())
+        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
+}
+
+static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
+                                                              bool view = false, bool strict = false,
+                                                              bool validate = false)
+{
+    quadriga_lib::arrayant<double> ant;
+
+    // A 4D pattern is multi-frequency data, which has its own converter
+    const auto e_theta_re_arr = py::array::ensure(arrayant["e_theta_re"]);
+    if (e_theta_re_arr && e_theta_re_arr.ndim() == 4)
+        throw std::invalid_argument("Arrayant dict has 4D (multi-frequency) patterns; this function takes "
+                                    "single-frequency (3D) patterns.");
+
+    // Mandatory fields
+    ant.e_theta_re = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_re"], view, strict);
+    ant.e_theta_im = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_im"], view, strict);
+    ant.e_phi_re = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_re"], view, strict);
+    ant.e_phi_im = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_im"], view, strict);
+    ant.azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], view, strict);
+    ant.elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], view, strict);
+
+    // Optional fields; absent or empty ones get their defaults (zeros, identity)
+    if (arrayant.contains("element_pos"))
+        ant.element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], view, strict);
+    if (arrayant.contains("coupling_re"))
+        ant.coupling_re = qd_python_numpy2arma_Mat<double>(arrayant["coupling_re"], view, strict);
+    if (arrayant.contains("coupling_im"))
+        ant.coupling_im = qd_python_numpy2arma_Mat<double>(arrayant["coupling_im"], view, strict);
+    qd_python_fill_arrayant_defaults(ant);
+
+    if (arrayant.contains("center_freq")) // Scalar or array with exactly one element
+    {
+        const auto center_freq = qd_python_numpy2arma_Col<double>(arrayant["center_freq"]);
+        if (center_freq.n_elem != 1)
+            throw std::invalid_argument("Input 'center_freq' must have exactly one element for a single-frequency arrayant.");
+        ant.center_freq = center_freq.at(0);
+    }
+
+    if (arrayant.contains("name"))
+        ant.name = arrayant["name"].cast<std::string>();
+
+    if (validate)
+    {
+        auto error_msg = ant.is_valid();
+        if (!error_msg.empty())
+            throw std::invalid_argument(error_msg.c_str());
+    }
+
+    return ant;
+}
+
+// Multi-frequency: dict → std::vector<arrayant>
+// - 'require_center_freq': 4D input without 'center_freq' raises; pass false only where the frequency is not used
+//   (all entries then get the default 299792458)
+static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi(const py::dict &arrayant,
+                                                                                 bool view = false, bool strict = false,
+                                                                                 bool validate = false,
+                                                                                 bool require_center_freq = true)
+{
+    // Determine number of frequencies from e_theta_re shape
+    py::array e_theta_re_arr = py::cast<py::array>(arrayant["e_theta_re"]);
+    int nd = (int)e_theta_re_arr.request().ndim;
+
+    // 1D/2D pattern fields describe a single-frequency antenna with implicit trailing dimensions.
+    // Delegate to the single-frequency parser (qd_python_numpy2arma_Cube promotes them to 3D cubes) and return a length-1 vector.
+    if (nd < 3)
+    {
+        std::vector<quadriga_lib::arrayant<double>> ant(1);
+        ant[0] = qd_python_dict2arrayant(arrayant, view, strict, validate);
+        return ant;
+    }
+
+    size_t n_freq = 1;
+    if (nd == 4)
+        n_freq = (size_t)e_theta_re_arr.request().shape[3];
+    else if (nd != 3)
+        throw std::invalid_argument("'e_theta_re' must be 3D (single freq) or 4D (multi-freq).");
+
+    // Parse pattern fields as vector<Cube>
+    auto e_theta_re = qd_python_numpy2arma_vecCube<double>(arrayant["e_theta_re"], view, strict);
+    auto e_theta_im = qd_python_numpy2arma_vecCube<double>(arrayant["e_theta_im"], view, strict);
+    auto e_phi_re = qd_python_numpy2arma_vecCube<double>(arrayant["e_phi_re"], view, strict);
+    auto e_phi_im = qd_python_numpy2arma_vecCube<double>(arrayant["e_phi_im"], view, strict);
+
+    if (e_theta_re.size() != n_freq || e_theta_im.size() != n_freq ||
+        e_phi_re.size() != n_freq || e_phi_im.size() != n_freq)
+        throw std::invalid_argument("Pattern fields must all have the same number of frequency entries.");
+
+    // Parse shared fields
+    auto azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], view, strict);
+    auto elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], view, strict);
+
+    arma::Mat<double> element_pos;
+    if (arrayant.contains("element_pos"))
+        element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], view, strict);
+
+    std::string name;
+    if (arrayant.contains("name"))
+        name = arrayant["name"].cast<std::string>();
+
+    // Parse center_freq: one value per frequency entry (scalar or array); required for more than one entry
+    arma::Col<double> center_freqs(n_freq);
+    if (arrayant.contains("center_freq"))
+    {
+        center_freqs = qd_python_numpy2arma_Col<double>(arrayant["center_freq"]);
+        if (center_freqs.n_elem != n_freq)
+            throw std::invalid_argument("'center_freq' length must match number of frequency entries.");
+    }
+    else if (n_freq == 1 || !require_center_freq)
+        center_freqs.fill(299792458.0); // Default
+    else
+        throw std::invalid_argument("Input 'center_freq' is required for a multi-frequency arrayant (4D pattern fields).");
+
+    // Parse coupling: 2D (shared) or 3D (per-freq)
+    std::vector<arma::Mat<double>> coupling_re_vec(n_freq);
+    std::vector<arma::Mat<double>> coupling_im_vec(n_freq);
+    bool has_coupling_re = arrayant.contains("coupling_re");
+    bool has_coupling_im = arrayant.contains("coupling_im");
+
+    if (has_coupling_re)
+    {
+        py::array cpl_arr = py::cast<py::array>(arrayant["coupling_re"]);
+        int cpl_nd = (int)cpl_arr.request().ndim;
+        if (cpl_nd <= 2) // Shared across all frequencies
+        {
+            auto cpl = qd_python_numpy2arma_Mat<double>(arrayant["coupling_re"], view, strict);
+            for (size_t f = 0; f < n_freq; ++f)
+                coupling_re_vec[f] = cpl;
+        }
+        else // 3D: (n_el, n_ports, n_freq) — slices are per-frequency coupling matrices
+        {
+            auto cpl_cube = qd_python_numpy2arma_Cube<double>(arrayant["coupling_re"], view, strict);
+            if (cpl_cube.n_slices != n_freq)
+                throw std::invalid_argument("'coupling_re' 3rd dimension must match number of frequency entries.");
+            for (size_t f = 0; f < n_freq; ++f)
+                coupling_re_vec[f] = cpl_cube.slice(f);
+        }
+    }
+
+    if (has_coupling_im)
+    {
+        py::array cpl_arr = py::cast<py::array>(arrayant["coupling_im"]);
+        int cpl_nd = (int)cpl_arr.request().ndim;
+        if (cpl_nd <= 2)
+        {
+            auto cpl = qd_python_numpy2arma_Mat<double>(arrayant["coupling_im"], view, strict);
+            for (size_t f = 0; f < n_freq; ++f)
+                coupling_im_vec[f] = cpl;
+        }
+        else
+        {
+            auto cpl_cube = qd_python_numpy2arma_Cube<double>(arrayant["coupling_im"], view, strict);
+            if (cpl_cube.n_slices != n_freq)
+                throw std::invalid_argument("'coupling_im' 3rd dimension must match number of frequency entries.");
+            for (size_t f = 0; f < n_freq; ++f)
+                coupling_im_vec[f] = cpl_cube.slice(f);
+        }
+    }
+
+    // Build the vector of arrayant
+    std::vector<quadriga_lib::arrayant<double>> ant(n_freq);
+    for (size_t f = 0; f < n_freq; ++f)
+    {
+        ant[f].e_theta_re = std::move(e_theta_re[f]);
+        ant[f].e_theta_im = std::move(e_theta_im[f]);
+        ant[f].e_phi_re = std::move(e_phi_re[f]);
+        ant[f].e_phi_im = std::move(e_phi_im[f]);
+        ant[f].azimuth_grid = azimuth_grid;
+        ant[f].elevation_grid = elevation_grid;
+        ant[f].element_pos = element_pos;
+        ant[f].center_freq = center_freqs[f];
+        ant[f].name = name;
+        if (has_coupling_re)
+            ant[f].coupling_re = std::move(coupling_re_vec[f]);
+        if (has_coupling_im)
+            ant[f].coupling_im = std::move(coupling_im_vec[f]);
+        qd_python_fill_arrayant_defaults(ant[f]);
+    }
+
+    if (validate)
+    {
+        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant);
+        if (!error_msg.empty())
+            throw std::invalid_argument(error_msg.c_str());
+    }
+
+    return ant;
+}
+
+// Emit a vector of per-snapshot arma objects either as a Python list of arrays
+// (stack = false) or stacked into one higher-dimensional Numpy array along an
+// appended snapshot axis (stack = true). i_vec selects / orders the snapshots.
+template <typename dtype_numpy, typename dtype_arma>
+static py::object qd_python_emit_paths(const std::vector<dtype_arma> *re,
+                                       bool stack,
+                                       const arma::uvec &i_vec = arma::uvec(),
+                                       const std::vector<dtype_arma> *im = nullptr)
+{
+    using dtype = typename dtype_arma::elem_type;
+    if (stack)
+        return qd_python_stack2numpy<dtype, dtype_numpy>(re, im, i_vec);
+    return qd_python_copy2list<dtype_arma, dtype_numpy>(re, im, i_vec);
+}
+
+// Convert a single channel object to the Python channel dict
+static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &channel,
+                                       const arma::uvec &snap = arma::uvec(),
+                                       bool validate = false,
+                                       bool stack = false)
+{
+    if (validate)
+    {
+        auto error_msg = channel.is_valid();
+        if (!error_msg.empty())
+            throw std::invalid_argument(error_msg.c_str());
+    }
+
+    const bool snap_given = !snap.is_empty();
+    const arma::uword n_snap_channel = channel.n_snap();
+
+    // Resolve snapshot index: empty -> all; otherwise validate bounds
+    arma::uvec i_snap;
+    if (n_snap_channel == 0)
+        i_snap.reset();
+    else if (!snap_given)
+    {
+        i_snap.set_size(n_snap_channel);
+        for (arma::uword s = 0; s < n_snap_channel; ++s)
+            i_snap.at(s) = s;
+    }
+    else
+    {
+        for (arma::uword s : snap)
+            if (s >= n_snap_channel)
+                throw std::invalid_argument("Snapshot index out of bound.");
+        i_snap = snap;
+    }
+
+    py::dict output;
+
+    // Positions / orientations: (3, 1) shared or (3, n_snap) per-snapshot
+    auto emit_per_snap_mat = [&](const char *key, const arma::Mat<double> &matrix)
+    {
+        if (matrix.n_cols == 1 || (matrix.n_cols > 1 && !snap_given))
+            output[key] = qd_python_copy2numpy(&matrix);
+        else if (snap_given && matrix.n_cols > 1)
+            output[key] = qd_python_copy2numpy<double, double>(&matrix, nullptr, i_snap);
+    };
+
+    output["name"] = channel.name;
+
+    emit_per_snap_mat("rx_pos", channel.rx_pos);
+    emit_per_snap_mat("tx_pos", channel.tx_pos);
+    emit_per_snap_mat("rx_orientation", channel.rx_orientation);
+    emit_per_snap_mat("tx_orientation", channel.tx_orientation);
+
+    // Coefficients (complex) and delays
+    if (!channel.coeff_re.empty())
+        output["coeff"] = qd_python_emit_paths<std::complex<double>>(&channel.coeff_re, stack, i_snap, &channel.coeff_im);
+    if (!channel.delay.empty())
+        output["delay"] = qd_python_emit_paths<double>(&channel.delay, stack, i_snap);
+
+    if (!channel.path_gain.empty())
+        output["path_gain"] = qd_python_emit_paths<double>(&channel.path_gain, stack, i_snap);
+    if (!channel.path_length.empty())
+        output["path_length"] = qd_python_emit_paths<double>(&channel.path_length, stack, i_snap);
+    if (!channel.polmat.empty())
+        output["polmat"] = qd_python_emit_paths<double>(&channel.polmat, stack, i_snap);
+    if (!channel.path_angles.empty())
+        output["path_angles"] = qd_python_emit_paths<double>(&channel.path_angles, stack, i_snap);
+
+    if (!channel.fbs_pos.empty())
+        output["fbs_pos"] = qd_python_emit_paths<double>(&channel.fbs_pos, stack, i_snap);
+    if (!channel.lbs_pos.empty())
+        output["lbs_pos"] = qd_python_emit_paths<double>(&channel.lbs_pos, stack, i_snap);
+
+    if (!channel.n_interact.empty())
+        output["n_interact"] = qd_python_emit_paths<py::ssize_t>(&channel.n_interact, stack, i_snap);
+    if (!channel.interact_coord.empty())
+        output["interact_coord"] = qd_python_emit_paths<double>(&channel.interact_coord, stack, i_snap);
+
+    // Center frequency: scalar shared or per-snapshot
+    if (channel.center_freq.n_elem == 1 || (channel.center_freq.n_elem > 1 && !snap_given))
+        output["center_freq"] = qd_python_copy2numpy(&channel.center_freq);
+    else if (snap_given && channel.center_freq.n_elem > 1)
+        output["center_freq"] = qd_python_copy2numpy<double, double>(&channel.center_freq, nullptr, i_snap);
+
+    if (n_snap_channel > 0)
+    {
+        output["initial_position"] = channel.initial_position;
+    }
+
+    return output;
+}
+
+static py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<double>> &chan,
+                                       bool validate = false,
+                                       bool stack = false)
+{
+    py::list list;
+    for (const auto &channel : chan)
+        list.append(qd_python_channel2dict(channel, {}, validate, stack));
+    return list;
+}
+
+// Build a single channel object from a Python channel dict (inverse of qd_python_channel2dict).
+//
+// Per-snapshot fields are accepted in either layout, auto-detected per field:
+//   * "list" model  — a Python list of per-snapshot arrays (n_path may vary per snapshot)
+//   * "stack" model — a single Numpy array with the snapshot index as the last axis
+// Positions, orientations and center_freq are plain arrays in both models.
+// Dict keys match qd_python_channel2dict / hdf5_read_channel (NOT the legacy write keys).
+// Unstructured "par" data is NOT handled here — it is kept separate (see hdf5_write_channel).
+static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict,
+                                                            bool validate = false)
+{
+    quadriga_lib::channel<double> c;
+
+    auto has = [&](const char *key) -> bool
+    {
+        return dict.contains(key) && !dict[key].is_none();
+    };
+
+    // Load one member if its key is present. Positions, orientations and center_freq are plain arrays;
+    // per-snapshot members are a list of per-snapshot arrays ("list" model) or one array with the
+    // snapshot index on the last axis ("stack" model).
+    auto load = [&](const char *key, auto &member)
+    {
+        if (!has(key))
+            return;
+        py::object v = dict[key];
+        const bool is_list = py::isinstance<py::list>(v);
+        using M = std::decay_t<decltype(member)>;
+        if constexpr (std::is_same_v<M, arma::Mat<double>>)
+            member = qd_python_numpy2arma_Mat<double>(v, true);
+        else if constexpr (std::is_same_v<M, arma::Col<double>>)
+            member = qd_python_numpy2arma_Col<double>(v, true);
+        else if constexpr (std::is_same_v<M, std::vector<arma::Cube<double>>>)
+            member = is_list ? qd_python_list2vector_Cube<double>(py::reinterpret_borrow<py::list>(v))
+                             : qd_python_numpy2arma_vecCube<double>(v, true);
+        else if constexpr (std::is_same_v<M, std::vector<arma::Mat<double>>>)
+            member = is_list ? qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v))
+                             : qd_python_numpy2arma_vecMat<double>(v);
+        else // std::vector<arma::Col<double or unsigned>>
+        {
+            using T = typename M::value_type::elem_type;
+            member = is_list ? qd_python_list2vector_Col<T>(py::reinterpret_borrow<py::list>(v))
+                             : qd_python_numpy2arma_vecCol<T>(v);
+        }
+    };
+
+    if (has("name"))
+        c.name = dict["name"].cast<std::string>();
+    if (has("initial_position"))
+        c.initial_position = dict["initial_position"].cast<decltype(c.initial_position)>();
+
+    load("tx_pos", c.tx_pos);
+    load("rx_pos", c.rx_pos);
+    load("tx_orientation", c.tx_orientation);
+    load("rx_orientation", c.rx_orientation);
+    load("center_freq", c.center_freq);
+
+    // Coefficients: one complex key "coeff", or the two real keys "coeff_re" / "coeff_im", not both
+    if (has("coeff") && (has("coeff_re") || has("coeff_im")))
+        throw std::invalid_argument("Channel dict: provide either 'coeff' (complex) or 'coeff_re'/'coeff_im' (real), not both.");
+    if (has("coeff"))
+    {
+        py::object v = dict["coeff"];
+        if (py::isinstance<py::list>(v))
+            qd_python_list2vector_Cube_Cplx<double>(py::reinterpret_borrow<py::list>(v), c.coeff_re, c.coeff_im);
+        else
+            qd_python_numpy2arma_vecCube_Cplx<double>(v, c.coeff_re, c.coeff_im);
+    }
+    load("coeff_re", c.coeff_re);
+    load("coeff_im", c.coeff_im);
+
+    load("delay", c.delay);
+    load("path_gain", c.path_gain);
+    load("path_length", c.path_length);
+    load("polmat", c.polmat);                       // real interleaved (8, n_path) as in C++
+    load("path_angles", c.path_angles);
+    load("fbs_pos", c.fbs_pos);
+    load("lbs_pos", c.lbs_pos);
+    load("n_interact", c.n_interact);
+    load("interact_coord", c.interact_coord);
+
+    // Prune zero-padded trailing columns in interact_coord (stacked layout, as in the MEX struct reader)
+    const size_t n_snap = (size_t)c.n_snap();
+    if (has("interact_coord") && !py::isinstance<py::list>(dict["interact_coord"]) &&
+        c.n_interact.size() == n_snap && c.interact_coord.size() == n_snap)
+        for (size_t s = 0; s < n_snap; ++s)
+        {
+            const arma::uword cnt = (arma::uword)arma::accu(arma::conv_to<arma::uvec>::from(c.n_interact[s]));
+            if (c.interact_coord[s].n_cols > cnt)
+                c.interact_coord[s].resize(c.interact_coord[s].n_rows, cnt);
+        }
+
+    if (validate && !c.empty())
+    {
+        const std::string err = c.is_valid();
+        if (!err.empty())
+            throw std::invalid_argument(err);
+    }
+
+    return c;
+}
+
+// Build a vector of channel objects from Python input (inverse of qd_python_channel2list).
+//
+// Accepts either:
+//   * a list of channel dicts  -> one channel per list entry
+//   * a single channel dict    -> a length-1 vector (convenience, mirrors MEX scalar-struct)
+// Each dict is converted via qd_python_dict2channel; per-snapshot fields independently use
+// the list or stack model (see there).
+static std::vector<quadriga_lib::channel<double>> qd_python_list2channel(const py::handle &obj,
+                                                                         bool validate = false)
+{
+    std::vector<quadriga_lib::channel<double>> channels;
+
+    if (obj.is_none())
+        return channels;
+
+    // Single dict -> length-1 vector
+    if (py::isinstance<py::dict>(obj))
+    {
+        channels.push_back(qd_python_dict2channel(py::reinterpret_borrow<py::dict>(obj), validate));
+        return channels;
+    }
+
+    if (!py::isinstance<py::list>(obj))
+        throw std::invalid_argument("Channel input must be a dict or a list of dicts.");
+
+    py::list list = py::reinterpret_borrow<py::list>(obj);
+    channels.reserve(list.size());
+    for (py::handle item : list)
+    {
+        if (!py::isinstance<py::dict>(item))
+            throw std::invalid_argument("Each channel list entry must be a dict.");
+        channels.push_back(qd_python_dict2channel(py::reinterpret_borrow<py::dict>(item), validate));
+    }
+
+    return channels;
+}
+
+// Convert an unstructured dataset (std::any) to a numpy array / scalar / str.
+// Missing dataset -> None. Stored type and shape are preserved.
+static py::object qd_python_any2numpy(const std::any &dset)
+{
+    if (!dset.has_value())
+        return py::none();
+
+    int type_id = quadriga_lib::any_type_id(&dset);
+
+#define QD_PY_ANY_ARR(id, T) \
+    case id:                 \
+        return qd_python_copy2numpy(std::any_cast<T>(&dset));
+
+    switch (type_id)
+    {
+    case 9: // std::string
+        return py::cast(std::any_cast<std::string>(dset));
+
+    // Scalars -> Python numbers
+    case 10:
+        return py::cast(std::any_cast<float>(dset));
+    case 11:
+        return py::cast(std::any_cast<double>(dset));
+    case 12:
+        return py::cast(std::any_cast<unsigned long long>(dset));
+    case 13:
+        return py::cast(std::any_cast<long long>(dset));
+    case 14:
+        return py::cast(std::any_cast<unsigned>(dset));
+    case 15:
+        return py::cast(std::any_cast<int>(dset));
+
+        // Matrices
+        QD_PY_ANY_ARR(20, arma::Mat<float>)
+        QD_PY_ANY_ARR(21, arma::Mat<double>)
+        QD_PY_ANY_ARR(22, arma::Mat<unsigned long long>)
+        QD_PY_ANY_ARR(23, arma::Mat<long long>)
+        QD_PY_ANY_ARR(24, arma::Mat<unsigned>)
+        QD_PY_ANY_ARR(25, arma::Mat<int>)
+
+        // Cubes
+        QD_PY_ANY_ARR(30, arma::Cube<float>)
+        QD_PY_ANY_ARR(31, arma::Cube<double>)
+        QD_PY_ANY_ARR(32, arma::Cube<unsigned long long>)
+        QD_PY_ANY_ARR(33, arma::Cube<long long>)
+        QD_PY_ANY_ARR(34, arma::Cube<unsigned>)
+        QD_PY_ANY_ARR(35, arma::Cube<int>)
+
+        // Column vectors
+        QD_PY_ANY_ARR(40, arma::Col<float>)
+        QD_PY_ANY_ARR(41, arma::Col<double>)
+        QD_PY_ANY_ARR(42, arma::Col<unsigned long long>)
+        QD_PY_ANY_ARR(43, arma::Col<long long>)
+        QD_PY_ANY_ARR(44, arma::Col<unsigned>)
+        QD_PY_ANY_ARR(45, arma::Col<int>)
+
+        // Row vectors
+        QD_PY_ANY_ARR(50, arma::Row<float>)
+        QD_PY_ANY_ARR(51, arma::Row<double>)
+        QD_PY_ANY_ARR(52, arma::Row<unsigned long long>)
+        QD_PY_ANY_ARR(53, arma::Row<long long>)
+        QD_PY_ANY_ARR(54, arma::Row<unsigned>)
+        QD_PY_ANY_ARR(55, arma::Row<int>)
+
+    default:
+        throw std::invalid_argument("Unsupported dataset type.");
+    }
+
+#undef QD_PY_ANY_ARR
+}
+
+// -------------------------------- Flags and paths --------------------------------
+
+// Python flag -> bool
+// - None gives 'default_value'; Python bool and numpy.bool_ give their value
+// - Anything else (also int and str) throws py::type_error naming the input 'name'
+static bool qd_python_flag(const py::handle &value, bool default_value, const std::string &name)
+{
+    if (value.is_none())
+        return default_value;
+    if (py::isinstance<py::bool_>(value) || py::isinstance(value, py::module_::import("numpy").attr("bool_")))
+    {
+        const int res = PyObject_IsTrue(value.ptr());
+        if (res < 0)
+            throw py::error_already_set();
+        return res == 1;
+    }
+    throw py::type_error("Input '" + name + "' must be a bool or None.");
+}
+
+// Python path -> std::string; returns false if 'value' is not a path
+// - str and bytes as they are; an object with '__fspath__' is converted with os.fspath first
+static bool qd_python_try_path(const py::handle &value, std::string &path)
+{
+    py::object v = py::reinterpret_borrow<py::object>(value);
+    if (!py::isinstance<py::str>(v) && !py::isinstance<py::bytes>(v) && py::hasattr(v, "__fspath__"))
+        v = py::module_::import("os").attr("fspath")(v);
+    if (!py::isinstance<py::str>(v) && !py::isinstance<py::bytes>(v))
+        return false;
+    path = py::cast<std::string>(v);
+    return true;
+}
+
+// Python path (str, bytes or os.PathLike) -> std::string; anything else throws py::type_error naming the input 'name'
+static std::string qd_python_path(const py::handle &value, const std::string &name)
+{
+    std::string path;
+    if (!qd_python_try_path(value, path))
+        throw py::type_error("Input '" + name + "' must be a str or path-like object.");
+    return path;
+}
+
+// -------------------------------- Scenario parameters --------------------------------
+
+// Read a dict value as a C-contiguous double array
+// - Accepts Python numbers and numpy scalars or arrays of the kinds bool, int, uint and float
+// - str, None, complex values and anything numpy cannot convert throw std::invalid_argument with 'error_msg'
+static py::array_t<double, py::array::c_style | py::array::forcecast | py::detail::npy_api::NPY_ARRAY_ALIGNED_> qd_python_real_array(const py::handle &value,
+                                                                                          const std::string &error_msg)
+{
+    py::array arr = py::array::ensure(value);
+    if (!arr)
+        throw std::invalid_argument(error_msg);
+    const char kind = arr.dtype().kind();
+    if (kind != 'b' && kind != 'i' && kind != 'u' && kind != 'f')
+        throw std::invalid_argument(error_msg);
+    return py::array_t<double, py::array::c_style | py::array::forcecast | py::detail::npy_api::NPY_ARRAY_ALIGNED_>::ensure(arr);
+}
+
+// Dict of QuaDRiGa scenario parameters -> map of the numeric values
+// - Every entry except 'SubpathMethod' must be a real scalar (one element)
+// - 'SubpathMethod' (an entry of QuaDRiGa's structs) must be the str 'legacy'; it is accepted and ignored
+// - Key names are not checked here, quadriga_lib::scenpar_validate rejects unknown names
+// - None or an empty dict gives an empty map
+// - 'var_name' is used in the error messages
+static std::unordered_map<std::string, double> qd_python_dict2scenpar(const py::handle &obj,
+                                                                      const std::string &var_name = "scenpar")
+{
+    std::unordered_map<std::string, double> scenpar;
+    if (obj.is_none())
+        return scenpar;
+    if (!py::isinstance<py::dict>(obj))
+        throw std::invalid_argument("Input '" + var_name + "' must be a dict or None.");
+
+    for (auto item : py::reinterpret_borrow<py::dict>(obj))
+    {
+        if (!py::isinstance<py::str>(item.first))
+            throw std::invalid_argument("Keys of '" + var_name + "' must be str.");
+        const std::string name = py::cast<std::string>(item.first);
+        if (name == "SubpathMethod")
+        {
+            if (!py::isinstance<py::str>(item.second))
+                throw std::invalid_argument("Entry 'SubpathMethod' of '" + var_name + "' must be a str.");
+            const std::string value = py::cast<std::string>(item.second);
+            if (value != "legacy")
+                throw std::invalid_argument("Value '" + value + "' of 'SubpathMethod' is not supported; only 'legacy' is accepted.");
+        }
+        else
+        {
+            const std::string error_msg = "Entry '" + name + "' of '" + var_name + "' must be a real scalar.";
+            const auto values = qd_python_real_array(item.second, error_msg);
+            if (values.size() != 1)
+                throw std::invalid_argument(error_msg);
+            scenpar[name] = *values.data();
+        }
+    }
+    return scenpar;
+}
+
+// Map of QuaDRiGa scenario parameters -> dict of float values, keys in the order of 'key_order'
+// - Every name in 'key_order' must be in 'scenpar'
+static py::dict qd_python_scenpar2dict(const std::unordered_map<std::string, double> &scenpar,
+                                       const std::vector<std::string> &key_order)
+{
+    py::dict output;
+    for (const auto &key : key_order)
+        output[py::str(key)] = scenpar.at(key);
+    return output;
+}
+
+// Dict of QuaDRiGa path-loss parameters -> map of the numeric values, the model and the key order
+// - The entry 'model' must be a str; it is returned in 'pl_model' (empty if the dict has no such entry)
+// - Every other entry must be a real scalar, list or 1D array
+// - 'pl_order' lists the numeric entries in dict order
+// - None or an empty dict gives an empty map, empty 'pl_model' and empty 'pl_order'
+// - 'var_name' is used in the error messages
+static std::unordered_map<std::string, std::vector<double>> qd_python_dict2plpar(const py::handle &obj,
+                                                                                std::string &pl_model,
+                                                                                std::vector<std::string> &pl_order,
+                                                                                const std::string &var_name = "plpar")
+{
+    std::unordered_map<std::string, std::vector<double>> plpar;
+    pl_model.clear();
+    pl_order.clear();
+    if (obj.is_none())
+        return plpar;
+    if (!py::isinstance<py::dict>(obj))
+        throw std::invalid_argument("Input '" + var_name + "' must be a dict or None.");
+
+    for (auto item : py::reinterpret_borrow<py::dict>(obj))
+    {
+        if (!py::isinstance<py::str>(item.first))
+            throw std::invalid_argument("Keys of '" + var_name + "' must be str.");
+        const std::string name = py::cast<std::string>(item.first);
+        if (name == "model")
+        {
+            if (!py::isinstance<py::str>(item.second))
+                throw std::invalid_argument("Entry 'model' of '" + var_name + "' must be a str.");
+            pl_model = py::cast<std::string>(item.second);
+        }
+        else
+        {
+            const std::string error_msg = "Entry '" + name + "' of '" + var_name +
+                                          "' must be a real scalar or 1D array.";
+            const auto values = qd_python_real_array(item.second, error_msg);
+            if (values.ndim() > 1)
+                throw std::invalid_argument(error_msg);
+            plpar[name] = std::vector<double>(values.data(), values.data() + values.size());
+            pl_order.push_back(name);
+        }
+    }
+    return plpar;
+}
+
+// QuaDRiGa path-loss parameters -> dict, empty if 'pl_model' and 'pl_order' are both empty
+// - Entry 'model' (str) first if 'pl_model' is not empty, then one 1D array per key in the order of 'pl_order';
+//   every name in 'pl_order' must be in 'plpar'
+static py::dict qd_python_plpar2dict(const std::string &pl_model,
+                                     const std::unordered_map<std::string, std::vector<double>> &plpar,
+                                     const std::vector<std::string> &pl_order)
+{
+    py::dict output;
+    if (!pl_model.empty())
+        output["model"] = pl_model;
+    for (const auto &key : pl_order)
+    {
+        const arma::vec values(plpar.at(key));
+        output[py::str(key)] = qd_python_copy2numpy(&values);
+    }
+    return output;
+}
+
+// -------------------------------- gbsm_rays dict --------------------------------
+
+// Keys of the gbsm_rays dict in their order; the first qd_python_gbsm_rays_n_required are required as input, the
+// others optional (missing or None = empty), also any key appended later
+static const char *const qd_python_gbsm_rays_keys[] = {
+    "method", "tx_pos", "rx_pos", "center_freq", "delay", "power", "aod", "eod", "aoa",
+    "eoa", "polmat", "path_type", "tap", "gr_eps", "fbs_pos", "lbs_pos", "fallback"};
+static constexpr size_t qd_python_gbsm_rays_n_required = 13; // "method" to "tap"
+
+// Labels, codes or counts (non-negative integers, no index shift) -> u32_vec; None gives an empty vector
+// - A uint32 ndarray is aliased (read-only rules of qd_python_numpy2arma_Col); anything else is read as float (exact
+//   below 2^53) and every entry must be an integer from 0 to 2^32 - 1, else std::invalid_argument naming 'name'
+static arma::u32_vec qd_python_u32_entries(const py::handle &obj, const std::string &name)
+{
+    if (py::isinstance<py::array_t<unsigned>>(obj))
+        return qd_python_numpy2arma_Col<unsigned>(obj, true);
+    const arma::vec in = qd_python_numpy2arma_Col<double>(obj, true);
+    arma::u32_vec out(in.n_elem);
+    for (arma::uword i = 0; i < in.n_elem; ++i)
+    {
+        if (!(in[i] >= 0.0 && in[i] < 4294967296.0 && in[i] == std::floor(in[i])))
+            throw std::invalid_argument("Entries in '" + name + "' must be integers from 0 to 4294967295.");
+        out[i] = (unsigned)in[i];
+    }
+    return out;
+}
+
+// Dict -> gbsm_rays, aliasing the numpy memory where dtype and layout allow (read-only)
+// - 'gr_eps' (complex, a real array = imaginary part 0) is copied into 'gr_eps_re' and 'gr_eps_im'
+// - Missing optional keys mean empty; a missing other key or an unknown key throws, naming 'var_name'
+// - Validation is left to is_valid()
+static quadriga_lib::gbsm_rays qd_python_dict2gbsm_rays(const py::dict &d, const std::string &var_name = "rays")
+{
+    const auto *K = qd_python_gbsm_rays_keys, *K_end = K + std::size(qd_python_gbsm_rays_keys);
+    for (auto item : d)
+    {
+        const std::string key = py::cast<std::string>(py::str(item.first));
+        if (std::find_if(K, K_end, [&](const char *k) { return key == k; }) == K_end)
+            throw std::invalid_argument("Entry '" + key + "' of '" + var_name + "' is unknown.");
+    }
+    for (size_t k = 0; k < qd_python_gbsm_rays_n_required; ++k)
+        if (!d.contains(K[k]))
+            throw std::invalid_argument("Entry '" + std::string(K[k]) + "' of '" + var_name + "' is missing.");
+    auto get = [&](const char *k) -> py::object
+    { return d.contains(k) ? py::object(d[k]) : py::object(py::none()); };
+
+    quadriga_lib::gbsm_rays r;
+    const py::object method = get("method");
+    if (!py::isinstance<py::str>(method))
+        throw std::invalid_argument("Entry 'method' of '" + var_name + "' must be a str.");
+    r.method = py::cast<std::string>(method);
+    r.tx_pos = qd_python_numpy2arma_Col<double>(get("tx_pos"), true);
+    r.rx_pos = qd_python_numpy2arma_Col<double>(get("rx_pos"), true);
+    r.center_freq = qd_python_numpy2arma_Col<double>(get("center_freq"), true);
+    r.delay = qd_python_numpy2arma_Col<double>(get("delay"), true);
+    r.power = qd_python_numpy2arma_Mat<double>(get("power"), true);
+    r.aod = qd_python_numpy2arma_Col<double>(get("aod"), true);
+    r.eod = qd_python_numpy2arma_Col<double>(get("eod"), true);
+    r.aoa = qd_python_numpy2arma_Col<double>(get("aoa"), true);
+    r.eoa = qd_python_numpy2arma_Col<double>(get("eoa"), true);
+    r.polmat = qd_python_numpy2arma_Cube<double>(get("polmat"), true);
+    r.path_type = qd_python_u32_entries(get("path_type"), var_name + ".path_type");
+    r.tap = qd_python_u32_entries(get("tap"), var_name + ".tap");
+    r.fbs_pos = qd_python_numpy2arma_Mat<double>(get("fbs_pos"), true);
+    r.lbs_pos = qd_python_numpy2arma_Mat<double>(get("lbs_pos"), true);
+    r.fallback = qd_python_u32_entries(get("fallback"), var_name + ".fallback");
+    const py::object gr_eps = get("gr_eps");
+    if (!gr_eps.is_none())
+    {
+        arma::cube re, im;
+        qd_python_copy2arma(py::cast<py::array_t<std::complex<double>>>(gr_eps), re, im);
+        r.gr_eps_re = arma::vectorise(re), r.gr_eps_im = arma::vectorise(im);
+    }
+    return r;
+}
+
+// Creates a list of n_link gbsm_rays dicts with all keys and aliases the attributes of 'rays' (resized to n_link)
+// whose size is known, as qd_mex_init_gbsm_rays; with 'has_gr', 'gr_eps_re' and 'gr_eps_im' are allocated in C++
+// - The other keys are empty arrays ('gr_eps' complex, 'fallback' uint32); the caller sets 'method' and, with
+//   'has_gr', 'gr_eps' after the call
+static py::list qd_python_init_gbsm_rays(arma::uword n_link, arma::uword n_ray, arma::uword n_freq, bool has_gr,
+                                         bool has_scatterers, std::vector<quadriga_lib::gbsm_rays> &rays)
+{
+    py::list out;
+    rays.clear();
+    rays.resize(n_link);
+    const arma::uword n3 = 3, n8 = 8;
+    for (arma::uword l = 0; l < n_link; ++l)
+    {
+        auto &r = rays[l];
+        py::dict d;
+        d["method"] = "";
+        d["tx_pos"] = qd_python_init_output(n3, 1, &r.tx_pos).reshape({n3}); // (3,) view of the [3, 1] member
+        d["rx_pos"] = qd_python_init_output(n3, 1, &r.rx_pos).reshape({n3});
+        d["center_freq"] = qd_python_init_output(n_freq, &r.center_freq);
+        d["delay"] = qd_python_init_output(n_ray, &r.delay);
+        d["power"] = qd_python_init_output(n_ray, n_freq, &r.power);
+        d["aod"] = qd_python_init_output(n_ray, &r.aod);
+        d["eod"] = qd_python_init_output(n_ray, &r.eod);
+        d["aoa"] = qd_python_init_output(n_ray, &r.aoa);
+        d["eoa"] = qd_python_init_output(n_ray, &r.eoa);
+        d["polmat"] = qd_python_init_output(n8, n_ray, n_freq, &r.polmat);
+        d["path_type"] = qd_python_init_output(n_ray, &r.path_type);
+        d["tap"] = qd_python_init_output(n_ray, &r.tap);
+        d["gr_eps"] = py::array_t<std::complex<double>>(0);
+        if (has_gr)
+            r.gr_eps_re.set_size(n_freq), r.gr_eps_im.set_size(n_freq);
+        if (has_scatterers)
+        {
+            d["fbs_pos"] = qd_python_init_output(n3, n_ray, &r.fbs_pos);
+            d["lbs_pos"] = qd_python_init_output(n3, n_ray, &r.lbs_pos);
+        }
+        else
+            d["fbs_pos"] = py::array_t<double>(0), d["lbs_pos"] = py::array_t<double>(0);
+        d["fallback"] = py::array_t<unsigned>(0);
+        out.append(d);
+    }
+    return out;
+}
+
+// Path inputs of the channel functions: true if 'h' is a list of numpy arrays (batch mode) or an empty list
+static bool qd_python_is_array_list(const py::handle &h)
+{
+    if (!py::isinstance<py::list>(h))
+        return false;
+    py::list lst = py::reinterpret_borrow<py::list>(h);
+    return lst.size() == 0 || py::isinstance<py::array>(lst[0]);
+}
+
+// Aliases the arrays of a list (batch mode), or a single input as a one-entry vector, without copying the data (arrays
+// that are not Fortran-contiguous float64 are copied, as are lists and scalars of a single input). T is
+// arma::Col<double>, arma::Mat<double> or arma::Cube<double>.
+// Every entry is added to 'keep_alive': the aliased memory must stay valid while the GIL is released, even if another
+// thread removes the entry from the list.
+template <typename T>
+static std::vector<T> qd_python_alias_list(const py::handle &h, bool batch, std::vector<py::object> &keep_alive)
+{
+    std::vector<T> out;
+    auto add = [&](const py::handle &item)
+    {
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item));
+        if constexpr (std::is_same_v<T, arma::Col<double>>)
+            out.push_back(qd_python_numpy2arma_Col<double>(keep_alive.back(), true));
+        else if constexpr (std::is_same_v<T, arma::Mat<double>>)
+            out.push_back(qd_python_numpy2arma_Mat<double>(keep_alive.back(), true));
+        else
+            out.push_back(qd_python_numpy2arma_Cube<double>(keep_alive.back(), true));
+    };
+    if (batch)
+    {
+        py::list lst = py::reinterpret_borrow<py::list>(h);
+        out.reserve(lst.size());
+        for (auto item : lst)
+            add(item);
+    }
+    else
+        out.reserve(1), add(h);
+    return out;
+}
+
+// Adds all values of a dict (e.g. an arrayant whose patterns are aliased) to 'keep_alive'
+static void qd_python_keep_dict_values(const py::dict &dict, std::vector<py::object> &keep_alive)
+{
+    for (auto item : dict)
+        keep_alive.push_back(py::reinterpret_borrow<py::object>(item.second));
+}
+
+// Frequency selection of the channel wrappers: all snapshots must have the same number of frequencies 'n_freq' in
+// 'path_gain' [n_path, n_freq] and 'polmat' [8, n_path, n_freq], 'center_freq' is empty or has 'n_freq' entries, and
+// 'i_freq' < n_freq (unless there are no snapshots). The slice 'i_freq' of every snapshot is aliased into 'path_gain_f'
+// and 'polmat_f'; returns the selected center frequency (0 for an empty 'center_freq').
+static double qd_python_select_freq(const std::vector<arma::Mat<double>> &path_gain, const std::vector<arma::Cube<double>> &polmat,
+                                    const arma::Col<double> &center_freq, arma::uword i_freq,
+                                    std::vector<arma::vec> &path_gain_f, std::vector<arma::mat> &polmat_f)
+{
+    const size_t n_snap = path_gain.size();
+    arma::uword n_freq = 0ULL;
+    for (size_t i = 0; i < n_snap; ++i)
+    {
+        const arma::uword n_freq_i = path_gain[i].n_cols;
+        if (i == 0)
+            n_freq = n_freq_i;
+        else if (n_freq_i != n_freq)
+            throw std::invalid_argument("All entries of 'path_gain' must have the same number of frequencies.");
+
+        if (polmat[i].n_slices != n_freq_i)
+            throw std::invalid_argument("Inputs 'path_gain' and 'polmat' must have the same number of frequencies.");
+    }
+
+    if (!center_freq.empty() && center_freq.n_elem != n_freq)
+        throw std::invalid_argument("Input 'center_freq' must have 'n_freq' elements.");
+
+    if (n_snap != 0 && i_freq >= n_freq)
+        throw std::out_of_range("Input 'i_freq' exceeds the number of frequencies.");
+
+    path_gain_f.clear(), polmat_f.clear();
+    path_gain_f.reserve(n_snap), polmat_f.reserve(n_snap);
+    for (size_t i = 0; i < n_snap; ++i)
+    {
+        path_gain_f.emplace_back(const_cast<double *>(path_gain[i].colptr(i_freq)), path_gain[i].n_rows, false, true);
+        polmat_f.emplace_back(const_cast<double *>(polmat[i].slice_memptr(i_freq)), polmat[i].n_rows, polmat[i].n_cols, false, true);
+    }
+    return center_freq.empty() ? 0.0 : center_freq.at(i_freq);
+}
+
+#endif

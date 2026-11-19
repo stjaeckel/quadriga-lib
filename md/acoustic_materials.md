@@ -110,7 +110,7 @@ findings are recorded as stage-2b issues in the meantime. A complete table matte
 - **No combination rows.** Walls and floors are modeled first; rugs, curtains and absorbers are placed on them as
   separate rows. A combination is a rig test, and only where a measurement of the combination exists (section 3).
   Drywall and masonry rows are no combinations: each is the finished wall a modeler sees.
-- **Reader rules** (`src/obj_file_read.cpp`, `base_material_name` and `resolve_csv`): the Blender material name is
+- **Reader rules** (`src/obj_file.cpp`, `base_material_name` and `resolve_csv`): the Blender material name is
   looked up exactly, then by its part before the first dot; there is no other fallback. Names are case-sensitive,
   snake_case, without dots, so that Blender's duplicates (`concrete.001`) map to the row `concrete`. A name that
   matches no row becomes "no material" (index 0, air) without a warning unless the reader is called with

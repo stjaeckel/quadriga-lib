@@ -10,8 +10,8 @@
 #include <utility>   // std::move
 
 #include "quadriga_channel.hpp"
-#include "quadriga_lib_helper_functions.hpp"
-#include "qd_arrayant_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
 
 /*!SECTION
 Channel generation functions

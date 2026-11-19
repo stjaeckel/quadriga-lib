@@ -3,7 +3,29 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
+
+// Flip LR inplace
+template <typename dtype>
+static inline void qd_flip_lr_inplace(dtype *data_NxM, size_t M, size_t N = 3)
+{
+    if (M < 2)
+        return;
+
+    size_t half = M >> 1; // floor(M/2)
+    for (size_t i = 0; i < half; ++i)
+    {
+        dtype *left = data_NxM + i * N;
+        dtype *right = data_NxM + (M - 1 - i) * N;
+
+        for (size_t c = 0; c < N; ++c)
+        {
+            dtype tmp = left[c];
+            left[c] = right[c];
+            right[c] = tmp;
+        }
+    }
+}
 
 /*!SECTION
 Site-specific simulation tools

@@ -4,11 +4,11 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
 - `md/SPEC_CPP_API.md` applies to wrappers and tests as well and is not repeated here: "GENERAL CONVENTIONS" (types, citations, lean code, MSVC), "Names, units and layouts" (the glossary), "Input validation" (exceptions), "File-local helpers" (helper scoping), "License statement" (`#` comments in Python files) and "Documentation block".
 
 # REPOSITORY LAYOUT AND BUILD
-- `api_python/qpy_<function_name>.cpp` — Python wrappers, one file per Python function. Variants of one function that share helpers (e.g. `_multi`) may share the file, as in C++; it is named after the first one.
-- The Python module is built from 7 dispatcher files: `python_main.cpp` (top-level module, `version`, `components`) and one file per submodule: `python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`, `python_sos.cpp`, `python_gbsm.cpp`. Each dispatcher `#include`s its `qpy_*.cpp` files and registers the functions with `m.def(...)`.
+- `api_python/qpy_<family>.cpp` — Python wrappers, grouped by family: functions that belong together, share helpers or wrap one C++ source file share a file (e.g. `qpy_hdf5.cpp` for the `hdf5_*` functions, `qpy_get_channels.cpp` for the channel generators), named after the group; a wrapper without a family has its own `qpy_<function_name>.cpp`. All functions of one file are in the same documentation section (one `/*!SECTION` per file). A helper used by several wrappers of one file is `static` in that file.
+- The Python module is built from 7 dispatcher files: `python_main.cpp` (top-level module, `version`, `components`) and one file per submodule: `python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`, `python_sos.cpp`, `python_gbsm.cpp`. Each dispatcher `#include`s its `qpy_*.cpp` files and registers the functions with `m.def(...)`; a file with wrappers of two submodules is not allowed.
   - A new wrapper is NOT picked up automatically: it must be included and registered in the dispatcher of its submodule (see "pybind11 registration").
   - All wrappers of one submodule are compiled into a single translation unit. Names of wrapper functions and of `static` helper functions must therefore be unique within the submodule.
-- `api_python/python_arma_adapter.hpp` (numpy / list / dict conversions) and `api_python/python_quadriga_adapter.hpp` (arrayant / channel dicts, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
+- `src/qd_helpers_python.hpp` (numpy / list / dict conversions) and `src/qd_helpers_python_types.hpp` (arrayant / channel dicts, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
 - `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`); `api_mex/*.cpp` — MEX wrappers.
 - `tests/python_tests/test_<function_name>.py` — tests, one file per wrapper; pytest collects all `test_*.py` files in the folder, so a new test file needs no registration.
 - `lib/` — the compiled Python module (`quadriga_lib.cpython-*.so`) is installed here by the build; the tests import it from there.
@@ -34,21 +34,21 @@ The interface is derived from the C++ declaration and documentation block, exist
 - anything that does not fit this document: an unclear submodule, a C++ type without helper, an output order that is not obvious, a flag beyond `stack`, logic that would have to live in the wrapper
 
 Existing wrappers that show the patterns:
-- `qpy_o2i_loss.cpp` — a complete recent example: array and string-list inputs, a default, outputs of known size, an integer index output; registered in `python_gbsm.cpp`, test in `tests/python_tests/test_o2i_loss.py` (its documentation block predates the lean rules)
-- `qpy_acdf.cpp` — array inputs, optional array input, outputs of known and unknown size
-- `qpy_obj_file_read.cpp` — outputs of runtime size, integer index outputs, string lists, map-to-dict
-- `qpy_obj_file_write.cpp` — many optional inputs, passed to C++ as (possibly empty) objects
-- `qpy_calc_delay_spread.cpp` — ragged inputs as lists of arrays
-- `qpy_arrayant_rotate_pattern.cpp` — arrayant dict in / dict out, in-place modification
-- `qpy_get_channels_multifreq.cpp` — arrayant dicts, 3-element position vectors, 4D outputs, zero-copy complex output
-- `qpy_quantize_delays.cpp` — `stack` flag for lists of arrays
-- `qpy_hdf5_write_channel.cpp`, `qpy_hdf5_read_channel.cpp` — channel dicts, unstructured data
+- `o2i_loss` in `qpy_large_scale.cpp` — a complete recent example: array and string-list inputs, a default, outputs of known size, an integer index output; registered in `python_gbsm.cpp`, test in `tests/python_tests/test_o2i_loss.py` (its documentation block predates the lean rules)
+- `acdf` in `qpy_channel_statistics.cpp` — array inputs, optional array input, outputs of known and unknown size
+- `obj_file_read` in `qpy_obj_file.cpp` — outputs of runtime size, integer index outputs, string lists, map-to-dict
+- `obj_file_write` in `qpy_obj_file.cpp` — many optional inputs, passed to C++ as (possibly empty) objects
+- `calc_delay_spread` in `qpy_channel_statistics.cpp` — ragged inputs as lists of arrays
+- `arrayant_rotate_pattern` in `qpy_arrayant_ops.cpp` — arrayant dict in / dict out, in-place modification
+- `get_channels_multifreq` in `qpy_get_channels.cpp` — arrayant dicts, 3-element position vectors, 4D outputs, zero-copy complex output
+- `quantize_delays` in `qpy_quantize_delays.cpp` — `stack` flag for lists of arrays
+- `hdf5_write_channel`, `hdf5_read_channel` in `qpy_hdf5.cpp` — channel dicts, unstructured data
 
 # IMPLEMENTATION ORDER
 Unlike the C++ work, the wrapper is written first and the test second: the physics is already verified by the Catch2 suite, and the Python test exercises the wrapper.
-1. **Wrapper and registration.** Write `api_python/qpy_<function_name>.cpp` following the "IMPLEMENTATION GUIDELINES". Register it in the dispatcher of its submodule. It must compile without warnings.
+1. **Wrapper and registration.** Add the wrapper to the `qpy_*.cpp` file of its family, or write `api_python/qpy_<function_name>.cpp`, following the "IMPLEMENTATION GUIDELINES". Register it in the dispatcher of its submodule. It must compile without warnings.
 2. **Test.** Write `tests/python_tests/test_<function_name>.py` (see "TESTS") and run it. It is expected to pass. If it fails, the cause is in the wrapper, the registration or the test's expectation; find out which before changing anything. If the failure points to the C++ function itself, stop and report it; do not work around it in the wrapper.
-3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature and the dispatcher entry name the same arguments in the same order. If the C++ function has another name than the wrapper, or the exposed name drops its prefix (e.g. `channel.irs`) and no MEX wrapper of the same file stem exists, add the pair to `docs_builder/content/api_matching.toml`; the builder finds the C++ counterpart by the documented names, and without the entry the page shows "Not in: C++" (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
+3. **Finish.** The new test passes; the complete Python test suite passes. The documentation block of the wrapper is complete and matches what the wrapper does; the usage line, the wrapper signature and the dispatcher entry name the same arguments in the same order. If the exposed name differs from the MATLAB name (e.g. `channel.irs` for `get_channels_irs`), add it to `[python_names]` in `docs_builder/content/api_matching.toml`; if the C++ function has another name than the wrapper, add the family to `[families]`. The builder pairs the functions by these names; without the entries the page shows "Not in: MATLAB" or "Not in: C++" (`docs_builder/README.md`, section "Cross-language buttons"). Run `make docs` and commit the changed files in `docs/` with the change (`docs_builder/README.md`, "Quick start").
 
 # HAND-OVER REPORT
 - the Python usage line and the submodule
@@ -59,7 +59,7 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 # IMPLEMENTATION GUIDELINES
 
 ## File and function naming
-- All Python wrapper source files use the `qpy_` prefix and match the C++/MEX function name, so `quadriga_lib::function_name` is wrapped in `qpy_function_name.cpp`.
+- All Python wrapper source files use the `qpy_` prefix and are named after their family or, for a single wrapper, after its function (see "REPOSITORY LAYOUT AND BUILD").
 - The wrapper function itself has the name of the C++ function it wraps (e.g. `acdf`, `arrayant_interpolate`). The name exposed to Python is that name without the fixed prefix of its submodule, which would repeat the submodule: `arrayant_` in `arrayant`, `channel_` and `get_channels_` in `channel`, `sos_` in `sos`, `gbsm_` in `gbsm`; `tools` and `RTtools` have no prefix. Examples: `arrayant_interpolate` is `quadriga_lib.arrayant.interpolate`, `get_channels_spherical` is `quadriga_lib.channel.spherical`, `acdf` is `quadriga_lib.tools.acdf`. No case conversion (lowercase stays lowercase).
 - There are no other renamings. The few wrappers whose name is not a C++ function name (e.g. `version`) are listed in `docs_builder/content/api_matching.toml`.
 - The heading of the documentation block and the Usage line always use the name exposed to Python.
@@ -97,14 +97,14 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 
 ## Headers
 ```
-#include "python_arma_adapter.hpp"
+#include "qd_helpers_python.hpp"
 #include "quadriga_lib.hpp"
 ```
-- `python_arma_adapter.hpp` pulls in pybind11, numpy, and Armadillo. `py` is aliased to `pybind11`.
-- If the wrapper converts arrayant dicts, channel dicts or `std::any` datasets, or reads a flag (`qd_python_flag`) or a file name (`qd_python_path`), include only `#include "python_quadriga_adapter.hpp"` instead; it includes the two headers above.
+- `qd_helpers_python.hpp` pulls in pybind11, numpy, and Armadillo. `py` is aliased to `pybind11`.
+- If the wrapper converts arrayant dicts, channel dicts or `std::any` datasets, or reads a flag (`qd_python_flag`) or a file name (`qd_python_path`), include only `#include "qd_helpers_python_types.hpp"` instead; it includes the two headers above.
 
 ## Helper function signatures
-Quadriga-Lib uses Armadillo for data structures. Conversion between numpy arrays / Python objects and Armadillo types is done via the helpers in `python_arma_adapter.hpp`.
+Quadriga-Lib uses Armadillo for data structures. Conversion between numpy arrays / Python objects and Armadillo types is done via the helpers in `qd_helpers_python.hpp`.
 
 The `copy2numpy`, `stack2numpy` and `copy2list` converters take their Armadillo inputs **by pointer** (pass `&obj`, and `nullptr` for an absent optional input) and are templated as `<dtype, dtype_numpy = dtype>`: `dtype` is the Armadillo scalar (deduced from the argument) and `dtype_numpy` is the numpy element type. The combination of `dtype_numpy` and the `im` argument selects the output form:
 
@@ -183,7 +183,7 @@ auto map = qd_python_dict2map<dtype>(handle);
 // Python str / float / int / numpy array -> std::any (type preserved; unsupported type throws)
 std::any data = qd_python_anycast(handle, var_name);
 
-// ---------- python_quadriga_adapter.hpp ----------
+// ---------- qd_helpers_python_types.hpp ----------
 
 quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
         bool view = false, bool strict = false, bool validate = false);
@@ -232,7 +232,7 @@ py::object qd_python_any2numpy(const std::any &dset);
 - There is no helper for C++ types that are not listed; ask before adding raw pybind11 / buffer code for them.
 
 ## Arrayant dict
-- A `quadriga_lib::arrayant<double>` is represented in Python as a `dict` with the keys below. Requires `python_quadriga_adapter.hpp`.
+- A `quadriga_lib::arrayant<double>` is represented in Python as a `dict` with the keys below. Requires `qd_helpers_python_types.hpp`.
 
 | Key (= C++ member) | Shape | Required as input |
 | --- | --- | --- |
@@ -261,7 +261,7 @@ py::object qd_python_any2numpy(const std::any &dset);
 - In the documentation, describe arrayant arguments as: "Dict containing the arrayant data; layout as documented in [[generate]]" and add a note where frequency-dependent input is supported. Do not repeat the key table.
 
 ## Channel dict
-- A `quadriga_lib::channel<double>` is represented in Python as a `dict` with the keys below; a `std::vector` of channels is a `list` of such dicts. Requires `python_quadriga_adapter.hpp`.
+- A `quadriga_lib::channel<double>` is represented in Python as a `dict` with the keys below; a `std::vector` of channels is a `list` of such dicts. Requires `qd_helpers_python_types.hpp`.
 - Members that are a `std::vector` over snapshots in C++ exist in two layouts:
   - "list" model (`stack = false`, default): a `list` with one array per snapshot; the number of paths may differ between snapshots.
   - "stack" model (`stack = true`): one array with the snapshot index on the last axis, zero-padded.
@@ -374,7 +374,7 @@ const arma::uvec *p_ray_ind = ray_ind.is_none() ? nullptr : &ray_ind_a;
 
 ### Strings
 - Strings are taken as `const std::string&` in the wrapper signature; pybind11 handles conversion automatically. No helper needed.
-- File names are the exception: they are taken as `const py::handle &` and read with `qd_python_path(handle, "name")` (`python_quadriga_adapter.hpp`), which accepts a `str`, `bytes` or path-like object (e.g. `pathlib.Path`) and raises `TypeError` for anything else. `docs_builder/content/api_intro_python.md` states this once for all functions.
+- File names are the exception: they are taken as `const py::handle &` and read with `qd_python_path(handle, "name")` (`qd_helpers_python_types.hpp`), which accepts a `str`, `bytes` or path-like object (e.g. `pathlib.Path`) and raises `TypeError` for anything else. `docs_builder/content/api_intro_python.md` states this once for all functions.
 - Optional strings: `py::arg("name") = ""` in the declaration.
 
 ### Scalars
@@ -382,7 +382,7 @@ const arma::uvec *p_ray_ind = ray_ind.is_none() ? nullptr : &ray_ind_a;
 - Defaults are set in the registration only: `py::arg("n_bins") = 201`. Do not repeat the default in the C++ function signature.
 
 ### Flags
-- A flag is taken as `py::handle` and read with `qd_python_flag(handle, default_value, "name")` (`python_quadriga_adapter.hpp`): `None` selects the default, a Python `bool` or `numpy.bool_` gives its value, any other type (float, int, str, array) raises `TypeError` with `Input '<name>' must be a bool or None.`. A plain `bool` parameter is not used: pybind11 would turn `None` into `False` (silently not the default) and accept other types.
+- A flag is taken as `py::handle` and read with `qd_python_flag(handle, default_value, "name")` (`qd_helpers_python_types.hpp`): `None` selects the default, a Python `bool` or `numpy.bool_` gives its value, any other type (float, int, str, array) raises `TypeError` with `Input '<name>' must be a bool or None.`. A plain `bool` parameter is not used: pybind11 would turn `None` into `False` (silently not the default) and accept other types.
 - The default stays in the registration (`py::arg("flag") = true`) and is passed again as `default_value`, so that `None` and an omitted argument behave the same.
 - The `## Inputs:` line states the default. The rule itself is stated once for all functions in `docs_builder/content/api_intro_python.md`; the doc blocks do not repeat it.
 - Tests: `None` equals the default, a non-bool value (e.g. `2.5`) raises `TypeError` whose message names the argument (match the name, not the full sentence).
@@ -473,7 +473,7 @@ return py::make_tuple(out1_py, out2_py, out3_py, out4_py);
 
 ## pybind11 registration
 - Register the wrapper in the dispatcher file of its submodule (`python_arrayant.cpp`, `python_channel.cpp`, `python_tools.cpp`, `python_RTtools.cpp`, `python_sos.cpp`, `python_gbsm.cpp`; `python_main.cpp` for top-level functions):
-  1. Add `#include "qpy_function_name.cpp"` to the include list at the top of the dispatcher.
+  1. For a new file, add `#include "qpy_<file>.cpp"` to the include list at the top of the dispatcher.
   2. Add the `m.def(...)` call inside the `quadriga_lib_<submodule>(py::module_ &m)` function.
 - The dispatcher entry is the only copy of the Python signature. When changing the arguments of an existing wrapper, update the function signature, the dispatcher entry and the Usage line together.
 - The kwarg names in `py::arg(...)` must match the C++ parameter names of the wrapper AND the names in the `## Usage:` line. These are what the user types as keyword arguments from Python.

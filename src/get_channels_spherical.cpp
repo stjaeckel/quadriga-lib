@@ -9,13 +9,89 @@
 #include <iostream>
 
 #include "quadriga_channel.hpp"
-#include "quadriga_lib_helper_functions.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "qd_channels_vec.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
+#include "qd_helpers_channel.hpp"
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
 #endif
+
+// Calculate Geographic coordinates from Cartesian coordinates
+template <typename dtype>
+static inline void qd_geo2cart(size_t N,                  // Number of values
+                               const dtype *az,           // Input azimuth angles
+                               dtype *x, dtype *y,        // 2D Output coordinates (x, y)
+                               const dtype *el = nullptr, // Input elevation angles (optional)
+                               dtype *z = nullptr,        // Output z-coordinate (optional)
+                               const dtype *r = nullptr)  // Input vector length (optional)
+{
+    bool use_3D = (el != nullptr);
+    bool has_length = (r != nullptr);
+    bool has_z = (z != nullptr);
+
+    for (size_t i = 0; i < N; ++i)
+    {
+        double ca = (double)az[i];
+        double sa = std::sin(ca);
+        ca = std::cos(ca);
+
+        double ce = 1.0, se = 0.0;
+        if (use_3D)
+        {
+            ce = (double)el[i];
+            se = std::sin(ce);
+            ce = std::cos(ce);
+        }
+
+        double le = has_length ? (double)r[i] : 1.0;
+
+        x[i] = dtype(le * ce * ca);
+        y[i] = dtype(le * ce * sa);
+
+        if (has_z)
+            z[i] = dtype(le * se);
+    }
+}
+
+// Calculate Cartesian coordinates from Geographic coordinates
+template <typename dtype>
+static inline void qd_cart2geo(size_t n,                       // Number of values
+                               dtype *az,                      // Output azimuth angles
+                               const dtype *x, const dtype *y, // 2D Input coordinates (x, y)
+                               dtype *el = nullptr,            // Output elevation angles (optional)
+                               const dtype *z = nullptr,       // Input z-coordinate (optional)
+                               dtype *r = nullptr)             // Output vector length (optional)
+{
+    bool use_3D = (el != nullptr);
+    bool has_length = (r != nullptr);
+    bool has_z = (z != nullptr);
+    bool has_az = (az != nullptr);
+
+    for (size_t in = 0; in < n; ++in)
+    {
+        double xx = (double)x[in];
+        double yy = (double)y[in];
+        double zz = has_z ? (double)z[in] : 0.0;
+
+        double le = std::sqrt(xx * xx + yy * yy + zz * zz);
+
+        if (has_length)
+            r[in] = (dtype)le;
+
+        le = 1.0 / le;
+        xx *= le, yy *= le, zz *= le;
+        xx = (xx > 1.0) ? 1.0 : xx;
+        yy = (yy > 1.0) ? 1.0 : yy;
+        zz = (zz > 1.0) ? 1.0 : zz;
+
+        if (has_az)
+            az[in] = (dtype)std::atan2(yy, xx);
+
+        if (use_3D)
+            el[in] = (dtype)std::asin(zz);
+    }
+}
 
 /*!SECTION
 Channel generation functions

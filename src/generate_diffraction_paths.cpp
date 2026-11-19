@@ -3,8 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_helper_functions.hpp"
-#include "qd_atmospheric_absorption.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_site.hpp"
 
 // Make sure size_t and arma::uword are synonyms
 static_assert(sizeof(size_t) == sizeof(arma::uword), "size_t and arma::uword have different sizes");

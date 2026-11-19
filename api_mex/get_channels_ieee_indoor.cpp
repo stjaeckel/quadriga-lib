@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "mex_quadriga_lib_functions.hpp"
+#include "qd_helpers_mex_types.hpp"
 
 /*!SECTION
 Channel generation functions

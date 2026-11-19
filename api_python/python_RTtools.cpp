@@ -8,21 +8,14 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_calc_diffraction_gain.cpp"
-#include "qpy_cube.cpp"
-#include "qpy_generate_diffraction_paths.cpp"
+#include "qpy_diffraction.cpp"
+#include "qpy_mesh_primitives.cpp"
 #include "qpy_icosphere.cpp"
 #include "qpy_mitsuba_xml_file_write.cpp"
-#include "qpy_obj_file_read.cpp"
-#include "qpy_obj_file_write.cpp"
-#include "qpy_point_cloud_aabb.cpp"
-#include "qpy_point_cloud_segmentation.cpp"
+#include "qpy_obj_file.cpp"
+#include "qpy_mesh_partition.cpp"
 #include "qpy_point_inside_mesh.cpp"
-#include "qpy_ray_point_intersect.cpp"
-#include "qpy_ray_triangle_intersect.cpp"
-#include "qpy_triangle_mesh_aabb.cpp"
-#include "qpy_triangle_mesh_segmentation.cpp"
-#include "qpy_plane.cpp"
+#include "qpy_ray_intersect.cpp"
 #include "qpy_subdivide_triangles.cpp"
 
 void quadriga_lib_RTtools(py::module_ &m)

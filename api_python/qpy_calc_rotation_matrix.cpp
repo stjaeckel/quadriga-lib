@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_quadriga_adapter.hpp"
+#include "qd_helpers_python_types.hpp"
 
 /*!SECTION
 Math functions

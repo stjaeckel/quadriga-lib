@@ -8,7 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_wrappers.hpp"
 
 #include <stdexcept>
 

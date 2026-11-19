@@ -11,7 +11,7 @@
 #include <cstring>
 #include <limits>
 #include <vector>
-#include "qd_arrayant_functions.hpp"
+#include "qd_helpers_arrayant.hpp"
 
 #define PUGIXML_HEADER_ONLY
 #include "pugixml.hpp"

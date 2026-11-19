@@ -21,7 +21,7 @@
 // stdout: P,tag,theta,tracer,f_base,f,nT,nR,rays,events,Tre,Tim,Rre,Rim (one line per frequency of the band).
 // Build: tools/acoustic/build_band_probe.sh <output binary>, from the repository root.
 #include "quadriga_lib.hpp"
-#include "qd_atmospheric_absorption.hpp"
+#include "qd_helpers_shared.hpp"
 #include <complex>
 #include <cstdio>
 #include <iostream>

@@ -1,0 +1,194 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
+
+#include "qd_helpers_python_types.hpp"
+
+
+
+/*!SECTION
+Site-specific simulation tools
+SECTION!*/
+
+/*!MD
+# calc_diffraction_gain
+Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
+
+- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided
+  into `n_path` elliptic-arc paths (controlled by `lod`), each approximated by `n_seg` line segments
+- Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,
+  generalized to arbitrary 3D shapes
+- Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping
+  triangles whose bounding box does not intersect the TX-RX path
+- The material model and its columns: <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-Surface Physics</a>; the CSV format
+  of the material table: <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
+
+## Usage:
+```
+# Output as tuple
+data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
+
+# Unpacked outputs
+gain, polmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+    center_freq, *, lod, verbose, sub_mesh_ind, use_kernel, gpu_id, scalar_mode, \
+    thin_slab_threshold, apply_fspl, apply_phase )
+```
+
+## Inputs:
+- **`orig`** — TX positions; `(n_pos, 3)`
+- **`dest`** — RX positions; `(n_pos, 3)`
+- **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]`; `(n_mesh, 9)`
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [[obj_file_read]]); `(n_mesh,)`
+- **`mtl_prop`** — Material properties as a `dict`; each key is one column (the `csv_prop` output of [[obj_file_read]]) mapping to a 1D array of length `n_mtl`
+- **`center_freq`** — Center frequency in Hz; in scalar mode the acoustic frequency
+- **`lod`** — Level of detail (0–7), controls `n_path` and `n_seg`: 0 = direct ray only (1 path, 1 segment);
+  1 / 2 = 7 / 19 paths with 3 segments; 3 = 37 paths, 4 segments; 4 = 61 paths, 5 segments; 5 / 6 = 1 / 2 paths
+  with 2 segments (debug); 7 = direct line in 10 segments; default: 2
+- **`verbose`** — Verbosity level; default: 0
+- **`sub_mesh_ind`** — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `(n_mesh,)` or `None`; default: `None`
+- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; auto as in [[ray_triangle_intersect]]; default: 0
+- **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
+- **`scalar_mode`** — If `True`, uses scalar transmission (TE-only reflection coefficient,
+  energy-conservation transmission) instead of EM TE/TM averaging; default: `False`
+- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always, 1 = resolve
+  never; default: 0
+- **`apply_fspl`** — If `True`, folds the geometric spreading loss into `gain`, making it an absolute
+  propagation gain instead of a value relative to FSPL. The reference distance is the direct TX-RX
+  distance, matching the `path_length` used by [[qrt_file_read]] for a
+  transmission-only path. EM mode: `32.45 + 20*log10(f_GHz) + 20*log10(d_m)` dB; scalar mode:
+  `20*log10(d_m) + alpha(f)*d_m` dB, with `alpha` from ISO 9613-1 at T = 20 °C, RH = 50 %, p = 1 atm.;
+  default: `False`
+- **`apply_phase`** — If `True`, multiplies `polmat` by the propagation phase `exp(-j*2*pi*d/lambda)`
+  using the same direct TX-RX distance. The wavelength follows from `center_freq` and the medium
+  wave speed (speed of light in EM mode, speed of sound in scalar mode). The term has unit magnitude,
+  so `polmat` stays normalized. This is the phase [[channel.spherical]] would otherwise add from
+  `path_length`; default: `False`
+
+## Outputs:
+- **`gain`** — Diffraction gain per TX-RX pair, linear power scale; `(n_pos,)`. Relative to FSPL by
+  default (bounded by 0 and 1), absolute propagation gain when `apply_fspl = True`
+- **`polmat`** — Normalized polarization transfer matrix: the amplitude carries no path gain (max column
+  power is 1), only the relative polarization coupling and phase; `gain` holds the power. EM mode:
+  interleaved complex, column-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]` with labels `<rx><tx>`:
+  rows 0-1 = (V rx, V tx), rows 2-3 = (H rx, V tx), rows 4-5 = (V rx, H tx), rows 6-7 = (H rx, H tx), the row
+  order of `polmat` in [[channel.spherical]], `(8, n_pos)`; scalar
+  mode: scalar pressure coefficient `[Re Im]`, `(2, n_pos)`
+- **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)` with `n_seg` from `lod`
+  (e.g. `(3, 2, n_pos)` for lod 2, `(3, 9, n_pos)` for lod 7, `(3, 0, n_pos)` for lod 0)
+
+## See also:
+- [[triangle_mesh_segmentation]] (generates `sub_mesh_ind`)
+- [[obj_file_read]] (defines the material format)
+- [[qrt_file_read]] (same path-loss model, used by `apply_fspl`)
+- [[channel.spherical]] (applies the same propagation phase as `apply_phase`)
+MD!*/
+
+py::tuple calc_diffraction_gain(const py::array_t<double> &orig,
+                                const py::array_t<double> &dest,
+                                const py::array_t<double> &mesh,
+                                const py::handle &mtl_ind,
+                                const py::handle &mtl_prop,
+                                double center_freq,
+                                int lod,
+                                int verbose,
+                                const py::handle &sub_mesh_ind,
+                                int use_kernel,
+                                int gpu_id,
+                                py::handle scalar_mode,
+                                double thin_slab_threshold,
+                                py::handle apply_fspl,
+                                py::handle apply_phase)
+{
+    const bool scalar_mode_b = qd_python_flag(scalar_mode, false, "scalar_mode");
+    const bool apply_fspl_b = qd_python_flag(apply_fspl, false, "apply_fspl");
+    const bool apply_phase_b = qd_python_flag(apply_phase, false, "apply_phase");
+
+    const auto orig_a = qd_python_numpy2arma_Mat<double>(orig, true);
+    const auto dest_a = qd_python_numpy2arma_Mat<double>(dest, true);
+    const auto mesh_a = qd_python_numpy2arma_Mat<double>(mesh, true);
+    const auto mtl_ind_a = qd_python_numpy2arma_Col<arma::uword>(mtl_ind, true, false, "mtl_ind");
+    const auto mtl_prop_map = qd_python_dict2map<double>(mtl_prop);
+    const auto sub_mesh_index_a = qd_python_numpy2arma_Col<unsigned>(sub_mesh_ind, true, false, "sub_mesh_ind");
+
+    arma::uword n_pos = orig_a.n_rows;
+
+    // Pre-allocate outputs in Python memory and map Armadillo wrappers to them;
+    // the size of coord depends on lod and is set by C++ (copied after the call)
+    arma::vec gain;
+    arma::mat polmat;
+    arma::cube coord;
+    auto gain_p = qd_python_init_output(n_pos, &gain);
+    auto polmat_p = qd_python_init_output((scalar_mode_b ? 2 : 8), n_pos, &polmat);
+
+    quadriga_lib::calc_diffraction_gain<double>(orig_a, dest_a, mesh_a, mtl_ind_a, mtl_prop_map,
+                                                center_freq, lod, &gain, &polmat, &coord, verbose,
+                                                sub_mesh_index_a, use_kernel, gpu_id, scalar_mode_b,
+                                                thin_slab_threshold, apply_fspl_b, apply_phase_b);
+
+    return py::make_tuple(gain_p, polmat_p, qd_python_copy2numpy(&coord));
+}
+
+/*!MD
+# generate_diffraction_paths
+Generate elliptic propagation paths and weights for diffraction gain estimation
+
+- Generates inputs required by [[calc_diffraction_gain]]: elliptic-arc paths sampling the Fresnel ellipsoid volume
+  between each TX-RX pair, plus per-segment weights
+- Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the semi-major axis
+- Weights are derived from the knife-edge diffraction model; initial weights normalized so
+  `sum(prod(weight, axis=2), axis=1) = 1`
+
+## Usage:
+```
+ray_x, ray_y, ray_z, weight = quadriga_lib.RTtools.generate_diffraction_paths( orig, dest, \
+    center_freq, lod, *, scalar_mode )
+```
+
+## Inputs:
+- **`orig`** — TX positions; `(n_pos, 3)`
+- **`dest`** — RX positions; `(n_pos, 3)`
+- **`center_freq`** — Center frequency in Hz; in scalar mode the acoustic frequency
+- **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
+   | `lod` | `n_path` | `n_seg` | Note  |
+   | ----- | -------- | ------- | ----- |
+   | 1     | 7        | 3       | -     |
+   | 2     | 19       | 3       | -     |
+   | 3     | 37       | 4       | -     |
+   | 4     | 61       | 5       | -     |
+   | 5     | 1        | 2       | debug |
+   | 6     | 2        | 2       | debug |
+   | 7     | 1        | 10      | direct line in 10 segments |
+
+- **`scalar_mode`** — `True` = acoustic: the Fresnel ellipsoids use the wavelength `343 / center_freq`;
+  default: `False` (EM, `299792458 / center_freq`)
+
+## Outputs:
+- **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `(n_pos, n_path, n_seg-1)`
+- **`ray_y`** — y-coordinates of path waypoints (excluding endpoints); `(n_pos, n_path, n_seg-1)`
+- **`ray_z`** — z-coordinates of path waypoints (excluding endpoints); `(n_pos, n_path, n_seg-1)`
+- **`weight`** — Per-segment weights; `(n_pos, n_path, n_seg)`
+
+## See also:
+- [[calc_diffraction_gain]] (consumes the output of this function)
+MD!*/
+
+py::tuple generate_diffraction_paths(const py::array_t<double> &orig,
+                                     const py::array_t<double> &dest,
+                                     double center_freq,
+                                     int lod,
+                                     py::handle scalar_mode)
+{
+    const auto orig_a = qd_python_numpy2arma_Mat(orig, true);
+    const auto dest_a = qd_python_numpy2arma_Mat(dest, true);
+    const bool scalar_mode_b = qd_python_flag(scalar_mode, false, "scalar_mode");
+
+    // Output size follows from the lod table in C++; copied after the call
+    arma::cube ray_x, ray_y, ray_z, weight;
+    quadriga_lib::generate_diffraction_paths<double>(orig_a, dest_a, center_freq, lod,
+                                                     ray_x, ray_y, ray_z, weight, scalar_mode_b);
+
+    return py::make_tuple(qd_python_copy2numpy(&ray_x), qd_python_copy2numpy(&ray_y),
+                          qd_python_copy2numpy(&ray_z), qd_python_copy2numpy(&weight));
+}

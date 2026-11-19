@@ -64,7 +64,7 @@ hmat = quadriga_lib.channel.baseband_freq_response( coeff, delay, pilot_grid, ba
 ## baseband_freq_response_multi
 Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 
-Not in: C++, MATLAB
+Also in: [C++](../cpp/channel-functions.md#baseband_freq_response_multi) · [MATLAB](../mex/channel-functions.md#baseband_freq_response_multi)
 
 - Interpolates the complex channel coefficients from the input frequencies `freq` to the output carrier
   frequencies `freq_new` using SLERP (magnitude and unwrapped phase each linear), then applies the delay-induced

@@ -1,2 +1,5 @@
 [families]
 arrayant_interpolate = [".interpolate", "arrayant_interpolate_multi"]
+
+[python_names]
+interpolate = "arrayant_interpolate"

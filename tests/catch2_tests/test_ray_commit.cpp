@@ -36,7 +36,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "quadriga_lib.hpp"
-#include "qd_atmospheric_absorption.hpp"
+#include "qd_helpers_shared.hpp"
 
 #include <algorithm>
 #include <cmath>

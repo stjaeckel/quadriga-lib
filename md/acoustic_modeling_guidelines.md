@@ -15,7 +15,7 @@ drafter's own proposal are marked **(proposed)**.
   bounce decision (stage-2b issue 2: reflection up to 1.073 for a board on a box of air; 8.3e-4 in octave absorption).
   `calc_diffraction_gain` already defaults to 0.
 - **Frequencies at the library's sound speed.** The API takes acoustic Hz; the material columns are in the
-  EM-equivalent GHz of 343 m/s (`qd_acoustic_freq_scale` in `src/qd_atmospheric_absorption.hpp`): 1 kHz is
+  EM-equivalent GHz of 343 m/s (`qd_acoustic_freq_scale` in `src/qd_helpers_shared.hpp`): 1 kHz is
   0.87403 GHz, 125 Hz is 0.10925 GHz. The material page and the starting rows of its section 11.4 use the same
   343 m/s.
 - **`min_gain_dB` with a margin** near walls: inside a plate the running gain lies up to −10·log₁₀(`tf`) below the
@@ -25,7 +25,7 @@ drafter's own proposal are marked **(proposed)**.
 
 ## 2. Material names in Blender
 
-- The Blender material name selects the table row. The reader (`src/obj_file_read.cpp`, `resolve_csv`) looks the
+- The Blender material name selects the table row. The reader (`src/obj_file.cpp`, `resolve_csv`) looks the
   name up exactly, then by its part before the first dot, and nothing else.
 - **The thickness suffix marks a sheet.** A row name ending in `_<NN>mm` (always last) is a sheet of that
   thickness; a name without it is a traced solid. `concrete` and `drywall_filled` are solids, `concrete_150mm` and

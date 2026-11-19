@@ -14,7 +14,7 @@
 #include "quadriga_lib.hpp"
 #include "quadriga_tools.hpp"
 #include "bits.hpp"
-#include "qd_atmospheric_absorption.hpp"
+#include "qd_helpers_shared.hpp"
 
 #include <algorithm>
 #include <array>

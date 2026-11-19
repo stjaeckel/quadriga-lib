@@ -8,22 +8,11 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_conf_file_read.cpp"
-#include "qpy_conf_file_write.cpp"
-#include "qpy_scenpar_validate.cpp"
-#include "qpy_conf_file_list.cpp"
-#include "qpy_gbsm_init_phases.cpp"
-#include "qpy_gbsm_draw.cpp"
-#include "qpy_path_loss.cpp"
-#include "qpy_lsp_generate.cpp"
-#include "qpy_los_probability.cpp"
-#include "qpy_o2i_loss.cpp"
-#include "qpy_ssf_clusters.cpp"
-#include "qpy_ssf_rays.cpp"
-#include "qpy_ssf_scatterers.cpp"
-#include "qpy_ssf_paths.cpp"
-#include "qpy_gbsm_rays_from_paths.cpp"
-#include "qpy_gbsm_single_link_channel.cpp"
+#include "qpy_conf_file.cpp"
+#include "qpy_gbsm_phases.cpp"
+#include "qpy_large_scale.cpp"
+#include "qpy_ssf.cpp"
+#include "qpy_gbsm_rays.cpp"
 
 // Mandatory arrays are declared with .none(false): without it pybind11 converts None to a 0-dimensional
 // array holding NaN.

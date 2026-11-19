@@ -677,7 +677,7 @@ static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 * abs, __m256 *
 
 // AVX2 accelerated spherical interpolation (SLERP) for complex value pairs
 // Processes 8 complex pairs simultaneously with per-lane interpolation weight.
-// Behaviour matches the scalar slerp_complex_mf<float> template except:
+// Behaviour matches the scalar qd_slerp_complex<float> template except:
 //   - sin(Phase) computed via sqrt(1 - cos²Phase) instead of sincos polynomial
 //     (eliminates one full sincos call, improves accuracy by ~2 ULP)
 //   - Weighted direction sum computed in single precision, with one FMA per component
@@ -689,7 +689,7 @@ static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 * abs, __m256 *
 //   - Spherical interpolation of normalised direction
 //   - Linear interpolation of amplitude
 //   - Smooth transition to linear fallback for near-antipodal directions
-//   - Zero output when both input amplitudes are negligible (zero_if_both_tiny = true, as slerp_complex_mf)
+//   - Zero output when both input amplitudes are negligible (zero_if_both_tiny = true, as qd_slerp_complex)
 // The result of a lane depends only on the inputs of that lane.
 //
 // Parameters (all __m256, i.e. 8 lanes of float):

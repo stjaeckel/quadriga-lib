@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "mex_quadriga_lib_functions.hpp"
+#include "qd_helpers_mex_types.hpp"
 
 // IRS array struct: the coupling matrix holds the IRS weights; without one, C++ throws instead of using identity
 static inline quadriga_lib::arrayant<double> qd_irs_struct2arrayant(const mxArray *input, const std::string &var_name)

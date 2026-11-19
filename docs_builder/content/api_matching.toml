@@ -1,7 +1,11 @@
-# C++ counterparts of the MATLAB / Python functions that the names do not find.
-# Key: the file stem (api_mex/<stem>.cpp, api_python/qpy_<stem>.cpp). Value: the C++ functions
-# that the wrappers call to carry out their operation; the first one is the target of the C++ pill.
-# A family listed here does not use the name match.
+# A MATLAB and a Python function form a family when their names match, read in lower case with "." as "_".
+#
+# [families] lists the C++ counterparts of the families that the names do not find. Key: the MATLAB name (or the
+# Python name read as above). Value: the C++ functions that the wrappers call to carry out their operation; the
+# first one is the target of the C++ pill. A family listed here does not use the name match.
+#
+# [python_names] lists the Python functions whose name differs from the MATLAB name. Key: the Python name.
+# Value: the MATLAB name.
 
 [families]
 arrayant_calc_beamwidth = ["arrayant_calc_beamwidth", "arrayant_calc_beamwidth_multi"]
@@ -20,3 +24,19 @@ hdf5_read_channel = ["hdf5_read_channel", "hdf5_read_channel_vec"]
 hdf5_write_channel = ["hdf5_write_channel", "hdf5_write_channel_vec"]
 interp = ["interp_2D"]
 version = ["quadriga_lib_version", "quadriga_lib_has_AVX2", "quadriga_lib_has_CUDA"]
+
+[python_names]
+calc_beamwidth = "arrayant_calc_beamwidth"
+calc_directivity = "arrayant_calc_directivity"
+combine_pattern = "arrayant_combine_pattern"
+concat = "arrayant_concat"
+copy_element = "arrayant_copy_element"
+export_obj_file = "arrayant_export_obj_file"
+generate = "arrayant_generate"
+interpolate = "arrayant_interpolate"
+rotate_pattern = "arrayant_rotate_pattern"
+"channel.ieee_indoor" = "get_channels_ieee_indoor"
+"channel.irs" = "get_channels_irs"
+"channel.multifreq" = "get_channels_multifreq"
+"channel.planar" = "get_channels_planar"
+"channel.spherical" = "get_channels_spherical"

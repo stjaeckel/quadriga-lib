@@ -8,20 +8,10 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_sos_preset.cpp"
-#include "qpy_sos_init_phases.cpp"
-#include "qpy_sos_acfi.cpp"
-#include "qpy_sos_val.cpp"
-#include "qpy_sos_map.cpp"
-#include "qpy_sos_randn.cpp"
-#include "qpy_sos_rand.cpp"
-#include "qpy_sos_randi.cpp"
-#include "qpy_sos_remove_bias.cpp"
-#include "qpy_sos_acf_2d.cpp"
-#include "qpy_sos_acf_approx.cpp"
-#include "qpy_sos_calc_mse.cpp"
-#include "qpy_sos_acf_estimate.cpp"
 #include "qpy_sos_generate.cpp"
+#include "qpy_sos_acf.cpp"
+#include "qpy_sos_val.cpp"
+#include "qpy_sos_rand.cpp"
 
 // Mandatory arrays are declared with .none(false): without it pybind11 converts None to a 0-dimensional
 // array holding NaN, which the library would evaluate as one position at NaN.

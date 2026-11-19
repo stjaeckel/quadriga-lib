@@ -12,9 +12,9 @@
 #include <cstdint>
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "slerp.h"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
+#include "qd_helpers_channel.hpp"
 
 // Find bracketing indices and weight for frequency interpolation
 // Returns: i_lo, i_hi, weight (0=lo, 1=hi), exact_match flag
@@ -101,7 +101,7 @@ static inline void interpolate_complex_matrix(const arma::Mat<dtype> &re_lo, con
     {
         dtype ai = ilo ? ilo[k] : zero;
         dtype bi = ihi ? ihi[k] : zero;
-        slerp_complex_mf(rlo[k], ai, rhi[k], bi, w, ro[k], io[k]);
+        qd_slerp_complex(rlo[k], ai, rhi[k], bi, w, ro[k], io[k]);
     }
 }
 
@@ -705,7 +705,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 for (arma::uword k = 0; k < n_pairs; ++k)
                 {
                     arma::uword idx = base + 2 * k;
-                    slerp_complex_mf(M_lo[idx], M_lo[idx + 1],
+                    qd_slerp_complex(M_lo[idx], M_lo[idx + 1],
                                      M_hi[idx], M_hi[idx + 1],
                                      fin_w, Mf[idx], Mf[idx + 1]);
                 }
@@ -874,8 +874,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 const dtype *hhr = Ht_re_hi.memptr(), *hhi = Ht_im_hi.memptr();
                 for (arma::uword k = 0; k < n_links; ++k)
                 {
-                    slerp_complex_mf(vlr[k], vli[k], vhr[k], vhi[k], tx_w, vtr[k], vti[k]);
-                    slerp_complex_mf(hlr[k], hli[k], hhr[k], hhi[k], tx_w, htr[k], hti[k]);
+                    qd_slerp_complex(vlr[k], vli[k], vhr[k], vhi[k], tx_w, vtr[k], vti[k]);
+                    qd_slerp_complex(hlr[k], hli[k], hhr[k], hhi[k], tx_w, htr[k], hti[k]);
                 }
             }
 
@@ -920,8 +920,8 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 const dtype *hhr = Hr_re_hi.memptr(), *hhi = Hr_im_hi.memptr();
                 for (arma::uword k = 0; k < n_links; ++k)
                 {
-                    slerp_complex_mf(vlr[k], vli[k], vhr[k], vhi[k], rx_w, vrr[k], vri[k]);
-                    slerp_complex_mf(hlr[k], hli[k], hhr[k], hhi[k], rx_w, hrr[k], hri[k]);
+                    qd_slerp_complex(vlr[k], vli[k], vhr[k], vhi[k], rx_w, vrr[k], vri[k]);
+                    qd_slerp_complex(hlr[k], hli[k], hhr[k], hhi[k], rx_w, hrr[k], hri[k]);
                 }
             }
 

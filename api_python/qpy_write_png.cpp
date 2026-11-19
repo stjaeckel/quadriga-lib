@@ -15,7 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "python_quadriga_adapter.hpp"
+#include "qd_helpers_python_types.hpp"
 
 /*!SECTION
 Miscellaneous / Tools

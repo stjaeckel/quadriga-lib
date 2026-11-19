@@ -69,7 +69,6 @@ class Function:
     intro: Part
     subblocks: list
     section: str = ""
-    stem: str = ""      # family stem of MATLAB and Python files
     counterparts: dict = field(default_factory=dict)  # lang -> anchor of the counterpart there
 
 
@@ -385,9 +384,6 @@ def read_api(root, lang, intro, diag):
         if sec is None:
             sec = sections[title] = Section(lang, title, links.slug(title), [], [],
                                              path, secs[0][1] - 1)
-        stem = p.stem
-        if lang == "python" and stem.startswith("qpy_"):
-            stem = stem[4:]
         for kind, first, lines in others:
             if kind == "SECTION_DESC":
                 _, opener = fence_states(lines)
@@ -399,7 +395,7 @@ def read_api(root, lang, intro, diag):
             else:
                 fn = parse_function(lang, path, first, lines, diag)
                 if fn:
-                    fn.section, fn.stem = title, (stem if lang != "cpp" else "")
+                    fn.section = title
                     sec.functions.append(fn)
     for sec in sections.values():
         sec.functions.sort(key=lambda f: (f.name.startswith("."), f.name))

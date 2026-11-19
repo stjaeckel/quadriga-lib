@@ -3,7 +3,8 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_gbsm.hpp"
-#include "quadriga_gbsm_helpers.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_gbsm.hpp"
 
 #include <algorithm>
 #include <chrono>

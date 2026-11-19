@@ -4,8 +4,8 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_quadriga_lib_functions.hpp"
-#include "quadriga_gbsm_helpers.hpp"
+#include "qd_helpers_mex_types.hpp"
+#include "qd_helpers_gbsm.hpp"
 
 /*!SECTION
 Geometry-based stochastic model

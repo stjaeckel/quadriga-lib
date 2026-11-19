@@ -5,7 +5,7 @@ quadriga-lib is a C++ radio channel modelling library with MATLAB/Octave and Pyt
 
 # REPOSITORY LAYOUT AND BUILD
 - `api_mex/<function_name>.cpp` — MEX wrappers, one file per MATLAB function. CMake globs `api_mex/*.cpp`, so a new file needs no registration in the build system.
-- `src/mex_helper_functions.hpp` (generic conversions) and `src/mex_quadriga_lib_functions.hpp` (arrayant / channel structs, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
+- `src/qd_helpers_mex.hpp` (generic conversions) and `src/qd_helpers_mex_types.hpp` (arrayant / channel structs, `std::any` datasets) — helper functions. Read them when a signature is unclear; the lists in this document are a summary.
 - `include/*.hpp` — C++ declarations; `src/*.cpp` — C++ implementations with their documentation blocks (`/*!MD ... MD!*/`).
 - `tests/mex_tests/test_<function_name>.m` — MOxUnit tests, one file per wrapper; `tests/quadriga_lib_mex_tests.m` collects and runs all `tests/mex_tests/test*.m` files, so a new test file needs no registration.
 - `+quadriga_lib/` — the MATLAB package populated by the build: the compiled MEX files and one `.m` help file per function.
@@ -61,7 +61,7 @@ Unlike the C++ work, the wrapper is written first and the test second: the physi
 
 ## Index conversion
 - MATLAB users give and get 1-based indices. Indices that are 0-based in C++ are shifted by the wrapper (-1 on input, +1 on output); indices that are 1-based in C++ pass through unchanged.
-- This includes indices in error messages. C++ messages name an entry of a vector input only by the prefixes `Entry <i>: ` and `Snapshot <i>: ` (0-based, see `md/SPEC_CPP_API.md`, "Input validation"). A wrapper passes C++ messages to MATLAB with `CALL_QD` or `qd_mex_cpp_error` (`src/mex_helper_functions.hpp`), which rewrite these prefixes to 1-based; never with `mexErrMsgIdAndTxt` directly. A message the wrapper writes itself states its indices 1-based.
+- This includes indices in error messages. C++ messages name an entry of a vector input only by the prefixes `Entry <i>: ` and `Snapshot <i>: ` (0-based, see `md/SPEC_CPP_API.md`, "Input validation"). A wrapper passes C++ messages to MATLAB with `CALL_QD` or `qd_mex_cpp_error` (`src/qd_helpers_mex.hpp`), which rewrite these prefixes to 1-based; never with `mexErrMsgIdAndTxt` directly. A message the wrapper writes itself states its indices 1-based.
 - Read index inputs that get converted with `qd_mex_get_index` (scalar) or `qd_mex_get_index_Col` (vector). They copy the input, reject 0 with `"Input 'x' cannot be 0 (1-based index)."` / `"Entries in 'x' cannot be 0 (1-based index)."` and non-integers with `"... must be an integer from 1 to <max>."`, and return the indices 0-based:
 ```
 // Vector index input, 1-based (MATLAB) -> 0-based (C++), empty = C++ default
@@ -86,9 +86,9 @@ if (nlhs > 2)
 ```
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_helper_functions.hpp"
+#include "qd_helpers_mex.hpp"
 ```
-- `#include "mex_quadriga_lib_functions.hpp"` instead when the wrapper converts arrayant structs, channel structs or `std::any` datasets; it pulls in the three headers above.
+- `#include "qd_helpers_mex_types.hpp"` instead when the wrapper converts arrayant structs, channel structs or `std::any` datasets; it pulls in the three headers above.
 
 ## Helper function signatures
 - Armadillo is pulled in by `quadriga_lib.hpp`. `dtype` in the helpers is one of float, double, int, unsigned, long long, unsigned long long (plus bool for scalars).
@@ -201,7 +201,7 @@ bool qd_mex_has_field(const mxArray *strct, const std::string &field);
 mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0,
                           const std::string &var_name = ""); // errors if field is missing, naming 'var_name' if given
 
-// ---------- mex_quadriga_lib_functions.hpp ----------
+// ---------- qd_helpers_mex_types.hpp ----------
 
 quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *input, bool validate = false, bool copy = false,
                                                       const std::string &var_name = "");
@@ -242,7 +242,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 - There is no helper for C++ types that are not listed (e.g. `std::vector<uint8_t>`, nested vectors); ask before adding raw `mx*` code for them.
 
 ## Arrayant struct
-- A `quadriga_lib::arrayant<double>` is represented in MATLAB as a struct with the fields below. Requires `mex_quadriga_lib_functions.hpp`.
+- A `quadriga_lib::arrayant<double>` is represented in MATLAB as a struct with the fields below. Requires `qd_helpers_mex_types.hpp`.
 
 | Field (= C++ member) | Size | Required as input |
 | --- | --- | --- |
@@ -268,7 +268,7 @@ mxArray *qd_mex_any2matlab(const std::any &dset);
 - Arrayants are passed and returned as structs only, never as separate field inputs or outputs.
 
 ## Channel struct
-- A `quadriga_lib::channel<double>` is represented in MATLAB as a struct with the fields below; a `std::vector` of channels is a 1xN struct array. Requires `mex_quadriga_lib_functions.hpp`.
+- A `quadriga_lib::channel<double>` is represented in MATLAB as a struct with the fields below; a `std::vector` of channels is a 1xN struct array. Requires `qd_helpers_mex_types.hpp`.
 - Members that are a `std::vector` over snapshots in C++ are regular arrays in MATLAB with the snapshot on the last dimension (zero-padded when the number of paths differs between snapshots).
 
 | Field (= C++ member) | MATLAB size |
@@ -365,7 +365,7 @@ if (nlhs > 1)
 - Mandatory C++ arguments (by reference) get the object itself. A mandatory output is pre-allocated with `qd_mex_init_output` only when it is requested (the first output always); otherwise the local empty object is passed and discarded.
 
 ## Call the C++ function
-- `CALL_QD(expr)` (defined in `mex_helper_functions.hpp`) wraps the call and turns any `std::exception` into `mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ex.what())`:
+- `CALL_QD(expr)` (defined in `qd_helpers_mex.hpp`) wraps the call and turns any `std::exception` into `mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ex.what())`:
 ```
 CALL_QD(quadriga_lib::function_name(arg1, arg2, p_optional_arg3, p_output4));
 ```

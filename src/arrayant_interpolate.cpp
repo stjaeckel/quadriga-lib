@@ -3,10 +3,9 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_arrayant.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_arrayant.hpp"
 #include "quadriga_lib_generic_functions.hpp"
-#include "slerp.h"
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
@@ -573,8 +572,8 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<arrayant<dtype>>
 
             for (arma::uword j = 0; j < n_vals; ++j)
             {
-                slerp_complex_mf(pVrl[j], pVil[j], pVrh[j], pVih[j], w, pVro[j * sV], pVio[j * sV]);
-                slerp_complex_mf(pHrl[j], pHil[j], pHrh[j], pHih[j], w, pHro[j * sH], pHio[j * sH]);
+                qd_slerp_complex(pVrl[j], pVil[j], pVrh[j], pVih[j], w, pVro[j * sV], pVio[j * sV]);
+                qd_slerp_complex(pHrl[j], pHil[j], pHrh[j], pHih[j], w, pHro[j * sH], pHio[j * sH]);
             }
         }
     }

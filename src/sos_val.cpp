@@ -4,7 +4,8 @@
 
 #include "quadriga_sos.hpp"
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "qd_helpers_shared.hpp"
+#include "qd_helpers_sos.hpp"
 #include "quadriga_lib_generic_functions.hpp"
 #include "quadriga_lib_avx2_functions.hpp"
 

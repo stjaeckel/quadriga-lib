@@ -763,7 +763,7 @@ Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response) · [Python](quadr
 ## baseband_freq_response_multi
 Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 
-Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response_multi) · Not in: Python
+Also in: [C++](quadriga_lib_api_cpp.md#baseband_freq_response_multi) · [Python](quadriga_lib_api_python.md#baseband_freq_response_multi)
 
 - Interpolates the complex channel coefficients from the input frequencies `freq` to the output carrier
   frequencies `freq_new` using SLERP (magnitude and unwrapped phase each linear), then applies the delay-induced
